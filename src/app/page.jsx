@@ -19,7 +19,7 @@ import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
-import ABI from '@/abi/somnia.json'
+import ABI from '@/abi/hup.json'
 import styles from './page.module.scss'
 import { Connector, useConnect } from 'wagmi'
 moment.defineLocale('en-short', {
