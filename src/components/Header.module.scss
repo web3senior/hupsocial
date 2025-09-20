@@ -1,0 +1,38 @@
+@use './../styles/components/responsive' as *;
+
+.header {
+  grid-row: 1/2;
+  grid-column: 1/1;
+  position: sticky;
+  top: 0;
+
+  button {
+    background-color: var(--black);
+    color: var(--white, #fff);
+    padding: 0.2rem 0.7rem;
+    border-radius: 1000px;
+    cursor: pointer;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    will-change: transform;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.025);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+
+  figure {
+    img {
+      width: 40px;
+    }
+  }
+
+  ul {
+    height: 100%;
+    padding: 0.7rem 1.5rem;
+  }
+}

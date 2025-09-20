@@ -1,0 +1,18 @@
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--thumbBG) var(--scrollbarBG);
+  }
+  
+  ::-webkit-scrollbar {
+    visibility: hidden;
+    width: 0.4rem;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbarBG);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--thumbBG);
+ 
+  }

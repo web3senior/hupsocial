@@ -1,0 +1,16 @@
+.page {
+  background-color: #ebf0f6;
+  padding: 2rem 0;
+}
+
+.category {
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: .5rem;
+  overflow: auto;
+  white-space: nowrap;
+max-width: calc(100vw - 1rem);
+ &__item {
+  display: inline-block;
+ margin-left: 1rem;
+  }
+}

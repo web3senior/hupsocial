@@ -1,0 +1,39 @@
+@use './../styles/components/responsive' as *;
+
+.page {
+  img {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+@include medium-down() {
+  .page {
+    img {
+    height: 200px;
+    }
+  }
+}
+
+.item {
+  position: relative;
+  user-select: none;
+
+  b {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    font-size: 1rem;
+    color: var(--white);
+    text-align: center;
+    width: 100%;
+  }
+}
+
+.comment {
+  &__respond {
+    background-color: #FFEEFF;
+    padding: 1rem;
+    border-radius: var(--global-border-radius);
+  }
+}

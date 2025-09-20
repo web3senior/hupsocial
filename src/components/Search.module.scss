@@ -1,0 +1,74 @@
+@use './../styles/components/responsive' as *;
+
+.page {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  padding: 2rem 1.2rem 0 1.2rem;
+  background-color: var(--white);
+
+  display: flex;
+  input {
+    width: 100%;
+    padding: 1rem;
+    border-radius: var(--global-border-radius);
+    border: 2px solid aliceblue;
+
+    &:focus {
+      outline: none;
+      border-color: aquamarine;
+    }
+  }
+}
+
+.product {
+  gap: 0.5rem;
+  isolation: isolate;
+  overflow-y: scroll;
+  height: 100%;
+
+  &__item {
+    min-width: 160px;
+
+    figure {
+      background-color: #f6f6f6;
+      padding: 2em;
+      height: 150px;
+      border-radius: 12px;
+
+      @include medium-down() {
+        height: 200px;
+      }
+
+      img {
+        height: auto;
+      }
+    }
+
+    h1 {
+      color: #10b245;
+      font-size: calc(0.9em + 0.1vw);
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    &__price {
+      small {
+        &:last-child {
+          font-family: var(--ff-dastnevis);
+        }
+      }
+    }
+  }
+}
+
+@include medium-down() {
+  .page {
+    img {
+      height: 200px;
+    }
+  }
+}

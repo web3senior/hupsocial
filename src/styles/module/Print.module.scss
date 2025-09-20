@@ -1,0 +1,60 @@
+@use './../components/responsive' as *;
+
+.container {
+    border: 3px solid #555;
+    background-color: #ffffff;
+    margin: 0 auto;
+
+    main {
+        padding: 1rem;
+    }
+
+}
+
+.gtranslate_wrapper {
+    display: none !important;
+}
+
+.header {
+    flex: 1;
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: .5rem 0;
+    border-bottom: 6px double #333;
+
+    li {
+        flex: 1;
+        padding: 0 1rem;
+    }
+}
+
+.footer {
+    border-top: 6px double #333;
+    text-align: center;
+}
+
+@page {
+    size: A4;
+}
+
+@media print {
+    .container {
+        background-color: white;
+        position: fixed !important;
+        inset: 0;
+        margin: 0;
+        padding: 5px;
+        font-size: 14px;
+        line-height: 16px;
+        z-index: 9999;
+        display: grid;
+
+    }
+
+    header,
+    button,
+    footer {
+        display: none !important;
+    }
+
+}

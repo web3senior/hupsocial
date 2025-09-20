@@ -1,0 +1,142 @@
+@use 'sass:list';
+@use 'sass:map';
+
+// Data Members
+$alerts: (
+  primary: (
+    background: #DFF1FE,
+    color: #004085,
+    stroke: #1c78c0,
+    link: #002752,
+  ),
+  secondary: (
+    background: #e2e3e5,
+    color: #383d41,
+    stroke: #202326,
+    link: #202326,
+  ),
+  danger: (
+    background: #FFF1F8,
+    color: #FE005B,
+    stroke: #f1aeb5,
+    link: #491217,
+  ),
+  info: (
+    background: #cff4fc,
+    color: #055160,
+    stroke: #9eeaf9,
+    link: #062c33,
+  ),
+  warning: (
+    background: #fff5c9,
+    color: #a06923,
+    stroke: #f3bb66,
+    link: #533f03,
+  ),
+  dark: (
+    background: #d6d8d9,
+    color: #1b1e21,
+    stroke: #c6c8ca,
+    link: #040505,
+  ),
+  light: (
+    background: #fefefe,
+    color: #818182,
+    stroke: #f1f1f1,
+    link: #686868,
+  ),
+  success: (
+    background: #dafbe1,
+    color: #277539,
+    stroke: #4ac26b66,
+    link: #0b2e13,
+  ),
+  important: (
+    background: rgba(189, 52, 254, 0.2),
+    color: #9e5cff,
+    stroke: #9e5cff,
+    link: #aa05ad,
+  ),
+);
+
+$border: (
+  width: 1px,
+  style: solid,
+  radius: 0.25rem,
+);
+
+$padding: (
+  x: 1.25rem,
+  y: 0.75rem,
+);
+
+// Alert
+.alert {
+  position: relative;
+  padding: map.get($padding, y) map.get($padding, x);
+  margin-bottom: 1rem;
+  border-radius: var(--global-border-radius);
+
+  &.alert--border {
+    border-width: map.get($border, width);
+    border-style: map.get($border, style);
+    border-radius: map.get($border, radius);
+  }
+
+  hr {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border: 0;
+    border-top: 1px solid transparent;
+  }
+
+  span {
+    vertical-align: middle;
+  }
+
+  /// @param {List} $alerts
+  @each $alert in (map.keys($alerts)) {
+    &.alert--#{$alert} {
+      color: map.get($alerts, $alert, color);
+      background-color: map.get($alerts, $alert, background);
+      border-color: map.get($alerts, $alert, stroke);
+
+      .alert__link {
+        color: map.get($alerts, $alert, link);
+      }
+
+      .alert__icon {
+        margin-left: 1rem;
+        color: map.get($alerts, $alert, color);
+      }
+      hr {
+        border-top-color: map.get($alerts, $alert, stroke);
+      }
+    }
+  }
+}
+
+.alert--dismissible {
+  padding-left: 4rem;
+
+  .alert__close {
+    position: absolute;
+    top: 50%;
+    left: 0.5rem;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    padding: 0.75rem 1.25rem;
+    color: inherit;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #000;
+    text-shadow: 0 1px 0 #fff;
+  }
+}
+
+.alert-heading {
+  color: inherit;
+  font-size: 1.5rem !important;
+}

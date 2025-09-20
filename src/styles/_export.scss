@@ -1,0 +1,10 @@
+@use 'abstract/_variables' as *;
+
+:export {
+    // Export the color palette to make it accessible to JS
+    primaryColor: $primary-color;
+    white: #fff;
+    black: #000;
+    grey: #ccc;
+    // etc...
+}

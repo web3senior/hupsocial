@@ -1,0 +1,29 @@
+.page {
+  background-color: #ebf0f6;
+  padding: 2rem 0;
+}
+
+.cart {
+  position: relative;
+
+  span {
+    content: attr(data-cart-count);
+    font-size: 9px;
+    border-radius: 999px;
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    min-width: 15px;
+    height: 15px;
+    display: flex;
+    place-content: center;
+    text-align: center;
+    color: var(--white);
+    background-color: var(--color-primary);
+    box-shadow: var(--shadow2);
+  }
+  &__item {
+    display: inline-block;
+    margin-left: 1rem;
+  }
+}

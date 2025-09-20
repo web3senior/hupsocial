@@ -1,0 +1,50 @@
+.heading {
+  position: relative;
+  padding-top: 4rem;
+  overflow: hidden;
+  isolation: isolate;
+
+  &:after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    width: 30svw;
+    height: 10svh;
+
+    // background-image: url('../public/sunflower.png');
+    // background-position: top center;
+    // background-size: contain;
+    // background-repeat: no-repeat;
+
+    z-index: -1;
+  }
+
+  h1 {
+    font-size: calc(1.4em + 0.2vw);
+    font-weight: bold;
+    padding: 1rem 0 0 0;
+    color: var(--color-secondary);
+  }
+
+  small {
+    font-size: calc(0.6rem + 0.2vw);
+    font-weight: 400;
+    color: var(--color-primary);
+    text-align: center;
+    text-wrap: balance;
+    max-width: 480px;
+  }
+
+  a {
+    margin-top: 1rem;
+    display: block;
+    padding: 0.5rem 1.2rem;
+    background-color: var(--color-black);
+    color: var(--white);
+    border-radius: 999px;
+  }
+}

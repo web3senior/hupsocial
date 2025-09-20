@@ -1,0 +1,93 @@
+.card {
+  position: relative;
+  background: var(--white);
+  border-radius: var(--global-border-radius);
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+
+  &:not([data-shadow="none"]) {
+    --shadow: 0px 9px 4px rgba(63, 93, 116, 0.01), 0px 5px 3px rgba(63, 93, 116, 0.04), 0px 2px 2px rgba(63, 93, 116, 0.07), 0px 1px 1px rgba(63, 93, 116, 0.08), 0px 0px 0px rgba(63, 93, 116, 0.08);
+    box-shadow: var(--shadow, 0 0 #0000);
+  }
+  &:not([data-margin="none"]) {
+    margin-bottom: 1rem;
+  }
+
+  &:hover:not([data-hover="none"]) {
+    --tw-shadow: 0px 18px 7px rgba(63, 93, 116, 0.02), 0px 10px 6px rgba(63, 93, 116, 0.08), 0px 4px 4px rgba(63, 93, 116, 0.13), 0px 1px 2px rgba(63, 93, 116, 0.15), 0px 0px 0px rgba(63, 93, 116, 0.16);
+    box-shadow: var(--tw-shadow, 0 0 #0000);
+  }
+
+  &__header {
+    padding: 2rem 2.5rem;
+    font-weight: bolder;
+    border-bottom: 1px solid #deeaf2;
+
+    a {
+      color: var(--white);
+      border-radius: 999px;
+      padding: .5rem 1rem;
+      box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+      background-image: linear-gradient(to right, #1fa2ff 0%, #12d8fa 51%, #1fa2ff 100%);
+      transition: 0.5s;
+      background-size: 200% auto;
+      column-gap: .5rem;
+      user-select: none;
+      min-width: 110px;
+
+      &:hover {
+        background-position: right center; /* change the direction of the change here */
+        color: #fff;
+        text-decoration: none;
+      }
+
+      &:active {
+        transform: scale(0.94);
+      }
+    }
+  }
+
+  &__body {
+    -ms-flex: 1 1 auto;
+    flex: 1 1 auto;
+    border-radius: inherit;
+    padding: 2rem 2.5rem;
+    background-color: var(--white);
+  }
+
+  &__footer {
+    padding: 2rem 2.5rem;
+    font-weight: bolder;
+    border-top: 1px solid #deeaf2;
+  }
+}
+
+.inner-card {
+  position: relative;
+  border-radius: var(--global-border-radius);
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+  margin-bottom: 1rem;
+
+  &__header {
+    padding: 2rem 2.5rem;
+    font-weight: bolder;
+    border-bottom: 1px solid #deeaf2;
+  }
+
+  &__body {
+    -ms-flex: 1 1 auto;
+    flex: 1 1 auto;
+    border-radius: inherit;
+    padding: 2rem 2.5rem;
+    background-color: var(--black-025);
+  }
+
+  &__footer {
+    padding: 2rem 2.5rem;
+    font-weight: bolder;
+    border-top: 1px solid #deeaf2;
+  }
+}

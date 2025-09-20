@@ -1,0 +1,12 @@
+.pageTitle {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+
+  h1 {
+    font-size: calc(.8em + 0.2vw);
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--black);
+  }
+}

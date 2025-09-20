@@ -1,0 +1,64 @@
+.page {
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+  --button-primary-hover: #383838;
+  --button-secondary-hover: #f2f2f2;
+
+  background-color: #f8fafb;
+
+  height: 100%;
+  padding: 1.25rem 0.5rem;
+
+  h4 {
+    min-height: 40px;
+    padding-top: 1rem;
+  }
+
+  a {
+    color: var(--blue);
+  }
+}
+
+.pfp {
+  border: 1px solid red;
+  width: 32px;
+  height: 32px;
+  img {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+    --button-primary-hover: #ccc;
+    --button-secondary-hover: #1a1a1a;
+  }
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  a.primary:hover {
+    background: var(--button-primary-hover);
+    border-color: transparent;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 0.1rem;
+    padding-bottom: 80px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo {
+    filter: invert(100%);
+  }
+}
