@@ -12,7 +12,6 @@ import Web3 from 'web3'
 import { getProfile, updateProfile } from '../../../util/api'
 import { initContract, getEmoji, getAllReacted } from '@/util/communication'
 import { toast } from '@/components/NextToast'
-import { useAppKitState, useAppKitTheme, useAppKitEvents, useAppKitAccount, useWalletInfo } from '@reown/appkit/react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useReadContract, useWriteContract } from 'wagmi'
 import somniaABI from '@/abi/somnia.json'
@@ -263,7 +262,6 @@ const Post = ({ addr }) => {
   })
   const [content, setContent] = useState()
   const [showPoll, setShowPoll] = useState(false)
-  const { address, caipAddress, isConnected, embeddedWalletInfo } = useAppKitAccount()
 
   const post = () => {
     try {
