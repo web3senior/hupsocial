@@ -1,11 +1,11 @@
 import Web3 from 'web3'
-import ABI from '@/abi/somnia.json'
+import ABI from '@/abi/hup.json'
 
 /**
  * Initialize Web3
  */
 export function initContract() {
-  const rpcUrl = process.env.NEXT_PUBLIC_SOMNIA_PROVIDER
+  const rpcUrl = process.env.NEXT_PUBLIC_PROVIDER
 
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
@@ -13,7 +13,7 @@ export function initContract() {
   const web3 = new Web3(window.ethereum) //new Web3.providers.HttpProvider(rpcUrl)
 
   // Create a Contract instance
-  const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_SOMNIA_CONTRACT)
+  const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)
   return { web3, contract }
 }
 
