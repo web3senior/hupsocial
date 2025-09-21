@@ -125,7 +125,7 @@ export default function Page() {
     //getReactionCounter().then((counter) => setReactionCounter(counter))
   }, [])
 
-  return (<div className='flex flex-column'>
+  return (<div className='flex flex-column mt-100'>
   <WalletOptions/>
   </div>
     // <div className={`${styles.page} ms-motion-slideDownIn`}>

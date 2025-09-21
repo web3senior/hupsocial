@@ -5,12 +5,12 @@ import ABI from '@/abi/hup.json'
  * Initialize Web3
  */
 export function initContract() {
-  const rpcUrl = process.env.NEXT_PUBLIC_PROVIDER
+  const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
 
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
   // 1. Initialize Web3 with an HttpProvider for server-side connection
-  const web3 = new Web3(window.ethereum) //new Web3.providers.HttpProvider(rpcUrl)
+  const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
 
   // Create a Contract instance
   const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)

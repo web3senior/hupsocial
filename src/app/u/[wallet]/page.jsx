@@ -14,7 +14,7 @@ import { initContract, getEmoji, getAllReacted } from '@/util/communication'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useReadContract, useWriteContract } from 'wagmi'
-import somniaABI from '@/abi/somnia.json'
+import somniaABI from '@/abi/hup.json'
 import styles from './page.module.scss'
 // import { getCategory, getFood } from '../util/api'
 
