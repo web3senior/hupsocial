@@ -1,6 +1,4 @@
-// @import '@/../../../styles/components/responsive';
-
-.page {
+.nav {
   --gray-rgb: 0, 0, 0;
   --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
@@ -8,27 +6,39 @@
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
 
-  &__container {
+  border-radius: var(--global-border-radius);
+  background-color: var(--white);
+  width: 200px;
+
+  ul {
+    padding: 1rem;
+    row-gap: 1rem;
   }
 }
 
-.footer {
-  grid-row-start: 3;
-  display: flex;
-  gap: 1rem;
+.miniNav {
+  background-color: var(--black-050);
   padding: 1rem;
-
-  .large-nav {
-    // @include medium-down() {
-    //   display: none;
-    // }
-  }
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overflow: auto;
+  white-space: nowrap;
+  max-width: 100dvw;
+  display: none;
 
   a {
-    text-wrap: nowrap;
-    background-color: var(--global-background-color);
-    padding: 0.7rem;
+    display: inline-block;
+    min-width: 150px;
+    background-color: var(--white);
+    padding: 1rem;
     text-align: center;
+    border-radius: var(--global-border-radius);
+    font-weight: bold;
+
+    &:not(:first-child) {
+      margin-right: 1rem;
+    }
   }
 }
 
@@ -41,17 +51,10 @@
     --button-primary-hover: #ccc;
     --button-secondary-hover: #1a1a1a;
   }
+  .logo {
+    filter: invert(100%);
+  }
 }
-
-.main {
-  grid-row: 2/3;
-  grid-column: 1/1;
-  height: 100%;
-  gap: 32px;
-}
-
-// @include medium-down() {
-// }
 
 /* Enable hover only on non-touch devices */
 @media (hover: hover) and (pointer: fine) {
@@ -72,18 +75,11 @@
 }
 
 @media (max-width: 600px) {
-  .page {
+  .miniNav {
+    display: block !important;
   }
-
-  .footer {
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .logo {
-    filter: invert(100%);
+  .nav {
+    padding-bottom: 80px;
+    display: none;
   }
 }

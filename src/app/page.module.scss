@@ -43,10 +43,6 @@
   isolation: isolate;
   cursor: pointer;
 
-  &:hover {
-    background-color: var(--gray-50);
-  }
-
   &__header {
     img.pfp {
       width: 48px;
@@ -62,9 +58,6 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 0.1em;
-    border-radius: 12px;
-    z-index: 999;
-  
 
     &__option {
       background-color: var(--white);
@@ -363,6 +356,7 @@
     img {
       width: 32px;
       height: 32px;
+      aspect-ratio: 1 / 1;
       cursor: pointer;
     }
   }

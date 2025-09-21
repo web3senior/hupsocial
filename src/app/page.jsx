@@ -124,7 +124,7 @@ export default function Page() {
             polls.length > 0 &&
             polls.map((item, i) => {
               return (
-                <article  onClick={() => router.push(`p/${item.pollId}`)} key={i}>
+                <article  onClick={() => router.push(`poll/${item.pollId}`)} key={i}>
                   {/* href={`p/${item.pollId}`} */}
                   <div data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
                     <header className={`${styles.poll__header}  w-100`}>
@@ -203,7 +203,7 @@ const Options = ({ item }) => {
   }
 
   const vote = (e, pollId, optionIndex) => {
-    e.stopImmediatePropagation();
+     e.stopPropagation(); 
 
     if (!isConnected) {
       console.log(`Please connect your wallet first`, 'error')
