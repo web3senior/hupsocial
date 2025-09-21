@@ -118,7 +118,7 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`${styles.page__title} d-f-c`}>Home</h3>
 
-      <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+      <div className={`__container ${styles.page__container} mt-100`} data-width={`medium`}>
         <div className={`${styles.grid} flex flex-column`}>
           {polls &&
             polls.length > 0 &&

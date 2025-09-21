@@ -44,13 +44,13 @@ body {
   overflow-x: hidden;
   min-height: 100svh;
 
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  grid-template-columns: 1fr;
-  align-items: center;
-  justify-items: stretch;
-  gap: 0;
-  background-color:#F8FAFB;
+  // display: grid;
+  // grid-template-rows: auto 1fr auto;
+  // grid-template-columns: 1fr;
+  // align-items: center;
+  // justify-items: stretch;
+  // gap: 0;
+background-color: var(--global-background-color);
 
   // cursor: url('./../public/awesome-face.cur') 4 12, auto;
 }
