@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useId, useRef } from 'react'
+import { FluentProvider, webLightTheme,Badge,Divider } from '@fluentui/react-components'
 import Link from 'next/link'
 import moment from 'moment'
 import heartIcon from '@/../public/icons/heart.svg'
@@ -10,14 +11,15 @@ import repostIcon from '@/../public/icons/repost.svg'
 import txIcon from '@/../public/icons/tx.svg'
 import { useRouter } from 'next/navigation'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
-import { networks, useAccount, useDisconnect, Connector, useConnect } from 'wagmi'
+import { useConnectorClient, useConnections, useClient, networks, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initContract, getPolls, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
 import { useClientMounted } from '@/hooks/useClientMount'
-import ABI from '@/abi/hup.json'
+import { config } from '@/config/wagmi'
+import abi from '@/abi/hup.json'
 import styles from './page.module.scss'
 
 moment.defineLocale('en-short', {
@@ -48,7 +50,8 @@ export default function Page() {
   const giftModalMessage = useRef()
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
-    const router = useRouter()
+  const router = useRouter()
+
   /**
    * Close the gift modal
    */
@@ -115,8 +118,9 @@ export default function Page() {
   }, [])
 
   return (
+            <FluentProvider theme={webLightTheme}>
     <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <h3 className={`${styles.page__title} d-f-c`}>Home</h3>
+      <h3 className={`page-title`}>home</h3>
 
       <div className={`__container ${styles.page__container} mt-100`} data-width={`medium`}>
         <div className={`${styles.grid} flex flex-column`}>
@@ -124,7 +128,7 @@ export default function Page() {
             polls.length > 0 &&
             polls.map((item, i) => {
               return (
-                <article  onClick={() => router.push(`poll/${item.pollId}`)} key={i}>
+                <article onClick={() => router.push(`poll/${item.pollId}`)} key={i}>
                   {/* href={`p/${item.pollId}`} */}
                   <div data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
                     <header className={`${styles.poll__header}  w-100`}>
@@ -135,8 +139,12 @@ export default function Page() {
 
                       {item.pollType.toString() === `2` && (
                         <div className={`flex flex-row align-items-center gap-025`}>
-                          <small className={`lable lable-primary text-uppercase`}>only lyx holders</small>
-                          <code className={`lable lable-brand`}>&gt; {web3.utils.fromWei(item.holderAmount, `ether`)} LYX</code>
+                          <Badge appearance="filled"  size="small">
+                            only lyx holders
+                          </Badge>
+                          <Badge appearance="filled" color="danger"  size="small">
+                            &gt; {web3.utils.fromWei(item.holderAmount, `ether`)} LYX
+                          </Badge>
                         </div>
                       )}
 
@@ -175,13 +183,14 @@ export default function Page() {
                       </div>
                     </main>
                   </div>
-                  <hr />
+                  <Divider></Divider>
                 </article>
               )
             })}
         </div>
       </div>
     </div>
+    </FluentProvider>
   )
 }
 
@@ -191,29 +200,43 @@ export default function Page() {
  * @returns
  */
 const Options = ({ item }) => {
-  console.log(item)
   const [optionsVoteCount, setOptionsVoteCount] = useState()
   const [voted, setVoted] = useState(false)
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initContract()
   const { address, isConnected } = useAccount()
-
-  const handleOptionChange = (e) => {
-    setSelectedOption(e.target.value)
-  }
-
-  const vote = (e, pollId, optionIndex) => {
-     e.stopPropagation(); 
+  const { data: hash, writeContract } = useWriteContract()
+  // const connections   = useConnections(config);
+  //  const result = useConnectorClient({
+  //   connector: connections[0]?.connector,
+  // })
+  const vote = async(e, pollId, optionIndex) => {
+    e.stopPropagation()
 
     if (!isConnected) {
       console.log(`Please connect your wallet first`, 'error')
       return
     }
 
-    const web3 = new Web3(window.lukso)
+    // writeContract({
+    //   address: process.env.NEXT_PUBLIC_CONTRACT,
+    //   abi,
+    //   functionName: 'mint',
+    //   args: [BigInt(tokenId)],
+    // })
+   
+    const result =await writeContract(config, {
+      abi,
+      address: process.env.NEXT_PUBLIC_CONTRACT,
+      functionName: 'vote',
+      args: [pollId, optionIndex],
+    })
+    console.log('------------')
+  return
+    const web3 = new Web3(config)
 
     // Create a Contract instance
-    const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)
+    const contract = new web3.eth.Contract(abi, process.env.NEXT_PUBLIC_CONTRACT)
 
     // setIsLoading(true)
 
@@ -271,8 +294,7 @@ const Options = ({ item }) => {
           item.options.length > 0 &&
           item.options.map((option, i) => {
             return (
-              <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} 
-              onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
+              <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
                 <span>{option}</span>
               </li>
             )

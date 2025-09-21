@@ -1,10 +1,12 @@
 .page {
   height: 100%;
 
+
   &__title {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--black-900);
     margin: 1rem 0;
+    z-index: 1000;
   }
 
   &__container {

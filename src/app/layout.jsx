@@ -1,11 +1,7 @@
 import Head from 'next/head'
 import { Geist, Geist_Mono } from 'next/font/google'
 import NextToast from '../components/NextToast'
-// import { Toaster } from 'react-hot-toast'
-// import { cookies } from 'next/headers'
-
 import WagmiContext from '@/contexts/WagmiContext'
-//import { UpProvider } from './../contexts/UpProvider' // mini-dapp grid
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import styles from './Layout.module.scss'
@@ -73,9 +69,9 @@ export default async function RootLayout({ children }) {
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
         <NextToast />
         <WagmiContext>
-          <Header />
-          <main className={`${styles.main}`}>{children}</main>
-          <Footer />
+            <Header />
+            <main className={`${styles.main}`}>{children}</main>
+            <Footer />
         </WagmiContext>
       </body>
     </html>

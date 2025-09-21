@@ -50,7 +50,7 @@ body {
   // align-items: center;
   // justify-items: stretch;
   // gap: 0;
-background-color: var(--global-background-color);
+  //background-color: var(--global-background-color);
 
   // cursor: url('./../public/awesome-face.cur') 4 12, auto;
 }
@@ -71,6 +71,14 @@ button {
 
 .rounded {
   border-radius: 999px;
+}
+
+.page-title {
+  text-align: center;
+  font-weight: 600;
+  color: var(--black-900);
+  margin: 1rem 0;
+  z-index: 1000;
 }
 
 .relative {

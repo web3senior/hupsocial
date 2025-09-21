@@ -1,6 +1,17 @@
 'use client'
 
 import { useEffect, useState, Suspense, useRef } from 'react'
+import { FluentProvider, webLightTheme,Badge,Textarea,Input, Label,InteractionTag } from '@fluentui/react-components'
+import {
+  useId,
+  Button,
+  Toaster,
+  useToastController,
+  Toast,
+  ToastTitle,
+  ToastBody,
+  ToastFooter,
+} from "@fluentui/react-components";
 import Image from 'next/image'
 import Link from 'next/link'
 import Icon from '../../../helper/MaterialIcon'
@@ -25,7 +36,16 @@ export default function Page() {
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const { web3, contract } = initContract()
-
+ const toasterId = useId("toaster");
+  const { dispatchToast } = useToastController(toasterId);
+  const notify = () =>
+    dispatchToast(
+      <Toast>
+        <ToastTitle action={<></>}>Poll created</ToastTitle>
+        <ToastBody subtitle="">Your poll successfuly created.</ToastBody>
+      </Toast>,
+      { intent: "success" }
+    );
   const handleForm = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -50,13 +70,20 @@ export default function Page() {
     })
   }
 
-  useEffect(() => {}, [])
+  useEffect(() => {
+  
+  }, [])
 
-  return (
+  return (<FluentProvider theme={webLightTheme}>
+
     <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <h3 className={`${styles.page__title} d-f-c`}>profile</h3>
+      <Toaster toasterId={toasterId} />
+      <h3 className={`page-title`}>profile</h3>
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+            <button onClick={()=>{
+        notify()
+    }}>yyyyyyyyyyyyy</button>
         <div className={`${styles.profileWrapper}`}>
           <Profile addr={params.wallet} />
         </div>
@@ -97,7 +124,7 @@ export default function Page() {
           </div>
         )}
       </div>
-    </div>
+    </div></FluentProvider>
   )
 }
 
@@ -337,19 +364,7 @@ const Post = ({ addr }) => {
       })
     }
     console.log(whitelist_accounts)
-console.log(
-          '',
-          content,
-          options.list,
-          moment(formData.get(`startTime`)).utc().unix().toString(),
-          moment(formData.get(`endTime`)).utc().unix().toString(),
-          whitelist_accounts,
-          formData.get(`votesPerAccount`),
-          formData.get(`pollType`),
-          formData.get(`token`),
-          web3.utils.toWei(formData.get(`holderAmount`), `ether`),
-          formData.get(`allowComments`) === 'true' ? true : false
-        )
+
     try {
       contract.methods
         .createPoll(
@@ -526,10 +541,12 @@ console.log(
         className={`${styles.post__pfp} rounded`}
       />
       <div className={`flex-1`}>
+    
+        {showPoll && (
+          <form ref={createFormRef} className={`formss`} onSubmit={(e) => handleCreatePoll(e)}>
+    <Textarea appearance="filled-lighter-shadow" resize="vertical" size="medium" required="true"></Textarea>
         <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
 
-        {showPoll && (
-          <form ref={createFormRef} className={`form`} onSubmit={(e) => handleCreatePoll(e)}>
             <div>
               Options:
               {options &&
@@ -537,6 +554,7 @@ console.log(
                   return (
                     <div key={i} className={`d-flex mt-10 grid--gap-1`}>
                       <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={item} placeholder={`${item}`} />
+                      
                       <button type={`button`} className="btn" onClick={(e) => delOption(e, i)}>
                         Delete
                       </button>
@@ -615,8 +633,11 @@ console.log(
             </div>
 
             <div>
-              <label htmlFor={`votesPerAccount`}>Voting Limit</label>
-              <input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
+         
+               <Label htmlFor={``} >
+      Voting Limit
+      </Label>
+              <Input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
               <small>Each account is limited to {votingLimit} votes for this poll.</small>
             </div>
             <div>
