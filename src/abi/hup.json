@@ -1,92 +1,5 @@
 [
 	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "_metadata",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "_question",
-				"type": "string"
-			},
-			{
-				"internalType": "string[]",
-				"name": "_options",
-				"type": "string[]"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_endTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address[]",
-				"name": "_whitelist",
-				"type": "address[]"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_votesPerAccount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "_onlyHolders",
-				"type": "bool"
-			},
-			{
-				"internalType": "address",
-				"name": "_token",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_holderAmount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "_allowedComments",
-				"type": "bool"
-			}
-		],
-		"name": "createPoll",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_pollId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bytes32",
-				"name": "_key",
-				"type": "bytes32"
-			}
-		],
-		"name": "delKey",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
@@ -161,13 +74,6 @@
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "pauseMinting",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -212,55 +118,6 @@
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_pollId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bytes32",
-				"name": "_key",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "string",
-				"name": "_val",
-				"type": "string"
-			}
-		],
-		"name": "setKey",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -272,136 +129,6 @@
 		],
 		"name": "Unpaused",
 		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "unpauseMinting",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_fee",
-				"type": "uint256"
-			}
-		],
-		"name": "updateFee",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_pollId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "string",
-				"name": "_metadata",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "_question",
-				"type": "string"
-			},
-			{
-				"internalType": "string[]",
-				"name": "_options",
-				"type": "string[]"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_endTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_votesPerAccount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "_onlyHolders",
-				"type": "bool"
-			},
-			{
-				"internalType": "address",
-				"name": "_token",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_holderAmount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "_allowedComments",
-				"type": "bool"
-			}
-		],
-		"name": "updatePoll",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_pollId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address[]",
-				"name": "_add",
-				"type": "address[]"
-			},
-			{
-				"internalType": "address[]",
-				"name": "_remove",
-				"type": "address[]"
-			}
-		],
-		"name": "updateWhitelist",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_pollId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_optionIndex",
-				"type": "uint256"
-			}
-		],
-		"name": "vote",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -473,46 +200,6 @@
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "withdrawAll",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_LSP7Token",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_amount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "_force",
-				"type": "bool"
-			},
-			{
-				"internalType": "bytes",
-				"name": "_data",
-				"type": "bytes"
-			}
-		],
-		"name": "withdrawToken",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -534,6 +221,93 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_metadata",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_question",
+				"type": "string"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_options",
+				"type": "string[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_startTime",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_endTime",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address[]",
+				"name": "_whitelist",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_votesPerAccount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "_pollType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "address",
+				"name": "_token",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_holderAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "_allowedComments",
+				"type": "bool"
+			}
+		],
+		"name": "createPoll",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_pollId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "_key",
+				"type": "bytes32"
+			}
+		],
+		"name": "delKey",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -646,9 +420,9 @@
 						"type": "address"
 					},
 					{
-						"internalType": "bool",
-						"name": "onlyHolders",
-						"type": "bool"
+						"internalType": "uint8",
+						"name": "pollType",
+						"type": "uint8"
 					},
 					{
 						"internalType": "bool",
@@ -746,6 +520,13 @@
 	},
 	{
 		"inputs": [],
+		"name": "pauseMinting",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "paused",
 		"outputs": [
 			{
@@ -764,6 +545,30 @@
 			{
 				"internalType": "uint256",
 				"name": "_value",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "pollVotesCasted",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
 				"type": "uint256"
 			}
 		],
@@ -816,6 +621,11 @@
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint8",
+				"name": "pollType",
+				"type": "uint8"
+			},
+			{
 				"internalType": "address",
 				"name": "creator",
 				"type": "address"
@@ -827,11 +637,6 @@
 			},
 			{
 				"internalType": "bool",
-				"name": "onlyHolders",
-				"type": "bool"
-			},
-			{
-				"internalType": "bool",
 				"name": "allowedComments",
 				"type": "bool"
 			}
@@ -840,27 +645,182 @@
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "_pollId",
 				"type": "uint256"
 			},
 			{
-				"internalType": "address",
+				"internalType": "bytes32",
+				"name": "_key",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "string",
+				"name": "_val",
+				"type": "string"
+			}
+		],
+		"name": "setKey",
+		"outputs": [
+			{
+				"internalType": "bool",
 				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
 				"type": "address"
 			}
 		],
-		"name": "pollVotesCasted",
-		"outputs": [
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "unpauseMinting",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "_fee",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"name": "updateFee",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_pollId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "_metadata",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_question",
+				"type": "string"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_options",
+				"type": "string[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_startTime",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_endTime",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_votesPerAccount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "_pollType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "address",
+				"name": "_token",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_holderAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "_allowedComments",
+				"type": "bool"
+			}
+		],
+		"name": "updatePoll",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_pollId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address[]",
+				"name": "_add",
+				"type": "address[]"
+			},
+			{
+				"internalType": "address[]",
+				"name": "_remove",
+				"type": "address[]"
+			}
+		],
+		"name": "updateWhitelist",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_pollId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_optionIndex",
+				"type": "uint256"
+			}
+		],
+		"name": "vote",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -885,6 +845,46 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "withdrawAll",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_LSP7Token",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "_force",
+				"type": "bool"
+			},
+			{
+				"internalType": "bytes",
+				"name": "_data",
+				"type": "bytes"
+			}
+		],
+		"name": "withdrawToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	}
 ]

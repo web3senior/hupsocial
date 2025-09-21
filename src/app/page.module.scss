@@ -15,7 +15,7 @@
   }
 
   &__container {
-    padding: 2rem 0;
+    padding: 0rem 0;
     background-color: var(--white, #fff);
     filter: drop-shadow(0px 0px 8px rgba(0, 0, 0, 0.04));
     border-radius: var(--global-border-radius);
@@ -36,8 +36,16 @@
 }
 
 .poll {
+  position: relative;
   background-color: var(--white, #fff);
-  padding: 1rem 2rem;
+  padding: 2rem 2rem;
+  transition: background-color 0.1s ease-out;
+  isolation: isolate;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--gray-50);
+  }
 
   &__header {
     img.pfp {
@@ -50,8 +58,16 @@
 
   &__options {
     margin-top: 0.2rem;
+    max-height: 180px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.1em;
+    border-radius: 12px;
+    z-index: 999;
+  
 
     &__option {
+      background-color: var(--white);
       padding: 16px 1rem;
       border: 1px solid #f0f0f0;
       border-radius: 12px;
@@ -63,11 +79,11 @@
 
       &:hover {
         background-color: var(--gray-alpha-100);
-        transform: scale(1.025);
+        transform: scale(0.97);
       }
 
       &:active {
-        transform: scale(0.95);
+        background-color: var(--gray-alpha-200);
       }
     }
 
@@ -225,7 +241,6 @@
 }
 
 .grid {
-  gap: 0.9rem;
 }
 
 .emoji {

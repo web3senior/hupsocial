@@ -1,14 +1,8 @@
-'use client'
-
 import Link from 'next/link'
-// import { ActionButtonList } from '@/components/ActionButtonList';
-// import  ConnectWallet  from '@/components/ConnectWallet';
-
+import { ConnectWallet } from '@/components/ConnectWallet';
 import styles from './Header.module.scss'
 
-
 export default function Header() {
-
   return (
     <header className={`${styles.header}`}>
       <ul className={`flex align-items-center justify-content-between`}>
@@ -20,14 +14,9 @@ export default function Header() {
           </Link>
         </li>
         <li className={`flex justify-content-end align-items-center`}>
-          {/* <ConnectWallet /> */}
-
-          {/* <ActionButtonList/> */}
-          {/* <ConnectBtn/> */}
-          {/* <button onClick={() => open()}>open</button> */}
+          <ConnectWallet/>
         </li>
       </ul>
     </header>
   )
 }
-

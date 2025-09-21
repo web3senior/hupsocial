@@ -7,8 +7,7 @@ import NextToast from '../components/NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
 //import { UpProvider } from './../contexts/UpProvider' // mini-dapp grid
 import Header from '../components/Header'
-// import Footer from '../components/Footer'
-// import NextTopLoader from 'nextjs-toploader'
+import Footer from '../components/Footer'
 import styles from './Layout.module.scss'
 
 import './Globals.scss'
@@ -26,16 +25,17 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL),
   title: {
     template: `${process.env.NEXT_PUBLIC_NAME} | %s`,
-    default: process.env.NEXT_NAME,
+    default: process.env.NEXT_PUBLIC_NAME,
   },
   description: process.env.NEXT_PUBLIC_DESCRIPTION,
   keywords: [process.env.NEXT_PUBLIC_KEYWORDS],
   author: { name: process.env.NEXT_PUBLIC_AUTHOR, url: process.env.NEXT_PUBLIC_AUTHOR_URL },
   creator: process.env.NEXT_PUBLIC_CREATOR,
   openGraph: {
-    images: '/og.png',
+    images: '/og-image.png',
   },
   robots: {
     index: false,
@@ -64,21 +64,18 @@ export const metadata = {
 }
 
 export const viewport = {
-  themeColor: '#000000',
+  themeColor: '#2E90FA',
 }
 
 export default async function RootLayout({ children }) {
   return (
     <html lang="en-US">
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
-        {/* <NextTopLoader color={`#FEB738`} showSpinner={false} /> */}
         <NextToast />
-
         <WagmiContext>
           <Header />
-            <main className={`${styles.main}`}>{children}</main>
-            {/* <Footer /> */}
-       
+          <main className={`${styles.main}`}>{children}</main>
+          <Footer />
         </WagmiContext>
       </body>
     </html>
