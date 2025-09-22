@@ -1,48 +1,62 @@
 // PollTimer.js
-import React, { useState, useEffect } from 'react'
-import moment from 'moment'
-import web3 from 'web3'
+import React, { useState, useEffect } from 'react';
+import moment from 'moment';
+import web3 from 'web3';
 
-function PollTimer({ startTime, endTime }) {
-  const [timeLeft, setTimeLeft] = useState(0)
+function PollTimer({ startTime, endTime, pollId }) {
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [isPollActive, setIsPollActive] = useState(false);
 
   useEffect(() => {
-    // Convert the Unix timestamp to a moment object
-    const startMoment = moment.unix(web3.utils.toNumber(startTime))
-    const endMoment = moment.unix(web3.utils.toNumber(endTime))
+    // Convert the Unix timestamps to moment objects
+    const startMoment = moment.unix(web3.utils.toNumber(startTime));
+    const endMoment = moment.unix(web3.utils.toNumber(endTime));
 
-    console.log(`%c ${moment()}`,'font-size:1rem;color:orange')
+    const updateTimer = () => {
+      const now = moment();
+      if (now.isBefore(startMoment)) {
+        // Poll is in the future, count down to the start time
+        setTimeLeft(startMoment.diff(now));
+        setIsPollActive(false);
+      } else if (now.isBetween(startMoment, endMoment)) {
+        // Poll is currently active, count down to the end time
+        setTimeLeft(endMoment.diff(now));
+        setIsPollActive(true);
+      } else {
+        // Poll has ended
+        setTimeLeft(0);
+        setIsPollActive(false);
+      }
+    };
 
-    // Calculate the initial remaining time in milliseconds
-    const initialTimeLeft = endMoment.diff(moment())
-    setTimeLeft(initialTimeLeft)
+    // Run the update immediately
+    updateTimer();
 
-    // Set up the timer to update every second
-    const timer = setInterval(() => {
-      setTimeLeft((prevTimeLeft) => {
-        // If time runs out, clear the interval
-        if (prevTimeLeft <= 1000) {
-          clearInterval(timer)
-          return 0
-        }
-        // Otherwise, decrease the time by one second
-        return prevTimeLeft - 1000
-      })
-    }, 1000)
+    // Set up a timer to update every second
+    const timer = setInterval(updateTimer, 1000);
 
     // Clean up the interval when the component unmounts
-    return () => clearInterval(timer)
-  }, [endTime]) // The effect depends on endTime
+    return () => clearInterval(timer);
+  }, [startTime, endTime]); // The effect depends on both startTime and endTime
 
   // Format the remaining time
-  const formattedTime = moment.utc(timeLeft).format('H:mm:ss')
+  const duration = moment.duration(timeLeft);
+  const days = Math.floor(duration.asDays());
+  const hours = duration.hours();
+  const minutes = duration.minutes();
+  const seconds = duration.seconds();
 
-  // Check if the poll has ended
-  if (timeLeft <= 0) {
-    return <>Poll Ended</>
+  const formattedTime = `${days > 0 ? `${days}d ` : ''}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  if (timeLeft <= 0 && !isPollActive) {
+    return <>Poll Ended</>;
   }
 
-  return <>Ends in {formattedTime}</>
+  return (
+    <>
+      {isPollActive ? 'Ends' : 'Starts'} in {formattedTime}
+    </>
+  );
 }
 
-export default PollTimer
+export default PollTimer;

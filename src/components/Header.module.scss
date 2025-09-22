@@ -8,8 +8,24 @@
   left: 0;
   right: 0;
   z-index: 1000;
+  height: 60px;
   background-color: var(--white);
   box-shadow: var(--shadow8);
+
+  ul {
+    height: 100%;
+    padding: 0.7rem 1.5rem;
+
+    @media (max-width: 600px) {
+      padding: 0.7rem 0.7rem;
+    }
+  }
+
+  figure {
+    img {
+      width: 40px;
+    }
+  }
 
   button {
     background-color: var(--black);
@@ -28,21 +44,5 @@
     &:active {
       transform: scale(0.95);
     }
-  }
-
-  figure {
-    img {
-      width: 40px;
-    }
-  }
-
-  ul {
-    height: 100%;
-    padding: 0.7rem 1.5rem;
-    
-  @media (max-width: 600px) {
-    padding: 0.7rem .4rem;
-  }
-
   }
 }

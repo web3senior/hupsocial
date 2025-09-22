@@ -82,7 +82,8 @@
       }
     }
 
-    &__option-voted {
+    &__voted {
+
       position: relative;
       padding: 16px 1rem;
       border: 1px solid #f0f0f0;
@@ -94,6 +95,9 @@
       user-select: none;
       cursor: help;
       isolation: isolate;
+
+      padding:4red;
+      border:3px solid red !important;
 
       &[data-chosen='true'] {
         background-color: var(--gray-900);
@@ -236,75 +240,6 @@
 }
 
 .grid {
-}
-
-.emoji {
-  position: relative;
-  width: 100%;
-  height: 12rem;
-  border-radius: var(--global-border-radius);
-  background-color: var(--white, #fff);
-  box-shadow: 0px 7.82816px 7.51503px rgba(0, 0, 0, 0.06);
-  padding: 0.8rem 0.5rem;
-  border-radius: 14px;
-
-  p {
-    font-size: 8px;
-  }
-
-  small {
-    width: 100%;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 4px 0;
-    gap: 6.26px;
-    margin: 0 auto;
-    background: #f2f2f2;
-    color: var(--black-800);
-  }
-
-  button,
-  a {
-    width: 100%;
-    padding: 4px 0;
-    color: var(--white);
-    cursor: pointer;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-    will-change: transform;
-    transition: transform 0.2s ease;
-
-    &:hover {
-      transform: scale(1.025);
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
-  }
-
-  button {
-    background: var(--black);
-  }
-
-  a {
-    background: var(--color-primary);
-  }
-
-  &__icon {
-    width: 100%;
-    width: 60px;
-    height: 60px;
-    will-change: transform;
-    transition-property: transform;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
-    z-index: 999;
-
-    img {
-      width: inherit;
-      height: inherit;
-    }
-  }
 }
 
 .priceIcon {

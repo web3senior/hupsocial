@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, InteractionTag } from '@fluentui/react-components'
-import { useId, Button, Toaster, useToastController, Toast, ToastTitle, ToastBody, ToastFooter } from '@fluentui/react-components'
+import { useId, Button, } from '@fluentui/react-components'
 import Image from 'next/image'
 import Link from 'next/link'
 import Icon from '../../../helper/MaterialIcon'
@@ -27,16 +27,7 @@ export default function Page() {
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const { web3, contract } = initContract()
-  const toasterId = useId('toaster')
-  const { dispatchToast } = useToastController(toasterId)
-  const notify = () =>
-    dispatchToast(
-      <Toast>
-        <ToastTitle action={<></>}>Poll created</ToastTitle>
-        <ToastBody subtitle="">Your poll successfuly created.</ToastBody>
-      </Toast>,
-      { intent: 'success' }
-    )
+
   const handleForm = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -66,7 +57,6 @@ export default function Page() {
   return (
     <FluentProvider theme={webLightTheme}>
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <Toaster toasterId={toasterId} />
         <h3 className={`page-title`}>profile</h3>
 
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
@@ -529,7 +519,6 @@ const Post = ({ addr }) => {
       <div className={`flex-1`}>
         {showPoll && (
           <form ref={createFormRef} className={`formss`} onSubmit={(e) => handleCreatePoll(e)}>
-            <Textarea appearance="filled-lighter-shadow" resize="vertical" size="medium" required="true"></Textarea>
             <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
 
             <div>

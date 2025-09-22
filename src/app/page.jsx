@@ -17,6 +17,7 @@ import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
+import { isPollActive } from '@/util/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/hup.json'
@@ -207,18 +208,19 @@ export default function Page() {
 const Options = ({ item }) => {
   const [status, setStatus] = useState(`loading`)
   const [optionsVoteCount, setOptionsVoteCount] = useState()
-  const [voted, setVoted] = useState(false)
+  const [voted, setVoted] = useState()
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initContract()
   const { address, isConnected } = useAccount()
   const { writeContract } = useWriteContract()
-  // const connections   = useConnections(config);
-  //  const result = useConnectorClient({
-  //   connector: connections[0]?.connector,
-  // })
 
   const vote = async (e, pollId, optionIndex) => {
     e.stopPropagation()
+console.log(isPollActive(item.startTime, item.endTime))
+    if (!isPollActive(item.startTime, item.endTime).isActive) {
+      alert(`Poll is not active!`)
+      return
+    }
 
     if (!isConnected) {
       console.log(`Please connect your wallet first`, 'error')
@@ -240,7 +242,6 @@ const Options = ({ item }) => {
     })
 
     console.log('------------')
-    console.log(result)
     return
     const web3 = new Web3(config)
 
@@ -286,10 +287,10 @@ const Options = ({ item }) => {
       setStatus(``)
     })
 
-    // getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
-    //   console.log(web3.utils.toNumber(res))
-    //   setVoted(web3.utils.toNumber(res))
-    // })
+    getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
+      console.log(web3.utils.toNumber(res))
+      setVoted(web3.utils.toNumber(res))
+    })
   }, [])
 
   if (status === `loading`)
@@ -305,9 +306,6 @@ const Options = ({ item }) => {
     <>
       <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
         {!voted &&
-          optionsVoteCount &&
-          optionsVoteCount.length > 0 &&
-          item.options.length > 0 &&
           item.options.map((option, i) => {
             return (
               <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
@@ -316,10 +314,7 @@ const Options = ({ item }) => {
             )
           })}
 
-        {voted &&
-          optionsVoteCount &&
-          optionsVoteCount.length > 0 &&
-          item.options.length > 0 &&
+        {voted && voted > 0 &&
           item.options.map((option, i) => {
             return (
               <li
@@ -329,7 +324,7 @@ const Options = ({ item }) => {
                 data-chosen={voted === i + 1 ? true : false}
                 style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
                 data-percentage={(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}
-                className={`${styles['poll__options__option-voted']} flex flex-row align-items-center justify-content-between`}
+                className={`${styles.poll__options__voted} flex flex-row align-items-center justify-content-between`}
               >
                 <span>{option}</span>
               </li>
@@ -339,7 +334,7 @@ const Options = ({ item }) => {
 
       <p className={`${styles.poll__ends}`}>
         {optionsVoteCount && <>{totalVotes}</>} votes • {` `}
-        <PollTimer startTime={item.startTime} endTime={item.endTime} />
+        <PollTimer startTime={item.startTime} endTime={item.endTime} pollId={item.pollId} />
       </p>
     </>
   )
