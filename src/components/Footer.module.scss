@@ -16,9 +16,12 @@
     transform: translate(0);
     box-shadow: var(--shadow8);
   }
+
   ul {
-    padding: 0 24px;
     gap: 0.5rem;
+    @media (min-width: 600px) {
+      padding: 1rem;
+    }
 
     li {
       position: relative;
@@ -29,9 +32,13 @@
         display: block;
         text-wrap: nowrap;
         text-align: center;
-        padding: 0.5rem;
         will-change: transform;
         transition: transform 0.2s ease;
+        padding: .8rem;
+ @media (max-width: 600px) {
+  padding: 20px;
+    }
+        
 
         svg {
           fill: var(--white, #fff) !important;
