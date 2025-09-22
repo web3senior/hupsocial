@@ -38,6 +38,9 @@
   position: relative;
   background-color: var(--white, #fff);
   padding: 2rem 2rem;
+    @media (max-width: 600px) {
+    padding: 1.2rem 1.2rem;
+  }
   transition: background-color 0.1s ease-out;
   isolation: isolate;
   cursor: pointer;
