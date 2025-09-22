@@ -81,9 +81,6 @@ export default function Page() {
       <h3 className={`page-title`}>profile</h3>
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-            <button onClick={()=>{
-        notify()
-    }}>yyyyyyyyyyyyy</button>
         <div className={`${styles.profileWrapper}`}>
           <Profile addr={params.wallet} />
         </div>

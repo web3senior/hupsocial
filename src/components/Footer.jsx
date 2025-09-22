@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { networks, useAccount, useDisconnect, Connector, useConnect } from 'wagmi'
+import { useAccount } from 'wagmi'
 import styles from './Footer.module.scss'
 
 export default function Footer() {

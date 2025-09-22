@@ -131,7 +131,7 @@ export default function Page() {
                 return (
                   <article onClick={() => router.push(`poll/${item.pollId}`)} key={i}>
                     {/* href={`p/${item.pollId}`} */}
-                    <div data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
+                    <section data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
                       <header className={`${styles.poll__header}  w-100`}>
                         <Profile addr={item.creator} createdAt={item.createdAt} />
                       </header>
@@ -179,7 +179,7 @@ export default function Page() {
                         </Link> */}
                         </div>
                       </main>
-                    </div>
+                    </section>
                     <hr />
                   </article>
                 )
@@ -193,7 +193,7 @@ export default function Page() {
 
 /**
  * Options
- * @param {*} param0
+ * @param {Object} item
  * @returns
  */
 const Options = ({ item }) => {
@@ -276,63 +276,61 @@ const Options = ({ item }) => {
       setStatus(``)
     })
 
-    getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
-      console.log(web3.utils.toNumber(res))
-      setVoted(web3.utils.toNumber(res))
-    })
+    // getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
+    //   console.log(web3.utils.toNumber(res))
+    //   setVoted(web3.utils.toNumber(res))
+    // })
   }, [])
 
-  //  if (optionsWithCount.list.length === 0) return <div className={`shimmer ${styles.shimmer}`} />
+  if (status === `loading`)
+    return (
+      <>
+        <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
+        <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
+        <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
+      </>
+    )
 
   return (
     <>
-      {status === `loading` ? (
-        <>
-          <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
-          <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
-          <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
-        </>
-      ) : (
-        <>
-          <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
-            {!voted &&
-              optionsVoteCount &&
-              optionsVoteCount.length > 0 &&
-              item.options.length > 0 &&
-              item.options.map((option, i) => {
-                return (
-                  <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
-                    <span>{option}</span>
-                  </li>
-                )
-              })}
+      <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
+        {!voted &&
+          optionsVoteCount &&
+          optionsVoteCount.length > 0 &&
+          item.options.length > 0 &&
+          item.options.map((option, i) => {
+            return (
+              <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
+                <span>{option}</span>
+              </li>
+            )
+          })}
 
-            {voted &&
-              optionsVoteCount &&
-              optionsVoteCount.length > 0 &&
-              item.options.length > 0 &&
-              item.options.map((option, i) => {
-                return (
-                  <li
-                    key={i}
-                    title={``}
-                    data-votes={web3.utils.toNumber(optionsVoteCount[i])}
-                    data-chosen={voted === i + 1 ? true : false}
-                    style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
-                    data-percentage={(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}
-                    className={`${styles['poll__options__option-voted']} flex flex-row align-items-center justify-content-between`}
-                  >
-                    <span>{option}</span>
-                  </li>
-                )
-              })}
-          </ul>
-          <p className={`${styles.poll__ends}`}>
-            {optionsVoteCount && <>{totalVotes}</>} votes • {` `}
-            <PollTimer endTime={item.endTime} />
-          </p>
-        </>
-      )}
+        {voted &&
+          optionsVoteCount &&
+          optionsVoteCount.length > 0 &&
+          item.options.length > 0 &&
+          item.options.map((option, i) => {
+            return (
+              <li
+                key={i}
+                title={``}
+                data-votes={web3.utils.toNumber(optionsVoteCount[i])}
+                data-chosen={voted === i + 1 ? true : false}
+                style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
+                data-percentage={(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}
+                className={`${styles['poll__options__option-voted']} flex flex-row align-items-center justify-content-between`}
+              >
+                <span>{option}</span>
+              </li>
+            )
+          })}
+      </ul>
+      
+      <p className={`${styles.poll__ends}`}>
+        {optionsVoteCount && <>{totalVotes}</>} votes • {` `}
+        <PollTimer endTime={item.endTime} />
+      </p>
     </>
   )
 }
