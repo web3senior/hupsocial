@@ -154,7 +154,7 @@
     color: var(--black-400);
     margin-top: 0.5rem;
     font-weight: 500;
-    gap: 0.2rem;
+    gap: 0.1rem;
 
     button {
       all: unset;
@@ -169,6 +169,10 @@
       gap: 0.5rem;
       border-radius: 999px;
       color: var(--black-600);
+
+          @media (max-width: 600px) {
+  padding: 3px 9px;
+    }
 
       &:before {
         content: '';
