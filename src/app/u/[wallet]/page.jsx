@@ -1,17 +1,8 @@
 'use client'
 
 import { useEffect, useState, Suspense, useRef } from 'react'
-import { FluentProvider, webLightTheme,Badge,Textarea,Input, Label,InteractionTag } from '@fluentui/react-components'
-import {
-  useId,
-  Button,
-  Toaster,
-  useToastController,
-  Toast,
-  ToastTitle,
-  ToastBody,
-  ToastFooter,
-} from "@fluentui/react-components";
+import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, InteractionTag } from '@fluentui/react-components'
+import { useId, Button, Toaster, useToastController, Toast, ToastTitle, ToastBody, ToastFooter } from '@fluentui/react-components'
 import Image from 'next/image'
 import Link from 'next/link'
 import Icon from '../../../helper/MaterialIcon'
@@ -36,16 +27,16 @@ export default function Page() {
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const { web3, contract } = initContract()
- const toasterId = useId("toaster");
-  const { dispatchToast } = useToastController(toasterId);
+  const toasterId = useId('toaster')
+  const { dispatchToast } = useToastController(toasterId)
   const notify = () =>
     dispatchToast(
       <Toast>
         <ToastTitle action={<></>}>Poll created</ToastTitle>
         <ToastBody subtitle="">Your poll successfuly created.</ToastBody>
       </Toast>,
-      { intent: "success" }
-    );
+      { intent: 'success' }
+    )
   const handleForm = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -70,58 +61,57 @@ export default function Page() {
     })
   }
 
-  useEffect(() => {
-  
-  }, [])
+  useEffect(() => {}, [])
 
-  return (<FluentProvider theme={webLightTheme}>
+  return (
+    <FluentProvider theme={webLightTheme}>
+      <div className={`${styles.page} ms-motion-slideDownIn`}>
+        <Toaster toasterId={toasterId} />
+        <h3 className={`page-title`}>profile</h3>
 
-    <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <Toaster toasterId={toasterId} />
-      <h3 className={`page-title`}>profile</h3>
+        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+          <div className={`${styles.profileWrapper}`}>
+            <Profile addr={params.wallet} />
+          </div>
 
-      <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        <div className={`${styles.profileWrapper}`}>
-          <Profile addr={params.wallet} />
+          <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center mt-20 w-100`}>
+            <li>
+              <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
+                Posts <span className={`lable lable-dark`}>0</span>
+              </button>
+            </li>
+            <li>
+              <button className={activeTab === 'activity' ? styles.activeTab : ''} onClick={() => setActiveTab('activity')}>
+                Activity
+              </button>
+            </li>
+            <li>
+              <button className={activeTab === 'reposts' ? styles.activeTab : ''} onClick={() => setActiveTab('reposts')}>
+                Reposts
+              </button>
+            </li>
+          </ul>
+
+          {activeTab === 'posts' && (
+            <div className={`${styles.tabContent} ${styles.posts} relative`}>
+              <Post addr={params.wallet} />
+            </div>
+          )}
+
+          {activeTab === 'activity' && (
+            <div className={`${styles.tabContent} ${styles.activity} relative`}>
+              <NoData name={`activity`} />
+            </div>
+          )}
+
+          {activeTab === 'reposts' && (
+            <div className={`${styles.tabContent} ${styles.reposts} relative`}>
+              <NoData name={`reposts`} />
+            </div>
+          )}
         </div>
-
-        <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center mt-20 w-100`}>
-          <li>
-            <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
-              Posts <span className={`lable lable-dark`}>0</span>
-            </button>
-          </li>
-          <li>
-            <button className={activeTab === 'activity' ? styles.activeTab : ''} onClick={() => setActiveTab('activity')}>
-              Activity
-            </button>
-          </li>
-          <li>
-            <button className={activeTab === 'reposts' ? styles.activeTab : ''} onClick={() => setActiveTab('reposts')}>
-              Reposts
-            </button>
-          </li>
-        </ul>
-
-        {activeTab === 'posts' && (
-          <div className={`${styles.tabContent} ${styles.posts} relative`}>
-            <Post addr={params.wallet} />
-          </div>
-        )}
-
-        {activeTab === 'activity' && (
-          <div className={`${styles.tabContent} ${styles.activity} relative`}>
-            <NoData name={`activity`} />
-          </div>
-        )}
-
-        {activeTab === 'reposts' && (
-          <div className={`${styles.tabContent} ${styles.reposts} relative`}>
-            <NoData name={`reposts`} />
-          </div>
-        )}
       </div>
-    </div></FluentProvider>
+    </FluentProvider>
   )
 }
 
@@ -220,7 +210,7 @@ const Profile = ({ addr }) => {
 
         <>
           <code className={`${styles.profile__wallet}`}>
-            <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].wallet}`} target={`_blank`}>
+            <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].id}`} target={`_blank`}>
               {`${profile.data.Profile[0].id.slice(0, 4)}…${profile.data.Profile[0].id.slice(38)}`}
             </Link>
           </code>
@@ -238,8 +228,7 @@ const Profile = ({ addr }) => {
           </button>
           <span>•</span>
           <Link className={`${styles.link}`} target={`_blank`} href={`https://profile.link/${profile.data.Profile[0].fullName}`}>
-            {/* profile.link/*/}
-            {profile.data.Profile[0].fullName}
+            profile.link/{profile.data.Profile[0].fullName}
           </Link>
         </li>
         <li className={`w-100`}>
@@ -538,11 +527,10 @@ const Post = ({ addr }) => {
         className={`${styles.post__pfp} rounded`}
       />
       <div className={`flex-1`}>
-    
         {showPoll && (
           <form ref={createFormRef} className={`formss`} onSubmit={(e) => handleCreatePoll(e)}>
-    <Textarea appearance="filled-lighter-shadow" resize="vertical" size="medium" required="true"></Textarea>
-        <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
+            <Textarea appearance="filled-lighter-shadow" resize="vertical" size="medium" required="true"></Textarea>
+            <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
 
             <div>
               Options:
@@ -551,7 +539,7 @@ const Post = ({ addr }) => {
                   return (
                     <div key={i} className={`d-flex mt-10 grid--gap-1`}>
                       <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={item} placeholder={`${item}`} />
-                      
+
                       <button type={`button`} className="btn" onClick={(e) => delOption(e, i)}>
                         Delete
                       </button>
@@ -630,10 +618,7 @@ const Post = ({ addr }) => {
             </div>
 
             <div>
-         
-               <Label htmlFor={``} >
-      Voting Limit
-      </Label>
+              <Label htmlFor={``}>Voting Limit</Label>
               <Input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
               <small>Each account is limited to {votingLimit} votes for this poll.</small>
             </div>

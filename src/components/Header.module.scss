@@ -8,6 +8,8 @@
   left: 0;
   right: 0;
   z-index: 1000;
+  background-color: var(--white);
+  box-shadow: var(--shadow8);
 
   button {
     background-color: var(--black);

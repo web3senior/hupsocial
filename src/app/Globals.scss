@@ -77,8 +77,11 @@ button {
   text-align: center;
   font-weight: 600;
   color: var(--black-900);
-  margin: 1.3rem 0 1.4rem 0;
   z-index: 1000;
+  position: fixed;
+  top: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .relative {
