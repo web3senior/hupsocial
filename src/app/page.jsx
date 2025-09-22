@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useId, useRef } from 'react'
-import { FluentProvider, webLightTheme,Badge,Divider } from '@fluentui/react-components'
+import { FluentProvider, webLightTheme, Badge } from '@fluentui/react-components'
 import Link from 'next/link'
 import moment from 'moment'
 import heartIcon from '@/../public/icons/heart.svg'
@@ -118,78 +118,74 @@ export default function Page() {
   }, [])
 
   return (
-            <FluentProvider theme={webLightTheme}>
-    <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <h3 className={`page-title`}>home</h3>
+    <FluentProvider theme={webLightTheme}>
+      <div className={`${styles.page} ms-motion-slideDownIn`}>
+        <h3 className={`page-title`}>home</h3>
 
-      <div className={`__container ${styles.page__container} mt-100`} data-width={`medium`}>
-        <div className={`${styles.grid} flex flex-column`}>
-          {polls &&
-            polls.length > 0 &&
-            polls.map((item, i) => {
-              return (
-                <article onClick={() => router.push(`poll/${item.pollId}`)} key={i}>
-                  {/* href={`p/${item.pollId}`} */}
-                  <div data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
-                    <header className={`${styles.poll__header}  w-100`}>
-                      <Profile addr={item.creator} createdAt={item.createdAt} />
-                    </header>
-                    <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050 pl-70`}>
-                      <p>{item.question}</p>
+        <div className={`__container ${styles.page__container} mt-100`} data-width={`medium`}>
+          <div className={`${styles.grid} flex flex-column`}>
+            {polls &&
+              polls.length > 0 &&
+              polls.map((item, i) => {
+                return (
+                  <article onClick={() => router.push(`poll/${item.pollId}`)} key={i}>
+                    {/* href={`p/${item.pollId}`} */}
+                    <div data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
+                      <header className={`${styles.poll__header}  w-100`}>
+                        <Profile addr={item.creator} createdAt={item.createdAt} />
+                      </header>
+                      <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050 pl-70`}>
+                        <p>{item.question}</p>
 
-                      {item.pollType.toString() === `2` && (
-                        <div className={`flex flex-row align-items-center gap-025`}>
-                          <Badge appearance="filled"  size="small">
-                            only lyx holders
-                          </Badge>
-                          <Badge appearance="filled" color="danger"  size="small">
-                            &gt; {web3.utils.fromWei(item.holderAmount, `ether`)} LYX
-                          </Badge>
-                        </div>
-                      )}
+                        {item.pollType.toString() === `2` && (
+                          <div className={`flex flex-row align-items-center gap-025`}>
+                            <span className={`badge badge-pill badge-primary`}>only lyx holders</span>
+                            <span className={`badge badge-pill badge-danger`}>&gt; {web3.utils.fromWei(item.holderAmount, `ether`)} LYX</span>
+                          </div>
+                        )}
 
-                      <Options item={item} />
+                        <Options item={item} />
 
-                      <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
-                        <button>
-                          <img alt={`blue checkmark icon`} src={heartIcon.src} />
-                          <span>{0}</span>
-                        </button>
-                        {item.allowedComments && (
+                        <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
                           <button>
-                            <img alt={`blue checkmark icon`} src={commentIcon.src} />
+                            <img alt={`blue checkmark icon`} src={heartIcon.src} />
                             <span>{0}</span>
                           </button>
-                        )}
-                        <button>
-                          <img alt={`blue checkmark icon`} src={repostIcon.src} />
-                        </button>
-                        <button>
-                          <img alt={`blue checkmark icon`} src={shareIcon.src} />
-                        </button>
+                          {item.allowedComments && (
+                            <button>
+                              <img alt={`blue checkmark icon`} src={commentIcon.src} />
+                              <span>{0}</span>
+                            </button>
+                          )}
+                          <button>
+                            <img alt={`blue checkmark icon`} src={repostIcon.src} />
+                          </button>
+                          <button>
+                            <img alt={`blue checkmark icon`} src={shareIcon.src} />
+                          </button>
 
-                        <button>
-                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                              d="M12 8.16338C12.1836 8.16338 12.3401 8.09875 12.4695 7.9695C12.5988 7.84012 12.6634 7.68363 12.6634 7.5C12.6634 7.31638 12.5988 7.15988 12.4695 7.0305C12.3401 6.90125 12.1836 6.83663 12 6.83663C11.8164 6.83663 11.6599 6.90125 11.5305 7.0305C11.4013 7.15988 11.3366 7.31638 11.3366 7.5C11.3366 7.68363 11.4013 7.84012 11.5305 7.9695C11.6599 8.09875 11.8164 8.16338 12 8.16338ZM6 6.5625H9.75V5.4375H6V6.5625ZM3.65625 15.375C3.26013 14.0076 2.86425 12.6471 2.46863 11.2933C2.07288 9.93944 1.875 8.55 1.875 7.125C1.875 6.08075 2.23894 5.19469 2.96681 4.46681C3.69469 3.73894 4.58075 3.375 5.625 3.375H9.5625C9.90575 2.924 10.3176 2.56125 10.7979 2.28675C11.2782 2.01225 11.8039 1.875 12.375 1.875C12.5818 1.875 12.7584 1.94831 12.9051 2.09494C13.0517 2.24156 13.125 2.41825 13.125 2.625C13.125 2.676 13.118 2.72694 13.104 2.77781C13.0901 2.82881 13.0755 2.87594 13.0601 2.91919C12.9909 3.09994 12.9319 3.28506 12.8833 3.47456C12.8348 3.66394 12.7933 3.85525 12.7586 4.0485L14.7101 6H16.125V10.5821L14.0783 11.2543L12.8438 15.375H9.375V13.875H7.125V15.375H3.65625ZM4.5 14.25H6V12.75H10.5V14.25H12L13.1625 10.3875L15 9.76875V7.125H14.25L11.625 4.5C11.625 4.25 11.6406 4.00938 11.6719 3.77813C11.7031 3.54688 11.7548 3.31488 11.8269 3.08213C11.4644 3.18213 11.1481 3.35644 10.8778 3.60506C10.6077 3.85356 10.4005 4.15188 10.2563 4.5H5.625C4.9 4.5 4.28125 4.75625 3.76875 5.26875C3.25625 5.78125 3 6.4 3 7.125C3 8.35 3.16875 9.54688 3.50625 10.7156C3.84375 11.8844 4.175 13.0625 4.5 14.25Z"
-                              fill="#424242"
-                            />
-                          </svg>
-                          <span>{new Intl.NumberFormat().format(0)} LYX</span>
-                        </button>
-                        {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
+                          <button>
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path
+                                d="M12 8.16338C12.1836 8.16338 12.3401 8.09875 12.4695 7.9695C12.5988 7.84012 12.6634 7.68363 12.6634 7.5C12.6634 7.31638 12.5988 7.15988 12.4695 7.0305C12.3401 6.90125 12.1836 6.83663 12 6.83663C11.8164 6.83663 11.6599 6.90125 11.5305 7.0305C11.4013 7.15988 11.3366 7.31638 11.3366 7.5C11.3366 7.68363 11.4013 7.84012 11.5305 7.9695C11.6599 8.09875 11.8164 8.16338 12 8.16338ZM6 6.5625H9.75V5.4375H6V6.5625ZM3.65625 15.375C3.26013 14.0076 2.86425 12.6471 2.46863 11.2933C2.07288 9.93944 1.875 8.55 1.875 7.125C1.875 6.08075 2.23894 5.19469 2.96681 4.46681C3.69469 3.73894 4.58075 3.375 5.625 3.375H9.5625C9.90575 2.924 10.3176 2.56125 10.7979 2.28675C11.2782 2.01225 11.8039 1.875 12.375 1.875C12.5818 1.875 12.7584 1.94831 12.9051 2.09494C13.0517 2.24156 13.125 2.41825 13.125 2.625C13.125 2.676 13.118 2.72694 13.104 2.77781C13.0901 2.82881 13.0755 2.87594 13.0601 2.91919C12.9909 3.09994 12.9319 3.28506 12.8833 3.47456C12.8348 3.66394 12.7933 3.85525 12.7586 4.0485L14.7101 6H16.125V10.5821L14.0783 11.2543L12.8438 15.375H9.375V13.875H7.125V15.375H3.65625ZM4.5 14.25H6V12.75H10.5V14.25H12L13.1625 10.3875L15 9.76875V7.125H14.25L11.625 4.5C11.625 4.25 11.6406 4.00938 11.6719 3.77813C11.7031 3.54688 11.7548 3.31488 11.8269 3.08213C11.4644 3.18213 11.1481 3.35644 10.8778 3.60506C10.6077 3.85356 10.4005 4.15188 10.2563 4.5H5.625C4.9 4.5 4.28125 4.75625 3.76875 5.26875C3.25625 5.78125 3 6.4 3 7.125C3 8.35 3.16875 9.54688 3.50625 10.7156C3.84375 11.8844 4.175 13.0625 4.5 14.25Z"
+                                fill="#424242"
+                              />
+                            </svg>
+                            <span>{new Intl.NumberFormat().format(0)} LYX</span>
+                          </button>
+                          {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
                           <img alt={`blue checkmark icon`} src={txIcon.src} />
                         </Link> */}
-                      </div>
-                    </main>
-                  </div>
-                  <Divider></Divider>
-                </article>
-              )
-            })}
+                        </div>
+                      </main>
+                    </div>
+                    <hr />
+                  </article>
+                )
+              })}
+          </div>
         </div>
       </div>
-    </div>
     </FluentProvider>
   )
 }
@@ -210,7 +206,8 @@ const Options = ({ item }) => {
   //  const result = useConnectorClient({
   //   connector: connections[0]?.connector,
   // })
-  const vote = async(e, pollId, optionIndex) => {
+
+  const vote = async (e, pollId, optionIndex) => {
     e.stopPropagation()
 
     if (!isConnected) {
@@ -224,15 +221,15 @@ const Options = ({ item }) => {
     //   functionName: 'mint',
     //   args: [BigInt(tokenId)],
     // })
-   
-    const result =await writeContract(config, {
+
+    const result = await writeContract(config, {
       abi,
       address: process.env.NEXT_PUBLIC_CONTRACT,
       functionName: 'vote',
       args: [pollId, optionIndex],
     })
     console.log('------------')
-  return
+    return
     const web3 = new Web3(config)
 
     // Create a Contract instance
@@ -277,10 +274,10 @@ const Options = ({ item }) => {
       setTotalVotes(res.reduce((a, b) => web3.utils.toNumber(a) + web3.utils.toNumber(b), 0))
     })
 
-    // getVoterChoices(web3.utils.toNumber(item.pollId), `0x188eeC07287D876a23565c3c568cbE0bb1984b83`).then((res) => {
-    //   console.log(web3.utils.toNumber(res))
-    //   setVoted(web3.utils.toNumber(res))
-    // })
+    getVoterChoices(web3.utils.toNumber(item.pollId), `0x188eeC07287D876a23565c3c568cbE0bb1984b83`).then((res) => {
+      console.log(web3.utils.toNumber(res))
+      setVoted(web3.utils.toNumber(res))
+    })
   }, [])
 
   //  if (optionsWithCount.list.length === 0) return <div className={`shimmer ${styles.shimmer}`} />
