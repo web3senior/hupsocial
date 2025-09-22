@@ -3,12 +3,15 @@ import React, { useState, useEffect } from 'react'
 import moment from 'moment'
 import web3 from 'web3'
 
-function PollTimer({ endTime }) {
+function PollTimer({ startTime, endTime }) {
   const [timeLeft, setTimeLeft] = useState(0)
 
   useEffect(() => {
     // Convert the Unix timestamp to a moment object
+    const startMoment = moment.unix(web3.utils.toNumber(startTime))
     const endMoment = moment.unix(web3.utils.toNumber(endTime))
+
+    console.log(`%c ${moment()}`,'font-size:1rem;color:orange')
 
     // Calculate the initial remaining time in milliseconds
     const initialTimeLeft = endMoment.diff(moment())

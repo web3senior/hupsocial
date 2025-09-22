@@ -51,6 +51,7 @@ export default function Page() {
   const giftModalMessage = useRef()
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
+  const { writeContract } = useWriteContract()
   const router = useRouter()
 
   /**
@@ -98,6 +99,10 @@ export default function Page() {
       toast.dismiss(t)
     }
   }
+
+  const like = (pollId) => {}
+
+  const unLike = (pollId) => {}
 
   const openModal = (e, item) => {
     e.target.innerText = `Sending...`
@@ -152,15 +157,18 @@ export default function Page() {
                             <img alt={`blue checkmark icon`} src={heartIcon.src} />
                             <span>{0}</span>
                           </button>
+
                           {item.allowedComments && (
                             <button>
                               <img alt={`blue checkmark icon`} src={commentIcon.src} />
                               <span>{0}</span>
                             </button>
                           )}
+
                           <button>
                             <img alt={`blue checkmark icon`} src={repostIcon.src} />
                           </button>
+
                           <button>
                             <img alt={`blue checkmark icon`} src={shareIcon.src} />
                           </button>
@@ -203,7 +211,7 @@ const Options = ({ item }) => {
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initContract()
   const { address, isConnected } = useAccount()
-  const { data: hash, writeContract } = useWriteContract()
+  const { writeContract } = useWriteContract()
   // const connections   = useConnections(config);
   //  const result = useConnectorClient({
   //   connector: connections[0]?.connector,
@@ -224,13 +232,15 @@ const Options = ({ item }) => {
     //   args: [BigInt(tokenId)],
     // })
 
-    const result = await writeContract(config, {
+    writeContract({
       abi,
       address: process.env.NEXT_PUBLIC_CONTRACT,
       functionName: 'vote',
-      args: [pollId, optionIndex],
+      args: [pollId, 0n],
     })
+
     console.log('------------')
+    console.log(result)
     return
     const web3 = new Web3(config)
 
@@ -326,10 +336,10 @@ const Options = ({ item }) => {
             )
           })}
       </ul>
-      
+
       <p className={`${styles.poll__ends}`}>
         {optionsVoteCount && <>{totalVotes}</>} votes • {` `}
-        <PollTimer endTime={item.endTime} />
+        <PollTimer startTime={item.startTime} endTime={item.endTime} />
       </p>
     </>
   )

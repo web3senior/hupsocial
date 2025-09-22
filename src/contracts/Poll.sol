@@ -36,6 +36,12 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
 
     mapping(uint256 => mapping(bytes32 => string)) public blockStorage;
 
+    /// @dev A mapping to track the number of likes for each poll.
+    mapping(uint256 => uint256) public pollLikes;
+
+    /// @dev A mapping to track which addresses have liked a specific poll.
+    mapping(uint256 => mapping(address => bool)) public pollLikedBy;
+
     // Structs
     /// @dev A struct to represent a single poll, including all relevant data.
     struct PollData {
@@ -112,12 +118,11 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     // Constructor
     constructor() {
         pollCount.increment();
-
         PollData storage newpoll = polls[pollCount.current()];
         newpoll.metadata = "";
         newpoll.question = unicode"Lorem Ipsum is simply dummy text";
-        newpoll.options = ["test 1", "test 2", "test 3"];
-        newpoll.startTime = block.timestamp + 10 seconds;
+        newpoll.options = ["Option 1", "Option 2", "Option 3"];
+        newpoll.startTime = block.timestamp + 10 minutes;
         newpoll.endTime = block.timestamp + 1 days;
         newpoll.createdAt = block.timestamp;
         newpoll.votesPerAccount = 1;
@@ -175,7 +180,7 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
         newPoll.holderAmount = _holderAmount;
         newPoll.allowedComments = _allowedComments;
 
-        emit PollCreated(pollId, _msgSender(), _question);
+        emit Event.PollCreated(pollId, _msgSender(), _question);
     }
 
     /// @notice Updates an existing poll.
@@ -215,7 +220,7 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
         updatedPoll.holderAmount = _holderAmount;
         updatedPoll.allowedComments = _allowedComments;
 
-        emit PollUpdated(_pollId, _msgSender());
+        emit Event.PollUpdated(_pollId, _msgSender());
         return true;
     }
 
@@ -223,18 +228,16 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     /// @dev Can only be called by the poll creator.
     function updateWhitelist(uint256 _pollId, address[] memory _add, address[] memory _remove) external onlyManager(_pollId) {
         PollData storage poll = polls[_pollId];
-
         for (uint256 i = 0; i < _add.length; i++) {
             poll.whitelist[_add[i]] = true;
         }
-
         for (uint256 i = 0; i < _remove.length; i++) {
             delete poll.whitelist[_remove[i]];
         }
-        
-        emit WhitelistUpdated(_pollId, _msgSender());
+        emit Event.WhitelistUpdated(_pollId, _msgSender());
     }
 
+    // Voting & Liking
     /// @notice Casts a vote for a specific poll option.
     function vote(uint256 _pollId, uint256 _optionIndex) external nonReentrant checkPollConditions(_pollId, _optionIndex) {
         PollData storage poll = polls[_pollId];
@@ -259,7 +262,27 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
         poll.votes[_optionIndex]++;
         pollVotesCasted[_pollId][_msgSender()]++;
         voterChoices[_pollId][_msgSender()] = _optionIndex + 1;
-        emit Voted(_pollId, _msgSender(), _optionIndex);
+        emit Event.Voted(_pollId, _msgSender(), _optionIndex);
+    }
+
+    /// @notice Allows a user to like a poll.
+    function likePoll(uint256 _pollId) external nonReentrant {
+        require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
+        require(!pollLikedBy[_pollId][_msgSender()], "Poll already liked.");
+        
+        pollLikes[_pollId]++;
+        pollLikedBy[_pollId][_msgSender()] = true;
+        emit Event.PollLiked(_pollId, _msgSender());
+    }
+
+    /// @notice Allows a user to unlike a poll.
+    function unlikePoll(uint256 _pollId) external nonReentrant {
+        require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
+        require(pollLikedBy[_pollId][_msgSender()], "Poll has not been liked by this account.");
+
+        pollLikes[_pollId]--;
+        pollLikedBy[_pollId][_msgSender()] = false;
+        emit Event.PollUnliked(_pollId, _msgSender());
     }
 
     // Owner Functions
@@ -284,7 +307,7 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
         require(amount > 0, "No balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
         require(success, "Failed");
-        emit Withdrawal(owner(), amount, block.timestamp);
+        emit Event.Withdrawal(owner(), amount, block.timestamp);
     }
 
     /// @notice Withdraws a specific amount of an LSP7 token to a recipient.
@@ -345,19 +368,31 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     function getVoteCountsForPoll(uint256 _pollId) external view returns (uint256[] memory) {
         PollData storage poll = polls[_pollId];
         uint256[] memory counts = new uint256[](poll.options.length);
-        
         for (uint256 i = 0; i < poll.options.length; i++) {
             counts[i] = poll.votes[i];
         }
-
         return counts;
     }
 
     /// @notice Returns the vote choice of a specific voter for a given poll.
     function getVoterChoice(uint256 _pollId, address _voter) external view returns (uint256) {
         uint256 choice = voterChoices[_pollId][_voter];
-        if (choice > 0) return choice - 1;
+        if (choice > 0) {
+            return choice - 1;
+        }
         return 0;
+    }
+
+    /// @notice Gets the number of likes for a specific poll.
+    function getPollLikeCount(uint256 _pollId) public view returns (uint256) {
+        require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
+        return pollLikes[_pollId];
+    }
+
+    /// @notice Checks if a user has liked a specific poll.
+    function hasLiked(uint256 _pollId, address _user) public view returns (bool) {
+        require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
+        return pollLikedBy[_pollId][_user];
     }
 
     /// @notice Gets the value of a key from the block storage for a specific poll.
