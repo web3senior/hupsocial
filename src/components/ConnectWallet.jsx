@@ -8,7 +8,7 @@ import Shimmer from '@/helper/Shimmer'
 import styles from './ConnectWallet.module.scss'
 
 export const ConnectWallet = () => {
-  const [showModal, setShowModal] = useState(true)
+  const [showModal, setShowModal] = useState(false)
   const { disconnect } = useDisconnect()
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
