@@ -68,7 +68,7 @@ export async function getVoterChoices(pollId, address) {
   const { web3, contract } = initContract()
 
   try {
-    const result = await contract.methods.voterChoices(pollId, address).call()
+    const result = await contract.methods.getVoterChoice(pollId, address).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)

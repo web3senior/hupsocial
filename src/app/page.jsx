@@ -21,6 +21,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/hup.json'
 import styles from './page.module.scss'
+import Shimmer from '@/helper/Shimmer'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -196,6 +197,7 @@ export default function Page() {
  * @returns
  */
 const Options = ({ item }) => {
+  const [status, setStatus] = useState(`loading`)
   const [optionsVoteCount, setOptionsVoteCount] = useState()
   const [voted, setVoted] = useState(false)
   const [totalVotes, setTotalVotes] = useState(0)
@@ -269,12 +271,12 @@ const Options = ({ item }) => {
 
   useEffect(() => {
     getVoteCountsForPoll(web3.utils.toNumber(item.pollId)).then((res) => {
-      console.log(res)
       setOptionsVoteCount(res)
       setTotalVotes(res.reduce((a, b) => web3.utils.toNumber(a) + web3.utils.toNumber(b), 0))
+      setStatus(``)
     })
 
-    getVoterChoices(web3.utils.toNumber(item.pollId), `0x188eeC07287D876a23565c3c568cbE0bb1984b83`).then((res) => {
+    getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
       console.log(web3.utils.toNumber(res))
       setVoted(web3.utils.toNumber(res))
     })
@@ -284,43 +286,53 @@ const Options = ({ item }) => {
 
   return (
     <>
-      <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
-        {!voted &&
-          optionsVoteCount &&
-          optionsVoteCount.length > 0 &&
-          item.options.length > 0 &&
-          item.options.map((option, i) => {
-            return (
-              <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
-                <span>{option}</span>
-              </li>
-            )
-          })}
+      {status === `loading` ? (
+        <>
+          <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
+          <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
+          <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
+        </>
+      ) : (
+        <>
+          <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
+            {!voted &&
+              optionsVoteCount &&
+              optionsVoteCount.length > 0 &&
+              item.options.length > 0 &&
+              item.options.map((option, i) => {
+                return (
+                  <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
+                    <span>{option}</span>
+                  </li>
+                )
+              })}
 
-        {voted &&
-          optionsVoteCount &&
-          optionsVoteCount.length > 0 &&
-          item.options.length > 0 &&
-          item.options.map((option, i) => {
-            return (
-              <li
-                key={i}
-                title={``}
-                data-votes={web3.utils.toNumber(optionsVoteCount[i])}
-                data-chosen={voted === i + 1 ? true : false}
-                style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
-                data-percentage={(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}
-                className={`${styles['poll__options__option-voted']} flex flex-row align-items-center justify-content-between`}
-              >
-                <span>{option}</span>
-              </li>
-            )
-          })}
-      </ul>
-      <small className={`${styles.poll__ends}`}>
-        {optionsVoteCount && <>{totalVotes}</>} votes • {` `}
-        <PollTimer endTime={item.endTime} />
-      </small>
+            {voted &&
+              optionsVoteCount &&
+              optionsVoteCount.length > 0 &&
+              item.options.length > 0 &&
+              item.options.map((option, i) => {
+                return (
+                  <li
+                    key={i}
+                    title={``}
+                    data-votes={web3.utils.toNumber(optionsVoteCount[i])}
+                    data-chosen={voted === i + 1 ? true : false}
+                    style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
+                    data-percentage={(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}
+                    className={`${styles['poll__options__option-voted']} flex flex-row align-items-center justify-content-between`}
+                  >
+                    <span>{option}</span>
+                  </li>
+                )
+              })}
+          </ul>
+          <p className={`${styles.poll__ends}`}>
+            {optionsVoteCount && <>{totalVotes}</>} votes • {` `}
+            <PollTimer endTime={item.endTime} />
+          </p>
+        </>
+      )}
     </>
   )
 }

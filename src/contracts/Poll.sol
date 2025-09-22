@@ -345,18 +345,18 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     function getVoteCountsForPoll(uint256 _pollId) external view returns (uint256[] memory) {
         PollData storage poll = polls[_pollId];
         uint256[] memory counts = new uint256[](poll.options.length);
+        
         for (uint256 i = 0; i < poll.options.length; i++) {
             counts[i] = poll.votes[i];
         }
+
         return counts;
     }
 
     /// @notice Returns the vote choice of a specific voter for a given poll.
     function getVoterChoice(uint256 _pollId, address _voter) external view returns (uint256) {
         uint256 choice = voterChoices[_pollId][_voter];
-        if (choice > 0) {
-            return choice - 1;
-        }
+        if (choice > 0) return choice - 1;
         return 0;
     }
 
