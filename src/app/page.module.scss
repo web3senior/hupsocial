@@ -185,11 +185,13 @@
       padding: 6px 12px;
       transition: background-color 0.2s ease-in-out;
       height: 30px;
+
       display: flex;
       flex-direction: row;
       align-items: center;
       justify-content: space-around;
       gap: 0.5rem;
+      
       border-radius: 999px;
       color: var(--black-600);
 

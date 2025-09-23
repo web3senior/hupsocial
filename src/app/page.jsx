@@ -5,6 +5,7 @@ import { FluentProvider, webLightTheme, Badge } from '@fluentui/react-components
 import Link from 'next/link'
 import moment from 'moment'
 import heartIcon from '@/../public/icons/heart.svg'
+import heartFilledIcon from '@/../public/icons/heart-filled.svg'
 import commentIcon from '@/../public/icons/comment.svg'
 import shareIcon from '@/../public/icons/share.svg'
 import repostIcon from '@/../public/icons/repost.svg'
@@ -12,8 +13,7 @@ import txIcon from '@/../public/icons/tx.svg'
 import { useRouter } from 'next/navigation'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
-import { initContract, getPolls, hasLike, getPollLikeCount,getPollCount,
-   getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
+import { initContract, getPolls, hasLike, getPollLikeCount, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
@@ -122,9 +122,7 @@ export default function Page() {
     })
   }
 
-  const unLikePoll = (pollId) => {
-
-  }
+  const unLikePoll = (pollId) => {}
 
   const openModal = (e, item) => {
     e.target.innerText = `Sending...`
@@ -133,8 +131,6 @@ export default function Page() {
   }
 
   useEffect(() => {
-    
-
     getPollCount().then((pollCount) => {
       console.log(pollCount)
 
@@ -172,7 +168,7 @@ export default function Page() {
                               <p
                                 className={`${styles.poll__showmore}`}
                                 onClick={(e) => {
-                                     e.stopPropagation()
+                                  e.stopPropagation()
                                   document.querySelector(`#pollQuestion${item.pollId}`).innerText = `${item.question}`
                                 }}
                               >
@@ -194,9 +190,8 @@ export default function Page() {
                         <Options item={item} />
 
                         <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
-                          <button onClick={(e)=> likePoll(e, item.pollId)}>
-                            <img alt={`blue checkmark icon`} src={heartIcon.src} />
-                            <span>{<LikeCount pollId={item.pollId}/>}</span>
+                          <button onClick={(e) => likePoll(e, item.pollId)}>
+                         {<LikeCount pollId={item.pollId} addr={address} />}
                           </button>
 
                           {item.allowedComments && (
@@ -240,45 +235,56 @@ export default function Page() {
   )
 }
 
-const LikeCount = ({ pollId }) => {
-  const [likeCount, setLikeCount] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const LikeCount = ({ pollId, addr }) => {
+  const [likeCount, setLikeCount] = useState(null)
+  const [hasLiked, setHasLiked] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const getPollData = async () => {
+    const likeCount = await getPollLikeCount(pollId)
+    const isLiked = await hasLike(pollId, addr)
+    return { likeCount, hasLiked: isLiked }
+  }
 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates on unmounted components
+    let isMounted = true
 
-    getPollLikeCount(pollId)
-      .then(result => {
+    getPollData()
+      .then((result) => {
         if (isMounted) {
-          setLikeCount(result);
-          setLoading(false);
+          setLikeCount(result.likeCount)
+          setHasLiked(result.hasLiked)
+          setLoading(false)
         }
       })
-      .catch(err => {
+      .catch((err) => {
         if (isMounted) {
-          setError('Failed to fetch like count');
-          setLoading(false);
+          setError('Failed to fetch poll data')
+          setLoading(false)
         }
-      });
+      })
 
-    // Cleanup function to prevent memory leaks if the component unmounts
     return () => {
-      isMounted = false;
-    };
-  }, [pollId]); // The dependency array ensures this effect runs only when pollId changes
+      isMounted = false
+    }
+  }, [pollId, addr])
 
   if (loading) {
-    return <span>Loading...</span>;
+    return <span>Loading...</span>
   }
 
   if (error) {
-    return <span>{error}</span>;
+    return <span>{error}</span>
   }
 
-  return <>{likeCount}</>;
-};
-
+  return (
+    <>
+      {hasLiked ? <img alt={``} src={heartFilledIcon.src} /> : <img alt={``} src={heartIcon.src} />}
+      <span> {likeCount}</span>
+    </>
+  )
+}
 
 /**
  * Options
@@ -348,7 +354,7 @@ const Options = ({ item }) => {
           item.options.map((option, i) => {
             return (
               <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)} disabled={isPending || isConfirming}>
-                <span> { option}</span>
+                <span> {option}</span>
               </li>
             )
           })}
