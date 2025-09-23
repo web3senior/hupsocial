@@ -140,7 +140,7 @@ export default function Page() {
                     {/* href={`p/${item.pollId}`} */}
                     <section data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
                       <header className={`${styles.poll__header}  w-100`}>
-                        <Profile addr={item.creator} createdAt={item.createdAt} />
+                        <Profile creator={item.creator} createdAt={item.createdAt} />
                       </header>
                       <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050 pl-70`}>
                         <p>{item.question}</p>
@@ -190,7 +190,7 @@ export default function Page() {
                         </div>
                       </main>
                     </section>
-                    <hr />
+                    {i < polls.length - 1 && <hr />}
                   </article>
                 )
               })}
@@ -235,13 +235,13 @@ const Options = ({ item }) => {
     //   args: [BigInt(tokenId)],
     // })
 
-    writeContract({
+    const result = writeContract({
       abi,
       address: process.env.NEXT_PUBLIC_CONTRACT,
       functionName: 'vote',
       args: [pollId, 0n],
     })
-
+console.log(result)
     console.log('------------')
     return
     const web3 = new Web3(config)
@@ -291,7 +291,7 @@ const Options = ({ item }) => {
 
     getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
       console.log(web3.utils.toNumber(res))
-      if (web3.utils.toNumber(res) > 0)setVoted(web3.utils.toNumber(res))
+      if (web3.utils.toNumber(res) > 0) setVoted(web3.utils.toNumber(res))
     })
   }, [])
 
@@ -347,7 +347,7 @@ const Options = ({ item }) => {
  * @param {String} addr
  * @returns
  */
-const Profile = ({ addr, createdAt }) => {
+const Profile = ({ creator, createdAt }) => {
   const [profile, setProfile] = useState({
     data: {
       Profile: [
@@ -375,9 +375,9 @@ const Profile = ({ addr, createdAt }) => {
     },
   })
   const { web3, contract } = initContract()
-  const { address, isConnected } = useAccount()
+
   useEffect(() => {
-    getProfile(addr).then((res) => {
+    getProfile(creator).then((res) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
@@ -400,7 +400,7 @@ const Profile = ({ addr, createdAt }) => {
           <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
           <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
         </div>
-        {isConnected && <code className={`text-secondary`}>{`${address.slice(0, 4)}…${address.slice(38)}`}</code>}
+        <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
       </figcaption>
     </figure>
   )
