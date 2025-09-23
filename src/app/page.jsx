@@ -12,7 +12,8 @@ import txIcon from '@/../public/icons/tx.svg'
 import { useRouter } from 'next/navigation'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
-import { initContract, getPolls, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
+import { initContract, getPolls, hasLike, getPollLikeCount,getPollCount,
+   getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
@@ -132,6 +133,8 @@ export default function Page() {
   }
 
   useEffect(() => {
+    
+
     getPollCount().then((pollCount) => {
       console.log(pollCount)
 
@@ -162,7 +165,7 @@ export default function Page() {
                         <Profile creator={item.creator} createdAt={item.createdAt} />
                       </header>
                       <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050 pl-70`}>
-                        <p className={`text-justify ${styles.poll__question}`} id={`pollQuestion${item.pollId}`}>
+                        <div className={`${styles.poll__question}`} id={`pollQuestion${item.pollId}`}>
                           {item.question.length > 280 ? (
                             <>
                               {item.question.slice(0, 280) + `…`}
@@ -179,7 +182,7 @@ export default function Page() {
                           ) : (
                             <>{item.question}</>
                           )}
-                        </p>
+                        </div>
 
                         {item.pollType.toString() === `2` && (
                           <div className={`flex flex-row align-items-center gap-025`}>
@@ -193,7 +196,7 @@ export default function Page() {
                         <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
                           <button onClick={(e)=> likePoll(e, item.pollId)}>
                             <img alt={`blue checkmark icon`} src={heartIcon.src} />
-                            <span>{0}</span>
+                            <span>{<LikeCount pollId={item.pollId}/>}</span>
                           </button>
 
                           {item.allowedComments && (
@@ -236,6 +239,46 @@ export default function Page() {
     </FluentProvider>
   )
 }
+
+const LikeCount = ({ pollId }) => {
+  const [likeCount, setLikeCount] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates on unmounted components
+
+    getPollLikeCount(pollId)
+      .then(result => {
+        if (isMounted) {
+          setLikeCount(result);
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        if (isMounted) {
+          setError('Failed to fetch like count');
+          setLoading(false);
+        }
+      });
+
+    // Cleanup function to prevent memory leaks if the component unmounts
+    return () => {
+      isMounted = false;
+    };
+  }, [pollId]); // The dependency array ensures this effect runs only when pollId changes
+
+  if (loading) {
+    return <span>Loading...</span>;
+  }
+
+  if (error) {
+    return <span>{error}</span>;
+  }
+
+  return <>{likeCount}</>;
+};
+
 
 /**
  * Options

@@ -75,6 +75,31 @@ export async function getVoterChoices(pollId, address) {
     return { error }
   }
 }
+
+export async function getPollLikeCount(pollId) {
+  const { web3, contract } = initContract()
+
+  try {
+    const result = await contract.methods.getPollLikeCount(pollId).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+export async function hasLike(pollId, address) {
+  const { web3, contract } = initContract()
+
+  try {
+    const result = await contract.methods.hasLike(pollId, address).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+
+
 export async function getAllEvents() {
   const { web3, contract } = initContract()
 
