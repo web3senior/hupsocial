@@ -53,8 +53,11 @@ export default function Page() {
   const giftModalMessage = useRef()
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
-  const { writeContract } = useWriteContract()
   const router = useRouter()
+  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
 
   /**
    * Close the gift modal
@@ -102,9 +105,25 @@ export default function Page() {
     }
   }
 
-  const like = (pollId) => {}
+  const likePoll = (e, pollId) => {
+    e.stopPropagation()
 
-  const unLike = (pollId) => {}
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi,
+      address: process.env.NEXT_PUBLIC_CONTRACT,
+      functionName: 'likePoll',
+      args: [pollId],
+    })
+  }
+
+  const unLikePoll = (pollId) => {
+
+  }
 
   const openModal = (e, item) => {
     e.target.innerText = `Sending...`
@@ -172,7 +191,7 @@ export default function Page() {
                         <Options item={item} />
 
                         <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
-                          <button>
+                          <button onClick={(e)=> likePoll(e, item.pollId)}>
                             <img alt={`blue checkmark icon`} src={heartIcon.src} />
                             <span>{0}</span>
                           </button>
@@ -234,6 +253,7 @@ const Options = ({ item }) => {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
+
   const vote = async (e, pollId, optionIndex) => {
     e.stopPropagation()
     console.log(isPollActive(item.startTime, item.endTime))
@@ -247,57 +267,12 @@ const Options = ({ item }) => {
       return
     }
 
-    // writeContract({
-    //   address: process.env.NEXT_PUBLIC_CONTRACT,
-    //   abi,
-    //   functionName: 'mint',
-    //   args: [BigInt(tokenId)],
-    // })
-
-    const result = await writeContract({
+    writeContract({
       abi,
       address: process.env.NEXT_PUBLIC_CONTRACT,
       functionName: 'vote',
-      args: [pollId, 0n],
+      args: [pollId, optionIndex],
     })
-    console.log(result)
-    console.log('------------')
-    return
-    const web3 = new Web3(config)
-
-    // Create a Contract instance
-    const contract = new web3.eth.Contract(abi, process.env.NEXT_PUBLIC_CONTRACT)
-
-    // setIsLoading(true)
-
-    // const t = toast.loading(`Waiting for transaction's confirmation`)
-
-    //const formData = new FormData(e.target)
-    // const price = formData.get('price')
-    console.log(pollId, optionIndex)
-    try {
-      contract.methods
-        .vote(pollId, optionIndex)
-        .send({
-          from: address,
-        })
-        .then((res) => {
-          console.log(res) //res.events.tokenId
-
-          //setIsLoading(true)
-
-          //   toast.success(`Done`)
-
-          // toast.dismiss(t)
-        })
-        .catch((error) => {
-          console.log(error)
-          // toast.dismiss(t)
-        })
-    } catch (error) {
-      console.log(error)
-      toast.dismiss(t)
-    }
   }
 
   useEffect(() => {
@@ -330,7 +305,7 @@ const Options = ({ item }) => {
           item.options.map((option, i) => {
             return (
               <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)} disabled={isPending || isConfirming}>
-                <span> {isPending ? 'Confirming...' : option}</span>
+                <span> { option}</span>
               </li>
             )
           })}
