@@ -21,6 +21,7 @@ import { isPollActive } from '@/util/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/hup.json'
+import { toast } from '@/components/NextToast'
 import styles from './page.module.scss'
 import Shimmer from '@/helper/Shimmer'
 
@@ -216,9 +217,9 @@ const Options = ({ item }) => {
 
   const vote = async (e, pollId, optionIndex) => {
     e.stopPropagation()
-console.log(isPollActive(item.startTime, item.endTime))
+    console.log(isPollActive(item.startTime, item.endTime))
     if (!isPollActive(item.startTime, item.endTime).isActive) {
-      alert(`Poll is not active!`)
+      toast(`Poll is not active!`, `danger`)
       return
     }
 
@@ -282,6 +283,7 @@ console.log(isPollActive(item.startTime, item.endTime))
 
   useEffect(() => {
     getVoteCountsForPoll(web3.utils.toNumber(item.pollId)).then((res) => {
+      console.log(res)
       setOptionsVoteCount(res)
       setTotalVotes(res.reduce((a, b) => web3.utils.toNumber(a) + web3.utils.toNumber(b), 0))
       setStatus(``)
@@ -289,7 +291,7 @@ console.log(isPollActive(item.startTime, item.endTime))
 
     getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
       console.log(web3.utils.toNumber(res))
-      setVoted(web3.utils.toNumber(res))
+      if (web3.utils.toNumber(res) > 0)setVoted(web3.utils.toNumber(res))
     })
   }, [])
 
@@ -314,7 +316,7 @@ console.log(isPollActive(item.startTime, item.endTime))
             )
           })}
 
-        {voted && voted > 0 &&
+        {voted &&
           item.options.map((option, i) => {
             return (
               <li

@@ -171,7 +171,7 @@ const Profile = ({ addr }) => {
   const { web3, contract } = initContract()
 
   const follow = () => {
-    toast(`coming soon`)
+    toast(`Coming soon `, `warning`)
   }
 
   useEffect(() => {

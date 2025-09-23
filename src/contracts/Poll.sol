@@ -122,7 +122,7 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
         newpoll.metadata = "";
         newpoll.question = unicode"Lorem Ipsum is simply dummy text";
         newpoll.options = ["Option 1", "Option 2", "Option 3"];
-        newpoll.startTime = block.timestamp + 10 minutes;
+        newpoll.startTime = block.timestamp + 2 minutes;
         newpoll.endTime = block.timestamp + 1 days;
         newpoll.createdAt = block.timestamp;
         newpoll.votesPerAccount = 1;
@@ -376,11 +376,12 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
 
     /// @notice Returns the vote choice of a specific voter for a given poll.
     function getVoterChoice(uint256 _pollId, address _voter) external view returns (uint256) {
-        uint256 choice = voterChoices[_pollId][_voter];
-        if (choice > 0) {
-            return choice - 1;
-        }
-        return 0;
+        return voterChoices[_pollId][_voter];
+        // uint256 choice = voterChoices[_pollId][_voter];
+        // if (choice > 0) {
+        //     return choice - 1;
+        // }
+        // return 0;
     }
 
     /// @notice Gets the number of likes for a specific poll.

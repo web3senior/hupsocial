@@ -54,7 +54,7 @@
 
   &__options {
     margin-top: 0.2rem;
-    max-height: 180px;
+    max-height: 190px;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0.2em;
@@ -69,6 +69,10 @@
       transition: transform 0.1s ease;
       user-select: none;
       cursor: pointer;
+
+      span {
+        font-weight: 400;
+      }
 
       @media (max-width: 600px) {
         padding: 8px 0.7rem;
@@ -87,23 +91,32 @@
     &__voted {
       position: relative;
       padding: 16px 1rem;
-      border: 1px solid #f0f0f0;
+      border: 1px solid var(--white, #FFF);
       border-radius: 12px;
       transition: background-color 0.2s ease-in-out;
       will-change: transform;
       transition: transform 0.1s ease;
-      background-color: var(--gray-200);
+      background-color: var(--gray-100);
       user-select: none;
       cursor: help;
       isolation: isolate;
 
-      padding: 4red;
-      border: 3px solid red !important;
+      span {
+        color: var(--gray-400);
+        font-weight: 500;
+      }
 
       &[data-chosen='true'] {
         background-color: var(--gray-900);
         color: var(--white);
-        outline: 3px solid var(--blue-300);
+        outline: 3px solid var(--success-400);
+
+        span {
+          color: var(--white);
+        }
+        &:after {
+          color: var(--white);
+        }
       }
 
       &:before,
@@ -137,6 +150,7 @@
         justify-content: flex-end;
         overflow: hidden;
         z-index: 1;
+        color: var(--gray-400);
       }
     }
   }

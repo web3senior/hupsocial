@@ -1,7 +1,6 @@
 .page {
   height: 100%;
 
-
   &__title {
     font-weight: 600;
     color: var(--black-900);
@@ -80,14 +79,14 @@
 
     span {
       font-size: 15px;
-      transition: all .1s ease-in-out;
+      transition: all 0.1s ease-in-out;
     }
   }
 
   > div {
     background: #fafafa;
     padding-right: 0.5rem;
-    border:1px solid #EEF3F6;
+    border: 1px solid #eef3f6;
     border-radius: 999px;
 
     figure {
@@ -200,6 +199,10 @@
 }
 
 .profile {
+  h1 {
+      vertical-align: middle;
+  }
+
   &__pfp {
     width: calc(94px + 1px);
     height: calc(94px + 1px);
@@ -209,13 +212,13 @@
   }
 
   &__checkmark {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
   }
 
   &__wallet {
     position: relative;
-    top: .2em;
+    top: 0.2em;
   }
 
   &__description {
@@ -269,20 +272,19 @@
   &__actions {
     li {
       svg {
+        border-radius: 1000px;
 
-      border-radius: 1000px;
+        path {
+          fill: var(--gray-400);
+        }
 
-    path {
-         fill: var(--gray-400);
-       }
+        &:hover {
+          cursor: pointer;
 
-      &:hover {
-        cursor: pointer;
-        
-       path {
-         fill: var(--gray-500);
-       }
-      }
+          path {
+            fill: var(--gray-500);
+          }
+        }
       }
     }
   }
@@ -291,8 +293,8 @@
     height: 40px;
     width: 100%;
     max-height: 270px;
-border: none;
-resize: vertical;
+    border: none;
+    resize: vertical;
     &:focus {
       outline: none;
     }
