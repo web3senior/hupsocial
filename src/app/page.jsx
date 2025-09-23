@@ -156,11 +156,11 @@ export default function Page() {
                 return (
                   <article onClick={() => router.push(`poll/${item.pollId}`)} key={i}>
                     {/* href={`p/${item.pollId}`} */}
-                    <section data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between gap-1`}>
-                      <header className={`${styles.poll__header}  w-100`}>
+                    <section data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between`}>
+                      <header className={`${styles.poll__header}`}>
                         <Profile creator={item.creator} createdAt={item.createdAt} />
                       </header>
-                      <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050 pl-70`}>
+                      <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
                         <div className={`${styles.poll__question}`} id={`pollQuestion${item.pollId}`}>
                           {item.question.length > 280 ? (
                             <>
