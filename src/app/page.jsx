@@ -11,7 +11,7 @@ import repostIcon from '@/../public/icons/repost.svg'
 import txIcon from '@/../public/icons/tx.svg'
 import { useRouter } from 'next/navigation'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
-import { useConnectorClient, useConnections, useClient, networks, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
+import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initContract, getPolls, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
@@ -143,7 +143,24 @@ export default function Page() {
                         <Profile creator={item.creator} createdAt={item.createdAt} />
                       </header>
                       <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050 pl-70`}>
-                        <p>{item.question}</p>
+                        <p className={`text-justify ${styles.poll__question}`} id={`pollQuestion${item.pollId}`}>
+                          {item.question.length > 280 ? (
+                            <>
+                              {item.question.slice(0, 280) + `…`}
+                              <p
+                                className={`${styles.poll__showmore}`}
+                                onClick={(e) => {
+                                     e.stopPropagation()
+                                  document.querySelector(`#pollQuestion${item.pollId}`).innerText = `${item.question}`
+                                }}
+                              >
+                                <b className={`text-primary`}>Show More</b>
+                              </p>
+                            </>
+                          ) : (
+                            <>{item.question}</>
+                          )}
+                        </p>
 
                         {item.pollType.toString() === `2` && (
                           <div className={`flex flex-row align-items-center gap-025`}>
@@ -213,8 +230,10 @@ const Options = ({ item }) => {
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initContract()
   const { address, isConnected } = useAccount()
-  const { writeContract } = useWriteContract()
-
+  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
   const vote = async (e, pollId, optionIndex) => {
     e.stopPropagation()
     console.log(isPollActive(item.startTime, item.endTime))
@@ -235,13 +254,13 @@ const Options = ({ item }) => {
     //   args: [BigInt(tokenId)],
     // })
 
-    const result = writeContract({
+    const result = await writeContract({
       abi,
       address: process.env.NEXT_PUBLIC_CONTRACT,
       functionName: 'vote',
       args: [pollId, 0n],
     })
-console.log(result)
+    console.log(result)
     console.log('------------')
     return
     const web3 = new Web3(config)
@@ -310,8 +329,8 @@ console.log(result)
         {!voted &&
           item.options.map((option, i) => {
             return (
-              <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}>
-                <span>{option}</span>
+              <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)} disabled={isPending || isConfirming}>
+                <span> {isPending ? 'Confirming...' : option}</span>
               </li>
             )
           })}

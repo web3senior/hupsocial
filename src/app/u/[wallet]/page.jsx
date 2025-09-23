@@ -520,7 +520,7 @@ const Post = ({ addr }) => {
         {showPoll && (
           <form ref={createFormRef} className={`formss`} onSubmit={(e) => handleCreatePoll(e)}>
             <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
-
+<span>Only the first 280 characters will be visible on the timeline.</span>
             <div>
               Options:
               {options &&
