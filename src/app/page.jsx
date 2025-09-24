@@ -148,7 +148,14 @@ export default function Page() {
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <h3 className={`page-title`}>home</h3>
 
+
+
         <div className={`__container ${styles.page__container} mt-100`} data-width={`medium`}>
+          {
+           polls.length < 1 && <>
+                                <div className={`shimmer ${styles.pollShimmer}`} />
+            </>
+          }
           <div className={`${styles.grid} flex flex-column`}>
             {polls &&
               polls.length > 0 &&

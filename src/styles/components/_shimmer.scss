@@ -1,17 +1,24 @@
 .shimmer {
-  --gray-rgb: 0, 0, 0;
-  --gray-alpha-600: rgba(var(--gray-rgb), 0.04);
-
   position: relative;
-  -webkit-mask: linear-gradient(-60deg, #000 30%, #0005, #000 70%) right/300% 100%;
-  background-repeat: no-repeat;
-  background-color: var(--gray-alpha-600);
-  border-radius: var(--global-border-radius);
-  animation: shimmer 1.5s infinite;
+  overflow: hidden;
+  background: var(--gray-100);
+
+  &:after {
+    content: ' ';
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-image: linear-gradient(90deg, var(--gray-50) 0%, var(--white) 50%, var(--gray-50) 100%);
+    animation-name: react-loading-skeleton;
+    animation-direction: 1.5s;
+    animation-duration: 1.5s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
 }
 
-@keyframes shimmer {
+@keyframes react-loading-skeleton {
   100% {
-    -webkit-mask-position: left;
+    transform: translateX(100%);
   }
 }
