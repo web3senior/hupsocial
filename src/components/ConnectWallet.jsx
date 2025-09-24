@@ -54,8 +54,6 @@ export function WalletConnectModal({ setShowModal }) {
 export function WalletOptions() {
   const { connectors, connect } = useConnect()
 
-  const handleConnect = () => {}
-
   return connectors.map((connector) => (
     <button className={`${styles['wallet']}`} key={connector.uid} onClick={() => connect({ connector })}>
       {connector.name}

@@ -286,13 +286,13 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     }
 
     // Owner Functions
-    /// @notice Pauses contract functions
-    function pauseMinting() public onlyOwner {
+ 
+    function pause() public onlyOwner {
         _pause();
     }
 
-    /// @notice Unpauses contract functions.
-    function unpauseMinting() public onlyOwner {
+  
+    function unpause() public onlyOwner {
         _unpause();
     }
 

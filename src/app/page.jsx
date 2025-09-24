@@ -148,14 +148,8 @@ export default function Page() {
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <h3 className={`page-title`}>home</h3>
 
-
-
         <div className={`__container ${styles.page__container} mt-100`} data-width={`medium`}>
-          {
-           polls.length < 1 && <>
-                                <div className={`shimmer ${styles.pollShimmer}`} />
-            </>
-          }
+          {polls.length < 1 && <div className={`shimmer ${styles.pollShimmer}`} />}
           <div className={`${styles.grid} flex flex-column`}>
             {polls &&
               polls.length > 0 &&
@@ -197,9 +191,7 @@ export default function Page() {
                         <Options item={item} />
 
                         <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
-                          <button onClick={(e) => likePoll(e, item.pollId)}>
-                         {<LikeCount pollId={item.pollId} addr={address} />}
-                          </button>
+                          <button onClick={(e) => likePoll(e, item.pollId)}>{<LikeCount pollId={item.pollId} />}</button>
 
                           {item.allowedComments && (
                             <button>
@@ -242,15 +234,16 @@ export default function Page() {
   )
 }
 
-const LikeCount = ({ pollId, addr }) => {
+const LikeCount = ({ pollId }) => {
   const [likeCount, setLikeCount] = useState(null)
   const [hasLiked, setHasLiked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { address, isConnected } = useAccount()
 
   const getPollData = async () => {
     const likeCount = await getPollLikeCount(pollId)
-    const isLiked = await hasLike(pollId, addr)
+    const isLiked = isConnected ? await hasLike(pollId, address) : false
     return { likeCount, hasLiked: isLiked }
   }
 
@@ -275,7 +268,7 @@ const LikeCount = ({ pollId, addr }) => {
     return () => {
       isMounted = false
     }
-  }, [pollId, addr])
+  }, [pollId])
 
   if (loading) {
     return <span>Loading...</span>
@@ -332,6 +325,7 @@ const Options = ({ item }) => {
   }
 
   useEffect(() => {
+    //isPollActive(item.startTime, item.endTime).isActive
     getVoteCountsForPoll(web3.utils.toNumber(item.pollId)).then((res) => {
       console.log(res)
       setOptionsVoteCount(res)
@@ -343,7 +337,7 @@ const Options = ({ item }) => {
       console.log(web3.utils.toNumber(res))
       if (web3.utils.toNumber(res) > 0) setVoted(web3.utils.toNumber(res))
     })
-  }, [])
+  }, [item])
 
   if (status === `loading`)
     return (
@@ -373,9 +367,9 @@ const Options = ({ item }) => {
                 key={i}
                 title={``}
                 data-votes={web3.utils.toNumber(optionsVoteCount[i])}
-                data-chosen={voted === i + 1 ? true : false}
+                data-chosen={voted && voted === i + 1 ? true : false}
                 style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
-                data-percentage={(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}
+                data-percentage={totalVotes > 0 ? (web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100 : 0}
                 className={`${styles.poll__options__voted} flex flex-row align-items-center justify-content-between`}
               >
                 <span>{option}</span>
