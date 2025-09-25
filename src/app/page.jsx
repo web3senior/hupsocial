@@ -373,7 +373,7 @@ const Options = ({ item }) => {
               style={{ '--data-width': `${votePercentage}%` }}
               data-percentage={votePercentage}
               data-isactive={isPollActive(item.startTime, item.endTime).isActive}
-              data-top-option={topOption === i + 1 ? true : false}
+              data-top-option={topOption && topOption === i ? true : false}
               className={`${isPollActive(item.startTime, item.endTime).status === `endeed` ? styles.poll__options__optionEndeed : styles.poll__options__option} flex flex-row align-items-center justify-content-between`}
               onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}
               disabled={isPending || isConfirming}
