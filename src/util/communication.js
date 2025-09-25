@@ -87,11 +87,12 @@ export async function getPollLikeCount(pollId) {
     return { error }
   }
 }
-export async function hasLike(pollId, address) {
+
+export async function getHasLiked(pollId, addr) {
   const { web3, contract } = initContract()
 
   try {
-    const result = await contract.methods.hasLike(pollId, address).call()
+    const result = await contract.methods.hasLiked(pollId, addr).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)

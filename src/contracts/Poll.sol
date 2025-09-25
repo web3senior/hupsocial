@@ -123,7 +123,7 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
         newpoll.question = unicode"Lorem Ipsum is simply dummy text";
         newpoll.options = ["Option 1", "Option 2", "Option 3"];
         newpoll.startTime = block.timestamp + 2 minutes;
-        newpoll.endTime = block.timestamp + 1 days;
+        newpoll.endTime = block.timestamp + 100 days;
         newpoll.createdAt = block.timestamp;
         newpoll.votesPerAccount = 1;
         newpoll.creator = _msgSender();
@@ -391,9 +391,9 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     }
 
     /// @notice Checks if a user has liked a specific poll.
-    function hasLiked(uint256 _pollId, address _user) public view returns (bool) {
+    function hasLiked(uint256 _pollId, address _addr) public view returns (bool) {
         require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
-        return pollLikedBy[_pollId][_user];
+        return pollLikedBy[_pollId][_addr];
     }
 
     /// @notice Gets the value of a key from the block storage for a specific poll.

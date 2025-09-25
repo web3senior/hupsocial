@@ -13,7 +13,7 @@ import txIcon from '@/../public/icons/tx.svg'
 import { useRouter } from 'next/navigation'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
-import { initContract, getPolls, hasLike, getPollLikeCount, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
+import { initContract, getPolls, getHasLiked, getPollLikeCount, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
@@ -23,8 +23,9 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/hup.json'
 import { toast } from '@/components/NextToast'
-import styles from './page.module.scss'
 import Shimmer from '@/helper/Shimmer'
+import { InlineLoading } from '@/components/Loading'
+import styles from './page.module.scss'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -148,7 +149,7 @@ export default function Page() {
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <h3 className={`page-title`}>home</h3>
 
-        <div className={`__container ${styles.page__container} mt-100`} data-width={`medium`}>
+        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           {polls.length < 1 && <div className={`shimmer ${styles.pollShimmer}`} />}
           <div className={`${styles.grid} flex flex-column`}>
             {polls &&
@@ -239,39 +240,32 @@ const LikeCount = ({ pollId }) => {
   const [hasLiked, setHasLiked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const isMounted = useClientMounted()
   const { address, isConnected } = useAccount()
 
   const getPollData = async () => {
     const likeCount = await getPollLikeCount(pollId)
-    const isLiked = isConnected ? await hasLike(pollId, address) : false
+    const isLiked = isConnected ? await getHasLiked(pollId, address) : false
+    console.log(isLiked)
     return { likeCount, hasLiked: isLiked }
   }
 
   useEffect(() => {
-    let isMounted = true
-
     getPollData()
       .then((result) => {
-        if (isMounted) {
-          setLikeCount(result.likeCount)
-          setHasLiked(result.hasLiked)
-          setLoading(false)
-        }
+        setLikeCount(result.likeCount)
+        setHasLiked(result.hasLiked)
+        setLoading(false)
       })
       .catch((err) => {
-        if (isMounted) {
-          setError('Failed to fetch poll data')
-          setLoading(false)
-        }
+        console.log(err)
+        setError(`⚠️`)
+        setLoading(false)
       })
-
-    return () => {
-      isMounted = false
-    }
   }, [pollId])
 
   if (loading) {
-    return <span>Loading...</span>
+    return <InlineLoading />
   }
 
   if (error) {
@@ -281,7 +275,7 @@ const LikeCount = ({ pollId }) => {
   return (
     <>
       {hasLiked ? <img alt={``} src={heartFilledIcon.src} /> : <img alt={``} src={heartIcon.src} />}
-      <span> {likeCount}</span>
+      <span>{likeCount}</span>
     </>
   )
 }
@@ -295,6 +289,7 @@ const Options = ({ item }) => {
   const [status, setStatus] = useState(`loading`)
   const [optionsVoteCount, setOptionsVoteCount] = useState()
   const [voted, setVoted] = useState()
+  const [topOption, setTopOption] = useState()
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initContract()
   const { address, isConnected } = useAccount()
@@ -302,13 +297,17 @@ const Options = ({ item }) => {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
-const isCurrentPollActive = isPollActive(item.startTime, item.endTime).isActive
 
   const vote = async (e, pollId, optionIndex) => {
     e.stopPropagation()
     console.log(isPollActive(item.startTime, item.endTime))
-    if (!isPollActive(item.startTime, item.endTime).isActive) {
-      toast(`Poll is not active!`, `danger`)
+
+    if (isPollActive(item.startTime, item.endTime).status === `endeed`) {
+      return
+    }
+
+    if (isPollActive(item.startTime, item.endTime).status === `willstart`) {
+      toast(`Poll is not active yet.`, `warning`)
       return
     }
 
@@ -326,63 +325,66 @@ const isCurrentPollActive = isPollActive(item.startTime, item.endTime).isActive
   }
 
   useEffect(() => {
-    
-
     getVoteCountsForPoll(web3.utils.toNumber(item.pollId)).then((res) => {
       console.log(res)
       setOptionsVoteCount(res)
       setTotalVotes(res.reduce((a, b) => web3.utils.toNumber(a) + web3.utils.toNumber(b), 0))
+
+      // 1. Map the array to convert all BigInts to standard numbers.
+      const numbers = res.map((n) => web3.utils.toNumber(n))
+
+      // 2. Find the maximum of the resulting standard numbers.
+      const largestOne = Math.max(...numbers)
+
+      setTopOption(largestOne)
+
       setStatus(``)
     })
 
-    getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
-      console.log(web3.utils.toNumber(res))
-      if (web3.utils.toNumber(res) > 0) setVoted(web3.utils.toNumber(res))
-    })
-
+    // Get connected wallet choice
+    if (isConnected) {
+      getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
+        console.log(web3.utils.toNumber(res))
+        if (web3.utils.toNumber(res) > 0) setVoted(web3.utils.toNumber(res))
+      })
+    }
   }, [item])
 
   if (status === `loading`)
     return (
       <>
-        <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
-        <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
-        <Shimmer style={{ background: `var(--gray-100)`, height: `50px` }} />
+        <div className={`shimmer ${styles.optionShimmer}`} />
+        <div className={`shimmer ${styles.optionShimmer}`} />
+        <div className={`shimmer ${styles.optionShimmer}`} />
       </>
     )
 
   return (
     <>
       <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
-        
-        {!voted && isCurrentPollActive &&
-          item.options.map((option, i) => {
-            return (
-              <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)} disabled={isPending || isConfirming}>
-                <span> {option}</span>
-              </li>
-            )
-          })}
-
-        {!isCurrentPollActive &&
-          item.options.map((option, i) => {
-            return (
-              <li
-                key={i}
-                title={``}
-                data-votes={web3.utils.toNumber(optionsVoteCount[i])}
-                data-chosen={voted && voted === i + 1 ? true : false}
-                style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
-                data-percentage={totalVotes > 0 ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed(0) : 0}
-                className={`${styles.poll__options__voted} flex flex-row align-items-center justify-content-between`}
-              >
-                <span>{option}</span>
-              </li>
-            )
-          })}
+        {item.options.map((option, i) => {
+          const votePercentage = totalVotes > 0 ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed() : 0
+          return (
+            <li
+              key={i}
+              title={``}
+              data-votes={web3.utils.toNumber(optionsVoteCount[i])}
+              data-chosen={voted && voted === i + 1 ? true : false}
+              style={{ '--data-width': `${votePercentage}%` }}
+              data-percentage={votePercentage}
+              data-isactive={isPollActive(item.startTime, item.endTime).isActive}
+              data-top-option={topOption === i + 1 ? true : false}
+              className={`${isPollActive(item.startTime, item.endTime).status === `endeed` ? styles.poll__options__optionEndeed : styles.poll__options__option} flex flex-row align-items-center justify-content-between`}
+              onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}
+              disabled={isPending || isConfirming}
+            >
+              <span>{option}</span>
+            </li>
+          )
+        })}
       </ul>
 
-      <p className={`${styles.poll__ends}`}>
+      <p className={`${styles.poll__footer}`}>
         {optionsVoteCount && <>{totalVotes}</>} votes • {` `}
         <PollTimer startTime={item.startTime} endTime={item.endTime} pollId={item.pollId} />
       </p>
@@ -436,20 +438,22 @@ const Profile = ({ creator, createdAt }) => {
   if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
 
   return (
-    <figure className={`flex flex-row align-items-center justify-content-start gap-050`}>
-      <img
-        alt={profile.data.Profile[0].name || `Default PFP`}
-        src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-        className={`${styles.pfp} rounded`}
-      />
-      <figcaption className={`flex flex-column gap-025`}>
-        <div className={`flex align-items-center gap-025`}>
-          <b>{profile.data.Profile[0].name}</b>
-          <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
-          <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
-        </div>
-        <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
-      </figcaption>
-    </figure>
+    <div className={`${styles.poll__header}`}>
+      <figure className={`flex align-items-center`}>
+        <img
+          alt={profile.data.Profile[0].name || `Default PFP`}
+          src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+          className={`rounded`}
+        />
+        <figcaption className={`flex flex-column`}>
+          <div className={`flex align-items-center gap-025`}>
+            <b>{profile.data.Profile[0].name}</b>
+            <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
+            <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
+          </div>
+          <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
+        </figcaption>
+      </figure>
+    </div>
   )
 }

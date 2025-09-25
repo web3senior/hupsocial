@@ -42,7 +42,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  min-height: 100svh;
+  min-height: calc(100svh - 4rem);
 
   // display: grid;
   // grid-template-rows: auto 1fr auto;

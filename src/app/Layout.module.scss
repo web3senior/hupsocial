@@ -28,6 +28,9 @@
   overflow: hidden;
   padding: 0 0 6rem 0;
   padding: 4.5rem .3rem 5rem .3rem;
+        @media (max-width: 600px) {
+  padding: 4.5rem 0rem 4rem 0rem;
+  }
   // --pattern-fg: color-mix(in oklab, var(--grey-90-a50) 5%, transparent);
   // background-attachment: fixed;
   // background-size: 10px 10px;

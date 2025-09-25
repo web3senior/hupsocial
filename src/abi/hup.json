@@ -571,7 +571,7 @@
 			},
 			{
 				"internalType": "address",
-				"name": "_user",
+				"name": "_addr",
 				"type": "address"
 			}
 		],
@@ -614,7 +614,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "pauseMinting",
+		"name": "pause",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -845,7 +845,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "unpauseMinting",
+		"name": "unpause",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"

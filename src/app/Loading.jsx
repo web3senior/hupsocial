@@ -11,12 +11,4 @@ export const FullPageLoading = () => (
   </div>
 )
 
-export const MiniLoading = () => (
-  <div className={styles['loading']}>
-    <div className={`${styles['loading__container']} d-f-c flex-column`}>
-      <div />
-    </div>
-  </div>
-)
-
 export default FullPageLoading

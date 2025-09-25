@@ -14,12 +14,12 @@ export function isPollActive(startMoment, endMoment) {
 
   if (now.isBetween(startMoment, endMoment)) {
     // Poll is active, return time until it ends
-    return { isActive: true, timeLeft: endMoment.diff(now) }
+    return { isActive: true, timeLeft: endMoment.diff(now) ,status: `started` }
   } else if (now.isBefore(startMoment)) {
     // Poll is in the future, return time until it starts
-    return { isActive: false, timeLeft: startMoment.diff(now) }
+    return { isActive: false, timeLeft: startMoment.diff(now),status: `willstart` }
   } else {
     // Poll has ended
-    return { isActive: false, timeLeft: 0 }
+    return { isActive: false, timeLeft: 0,status: `endeed` }
   }
 }
