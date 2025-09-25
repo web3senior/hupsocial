@@ -269,7 +269,7 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     function likePoll(uint256 _pollId) external nonReentrant {
         require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
         require(!pollLikedBy[_pollId][_msgSender()], "Poll already liked.");
-        
+
         pollLikes[_pollId]++;
         pollLikedBy[_pollId][_msgSender()] = true;
         emit Event.PollLiked(_pollId, _msgSender());
@@ -286,12 +286,11 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     }
 
     // Owner Functions
- 
+
     function pause() public onlyOwner {
         _pause();
     }
 
-  
     function unpause() public onlyOwner {
         _unpause();
     }
@@ -354,6 +353,33 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
                 pollType: poll.pollType
             });
         }
+        return pollsArray;
+    }
+
+    /// @notice Retrieves an specific poll.
+    function getPollByIndex(uint256 _index) external view returns (PollWithoutMappings[] memory) {
+        require(_index > 0, "Index must be greater than 0.");
+        require(_index <= pollCount.current(), "Exceeds total poll count.");
+
+        PollWithoutMappings[] memory pollsArray = new PollWithoutMappings[](1);
+
+        PollData storage poll = polls[_index];
+        pollsArray[0] = PollWithoutMappings({
+            pollId: _index,
+            metadata: poll.metadata,
+            question: poll.question,
+            options: poll.options,
+            startTime: poll.startTime,
+            endTime: poll.endTime,
+            createdAt: poll.createdAt,
+            votesPerAccount: poll.votesPerAccount,
+            holderAmount: poll.holderAmount,
+            creator: poll.creator,
+            token: poll.token,
+            allowedComments: poll.allowedComments,
+            pollType: poll.pollType
+        });
+
         return pollsArray;
     }
 

@@ -28,6 +28,17 @@ export async function getPolls(index, count) {
     return { error }
   }
 }
+export async function getPollByIndex(index) {
+  const { web3, contract } = initContract()
+
+  try {
+    const result = await contract.methods.getPollByIndex(index).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
 
 export async function getPollCount() {
   const { web3, contract } = initContract()

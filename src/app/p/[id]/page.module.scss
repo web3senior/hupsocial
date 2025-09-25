@@ -91,7 +91,6 @@
   }
 
   &__options {
-    margin-top: 0.2rem;
     max-height: 190px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -110,17 +109,8 @@
       @media (max-width: 600px) {
         padding: 8px 0.7rem;
       }
-   
-      &:hover {
-        background-color: var(--gray-alpha-100);
-        transform: scale(0.97);
-      }
-
-      &:active {
-        background-color: var(--gray-alpha-200);
-      }
-
-            &[data-chosen='true'] {
+      
+      &[data-chosen='true'] {
         background-color: var(--gray-900);
         color: var(--white);
         outline: 3px solid var(--success-400);
@@ -132,6 +122,17 @@
           color: var(--white);
         }
       }
+
+      &:hover {
+        background-color: var(--gray-alpha-100);
+        transform: scale(0.97);
+      }
+
+      &:active {
+        background-color: var(--gray-alpha-200);
+      }
+      
+
     }
 
     &__optionEndeed {

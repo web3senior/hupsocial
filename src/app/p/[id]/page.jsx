@@ -10,10 +10,10 @@ import commentIcon from '@/../public/icons/comment.svg'
 import shareIcon from '@/../public/icons/share.svg'
 import repostIcon from '@/../public/icons/repost.svg'
 import txIcon from '@/../public/icons/tx.svg'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
-import { initContract, getPolls, getHasLiked, getPollLikeCount, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
+import { initContract, getPollByIndex, getHasLiked, getPollLikeCount, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
@@ -47,7 +47,7 @@ moment.defineLocale('en-short', {
 })
 
 export default function Page() {
-  const [polls, setPolls] = useState([])
+  const [poll, setPoll] = useState([])
   const [reactionCounter, setReactionCounter] = useState(0)
   const [selectedEmoji, setSelectedEmoji] = useState()
   const { web3, contract } = initContract()
@@ -56,14 +56,12 @@ export default function Page() {
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
   const router = useRouter()
+  const params = useParams()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
 
-  /**
-   * Close the gift modal
-   */
   const giftModalClose = (action) => {
     // Check if user canceled gifting
     if (action === 'cancel') {
@@ -81,7 +79,7 @@ export default function Page() {
       const web3 = new Web3(auth.provider)
 
       // Create a Contract instance
-      const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)
+      const contract = new web3.eth.Contract(abi, process.env.NEXT_PUBLIC_CONTRACT)
       contract.methods
         .react(auth.contextAccounts[0], selectedEmoji.item.emojiId, web3.utils.toHex(message))
         .send({
@@ -132,29 +130,25 @@ export default function Page() {
   }
 
   useEffect(() => {
-    getPollCount().then((pollCount) => {
-      console.log(pollCount)
-
-      getPolls(1, web3.utils.toNumber(pollCount)).then((res) => {
+  getPollByIndex(params.id).then((res) => {
         console.log(res)
-        if (Array.isArray(res)) setPolls(res.reverse())
+        res.pollId = params.id
+        setPoll(res)
       })
-    })
 
     //getReactionCounter().then((counter) => setReactionCounter(counter))
   }, [])
 
   return (
-    <FluentProvider theme={webLightTheme}>
+
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <h3 className={`page-title`}>home</h3>
 
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-          {polls.length < 1 && <div className={`shimmer ${styles.pollShimmer}`} />}
+          {poll.length < 1 && <div className={`shimmer ${styles.pollShimmer}`} />}
           <div className={`${styles.grid} flex flex-column`}>
-            {polls &&
-              polls.length > 0 &&
-              polls.map((item, i) => {
+            {poll.length > 0 &&
+              poll.map((item, i) => {
                 return (
                   <article key={i} onClick={() => router.push(`p/${item.pollId}`)}>
                     <section data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between`}>
@@ -223,14 +217,12 @@ export default function Page() {
                         </div>
                       </main>
                     </section>
-                    {i < polls.length - 1 && <hr />}
                   </article>
                 )
               })}
           </div>
         </div>
       </div>
-    </FluentProvider>
   )
 }
 
