@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, InteractionTag } from '@fluentui/react-components'
-
 import { useId, Button } from '@fluentui/react-components'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -241,24 +240,12 @@ const Post = ({ addr }) => {
     data: {
       Profile: [
         {
-          fullName: 'atenyun#188e',
-          name: 'atenyun',
-          description: '🌐 Working remotely\n👨‍💻 Software dev & tutor\n🧘‍♂️ Yoga\n\n⏣Official LUKSO Ambassador⏣ 🆙',
+          fullName: 'anonymous',
+          name: 'anonymous',
+          description: ``,
           id: '0x188eec07287d876a23565c3c568cbe0bb1984b83',
           profileImages: [
-            {
-              src: 'https://api.universalprofile.cloud/image/QmNhc9ZURyfqrEkn6dtVK12RBEoYZ61dcF9pivVuNCkitS?method=keccak256(bytes)&data=0xeef9c765d065ee3c3499ae953757523b8d38516fa3af39bd4a32ff701ad0f844',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmdoAvDg1BBjn55jAz89nr9zjM3NtCsW8aEqfh7ogHAarH?method=keccak256(bytes)&data=0x2c8bf1fae505819299cc003771c7a08e789cd07219886ebe39bc0b8c57c1ac95',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmdUkBCTotaaKYMx1azkYdreCt4R5kTH4VyyCLdwZNtG8M?method=keccak256(bytes)&data=0xae1e394ddfec918ad42c42e0911d935ec423fcb7024fad1fd68af94df5107ecd',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmR9K5NVHZQxwopoKeDQEMeynxxq8cyPfUiU7fqfeeqbV1?method=keccak256(bytes)&data=0xe25a3521b5f28c353a26a9c0b2a6001cb38a4606cc58e29a11363c518c469a34',
-            },
-          ],
+           ],
         },
       ],
     },
@@ -485,12 +472,12 @@ const Post = ({ addr }) => {
   }
 
   useEffect(() => {
-    // getProfile(addr).then((res) => {
-    //   console.log(res)
-    //   if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-    //     setProfile(res)
-    //   }
-    // })
+    getProfile(addr).then((res) => {
+      console.log(res)
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+        setProfile(res)
+      }
+    })
   }, [])
 
   if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
@@ -654,7 +641,12 @@ const Post = ({ addr }) => {
         )}
 
         <ul className={`flex ${styles.post__actions}`}>
-          <li title={`Attach media`}>
+          <li title={`Write post`}>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M5 19H6.098L16.7962 8.302L15.698 7.20375L5 17.902V19ZM4 20V17.4807L17.1807 4.2865C17.2832 4.19517 17.3963 4.12458 17.52 4.07475C17.6438 4.02492 17.7729 4 17.9072 4C18.0416 4 18.1717 4.02117 18.2977 4.0635C18.4236 4.10583 18.5397 4.18208 18.6462 4.29225L19.7135 5.3655C19.8237 5.47183 19.899 5.5885 19.9395 5.7155C19.9798 5.84267 20 5.96975 20 6.09675C20 6.23225 19.9772 6.36192 19.9315 6.48575C19.8858 6.60942 19.8132 6.7225 19.7135 6.825L6.51925 20H4ZM16.2375 7.7625L15.698 7.20375L16.7962 8.302L16.2375 7.7625Z" fill="#1F1F1F"/>
+</svg>
+          </li>
+            <li title={`Attach media`}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M5.6155 20C5.15517 20 4.77083 19.8458 4.4625 19.5375C4.15417 19.2292 4 18.8448 4 18.3845V5.6155C4 5.15517 4.15417 4.77083 4.4625 4.4625C4.77083 4.15417 5.15517 4 5.6155 4H18.3845C18.8448 4 19.2292 4.15417 19.5375 4.4625C19.8458 4.77083 20 5.15517 20 5.6155V18.3845C20 18.8448 19.8458 19.2292 19.5375 19.5375C19.2292 19.8458 18.8448 20 18.3845 20H5.6155ZM5.6155 19H18.3845C18.5385 19 18.6796 18.9359 18.8077 18.8077C18.9359 18.6796 19 18.5385 19 18.3845V5.6155C19 5.4615 18.9359 5.32042 18.8077 5.19225C18.6796 5.06408 18.5385 5 18.3845 5H5.6155C5.4615 5 5.32042 5.06408 5.19225 5.19225C5.06408 5.32042 5 5.4615 5 5.6155V18.3845C5 18.5385 5.06408 18.6796 5.19225 18.8077C5.32042 18.9359 5.4615 19 5.6155 19ZM7.5 16.5H16.6538L13.827 12.7308L11.2115 16.0385L9.4615 13.923L7.5 16.5Z" />
             </svg>
