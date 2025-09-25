@@ -258,6 +258,20 @@
       transform: scale(0.95);
     }
   }
+
+    &__btnDisconnect {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border-radius: var(--global-border-radius);
+    background-color: var(--rose-100);
+    color: var(--rose-600);
+    will-change: transform;
+    transition: transform 0.2s ease;
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
 }
 
 // Post

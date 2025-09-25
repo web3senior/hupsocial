@@ -33,10 +33,9 @@ export const ConnectWallet = () => {
           </button>
         </>
       ) : (
-        <div className={`flex gap-050`}>
+        <>
           <Profile addr={address} />
-          <button onClick={() => disconnect()}>Disconnect</button>
-        </div>
+        </>
       )}
       {showModal && <WalletConnectModal setShowModal={setShowModal} />}
     </div>
