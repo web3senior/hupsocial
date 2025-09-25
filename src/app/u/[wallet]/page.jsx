@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, InteractionTag } from '@fluentui/react-components'
-import { useId, Button, } from '@fluentui/react-components'
+import { useId, Button } from '@fluentui/react-components'
 import Image from 'next/image'
 import Link from 'next/link'
 import Icon from '../../../helper/MaterialIcon'
@@ -19,7 +19,6 @@ import { useAccount, useDisconnect, Connector, useConnect, useReadContract, useW
 import moment from 'moment'
 import ABI from '@/abi/hup.json'
 import styles from './page.module.scss'
-// import { getCategory, getFood } from '../util/api'
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(false)
@@ -272,7 +271,7 @@ const Post = ({ addr }) => {
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
-  
+
   const handleForm = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -519,15 +518,15 @@ const Post = ({ addr }) => {
       />
       <div className={`flex-1`}>
         {showPoll && (
-          <form ref={createFormRef} className={`formss`} onSubmit={(e) => handleCreatePoll(e)}>
+          <form ref={createFormRef} className={`form`} onSubmit={(e) => handleCreatePoll(e)}>
             <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
-<span>Only the first 280 characters will be visible on the timeline.</span>
+            <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
             <div>
               Options:
               {options &&
                 options.list.map((item, i) => {
                   return (
-                    <div key={i} className={`d-flex mt-10 grid--gap-1`}>
+                    <div key={i} className={`flex mt-10 gap-1`}>
                       <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={item} placeholder={`${item}`} />
 
                       <button type={`button`} className="btn" onClick={(e) => delOption(e, i)}>
@@ -607,9 +606,9 @@ const Post = ({ addr }) => {
               )}
             </div>
 
-            <div>
+            <div className={`flex flex-column`}>
               <Label htmlFor={``}>Voting Limit</Label>
-              <Input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
+              <input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
               <small>Each account is limited to {votingLimit} votes for this poll.</small>
             </div>
             <div>

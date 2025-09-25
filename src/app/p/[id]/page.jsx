@@ -150,7 +150,7 @@ export default function Page() {
             {poll.length > 0 &&
               poll.map((item, i) => {
                 return (
-                  <article key={i} onClick={() => router.push(`p/${item.pollId}`)}>
+                  <article key={i}>
                     <section data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between`}>
                       <header className={`${styles.poll__header}`}>
                         <Profile creator={item.creator} createdAt={item.createdAt} />

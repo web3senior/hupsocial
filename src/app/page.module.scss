@@ -213,6 +213,7 @@
   &__footer {
     color: var(--black-400);
     font-size: 11px;
+    user-select: none;
   }
 
   &__actions {

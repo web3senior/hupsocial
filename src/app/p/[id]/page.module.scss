@@ -54,7 +54,6 @@
   background-color: var(--white, #fff);
   transition: background-color 0.1s ease-out;
   isolation: isolate;
-  cursor: pointer;
   padding: 2rem 2rem;
   @media (max-width: 600px) {
     padding: 0.7rem 0.7rem;
@@ -63,8 +62,6 @@
 
   &__header {
     figure {
-
-
       figcaption {
         height: 100%;
       }
@@ -109,7 +106,7 @@
       @media (max-width: 600px) {
         padding: 8px 0.7rem;
       }
-      
+
       &[data-chosen='true'] {
         background-color: var(--gray-900);
         color: var(--white);
@@ -123,7 +120,7 @@
         }
       }
 
-      &:hover {
+      &:hover:not(&[data-chosen='true']) {
         background-color: var(--gray-alpha-100);
         transform: scale(0.97);
       }
@@ -131,8 +128,6 @@
       &:active {
         background-color: var(--gray-alpha-200);
       }
-      
-
     }
 
     &__optionEndeed {
@@ -214,6 +209,7 @@
   &__footer {
     color: var(--black-400);
     font-size: 11px;
+    user-select: none;
   }
 
   &__actions {
