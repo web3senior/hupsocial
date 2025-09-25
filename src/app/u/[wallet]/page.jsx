@@ -690,7 +690,7 @@ const Post = ({ addr }) => {
             </div>
 
             <div className={`mt-10`}>
-              {isConfirming && <InlineLoading />}
+              {isConfirming && <>Waiting for trasaction's confirmation <InlineLoading /></>}
               <button className={`btn`} type="submit" disabled={isSigning}>
                 {isSigning || isConfirming ? 'Posting...' : 'Post'}
               </button>
