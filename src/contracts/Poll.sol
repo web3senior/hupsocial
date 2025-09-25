@@ -152,7 +152,7 @@ contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     ) external payable {
         require(msg.value >= fee, "Insufficient payment for poll creation.");
         if (_options.length > 0) {
-            require(_startTime > block.timestamp + 3 minutes, "Start time must be at least 3 minutes in the future.");
+            require(_startTime > block.timestamp + 2 minutes, "Start time must be at least 3 minutes in the future.");
             require(_endTime > _startTime, "End time must be after start time.");
             require(_options.length > 1, "A poll must have at least two options.");
             require(_votesPerAccount > 0, "A poll must have at least one vote per account.");

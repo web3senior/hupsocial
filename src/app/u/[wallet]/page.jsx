@@ -265,6 +265,7 @@ const Post = ({ addr }) => {
   const [content, setContent] = useState('Question?')
   const [showPoll, setShowPoll] = useState(false)
   const [votingLimit, setVotingLimit] = useState(1)
+  const [showWhitelist, setShowWhitelist] = useState(false)
   const [whitelist, setWhitelist] = useState({ list: [] })
   const [filteredProfiles, setFilteredProfiles] = useState()
   const [options, setOptions] = useState({ list: [`Option 1`, `Option 2`] })
@@ -553,6 +554,27 @@ const Post = ({ addr }) => {
               <input type={`datetime-local`} name={`endTime`} required />
             </div>
 
+
+            <div className={`flex flex-column`}>
+              <Label htmlFor={``}>Voting Limit</Label>
+              <input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
+              <small>Each account is limited to {votingLimit} votes for this poll.</small>
+            </div>
+            <div>
+              <label htmlFor={`pollType`}>Poll Type</label>
+              <select name={`pollType`} id="" onClick={(e)=> {
+                const selectedOption = e.target.value
+                if (selectedOption ===`1`) setShowWhitelist(true)
+                  else setShowWhitelist(false)
+              }}>
+                <option value={0}>Public</option>
+                <option value={1}>Private (Whitelisted)</option>
+                <option value={2}>Only native token holders</option>
+                <option value={3}>Only tokens holder</option>
+                <option value={4}>Only NFT holders</option>
+              </select>
+            </div>
+            {showWhitelist &&
             <div className={`${styles['whitelist-container']} relative form-group`}>
               <label htmlFor={`whitelist`}>Whitelist</label>
 
@@ -605,22 +627,8 @@ const Post = ({ addr }) => {
                 </div>
               )}
             </div>
+}
 
-            <div className={`flex flex-column`}>
-              <Label htmlFor={``}>Voting Limit</Label>
-              <input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
-              <small>Each account is limited to {votingLimit} votes for this poll.</small>
-            </div>
-            <div>
-              <label htmlFor={`pollType`}>Poll Type</label>
-              <select name={`pollType`} id="">
-                <option value={0}>Public</option>
-                <option value={1}>Private (Whitelisted)</option>
-                <option value={2}>Only native token holders</option>
-                <option value={3}>Only tokens holder</option>
-                <option value={4}>Only NFT holders</option>
-              </select>
-            </div>
             <div>
               <label htmlFor={`token`}>Token</label>
               <select name="token" id="">
@@ -629,10 +637,12 @@ const Post = ({ addr }) => {
                 <option value={`0x00ecc3275aeb551ec553bfcb966cd0813ecf2935`}>$FISH</option>
               </select>
             </div>
+
             <div>
               <label htmlFor={`holderAmount`}>Amount</label>
               <input type={`number`} name={`holderAmount`} defaultValue={0} />
             </div>
+
             <div>
               <label htmlFor={`allowComments`}>Allow comments</label>
               <select name={`allowComments`} id="">
@@ -640,8 +650,9 @@ const Post = ({ addr }) => {
                 <option value={false}>No</option>
               </select>
             </div>
-            <div>
-              <button className={`btn mt-30`} type="submit">
+
+            <div className={`mt-10`}>
+              <button className={`btn`} type="submit">
                 {status.pending ? 'Creating...' : 'Create'}
               </button>
             </div>
