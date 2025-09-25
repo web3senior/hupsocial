@@ -272,6 +272,7 @@ const Post = ({ addr }) => {
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
+  
   const handleForm = async (e) => {
     e.preventDefault()
     setIsLoading(true)

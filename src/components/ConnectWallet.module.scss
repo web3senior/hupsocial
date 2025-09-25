@@ -39,42 +39,27 @@ figure.pfp {
   place-content: center;
   place-items: center;
   row-gap: 1rem;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--gray-50);
   z-index: 1000;
-}
 
-.wallet {
-  font-size: 14px;
-  font-weight: 600;
-  column-gap: 0.5rem;
-  width: 100%;
-  max-width: 200px;
-  border-radius: var(--global-border-radius);
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 0.4rem 0.25rem 0.4rem 0.5rem;
-
-  &:hover {
-    transform: scale(1.025);
-    transition: all 0.3s ease-in-out;
-  }
-
-  &:active {
-    transform: scale(0.95);
-    transition: all 0.3s ease;
-  }
-
-  img {
-    transform: scale(0.8);
-    border-radius: 999px;
-  }
-
-  li {
+  .wallet {
+    font-size: 14px;
+    font-weight: 600;
     column-gap: 0.5rem;
+    width: 100%;
+    max-width: 200px;
+    border-radius: var(--global-border-radius);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 1rem;
 
-    &:last-child {
-      padding-left: 0.1rem;
-      background-color: var(--black-025);
-      border-radius: var(--global-border-radius);
+    &:hover {
+      transform: scale(1.025);
+      transition: all 0.3s ease-in-out;
+    }
+
+    &:active {
+      transform: scale(0.95);
+      transition: all 0.3s ease;
     }
   }
 }
