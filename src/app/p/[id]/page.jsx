@@ -209,7 +209,7 @@ export default function Page() {
                                 fill="#424242"
                               />
                             </svg>
-                            <span>{new Intl.NumberFormat().format(0)} LYX</span>
+                            <span>{new Intl.NumberFormat().format(0)}</span>
                           </button>
                           {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
                           <img alt={`blue checkmark icon`} src={txIcon.src} />
