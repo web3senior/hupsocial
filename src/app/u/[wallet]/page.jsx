@@ -519,9 +519,11 @@ const Post = ({ addr }) => {
       />
       <div className={`flex-1`}>
         {showPoll && (
-          <form ref={createFormRef} className={`form`} onSubmit={(e) => handleCreatePoll(e)}>
-            <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
-            <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
+          <form ref={createFormRef} className={`form flex flex-column gap-050`} onSubmit={(e) => handleCreatePoll(e)}>
+            <div>
+              <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
+              <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
+            </div>
             <div>
               Options:
               {options &&
@@ -545,15 +547,17 @@ const Post = ({ addr }) => {
               </div>
             </div>
 
-            <div>
-              <label htmlFor={`startTime`}>Start</label>
-              <input type={`datetime-local`} name={`startTime`} required />
-              <small>Start time must be at least a minute from now.</small>
-            </div>
+            <div className={`grid grid--fill grid--gap-1`} style={{ '--data-width': `200px` }}>
+              <div>
+                <label htmlFor={`startTime`}>Start time</label>
+                <input type={`datetime-local`} name={`startTime`} required />
+                <small>Start time must be at least a minute from now.</small>
+              </div>
 
-            <div>
-              <label htmlFor={`endTime`}>End</label>
-              <input type={`datetime-local`} name={`endTime`} required />
+              <div>
+                <label htmlFor={`endTime`}>End time</label>
+                <input type={`datetime-local`} name={`endTime`} required />
+              </div>
             </div>
 
             <div className={`flex flex-column`}>
@@ -574,9 +578,9 @@ const Post = ({ addr }) => {
               >
                 <option value={0}>Public</option>
                 <option value={1}>Private (Whitelisted)</option>
-                <option value={2}>Only native token holders</option>
-                <option value={3}>Only tokens holder</option>
-                <option value={4}>Only NFT holders</option>
+                <option value={2}>Only native token holders (LYX)</option>
+                <option value={3}>Only tokens holder (LSP7)</option>
+                <option value={4}>Only NFT holders (LSP8)</option>
               </select>
             </div>
             {showWhitelist && (
