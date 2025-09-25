@@ -18,8 +18,8 @@
     line-height: 28px;
     color: #333;
     background-clip: padding-box;
-    border-radius: var(--global-border-radius);
-    border: 1px solid #ff79a865;
+    border-radius: 4px;
+    border: 1px solid var(--color-primary);
     outline: none;
     background-color: #fff;
     transition: background-color 200ms ease, outline 200ms ease, color 200ms ease, box-shadow 200ms ease, -webkit-box-shadow 200ms ease;
@@ -33,14 +33,14 @@
     &:hover {
       border-color: rgba(0, 0, 0, 0.1);
       background-color: #fff;
-      box-shadow: 0 0 0 4px rgba(255, 118, 214, 0.1);
+      box-shadow: 0 0 0 4px rgba(148, 203, 255, 0.1);
     }
 
     &:focus,
     &:active {
       border-color: rgba(0, 0, 0, 0.1);
       background-color: #fff;
-      box-shadow: 0 0 0 4px rgba(255, 118, 214, 0.1);
+      box-shadow: 0 0 0 4px rgba(148, 203, 255, 0.1);
     }
   }
 

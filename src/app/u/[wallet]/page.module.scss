@@ -14,7 +14,7 @@
     overflow: hidden;
     border: 1px solid var(--global-border-color);
     background-color: var(--white, #fff);
-        @media (max-width: 600px) {
+    @media (max-width: 600px) {
       border: none;
       filter: none;
     }
@@ -203,7 +203,7 @@
 
 .profile {
   h1 {
-      vertical-align: middle;
+    vertical-align: middle;
   }
 
   &__pfp {
@@ -274,7 +274,7 @@
 
   &__actions {
     margin-top: 1rem;
-    
+
     li {
       svg {
         border-radius: 1000px;
@@ -295,10 +295,8 @@
   }
 
   textarea {
-    height: 40px;
-    width: 100%;
+    height: 80px;
     max-height: 270px;
-    border: none;
     resize: vertical;
     &:focus {
       outline: none;
