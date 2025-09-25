@@ -531,13 +531,15 @@ const Post = ({ addr }) => {
                       <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={item} placeholder={`${item}`} />
 
                       <button type={`button`} className="btn" onClick={(e) => delOption(e, i)}>
-                        Delete
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#fff">
+                          <path d="M304.62-160q-27.62 0-46.12-18.5Q240-197 240-224.62V-720h-40v-40h160v-30.77h240V-760h160v40h-40v495.38q0 27.62-18.5 46.12Q683-160 655.38-160H304.62Zm87.69-120h40v-360h-40v360Zm135.38 0h40v-360h-40v360Z" />
+                        </svg>
                       </button>
                     </div>
                   )
                 })}
-              <div className={`mt-40 mb-10 d-f-c`}>
-                <button className="btn" type="button" onClick={(e) => addOption(e)}>
+              <div className={`mt-10`}>
+                <button className={`${styles.btnAddOption}`} type="button" onClick={(e) => addOption(e)}>
                   Add option
                 </button>
               </div>
@@ -554,7 +556,6 @@ const Post = ({ addr }) => {
               <input type={`datetime-local`} name={`endTime`} required />
             </div>
 
-
             <div className={`flex flex-column`}>
               <Label htmlFor={``}>Voting Limit</Label>
               <input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
@@ -562,11 +563,15 @@ const Post = ({ addr }) => {
             </div>
             <div>
               <label htmlFor={`pollType`}>Poll Type</label>
-              <select name={`pollType`} id="" onClick={(e)=> {
-                const selectedOption = e.target.value
-                if (selectedOption ===`1`) setShowWhitelist(true)
+              <select
+                name={`pollType`}
+                id=""
+                onClick={(e) => {
+                  const selectedOption = e.target.value
+                  if (selectedOption === `1`) setShowWhitelist(true)
                   else setShowWhitelist(false)
-              }}>
+                }}
+              >
                 <option value={0}>Public</option>
                 <option value={1}>Private (Whitelisted)</option>
                 <option value={2}>Only native token holders</option>
@@ -574,60 +579,60 @@ const Post = ({ addr }) => {
                 <option value={4}>Only NFT holders</option>
               </select>
             </div>
-            {showWhitelist &&
-            <div className={`${styles['whitelist-container']} relative form-group`}>
-              <label htmlFor={`whitelist`}>Whitelist</label>
+            {showWhitelist && (
+              <div className={`${styles['whitelist-container']} relative form-group`}>
+                <label htmlFor={`whitelist`}>Whitelist</label>
 
-              {whitelist && whitelist.list.length > 0 && (
-                <div className={`${styles['selected-whitelist']} grid grid--fill grid--gap-1`} style={{ '--data-width': `200px` }}>
-                  {whitelist.list.map((profile, i) => {
-                    return (
-                      <div key={i} className={`d-flex grid--gap-050 ms-motion-slideDownIn`}>
-                        <figure>
-                          <img src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`} alt={`${profile.fullName}`} />
-                        </figure>
-                        <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
-                          <div className={`d-flex flex-column`}>
-                            <small className={`ms-fontWeight-bold`}>{profile.fullName}</small>
-                            <span>{`${profile.id.slice(0, 4)}...${profile.id.slice(38)}`}</span>
+                {whitelist && whitelist.list.length > 0 && (
+                  <div className={`${styles['selected-whitelist']} grid grid--fill grid--gap-1`} style={{ '--data-width': `200px` }}>
+                    {whitelist.list.map((profile, i) => {
+                      return (
+                        <div key={i} className={`d-flex grid--gap-050 ms-motion-slideDownIn`}>
+                          <figure>
+                            <img src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`} alt={`${profile.fullName}`} />
+                          </figure>
+                          <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
+                            <div className={`d-flex flex-column`}>
+                              <small className={`ms-fontWeight-bold`}>{profile.fullName}</small>
+                              <span>{`${profile.id.slice(0, 4)}...${profile.id.slice(38)}`}</span>
+                            </div>
+
+                            <button className={`rounded d-f-c`} type={`button`} title={`Clear ${profile.fullName}`} onClick={(e) => handleRemoveWhitelist(e, i)}>
+                              <Icon name={`close`} />
+                            </button>
                           </div>
-
-                          <button className={`rounded d-f-c`} type={`button`} title={`Clear ${profile.fullName}`} onClick={(e) => handleRemoveWhitelist(e, i)}>
-                            <Icon name={`close`} />
-                          </button>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                )}
 
-              <input ref={whitelistInputRef} type={`text`} name={`whitelist`} autoComplete={`off`} placeholder={`Search profile by name or address`} onChange={(e) => handleSearchProfile(e)} />
+                <input ref={whitelistInputRef} type={`text`} name={`whitelist`} autoComplete={`off`} placeholder={`Search profile by name or address`} onChange={(e) => handleSearchProfile(e)} />
 
-              {filteredProfiles && filteredProfiles?.data && (
-                <div className={`${styles['filter-profile']} ms-depth-8`}>
-                  {filteredProfiles.data.search_profiles.map((profile, i) => {
-                    return (
-                      <div key={i} id={`profileCard${i}`} className={`d-flex grid--gap-050`}>
-                        <figure>
-                          <img src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`} alt={`${profile.fullName}`} />
-                        </figure>
-                        <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
-                          <div className={`d-flex flex-column`}>
-                            <b>{profile.fullName}</b>
-                            <span>{`${profile.id.slice(0, 4)}…${profile.id.slice(38)}`}</span>
+                {filteredProfiles && filteredProfiles?.data && (
+                  <div className={`${styles['filter-profile']} ms-depth-8`}>
+                    {filteredProfiles.data.search_profiles.map((profile, i) => {
+                      return (
+                        <div key={i} id={`profileCard${i}`} className={`d-flex grid--gap-050`}>
+                          <figure>
+                            <img src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`} alt={`${profile.fullName}`} />
+                          </figure>
+                          <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
+                            <div className={`d-flex flex-column`}>
+                              <b>{profile.fullName}</b>
+                              <span>{`${profile.id.slice(0, 4)}…${profile.id.slice(38)}`}</span>
+                            </div>
+                            <button className={`btn`} type={`button`} onClick={(e) => handleAddWhitelist(e, profile, `profileCard${i}`)}>
+                              Add profile
+                            </button>
                           </div>
-                          <button className={`btn`} type={`button`} onClick={(e) => handleAddWhitelist(e, profile, `profileCard${i}`)}>
-                            Add profile
-                          </button>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-}
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label htmlFor={`token`}>Token</label>
@@ -683,10 +688,6 @@ const Post = ({ addr }) => {
           </li>
         </ul>
       </div>
-
-      <button className={`flex-1`} onClick={(e) => post(e)} disabled={!content}>
-        Post
-      </button>
     </div>
   )
 }

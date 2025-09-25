@@ -273,6 +273,8 @@
   }
 
   &__actions {
+    margin-top: 1rem;
+    
     li {
       svg {
         border-radius: 1000px;
@@ -303,13 +305,10 @@
     }
   }
 
-  button {
-    all: unset;
+  .btnAddOption {
     display: block;
-    padding: 0.5rem 1rem;
-    font-weight: 600;
+    padding: 0.1rem 1rem;
     border-radius: var(--global-border-radius);
-    border: 2px solid var(--gray-900, #000);
     cursor: pointer;
 
     &[disabled] {
