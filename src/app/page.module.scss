@@ -63,8 +63,6 @@
 
   &__header {
     figure {
-
-
       figcaption {
         height: 100%;
       }
@@ -110,7 +108,7 @@
       @media (max-width: 600px) {
         padding: 8px 0.7rem;
       }
-   
+
       &:hover {
         background-color: var(--gray-alpha-100);
         transform: scale(0.97);
@@ -120,7 +118,7 @@
         background-color: var(--gray-alpha-200);
       }
 
-            &[data-chosen='true'] {
+      &[data-chosen='true'] {
         background-color: var(--gray-900);
         color: var(--white);
         outline: 3px solid var(--success-400);
@@ -128,8 +126,9 @@
         span {
           color: var(--white);
         }
+
         &:after {
-          color: var(--white);
+          color: var(--white) !important;
         }
       }
     }
@@ -174,6 +173,42 @@
         color: var(--white);
       }
 
+      &:before,
+      &:after {
+        content: '';
+        border-radius: inherit;
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-weight: 900;
+      }
+
+      &:before {
+        height: 100%;
+        width: var(--data-width, 0%);
+        padding: 0 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        overflow: hidden;
+        z-index: 1;
+      }
+
+      &:after {
+        content: attr(data-percentage) '%';
+        height: 100%;
+        width: 100%;
+        padding: 0 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        overflow: hidden;
+        z-index: 1;
+        color: var(--gray-400);
+      }
+    }
+
+    .showPercentage {
       &:before,
       &:after {
         content: '';

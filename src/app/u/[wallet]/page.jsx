@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, InteractionTag } from '@fluentui/react-components'
+
 import { useId, Button } from '@fluentui/react-components'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -15,9 +16,9 @@ import { getProfile, updateProfile } from '../../../util/api'
 import { initContract, getEmoji, getAllReacted } from '@/util/communication'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { useAccount, useDisconnect, Connector, useConnect, useReadContract, useWriteContract } from 'wagmi'
+import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
-import ABI from '@/abi/hup.json'
+import abi from '@/abi/hup.json'
 import styles from './page.module.scss'
 
 export default function Page() {
@@ -272,7 +273,11 @@ const Post = ({ addr }) => {
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
-
+  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
+  const { web3, contract } = initContract()
   const handleForm = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -314,10 +319,10 @@ const Post = ({ addr }) => {
     //   creator: profile.id,
     // })
     // console.log(`IPFS`, upload)
-    console.log(process.env.NEXT_PUBLIC_CONTRACT)
-    const web3 = new Web3(window.lukso)
-    const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)
-    const t = toast(`Waiting for transaction's confirmation`)
+    // console.log(process.env.NEXT_PUBLIC_CONTRACT)
+    // const web3 = new Web3(window.lukso)
+    // const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)
+    // const t = toast(`Waiting for transaction's confirmation`)
     const formData = new FormData(e.target)
 
     // try {
@@ -342,10 +347,13 @@ const Post = ({ addr }) => {
     }
     console.log(whitelist_accounts)
 
-    try {
-      contract.methods
-        .createPoll(
-          '',
+
+   
+    writeContract({
+      abi,
+      address: process.env.NEXT_PUBLIC_CONTRACT,
+      functionName: 'createPoll',
+      args: [ '',
           content,
           options.list,
           moment(formData.get(`startTime`)).utc().unix().toString(),
@@ -355,31 +363,8 @@ const Post = ({ addr }) => {
           formData.get(`pollType`),
           formData.get(`token`),
           web3.utils.toWei(formData.get(`holderAmount`), `ether`),
-          formData.get(`allowComments`) === 'true' ? true : false
-        )
-        .send({
-          from: address,
-        })
-        .then((res) => {
-          console.log(res) //res.events.tokenId
-
-          // Run partyjs
-          // party.confetti(document.querySelector(`.__container`), {
-          //   count: party.variation.range(20, 40),
-          //   shapes: ['coin'],
-          // })
-
-          toast.success(`Done`)
-          router.push(`/poll/list`)
-
-          //   e.target.innerText = `Connect & Claim`
-        })
-        .catch((error) => {
-          // e.target.innerText = `Connect & Claim`
-        })
-    } catch (error) {
-      console.log(error)
-    }
+          formData.get(`allowComments`) === 'true' ? true : false],
+    })
   }
 
   const addOption = () => {
