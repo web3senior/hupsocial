@@ -302,6 +302,7 @@ const Options = ({ item }) => {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
+const isCurrentPollActive = isPollActive(item.startTime, item.endTime).isActive
 
   const vote = async (e, pollId, optionIndex) => {
     e.stopPropagation()
@@ -325,7 +326,8 @@ const Options = ({ item }) => {
   }
 
   useEffect(() => {
-    //isPollActive(item.startTime, item.endTime).isActive
+    
+
     getVoteCountsForPoll(web3.utils.toNumber(item.pollId)).then((res) => {
       console.log(res)
       setOptionsVoteCount(res)
@@ -337,6 +339,7 @@ const Options = ({ item }) => {
       console.log(web3.utils.toNumber(res))
       if (web3.utils.toNumber(res) > 0) setVoted(web3.utils.toNumber(res))
     })
+
   }, [item])
 
   if (status === `loading`)
@@ -351,7 +354,8 @@ const Options = ({ item }) => {
   return (
     <>
       <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
-        {!voted &&
+        
+        {!voted && isCurrentPollActive &&
           item.options.map((option, i) => {
             return (
               <li key={i} title={``} className={`${styles.poll__options__option} flex flex-row align-items-center justify-content-between`} onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)} disabled={isPending || isConfirming}>
@@ -360,7 +364,7 @@ const Options = ({ item }) => {
             )
           })}
 
-        {voted &&
+        {!isCurrentPollActive &&
           item.options.map((option, i) => {
             return (
               <li
@@ -369,7 +373,7 @@ const Options = ({ item }) => {
                 data-votes={web3.utils.toNumber(optionsVoteCount[i])}
                 data-chosen={voted && voted === i + 1 ? true : false}
                 style={{ '--data-width': `${(web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100}%` }}
-                data-percentage={totalVotes > 0 ? (web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100 : 0}
+                data-percentage={totalVotes > 0 ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed(0) : 0}
                 className={`${styles.poll__options__voted} flex flex-row align-items-center justify-content-between`}
               >
                 <span>{option}</span>
