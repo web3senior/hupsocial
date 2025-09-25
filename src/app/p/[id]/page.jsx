@@ -182,7 +182,7 @@ export default function Page() {
                           </div>
                         )}
 
-                        <Options item={item} />
+                     {item.options.length > 0 && <Options item={item} />}
 
                         <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
                           <button onClick={(e) => likePoll(e, item.pollId)}>{<LikeCount pollId={item.pollId} />}</button>
