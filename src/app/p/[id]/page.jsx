@@ -393,32 +393,7 @@ const Options = ({ item }) => {
  * @returns
  */
 const Profile = ({ creator, createdAt }) => {
-  const [profile, setProfile] = useState({
-    data: {
-      Profile: [
-        {
-          fullName: 'atenyun#188e',
-          name: 'atenyun',
-          description: '🌐 Working remotely\n👨‍💻 Software dev & tutor\n🧘‍♂️ Yoga\n\n⏣Official LUKSO Ambassador⏣ 🆙',
-          id: '0x188eec07287d876a23565c3c568cbe0bb1984b83',
-          profileImages: [
-            {
-              src: 'https://api.universalprofile.cloud/image/QmNhc9ZURyfqrEkn6dtVK12RBEoYZ61dcF9pivVuNCkitS?method=keccak256(bytes)&data=0xeef9c765d065ee3c3499ae953757523b8d38516fa3af39bd4a32ff701ad0f844',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmdoAvDg1BBjn55jAz89nr9zjM3NtCsW8aEqfh7ogHAarH?method=keccak256(bytes)&data=0x2c8bf1fae505819299cc003771c7a08e789cd07219886ebe39bc0b8c57c1ac95',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmdUkBCTotaaKYMx1azkYdreCt4R5kTH4VyyCLdwZNtG8M?method=keccak256(bytes)&data=0xae1e394ddfec918ad42c42e0911d935ec423fcb7024fad1fd68af94df5107ecd',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmR9K5NVHZQxwopoKeDQEMeynxxq8cyPfUiU7fqfeeqbV1?method=keccak256(bytes)&data=0xe25a3521b5f28c353a26a9c0b2a6001cb38a4606cc58e29a11363c518c469a34',
-            },
-          ],
-        },
-      ],
-    },
-  })
+  const [profile, setProfile] = useState()
   const { web3, contract } = initContract()
 
   useEffect(() => {
@@ -430,7 +405,16 @@ const Profile = ({ creator, createdAt }) => {
     })
   }, [])
 
-  if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
+  if (!profile)
+    return (
+      <div className={`${styles.profileShimmer} flex align-items-center gap-050`}>
+        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
+        <div className={`flex flex-column justify-content-between gap-025`}>
+          <span className={`shimmer rounded`} style={{ width: `60px`, height: `10px` }} />
+          <span className={`shimmer rounded`} style={{ width: `40px`, height: `10px` }} />
+        </div>
+      </div>
+    )
 
   return (
     <div className={`${styles.poll__header}`}>

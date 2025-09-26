@@ -165,7 +165,7 @@ export default function Page() {
 
                       {item.question.length > 150 && (
                         <button
-                          className={`${styles.poll__btnShowMore}`}
+                          className={`${styles.poll__btnShowMore} text-left`}
                           onClick={(e) => {
                             e.stopPropagation()
                             document.querySelector(`#pollQuestion${item.pollId}`).style.maxHeight = `unset !important`

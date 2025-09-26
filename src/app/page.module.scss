@@ -111,9 +111,8 @@
   }
 
   &__btnShowMore {
-    margin-top: 0.5rem;
     padding: .2rem;
-    background-color: var(--indigo-50);
+    background-color: unset;
   }
 
   &__options {
