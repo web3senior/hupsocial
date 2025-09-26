@@ -162,7 +162,8 @@ export default function Page() {
                         <Profile creator={item.creator} createdAt={item.createdAt} />
                       </header>
                       <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
-                        <div className={`${styles.poll__question}`} id={`pollQuestion${item.pollId}`}>
+                        <div  onClick={(e)=>e.stopPropagation()}
+                        className={`${styles.poll__question}`} id={`pollQuestion${item.pollId}`}>
                           {item.question.length > 280 ? (
                             <>
                               {item.question.slice(0, 280) + `…`}
