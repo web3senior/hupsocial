@@ -81,7 +81,14 @@
   }
 
   &__question {
+    height: auto;
+    max-height: 90px;
+    overflow: hidden;
+    padding-right: .4rem;
+    text-indent: .4rem;
+    line-height: 1.4;
     font-size: 13px;
+    cursor: default;
   }
 
   &__showmore {

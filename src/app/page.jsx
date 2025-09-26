@@ -145,7 +145,6 @@ export default function Page() {
   }, [])
 
   return (
-    <FluentProvider theme={webLightTheme}>
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <h3 className={`page-title`}>home</h3>
 
@@ -167,15 +166,16 @@ export default function Page() {
 
                                   {item.question.length > 150 ? (
                             <>
-                              <p
+                              <button
                                 className={`${styles.poll__showmore}`}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   document.querySelector(`#pollQuestion${item.pollId}`).style.maxHeight = `unset !important`
+                                  e.target.remove()
                                 }}
                               >
                                 <b className={`text-primary`}>Show More</b>
-                              </p>
+                              </button>
                             </>
                           ) : (
                             <></>
@@ -234,7 +234,6 @@ export default function Page() {
           </div>
         </div>
       </div>
-    </FluentProvider>
   )
 }
 
@@ -249,7 +248,6 @@ const LikeCount = ({ pollId }) => {
   const getPollData = async () => {
     const likeCount = await getPollLikeCount(pollId)
     const isLiked = isConnected ? await getHasLiked(pollId, address) : false
-    console.log(isLiked)
     return { likeCount, hasLiked: isLiked }
   }
 
@@ -333,7 +331,6 @@ const Options = ({ item }) => {
 
   useEffect(() => {
     getVoteCountsForPoll(web3.utils.toNumber(item.pollId)).then((res) => {
-      console.log(res)
       setOptionsVoteCount(res)
       setTotalVotes(res.reduce((a, b) => web3.utils.toNumber(a) + web3.utils.toNumber(b), 0))
 
@@ -412,7 +409,6 @@ const Profile = ({ creator, createdAt }) => {
 
   useEffect(() => {
     getProfile(creator).then((res) => {
-      console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
       }
