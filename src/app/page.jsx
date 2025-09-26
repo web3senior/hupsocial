@@ -195,7 +195,7 @@ export default function Page() {
                         )}
 
                         <div onClick={(e)=>e.stopPropagation()}
-                        className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
+                        className={`${styles.poll__actions} flex flex-row align-items-center justify-content-start`}>
                           <button onClick={(e) => likePoll(e, item.pollId)}>{<LikeCount pollId={item.pollId} />}</button>
 
                           {item.allowedComments && (
