@@ -156,8 +156,8 @@ export default function Page() {
               polls.length > 0 &&
               polls.map((item, i) => {
                 return (
-                  <article key={i} onClick={() => router.push(`p/${item.pollId}`)}>
-                    <section data-name={item.name} className={`${styles.poll} flex flex-column align-items-start justify-content-between`}>
+                  <article key={i} className={`${styles.poll}`} onClick={() => router.push(`p/${item.pollId}`)}>
+                    <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                       <header className={`${styles.poll__header}`}>
                         <Profile creator={item.creator} createdAt={item.createdAt} />
                       </header>
@@ -181,16 +181,21 @@ export default function Page() {
                           )}
                         </div>
 
-                        {item.pollType.toString() === `2` && (
-                          <div className={`flex flex-row align-items-center gap-025`}>
-                            <span className={`badge badge-pill badge-primary`}>only lyx holders</span>
-                            <span className={`badge badge-pill badge-danger`}>&gt; {web3.utils.fromWei(item.holderAmount, `ether`)} LYX</span>
-                          </div>
+                        {/* Is it poll or a post? */}
+                        {item.options.length > 0 && (
+                          <>
+                            {item.pollType.toString() === `2` && (
+                              <div className={`flex flex-row align-items-center gap-025`}>
+                                <span className={`badge badge-pill badge-primary`}>only lyx holders</span>
+                                <span className={`badge badge-pill badge-danger`}>&gt; {web3.utils.fromWei(item.holderAmount, `ether`)} LYX</span>
+                              </div>
+                            )}
+                            <Options item={item} />
+                          </>
                         )}
 
-                        {item.options.length > 0 && <Options item={item} />}
-
-                        <div className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
+                        <div onClick={(e)=>e.stopPropagation()}
+                        className={`${styles.poll__actions} w-100 flex flex-row align-items-center justify-content-start`}>
                           <button onClick={(e) => likePoll(e, item.pollId)}>{<LikeCount pollId={item.pollId} />}</button>
 
                           {item.allowedComments && (

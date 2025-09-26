@@ -50,16 +50,25 @@
 }
 
 .poll {
-  position: relative;
-  background-color: var(--white, #fff);
-  transition: background-color 0.1s ease-out;
-  isolation: isolate;
-  cursor: pointer;
-  padding: 2rem 2rem;
-  @media (max-width: 600px) {
-    padding: 0.7rem 0.7rem;
+  -webkit-tap-highlight-color: transparent;
+
+  > section {
+    position: relative;
+    background-color: var(--white, #fff);
+    transition: background-color 0.1s ease-out;
+    isolation: isolate;
+    cursor: pointer;
+    padding: 1.7rem 1.7rem 0 1.7rem;
+    @media (max-width: 600px) {
+      padding: 0.7rem 0.7rem;
+    }
+    place-items: stretch;
   }
-  place-items: stretch;
+
+  // background-image: url('/hup.svg');
+  // background-position: 97% 95%;
+  // background-repeat: no-repeat;
+  // background-size: 2rem;
 
   &__header {
     figure {
@@ -83,6 +92,7 @@
   }
 
   &__question {
+    font-size: 13px;
   }
 
   &__showmore {
@@ -255,9 +265,11 @@
   &__actions {
     font-size: 11px;
     color: var(--black-400);
-    margin-top: 0.5rem;
+    padding-bottom: 0.5rem;
     font-weight: 500;
     gap: 0.1rem;
+    cursor: default;
+    width: fit-content;
 
     button {
       all: unset;
