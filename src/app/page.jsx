@@ -162,24 +162,24 @@ export default function Page() {
                         <Profile creator={item.creator} createdAt={item.createdAt} />
                       </header>
                       <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
-                        <div onClick={(e) => e.stopPropagation()} className={`${styles.poll__question}`} id={`pollQuestion${item.pollId}`}>
-                          {item.question.length > 280 ? (
+                        <div onClick={(e) => e.stopPropagation()} className={`${styles.poll__question} `} 
+                        id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{__html: `<p>${item.question}</p>`}}/>
+
+                                  {item.question.length > 150 ? (
                             <>
-                              {item.question.slice(0, 280) + `…`}
                               <p
                                 className={`${styles.poll__showmore}`}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  document.querySelector(`#pollQuestion${item.pollId}`).innerText = `${item.question}`
+                                  document.querySelector(`#pollQuestion${item.pollId}`).style.maxHeight = `unset !important`
                                 }}
                               >
                                 <b className={`text-primary`}>Show More</b>
                               </p>
                             </>
                           ) : (
-                            <>{item.question}</>
+                            <></>
                           )}
-                        </div>
 
                         {/* Is it poll or a post? */}
                         {item.options.length > 0 && (

@@ -100,7 +100,11 @@
   }
 
   &__question {
-    font-size: 13px;
+    height: auto;
+    max-height: 100px;
+    overflow: hidden;
+    padding-right: .4rem;
+    text-indent: .4rem;
   }
 
   &__showmore {
