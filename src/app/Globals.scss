@@ -82,6 +82,7 @@ button {
   top: 1.2rem;
   left: 50%;
   transform: translateX(-50%);
+  user-select: none;
 }
 
 .relative {

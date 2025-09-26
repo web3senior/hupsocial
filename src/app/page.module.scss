@@ -29,8 +29,6 @@
   }
 }
 
-
-
 .shimmer {
   width: 548px;
   height: 48px;
@@ -53,7 +51,6 @@
 
 .profileShimmer {
   &__pfp {
- 
   }
 }
 
@@ -87,7 +84,7 @@
       > img {
         width: 36px;
         height: 36px;
-        border-radius:1000px;
+        border-radius: 1000px;
         margin-right: 0.5rem;
         border: 1px solid var(--gray-200);
         background: var(--gray-100);
@@ -101,17 +98,18 @@
 
   &__question {
     height: auto;
-    max-height: 90px;
+    max-height: 95px;
     overflow: hidden;
-    padding-right: .4rem;
-    text-indent: .4rem;
+    padding-right: 0.4rem;
+    text-indent: 0.4rem;
     line-height: 1.4;
     font-size: 13px;
     cursor: default;
+    padding: 0.2rem 0;
   }
 
   &__btnShowMore {
-    padding: .2rem;
+    padding: 0.2rem;
     background-color: unset;
   }
 
@@ -286,6 +284,7 @@
     gap: 0.1rem;
     cursor: default;
     width: fit-content;
+    user-select: none;
 
     button {
       all: unset;
@@ -305,6 +304,11 @@
 
       @media (max-width: 600px) {
         padding: 3px 9px;
+      }
+
+      &:active {
+        transform: scale(0.9);
+        transition: all 0.3s ease-in-out;
       }
 
       &:before {

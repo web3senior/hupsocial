@@ -84,8 +84,8 @@
     height: auto;
     max-height: 90px;
     overflow: hidden;
-    padding-right: .4rem;
-    text-indent: .4rem;
+    padding-right: 0.4rem;
+    text-indent: 0.4rem;
     line-height: 1.4;
     font-size: 13px;
     cursor: default;
@@ -226,6 +226,7 @@
     margin-top: 0.5rem;
     font-weight: 500;
     gap: 0.1rem;
+    user-select: none;
 
     button {
       all: unset;
