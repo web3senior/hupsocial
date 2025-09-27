@@ -47,9 +47,10 @@ moment.defineLocale('en-short', {
 })
 
 export default function Page() {
-  const [polls, setPolls] = useState([])
+  const [polls, setPolls] = useState({ list: [] })
+  const [postsLoaded, setPostsLoaded] = useState(0)
   const [reactionCounter, setReactionCounter] = useState(0)
-  const [selectedEmoji, setSelectedEmoji] = useState()
+  const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const { web3, contract } = initContract()
   const giftModal = useRef()
   const giftModalMessage = useRef()
@@ -61,49 +62,54 @@ export default function Page() {
     hash,
   })
 
-  /**
-   * Close the gift modal
-   */
-  const giftModalClose = (action) => {
-    // Check if user canceled gifting
-    if (action === 'cancel') {
-      giftModal.current.close()
-      selectedEmoji.e.innerText = `Gift`
-      return
-    }
+  const loadMorePolls = async () => {
+    // 1. **Add a guard clause to prevent re-entry**
+    if (isLoadedPoll) return
 
-    const t = toast.loading(`Waiting for transaction's confirmation`)
-    console.log(giftModalMessage.current.value)
-    const message = giftModalMessage.current.value
+    // 2. Set to true *before* starting the async operation
+    setIsLoadedPoll(true)
 
     try {
-      // window.lukso.request({ method: 'eth_requestAccounts' }).then((accounts) => {})
-      const web3 = new Web3(auth.provider)
+      const pollCount = await getPollCount()
+      console.log(`pollCount`, pollCount)
+      const totalPoll = web3.utils.toNumber(pollCount)
+      let postsPerPage = 10
+      let startIndex = totalPoll - postsLoaded - postsPerPage
 
-      // Create a Contract instance
-      const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)
-      contract.methods
-        .react(auth.contextAccounts[0], selectedEmoji.item.emojiId, web3.utils.toHex(message))
-        .send({
-          from: account,
-          value: selectedEmoji.item.price,
-        })
-        .then((res) => {
-          console.log(res)
+      // **Stop loading if all posts are accounted for**
+      if (postsLoaded >= totalPoll) {
+        console.log('All polls loaded.')
+        // We can return here, but still need to handle setIsLoadedPoll(false)
+      }
 
-          toast.success(`Done`)
-          toast.dismiss(t)
+      if (startIndex < 0) {
+        // Check if we are trying to load past the first post
+        postsPerPage = totalPoll - postsLoaded
+        startIndex = 0
+        if (postsPerPage <= 0) {
+          // All loaded
+          console.log('All polls loaded.')
+          return // Exit early
+        }
+      }
 
-          party.confetti(document.body, {
-            count: party.variation.range(20, 40),
-          })
-        })
-        .catch((error) => {
-          toast.dismiss(t)
-        })
+      // ... (rest of your logic for calculating startIndex/postsPerPage) ...
+
+      // 3. Fetch the next batch of polls
+      console.log(startIndex + 1, postsPerPage)
+      const newPolls = await getPolls(startIndex + 1, postsPerPage)
+      newPolls.reverse()
+
+      if (Array.isArray(newPolls) && newPolls.length > 0) {
+        setPolls({ list: [...polls.list, ...newPolls] })
+        setPostsLoaded((prevLoaded) => prevLoaded + newPolls.length)
+      }
     } catch (error) {
-      console.log(error)
-      toast.dismiss(t)
+      console.error('Error loading more polls:', error)
+    } finally {
+      // 4. **Crucial: Set to false in finally block**
+      // This re-enables loading for the next scroll event.
+      setIsLoadedPoll(false)
     }
   }
 
@@ -132,28 +138,47 @@ export default function Page() {
   }
 
   useEffect(() => {
-    getPollCount().then((pollCount) => {
-      console.log(pollCount)
+    // We only need the scroll handler logic here now.
+    // The initial load can be handled by calling loadMorePolls in the body
+    // of the component or by an initial scroll/check.
 
-      getPolls(1, web3.utils.toNumber(pollCount)).then((res) => {
-        console.log(res)
-        if (Array.isArray(res)) setPolls(res.reverse())
-      })
-    })
+    const handleScroll = () => {
+      const scrolledTo = window.scrollY + window.innerHeight
+      // Use a small buffer (e.g., -100px) for better UX
+      const isReachBottom = document.body.scrollHeight - 100 < scrolledTo
 
-    //getReactionCounter().then((counter) => setReactionCounter(counter))
-  }, [])
+      // **Now this check prevents simultaneous loads**
+      if (isReachBottom && !isLoadedPoll) {
+        loadMorePolls()
+      }
+    }
+
+    // Call loadMorePolls once on mount to load the initial batch
+    // This is safer outside the scroll handler definition.
+    if (postsLoaded === 0 && !isLoadedPoll) {
+      loadMorePolls()
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+    // NOTE: loadMorePolls must be wrapped in useCallback if you want to
+    // add it to the dependency array. For this simple case, we'll keep
+    // dependencies simple, but be aware of stale closure issues.
+    // If loadMorePolls isn't wrapped in useCallback, you might get a warning.
+  }, [isLoadedPoll, postsLoaded]) // Added necessary dependencies
 
   return (
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title`}>home</h3>
 
+     <button onClick={()=>loadMorePolls()} style={{position:`fixed`,left:`0`,top:`2rem`,zIndex:`1999`}}>Load More</button>
+
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {polls.length < 1 && <div className={`shimmer ${styles.pollShimmer}`} />}
+        {polls.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}        
         <div className={`${styles.grid} flex flex-column`}>
           {polls &&
-            polls.length > 0 &&
-            polls.map((item, i) => {
+            polls.list.length > 0 &&
+            polls.list.map((item, i) => {
               return (
                 <article key={i} className={`${styles.poll}`} onClick={() => router.push(`p/${item.pollId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
@@ -216,6 +241,8 @@ export default function Page() {
                           </svg>
                           <span>{new Intl.NumberFormat().format(0)} LYX</span>
                         </button>
+
+                        <code>ID: {item.pollId}</code>
                         {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
                           <img alt={`blue checkmark icon`} src={txIcon.src} />
                         </Link> */}
@@ -232,6 +259,11 @@ export default function Page() {
   )
 }
 
+/**
+ *
+ * @param {*} param0
+ * @returns
+ */
 const LikeCount = ({ pollId }) => {
   const [likeCount, setLikeCount] = useState(null)
   const [hasLiked, setHasLiked] = useState(false)
@@ -343,7 +375,6 @@ const Options = ({ item }) => {
     // Get connected wallet choice
     if (isConnected) {
       getVoterChoices(web3.utils.toNumber(item.pollId), address).then((res) => {
-        console.log(web3.utils.toNumber(res))
         if (web3.utils.toNumber(res) > 0) setVoted(web3.utils.toNumber(res))
       })
     }
