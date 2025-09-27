@@ -26,7 +26,7 @@ export default function Footer() {
     },
     {
       name: `New`,
-      path: 'leaderboard',
+      path: 'new',
       icon: `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1f1f1f"><path d="M450-450H220v-60h230v-230h60v230h230v60H510v230h-60v-230Z"/></svg>`,
       disabled: false,
     },
