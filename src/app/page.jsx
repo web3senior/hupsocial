@@ -169,7 +169,7 @@ export default function Page() {
             polls.list.length > 0 &&
             polls.list.map((item, i) => {
               return (
-                <article key={i} className={`${styles.poll}`} onClick={() => router.push(`p/${item.pollId}`)}>
+                <article key={i} className={`${styles.poll} animate fade`} onClick={() => router.push(`p/${item.pollId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                     <header className={`${styles.poll__header}`}>
                       <Profile creator={item.creator} createdAt={item.createdAt} />
