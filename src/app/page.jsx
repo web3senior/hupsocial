@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useId, useRef } from 'react'
+import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import { FluentProvider, webLightTheme, Badge } from '@fluentui/react-components'
 import Link from 'next/link'
 import moment from 'moment'
@@ -62,7 +62,7 @@ export default function Page() {
     hash,
   })
 
-  const loadMorePolls = async () => {
+  const loadMorePolls =  async() => {
     // 1. **Add a guard clause to prevent re-entry**
     if (isLoadedPoll) return
 
@@ -73,7 +73,7 @@ export default function Page() {
       const pollCount = await getPollCount()
       console.log(`pollCount`, pollCount)
       const totalPoll = web3.utils.toNumber(pollCount)
-      let postsPerPage = 10
+      let postsPerPage = 11
       let startIndex = totalPoll - postsLoaded - postsPerPage
 
       // **Stop loading if all posts are accounted for**
@@ -101,7 +101,7 @@ export default function Page() {
       newPolls.reverse()
 
       if (Array.isArray(newPolls) && newPolls.length > 0) {
-        setPolls({ list: [...polls.list, ...newPolls] })
+  setPolls((prevPolls) => ({ list: [...prevPolls.list, ...newPolls] }))
         setPostsLoaded((prevLoaded) => prevLoaded + newPolls.length)
       }
     } catch (error) {
@@ -159,19 +159,18 @@ export default function Page() {
       loadMorePolls()
     }
 
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    // window.addEventListener('scroll', handleScroll)
+    // return () => window.removeEventListener('scroll', handleScroll)
     // NOTE: loadMorePolls must be wrapped in useCallback if you want to
     // add it to the dependency array. For this simple case, we'll keep
     // dependencies simple, but be aware of stale closure issues.
     // If loadMorePolls isn't wrapped in useCallback, you might get a warning.
-  }, [isLoadedPoll, postsLoaded]) // Added necessary dependencies
+  }, []) // Added necessary dependencies  [isLoadedPoll, postsLoaded]
 
   return (
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title`}>home</h3>
 
-     <button onClick={()=>loadMorePolls()} style={{position:`fixed`,left:`0`,top:`2rem`,zIndex:`1999`}}>Load More</button>
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
         {polls.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}        
@@ -254,7 +253,12 @@ export default function Page() {
               )
             })}
         </div>
+
+
       </div>
+
+                   <button className={`${styles.loadMore}`} onClick={()=>loadMorePolls()} 
+            >Load More</button>
     </div>
   )
 }
