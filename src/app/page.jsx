@@ -62,7 +62,7 @@ export default function Page() {
     hash,
   })
 
-  const loadMorePolls =  async() => {
+  const loadMorePolls = async () => {
     // 1. **Add a guard clause to prevent re-entry**
     if (isLoadedPoll) return
 
@@ -101,7 +101,7 @@ export default function Page() {
       newPolls.reverse()
 
       if (Array.isArray(newPolls) && newPolls.length > 0) {
-  setPolls((prevPolls) => ({ list: [...prevPolls.list, ...newPolls] }))
+        setPolls((prevPolls) => ({ list: [...prevPolls.list, ...newPolls] }))
         setPostsLoaded((prevLoaded) => prevLoaded + newPolls.length)
       }
     } catch (error) {
@@ -171,9 +171,8 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title`}>home</h3>
 
-
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {polls.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}        
+        {polls.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
         <div className={`${styles.grid} flex flex-column`}>
           {polls &&
             polls.list.length > 0 &&
@@ -240,8 +239,6 @@ export default function Page() {
                           </svg>
                           <span>{new Intl.NumberFormat().format(0)} LYX</span>
                         </button>
-
-                        <code>ID: {item.pollId}</code>
                         {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
                           <img alt={`blue checkmark icon`} src={txIcon.src} />
                         </Link> */}
@@ -253,12 +250,11 @@ export default function Page() {
               )
             })}
         </div>
-
-
       </div>
 
-                   <button className={`${styles.loadMore}`} onClick={()=>loadMorePolls()} 
-            >Load More</button>
+      <button className={`${styles.loadMore}`} onClick={() => loadMorePolls()}>
+        Load More
+      </button>
     </div>
   )
 }
