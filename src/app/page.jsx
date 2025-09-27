@@ -25,6 +25,7 @@ import abi from '@/abi/hup.json'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
+import { toSvg } from 'jdenticon'
 import styles from './page.module.scss'
 
 moment.defineLocale('en-short', {
@@ -430,6 +431,25 @@ const Profile = ({ creator, createdAt }) => {
     getProfile(creator).then((res) => {
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
+      }else {
+                setProfile({
+                  data: {
+                    Profile: [
+                      {
+                        fullName: 'annonymous',
+                        name: 'annonymous',
+                        tags: ['profile'],
+                        profileImages: [
+                          {
+                            isSVG: true,
+                           src: `${toSvg(`${creator}`,36)}`,
+                            url: 'ipfs://',
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                })
       }
     })
   }, [])
@@ -448,11 +468,15 @@ const Profile = ({ creator, createdAt }) => {
   return (
     <div className={`${styles.poll__header}`}>
       <figure className={`flex align-items-center`}>
-        <img
-          alt={profile.data.Profile[0].name || `Default PFP`}
-          src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-          className={`rounded`}
-        />
+        {!profile.data.Profile[0].profileImages[0].isSVG ? (
+          <img
+            alt={profile.data.Profile[0].name || `Default PFP`}
+            src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+            className={`rounded`}
+          />
+        ) : (
+          <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div>
+        )}
         <figcaption className={`flex flex-column`}>
           <div className={`flex align-items-center gap-025`}>
             <b>{profile.data.Profile[0].name}</b>
