@@ -50,6 +50,7 @@ export default function Page() {
   const [polls, setPolls] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [reactionCounter, setReactionCounter] = useState(0)
+  const [pollCount, setPollCount] = useState()
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const { web3, contract } = initContract()
   const giftModal = useRef()
@@ -62,7 +63,7 @@ export default function Page() {
     hash,
   })
 
-  const loadMorePolls = async () => {
+  const loadMorePolls = async (totalPoll) => {
     // 1. **Add a guard clause to prevent re-entry**
     if (isLoadedPoll) return
 
@@ -70,9 +71,7 @@ export default function Page() {
     setIsLoadedPoll(true)
 
     try {
-      const pollCount = await getPollCount()
       console.log(`pollCount`, pollCount)
-      const totalPoll = web3.utils.toNumber(pollCount)
       let postsPerPage = 11
       let startIndex = totalPoll - postsLoaded - postsPerPage
 
@@ -138,9 +137,14 @@ export default function Page() {
   }
 
   useEffect(() => {
-    // We only need the scroll handler logic here now.
-    // The initial load can be handled by calling loadMorePolls in the body
-    // of the component or by an initial scroll/check.
+    getPollCount().then((count) => {
+      const totalPoll=web3.utils.toNumber(count)
+      setPollCount(totalPoll)
+
+      if (postsLoaded === 0 && !isLoadedPoll) {
+        loadMorePolls(totalPoll)
+      }
+    })
 
     const handleScroll = () => {
       const scrolledTo = window.scrollY + window.innerHeight
@@ -152,19 +156,6 @@ export default function Page() {
         loadMorePolls()
       }
     }
-
-    // Call loadMorePolls once on mount to load the initial batch
-    // This is safer outside the scroll handler definition.
-    if (postsLoaded === 0 && !isLoadedPoll) {
-      loadMorePolls()
-    }
-
-    // window.addEventListener('scroll', handleScroll)
-    // return () => window.removeEventListener('scroll', handleScroll)
-    // NOTE: loadMorePolls must be wrapped in useCallback if you want to
-    // add it to the dependency array. For this simple case, we'll keep
-    // dependencies simple, but be aware of stale closure issues.
-    // If loadMorePolls isn't wrapped in useCallback, you might get a warning.
   }, []) // Added necessary dependencies  [isLoadedPoll, postsLoaded]
 
   return (
@@ -252,9 +243,11 @@ export default function Page() {
         </div>
       </div>
 
-      <button className={`${styles.loadMore}`} onClick={() => loadMorePolls()}>
-        Load More
-      </button>
+      {postsLoaded !== pollCount && (
+        <button className={`${styles.loadMore}`} onClick={() => loadMorePolls(pollCount)}>
+          Load More
+        </button>
+      )}
     </div>
   )
 }
