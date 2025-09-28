@@ -273,7 +273,7 @@ const Post = ({ addr }) => {
   const [showWhitelist, setShowWhitelist] = useState(false)
   const [whitelist, setWhitelist] = useState({ list: [] })
   const [filteredProfiles, setFilteredProfiles] = useState()
-  const [options, setOptions] = useState({ list: [`Option 1`, `Option 2`] })
+  const [options, setOptions] = useState({ list: [``, ``] })
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
@@ -390,7 +390,7 @@ const Post = ({ addr }) => {
 
   const addOption = () => {
     let newOptions = options.list
-    newOptions.push(`Option ${newOptions.length + 1}`)
+    newOptions.push(``)
     setOptions({ list: newOptions })
   }
 
@@ -536,7 +536,7 @@ const Post = ({ addr }) => {
                 options.list.map((item, i) => {
                   return (
                     <div key={i} className={`flex mt-10 gap-1`}>
-                      <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={item} placeholder={`${item}`} />
+                      <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={``} placeholder={`Option ${++i}`} />
 
                       <button type={`button`} className="btn" onClick={(e) => delOption(e, i)}>
                         <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#fff">
