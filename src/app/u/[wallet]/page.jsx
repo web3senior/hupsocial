@@ -64,7 +64,7 @@ export default function Page() {
             <Profile addr={params.wallet} />
           </div>
 
-          <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center mt-20 w-100`}>
+          <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
             <li>
               <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
                 Posts <span className={`lable lable-dark`}>0</span>
@@ -168,6 +168,7 @@ const Profile = ({ addr }) => {
       ],
     },
   })
+  const [selfView, setSelfView] = useState()
   const params = useParams()
   const { web3, contract } = initContract()
   const { address, isConnected } = useAccount()
@@ -190,6 +191,7 @@ const Profile = ({ addr }) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
+        setSelfView(addr.toString().toLowerCase() === profile.data.Profile[0].id.toLowerCase())
       }
     })
   }, [])
@@ -222,26 +224,35 @@ const Profile = ({ addr }) => {
         </>
       </figcaption>
 
-      <ul className={`flex flex-column align-items-center justify-content-between gap-1 mt-20 `}>
+      <ul className={`flex flex-column align-items-center justify-content-between gap-1 mt-10 `}>
         <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
           <button className={`${styles.btnFollowers}`}>
             <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
           </button>
           <span>•</span>
-          <Link className={`${styles.link}`} target={`_blank`} href={`https://profile.link/${profile.data.Profile[0].fullName}`}>
-            profile.link/{profile.data.Profile[0].fullName}
+          <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
+            hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
           </Link>
         </li>
-        <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-          <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-            Follow
-          </button>
-          {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
-            <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
-              Disconnect
+        {!selfView && (
+          <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+            <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+              Edit profile
             </button>
-          )}
-        </li>
+          </li>
+        )}
+        {selfView && (
+          <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+            <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+              Follow
+            </button>
+            {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
+              <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
+                Disconnect
+              </button>
+            )}
+          </li>
+        )}
       </ul>
     </div>
   )
@@ -548,17 +559,15 @@ const Post = ({ addr }) => {
                     </div>
                   )
                 })}
-
-                {
-                  options.list.length < 8 && <>
+              {options.list.length < 8 && (
+                <>
                   <div className={`mt-10`}>
-                <button className={`${styles.btnAddOption}`} type="button" onClick={(e) => addOption(e)}>
-                  Add option
-                </button>
-              </div>
-                  </>
-                }
-              
+                    <button className={`${styles.btnAddOption}`} type="button" onClick={(e) => addOption(e)}>
+                      Add option
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className={`grid grid--fill grid--gap-1`} style={{ '--data-width': `200px` }}>
@@ -698,7 +707,11 @@ const Post = ({ addr }) => {
             </div>
 
             <div className={`mt-10`}>
-              {isConfirming && <>Waiting for trasaction's confirmation <InlineLoading /></>}
+              {isConfirming && (
+                <>
+                  Waiting for trasaction's confirmation <InlineLoading />
+                </>
+              )}
               <button className={`btn`} type="submit" disabled={isSigning}>
                 {isSigning || isConfirming ? 'Posting...' : 'Post'}
               </button>

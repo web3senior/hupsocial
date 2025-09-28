@@ -139,7 +139,7 @@ export default function Page() {
 
   useEffect(() => {
     getPollCount().then((count) => {
-      const totalPoll=web3.utils.toNumber(count)
+      const totalPoll = web3.utils.toNumber(count)
       setPollCount(totalPoll)
 
       if (postsLoaded === 0 && !isLoadedPoll) {
@@ -426,30 +426,31 @@ const Options = ({ item }) => {
 const Profile = ({ creator, createdAt }) => {
   const [profile, setProfile] = useState()
   const { web3, contract } = initContract()
-
+  const router = useRouter()
+  
   useEffect(() => {
     getProfile(creator).then((res) => {
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
-      }else {
-                setProfile({
-                  data: {
-                    Profile: [
-                      {
-                        fullName: 'annonymous',
-                        name: 'annonymous',
-                        tags: ['profile'],
-                        profileImages: [
-                          {
-                            isSVG: true,
-                           src: `${toSvg(`${creator}`,36)}`,
-                            url: 'ipfs://',
-                          },
-                        ],
-                      },
-                    ],
+      } else {
+        setProfile({
+          data: {
+            Profile: [
+              {
+                fullName: 'annonymous',
+                name: 'annonymous',
+                tags: ['profile'],
+                profileImages: [
+                  {
+                    isSVG: true,
+                    src: `${toSvg(`${creator}`, 36)}`,
+                    url: 'ipfs://',
                   },
-                })
+                ],
+              },
+            ],
+          },
+        })
       }
     })
   }, [])
@@ -466,7 +467,13 @@ const Profile = ({ creator, createdAt }) => {
     )
 
   return (
-    <div className={`${styles.poll__header}`}>
+    <div
+      className={`${styles.poll__header}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        router.push(`/u/${creator}`)
+      }}
+    >
       <figure className={`flex align-items-center`}>
         {!profile.data.Profile[0].profileImages[0]?.isSVG ? (
           <img

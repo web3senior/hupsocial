@@ -16,7 +16,7 @@
     overflow: hidden;
     border: 1px solid var(--gray-300);
     isolation: isolate;
-    
+
     @media (max-width: 600px) {
       border: none;
       filter: none;
@@ -35,7 +35,7 @@
   text-align: center;
   margin: 0 auto;
   position: relative;
-  top: .5rem;
+  top: 0.5rem;
 
   color: var(--white, #fff);
   background-color: var(--color-primary);
@@ -102,6 +102,9 @@
   // background-size: 2rem;
 
   &__header {
+    width: fit-content;
+    user-select: none;
+
     figure {
       figcaption {
         height: 100%;
