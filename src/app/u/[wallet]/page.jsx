@@ -191,7 +191,7 @@ const Profile = ({ addr }) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
-        setSelfView(addr.toString().toLowerCase() === profile.data.Profile[0].id.toLowerCase())
+        setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
       }
     })
   }, [])
@@ -234,23 +234,23 @@ const Profile = ({ addr }) => {
             hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
           </Link>
         </li>
-        {!selfView && (
-          <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-            <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-              Edit profile
-            </button>
-          </li>
-        )}
         {selfView && (
           <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
             <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-              Follow
+              Edit profile
             </button>
             {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
               <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
                 Disconnect
               </button>
             )}
+          </li>
+        )}
+        {!selfView && (
+          <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+            <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+              Follow
+            </button>
           </li>
         )}
       </ul>
