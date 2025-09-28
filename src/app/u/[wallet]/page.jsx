@@ -389,9 +389,10 @@ const Post = ({ addr }) => {
   }
 
   const addOption = () => {
-    let newOptions = options.list
-    newOptions.push(``)
-    setOptions({ list: newOptions })
+    let optionList = options.list
+    if (optionList.length === 8) return
+    optionList.push(``)
+    setOptions({ list: optionList })
   }
 
   const updateOption = (e, index) => {
@@ -400,11 +401,12 @@ const Post = ({ addr }) => {
   }
 
   const delOption = (e, index) => {
-    let newOptions = []
+    if (options.list.length === 2) return
+    let optionList = []
     options.list.map((item, i) => {
-      if (i !== index) newOptions.push(`Choice ${newOptions.length + 1}`)
+      if (i !== index) optionList.push(``)
     })
-    setOptions({ list: newOptions })
+    setOptions({ list: optionList })
   }
 
   const handleSearchProfile = async (e) => {
@@ -536,7 +538,7 @@ const Post = ({ addr }) => {
                 options.list.map((item, i) => {
                   return (
                     <div key={i} className={`flex mt-10 gap-1`}>
-                      <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={``} placeholder={`Option ${++i}`} />
+                      <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={``} placeholder={`Option ${i + 1}`} />
 
                       <button type={`button`} className="btn" onClick={(e) => delOption(e, i)}>
                         <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#fff">
@@ -546,11 +548,17 @@ const Post = ({ addr }) => {
                     </div>
                   )
                 })}
-              <div className={`mt-10`}>
+
+                {
+                  options.list.length < 8 && <>
+                  <div className={`mt-10`}>
                 <button className={`${styles.btnAddOption}`} type="button" onClick={(e) => addOption(e)}>
                   Add option
                 </button>
               </div>
+                  </>
+                }
+              
             </div>
 
             <div className={`grid grid--fill grid--gap-1`} style={{ '--data-width': `200px` }}>
