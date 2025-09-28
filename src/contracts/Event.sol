@@ -1,33 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-/// @title Events
-/// @author Aratta Labs
-/// @notice Defines all events emitted by the Poll contract for on-chain logging.
-contract Event {
+library Event {
     // Poll Lifecycle Events
-    /// @dev Emitted when a new poll is created.
-    /// @param pollId The ID of the newly created poll.
+    /// @dev Emitted when a new poll is successfully created.
+    /// @param pollId The unique ID of the newly created poll.
     /// @param creator The address that created the poll.
-    /// @param question The question of the poll.
+    /// @param question The question string of the poll.
     event PollCreated(uint256 indexed pollId, address indexed creator, string question);
 
-    /// @dev Emitted when a poll is updated.
-    /// @param pollId The ID of the poll that was updated.
-    /// @param updater The address of the account that updated the poll.
+    /// @dev Emitted when an existing poll's details are updated.
+    /// @param pollId The ID of the updated poll.
+    /// @param updater The address that performed the update (should be the creator).
     event PollUpdated(uint256 indexed pollId, address indexed updater);
 
-    /// @dev Emitted when the whitelist of a poll is updated.
+    /// @dev Emitted when the whitelist for a private poll is modified.
     /// @param pollId The ID of the poll whose whitelist was updated.
-    /// @param manager The address that updated the whitelist.
-    event WhitelistUpdated(uint256 indexed pollId, address indexed manager);
+    /// @param updater The address that performed the update.
+    event WhitelistUpdated(uint256 indexed pollId, address indexed updater);
 
     // User Interaction Events
-    /// @dev Emitted when a user successfully casts a vote in a poll.
-    /// @param pollId The ID of the poll.
-    /// @param voter The address of the voter.
-    /// @param optionIndex The index of the option that was voted for.
+    /// @dev Emitted when an account successfully casts a vote.
+    /// @param pollId The ID of the poll that was voted on.
+    /// @param voter The address that cast the vote.
+    /// @param optionIndex The index of the option that was chosen.
     event Voted(uint256 indexed pollId, address indexed voter, uint256 optionIndex);
+    
+    /// @dev Emitted when a new comment is added to a poll.
+    /// @param pollId The ID of the poll where the comment was added.
+    /// @param commentId The unique ID of the new comment.
+    /// @param commenter The address that submitted the comment.
+    event CommentAdded(uint256 indexed pollId, uint256 indexed commentId, address indexed commenter);
 
     /// @dev Emitted when a user likes a poll.
     /// @param pollId The ID of the poll that was liked.
@@ -39,16 +42,10 @@ contract Event {
     /// @param unliker The address that unliked the poll.
     event PollUnliked(uint256 indexed pollId, address indexed unliker);
 
-    /// @dev Emitted when a new comment is added to a poll.
-    /// @param pollId The ID of the poll that the comment belongs to.
-    /// @param commenter The address of the commenter.
-    /// @param comment The content of the comment.
-    event CommentAdded(uint256 indexed pollId, address indexed commenter, string comment);
-
     // Financial Events
-    /// @dev Emitted when ETH is transferred from the contract's balance.
-    /// @param recipient The address that receives the funds.
-    /// @param amount The amount of ETH (in wei) that was withdrawn.
-    /// @param timestamp The block timestamp at which the withdrawal occurred.
-    event Withdrawal(address indexed recipient, uint256 amount, uint256 timestamp);
+    /// @dev Emitted when the contract owner successfully withdraws ETH.
+    /// @param to The address the funds were sent to (the owner).
+    /// @param amount The amount of native token (LYX/ETH) withdrawn.
+    /// @param timestamp The time of the withdrawal.
+    event Withdrawal(address indexed to, uint256 amount, uint256 timestamp);
 }
