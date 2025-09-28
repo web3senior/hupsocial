@@ -438,7 +438,7 @@ const Profile = ({ creator, createdAt }) => {
   return (
     <div className={`${styles.poll__header}`}>
       <figure className={`flex align-items-center`}>
-        {!profile.data.Profile[0].profileImages[0].isSVG ? (
+        {!profile.data.Profile[0].profileImages[0]?.isSVG ? (
           <img
             alt={profile.data.Profile[0].name || `Default PFP`}
             src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
