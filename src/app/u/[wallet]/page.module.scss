@@ -190,6 +190,26 @@
   padding: 2rem;
 }
 
+.postForm {
+
+  &__postContent {
+    position: relative;
+
+    &:after {
+      content:'draft mode';
+      position: absolute;
+      top: .5rem;
+      right: .5rem;
+      font-size: 9px;
+      background-color: var(--indigo-50);
+      color: var(--indigo-600);
+      border-radius: 1000px;
+      padding: .5rem .4rem;
+      line-height: 0;
+    }
+  }
+}
+
 .posts,
 .polls,
 .activity,

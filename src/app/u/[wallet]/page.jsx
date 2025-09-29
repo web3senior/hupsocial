@@ -280,7 +280,7 @@ const Post = ({ addr }) => {
   const [content, setContent] = useState('Question?')
   const [showForm, setShowForm] = useState(``)
   const [votingLimit, setVotingLimit] = useState(1)
-  const [postQuestion, setPostQuestion] = useState(``)
+  const [postContent, setPostContent] = useState(localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`))
   const [showWhitelist, setShowWhitelist] = useState(false)
   const [whitelist, setWhitelist] = useState({ list: [] })
   const [filteredProfiles, setFilteredProfiles] = useState()
@@ -384,6 +384,12 @@ const Post = ({ addr }) => {
         formData.get(`allowComments`) === 'true' ? true : false,
       ],
     })
+  }
+
+  const handlePostContentChange = (e) =>{
+    const value = e.target.value
+    setPostContent(value)
+    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`,value)
   }
 
   const handleCreatePost = async (e) => {
@@ -692,9 +698,11 @@ const Post = ({ addr }) => {
         )}
 
         {showForm === `post` && (
-          <form ref={createFormRef} className={`form flex flex-column gap-050`} onSubmit={(e) => handleCreatePost(e)}>
-            <div>
-              <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={postQuestion} onChange={(e) => setPostQuestion(e.target.value)} rows={10} />
+          <form ref={createFormRef} className={`form flex flex-column gap-050 ${styles.postForm}`} 
+          onSubmit={(e) => handleCreatePost(e)}>
+            <div className={`form-group ${styles.postForm__postContent}`}>
+              <textarea type="text" name="q" placeholder={`What's up!`} 
+              defaultValue={postContent} onChange={(e) => handlePostContentChange(e)} rows={10} />
               <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
             </div>
 
