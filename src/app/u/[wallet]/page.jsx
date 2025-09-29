@@ -401,7 +401,7 @@ const Post = ({ addr }) => {
       abi,
       address: process.env.NEXT_PUBLIC_CONTRACT,
       functionName: 'createPoll',
-      args: ['', postQuestion, [], 0, 0, [], 0, 0, '0x0000000000000000000000000000000000000000', 0, formData.get(`allowComments`) === 'true' ? true : false],
+      args: ['', postContent, [], 0, 0, [], 0, 0, '0x0000000000000000000000000000000000000000', 0, formData.get(`allowComments`) === 'true' ? true : false],
     })
   }
 
