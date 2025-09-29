@@ -192,20 +192,25 @@
 
 .postForm {
 
+  textarea {
+
+  }
+
   &__postContent {
     position: relative;
 
     &:after {
       content:'draft mode';
       position: absolute;
-      top: .5rem;
-      right: .5rem;
-      font-size: 9px;
-      background-color: var(--indigo-50);
-      color: var(--indigo-600);
-      border-radius: 1000px;
+      bottom: 0;
+      right: 0;
+      font-size: 8px;
+      background-color: var(--blue-50);
+      color: var(--blue-600);
+      border-bottom-left-radius:4px;
       padding: .5rem .4rem;
       line-height: 0;
+      opacity: .7;
     }
   }
 }
