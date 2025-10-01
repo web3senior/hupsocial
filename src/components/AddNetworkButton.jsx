@@ -1,5 +1,4 @@
 import React from 'react'
-import { toast } from 'react-hot-toast'
 import styles from './AddNetworkButton.module.scss'
 
 // TODO: we could use a global config file and fetch the info from there on all pages
@@ -22,7 +21,7 @@ export default function AddNetworkButton() {
     const ethereum = window.ethereum
 
     if (!ethereum) {
-      toast.error('No extension detected.')
+      toast('No extension detected.')
       return
     }
 
@@ -31,7 +30,7 @@ export default function AddNetworkButton() {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: LUKSO_NETWORK_CONFIGS.mainnet.chainId }],
       })
-      toast.success('Your extension is now connected to LUKSO network.')
+      toast('Your extension is now connected to LUKSO network.')
     } catch (switchError) {
       // This error code indicates that the chain has not been added to MetaMask.
       if (switchError.code === 4902) {
@@ -41,17 +40,15 @@ export default function AddNetworkButton() {
             params: [LUKSO_NETWORK_CONFIGS.mainnet],
           })
         } catch (addError) {
-          toast.error(addError.message)
+          toast(addError.message)
         }
       } else {
-        toast.error(switchError.message)
+        toast(switchError.message)
       }
     }
   }
 
   return (
-    <div className={styles.button} onClick={addNetwork}>
-     🦊 Add LUKSO network to 
-    </div>
+    
   )
 }

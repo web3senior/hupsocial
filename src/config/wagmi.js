@@ -5,12 +5,12 @@ import { injected, metaMask, safe, walletConnect } from 'wagmi/connectors'
 const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ``
 
 export const config = createConfig({
-  chains: [mainnet, base, lukso, luksoTestnet],
+  chains: [luksoTestnet],//mainnet, base, lukso, 
   connectors: [injected(), walletConnect({ projectId }), metaMask()], //, safe()
   transports: {
-    [mainnet.id]: http(),
-    [base.id]: http(),
-    [lukso.id]: http(),
     [luksoTestnet.id]: http(),
+    // [mainnet.id]: http(),
+    // [base.id]: http(),
+    // [lukso.id]: http(),
   },
 })

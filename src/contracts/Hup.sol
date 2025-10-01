@@ -11,14 +11,14 @@ import "./Counters.sol";
 import "./Event.sol";
 import "./Error.sol";
 
-/// @title Poll
+/// @title Hup
 /// @author Aratta Labs
-/// @notice Poll contract
+/// @notice Hup contract
 /// @dev You will find the deployed contract addresses in the repo
 /// @custom:version 1
 /// @custom:emoji 📊
 /// @custom:security-contact atenyun@gmail.com
-contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
+contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
     // State Variables
     using Counters for Counters.Counter;
 

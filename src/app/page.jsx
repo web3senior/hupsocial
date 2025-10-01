@@ -72,7 +72,7 @@ export default function Page() {
     setIsLoadedPoll(true)
 
     try {
-      let postsPerPage = 30
+      let postsPerPage = 20
       let startIndex = totalPoll - postsLoaded - postsPerPage
 
       // **Stop loading if all posts are accounted for**
@@ -163,7 +163,12 @@ export default function Page() {
       <h3 className={`page-title`}>home</h3>
 
       <div className={`__container`} data-width={`medium`}>
-        <p className={`${styles.alert}`}>Currently running on the LUKSO Testnet network.</p>
+        <p className={`${styles.alert}`}>
+          Currently running on the LUKSO Testnet network.
+          <Link href={`/networks/lukso`}>
+            <b>&nbsp;Add network</b>
+          </Link>
+        </p>
       </div>
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
