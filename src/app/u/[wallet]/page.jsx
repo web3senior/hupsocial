@@ -12,14 +12,16 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useParams } from 'next/navigation'
 import Web3 from 'web3'
 import { getProfile, updateProfile } from '../../../util/api'
-import { initContract, getEmoji, getAllReacted } from '@/util/communication'
+import { initContract, initNoteContract, getEmoji, getNote, getMaxLength } from '@/util/communication'
 import { toast } from '@/components/NextToast'
+import abi from '@/abi/hup.json'
+import noteAbi from '@/abi/note.json'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { config } from '@/config/wagmi'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
-import abi from '@/abi/hup.json'
-import styles from './page.module.scss'
 import { InlineLoading } from '@/components/Loading'
+import styles from './page.module.scss'
 
 export default function Page() {
   const [isLoading, setIsLoading] = useState(false)
@@ -104,7 +106,11 @@ export default function Page() {
     </FluentProvider>
   )
 }
-
+/**
+ * No data in tab content
+ * @param {*} param0
+ * @returns
+ */
 const NoData = ({ name }) => {
   return (
     <div className={`${styles.tabContent} ${styles.posts} d-f-c`}>
@@ -169,16 +175,93 @@ const Profile = ({ addr }) => {
     },
   })
   const [selfView, setSelfView] = useState()
+  const [showModal, setShowModal] = useState(false)
+  const [note, setNote] = useState()
+  const [noteContent, setNoteContent] = useState('')
+  const [expirationTimestamp, setExpirationTimestamp] = useState(24)
+  const [maxLength, setMaxLength] = useState()
+  const placeholders = [
+    'Share a short status',
+    "What's on your mind?",
+    'Working on a new idea...',
+    'The best thing I saw today was...',
+    "What's the next big thing in Web3?",
+    'Launching something new soon!',
+    'Share one emoji that describes your day.',
+    'I just learned something new about...',
+    'How are you feeling in 3 emojis?',
+    'A random memory that popped up today...',
+    'What book/podcast should everyone check out?',
+    'Best DAO right now?',
+    'Next trend?',
+    'Your biggest gain today?',
+    'Share a mini dapp',
+    'Bull or bear today?',
+    'My last trade was...',
+    'Watching [Coin Ticker]...',
+    'Favorite yield farm?',
+    'Best dating advice received?',
+    'Tell us about your crush...',
+    'What makes a perfect date?',
+  ]
   const params = useParams()
   const { web3, contract } = initContract()
+  const { contract: noteContract } = initNoteContract()
+
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
 
-  const follow = () => {
-    toast(`Coming soon `, `warning`)
+  /* Error during submission (e.g., user rejected)  */
+  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  /* Error after mining (e.g., transaction reverted) */
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
+    hash,
+  })
+  
+  const noteRef = useRef(``)
+
+  /**
+   * Selects a random placeholder phrase from the list.
+   * @returns {string} The randomly selected placeholder text.
+   */
+  function getRandomPlaceholder() {
+    // 1. Math.random() generates a floating point number between 0 (inclusive) and 1 (exclusive).
+    // 2. We multiply it by the array's length to get a number between 0 and array.length.
+    // 3. Math.floor() rounds this number down to the nearest whole integer, giving us a valid array index.
+    const randomIndex = Math.floor(Math.random() * placeholders.length)
+    return placeholders[randomIndex]
   }
 
-  const handleDisconnect = () => {
+  const follow = async () => toast(`Coming soon `, `warning`)
+
+  const deleteNote =  () => {
+    try {
+      const result = writeContract({
+        abi: noteAbi,
+        address: process.env.NEXT_PUBLIC_CONTRACT_NOTE,
+        functionName: 'deleteNote',
+        args: [],
+      })
+      console.log('Transaction sent:', result)
+    } catch (error) {
+      console.error('Contract write failed:', error)
+    }
+  }
+
+  const updateNote =  (e) => {
+    writeContract({
+      abi: noteAbi,
+      address: process.env.NEXT_PUBLIC_CONTRACT_NOTE,
+      functionName: 'updateNote',
+      args: [noteContent, 'public', 24],
+    })
+  }
+
+  const handleDisconnect = async () => {
     disconnect()
 
     setTimeout(() => {
@@ -186,7 +269,30 @@ const Profile = ({ addr }) => {
     }, 1000)
   }
 
+  // const getNote = async () => {
+  //   // const result = await readContract(config, {
+  //   //   noteAbi,
+  //   //   address: process.env.NEXT_PUBLIC_CONTRACT_NOTE,
+  //   //   functionName: 'notes',
+  //   //   args: [`${addr}`],
+  //   // })
+
+  //   // return result
+
+  //   noteContract
+  // }
+
   useEffect(() => {
+    getNote(addr).then((noteObj) => {
+      console.log(noteObj)
+      setNote(noteObj)
+    })
+
+    getMaxLength().then((res) => {
+      console.log(res)
+      setMaxLength(web3.utils.toNumber(res))
+    })
+
     getProfile(addr).then((res) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
@@ -194,24 +300,102 @@ const Profile = ({ addr }) => {
         setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
       }
     })
-  }, [])
+  }, [showModal])
 
   if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
 
   return (
-    <div className={`${styles.profile} flex flex-column align-items-start justify-content-start gap-050`}>
-      <img
-        alt={profile.data.Profile[0].name || `PFP`}
-        src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-        className={`${styles.profile__pfp} rounded`}
-      />
-      <figcaption className={`flex flex-column align-items-start justify-content-center gap-025`}>
-        <div className={`flex align-items-center gap-025`}>
-          <h1>{profile.data.Profile[0].name}</h1>
-          <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
-        </div>
+    <>
+      {showModal && (
+        <div className={`${styles.noteModal} animate fade`} onClick={() => setShowModal(false)}>
+          <div className={`${styles.noteModal__card}`} onClick={(e) => e.stopPropagation()}>
+            <header className={``}>
+              <div className={``} aria-label="Close" onClick={() => setShowModal(false)}>
+                <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
+                  <title>Close</title>
+                  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="3" y2="21"></line>
+                  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="21" y2="3"></line>
+                </svg>
+              </div>
+              <div className={`flex-1`}>
+                <h3>Set your status</h3>
+              </div>
+              <div className={`pointer`} onClick={(e) => updateNote(e)}>
+                {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : note && note !== '' ? `Update` : `Share`}
+              </div>
+            </header>
 
-        <>
+            <main className={`flex flex-column align-items-center gap-1 `}>
+              <div className={`${styles.noteModal__pfp} relative`}>
+                <figure className={`rounded`}>
+                  <img
+                    alt={profile.data.Profile[0].name || `PFP`}
+                    src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+                  />
+                </figure>
+
+                <div className={`d-f-c`} title={note && note.note !== '' && moment.unix(web3.utils.toNumber(note.timestamp)).utc().fromNow()}>
+                  <textarea
+                    autoFocus
+                    id="note"
+                    name="note"
+                    defaultValue={note && note !== '' ? note.note : noteContent}
+                    onInput={(e) => setNoteContent(e.target.value)}
+                    placeholder={`${getRandomPlaceholder()}`}
+                    maxLength={maxLength ? maxLength : 60}
+                  />
+                </div>
+              </div>
+
+              <div className={`${styles.noteModal__expirationTimestamp} relative`}>
+                <label htmlFor="">Clear after </label>
+                <select name="" id="" onChange={(e) => setexpirationTimestamp(e.target.value)}>
+                  <option value={24}>24h</option>
+                  <option value={8}>8h</option>
+                  <option value={6}>6h</option>
+                  <option value={4}>4h</option>
+                  <option value={1}>1h</option>
+                  <option value={0}>∞</option>
+                </select>
+              </div>
+
+              {isConfirmed && <p className='text-center badge badge-success'>Done</p>}
+
+              <div title={`Expire: ${note && moment.unix(web3.utils.toNumber(note.expirationTimestamp)).utc().fromNow()}`}>{note && note.note !== '' && <button onClick={(e) => deleteNote(e)}>Delete status</button>}</div>
+
+              <div className={`flex flex-row align-items-center gap-025`}>
+                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#1f1f1f">
+                  <path d="M460-300h40v-220h-40v220Zm20-276.92q10.46 0 17.54-7.08 7.08-7.08 7.08-17.54 0-10.46-7.08-17.54-7.08-7.07-17.54-7.07-10.46 0-17.54 7.07-7.08 7.08-7.08 17.54 0 10.46 7.08 17.54 7.08 7.08 17.54 7.08Zm.13 456.92q-74.67 0-140.41-28.34-65.73-28.34-114.36-76.92-48.63-48.58-76.99-114.26Q120-405.19 120-479.87q0-74.67 28.34-140.41 28.34-65.73 76.92-114.36 48.58-48.63 114.26-76.99Q405.19-840 479.87-840q74.67 0 140.41 28.34 65.73 28.34 114.36 76.92 48.63 48.58 76.99 114.26Q840-554.81 840-480.13q0 74.67-28.34 140.41-28.34 65.73-76.92 114.36-48.58 48.63-114.26 76.99Q554.81-120 480.13-120Zm-.13-40q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z" />
+                </svg>
+                <small>Your status is viewable by all users.</small>
+              </div>
+            </main>
+          </div>
+        </div>
+      )}
+
+      <div className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-050`}>
+        <figure className={`${styles.profile__pfp} rounded`}>
+          <img
+            alt={profile.data.Profile[0].name || `PFP`}
+            src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+          />
+          <div
+            className={`${styles['note']} animate pointer`}
+            onClick={() => {
+              setShowModal(true)
+            }}
+          >
+            {note && (note.note === '' ? `Status...` : note.note)}
+          </div>
+        </figure>
+
+        <div className={`flex flex-column align-items-start justify-content-center gap-025`}>
+          <div className={`flex align-items-center gap-025`}>
+            <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name}</h1>
+            <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
+          </div>
+
           <code className={`${styles.profile__wallet}`}>
             <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].id}`} target={`_blank`}>
               {`${profile.data.Profile[0].id.slice(0, 4)}…${profile.data.Profile[0].id.slice(38)}`}
@@ -221,45 +405,45 @@ const Profile = ({ addr }) => {
           <p className={`${styles.profile__description} mt-20`}>{profile.data.Profile[0].description || `This user has not set up a bio yet.`}</p>
 
           <div className={`${styles.profile__tags} flex flex-row align-items-center gap-025 flex-wrap gap-025`}>{profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
-        </>
-      </figcaption>
+        </div>
 
-      <ul className={`flex flex-column align-items-center justify-content-between gap-1 mt-10 `}>
-        <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
-          <button className={`${styles.btnFollowers}`}>
-            <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
-          </button>
-          <span>•</span>
-          <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
-            hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
-          </Link>
-        </li>
-        {selfView && (
-          <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-            <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-              Edit profile
+        <ul className={`flex flex-column align-items-center justify-content-between gap-1 mt-10 `}>
+          <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
+            <button className={`${styles.btnFollowers}`}>
+              <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
             </button>
-            {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
-              <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
-                Disconnect
+            <span>•</span>
+            <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
+              hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
+            </Link>
+          </li>
+          {selfView && (
+            <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+              <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+                Edit profile
               </button>
-            )}
-          </li>
-        )}
-        {!selfView && (
-          <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-            <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-              Follow
-            </button>
-          </li>
-        )}
-      </ul>
-    </div>
+              {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
+                <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
+                  Disconnect
+                </button>
+              )}
+            </li>
+          )}
+          {!selfView && (
+            <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+              <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+                Follow
+              </button>
+            </li>
+          )}
+        </ul>
+      </div>
+    </>
   )
 }
 
 /**
- * Profile
+ * Post
  * @param {String} addr
  * @returns
  */
@@ -386,10 +570,10 @@ const Post = ({ addr }) => {
     })
   }
 
-  const handlePostContentChange = (e) =>{
+  const handlePostContentChange = (e) => {
     const value = e.target.value
     setPostContent(value)
-    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`,value)
+    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, value)
   }
 
   const handleCreatePost = async (e) => {
@@ -401,7 +585,7 @@ const Post = ({ addr }) => {
       abi,
       address: process.env.NEXT_PUBLIC_CONTRACT,
       functionName: 'createPoll',
-      args: ['', postContent, [], 0, 0, [], 0, 0, '0x0000000000000000000000000000000000000000', 0, formData.get(`allowComments`) === 'true' ? true : false],
+      args: ['', postContent, [], 0, 0, [], 0, 0, `0x0000000000000000000000000000000000000000`, 0, formData.get(`allowComments`) === 'true' ? true : false],
     })
   }
 
@@ -698,11 +882,9 @@ const Post = ({ addr }) => {
         )}
 
         {showForm === `post` && (
-          <form ref={createFormRef} className={`form flex flex-column gap-050 ${styles.postForm}`} 
-          onSubmit={(e) => handleCreatePost(e)}>
+          <form ref={createFormRef} className={`form flex flex-column gap-050 ${styles.postForm}`} onSubmit={(e) => handleCreatePost(e)}>
             <div className={`form-group ${styles.postForm__postContent}`}>
-              <textarea type="text" name="q" placeholder={`What's up!`} 
-              defaultValue={postContent} onChange={(e) => handlePostContentChange(e)} rows={10} />
+              <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={postContent} onChange={(e) => handlePostContentChange(e)} rows={10} />
               <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
             </div>
 

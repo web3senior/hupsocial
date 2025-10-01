@@ -6,7 +6,7 @@ const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ``
 
 export const config = createConfig({
   chains: [mainnet, base, lukso, luksoTestnet],
-  connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
+  connectors: [injected(), walletConnect({ projectId }), metaMask()], //, safe()
   transports: {
     [mainnet.id]: http(),
     [base.id]: http(),
