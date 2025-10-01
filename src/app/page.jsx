@@ -12,8 +12,7 @@ import repostIcon from '@/../public/icons/repost.svg'
 import txIcon from '@/../public/icons/tx.svg'
 import { useRouter } from 'next/navigation'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, 
-  useWriteContract, useReadContract } from 'wagmi'
+import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initContract, getPolls, getHasLiked, getPollLikeCount, getPollCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
@@ -73,8 +72,7 @@ export default function Page() {
     setIsLoadedPoll(true)
 
     try {
-      console.log(`pollCount`, pollCount)
-      let postsPerPage = 11
+      let postsPerPage = 30
       let startIndex = totalPoll - postsLoaded - postsPerPage
 
       // **Stop loading if all posts are accounted for**
@@ -398,7 +396,7 @@ const Options = ({ item }) => {
               style={{ '--data-width': `${votePercentage}%` }}
               data-percentage={votePercentage}
               data-isactive={isPollActive(item.startTime, item.endTime).isActive}
-              data-top-option={topOption && topOption === i ? true : false}
+              data-top-option={topOption && topOption === i + 1 ? true : false}
               className={`${voted && voted > 0 && styles.showPercentage} ${
                 isPollActive(item.startTime, item.endTime).status === `endeed` ? styles.poll__options__optionEndeed : styles.poll__options__option
               } flex flex-row align-items-center justify-content-between`}
@@ -428,7 +426,7 @@ const Profile = ({ creator, createdAt }) => {
   const [profile, setProfile] = useState()
   const { web3, contract } = initContract()
   const router = useRouter()
-  
+
   useEffect(() => {
     getProfile(creator).then((res) => {
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {

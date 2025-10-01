@@ -221,7 +221,7 @@ const Profile = ({ addr }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
-  
+
   const noteRef = useRef(``)
 
   /**
@@ -238,7 +238,7 @@ const Profile = ({ addr }) => {
 
   const follow = async () => toast(`Coming soon `, `warning`)
 
-  const deleteNote =  () => {
+  const deleteNote = () => {
     try {
       const result = writeContract({
         abi: noteAbi,
@@ -252,7 +252,7 @@ const Profile = ({ addr }) => {
     }
   }
 
-  const updateNote =  (e) => {
+  const updateNote = (e) => {
     writeContract({
       abi: noteAbi,
       address: process.env.NEXT_PUBLIC_CONTRACT_NOTE,
@@ -359,9 +359,9 @@ const Profile = ({ addr }) => {
                 </select>
               </div>
 
-              {isConfirmed && <p className='text-center badge badge-success'>Done</p>}
+              {isConfirmed && <p className="text-center badge badge-success">Done</p>}
 
-              <div title={`Expire: ${note && moment.unix(web3.utils.toNumber(note.expirationTimestamp)).utc().fromNow()}`}>{note && note.note !== '' && <button onClick={(e) => deleteNote(e)}>Delete status</button>}</div>
+              <div title={`Expire: ${note && moment.unix(web3.utils.toNumber(note.expirationTimestamp)).utc().fromNow()}`}>{note && note.note !== '' && selfView && <button onClick={(e) => deleteNote(e)}>Delete status</button>}</div>
 
               <div className={`flex flex-row align-items-center gap-025`}>
                 <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#1f1f1f">
@@ -374,70 +374,77 @@ const Profile = ({ addr }) => {
         </div>
       )}
 
-      <div className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-050`}>
-        <figure className={`${styles.profile__pfp} rounded`}>
-          <img
-            alt={profile.data.Profile[0].name || `PFP`}
-            src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-          />
-          <div
-            className={`${styles['note']} animate pointer`}
-            onClick={() => {
-              setShowModal(true)
-            }}
-          >
-            {note && (note.note === '' ? `Status...` : note.note)}
-          </div>
-        </figure>
+      <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
+        <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
+          <div className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}>
+            <div className={`flex align-items-center gap-025`}>
+              <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name}</h1>
+              <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
+            </div>
 
-        <div className={`flex flex-column align-items-start justify-content-center gap-025`}>
-          <div className={`flex align-items-center gap-025`}>
-            <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name}</h1>
-            <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
+            <code className={`${styles.profile__wallet}`}>
+              <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].id}`} target={`_blank`}>
+                {`${profile.data.Profile[0].id.slice(0, 4)}…${profile.data.Profile[0].id.slice(38)}`}
+              </Link>
+            </code>
+
+            <p className={`${styles.profile__description} mt-20`}>{profile.data.Profile[0].description || `This user has not set up a bio yet.`}</p>
+
+            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>{profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
           </div>
 
-          <code className={`${styles.profile__wallet}`}>
-            <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].id}`} target={`_blank`}>
-              {`${profile.data.Profile[0].id.slice(0, 4)}…${profile.data.Profile[0].id.slice(38)}`}
-            </Link>
-          </code>
+          <div className={`${styles.profile__pfp} relative`}>
+            <figure className={`rounded`}>
+              <img
+                alt={profile.data.Profile[0].name || `PFP`}
+                src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+              />
+            </figure>
 
-          <p className={`${styles.profile__description} mt-20`}>{profile.data.Profile[0].description || `This user has not set up a bio yet.`}</p>
+            <div
+              className={`${styles.note} animate pointer`}
+              onClick={() => {
+                setShowModal(true)
+              }}
+            >
+              <p>{note && (note.note === '' ? `Status...` : note.note)}</p>
+            </div>
+          </div>
+        </header>
 
-          <div className={`${styles.profile__tags} flex flex-row align-items-center gap-025 flex-wrap gap-025`}>{profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
-        </div>
-
-        <ul className={`flex flex-column align-items-center justify-content-between gap-1 mt-10 `}>
-          <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
-            <button className={`${styles.btnFollowers}`}>
-              <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
-            </button>
-            <span>•</span>
-            <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
-              hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
-            </Link>
-          </li>
-          {selfView && (
-            <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-              <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-                Edit profile
+        <footer className={`w-100`}>
+          <ul className={`flex flex-column align-items-center justify-content-between gap-1`}>
+            <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
+              <button className={`${styles.btnFollowers}`}>
+                <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
               </button>
-              {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
-                <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
-                  Disconnect
+              <span>•</span>
+              <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
+                hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
+              </Link>
+            </li>
+            {selfView && (
+              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+                  Edit profile
                 </button>
-              )}
-            </li>
-          )}
-          {!selfView && (
-            <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-              <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-                Follow
-              </button>
-            </li>
-          )}
-        </ul>
-      </div>
+                {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
+                  <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
+                    Disconnect
+                  </button>
+                )}
+              </li>
+            )}
+            {!selfView && (
+              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+                  Follow
+                </button>
+              </li>
+            )}
+          </ul>
+        </footer>
+      </section>
     </>
   )
 }
@@ -462,7 +469,7 @@ const Post = ({ addr }) => {
     },
   })
   const [content, setContent] = useState('Question?')
-  const [showForm, setShowForm] = useState(``)
+  const [showForm, setShowForm] = useState(`post`)
   const [votingLimit, setVotingLimit] = useState(1)
   const [postContent, setPostContent] = useState(localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`))
   const [showWhitelist, setShowWhitelist] = useState(false)
@@ -481,6 +488,7 @@ const Post = ({ addr }) => {
     hash,
   })
   const { web3, contract } = initContract()
+
   const handleForm = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -897,13 +905,8 @@ const Post = ({ addr }) => {
             </div>
 
             <div className={`mt-10`}>
-              {isConfirming && (
-                <>
-                  Waiting for trasaction's confirmation <InlineLoading />
-                </>
-              )}
               <button className={`btn`} type="submit" disabled={isSigning}>
-                {isSigning || isConfirming ? 'Posting...' : 'Post'}
+                {isConfirming ? `Posting...` :isSigning ? `Signing...` : 'Post'}
               </button>
             </div>
           </form>
@@ -929,11 +932,6 @@ const Post = ({ addr }) => {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M5.6155 20C5.15517 20 4.77083 19.8458 4.4625 19.5375C4.15417 19.2292 4 18.8448 4 18.3845V5.6155C4 5.15517 4.15417 4.77083 4.4625 4.4625C4.77083 4.15417 5.15517 4 5.6155 4H18.3845C18.8448 4 19.2292 4.15417 19.5375 4.4625C19.8458 4.77083 20 5.15517 20 5.6155V18.3845C20 18.8448 19.8458 19.2292 19.5375 19.5375C19.2292 19.8458 18.8448 20 18.3845 20H5.6155ZM5.6155 19H18.3845C18.5385 19 18.6796 18.9359 18.8077 18.8077C18.9359 18.6796 19 18.5385 19 18.3845V5.6155C19 5.4615 18.9359 5.32042 18.8077 5.19225C18.6796 5.06408 18.5385 5 18.3845 5H5.6155C5.4615 5 5.32042 5.06408 5.19225 5.19225C5.06408 5.32042 5 5.4615 5 5.6155V18.3845C5 18.5385 5.06408 18.6796 5.19225 18.8077C5.32042 18.9359 5.4615 19 5.6155 19Z" />
                   <path d="M11.3333 14V10H12.3333V14H11.3333ZM7.66667 14C7.46667 14 7.30556 13.9306 7.18333 13.7917C7.06111 13.6528 7 13.5 7 13.3333V10.6667C7 10.5 7.06111 10.3472 7.18333 10.2083C7.30556 10.0694 7.46667 10 7.66667 10H9.66667C9.86667 10 10.0278 10.0694 10.15 10.2083C10.2722 10.3472 10.3333 10.5 10.3333 10.6667V11H8V13H9.33333V12H10.3333V13.3333C10.3333 13.5 10.2722 13.6528 10.15 13.7917C10.0278 13.9306 9.86667 14 9.66667 14H7.66667ZM13.3333 14V10H16.3333V11H14.3333V11.6667H15.6667V12.6667H14.3333V14H13.3333Z" />
-                </svg>
-              </li>
-              <li title={`Add an emoji`}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M15.3123 10.6155C15.6233 10.6155 15.8862 10.5066 16.101 10.2887C16.3157 10.0709 16.423 9.8065 16.423 9.4955C16.423 9.18433 16.3142 8.92142 16.0965 8.70675C15.8787 8.49192 15.6143 8.3845 15.3033 8.3845C14.9921 8.3845 14.7292 8.49342 14.5145 8.71125C14.2997 8.92908 14.1923 9.1935 14.1923 9.5045C14.1923 9.81567 14.3012 10.0786 14.519 10.2932C14.7367 10.5081 15.0011 10.6155 15.3123 10.6155ZM8.69675 10.6155C9.00792 10.6155 9.27083 10.5066 9.4855 10.2887C9.70033 10.0709 9.80775 9.8065 9.80775 9.4955C9.80775 9.18433 9.69883 8.92142 9.481 8.70675C9.26333 8.49192 8.99892 8.3845 8.68775 8.3845C8.37675 8.3845 8.11383 8.49342 7.899 8.71125C7.68433 8.92908 7.577 9.1935 7.577 9.5045C7.577 9.81567 7.68583 10.0786 7.9035 10.2932C8.12133 10.5081 8.38575 10.6155 8.69675 10.6155ZM12 16.8845C12.9538 16.8845 13.8323 16.6214 14.6355 16.0953C15.4388 15.5689 16.0424 14.8705 16.4462 14H15.45C15.0833 14.6167 14.5958 15.1042 13.9875 15.4625C13.3792 15.8208 12.7167 16 12 16C11.2833 16 10.6208 15.8208 10.0125 15.4625C9.40417 15.1042 8.91667 14.6167 8.55 14H7.55375C7.95758 14.8705 8.56117 15.5689 9.3645 16.0953C10.1677 16.6214 11.0462 16.8845 12 16.8845ZM12.0033 21C10.7588 21 9.58867 20.7638 8.493 20.2915C7.3975 19.8192 6.4445 19.1782 5.634 18.3685C4.8235 17.5588 4.18192 16.6067 3.70925 15.512C3.23642 14.4175 3 13.2479 3 12.0033C3 10.7588 3.23617 9.58867 3.7085 8.493C4.18083 7.3975 4.82183 6.4445 5.6315 5.634C6.44117 4.8235 7.39333 4.18192 8.488 3.70925C9.5825 3.23642 10.7521 3 11.9967 3C13.2413 3 14.4113 3.23617 15.507 3.7085C16.6025 4.18083 17.5555 4.82183 18.366 5.6315C19.1765 6.44117 19.8181 7.39333 20.2908 8.488C20.7636 9.5825 21 10.7521 21 11.9967C21 13.2413 20.7638 14.4113 20.2915 15.507C19.8192 16.6025 19.1782 17.5555 18.3685 18.366C17.5588 19.1765 16.6067 19.8181 15.512 20.2908C14.4175 20.7636 13.2479 21 12.0033 21ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z" />
                 </svg>
               </li>
               <li title={`Add a poll`} onClick={() => setShowForm(`poll`)}>

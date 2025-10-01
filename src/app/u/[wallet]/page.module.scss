@@ -225,14 +225,28 @@
 
 // Profile
 .profile {
+  header,
+  footer {
+    width: 100%;
+    align-items: stretch;
+  }
+
   &__pfp {
-    --r: min(8rem, 28vw);
-    width: var(--r);
-    height: var(--r);
-    position: absolute;
-    right: 0;
-    top: 0;
-    outline: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    figure {
+      --r: min(8rem, 28vw);
+      width: var(--r);
+      height: var(--r);
+      outline: 1px solid var(--gray-200);
+
+      img {
+        border-radius: inherit;
+        aspect-ratio: 1/1;
+      }
+    }
 
     .note {
       position: absolute;
@@ -241,30 +255,29 @@
       transform: translateX(-50%);
       min-width: 16px;
       max-width: 80%;
-      padding: 0.9rem 0.6rem;
+      padding: 0.2rem 0.3rem;
       border-radius: 11px;
       background-color: var(--white, #fff);
       box-shadow: var(--shadow16);
       text-overflow: ellipsis;
-      isolation: isolate;
       font-size: 11px;
       font-weight: 400;
       color: var(--gray-500);
       line-height: 1.2;
-      overflow-y: auto;
-      text-wrap: wrap;
-      overflow-x: hidden;
-      scrollbar-color: var(--gray-300) var(--gray-50);
-      scrollbar-width: thin;
+      isolation: isolate;
 
-
-
+      p {
+        overflow-y: auto;
+        text-wrap: wrap;
+        overflow-x: hidden;
         width: max-content;
-  max-width: 100%;
-  overflow: hidden; /* Clips the text outside the boundary */
-  white-space: wrap; /* Prevents text from wrapping */
-  text-overflow: ellipsis; /* Adds "..." to indicate clipping */
-
+        max-width: 100%;
+        max-height: 60px;
+        white-space: wrap;
+        text-overflow: ellipsis;
+        scrollbar-color: var(--gray-300) var(--gray-50);
+        scrollbar-width: thin;
+      }
 
       &:after,
       &:before {
@@ -293,11 +306,6 @@
         transform: translateX(-30%);
         background-color: var(--white, #fff);
       }
-    }
-
-    img {
-      border-radius: inherit;
-      aspect-ratio: 1/1;
     }
   }
 
