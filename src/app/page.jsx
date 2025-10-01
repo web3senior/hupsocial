@@ -165,7 +165,7 @@ export default function Page() {
       <div className={`__container`} data-width={`medium`}>
         <p className={`${styles.alert}`}>
           Currently running on the LUKSO Testnet network.
-          <Link href={`/networks/lukso`}>
+          <Link href={`/networks`}>
             <b>&nbsp;Add network</b>
           </Link>
         </p>
