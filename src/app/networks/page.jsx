@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from '@/components/NextToast'
 import { config } from '@/config/wagmi'
+import Web3 from 'web3'
 import styles from './page.module.scss'
 
 export default function Page() {
@@ -20,7 +21,7 @@ export default function Page() {
     try {
       await ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: web3.utils.toHex(network.id) }],
+        params: [{ chainId: Web3.utils.toHex(network.id) }],
       })
       toast('Your extension is now connected to LUKSO network.', `success`)
     } catch (switchError) {
@@ -31,7 +32,7 @@ export default function Page() {
             method: 'wallet_addEthereumChain',
             params: [
               {
-                chainId: web3.utils.toHex(network.id), //'0x2A',
+                chainId: Web3.utils.toHex(network.id), //'0x2A',
                 chainName: network.name,
                 nativeCurrency: {
                   name: network.nativeCurrency.name,
