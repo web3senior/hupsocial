@@ -112,7 +112,6 @@ export default function Page() {
     }
   }
 
-
   const openModal = (e, item) => {
     e.target.innerText = `Sending...`
     setSelectedEmoji({ e: e.target, item: item, message: null })
@@ -167,8 +166,7 @@ export default function Page() {
                       <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
                     </header>
                     <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
-                      <div
-                      className={`${styles.poll__question} `} id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
+                      <div className={`${styles.poll__question} `} id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
 
                       {item.question.length > 150 && (
                         <button
@@ -197,10 +195,7 @@ export default function Page() {
                       )}
 
                       <div onClick={(e) => e.stopPropagation()} className={`${styles.poll__actions} flex flex-row align-items-center justify-content-start`}>
-                        
-                       
-                          {<LikeCount pollId={item.pollId} />}
-                      
+                        {<LikeCount pollId={item.pollId} />}
 
                         {item.allowedComments && (
                           <button>
@@ -260,7 +255,7 @@ const LikeCount = ({ pollId }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const { address, isConnected } = useAccount()
-    const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
@@ -271,7 +266,7 @@ const LikeCount = ({ pollId }) => {
     return { likeCount, hasLiked: isLiked }
   }
 
-    const likePoll = (e, pollId) => {
+  const likePoll = (e, pollId) => {
     e.stopPropagation()
 
     if (!isConnected) {
@@ -287,8 +282,8 @@ const LikeCount = ({ pollId }) => {
     })
   }
 
-  const unLikePoll= (e, pollId) => {
-        e.stopPropagation()
+  const unLikePoll = (e, pollId) => {
+    e.stopPropagation()
 
     if (!isConnected) {
       console.log(`Please connect your wallet first`, 'error')
@@ -302,7 +297,6 @@ const LikeCount = ({ pollId }) => {
       args: [pollId],
     })
   }
-
 
   useEffect(() => {
     getPollData()
@@ -327,7 +321,7 @@ const LikeCount = ({ pollId }) => {
   }
 
   return (
-    <button onClick={(e) => hasLiked ? unLikePoll(e, pollId) :likePoll(e, pollId)}>
+    <button onClick={(e) => (hasLiked ? unLikePoll(e, pollId) : likePoll(e, pollId))}>
       {hasLiked ? <img alt={``} src={heartFilledIcon.src} /> : <img alt={``} src={heartIcon.src} />}
       <span>{likeCount}</span>
     </button>
@@ -457,11 +451,11 @@ const Options = ({ item }) => {
  */
 const Profile = ({ creator, createdAt, chainId }) => {
   const [profile, setProfile] = useState()
+  const [chain, setChain] = useState()
   const { web3, contract } = initContract()
   const router = useRouter()
 
   useEffect(() => {
-
     getProfile(creator).then((res) => {
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
@@ -487,8 +481,7 @@ const Profile = ({ creator, createdAt, chainId }) => {
       }
     })
 
-
-    console.log(config.chains)
+    setChain(config.chains.filter((filterItem) => filterItem.id === chainId)[0])
   }, [])
 
   if (!profile)
@@ -524,7 +517,7 @@ const Profile = ({ creator, createdAt, chainId }) => {
           <div className={`flex align-items-center gap-025`}>
             <b>{profile.data.Profile[0].name}</b>
             <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
-            <div className={`${styles.badge}`} dangerouslySetInnerHTML={{__html: `${config.chains.filter(filterItem=>filterItem.id === chainId)[0].icon}`}}></div>
+            <div className={`${styles.badge}`} title={chain && chain.name} dangerouslySetInnerHTML={{ __html: `${chain && chain.icon}` }}></div>
             <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
           </div>
           <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>

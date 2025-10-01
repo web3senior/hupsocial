@@ -251,7 +251,7 @@
     .note {
       position: absolute;
       left: 50%;
-      top: -1.7rem;
+      top: -1.7em;
       transform: translateX(-50%);
       min-width: 16px;
       max-width: 80%;
@@ -264,6 +264,7 @@
       font-weight: 400;
       color: var(--gray-500);
       line-height: 1.2;
+      z-index: 1;
       isolation: isolate;
 
       p {
@@ -294,7 +295,7 @@
         left: 30%;
         transform: translateX(-30%);
         background-color: var(--white, #fff);
-        z-index: 1;
+        z-index: -1;
       }
 
       &:after {
