@@ -166,7 +166,7 @@ export default function Page() {
         <p className={`${styles.alert}`}>
           Currently running on the LUKSO Testnet network.
           <Link href={`/networks`}>
-            <b>&nbsp;Add network</b>
+            <b>&nbsp;Add networks</b>
           </Link>
         </p>
       </div>
