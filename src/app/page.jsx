@@ -112,23 +112,6 @@ export default function Page() {
     }
   }
 
-  const likePoll = (e, pollId) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT,
-      functionName: 'likePoll',
-      args: [pollId],
-    })
-  }
-
-  const unLikePoll = (pollId) => {}
 
   const openModal = (e, item) => {
     e.target.innerText = `Sending...`
@@ -181,10 +164,11 @@ export default function Page() {
                 <article key={i} className={`${styles.poll} animate fade`} onClick={() => router.push(`p/${item.pollId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                     <header className={`${styles.poll__header}`}>
-                      <Profile creator={item.creator} createdAt={item.createdAt} />
+                      <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
                     </header>
                     <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
-                      <div onClick={(e) => e.stopPropagation()} className={`${styles.poll__question} `} id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
+                      <div
+                      className={`${styles.poll__question} `} id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
 
                       {item.question.length > 150 && (
                         <button
@@ -213,7 +197,10 @@ export default function Page() {
                       )}
 
                       <div onClick={(e) => e.stopPropagation()} className={`${styles.poll__actions} flex flex-row align-items-center justify-content-start`}>
-                        <button onClick={(e) => likePoll(e, item.pollId)}>{<LikeCount pollId={item.pollId} />}</button>
+                        
+                       
+                          {<LikeCount pollId={item.pollId} />}
+                      
 
                         {item.allowedComments && (
                           <button>
@@ -273,12 +260,49 @@ const LikeCount = ({ pollId }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const { address, isConnected } = useAccount()
+    const { data: hash, isPending, writeContract } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
 
   const getPollData = async () => {
     const likeCount = await getPollLikeCount(pollId)
     const isLiked = isConnected ? await getHasLiked(pollId, address) : false
     return { likeCount, hasLiked: isLiked }
   }
+
+    const likePoll = (e, pollId) => {
+    e.stopPropagation()
+
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi,
+      address: process.env.NEXT_PUBLIC_CONTRACT,
+      functionName: 'likePoll',
+      args: [pollId],
+    })
+  }
+
+  const unLikePoll= (e, pollId) => {
+        e.stopPropagation()
+
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi,
+      address: process.env.NEXT_PUBLIC_CONTRACT,
+      functionName: 'unlikePoll',
+      args: [pollId],
+    })
+  }
+
 
   useEffect(() => {
     getPollData()
@@ -303,10 +327,10 @@ const LikeCount = ({ pollId }) => {
   }
 
   return (
-    <>
+    <button onClick={(e) => hasLiked ? unLikePoll(e, pollId) :likePoll(e, pollId)}>
       {hasLiked ? <img alt={``} src={heartFilledIcon.src} /> : <img alt={``} src={heartIcon.src} />}
       <span>{likeCount}</span>
-    </>
+    </button>
   )
 }
 
@@ -431,12 +455,13 @@ const Options = ({ item }) => {
  * @param {String} addr
  * @returns
  */
-const Profile = ({ creator, createdAt }) => {
+const Profile = ({ creator, createdAt, chainId }) => {
   const [profile, setProfile] = useState()
   const { web3, contract } = initContract()
   const router = useRouter()
 
   useEffect(() => {
+
     getProfile(creator).then((res) => {
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
@@ -461,6 +486,9 @@ const Profile = ({ creator, createdAt }) => {
         })
       }
     })
+
+
+    console.log(config.chains)
   }, [])
 
   if (!profile)
@@ -496,6 +524,7 @@ const Profile = ({ creator, createdAt }) => {
           <div className={`flex align-items-center gap-025`}>
             <b>{profile.data.Profile[0].name}</b>
             <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
+            <div className={`${styles.badge}`} dangerouslySetInnerHTML={{__html: `${config.chains.filter(filterItem=>filterItem.id === chainId)[0].icon}`}}></div>
             <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
           </div>
           <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>

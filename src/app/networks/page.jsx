@@ -54,17 +54,6 @@ export default function Page() {
   }
 
   useEffect(() => {
-    config.chains.forEach((item, i) => {
-      switch (item.name) {
-        case `LUKSO Testnet`:
-          item.faucetUrl = `https://faucet.testnet.lukso.network/`
-          break
-
-        default:
-          break
-      }
-    })
-
     setChains(config.chains)
   }, [])
 
@@ -100,12 +89,14 @@ export default function Page() {
                         <span>Block explorer URL</span>
                         <code title={item.blockExplorers.default.name}>{item.blockExplorers.default.url}</code>
                       </li>
-                      <li className={``}>
-                        <span>Faucet URL</span>
-                        <a href={item.faucetUrl} target={`_blank`}>
-                          <code>{item.faucetUrl}</code>
-                        </a>
-                      </li>
+                      {item.faucetUrl && (
+                        <li className={``}>
+                          <span>Faucet URL</span>
+                          <a href={item.faucetUrl} target={`_blank`}>
+                            <code>{item.faucetUrl}</code>
+                          </a>
+                        </li>
+                      )}
                       <li>
                         <button className={styles.button} onClick={(e) => addNetwork(item)}>
                           🦊 Add {item.name} network

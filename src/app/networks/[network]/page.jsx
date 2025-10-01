@@ -10,7 +10,7 @@ import styles from './page.module.scss'
 export default function Page() {
   const [isLoading, setIsLoading] = useState(false)
   const [chains, setChains] = useState()
-const params = useParams()
+  const params = useParams()
 
   const addNetwork = async (network) => {
     const ethereum = window.ethereum
@@ -56,17 +56,6 @@ const params = useParams()
   }
 
   useEffect(() => {
-    config.chains.forEach((item, i) => {
-      switch (item.name) {
-        case `LUKSO Testnet`:
-          item.faucetUrl = `https://faucet.testnet.lukso.network/`
-          break
-
-        default:
-          break
-      }
-    })
-
     setChains(config.chains)
   }, [])
 
@@ -77,47 +66,51 @@ const params = useParams()
       <div className={`__container`} data-width={`medium`}>
         <div className={`flex flex-column gap-1`}>
           {chains &&
-            chains.filter(filterItem => filterItem.name.toLowerCase().includes(params.network.toLowerCase())).map((item, i) => {
-              return (
-                <div key={i} className={`${styles.network}`}>
-                  <div className={`${styles.network__body}`}>
-                    <ul className={`flex flex-column align-items-center justify-content-between gap-050`}>
-                      <li className={``}>
-                        <span>Network name</span>
-                        <code>{item.name}</code>
-                      </li>
-                      <li className={``}>
-                        <span> Default RPC URL</span>
-                        <code>{item.rpcUrls.default.http[0]}</code>
-                      </li>
-                      <li className={``}>
-                        <span> Chain ID</span>
-                        <code>{item.id}</code>
-                      </li>
-                      <li className={``}>
-                        <span> Currency symbol</span>
-                        <code>{item.nativeCurrency.symbol}</code>
-                      </li>
-                      <li className={``}>
-                        <span>Block explorer URL</span>
-                        <code title={item.blockExplorers.default.name}>{item.blockExplorers.default.url}</code>
-                      </li>
-                      <li className={``}>
-                        <span>Faucet URL</span>
-                        <a href={item.faucetUrl} target={`_blank`}>
-                          <code>{item.faucetUrl}</code>
-                        </a>
-                      </li>
-                      <li>
-                        <button className={styles.button} onClick={(e) => addNetwork(item)}>
-                          🦊 Add {item.name} network
-                        </button>
-                      </li>
-                    </ul>
+            chains
+              .filter((filterItem) => filterItem.name.toLowerCase().includes(params.network.toLowerCase()))
+              .map((item, i) => {
+                return (
+                  <div key={i} className={`${styles.network}`}>
+                    <div className={`${styles.network__body}`}>
+                      <ul className={`flex flex-column align-items-center justify-content-between gap-050`}>
+                        <li className={``}>
+                          <span>Network name</span>
+                          <code>{item.name}</code>
+                        </li>
+                        <li className={``}>
+                          <span> Default RPC URL</span>
+                          <code>{item.rpcUrls.default.http[0]}</code>
+                        </li>
+                        <li className={``}>
+                          <span> Chain ID</span>
+                          <code>{item.id}</code>
+                        </li>
+                        <li className={``}>
+                          <span> Currency symbol</span>
+                          <code>{item.nativeCurrency.symbol}</code>
+                        </li>
+                        <li className={``}>
+                          <span>Block explorer URL</span>
+                          <code title={item.blockExplorers.default.name}>{item.blockExplorers.default.url}</code>
+                        </li>
+                        {item.faucetUrl && (
+                          <li className={``}>
+                            <span>Faucet URL</span>
+                            <a href={item.faucetUrl} target={`_blank`}>
+                              <code>{item.faucetUrl}</code>
+                            </a>
+                          </li>
+                        )}
+                        <li>
+                          <button className={styles.button} onClick={(e) => addNetwork(item)}>
+                            🦊 Add {item.name} network
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
         </div>
       </div>
     </div>

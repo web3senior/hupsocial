@@ -119,9 +119,22 @@
     width: fit-content;
     user-select: none;
 
+    .badge {
+      width: 18px;
+      height: 18px;
+      border-radius: 1000px;
+      overflow: hidden;
+    }
+
     figure {
       figcaption {
         height: 100%;
+
+        img {
+          width: 14px;
+          height: 14px;
+          aspect-ratio: 1/1;
+        }
       }
 
       > img {
@@ -131,6 +144,7 @@
         margin-right: 0.5rem;
         border: 1px solid var(--gray-200);
         background: var(--gray-100);
+        aspect-ratio: 1/1;
       }
     }
   }
@@ -146,7 +160,6 @@
     padding-right: 0.4rem;
     line-height: 1.4;
     font-size: 13px;
-    cursor: default;
     padding: 0.2rem 0;
   }
 
