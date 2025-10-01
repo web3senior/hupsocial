@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ConnectWallet } from '@/components/ConnectWallet';
+import { ConnectWallet } from '@/components/ConnectWallet'
 import styles from './Header.module.scss'
 
 export default function Header() {
@@ -14,7 +14,7 @@ export default function Header() {
           </Link>
         </li>
         <li className={`flex justify-content-end align-items-center`}>
-          <ConnectWallet/>
+          <ConnectWallet />
         </li>
       </ul>
     </header>

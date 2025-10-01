@@ -10,7 +10,8 @@
   z-index: 1000;
   height: 55px;
   background-color: var(--white);
-user-select: none;
+  user-select: none;
+  isolation: isolate;
 
   ul {
     height: 100%;

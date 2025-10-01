@@ -30,6 +30,20 @@
   }
 }
 
+.alert {
+    height: 20px;
+    width: 100%;
+    background-color: var(--orange-50);
+    color: var(--orange-400);
+    text-align: center;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1000px;
+    margin: 0 0 1rem 0;
+}
+
 .loadMore {
   display: block;
   text-align: center;

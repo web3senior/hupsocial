@@ -162,6 +162,10 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title`}>home</h3>
 
+      <div className={`__container`} data-width={`medium`}>
+        <p className={`${styles.alert}`}>Currently running on the LUKSO Testnet network.</p>
+      </div>
+
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
         {polls.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
         <div className={`${styles.grid} flex flex-column`}>
