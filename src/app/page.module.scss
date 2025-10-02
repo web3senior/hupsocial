@@ -31,17 +31,22 @@
 }
 
 .portal {
-    padding: 0.8rem 0;
+  padding: 0.8rem 0;
 
-    select.chains {
-      all: unset;
-      padding: .1rem .5rem;
-      border: none;
-      border:1px solid var(--gray-200);
-      background-color: var(--white);
-      border-radius: 1000px;
-      cursor: pointer;
+  select.chains {
+    all: unset;
+    padding: 0.1rem 0.5rem;
+    border: none;
+    border: 1px solid var(--gray-200);
+    background-color: var(--white);
+    border-radius: 1000px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+
+    option {
+      text-align: center;
     }
+  }
 }
 
 .loadMore {
