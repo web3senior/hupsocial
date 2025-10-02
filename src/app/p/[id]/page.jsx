@@ -376,6 +376,7 @@ const Options = ({ item }) => {
 const Profile = ({ creator, createdAt, chainId }) => {
   const [profile, setProfile] = useState()
   const [chain, setChain] = useState()
+  const defaultUsername = `hup-user`
   const { web3, contract } = initContract()
   const router = useRouter()
 
@@ -439,7 +440,7 @@ const Profile = ({ creator, createdAt, chainId }) => {
         )}
         <figcaption className={`flex flex-column`}>
           <div className={`flex align-items-center gap-025`}>
-            <b>{profile.data.Profile[0].name}</b>
+            <b>{profile.data.Profile[0].name ?? defaultUsername}</b>
             <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
             <div className={`${styles.badge}`} title={chain && chain.name} dangerouslySetInnerHTML={{ __html: `${chain && chain.icon}` }}></div>
             <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
