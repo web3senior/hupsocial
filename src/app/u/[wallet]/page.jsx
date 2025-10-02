@@ -390,7 +390,8 @@ const Profile = ({ addr }) => {
 
             <p className={`${styles.profile__description} mt-20`}>{profile.data.Profile[0].description || `This user has not set up a bio yet.`}</p>
 
-            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>{profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
+            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
+              {profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
           </div>
 
           <div className={`${styles.profile__pfp} relative`}>
@@ -408,6 +409,7 @@ const Profile = ({ addr }) => {
               }}
             >
               <p>{note && (note.note === '' ? `Status...` : note.note)}</p>
+              {/* {moment.unix(web3.utils.toNumber(note.timestampExpiration)).utc().fromNow()} */}
             </div>
           </div>
         </header>

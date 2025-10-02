@@ -57,6 +57,7 @@ export default function Page() {
   const giftModal = useRef()
   const giftModalMessage = useRef()
   const mounted = useClientMounted()
+  const [chains, setChains] = useState()
   const { address, isConnected } = useAccount()
   const router = useRouter()
   const { data: hash, isPending, writeContract } = useWriteContract()
@@ -119,6 +120,8 @@ export default function Page() {
   }
 
   useEffect(() => {
+    setChains(config.chains)
+
     getPollCount().then((count) => {
       const totalPoll = web3.utils.toNumber(count)
       setPollCount(totalPoll)
@@ -144,14 +147,18 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title`}>home</h3>
 
-      <div className={`__container`} data-width={`medium`}>
-        <p className={`${styles.alert}`}>
-          Currently running on the LUKSO Testnet network.
-          <Link href={`/networks`}>
-            <b>&nbsp;Add networks</b>
-          </Link>
-        </p>
-      </div>
+      {chains && (
+        <div className={`__container`} data-width={`medium`}>
+          <div className={`${styles.portal} flex align-items-center justify-content-center gap-050`}>
+            <span>Switch portal</span>
+            <select className={`${styles.chains}`}>
+              {chains.map((item, i) => (
+                <option value={`${item.name}`} disabled={item.name!== `LUKSO Testnet`}>{item.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
         {polls.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
@@ -452,7 +459,7 @@ const Options = ({ item }) => {
 const Profile = ({ creator, createdAt, chainId }) => {
   const [profile, setProfile] = useState()
   const [chain, setChain] = useState()
-    const defaultUsername = `hup-user`
+  const defaultUsername = `hup-user`
   const { web3, contract } = initContract()
   const router = useRouter()
 

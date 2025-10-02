@@ -48,3 +48,20 @@
     }
   }
 }
+
+.logo {
+        &:after {
+        content: 'testnet';
+        position: absolute;
+        left: 50%;
+        bottom: -.5rem;
+        transform: translateX(-50%);
+        font-size: 11px;
+        background-color: var(--warning-200);
+        color: var(--warning-800);
+        padding: .07rem .2rem;
+        line-height: 1;
+        border-radius: 1000px;
+
+      }
+}

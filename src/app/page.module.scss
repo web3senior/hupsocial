@@ -30,18 +30,18 @@
   }
 }
 
-.alert {
-  padding: 0.42rem 0;
-  width: 100%;
-  background-color: var(--orange-50);
-  color: var(--orange-400);
-  text-align: center;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 1000px;
-  margin: 0 0 1rem 0;
+.portal {
+    padding: 0.8rem 0;
+
+    select.chains {
+      all: unset;
+      padding: .1rem .5rem;
+      border: none;
+      border:1px solid var(--gray-200);
+      background-color: var(--white);
+      border-radius: 1000px;
+      cursor: pointer;
+    }
 }
 
 .loadMore {

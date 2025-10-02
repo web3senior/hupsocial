@@ -7,7 +7,7 @@ export default function Header() {
     <header className={`${styles.header}`}>
       <ul className={`flex align-items-center justify-content-between`}>
         <li className={`flex align-items-end`}>
-          <Link href={`/`} className={`${styles.logo} d-flex align-items-center justify-content-center`}>
+          <Link href={`/`} className={`${styles.logo} relative`}>
             <figure className={`d-flex flex-row align-items-center`}>
               <img alt={`${process.env.NEXT_PUBLIC_NAME} Logo`} src={`/hup.svg`} />
             </figure>
