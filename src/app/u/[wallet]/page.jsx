@@ -207,7 +207,7 @@ const Profile = ({ addr }) => {
   const params = useParams()
   const { web3, contract } = initContract()
   const { contract: noteContract } = initNoteContract()
-
+  const defaultUsername = `hup-user`
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
 
@@ -378,7 +378,7 @@ const Profile = ({ addr }) => {
         <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
           <div className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}>
             <div className={`flex align-items-center gap-025`}>
-              <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name}</h1>
+              <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name ?? defaultUsername}</h1>
               <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
             </div>
 
@@ -906,7 +906,7 @@ const Post = ({ addr }) => {
 
             <div className={`mt-10`}>
               <button className={`btn`} type="submit" disabled={isSigning}>
-                {isConfirming ? `Posting...` :isSigning ? `Signing...` : 'Post'}
+                {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
               </button>
             </div>
           </form>

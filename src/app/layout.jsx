@@ -39,7 +39,7 @@ export const metadata = {
     nocache: true,
     googleBot: {
       index: true,
-      follow: false,
+      follow: true,
       noimageindex: true,
       'max-video-preview': -1,
       'max-image-preview': 'large',
@@ -56,7 +56,7 @@ export const metadata = {
     },
   },
   manifest: '/manifest.json',
-  category: 'Blockchain',
+  category: 'Social',
 }
 
 export const viewport = {
@@ -66,12 +66,13 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   return (
     <html lang="en-US">
+      <Head></Head>
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
         <NextToast />
         <WagmiContext>
-            <Header />
-            <main className={`${styles.main}`}>{children}</main>
-            <Footer />
+          <Header />
+          <main className={`${styles.main}`}>{children}</main>
+          <Footer />
         </WagmiContext>
       </body>
     </html>
