@@ -1,6 +1,6 @@
 .page {
   height: 100%;
-
+background-color: var(--gray-50);
   &__title {
     font-weight: 600;
     color: var(--black-900);
@@ -11,7 +11,7 @@
   &__container {
     border-radius: var(--global-border-radius);
     border: 1px solid var(--global-border-color);
-    background-color: var(--white, #fff);
+      background-color: var(--white, #fff);
     @media (max-width: 600px) {
       border: none;
       filter: none;

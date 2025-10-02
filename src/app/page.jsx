@@ -173,7 +173,9 @@ export default function Page() {
                       <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
                     </header>
                     <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
-                      <div className={`${styles.poll__question} `} id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
+                      <div className={`${styles.poll__question} `}
+                      onClick={(e)=>e.stopPropagation()}
+                       id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
 
                       {item.question.length > 150 && (
                         <button
