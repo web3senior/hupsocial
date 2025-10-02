@@ -2,10 +2,9 @@
   --background: #ffffff;
   --foreground: #171717;
   ::selection {
-  color: var(--brand-800);
-  background-color: var(--brand-100);
-}
-
+    color: var(--brand-800);
+    background-color: var(--brand-100);
+  }
 }
 
 ::backdrop {
@@ -79,7 +78,7 @@ button {
 }
 
 .debug {
-  border:2px solid red;
+  border: 1px solid red;
 }
 
 .page-title {
@@ -88,7 +87,7 @@ button {
   color: var(--black-900);
   z-index: 1000;
   position: fixed;
-  top: 1.2rem;
+  top: 1rem;
   left: 50%;
   transform: translateX(-50%);
   user-select: none;

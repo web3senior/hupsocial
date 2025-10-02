@@ -24,6 +24,17 @@
 figure.pfp {
   width: 32px;
   height: 32px;
+    will-change: transform outline;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.025);
+      outline:2px solid var(--gray-100);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
 
   img {
     width: inherit;

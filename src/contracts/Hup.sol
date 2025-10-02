@@ -92,6 +92,7 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
         uint256 createdAt;
         uint256 votesPerAccount;
         uint256 holderAmount;
+        uint256 likeCount;
         address creator;
         address token;
         uint8 pollType;
@@ -384,6 +385,7 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
                 createdAt: poll.createdAt,
                 votesPerAccount: poll.votesPerAccount,
                 holderAmount: poll.holderAmount,
+                likeCount: getPollLikeCount(pollId),
                 creator: poll.creator,
                 token: poll.token,
                 allowedComments: poll.allowedComments,
@@ -411,6 +413,7 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
             createdAt: poll.createdAt,
             votesPerAccount: poll.votesPerAccount,
             holderAmount: poll.holderAmount,
+            likeCount: getPollLikeCount(_index),
             creator: poll.creator,
             token: poll.token,
             allowedComments: poll.allowedComments,

@@ -5,6 +5,7 @@ import { networks } from '@/config/wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useAccount, useDisconnect, Connector, useConnect } from 'wagmi'
 import Shimmer from '@/helper/Shimmer'
+import Link from 'next/link'
 import styles from './ConnectWallet.module.scss'
 
 export const ConnectWallet = () => {
@@ -109,20 +110,16 @@ const Profile = ({ addr }) => {
   if (!data || data.data?.search_profiles.length === 0) return <Shimmer style={{ width: `32px`, height: `32px`, borderRadius: `999px` }} />
 
   return (
-    <div className={`__container`} data-width={`small`}>
-      <figure className={`${styles.pfp} d-f-c flex-column grid--gap-050`}>
+    <Link href={`u/${addr}`}>
+      <figure className={`${styles.pfp} d-f-c flex-column grid--gap-050 rounded`}
+      title={data.data.search_profiles[0].name}>
         <img
           alt={data.data.search_profiles[0].fullName}
           src={`${data.data.search_profiles[0].profileImages.length > 0 ? data.data.search_profiles[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
           className={`rounded`}
         />
-        {/* <figcaption>@{data.data.search_profiles[0].name}</figcaption> */}
+
       </figure>
-      {/* <div className={`text-center text-dark`}>
-        <div className={`card__body`} style={{ padding: `0rem` }}>
-          <small>{data.data.search_profiles[0].description}</small>
-        </div>
-      </div> */}
-    </div>
+    </Link>
   )
 }
