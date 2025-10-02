@@ -34,7 +34,7 @@ export const metadata = {
     images: '/og-image.png',
   },
   robots: {
-    index: false,
+    index: true,
     follow: true,
     nocache: true,
     googleBot: {
