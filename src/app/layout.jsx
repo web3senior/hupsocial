@@ -66,7 +66,9 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   return (
     <html lang="en-US">
-      <Head></Head>
+      <Head>
+        <link rel="icon" href="https://example.com/favicon.ico" type="image/svg+xml" />
+      </Head>
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
         <NextToast />
         <WagmiContext>
