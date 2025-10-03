@@ -150,7 +150,7 @@ export default function Page() {
       {chains && (
         <div className={`__container`} data-width={`medium`}>
           <div className={`${styles.portal} flex align-items-center justify-content-center gap-050`}>
-            <span>Switch portal</span>
+            <span>Switch network</span>
             <select className={`${styles.chains}`}>
               {chains.map((item, i) => (
                 <option value={`${item.name}`} disabled={item.name!== `LUKSO Testnet`}>{item.name}</option>

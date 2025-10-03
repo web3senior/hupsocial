@@ -50,18 +50,17 @@
 }
 
 .logo {
-        &:after {
-        content: 'testnet';
-        position: absolute;
-        left: 50%;
-        bottom: -.5rem;
-        transform: translateX(-50%);
-        font-size: 11px;
-        background-color: var(--warning-200);
-        color: var(--warning-800);
-        padding: .07rem .2rem;
-        line-height: 1;
-        border-radius: 1000px;
-
-      }
+  &:after {
+    content: 'testnet';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translate(-50%, -50%);
+    font-size: 9px;
+    background-color: rgba(0, 0, 0, 0.1);
+    color: var(--rose-400);
+    padding: 0.07rem 0.2rem;
+    line-height: 1;
+    border-radius: 1000px;
+  }
 }
