@@ -149,7 +149,7 @@ export default function Page() {
 
       {chains && (
         <div className={`__container`} data-width={`medium`}>
-          <div className={`${styles.portal} flex align-items-center justify-content-center gap-050`}>
+          <div className={`${styles.networks} flex align-items-center justify-content-center gap-050`}>
             <span>Switch network</span>
             <select className={`${styles.chains}`}>
               {chains.map((item, i) => (

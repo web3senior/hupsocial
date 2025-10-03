@@ -30,7 +30,7 @@
   }
 }
 
-.portal {
+.networks {
   padding: 0 0 0.8rem 0;
 
   select.chains {
@@ -102,6 +102,7 @@
 .poll {
   -webkit-tap-highlight-color: transparent;
 
+
   > section {
     position: relative;
     background-color: var(--white, #fff);
@@ -113,6 +114,10 @@
       padding: 0.7rem 0.7rem;
     }
     place-items: stretch;
+    
+  &:hover {
+    background-color: var(--gray-100);
+  }
   }
 
   // background-image: url('/hup.svg');
