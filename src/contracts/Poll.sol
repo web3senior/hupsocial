@@ -16,7 +16,7 @@ import "./Error.sol";
 /// @notice Hup contract
 /// @dev You will find the deployed contract addresses in the repo
 /// @custom:version 1
-/// @custom:emoji 🧵
+/// @custom:emoji 📊
 /// @custom:security-contact atenyun@gmail.com
 contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
     // State Variables

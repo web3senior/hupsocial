@@ -1,6 +1,6 @@
 import Web3 from 'web3'
 import hupAbi from '@/abi/hup.json'
-import noteAbi from '@/abi/note.json'
+import statusAbi from '@/abi/status.json'
 
 /**
  * Initialize Hup contract
@@ -19,9 +19,9 @@ export function initContract() {
 }
 
 /**
- * Initialize Note contract
+ * Initialize Status contract
  */
-export function initNoteContract() {
+export function initStatusContract() {
   const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
 
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
@@ -30,15 +30,15 @@ export function initNoteContract() {
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
 
   // Create a Contract instance
-  const contract = new web3.eth.Contract(noteAbi, process.env.NEXT_PUBLIC_CONTRACT_NOTE)
+  const contract = new web3.eth.Contract(statusAbi, process.env.NEXT_PUBLIC_CONTRACT_STATUS)
   return { web3, contract }
 }
 
-export async function getNote(address) {
-  const { web3, contract } = initNoteContract()
+export async function getStatus(address) {
+  const { web3, contract } = initStatusContract()
 
   try {
-    const result = await contract.methods.notes(address).call()
+    const result = await contract.methods.statuses(address).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -47,7 +47,7 @@ export async function getNote(address) {
 }
 
 export async function getMaxLength() {
-  const { web3, contract } = initNoteContract()
+  const { web3, contract } = initStatusContract()
 
   try {
     const result = await contract.methods.maxLength().call()

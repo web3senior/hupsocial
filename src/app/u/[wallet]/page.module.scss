@@ -381,7 +381,7 @@ background-color: var(--gray-50);
   }
 }
 
-.noteModal {
+.statusModal {
   position: fixed;
   inset: 0;
   display: flex;
@@ -489,7 +489,7 @@ background-color: var(--gray-50);
         }
       }
 
-      .noteModal__pfp {
+      .statusModal__pfp {
         isolation: isolate;
 
         > div {
@@ -576,7 +576,7 @@ background-color: var(--gray-50);
         }
       }
 
-      .noteModal__expirationTimestamp {
+      .statusModal__expirationTimestamp {
         font-size: 12px;
 
         select {

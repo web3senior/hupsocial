@@ -12,10 +12,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useParams } from 'next/navigation'
 import Web3 from 'web3'
 import { getProfile, updateProfile } from '../../../util/api'
-import { initContract, initNoteContract, getEmoji, getNote, getMaxLength } from '@/util/communication'
+import { initContract, initStatusContract, getEmoji, getStatus, getMaxLength } from '@/util/communication'
 import { toast } from '@/components/NextToast'
 import abi from '@/abi/hup.json'
-import noteAbi from '@/abi/note.json'
+import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
@@ -309,13 +309,13 @@ const Status = ({ addr, profile, selfView }) => {
     'What makes a perfect date?',
   ]
   const [showModal, setShowModal] = useState(false)
-  const [note, setNote] = useState()
-  const [noteContent, setNoteContent] = useState('')
+  const [status, setStatus] = useState()
+  const [statusContent, setStatusContent] = useState('')
   const [expirationTimestamp, setExpirationTimestamp] = useState(24)
   const [maxLength, setMaxLength] = useState()
   const { web3, contract } = initContract()
-  const { contract: noteContract } = initNoteContract()
-  const noteRef = useRef(``)
+  const { contract: statusContract } = initStatusContract()
+  const statusRef = useRef(``)
 
   /* Error during submission (e.g., user rejected)  */
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -339,12 +339,12 @@ const Status = ({ addr, profile, selfView }) => {
     return placeholders[randomIndex]
   }
 
-  const deleteNote = () => {
+  const clearStatus = () => {
     try {
       const result = writeContract({
-        abi: noteAbi,
-        address: process.env.NEXT_PUBLIC_CONTRACT_NOTE,
-        functionName: 'deleteNote',
+        abi: statusAbi,
+        address: process.env.NEXT_PUBLIC_CONTRACT_STATUS,
+        functionName: 'clearStatus',
         args: [],
       })
       console.log('Transaction sent:', result)
@@ -353,31 +353,31 @@ const Status = ({ addr, profile, selfView }) => {
     }
   }
 
-  const updateNote = (e) => {
+  const updateStatus = (e) => {
     writeContract({
-      abi: noteAbi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_NOTE,
-      functionName: 'updateNote',
-      args: [noteContent, 'public', 24],
+      abi: statusAbi,
+      address: process.env.NEXT_PUBLIC_CONTRACT_STATUS,
+      functionName: 'updateStatus',
+      args: [statusContent, 'public', '', 24],
     })
   }
 
-  // const getNote = async () => {
+  // const getStatus = async () => {
   //   // const result = await readContract(config, {
-  //   //   noteAbi,
-  //   //   address: process.env.NEXT_PUBLIC_CONTRACT_NOTE,
+  //   //   statusAbi,
+  //   //   address: process.env.NEXT_PUBLIC_CONTRACT_STATUS,
   //   //   functionName: 'notes',
   //   //   args: [`${addr}`],
   //   // })
 
   //   // return result
 
-  //   noteContract
+  //   statusContract
   // }
   useEffect(() => {
-    getNote(addr).then((noteObj) => {
-      console.log(noteObj)
-      setNote(noteObj)
+    getStatus(addr).then((res) => {
+      console.log(res)
+      setStatus(res)
     })
 
     getMaxLength().then((res) => {
@@ -388,8 +388,8 @@ const Status = ({ addr, profile, selfView }) => {
   return (
     <>
       {showModal && (
-        <div className={`${styles.noteModal} animate fade`} onClick={() => setShowModal(false)}>
-          <div className={`${styles.noteModal__card}`} onClick={(e) => e.stopPropagation()}>
+        <div className={`${styles.statusModal} animate fade`} onClick={() => setShowModal(false)}>
+          <div className={`${styles.statusModal__card}`} onClick={(e) => e.stopPropagation()}>
             <header className={``}>
               <div className={``} aria-label="Close" onClick={() => setShowModal(false)}>
                 <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
@@ -401,13 +401,13 @@ const Status = ({ addr, profile, selfView }) => {
               <div className={`flex-1`}>
                 <h3>Set your status</h3>
               </div>
-              <div className={`pointer`} onClick={(e) => updateNote(e)}>
-                {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : note && note !== '' ? `Update` : `Share`}
+              <div className={`pointer`} onClick={(e) => updateStatus(e)}>
+                {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
               </div>
             </header>
 
             <main className={`flex flex-column align-items-center gap-1 `}>
-              <div className={`${styles.noteModal__pfp} relative`}>
+              <div className={`${styles.statusModal__pfp} relative`}>
                 <figure className={`rounded`}>
                   <img
                     alt={profile.data.Profile[0].name || `PFP`}
@@ -415,20 +415,12 @@ const Status = ({ addr, profile, selfView }) => {
                   />
                 </figure>
 
-                <div className={`d-f-c`} title={note && note.note !== '' && moment.unix(web3.utils.toNumber(note.timestamp)).utc().fromNow()}>
-                  <textarea
-                    autoFocus
-                    id="note"
-                    name="note"
-                    defaultValue={note && note !== '' ? note.note : noteContent}
-                    onInput={(e) => setNoteContent(e.target.value)}
-                    placeholder={`${getRandomPlaceholder()}`}
-                    maxLength={maxLength ? maxLength : 60}
-                  />
+                <div className={`d-f-c`} title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}>
+                  <textarea autoFocus defaultValue={status && status !== '' ? status.content : statusContent} onInput={(e) => setStatusContent(e.target.value)} placeholder={`${getRandomPlaceholder()}`} maxLength={maxLength ? maxLength : 60} />
                 </div>
               </div>
 
-              <div className={`${styles.noteModal__expirationTimestamp} relative`}>
+              <div className={`${styles.statusModal__expirationTimestamp} relative`}>
                 <label htmlFor="">Clear after </label>
                 <select name="" id="" onChange={(e) => setexpirationTimestamp(e.target.value)}>
                   <option value={24}>24h</option>
@@ -442,7 +434,7 @@ const Status = ({ addr, profile, selfView }) => {
 
               {isConfirmed && <p className="text-center badge badge-success">Done</p>}
 
-              <div title={`Expire: ${note && moment.unix(web3.utils.toNumber(note.expirationTimestamp)).utc().fromNow()}`}>{note && note.note !== '' && selfView && <button onClick={(e) => deleteNote(e)}>Delete status</button>}</div>
+              <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>{status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}</div>
 
               <div className={`flex flex-row align-items-center gap-025`}>
                 <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#1f1f1f">
@@ -461,8 +453,10 @@ const Status = ({ addr, profile, selfView }) => {
           setShowModal(true)
         }}
       >
-        {note && (
-          <p title={`Update ${moment.unix(web3.utils.toNumber(note.timestamp)).utc().fromNow()} - Expire ${moment.unix(web3.utils.toNumber(note.expirationTimestamp)).utc().fromNow()}`}>{note.note !== '' ? <>{note.note}</> : <> Status...</>}</p>
+        {status && (
+          <p title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
+            {status.content !== '' ? <>{status.content}</> : <> Status...</>}
+          </p>
         )}
       </div>
     </>
