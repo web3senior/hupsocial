@@ -175,11 +175,115 @@ const Profile = ({ addr }) => {
     },
   })
   const [selfView, setSelfView] = useState()
-  const [showModal, setShowModal] = useState(false)
-  const [note, setNote] = useState()
-  const [noteContent, setNoteContent] = useState('')
-  const [expirationTimestamp, setExpirationTimestamp] = useState(24)
-  const [maxLength, setMaxLength] = useState()
+  const params = useParams()
+  const defaultUsername = `hup-user`
+  const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
+
+  /* Error during submission (e.g., user rejected)  */
+  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  /* Error after mining (e.g., transaction reverted) */
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
+    hash,
+  })
+
+  const follow = async () => toast(`Coming soon `, `warning`)
+
+  const handleDisconnect = async () => {
+    disconnect()
+
+    setTimeout(() => {
+      window.location.reload()
+    }, 1000)
+  }
+
+  useEffect(() => {
+    getProfile(addr).then((res) => {
+      console.log(res)
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+        setProfile(res)
+        setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
+      }
+    })
+  }, [])
+
+  if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
+
+  return (
+    <>
+      <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
+        <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
+          <div className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}>
+            <div className={`flex align-items-center gap-025`}>
+              <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name ?? defaultUsername}</h1>
+              <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
+            </div>
+
+            <code className={`${styles.profile__wallet}`}>
+              <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].id}`} target={`_blank`}>
+                {`${profile.data.Profile[0].id.slice(0, 4)}…${profile.data.Profile[0].id.slice(38)}`}
+              </Link>
+            </code>
+
+            <p className={`${styles.profile__description} mt-20`}>{profile.data.Profile[0].description || `This user has not set up a bio yet.`}</p>
+
+            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>{profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
+          </div>
+
+          <div className={`${styles.profile__pfp} relative`}>
+            <figure className={`rounded`}>
+              <img
+                alt={profile.data.Profile[0].name || `PFP`}
+                src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+              />
+            </figure>
+
+            <Status addr={addr} profile={profile} selfView={selfView} />
+          </div>
+        </header>
+
+        <footer className={`w-100`}>
+          <ul className={`flex flex-column align-items-center justify-content-between gap-1`}>
+            <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
+              <button className={`${styles.btnFollowers}`}>
+                <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
+              </button>
+              <span>•</span>
+              <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
+                hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
+              </Link>
+            </li>
+            {selfView && (
+              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+                  Edit profile
+                </button>
+                {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
+                  <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
+                    Disconnect
+                  </button>
+                )}
+              </li>
+            )}
+            {!selfView && (
+              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
+                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+                  Follow
+                </button>
+              </li>
+            )}
+          </ul>
+        </footer>
+      </section>
+    </>
+  )
+}
+
+const Status = ({ addr, profile, selfView }) => {
   const placeholders = [
     'Share a short status',
     "What's on your mind?",
@@ -204,12 +308,14 @@ const Profile = ({ addr }) => {
     'Tell us about your crush...',
     'What makes a perfect date?',
   ]
-  const params = useParams()
+  const [showModal, setShowModal] = useState(false)
+  const [note, setNote] = useState()
+  const [noteContent, setNoteContent] = useState('')
+  const [expirationTimestamp, setExpirationTimestamp] = useState(24)
+  const [maxLength, setMaxLength] = useState()
   const { web3, contract } = initContract()
   const { contract: noteContract } = initNoteContract()
-  const defaultUsername = `hup-user`
-  const { address, isConnected } = useAccount()
-  const { disconnect } = useDisconnect()
+  const noteRef = useRef(``)
 
   /* Error during submission (e.g., user rejected)  */
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -221,9 +327,6 @@ const Profile = ({ addr }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
-
-  const noteRef = useRef(``)
-
   /**
    * Selects a random placeholder phrase from the list.
    * @returns {string} The randomly selected placeholder text.
@@ -235,8 +338,6 @@ const Profile = ({ addr }) => {
     const randomIndex = Math.floor(Math.random() * placeholders.length)
     return placeholders[randomIndex]
   }
-
-  const follow = async () => toast(`Coming soon `, `warning`)
 
   const deleteNote = () => {
     try {
@@ -261,14 +362,6 @@ const Profile = ({ addr }) => {
     })
   }
 
-  const handleDisconnect = async () => {
-    disconnect()
-
-    setTimeout(() => {
-      window.location.reload()
-    }, 1000)
-  }
-
   // const getNote = async () => {
   //   // const result = await readContract(config, {
   //   //   noteAbi,
@@ -281,7 +374,6 @@ const Profile = ({ addr }) => {
 
   //   noteContract
   // }
-
   useEffect(() => {
     getNote(addr).then((noteObj) => {
       console.log(noteObj)
@@ -292,18 +384,7 @@ const Profile = ({ addr }) => {
       console.log(res)
       setMaxLength(web3.utils.toNumber(res))
     })
-
-    getProfile(addr).then((res) => {
-      console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
-        setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
-      }
-    })
   }, [showModal])
-
-  if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
-
   return (
     <>
       {showModal && (
@@ -374,79 +455,16 @@ const Profile = ({ addr }) => {
         </div>
       )}
 
-      <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
-        <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
-          <div className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}>
-            <div className={`flex align-items-center gap-025`}>
-              <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name ?? defaultUsername}</h1>
-              <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
-            </div>
-
-            <code className={`${styles.profile__wallet}`}>
-              <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].id}`} target={`_blank`}>
-                {`${profile.data.Profile[0].id.slice(0, 4)}…${profile.data.Profile[0].id.slice(38)}`}
-              </Link>
-            </code>
-
-            <p className={`${styles.profile__description} mt-20`}>{profile.data.Profile[0].description || `This user has not set up a bio yet.`}</p>
-
-            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
-              {profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
-          </div>
-
-          <div className={`${styles.profile__pfp} relative`}>
-            <figure className={`rounded`}>
-              <img
-                alt={profile.data.Profile[0].name || `PFP`}
-                src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-              />
-            </figure>
-
-            <div
-              className={`${styles.note} animate pointer`}
-              onClick={() => {
-                setShowModal(true)
-              }}
-            >
-              <p>{note && (note.note === '' ? `Status...` : note.note)}</p>
-              {/* {moment.unix(web3.utils.toNumber(note.timestampExpiration)).utc().fromNow()} */}
-            </div>
-          </div>
-        </header>
-
-        <footer className={`w-100`}>
-          <ul className={`flex flex-column align-items-center justify-content-between gap-1`}>
-            <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
-              <button className={`${styles.btnFollowers}`}>
-                <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
-              </button>
-              <span>•</span>
-              <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
-                hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
-              </Link>
-            </li>
-            {selfView && (
-              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-                  Edit profile
-                </button>
-                {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
-                  <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
-                    Disconnect
-                  </button>
-                )}
-              </li>
-            )}
-            {!selfView && (
-              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-                  Follow
-                </button>
-              </li>
-            )}
-          </ul>
-        </footer>
-      </section>
+      <div
+        className={`${styles.status} animate pointer`}
+        onClick={() => {
+          setShowModal(true)
+        }}
+      >
+        {note && (
+          <p title={`Update ${moment.unix(web3.utils.toNumber(note.timestamp)).utc().fromNow()} - Expire ${moment.unix(web3.utils.toNumber(note.expirationTimestamp)).utc().fromNow()}`}>{note.note !== '' ? <>{note.note}</> : <> Status...</>}</p>
+        )}
+      </div>
     </>
   )
 }
