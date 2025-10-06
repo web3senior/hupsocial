@@ -1,11 +1,12 @@
 import Web3 from 'web3'
-import hupAbi from '@/abi/hup.json'
+import postAbi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
+import commentAbi from '@/abi/post-comment.json'
 
 /**
- * Initialize Hup contract
+ * Initialize post contract
  */
-export function initContract() {
+export function initPostContract() {
   const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
 
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
@@ -14,12 +15,28 @@ export function initContract() {
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
 
   // Create a Contract instance
-  const contract = new web3.eth.Contract(hupAbi, process.env.NEXT_PUBLIC_CONTRACT)
+  const contract = new web3.eth.Contract(postAbi, process.env.NEXT_PUBLIC_CONTRACT_POST)
   return { web3, contract }
 }
 
 /**
- * Initialize Status contract
+ * Initialize post comment contract
+ */
+export function initPostCommentContract() {
+  const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
+
+  if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
+
+  // 1. Initialize Web3 with an HttpProvider for server-side connection
+  const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
+
+  // Create a Contract instance
+  const contract = new web3.eth.Contract(commentAbi, process.env.NEXT_PUBLIC_CONTRACT_POST_COMMENT)
+  return { web3, contract }
+}
+
+/**
+ * Initialize status contract
  */
 export function initStatusContract() {
   const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
@@ -58,23 +75,11 @@ export async function getMaxLength() {
   }
 }
 
-
-export async function getPolls(index, count) {
-  const { web3, contract } = initContract()
-
-  try {
-    const result = await contract.methods.getPolls(index, count).call()
-    return result
-  } catch (error) {
-    console.error('Error fetching contract data with Web3.js:', error)
-    return { error }
-  }
-}
-export async function getPollByIndex(index) {
-  const { web3, contract } = initContract()
+export async function getPosts(index, count) {
+  const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.getPollByIndex(index).call()
+    const result = await contract.methods.getPosts(index, count).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -82,11 +87,33 @@ export async function getPollByIndex(index) {
   }
 }
 
-export async function getPollCount() {
-  const { web3, contract } = initContract()
+export async function getPostByIndex(index) {
+  const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.pollCount().call()
+    const result = await contract.methods.getPostByIndex(index).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+export async function getPostCommentCount(postId) {
+  const { web3, contract } = initPostCommentContract()
+
+  try {
+    const result = await contract.methods.getPostCommentCount(postId).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+export async function getCommentsByPostId(postId, startIndex, count) {
+  const { web3, contract } = initPostCommentContract()
+
+  try {
+    const result = await contract.methods.getCommentsByPostId(postId, startIndex, count).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -94,11 +121,11 @@ export async function getPollCount() {
   }
 }
 
-export async function getVoteCountsForPoll(pollId) {
-  const { web3, contract } = initContract()
+export async function getPostCount() {
+  const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.getVoteCountsForPoll(pollId).call()
+    const result = await contract.methods.postCount().call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -106,22 +133,11 @@ export async function getVoteCountsForPoll(pollId) {
   }
 }
 
-export async function getVoteCount(pollId, optionIndex) {
-  const { web3, contract } = initContract()
+export async function getVoteCountsForPoll(id) {
+  const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.getVoteCount(pollId, optionIndex).call()
-    return result
-  } catch (error) {
-    console.error('Error fetching contract data with Web3.js:', error)
-    return { error }
-  }
-}
-export async function getVoterChoices(pollId, address) {
-  const { web3, contract } = initContract()
-
-  try {
-    const result = await contract.methods.getVoterChoice(pollId, address).call()
+    const result = await contract.methods.getVoteCountsForPoll(id).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -129,11 +145,22 @@ export async function getVoterChoices(pollId, address) {
   }
 }
 
-export async function getPollLikeCount(pollId) {
-  const { web3, contract } = initContract()
+export async function getVoteCount(id, optionIndex) {
+  const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.getPollLikeCount(pollId).call()
+    const result = await contract.methods.getVoteCount(id, optionIndex).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+export async function getVoterChoices(id, address) {
+  const { web3, contract } = initPostContract()
+
+  try {
+    const result = await contract.methods.getVoterChoice(id, address).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -141,11 +168,11 @@ export async function getPollLikeCount(pollId) {
   }
 }
 
-export async function getHasLiked(pollId, addr) {
-  const { web3, contract } = initContract()
+export async function getHasLikedPost(postId, addr) {
+  const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.hasLiked(pollId, addr).call()
+    const result = await contract.methods.hasLiked(postId, addr).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -153,9 +180,20 @@ export async function getHasLiked(pollId, addr) {
   }
 }
 
+export async function getHasLikedComment(commentId, addr) {
+  const { web3, contract } = initPostCommentContract()
+
+  try {
+    const result = await contract.methods.hasLikedComment(commentId, addr).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
 
 export async function getAllEvents() {
-  const { web3, contract } = initContract()
+  const { web3, contract } = initPostContract()
 
   try {
     // Get the latest block number (optional, but good for defining a range)
@@ -182,7 +220,7 @@ export async function getAllEvents() {
   }
 }
 export async function getAllReacted() {
-  const { web3, contract } = initContract()
+  const { web3, contract } = initPostContract()
 
   try {
     // Get the latest block number (optional, but good for defining a range)
@@ -208,7 +246,7 @@ export async function getAllReacted() {
   }
 }
 export async function getLastGift() {
-  const { web3, contract } = initContract()
+  const { web3, contract } = initPostContract()
 
   try {
     // Get the latest block number (optional, but good for defining a range)

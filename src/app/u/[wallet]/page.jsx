@@ -12,15 +12,16 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useParams } from 'next/navigation'
 import Web3 from 'web3'
 import { getProfile, updateProfile } from '../../../util/api'
-import { initContract, initStatusContract, getEmoji, getStatus, getMaxLength } from '@/util/communication'
+import { initPostContract, initStatusContract, getEmoji, getStatus, getMaxLength } from '@/util/communication'
 import { toast } from '@/components/NextToast'
-import abi from '@/abi/hup.json'
+import abi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
 import { InlineLoading } from '@/components/Loading'
+import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon } from '@/components/Icons'
 import styles from './page.module.scss'
 
 export default function Page() {
@@ -28,7 +29,7 @@ export default function Page() {
   const [data, setData] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
-  const { web3, contract } = initContract()
+  const { web3, contract } = initPostContract()
 
   const handleForm = async (e) => {
     e.preventDefault()
@@ -313,7 +314,7 @@ const Status = ({ addr, profile, selfView }) => {
   const [statusContent, setStatusContent] = useState('')
   const [expirationTimestamp, setExpirationTimestamp] = useState(24)
   const [maxLength, setMaxLength] = useState()
-  const { web3, contract } = initContract()
+  const { web3, contract } = initPostContract()
   const { contract: statusContract } = initStatusContract()
   const statusRef = useRef(``)
 
@@ -437,9 +438,7 @@ const Status = ({ addr, profile, selfView }) => {
               <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>{status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}</div>
 
               <div className={`flex flex-row align-items-center gap-025`}>
-                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#1f1f1f">
-                  <path d="M460-300h40v-220h-40v220Zm20-276.92q10.46 0 17.54-7.08 7.08-7.08 7.08-17.54 0-10.46-7.08-17.54-7.08-7.07-17.54-7.07-10.46 0-17.54 7.07-7.08 7.08-7.08 17.54 0 10.46 7.08 17.54 7.08 7.08 17.54 7.08Zm.13 456.92q-74.67 0-140.41-28.34-65.73-28.34-114.36-76.92-48.63-48.58-76.99-114.26Q120-405.19 120-479.87q0-74.67 28.34-140.41 28.34-65.73 76.92-114.36 48.58-48.63 114.26-76.99Q405.19-840 479.87-840q74.67 0 140.41 28.34 65.73 28.34 114.36 76.92 48.63 48.58 76.99 114.26Q840-554.81 840-480.13q0 74.67-28.34 140.41-28.34 65.73-76.92 114.36-48.58 48.63-114.26 76.99Q554.81-120 480.13-120Zm-.13-40q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z" />
-                </svg>
+                <InfoIcon />
                 <small>Your status is viewable by all users.</small>
               </div>
             </main>
@@ -501,7 +500,7 @@ const Post = ({ addr }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
-  const { web3, contract } = initContract()
+  const { web3, contract } = initPostContract()
 
   const handleForm = async (e) => {
     e.preventDefault()
@@ -544,9 +543,9 @@ const Post = ({ addr }) => {
     //   creator: profile.id,
     // })
     // console.log(`IPFS`, upload)
-    // console.log(process.env.NEXT_PUBLIC_CONTRACT)
+    // console.log(process.env.NEXT_PUBLIC_CONTRACT_POST)
     // const web3 = new Web3(window.lukso)
-    // const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT)
+    // const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_CONTRACT_POST)
     // const t = toast(`Waiting for transaction's confirmation`)
     const formData = new FormData(e.target)
 
@@ -574,7 +573,7 @@ const Post = ({ addr }) => {
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT,
+      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
       functionName: 'createPoll',
       args: [
         '',
@@ -602,12 +601,13 @@ const Post = ({ addr }) => {
     e.preventDefault()
 
     const formData = new FormData(e.target)
+    const metadata = ''
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT,
-      functionName: 'createPoll',
-      args: ['', postContent, [], 0, 0, [], 0, 0, `0x0000000000000000000000000000000000000000`, 0, formData.get(`allowComments`) === 'true' ? true : false],
+      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      functionName: 'createPost',
+      args: [metadata, postContent, formData.get(`allowComments`) === 'true' ? true : false],
     })
   }
 

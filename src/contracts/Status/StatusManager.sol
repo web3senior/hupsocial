@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 /// @author Aratta Labs
 /// @notice A decentralized status manager where each user stores a single, publicly viewable status with an optional expiration period.
 /// @dev Implements Ownable for administration and Pausable for emergency shutdown. Uses a mapping to store one StatusData struct per address.
-/// @custom:version 1.2
+/// @custom:version 1
 /// @custom:emoji 📝
 /// @custom:security-contact atenyun@gmail.com
 contract StatusManager is Ownable(msg.sender), Pausable {
@@ -21,7 +21,7 @@ contract StatusManager is Ownable(msg.sender), Pausable {
     struct StatusData {
         /// @notice The main text content of the status message.
         string content;
-        /// @notice A category or type identifier for the status (e.g., 'Mood', 'Building').
+        /// @notice A category or type identifier for the status (e.g., 'Public', 'Private').
         string contentType;
         /// @notice Optional string for storing external metadata, such as a URI to a JSON file or IPFS hash.
         string metadata;
@@ -44,7 +44,7 @@ contract StatusManager is Ownable(msg.sender), Pausable {
     /// @param metadata The optional metadata string associated with the status.
     /// @param periodHours The duration in hours provided by the user.
     /// @param timestamp The time the update occurred (block.timestamp).
-    event StatusUpdated(address indexed user, string content, string statusType, string metadata, uint256 periodHours, uint256 timestamp);
+    event StatusUpdated(address indexed user, string content, string indexed statusType, string metadata, uint256 periodHours, uint256 timestamp);
 
     /// @notice Emitted when a user successfully clears their current status.
     /// @param user The address of the user who deleted the status.

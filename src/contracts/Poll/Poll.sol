@@ -3,30 +3,29 @@ pragma solidity ^0.8.30;
 
 import {ILSP7DigitalAsset as ILSP7} from "@lukso/lsp7-contracts/contracts/ILSP7DigitalAsset.sol";
 import {ILSP8IdentifiableDigitalAsset as ILSP8} from "@lukso/lsp8-contracts/contracts/ILSP8IdentifiableDigitalAsset.sol";
-import {ILSP26FollowerSystem as IFollowerSystem} from "@lukso/lsp26-contracts/contracts/ILSP26FollowerSystem.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-import "./Counters.sol";
-import "./Event.sol";
-import "./Error.sol";
+import "./../Counters.sol";
+import "./PollEvent.sol";
+import "./PollError.sol";
+import "./IPollCommentManager.sol"; // Import the updated interface
 
-/// @title Hup
+/// @title Poll
 /// @author Aratta Labs
-/// @notice Hup contract
-/// @dev You will find the deployed contract addresses in the repo
+/// @notice Core contract for Poll/Status creation, voting, and liking.
 /// @custom:version 1
 /// @custom:emoji 🧵
 /// @custom:security-contact atenyun@gmail.com
-contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
+contract Poll is Ownable(msg.sender), Pausable, ReentrancyGuard {
     // State Variables
     using Counters for Counters.Counter;
 
     Counters.Counter public pollCount;
     uint256 public fee = 0 ether;
 
-    /// @dev Counter for unique comment IDs across all polls.
-    Counters.Counter internal commentCount;
+    /// @dev The address of the deployed PollCommentManager contract.
+    address public commentManagerAddress;
 
     /// @dev A mapping to track the number of votes cast by each address per poll.
     mapping(uint256 => mapping(address => uint256)) public pollVotesCasted;
@@ -36,9 +35,6 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
 
     /// @dev A mapping to store poll data using a uint256 ID
     mapping(uint256 => PollData) public polls;
-
-    /// @dev Mapping from pollId to an array of Comment structs.
-    mapping(uint256 => Comment[]) public pollComments;
 
     mapping(uint256 => mapping(bytes32 => string)) public blockStorage;
 
@@ -97,14 +93,6 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
         address token;
         uint8 pollType;
         bool allowedComments;
-    }
-
-    /// @dev A struct to represent a single comment on a poll.
-    struct Comment {
-        uint256 commentId;
-        address creator;
-        string content;
-        uint256 createdAt;
     }
 
     // Modifiers
@@ -166,7 +154,7 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
         bool _allowedComments
     ) external payable {
         require(msg.value >= fee, "Insufficient payment for poll creation.");
-        
+
         if (_options.length > 0) {
             require(_startTime > block.timestamp + 2 minutes, "Start time must be at least 2 minutes in the future.");
             require(_endTime > _startTime, "End time must be after start time.");
@@ -253,7 +241,7 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
         emit Event.WhitelistUpdated(_pollId, _msgSender());
     }
 
-    // Voting, Liking, & Commenting
+    // Voting & Liking
     /// @notice Casts a vote for a specific poll option.
     function vote(uint256 _pollId, uint256 _optionIndex) external nonReentrant checkPollConditions(_pollId, _optionIndex) {
         PollData storage poll = polls[_pollId];
@@ -279,28 +267,6 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
         pollVotesCasted[_pollId][_msgSender()]++;
         voterChoices[_pollId][_msgSender()] = _optionIndex + 1;
         emit Event.Voted(_pollId, _msgSender(), _optionIndex);
-    }
-
-    /// @notice Allows a user to add a comment to a poll.
-    function addComment(uint256 _pollId, string memory _content) external nonReentrant {
-        PollData storage poll = polls[_pollId];
-        require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
-        require(poll.allowedComments, "Comments are not allowed on this poll.");
-        require(bytes(_content).length > 0, "Comment content cannot be empty.");
-
-        commentCount.increment();
-        uint256 newCommentId = commentCount.current();
-
-        pollComments[_pollId].push(
-            Comment({
-                commentId: newCommentId,
-                creator: _msgSender(),
-                content: _content,
-                createdAt: block.timestamp
-            })
-        );
-
-        emit Event.CommentAdded(_pollId, newCommentId, _msgSender());
     }
 
     /// @notice Allows a user to like a poll.
@@ -331,6 +297,12 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
 
     function unpause() public onlyOwner {
         _unpause();
+    }
+
+    /// @notice Sets the address of the dedicated comment manager contract.
+    function setCommentManager(address _commentManagerAddress) public onlyOwner {
+        require(_commentManagerAddress != address(0), "Invalid address.");
+        commentManagerAddress = _commentManagerAddress;
     }
 
     /// @notice Updates the fee
@@ -441,51 +413,15 @@ contract Hup is Ownable(msg.sender), Pausable, ReentrancyGuard {
     }
 
     /// @notice Returns the vote choice of a specific voter for a given poll.
-    function getVoterChoice(uint256 _pollId, address _voter) external view returns (uint256) {
+    function getVoterChoice(uint256 _pollId, address _voter) public view returns (uint256) {
+        // Voter choice is stored as (optionIndex + 1) to distinguish a vote for Option 0 from no vote (0).
         uint256 choice = voterChoices[_pollId][_voter];
-        return choice;
-        // if (choice > 0) {
-        //     // Subtract 1 to get the original 0-indexed option.
-        //     return choice - 1;
-        // }
-        // // Returns 0 if no vote was cast, which is distinguishable from option 0.
-        // return 0;
-    }
-
-    /// @notice Retrieves all comments for a specific poll.
-    function getComments(uint256 _pollId) external view returns (Comment[] memory) {
-        require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
-        return pollComments[_pollId];
-    }
-
-    /// @notice Retrieves all comments made by a specific user on a given poll.
-    /// @param _pollId The ID of the poll to check comments for.
-    /// @param _user The address of the user whose comments are being retrieved.
-    function getUserComments(uint256 _pollId, address _user) external view returns (Comment[] memory) {
-        require(_pollId > 0 && _pollId <= pollCount.current(), "Invalid poll ID.");
-
-        Comment[] storage allComments = pollComments[_pollId];
-        uint256 commentCountForUser = 0;
-        
-        // First pass: Count how many comments the user has made to size the final array
-        for (uint256 i = 0; i < allComments.length; i++) {
-            if (allComments[i].creator == _user) {
-                commentCountForUser++;
-            }
+        if (choice > 0) {
+            // Subtract 1 to get the original 0-indexed option.
+            return choice - 1; 
         }
-
-        // Second pass: Create the array and populate it only with the user's comments
-        Comment[] memory userComments = new Comment[](commentCountForUser);
-        uint256 currentIndex = 0;
-
-        for (uint256 i = 0; i < allComments.length; i++) {
-            if (allComments[i].creator == _user) {
-                userComments[currentIndex] = allComments[i];
-                currentIndex++;
-            }
-        }
-
-        return userComments;
+        // Returns 0 if no vote was cast.
+        return 0;
     }
 
     /// @notice Gets the number of likes for a specific poll.

@@ -1,0 +1,61 @@
+.shimmer {
+  width: 548px;
+  height: 48px;
+  border-radius: 999px;
+}
+
+.profileShimmer {
+  &__pfp {
+  }
+}
+
+.badge {
+  width: 18px;
+  height: 18px;
+  border-radius: 1000px;
+  overflow: hidden;
+}
+
+figure.profile {
+  column-gap: 0.5rem;
+  cursor: pointer;
+  
+  figcaption {
+    height: 100%;
+
+    svg {
+      aspect-ratio: 1/1;
+    }
+  }
+
+  > img {
+    width: 36px;
+    height: 36px;
+    border-radius: 1000px;
+    margin-right: 0.5rem;
+    border: 1px solid var(--gray-200);
+    background: var(--gray-100);
+    aspect-ratio: 1/1;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+}
+
+@media (max-width: 600px) {
+  // .page {
+  //   padding: 32px;
+  //   padding-bottom: 80px;
+  // }
+
+  // .main {
+  //   align-items: center;
+  // }
+}
+
+@media (prefers-color-scheme: dark) {
+}
