@@ -21,6 +21,26 @@
   }
 }
 
+  button.btnConnect {
+    background-color: var(--black);
+    color: var(--white, #fff);
+    padding: 0.2rem 0.7rem;
+    border-radius: 1000px;
+    font-size: 12px;
+    cursor: pointer;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    will-change: transform;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.025);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+  
 .networks {
   position: relative;
     border-radius: 1000px;
