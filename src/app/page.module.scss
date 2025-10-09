@@ -210,24 +210,6 @@
   }
 }
 
-.networks {
-  padding: 0 0 0.8rem 0;
-
-  select.chains {
-    all: unset;
-    padding: 0.1rem 0.5rem;
-    border: none;
-    border: 1px solid var(--gray-200);
-    background-color: var(--white);
-    border-radius: 1000px;
-    cursor: pointer;
-    transition: transform 0.2s ease;
-    box-shadow: 0 2px 8px 0 var(--box-shadow-08);
-    option {
-      text-align: center;
-    }
-  }
-}
 
 .loadMore {
   display: block;
@@ -295,20 +277,15 @@
     isolation: isolate;
     cursor: pointer;
     padding: 1.7rem 1.7rem 0 1.7rem;
+    place-items: stretch;
     @media (max-width: 600px) {
       padding: 0.7rem 0.7rem;
     }
-    place-items: stretch;
 
     &:hover {
       background-color: var(--gray-100);
     }
   }
-
-  // background-image: url('/hup.svg');
-  // background-position: 97% 95%;
-  // background-repeat: no-repeat;
-  // background-size: 2rem;
 
   &__header {
     width: fit-content;
@@ -321,12 +298,12 @@
 
   &__content {
     height: auto;
+    width: fit-content;
     max-height: 150px;
     overflow: hidden;
-    padding-right: 0.4rem;
     line-height: 1.4;
     font-size: 13px;
-    padding: 0.2rem 0;
+    padding: 0.2rem 0 .2rem 0.3rem;
     cursor: text;
   }
 

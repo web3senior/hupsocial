@@ -192,6 +192,18 @@ export async function getHasLikedComment(commentId, addr) {
   }
 }
 
+export async function getPostsByCreator(addr, startIndex, count ) {
+  const { web3, contract } = initPostContract()
+
+  try {
+    const result = await contract.methods.getPostsByCreator(addr,startIndex, count ).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+
 export async function getAllEvents() {
   const { web3, contract } = initPostContract()
 

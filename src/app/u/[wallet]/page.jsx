@@ -12,19 +12,24 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useParams } from 'next/navigation'
 import Web3 from 'web3'
 import { getProfile, updateProfile } from '../../../util/api'
-import { initPostContract, initStatusContract, getEmoji, getStatus, getMaxLength } from '@/util/communication'
+import { initPostContract, initStatusContract, getEmoji, getStatus, getMaxLength ,getPostsByCreator} from '@/util/communication'
 import { toast } from '@/components/NextToast'
 import abi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
+import { useConnectorClient, useConnections, useClient, networks,
+   useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect,
+    useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
 import { InlineLoading } from '@/components/Loading'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon } from '@/components/Icons'
 import styles from './page.module.scss'
 
 export default function Page() {
+  const [posts, setPosts] = useState({ list: [] })
+    const [postsLoaded, setPostsLoaded] = useState(0)
+    const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [data, setData] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
@@ -55,7 +60,65 @@ export default function Page() {
     })
   }
 
-  useEffect(() => {}, [])
+  const loadMorePosts = async (totalPoll) => {
+    // 1. **Add a guard clause to prevent re-entry**
+    if (isLoadedPoll) return
+
+    // 2. Set to true *before* starting the async operation
+    setIsLoadedPoll(true)
+
+    try {
+      let postsPerPage = 20
+      let startIndex = totalPoll - postsLoaded - postsPerPage
+
+      // **Stop loading if all posts are accounted for**
+      if (postsLoaded >= totalPoll) {
+        console.log('All polls loaded.')
+        // We can return here, but still need to handle setIsLoadedPoll(false)
+      }
+
+      if (startIndex < 0) {
+        // Check if we are trying to load past the first post
+        postsPerPage = totalPoll - postsLoaded
+        startIndex = 0
+        if (postsPerPage <= 0) {
+          // All loaded
+          console.log('All polls loaded.')
+          return // Exit early
+        }
+      }
+
+      // ... (rest of your logic for calculating startIndex/postsPerPage) ...
+
+      // 3. Fetch the next batch of polls
+      console.log(startIndex + 1, postsPerPage)
+      const newPosts = await getPostsByCreator(params.wallet,startIndex + 1, postsPerPage)
+      console.log(`newPosts => `, newPosts)
+      newPosts.reverse()
+
+      if (Array.isArray(newPosts) && newPosts.length > 0) {
+        setPosts((prevPolls) => ({ list: [...prevPolls.list, ...newPosts] }))
+        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
+      }
+    } catch (error) {
+      console.error('Error loading more polls:', error)
+    } finally {
+      // 4. **Crucial: Set to false in finally block**
+      // This re-enables loading for the next scroll event.
+      setIsLoadedPoll(false)
+    }
+  }
+
+  useEffect(() => {
+       // getPostCount().then((count) => {
+        //  const totalPoll = web3.utils.toNumber(count)
+        //  setPostCount(totalPoll)
+    
+          //if (postsLoaded === 0 && !isLoadedPoll) {
+            loadMorePosts(10)
+        //  }
+       // })
+  }, [])
 
   return (
     <FluentProvider theme={webLightTheme}>

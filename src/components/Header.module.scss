@@ -21,46 +21,11 @@
       padding: 0.7rem 0.7rem;
     }
   }
-
-  figure {
-    img {
-      width: 36px;
-    }
-  }
-
-  button {
-    background-color: var(--black);
-    color: var(--white, #fff);
-    padding: 0.2rem 0.7rem;
-    border-radius: 1000px;
-    font-size: 12px;
-    cursor: pointer;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-    will-change: transform;
-    transition: transform 0.2s ease;
-
-    &:hover {
-      transform: scale(1.025);
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
-  }
 }
 
-.logo {
-  &:after {
-    content: 'testnet';
-    position: absolute;
-    left: 50%;
-    top: 100%;
-    transform: translate(-50%, -50%);
-    font-size: 9px;
-    background-color: var(--error-100);
-    color: var(--error-400);
-    padding: 0.07rem 0.2rem;
-    line-height: 1;
-    border-radius: 1000px;
+figure.logo {
+  img {
+    --r: 32px;
+    width: var(--r);
   }
 }
