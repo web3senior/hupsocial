@@ -21,7 +21,7 @@ import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile from '@/app/ui/Profile'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
 import styles from './page.module.scss'
 
 moment.defineLocale('en-short', {
@@ -154,7 +154,6 @@ export default function Page() {
 
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
 
-
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
         {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
         <div className={`${styles.grid} flex flex-column`}>
@@ -162,11 +161,12 @@ export default function Page() {
             posts.list.length > 0 &&
             posts.list.map((item, i) => {
               return (
-                <article key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`p/${item.postId}`)}>
+                <article key={i} className={`${styles.post} animate fade`} 
+                onClick={() => router.push(`p/${item.postId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
-                    <header className={`${styles.post__header}`}>
+                    <header className={`${styles.post__header} flex align-items-start justify-content-between`}>
                       <Profile creator={item.creator} createdAt={item.createdAt} />
-                      <Nav/>
+                      <Nav item={item}/>
                     </header>
                     <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
                       <div className={`${styles.post__content} `} onClick={(e) => e.stopPropagation()} id={`pollQuestion${item.pollId}`}>
@@ -218,8 +218,29 @@ export default function Page() {
   )
 }
 
-const Nav = ()=>{
-  return <></>
+const Nav = ({item}) => {
+  const [showPostDropdown, setShowPostDropdown] = useState()
+
+  return (
+    <div className={`relative`}>
+      <button className={`${styles.btnPostMenu} rounded`} onClick={(e) => {
+        e.stopPropagation()
+        setShowPostDropdown(!showPostDropdown)
+      }}>
+        <ThreeDotIcon />
+      </button>
+
+      {showPostDropdown && (
+        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
+          <ul>
+            <li>
+              <Link href={`p/${item.postId}`}>View post</Link>
+            </li>
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 const CommentModal = ({ item, setShowCommentModal }) => {
