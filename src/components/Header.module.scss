@@ -13,6 +13,19 @@
   user-select: none;
   isolation: isolate;
 
+  &:before {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    top: -1rem;
+    width: 140px;
+    height: 140px;
+    background-image: url('./../../public/web.svg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    z-index: -1;
+  }
   ul {
     height: 100%;
     padding: 0.7rem 1.5rem;
@@ -23,9 +36,33 @@
   }
 }
 
-figure.logo {
-  img {
-    --r: 32px;
-    width: var(--r);
+a.logo {
+  position: relative;
+  transition-duration: 0.2s;
+  transition-property: transform;
+  forced-color-adjust: auto;
+
+  svg {
+    --r: 20px;
+    width: auto !important;
+    height: var(--r) !important;
+  }
+
+  &:after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 0;
+    width: 20px;
+    height: 40px;
+    background-image: url('./../../public/spider.svg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    z-index: 999;
+  }
+
+  &:hover {
+    transform: scale(1.04);
   }
 }
