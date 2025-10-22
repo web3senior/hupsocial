@@ -16,15 +16,16 @@
   &:before {
     content: '';
     position: absolute;
-    left: -1rem;
-    top: -1rem;
-    width: 140px;
-    height: 140px;
+    left: -3rem;
+    top: -2rem;
+    width: 240px;
+    height: 240px;
     background-image: url('./../../public/web.svg');
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;
     z-index: -1;
+    pointer-events: none;
   }
   ul {
     height: 100%;
