@@ -26,7 +26,14 @@
     background-size: contain;
     z-index: -1;
     pointer-events: none;
-    opacity: .4;
+    opacity: 0.4;
+
+    @media (max-width: 600px) {
+      top: -1rem;
+      left: -1rem;
+      width: 140px;
+      height: 140px;
+    }
   }
   ul {
     height: 100%;
