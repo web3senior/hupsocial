@@ -13,28 +13,6 @@
   user-select: none;
   isolation: isolate;
 
-  &:before {
-    content: '';
-    position: absolute;
-    left: -3rem;
-    top: -2rem;
-    width: 240px;
-    height: 240px;
-    background-image: url('./../../public/web.svg');
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-    z-index: -1;
-    pointer-events: none;
-    opacity: 0.4;
-
-    @media (max-width: 600px) {
-      top: -1rem;
-      left: -1rem;
-      width: 140px;
-      height: 140px;
-    }
-  }
   ul {
     height: 100%;
     padding: 0.7rem 1.5rem;
@@ -55,20 +33,6 @@ a.logo {
     --r: 20px;
     width: auto !important;
     height: var(--r) !important;
-  }
-
-  &:after {
-    content: '';
-    position: absolute;
-    left: -10px;
-    top: 0;
-    width: 20px;
-    height: 40px;
-    background-image: url('./../../public/spider.svg');
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-    z-index: 999;
   }
 
   &:hover {

@@ -1,7 +1,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  
+
   ::selection {
     color: var(--brand-800);
     background-color: var(--brand-100);
@@ -12,6 +12,24 @@
   background-image: linear-gradient(45deg, magenta, rebeccapurple, dodgerblue, green);
   opacity: 0.5;
   filter: blur(100px);
+}
+
+// Scrollbar
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-primary);
+    background-clip: padding-box;
+    border: 2px solid #0000;
+    border-radius: 100vh;
+}
+
+::-webkit-scrollbar-track {
+    background: 0 0;
+    border-radius: 100vh;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -88,10 +106,21 @@ button {
   color: var(--black-900);
   z-index: 1000;
   position: fixed;
-  top: 1rem;
+  top: 0;
   left: 50%;
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transform: translateX(-50%);
   user-select: none;
+  font-size: var(--15-font-size);
+
+  code {
+    font-weight: 200;
+    font-size: var(--10-font-size);
+    color: var(--black-600);
+  }
 }
 
 .relative {
