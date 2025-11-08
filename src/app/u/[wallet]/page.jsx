@@ -202,9 +202,9 @@ const Profile = ({ addr }) => {
   const handleDisconnect = async () => {
     disconnect()
 
-    setTimeout(() => {
-      window.location.reload()
-    }, 1000)
+    // setTimeout(() => {
+    //   window.location.reload()
+    // }, 2000)
   }
 
   const Tags = ({ tags }) => {
