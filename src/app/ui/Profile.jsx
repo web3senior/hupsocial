@@ -50,13 +50,13 @@ export default function Profile({ creator, createdAt }) {
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setIsItUp(true)
         setProfile({
-          wallet: res.data.Profile[0].id,
-          name: res.data.Profile[0].name,
-          description: res.data.Profile[0].description,
+          wallet: res.data.id,
+          name: res.data.name,
+          description: res.data.description,
           profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
           profileHeader: '',
-          tags: JSON.stringify(res.data.Profile[0].tags),
-          links: JSON.stringify(res.data.Profile[0].links_),
+          tags: JSON.stringify(res.data.tags),
+          links: JSON.stringify(res.data.links_),
           lastUpdate: '',
         })
       } else {
@@ -92,8 +92,8 @@ export default function Profile({ creator, createdAt }) {
         router.push(`/u/${creator}`)
       }}
     >
-      {/* profile.data.Profile[0].profileImages[0]?.isSVG */}
-      {/* <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div> */}
+      {/* profile.profileImages[0]?.isSVG */}
+      {/* <div dangerouslySetInnerHTML={{ __html: profile.profileImages[0].src }}></div> */}
 
       <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
 
@@ -112,33 +112,34 @@ export default function Profile({ creator, createdAt }) {
 
 export function ProfileImage({ addr }) {
   const [profile, setProfile] = useState()
-  const [chain, setChain] = useState()
+    const [isItUp, setIsItUp] = useState()
   const defaultUsername = `hup-user`
   //   const { web3, contract } = initPostContract()
   const router = useRouter()
 
   useEffect(() => {
-    getProfile(addr).then((res) => {
+    getUniversalProfile(addr).then((res) => {
+      console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
-      } else {
+        setIsItUp(true)
         setProfile({
-          data: {
-            Profile: [
-              {
-                fullName: 'annonymous',
-                name: 'annonymous',
-                tags: ['profile'],
-                profileImages: [
-                  {
-                    isSVG: true,
-                    src: `${toSvg(`${addr}`, 36)}`,
-                    url: 'ipfs://',
-                  },
-                ],
-              },
-            ],
-          },
+          wallet: res.data.id,
+          name: res.data.name,
+          description: res.data.description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.tags),
+          links: JSON.stringify(res.data.links_),
+          lastUpdate: '',
+        })
+      } else {
+        getProfile(addr).then((res) => {
+          console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            res.profileImage = profileImage
+            setProfile(res)
+          }
         })
       }
     })
@@ -163,15 +164,16 @@ export function ProfileImage({ addr }) {
         router.push(`/u/${creator}`)
       }}
     >
-      {!profile.data.Profile[0].profileImages[0]?.isSVG ? (
+         <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+      {/* {!profile.profileImages[0]?.isSVG ? (
         <img
-          alt={profile.data.Profile[0].name || `Default PFP`}
-          src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+          alt={profile.name || `Default PFP`}
+          src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
           className={`rounded`}
         />
       ) : (
-        <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div>
-      )}
+        <div dangerouslySetInnerHTML={{ __html: profile.profileImages[0].src }}></div>
+      )} */}
     </figure>
   )
 }
