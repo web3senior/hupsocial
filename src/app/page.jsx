@@ -8,7 +8,7 @@ import txIcon from '@/../public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
-import { getProfile } from '@/util/api'
+import { getProfile, getUniversalProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -16,7 +16,7 @@ import { isPollActive } from '@/util/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
-import {getActiveChain} from '@/util/communication'
+import { getActiveChain } from '@/util/communication'
 import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
@@ -129,7 +129,6 @@ export default function Page() {
     })
      */
 
-
     console.log(config)
     getPostCount().then((count) => {
       const totalPoll = web3.utils.toNumber(count)
@@ -160,14 +159,13 @@ export default function Page() {
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
         {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
-        
+
         <div className={`${styles.grid} flex flex-column`}>
           {posts &&
             posts.list.length > 0 &&
             posts.list.map((item, i) => {
               return (
-                <article key={i} className={`${styles.post} animate fade`} 
-                onClick={() => router.push(`p/${item.postId}`)}>
+                <article key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`p/${item.postId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                     <header className={`${styles.post__header} flex align-items-start justify-content-between`}>
                       <Profile creator={item.creator} createdAt={item.createdAt} />
@@ -258,7 +256,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
   const { address, isConnected } = useAccount()
-      const activeChain = getActiveChain()
+  const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
   const {
@@ -646,38 +644,37 @@ const Options = ({ item }) => {
  * @param {String} addr
  * @returns
  */
-const ConnectedProfile = ({ addr, chainId = 4201 }) => {
+const ConnectedProfile = ({ addr }) => {
   const [profile, setProfile] = useState()
-  const [chain, setChain] = useState()
+  const activeChain = getActiveChain()
   const defaultUsername = `hup-user`
-
+  const [isItUp, setIsItUp] = useState()
   useEffect(() => {
-    getProfile(addr).then((res) => {
+    getUniversalProfile(addr).then((res) => {
+      console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
-      } else {
+        setIsItUp(true)
         setProfile({
-          data: {
-            Profile: [
-              {
-                fullName: 'annonymous',
-                name: 'annonymous',
-                tags: ['profile'],
-                profileImages: [
-                  {
-                    isSVG: true,
-                    src: `${toSvg(`${creator}`, 36)}`,
-                    url: 'ipfs://',
-                  },
-                ],
-              },
-            ],
-          },
+          wallet: res.data.Profile[0].id,
+          name: res.data.Profile[0].name,
+          description: res.data.Profile[0].description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.Profile[0].tags),
+          links: JSON.stringify(res.data.Profile[0].links_),
+          lastUpdate: '',
+        })
+      } else {
+        getProfile(addr).then((res) => {
+          console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            res.profileImage = profileImage
+            setProfile(res)
+          }
         })
       }
     })
-
-    setChain(config.chains.filter((filterItem) => filterItem.id === chainId)[0])
   }, [])
 
   if (!profile)
@@ -699,20 +696,14 @@ const ConnectedProfile = ({ addr, chainId = 4201 }) => {
         router.push(`/u/${addr}`)
       }}
     >
-      {!profile.data.Profile[0].profileImages[0]?.isSVG ? (
-        <img
-          alt={profile.data.Profile[0].name || `Default PFP`}
-          src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-          className={`rounded`}
-        />
-      ) : (
-        <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div>
-      )}
+
+      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
-          <b>{profile.data.Profile[0].name ?? defaultUsername}</b>
+          <b>{profile.name ?? defaultUsername}</b>
           <BlueCheckMarkIcon />
-          <div className={`${styles.badge}`} title={chain && chain.name} dangerouslySetInnerHTML={{ __html: `${chain && chain.icon}` }}></div>
+          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
         </div>
         <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
       </figcaption>
