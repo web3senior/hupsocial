@@ -98,7 +98,7 @@ export default function Page() {
       console.log(startIndex + 1, postsPerPage)
       const newPosts = await getPosts(startIndex + 1, postsPerPage, address)
       console.log(`newPosts => `, newPosts)
-      newPosts.reverse()
+      // newPosts.reverse()
 
       if (Array.isArray(newPosts) && newPosts.length > 0) {
         setPosts((prevPolls) => ({ list: [...prevPolls.list, ...newPosts] }))
