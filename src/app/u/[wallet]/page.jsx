@@ -258,6 +258,7 @@ const Profile = ({ addr }) => {
           if (res.wallet) {
             const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
+            res.profileImageName = res.profileImage
             setData(res)
             setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
           }
@@ -664,7 +665,7 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
               <div className={`form-group`}>
                 <label htmlFor="">Profile picture</label>
                 <input type="file" name="profileImage" id="" onChange={(e) => showPFP(e)} />
-                <input type="hidden" name="profileImage_hidden" defaultValue={profile.profileImage} />
+                <input type="hidden" name="profileImage_hidden" defaultValue={profile.profileImageName} />
               </div>
               <div className={`form-group`}>
                 <label htmlFor="">Name</label>
