@@ -1,21 +1,73 @@
 import Web3 from 'web3'
+import { config, CONTRACTS } from '@/config/wagmi'
+
 import postAbi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import commentAbi from '@/abi/post-comment.json'
 
 /**
+ * Get user selected chain
+ * @returns Array [chainObject, contractAddress]
+ */
+export const getActiveChain = () => {
+  const DEFAULT_CHAIN_ID = 4201
+
+  if (typeof window !== 'undefined') {
+    // Client-side execution: Read from localStorage
+    const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || DEFAULT_CHAIN_ID.toString()
+    const userSelectedChain = config.chains.filter((filterItem) => filterItem.id.toString() === activeChain.toString())
+
+    // Ensure a chain was actually found
+    if (userSelectedChain.length > 0) {
+      // Change primary color of the app
+      // document.documentElement.style.setProperty('--color-primary', userSelectedChain[0].primaryColor)
+      // document.documentElement.style.setProperty('--color-text', userSelectedChain[0].textColor)
+
+      return [userSelectedChain[0], CONTRACTS[`chain${userSelectedChain[0].id}`]]
+    }
+  }
+
+  // Server-side execution OR localStorage failed to find a matching chain
+  const defaultChain = config.chains.find((filterItem) => filterItem.id === DEFAULT_CHAIN_ID)
+
+  if (defaultChain) {
+    return [defaultChain, CONTRACTS[`chain${DEFAULT_CHAIN_ID}`]]
+  }
+
+  // Fallback if the default chain isn't even in config (should rarely happen)
+  console.error('Default chain not found in config.')
+  return [null, null]
+}
+
+// /**
+//  * Get user selected chain
+//  * @returns Array
+//  */
+// export const getActiveChain = () => {
+
+//   if (typeof window !== 'undefined') {
+//   const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || 4201
+//   const userSelectedChain = config.chains.filter((filterItem) => filterItem.id.toString() === activeChain.toString())
+
+//   return [userSelectedChain[0], CONTRACTS[`chain${userSelectedChain[0].id}`]]
+//   }
+
+// }
+
+/**
  * Initialize post contract
  */
 export function initPostContract() {
-  const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
+  const activeChain = getActiveChain()
+  const rpcUrl = activeChain[0].rpcUrls.default.http[0]
 
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
-  // 1. Initialize Web3 with an HttpProvider for server-side connection
+  // Initialize Web3 with an HttpProvider for server-side connection
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
 
   // Create a Contract instance
-  const contract = new web3.eth.Contract(postAbi, process.env.NEXT_PUBLIC_CONTRACT_POST)
+  const contract = new web3.eth.Contract(postAbi, activeChain[1].post)
   return { web3, contract }
 }
 
@@ -23,15 +75,16 @@ export function initPostContract() {
  * Initialize post comment contract
  */
 export function initPostCommentContract() {
-  const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
+  const activeChain = getActiveChain()
+  const rpcUrl = activeChain[0].rpcUrls.default.http[0]
 
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
-  // 1. Initialize Web3 with an HttpProvider for server-side connection
+  // Initialize Web3 with an HttpProvider for server-side connection
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
 
   // Create a Contract instance
-  const contract = new web3.eth.Contract(commentAbi, process.env.NEXT_PUBLIC_CONTRACT_POST_COMMENT)
+  const contract = new web3.eth.Contract(commentAbi, activeChain[1].comment)
   return { web3, contract }
 }
 
@@ -39,15 +92,15 @@ export function initPostCommentContract() {
  * Initialize status contract
  */
 export function initStatusContract() {
-  const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_PROVIDER
+  const activeChain = getActiveChain()
+  const rpcUrl = activeChain[0].rpcUrls.default.http[0]
 
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
-  // 1. Initialize Web3 with an HttpProvider for server-side connection
+  // Initialize Web3 with an HttpProvider for server-side connection
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
-
   // Create a Contract instance
-  const contract = new web3.eth.Contract(statusAbi, process.env.NEXT_PUBLIC_CONTRACT_STATUS)
+  const contract = new web3.eth.Contract(statusAbi, activeChain[1].status)
   return { web3, contract }
 }
 
@@ -75,11 +128,11 @@ export async function getMaxLength() {
   }
 }
 
-export async function getPosts(index, count) {
+export async function getPosts(index, count, address = `0x0000000000000000000000000000000000000000`) {
   const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.getPosts(index, count).call()
+    const result = await contract.methods.getPosts(index, count, address).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -87,33 +140,58 @@ export async function getPosts(index, count) {
   }
 }
 
-export async function getPostByIndex(index) {
+export async function getPostByIndex(index, address = `0x0000000000000000000000000000000000000000`) {
   const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.getPostByIndex(index).call()
+    const result = await contract.methods.getPostByIndex(index, address).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
     return { error }
   }
 }
-export async function getPostCommentCount(postId) {
+export async function getPostCommentCount(parentId) {
   const { web3, contract } = initPostCommentContract()
 
   try {
-    const result = await contract.methods.getPostCommentCount(postId).call()
+    const result = await contract.methods.getPostCommentCount(parentId).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
     return { error }
   }
 }
-export async function getCommentsByPostId(postId, startIndex, count) {
+
+export async function getReplyCount(postId) {
   const { web3, contract } = initPostCommentContract()
 
   try {
-    const result = await contract.methods.getCommentsByPostId(postId, startIndex, count).call()
+    const result = await contract.methods.getReplyCount(postId).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+
+export async function getCommentsByPostId(postId, startIndex, count, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initPostCommentContract()
+
+  try {
+    const result = await contract.methods.getCommentsByPostId(postId, startIndex, count, address).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+
+export async function getRepliesByCommentId(commentId, startIndex, count, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initPostCommentContract()
+
+  try {
+    const result = await contract.methods.getRepliesByCommentId(commentId, startIndex, count, address).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -192,11 +270,35 @@ export async function getHasLikedComment(commentId, addr) {
   }
 }
 
-export async function getPostsByCreator(addr, startIndex, count ) {
+export async function getComment(commentId, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initPostCommentContract()
+
+  try {
+    const result = await contract.methods.getComment(commentId, address).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+
+export async function getPostsByCreator(creator, startIndex, count, viewer = `0x0000000000000000000000000000000000000000`) {
   const { web3, contract } = initPostContract()
 
   try {
-    const result = await contract.methods.getPostsByCreator(addr,startIndex, count ).call()
+    const result = await contract.methods.getPostsByCreator(creator, startIndex, count, viewer).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+
+export async function getCreatorPostCount(creator) {
+  const { web3, contract } = initPostContract()
+
+  try {
+    const result = await contract.methods.getCreatorPostCount(creator).call()
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)

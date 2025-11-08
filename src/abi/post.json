@@ -17,6 +17,17 @@
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "valueSent",
+				"type": "uint256"
+			}
+		],
+		"name": "InsufficientPayment",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "owner",
 				"type": "address"
@@ -386,6 +397,25 @@
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "_creator",
+				"type": "address"
+			}
+		],
+		"name": "getCreatorPostCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
 				"name": "_postId",
 				"type": "uint256"
@@ -402,77 +432,6 @@
 				"internalType": "string",
 				"name": "",
 				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_index",
-				"type": "uint256"
-			}
-		],
-		"name": "getPostByIndex",
-		"outputs": [
-			{
-				"components": [
-					{
-						"internalType": "uint256",
-						"name": "postId",
-						"type": "uint256"
-					},
-					{
-						"internalType": "string",
-						"name": "metadata",
-						"type": "string"
-					},
-					{
-						"internalType": "string",
-						"name": "content",
-						"type": "string"
-					},
-					{
-						"internalType": "uint256",
-						"name": "createdAt",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "likeCount",
-						"type": "uint256"
-					},
-					{
-						"internalType": "address",
-						"name": "creator",
-						"type": "address"
-					},
-					{
-						"internalType": "bool",
-						"name": "allowedComments",
-						"type": "bool"
-					},
-					{
-						"internalType": "bool",
-						"name": "isDeleted",
-						"type": "bool"
-					},
-					{
-						"internalType": "bool",
-						"name": "isUpdated",
-						"type": "bool"
-					},
-					{
-						"internalType": "uint256",
-						"name": "commentCount",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct Post.PostWithoutMappings",
-				"name": "",
-				"type": "tuple"
 			}
 		],
 		"stateMutability": "view",
@@ -508,6 +467,11 @@
 				"internalType": "uint256",
 				"name": "_count",
 				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_addr",
+				"type": "address"
 			}
 		],
 		"name": "getPosts",
@@ -563,6 +527,11 @@
 						"internalType": "uint256",
 						"name": "commentCount",
 						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "hasLiked",
+						"type": "bool"
 					}
 				],
 				"internalType": "struct Post.PostWithoutMappings[]",
@@ -589,6 +558,11 @@
 				"internalType": "uint256",
 				"name": "_count",
 				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_viewer",
+				"type": "address"
 			}
 		],
 		"name": "getPostsByCreator",
@@ -644,6 +618,11 @@
 						"internalType": "uint256",
 						"name": "commentCount",
 						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "hasLiked",
+						"type": "bool"
 					}
 				],
 				"internalType": "struct Post.PostWithoutMappings[]",

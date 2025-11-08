@@ -1,0 +1,85 @@
+.nav {
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+  --button-primary-hover: #383838;
+  --button-secondary-hover: #f2f2f2;
+
+  border-radius: var(--global-border-radius);
+  background-color: var(--white);
+  width: 200px;
+
+  ul {
+    padding: 1rem;
+    row-gap: 1rem;
+  }
+}
+
+.miniNav {
+  background-color: var(--black-050);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overflow: auto;
+  white-space: nowrap;
+  max-width: 100dvw;
+  display: none;
+
+  a {
+    display: inline-block;
+    min-width: 150px;
+    background-color: var(--white);
+    padding: 1rem;
+    text-align: center;
+    border-radius: var(--global-border-radius);
+    font-weight: bold;
+
+    &:not(:first-child) {
+      margin-right: 1rem;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+    --button-primary-hover: #ccc;
+    --button-secondary-hover: #1a1a1a;
+  }
+  .logo {
+    filter: invert(100%);
+  }
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  a.primary:hover {
+    background: var(--button-primary-hover);
+    border-color: transparent;
+  }
+
+  a.secondary:hover {
+    background: var(--button-secondary-hover);
+    border-color: transparent;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}
+
+@media (max-width: 600px) {
+  .miniNav {
+    display: block !important;
+  }
+  .nav {
+    padding-bottom: 80px;
+    display: none;
+  }
+}

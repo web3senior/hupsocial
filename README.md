@@ -3,6 +3,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 ## Contract version 1.0
 0x06D446741eC8dE2EE4749BDD9161907fe539b34f
 
+## Contract version 2.0
+NEXT_PUBLIC_CONTRACT_POST=0x3E1E25B214d39edC1d11ea03425d3c7C0160A8Cb
+NEXT_PUBLIC_CONTRACT_POST_COMMENT=0x116778e5623eea92770146B08e9098A61c47e51E
+NEXT_PUBLIC_CONTRACT_STATUS=0x6B10B966C3369332De8c976da62249F38D6898ca
+
+## 
+
+
 ## Getting Started
 
 First, run the development server:

@@ -5,22 +5,22 @@ import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, Interacti
 import { useId, Button } from '@fluentui/react-components'
 import Image from 'next/image'
 import Link from 'next/link'
-import Icon from '../../../helper/MaterialIcon'
+import Icon from '@/helper/MaterialIcon'
 import Nav from '../nav'
+
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useAuth } from '@/contexts/AuthContext'
 import { useParams } from 'next/navigation'
 import Web3 from 'web3'
-import { getProfile, updateProfile } from '../../../util/api'
-import { initPostContract, initStatusContract, getEmoji, getStatus, getMaxLength ,getPostsByCreator} from '@/util/communication'
+import { getUniversalProfile, getProfile, updateProfile } from '@/util/api'
+import { initPostContract, initStatusContract, getEmoji, getStatus, getCreatorPostCount, getMaxLength, getPostsByCreator } from '@/util/communication'
 import { toast } from '@/components/NextToast'
 import abi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-import { useConnectorClient, useConnections, useClient, networks,
-   useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect,
-    useWriteContract, useReadContract } from 'wagmi'
+import { getActiveChain } from '@/util/communication'
+import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
 import { InlineLoading } from '@/components/Loading'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon } from '@/components/Icons'
@@ -28,37 +28,15 @@ import styles from './page.module.scss'
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
-    const [postsLoaded, setPostsLoaded] = useState(0)
-    const [isLoadedPoll, setIsLoadedPoll] = useState(false)
+  const [postsLoaded, setPostsLoaded] = useState(0)
+  const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [data, setData] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
+  const [postCount, setPostCount] = useState(0)
+  const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
-
-  const handleForm = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    const formData = new FormData(e.target)
-    const fullname = formData.get('fullname')
-    const phone = formData.get('phone')
-    const address = formData.get('address')
-    const wallet = formData.get('wallet')
-    const errors = {}
-
-    const post = {
-      fullname: fullname,
-      phone: phone,
-      address: address,
-      wallet: wallet,
-    }
-
-    updateProfile(post).then((res) => {
-      console.log(res)
-      toast(`${res.message}`, 'success')
-    })
-  }
 
   const loadMorePosts = async (totalPoll) => {
     // 1. **Add a guard clause to prevent re-entry**
@@ -91,8 +69,8 @@ export default function Page() {
       // ... (rest of your logic for calculating startIndex/postsPerPage) ...
 
       // 3. Fetch the next batch of polls
-      console.log(startIndex + 1, postsPerPage)
-      const newPosts = await getPostsByCreator(params.wallet,startIndex + 1, postsPerPage)
+      console.log(startIndex, postsPerPage)
+      const newPosts = await getPostsByCreator(params.wallet, startIndex, postsPerPage, isConnected || address)
       console.log(`newPosts => `, newPosts)
       newPosts.reverse()
 
@@ -110,66 +88,76 @@ export default function Page() {
   }
 
   useEffect(() => {
-       // getPostCount().then((count) => {
-        //  const totalPoll = web3.utils.toNumber(count)
-        //  setPostCount(totalPoll)
-    
-          //if (postsLoaded === 0 && !isLoadedPoll) {
-            loadMorePosts(10)
-        //  }
-       // })
+    getCreatorPostCount(params.wallet).then((count) => {
+      const totalPoll = web3.utils.toNumber(count)
+      setPostCount(totalPoll)
+
+      if (postsLoaded === 0 && !isLoadedPoll) {
+        loadMorePosts(totalPoll)
+      }
+    })
   }, [])
 
   return (
-    <FluentProvider theme={webLightTheme}>
-      <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <h3 className={`page-title`}>profile</h3>
+    <div className={`${styles.page} ms-motion-slideDownIn`}>
+      <h3 className={`page-title`}>profile</h3>
 
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-          <div className={`${styles.profileWrapper}`}>
-            <Profile addr={params.wallet} />
-          </div>
-
-          <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
-            <li>
-              <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
-                Posts <span className={`lable lable-dark`}>0</span>
-              </button>
-            </li>
-            <li>
-              <button className={activeTab === 'activity' ? styles.activeTab : ''} onClick={() => setActiveTab('activity')}>
-                Activity
-              </button>
-            </li>
-            <li>
-              <button className={activeTab === 'reposts' ? styles.activeTab : ''} onClick={() => setActiveTab('reposts')}>
-                Reposts
-              </button>
-            </li>
-          </ul>
-
-          {activeTab === 'posts' && (
-            <div className={`${styles.tabContent} ${styles.posts} relative`}>
-              <Post addr={params.wallet} />
-            </div>
-          )}
-
-          {activeTab === 'activity' && (
-            <div className={`${styles.tabContent} ${styles.activity} relative`}>
-              <NoData name={`activity`} />
-            </div>
-          )}
-
-          {activeTab === 'reposts' && (
-            <div className={`${styles.tabContent} ${styles.reposts} relative`}>
-              <NoData name={`reposts`} />
-            </div>
-          )}
+      <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+        <div className={`${styles.profileWrapper}`}>
+          <Profile addr={params.wallet} />
         </div>
+
+        <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
+          <li>
+            <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
+              Posts <span className={`lable lable-dark`}>{postCount}</span>
+            </button>
+          </li>
+          <li>
+            <button className={activeTab === 'activity' ? styles.activeTab : ''} onClick={() => setActiveTab('activity')}>
+              Activity
+            </button>
+          </li>
+          <li>
+            <button className={activeTab === 'reposts' ? styles.activeTab : ''} onClick={() => setActiveTab('reposts')}>
+              Reposts
+            </button>
+          </li>
+          <li>
+            <button className={activeTab === 'links' ? styles.activeTab : ''} onClick={() => setActiveTab('links')}>
+              Links
+            </button>
+          </li>
+        </ul>
+
+        {activeTab === 'posts' && (
+          <div className={`${styles.tabContent} ${styles.posts} relative`}>
+            <Post addr={params.wallet} />
+          </div>
+        )}
+
+        {activeTab === 'activity' && (
+          <div className={`${styles.tabContent} ${styles.activity} relative`}>
+            <NoData name={`activity`} />
+          </div>
+        )}
+
+        {activeTab === 'reposts' && (
+          <div className={`${styles.tabContent} ${styles.reposts} relative`}>
+            <NoData name={`reposts`} />
+          </div>
+        )}
+
+        {activeTab === 'links' && (
+          <div className={`${styles.tabContent} ${styles.links} relative`}>
+            <NoData name={`links`} />
+          </div>
+        )}
       </div>
-    </FluentProvider>
+    </div>
   )
 }
+
 /**
  * No data in tab content
  * @param {*} param0
@@ -189,60 +177,14 @@ const NoData = ({ name }) => {
  * @returns
  */
 const Profile = ({ addr }) => {
-  const [profile, setProfile] = useState({
-    data: {
-      Profile: [
-        {
-          id: '0x0d5c8b7cc12ed8486e1e0147cc0c3395739f138d',
-          fullName: 'arattalabs#0D5C',
-          tags: ['dev', 'founder', 'dao'],
-          standard: 'LSP0ERC725Account',
-          transactions_aggregate: {
-            aggregate: {
-              count: 1122,
-            },
-          },
-          profileImages: [
-            {
-              src: 'https://api.universalprofile.cloud/image/QmaZqvrtLtLCaYth3DiN6KS1SK6nuGSXXzimxghvjpiQtJ?method=keccak256(bytes)&data=0x27a297c9605a4ab6118627a1aa8e513e44ae2816a26bde2d9f15a87497d110a8',
-              url: 'ipfs://QmaZqvrtLtLCaYth3DiN6KS1SK6nuGSXXzimxghvjpiQtJ',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmcnBYzr4DJhWQce7tERAiTip2dz6yQBXFjQ8zweG5wuDH?method=keccak256(bytes)&data=0x33e4a6a4e6e105b224e590d51b0f13504a877a283cff22036b65f665955ed1ae',
-              url: 'ipfs://QmcnBYzr4DJhWQce7tERAiTip2dz6yQBXFjQ8zweG5wuDH',
-            },
-            {
-              src: 'https://api.universalprofile.cloud/image/QmPGHJV7AK2RYLSu6B1a6YjTfKNVbmDJMNJJTbeUaLGtZg?method=keccak256(bytes)&data=0x448485c195adf3a4a9a991d8d143fb6352cb86ac512426f392d485ba53f52c9e',
-              url: 'ipfs://QmPGHJV7AK2RYLSu6B1a6YjTfKNVbmDJMNJJTbeUaLGtZg',
-            },
-          ],
-          name: 'arattalabs',
-          isEOA: false,
-          isContract: true,
-          followed_aggregate: {
-            aggregate: {
-              count: 454,
-            },
-          },
-          following_aggregate: {
-            aggregate: {
-              count: 24,
-            },
-          },
-          description: 'Aratta Labs is a Web3 blockchain guild',
-          createdBlockNumber: 1236480,
-          createdTimestamp: 1699971948,
-          lastMetadataUpdate: 5656224,
-          url: 'ipfs://QmWoLLLvxhU1YoMdnoq1HoxnKXYJHx7B6iwzecSNe95D8s',
-        },
-      ],
-    },
-  })
+  const [data, setData] = useState()
   const [selfView, setSelfView] = useState()
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [isItUp, setIsItUp] = useState(false)
   const params = useParams()
-  const defaultUsername = `hup-user`
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
+  const activeChain = getActiveChain()
 
   /* Error during submission (e.g., user rejected)  */
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -265,48 +207,98 @@ const Profile = ({ addr }) => {
     }, 1000)
   }
 
+  const Tags = ({ tags }) => {
+    tags = JSON.parse(tags)
+    if (tags === null) {
+      return (
+        <>
+          <small>#profile</small>
+          <small>#hup</small>
+          <small>#social</small>
+        </>
+      )
+    }
+
+    let tagList = []
+    tags.forEach((element) => {
+      tagList.push(<small>#{element}</small>)
+    })
+
+    return <>{...tagList}</>
+  }
+
+  const editProfile = ()=>{
+    console.log(isItUp)
+    if (isItUp) {
+      toast(`Please update your profile through Universal Profile`, `error`)
+      return
+    }
+    setShowProfileModal(true)
+  }
+
   useEffect(() => {
-    getProfile(addr).then((res) => {
+    getUniversalProfile(addr).then((res) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
+        setIsItUp(true)
+        setData({
+          wallet: res.data.Profile[0].id,
+          name: res.data.Profile[0].name,
+          description: res.data.Profile[0].description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.Profile[0].tags),
+          links:JSON.stringify( res.data.Profile[0].links_),
+          lastUpdate: '',
+        })
         setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
+      } else {
+        getProfile(addr).then((res) => {
+          console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+           res.profileImage = profileImage
+            setData(res)
+            setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
+          }
+        })
       }
     })
   }, [])
 
-  if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
+  if (!data) return <div className={`shimmer ${styles.shimmer}`} />
 
   return (
     <>
+      {showProfileModal && data && <ProfileModal profile={data} setShowProfileModal={setShowProfileModal} />}
+
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
         <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
           <div className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}>
             <div className={`flex align-items-center gap-025`}>
-              <h1 className={`${styles.profile__name}`}>{profile.data.Profile[0].name ?? defaultUsername}</h1>
+              <h1 className={`${styles.profile__name}`}>{data.name !== '' ? data.name : `hup-user`}</h1>
               <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
             </div>
 
             <code className={`${styles.profile__wallet}`}>
-              <Link href={`https://explorer.lukso.network/address/${profile.data.Profile[0].id}`} target={`_blank`}>
-                {`${profile.data.Profile[0].id.slice(0, 4)}…${profile.data.Profile[0].id.slice(38)}`}
+              <Link href={`${activeChain[0].blockExplorers.default.url}/address/${data.wallet}`} target={`_blank`}>
+                {`${data.wallet.slice(0, 4)}…${data.wallet.slice(38)}`}
               </Link>
             </code>
 
-            <p className={`${styles.profile__description} mt-20`}>{profile.data.Profile[0].description || `This user has not set up a bio yet.`}</p>
+            <p className={`${styles.profile__description} mt-20`}>{data.description || `This user has not set up a bio yet.`}</p>
 
-            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>{profile.data.Profile[0].tags && profile.data.Profile[0].tags.map((tag, i) => <small key={i}>#{tag}</small>)}</div>
+            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
+              <Tags tags={data.tags} />
+            </div>
           </div>
 
-          <div className={`${styles.profile__pfp} relative`}>
-            <figure className={`rounded`}>
-              <img
-                alt={profile.data.Profile[0].name || `PFP`}
-                src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-              />
+          <div className={`${styles.profile__pfp} rounded relative`}>
+            <figure className={``}>
+              <img alt={`hup profile ${data.name}`} src={`${data.profileImage}`} />
             </figure>
 
-            <Status addr={addr} profile={profile} selfView={selfView} />
+            <Status addr={addr} profile={data} selfView={selfView} />
           </div>
         </header>
 
@@ -314,22 +306,25 @@ const Profile = ({ addr }) => {
           <ul className={`flex flex-column align-items-center justify-content-between gap-1`}>
             <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
               <button className={`${styles.btnFollowers}`}>
-                <span className={`mt-20 text-secondary`}>{profile.data.Profile[0].followed_aggregate.aggregate.count} followers</span>
+                <span className={`mt-20 text-secondary`}>{100} followers</span>
               </button>
               <span>•</span>
               <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
                 hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
               </Link>
             </li>
-            {selfView && (
+            {isConnected && selfView && (
               <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
-                  Edit profile
-                </button>
-                {isConnected && address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
-                  <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
-                    Disconnect
-                  </button>
+                {address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
+                  <>
+                    <button className={`${styles.profile__btnFollow}`}
+                    onClick={() => editProfile()}>
+                      Edit profile
+                    </button>
+                    <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
+                      Disconnect
+                    </button>
+                  </>
                 )}
               </li>
             )}
@@ -347,6 +342,11 @@ const Profile = ({ addr }) => {
   )
 }
 
+/**
+ * Status
+ * @param {*} param0
+ * @returns
+ */
 const Status = ({ addr, profile, selfView }) => {
   const placeholders = [
     'Share a short status',
@@ -378,6 +378,7 @@ const Status = ({ addr, profile, selfView }) => {
   const [expirationTimestamp, setExpirationTimestamp] = useState(24)
   const [maxLength, setMaxLength] = useState()
   const { web3, contract } = initPostContract()
+  const [activeChain, setActiveChain] = useState()
   const { contract: statusContract } = initStatusContract()
   const statusRef = useRef(``)
 
@@ -391,6 +392,7 @@ const Status = ({ addr, profile, selfView }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
+
   /**
    * Selects a random placeholder phrase from the list.
    * @returns {string} The randomly selected placeholder text.
@@ -407,7 +409,7 @@ const Status = ({ addr, profile, selfView }) => {
     try {
       const result = writeContract({
         abi: statusAbi,
-        address: process.env.NEXT_PUBLIC_CONTRACT_STATUS,
+        address: activeChain[1].status,
         functionName: 'clearStatus',
         args: [],
       })
@@ -420,7 +422,7 @@ const Status = ({ addr, profile, selfView }) => {
   const updateStatus = (e) => {
     writeContract({
       abi: statusAbi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_STATUS,
+      address: activeChain[1].status,
       functionName: 'updateStatus',
       args: [statusContent, 'public', '', 24],
     })
@@ -438,7 +440,10 @@ const Status = ({ addr, profile, selfView }) => {
 
   //   statusContract
   // }
+
   useEffect(() => {
+    setActiveChain(getActiveChain())
+
     getStatus(addr).then((res) => {
       console.log(res)
       setStatus(res)
@@ -471,11 +476,11 @@ const Status = ({ addr, profile, selfView }) => {
             </header>
 
             <main className={`flex flex-column align-items-center gap-1 `}>
-              <div className={`${styles.statusModal__pfp} relative`}>
-                <figure className={`rounded`}>
+              <div className={`${styles.statusModal__pfp} rounded relative`}>
+                <figure className={``}>
                   <img
-                    alt={profile.data.Profile[0].name || `PFP`}
-                    src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+                    alt={`hup profile ${profile.name}`}
+                    src={`${profile.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${profile.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`}`}
                   />
                 </figure>
 
@@ -526,6 +531,220 @@ const Status = ({ addr, profile, selfView }) => {
 }
 
 /**
+ * Profile Modal
+ * @param {*} param0
+ * @returns
+ */
+const ProfileModal = ({ profile, setShowProfileModal }) => {
+  console.log(profile)
+  const [tags, setTags] = useState({ list: JSON.parse(profile.tags) || [] })
+  const [links, setLinks] = useState({ list: JSON.parse(profile.links) || [] })
+  const [activeChain, setActiveChain] = useState()
+  const { address, isConnected } = useAccount()
+  const pfpRef = useRef()
+  const tagRef = useRef()
+  const linkNameRef = useRef()
+  const linkURLRef = useRef()
+
+  /* Error during submission (e.g., user rejected)  */
+  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  /* Error after mining (e.g., transaction reverted) */
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
+    hash,
+  })
+
+  const clearStatus = () => {
+    try {
+      const result = writeContract({
+        abi: statusAbi,
+        address: activeChain[1].status,
+        functionName: 'clearStatus',
+        args: [],
+      })
+      console.log('Transaction sent:', result)
+    } catch (error) {
+      console.error('Contract write failed:', error)
+    }
+  }
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault()
+    if (!isConnected) return
+
+    const formData = new FormData(e.target)
+    const name = formData.get('name')
+    const description = formData.get('description')
+    formData.set('tags', JSON.stringify(tags.list))
+    formData.set('links', JSON.stringify(links.list))
+    const errors = {}
+
+    updateProfile(formData, address).then((res) => {
+      console.log(res)
+      toast(`${res.data.message}`, 'success')
+    })
+  }
+
+  const showPFP = (e) => {
+    const preview = pfpRef.current
+
+    const file = e.target.files[0]
+    const reader = new FileReader()
+
+    reader.addEventListener('load', () => {
+      // convert image file to base64 string
+      preview.src = reader.result
+    })
+
+    if (file) {
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const addTag = (e) => {
+    const newTag = tagRef.current.value
+    if (newTag === '') return
+
+    const isReduntant = tags.list.filter((filterItem) => filterItem === newTag)
+    if (isReduntant.length === 0) setTags({ list: tags.list.concat(newTag) })
+    tagRef.current.value = null
+  }
+
+  const removeTag = (e, tag) => {
+    setTags({ list: tags.list.filter((filterItem) => filterItem !== tag) })
+  }
+
+  const addLink = (e) => {
+    const newLinkName = linkNameRef.current.value
+    const newLinkURL = linkURLRef.current.value
+    if (newLinkName === '' || newLinkURL === '') return
+
+    const isReduntant = links.list.filter((filterItem) => filterItem.name === newLinkName)
+    if (isReduntant.length === 0) setLinks({ list: links.list.concat({ name: newLinkName, url: newLinkURL }) })
+    linkNameRef.current.value = null
+    linkURLRef.current.value = null
+  }
+
+  const removeLink = (e, link) => {
+    setLinks({ list: links.list.filter((filterItem) => filterItem !== link) })
+  }
+
+  useEffect(() => {
+    setActiveChain(getActiveChain())
+    // getStatus(addr).then((res) => {
+    //   console.log(res)
+    //   setStatus(res)
+    // })
+  }, [])
+  return (
+    <>
+      <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
+        <div className={`${styles.profileModal__card}`} onMouseDown={(e) => e.stopPropagation()}>
+          <header className={``}>
+            <div className={``} aria-label="Close" onClick={() => setShowProfileModal(false)}>
+              <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
+                <title>Close</title>
+                <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="3" y2="21"></line>
+                <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="21" y2="3"></line>
+              </svg>
+            </div>
+            <div className={`flex-1`}>
+              <h3>Update profile</h3>
+            </div>
+            <div className={`pointer`}></div>
+          </header>
+
+          <main className={`flex flex-column align-items-center gap-1 `}>
+            {isConfirmed && <p className="text-center badge badge-success">Done</p>}
+            <form className={`form`} action="" onSubmit={(e) => handleUpdateProfile(e)} encType={`multipart/form-data`}>
+              <div className={`form-group`}>
+                <figure className={`rounded`}>
+                  <img ref={pfpRef} src={`${profile.profileImage}`} />
+                </figure>
+              </div>
+              <div className={`form-group`}>
+                <label htmlFor="">Profile picture</label>
+                <input type="file" name="profileImage" id="" onChange={(e) => showPFP(e)} />
+                <input type="hidden" name="profileImage_hidden" defaultValue={profile.profileImage} />
+              </div>
+              <div className={`form-group`}>
+                <label htmlFor="">Name</label>
+                <input type="text" name="name" id="" defaultValue={profile.name} placeholder={`Name`} />
+              </div>
+              <div className={`form-group`}>
+                <label htmlFor="">Bio</label>
+                <textarea name="description" id="" defaultValue={profile.description} placeholder="Profile bio"></textarea>
+              </div>
+
+              <details open>
+                <summary>Advanced</summary>
+                <div>
+                  <div>
+                    <div className={`flex flex-wrap`}>
+                      {tags.list.length > 0 &&
+                        tags.list.map((tag, i) => (
+                          <>
+                            <span key={i} className={`${styles['form-tag']}`}>
+                              {tag}
+                              <button type="button" onClick={(e) => removeTag(e, tag)}>
+                                X
+                              </button>
+                            </span>
+                          </>
+                        ))}
+                    </div>
+
+                    <div className={`form-group flex`}>
+                      <input ref={tagRef} type="text" name="tags" id="" placeholder={`Tag`} />
+                      <button type="button" onClick={(e) => addTag(e)}>
+                        Add
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className={`flex flex-wrap`}>
+                      {links.list.length > 0 &&
+                        links.list.map((link, i) => (
+                          <>
+                            <span key={i} className={`${styles['form-link']}`}>
+                              {link.name}
+                              <button type="button" onClick={(e) => removeLink(e, link)}>
+                                X
+                              </button>
+                            </span>
+                          </>
+                        ))}
+                    </div>
+
+                    <div className={`form-group flex`}>
+                      <input ref={linkNameRef} type="text" name="links" id="" placeholder={`Link Name`} />
+                      <input ref={linkURLRef} type="text" name="links" id="" placeholder={`Link URL`} />
+                      <button type="button" onClick={(e) => addLink(e)}>
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <div className={`form-group`}>
+                <button type="submit" className="btn">
+                  Update
+                </button>
+              </div>
+            </form>
+          </main>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/**
  * Post
  * @param {String} addr
  * @returns
@@ -547,11 +766,12 @@ const Post = ({ addr }) => {
   const [content, setContent] = useState('Question?')
   const [showForm, setShowForm] = useState(`post`)
   const [votingLimit, setVotingLimit] = useState(1)
-  const [postContent, setPostContent] = useState(localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`))
+  const [postContent, setPostContent] = useState()
   const [showWhitelist, setShowWhitelist] = useState(false)
   const [whitelist, setWhitelist] = useState({ list: [] })
   const [filteredProfiles, setFilteredProfiles] = useState()
   const [options, setOptions] = useState({ list: [``, ``] })
+  const [activeChain, setActiveChain] = useState()
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
@@ -668,7 +888,7 @@ const Post = ({ addr }) => {
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      address: activeChain[1].post,
       functionName: 'createPost',
       args: [metadata, postContent, formData.get(`allowComments`) === 'true' ? true : false],
     })
@@ -794,12 +1014,16 @@ const Post = ({ addr }) => {
   }
 
   useEffect(() => {
+    setActiveChain(getActiveChain())
+
     getProfile(addr).then((res) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setProfile(res)
       }
     })
+
+    setPostContent(localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`))
   }, [])
 
   if (!profile) return <div className={`shimmer ${styles.shimmer}`} />

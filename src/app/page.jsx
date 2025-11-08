@@ -16,6 +16,7 @@ import { isPollActive } from '@/util/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
+import {getActiveChain} from '@/util/communication'
 import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
@@ -55,6 +56,7 @@ export default function Page() {
   const giftModalMessage = useRef()
   const mounted = useClientMounted()
   const params = useParams()
+  const activeChain = getActiveChain()
   const { address, isConnected } = useAccount()
   const router = useRouter()
   const { data: hash, isPending, writeContract } = useWriteContract()
@@ -94,7 +96,7 @@ export default function Page() {
 
       // 3. Fetch the next batch of polls
       console.log(startIndex + 1, postsPerPage)
-      const newPosts = await getPosts(startIndex + 1, postsPerPage)
+      const newPosts = await getPosts(startIndex + 1, postsPerPage, address)
       console.log(`newPosts => `, newPosts)
       newPosts.reverse()
 
@@ -127,6 +129,8 @@ export default function Page() {
     })
      */
 
+
+    console.log(config)
     getPostCount().then((count) => {
       const totalPoll = web3.utils.toNumber(count)
       setPostCount(totalPoll)
@@ -156,25 +160,26 @@ export default function Page() {
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
         {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
+        
         <div className={`${styles.grid} flex flex-column`}>
           {posts &&
             posts.list.length > 0 &&
             posts.list.map((item, i) => {
               return (
                 <article key={i} className={`${styles.post} animate fade`} 
-                onClick={() => router.push(`p/${item.postId}`)}>
+                onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                     <header className={`${styles.post__header} flex align-items-start justify-content-between`}>
                       <Profile creator={item.creator} createdAt={item.createdAt} />
-                      <Nav item={item}/>
+                      <Nav item={item} />
                     </header>
                     <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-                      <div className={`${styles.post__content} `} onClick={(e) => e.stopPropagation()} id={`pollQuestion${item.pollId}`}>
+                      <div className={`${styles.post__content} `} id={`pollQuestion${item.pollId}`}>
                         {item.content}
                       </div>
 
                       <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
-                        <Like id={item.postId} likeCount={item.likeCount} />
+                        <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
 
                         {item.allowedComments && (
                           <button onClick={() => setShowCommentModal(item)}>
@@ -218,15 +223,18 @@ export default function Page() {
   )
 }
 
-const Nav = ({item}) => {
+const Nav = ({ item }) => {
   const [showPostDropdown, setShowPostDropdown] = useState()
 
   return (
     <div className={`relative`}>
-      <button className={`${styles.btnPostMenu} rounded`} onClick={(e) => {
-        e.stopPropagation()
-        setShowPostDropdown(!showPostDropdown)
-      }}>
+      <button
+        className={`${styles.btnPostMenu} rounded`}
+        onClick={(e) => {
+          e.stopPropagation()
+          setShowPostDropdown(!showPostDropdown)
+        }}
+      >
         <ThreeDotIcon />
       </button>
 
@@ -250,6 +258,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
   const { address, isConnected } = useAccount()
+      const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
   const {
@@ -271,31 +280,10 @@ const CommentModal = ({ item, setShowCommentModal }) => {
       console.log(`Please connect your wallet first`, 'error')
       return
     }
-    //  const web3 = new Web3(window.lukso)
-
-    //   // // Create a Contract instance
-    //   const contract = new web3.eth.Contract(commentAbi, process.env.NEXT_PUBLIC_CONTRACT_POST_COMMENT)
-
-    //     window.lukso.request({ method: 'eth_requestAccounts' }).then((accounts) => {
-    //       contract.methods
-    //         .addComment(web3.utils.toNumber(id), commentContent, '')
-    //         .send({
-    //           from: accounts[0],
-    //         })
-    //         .then((res) => {
-    //           console.log(res)
-    //           toast(`Done`)
-    //         })
-    //         .catch((error) => {
-    //           console.log(error)
-    //           toast.dismiss(t)
-    //         })
-    //     })
-    //     //-------------------------------
 
     writeContract({
       abi: commentAbi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST_COMMENT,
+      address: activeChain[1].comment,
       functionName: 'addComment',
       args: [web3.utils.toNumber(id), 0, commentContent, ''],
     })
@@ -374,7 +362,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
 
         <footer className={`${styles.commentModal__footer}  flex flex-column align-items-start`}>
           <ConnectedProfile addr={address} />
-          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`Reply to ${item.creator}`} />
+          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
           <button className="btn" onClick={(e) => postComment(e, item.postId)}>
             Post comment
           </button>
@@ -389,11 +377,11 @@ const CommentModal = ({ item, setShowCommentModal }) => {
  * @param {*} param0
  * @returns
  */
-const Like = ({ id, likeCount }) => {
-  const [hasLiked, setHasLiked] = useState(false)
+const Like = ({ id, likeCount, hasLiked }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
+  const activeChain = getActiveChain()
   const { address, isConnected } = useAccount()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -401,7 +389,7 @@ const Like = ({ id, likeCount }) => {
   })
 
   const getHasLiked = async () => {
-    return isConnected ? await getHasLikedPost(id, address) : false
+    return isConnected ? await getHasLikedPost(Web3.utils.toNumber(id), address) : false
   }
 
   const likePost = (e, id) => {
@@ -414,7 +402,7 @@ const Like = ({ id, likeCount }) => {
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      address: activeChain[1].post,
       functionName: 'likePost',
       args: [id],
     })
@@ -430,23 +418,23 @@ const Like = ({ id, likeCount }) => {
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      address: activeChain[1].post,
       functionName: 'unlikePost',
       args: [id],
     })
   }
 
   useEffect(() => {
-    getHasLiked()
-      .then((result) => {
-        setHasLiked(result)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.log(err)
-        setError(`⚠️`)
-        setLoading(false)
-      })
+    // getHasLiked()
+    //   .then((result) => {
+    //     setHasLiked(result)
+    //     setLoading(false)
+    //   })
+    //   .catch((err) => {
+    //     console.log(err)
+    //     setError(`⚠️`)
+    //     setLoading(false)
+    //   })
   }, [id])
 
   // if (loading) {

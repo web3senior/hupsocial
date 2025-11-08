@@ -387,6 +387,11 @@
 				"internalType": "uint256",
 				"name": "_commentId",
 				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_addr",
+				"type": "address"
 			}
 		],
 		"name": "getComment",
@@ -442,6 +447,11 @@
 						"internalType": "uint256",
 						"name": "replyCount",
 						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "hasLiked",
+						"type": "bool"
 					}
 				],
 				"internalType": "struct PostCommentManager.CommentWithoutMappings",
@@ -487,6 +497,11 @@
 				"internalType": "uint256",
 				"name": "_count",
 				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_addr",
+				"type": "address"
 			}
 		],
 		"name": "getCommentsByPostId",
@@ -542,6 +557,11 @@
 						"internalType": "uint256",
 						"name": "replyCount",
 						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "hasLiked",
+						"type": "bool"
 					}
 				],
 				"internalType": "struct PostCommentManager.CommentWithoutMappings[]",
@@ -587,6 +607,11 @@
 				"internalType": "uint256",
 				"name": "_count",
 				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_addr",
+				"type": "address"
 			}
 		],
 		"name": "getRepliesByCommentId",
@@ -642,6 +667,11 @@
 						"internalType": "uint256",
 						"name": "replyCount",
 						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "hasLiked",
+						"type": "bool"
 					}
 				],
 				"internalType": "struct PostCommentManager.CommentWithoutMappings[]",

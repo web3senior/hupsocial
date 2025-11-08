@@ -16,6 +16,9 @@ import {
   getCommentsByPostId,
   getHasLikedPost,
   getHasLikedComment,
+  getReplyCount,
+  getComment,
+  getRepliesByCommentId,
   getPollLikeCount,
   getPostCount,
   getVoteCountsForPoll,
@@ -57,12 +60,12 @@ moment.defineLocale('en-short', {
 })
 
 export default function Page() {
-  const [post, setPost] = useState()
+  const [comment, setComment] = useState()
 
-  const [comments, setComments] = useState({ list: [] })
+  const [replies, setReplies] = useState({ list: [] })
   const [commentsLoaded, setcommentsLoaded] = useState(0)
   const [reactionCounter, setReactionCounter] = useState(0)
-  const [commentCount, setCommentCount] = useState(0)
+  const [replyCount, setReplyCount] = useState(0)
   const [isLoadedComment, setIsLoadedPoll] = useState(false)
   const [showCommentModal, setShowCommentModal] = useState()
   const { web3, contract } = initPostContract()
@@ -111,11 +114,12 @@ export default function Page() {
 
       // 3. Fetch the next batch of polls
       console.log(startIndex + 1, showingCommentCount)
-      const newComments = await getCommentsByPostId(params.id, startIndex, showingCommentCount, address)
+      const newComments = await getRepliesByCommentId(params.id, startIndex, showingCommentCount)
       console.log(`newComments => `, newComments)
+      newComments.reverse()
 
       if (Array.isArray(newComments) && newComments.length > 0) {
-        setComments((prevComments) => ({ list: [...prevComments.list, ...newComments] }))
+        setReplies((prevComments) => ({ list: [...prevComments.list, ...newComments] }))
         setcommentsLoaded((prevLoaded) => prevLoaded + newComments.length)
       }
     } catch (error) {
@@ -134,16 +138,13 @@ export default function Page() {
   }
 
   useEffect(() => {
-    getPostByIndex(params.id, address).then((res) => {
+    getComment(params.id).then((res) => {
       console.log(res)
-      res.postId = params.id
-      setPost(res)
-    })
+      //  res.postId = params.id
+      setComment(res)
 
-    // Comments
-    getPostCommentCount(params.id).then((count) => {
-      const totalComment = web3.utils.toNumber(count)
-      setCommentCount(totalComment)
+      const totalComment = web3.utils.toNumber(res.replyCount)
+      setReplyCount(totalComment)
 
       if (commentsLoaded === 0 && !isLoadedComment) {
         loadMoreComment(totalComment)
@@ -160,36 +161,33 @@ export default function Page() {
         <code>10 views</code>
       </h3>
 
-      {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} 
-      setShowCommentModal={setShowCommentModal} />}
+      {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
+        {!comment && <div className={`shimmer ${styles.pollShimmer}`} />}
         <div className={`${styles.grid} flex flex-column`}>
-          {post && (
+          {comment && (
             <article className={`${styles.post} animate fade`}>
-              <section data-name={post.name} className={`flex flex-column align-items-start justify-content-between`}>
+              <section data-name={comment.name} className={`flex flex-column align-items-start justify-content-between`}>
                 <header className={`${styles.post__header}`}>
-                  <Profile creator={post.creator} createdAt={post.createdAt} />
+                  <Profile creator={comment.creator} createdAt={comment.createdAt} />
                 </header>
                 <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
                   <div
                     className={`${styles.post__content} `}
                     // onClick={(e) => e.stopPropagation()}
-                    id={`pollQuestion${post.pollId}`}
+                    id={`pollQuestion${comment.pollId}`}
                   >
-                    {post.content}
+                    {comment.content}
                   </div>
 
                   <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
-                    <Like id={post.postId} likeCount={post.likeCount} hasLiked={post.hasLiked} />
+                    <Like id={comment.commentId} likeCount={comment.likeCount} hasLiked={comment.hasLiked} />
 
-                    {post.allowedComments && (
-                      <button onClick={() => setShowCommentModal({ data: post, parentId: 0, type: `post` })}>
-                        <CommentIcon />
-                        <span>{post.commentCount}</span>
-                      </button>
-                    )}
+                    <button onClick={() => setShowCommentModal({ data: comment, parentId: params.id, type: `post` })}>
+                      <CommentIcon />
+                      <span>{comment.replyCount}</span>
+                    </button>
 
                     <button>
                       <RepostIcon />
@@ -215,19 +213,19 @@ export default function Page() {
           )}
         </div>
 
-        {comments &&
-          comments.list.length > 0 &&
-          comments.list.map((item, i) => {
+        {replies &&
+          replies.list.length > 0 &&
+          replies.list.map((item, i) => {
             return (
-              <div key={i}>
-                <div className={`${styles.comment}`} onClick={() => router.push(`/comment/${item.commentId}`)}>
+              <div key={i} onClick={() => router.push(`/comment/${item.commentId}`)}>
+                <div className={`${styles.comment}`}>
                   <Profile creator={item.creator} createdAt={item.createdAt} />
 
                   <div className={`${styles.comment__content}`}>
                     <p>{item.content}</p>
 
                     <div onClick={(e) => e.stopPropagation()} className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}>
-                      <LikeComment commentId={item.commentId} likeCount={item.likeCount} />
+                      <LikeComment commentId={item.commentId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
 
                       <button onClick={() => setShowCommentModal({ data: item, parentId: item.commentId, type: `comment` })}>
                         <CommentIcon />
@@ -247,7 +245,8 @@ export default function Page() {
           })}
 
         {mounted && isConnected && (
-          <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: post, type: `post` })}>
+          <div className={`${styles.reply} flex align-items-center gap-025`} 
+          onClick={() => setShowCommentModal({ data: comment, type: `comment` })}>
             <ProfileImage addr={address} />
             <p>
               Reply to {address.slice(0, 4)}…${address.slice(38)}
@@ -256,8 +255,8 @@ export default function Page() {
         )}
       </div>
 
-      {commentsLoaded !== commentCount && (
-        <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(postCount)}>
+      {commentsLoaded !== replyCount && (
+        <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(replyCount)}>
           Load More
         </button>
       )}
@@ -452,8 +451,8 @@ const Like = ({ id, likeCount, hasLiked }) => {
  * @param {*} param0
  * @returns
  */
-const LikeComment = ({ commentId: id, likeCount }) => {
-  const [hasLiked, setHasLiked] = useState(false)
+const LikeComment = ({ commentId: id, likeCount, hasLiked }) => {
+  // const [hasLiked, setHasLiked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
@@ -496,16 +495,16 @@ const LikeComment = ({ commentId: id, likeCount }) => {
   }
 
   useEffect(() => {
-    getHasLiked()
-      .then((result) => {
-        setHasLiked(result)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.log(err)
-        setError(`⚠️`)
-        setLoading(false)
-      })
+    // getHasLiked()
+    //   .then((result) => {
+    //     setHasLiked(result)
+    //     setLoading(false)
+    //   })
+    //   .catch((err) => {
+    //     console.log(err)
+    //     setError(`⚠️`)
+    //     setLoading(false)
+    //   })
   }, [id])
 
   // if (loading) {

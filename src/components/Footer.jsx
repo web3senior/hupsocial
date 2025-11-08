@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useParams, usePathname } from 'next/navigation'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { getActiveChain } from '@/util/communication'
 import { useAccount } from 'wagmi'
 import styles from './Footer.module.scss'
 
@@ -10,6 +11,8 @@ export default function Footer() {
   const mounted = useClientMounted()
   const pathname = usePathname()
   const { address, isConnected } = useAccount()
+  const params = useParams()
+  const activeChain = getActiveChain()
 
   const pages = [
     {

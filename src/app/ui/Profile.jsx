@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { getProfile } from '@/util/api'
+import { getProfile, getUniversalProfile } from '@/util/api'
 import { config } from '@/config/wagmi'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import web3 from 'web3'
 import moment from 'moment'
 import { toSvg } from 'jdenticon'
-import {BlueCheckMarkIcon} from '@/components/Icons'
+import { getActiveChain } from '@/util/communication'
+import { BlueCheckMarkIcon } from '@/components/Icons'
 import styles from './Profile.module.scss'
 
 moment.defineLocale('en-short', {
@@ -32,43 +33,43 @@ moment.defineLocale('en-short', {
 
 /**
  * Profile
- * @param {String} addr
+ * @param {String} creator
  * @returns
  */
-export default function Profile({ creator, createdAt, chainId = 4201 }) {
+export default function Profile({ creator, createdAt }) {
   const [profile, setProfile] = useState()
-  const [chain, setChain] = useState()
+  const activeChain = getActiveChain()
   const defaultUsername = `hup-user`
   //   const { web3, contract } = initPostContract()
   const router = useRouter()
 
   useEffect(() => {
-    getProfile(creator).then((res) => {
+    getUniversalProfile(creator).then((res) => {
+      console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
-      } else {
+        setIsItUp(true)
         setProfile({
-          data: {
-            Profile: [
-              {
-                fullName: 'annonymous',
-                name: 'annonymous',
-                tags: ['profile'],
-                profileImages: [
-                  {
-                    isSVG: true,
-                    src: `${toSvg(`${creator}`, 36)}`,
-                    url: 'ipfs://',
-                  },
-                ],
-              },
-            ],
-          },
+          wallet: res.data.Profile[0].id,
+          name: res.data.Profile[0].name,
+          description: res.data.Profile[0].description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.Profile[0].tags),
+          links: JSON.stringify(res.data.Profile[0].links_),
+          lastUpdate: '',
+        })
+      } else {
+        getProfile(creator).then((res) => {
+          console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            res.profileImage = profileImage
+            setProfile(res)
+          }
         })
       }
     })
-
-    setChain(config.chains.filter((filterItem) => filterItem.id === chainId)[0])
+    //${toSvg(`${creator}`, 36)}
   }, [])
 
   if (!profile)
@@ -90,21 +91,16 @@ export default function Profile({ creator, createdAt, chainId = 4201 }) {
         router.push(`/u/${creator}`)
       }}
     >
-      {!profile.data.Profile[0].profileImages[0]?.isSVG ? (
-        <img
-          alt={profile.data.Profile[0].name || `Default PFP`}
-          src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-          className={`rounded`}
-        />
-      ) : (
-        <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div>
-      )}
+      {/* profile.data.Profile[0].profileImages[0]?.isSVG */}
+      {/* <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div> */}
+
+      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
-          <b>{profile.data.Profile[0].name ?? defaultUsername}</b>
+          <b>{profile.name ?? defaultUsername}</b>
           <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
-          <div className={`${styles.badge}`} title={chain && chain.name} 
-          dangerouslySetInnerHTML={{ __html: `${chain && chain.icon}` }}></div>
+          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
           <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
         </div>
         <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>

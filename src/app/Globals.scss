@@ -16,20 +16,20 @@
 
 // Scrollbar
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--color-primary);
-    background-clip: padding-box;
-    border: 2px solid #0000;
-    border-radius: 100vh;
+  background: var(--color-primary);
+  background-clip: padding-box;
+  border: 2px solid #0000;
+  border-radius: 100vh;
 }
 
 ::-webkit-scrollbar-track {
-    background: 0 0;
-    border-radius: 100vh;
+  background: 0 0;
+  border-radius: 100vh;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,6 +39,63 @@
   }
 }
 
+// Details
+details {
+  cursor: pointer;
+}
+details::details-content {
+  opacity: 0;
+  transition: opacity 400ms, content-visibility 400ms allow-discrete;
+}
+
+details[open]::details-content {
+  opacity: 1;
+}
+// details {
+//   border-radius: var(--global-border-radius);
+//   color: var(--black);
+//   background-color: #f8fafd;
+//   cursor: pointer;
+//   transition-property: all;
+//   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+//   transition-duration: 150ms;
+//   user-select: none;
+
+//   summary {
+//     position: relative;
+//     font-weight: bold;
+//     display: flex;
+//     align-items: center;
+//     justify-content: space-between;
+//     padding: 1rem 2.5rem;
+//     background-color: var(--white);
+//     border-radius: var(--global-border-radius);
+
+//     &:before {
+//       content: '👈🏻';
+//       position: absolute;
+//       right: 1rem;
+//       transition: 0.25s all ease;
+//     }
+//   }
+
+//   > div {
+//     background-color: var(--white);
+//     border-bottom-left-radius: var(--global-border-radius);
+//     border-bottom-right-radius: var(--global-border-radius);
+//     padding: 1rem;
+//   }
+
+//   &[open] {
+//     summary {
+//       border-bottom-left-radius: unset;
+//       border-bottom-right-radius: unset;
+//       &:before {
+//         content: '👇🏻';
+//       }
+//     }
+//   }
+// }
 * {
   box-sizing: border-box;
   padding: 0;

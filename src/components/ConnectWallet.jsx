@@ -7,17 +7,19 @@ import { config } from '@/config/wagmi'
 import { useAccount, useDisconnect, Connector, useConnect } from 'wagmi'
 import Shimmer from '@/helper/Shimmer'
 import Link from 'next/link'
+import { useSwitchChain } from 'wagmi'
+import {getActiveChain} from "@/util/communication"
 import styles from './ConnectWallet.module.scss'
+import { getProfile, getUniversalProfile } from '@/util/api'
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
   const [showNetworks, setShowNetworks] = useState(false)
   const { disconnect } = useDisconnect()
-  const [chains, setChains] = useState()
   const [defaultChain, setDefaultChain] = useState()
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
-
+  const { chains, switchChain } = useSwitchChain()
   // const handleDisconnect = async () => {
   //   try {
   //     await disconnect()
@@ -26,9 +28,18 @@ export const ConnectWallet = () => {
   //   }
   // }
 
+  const handleSwitchChain = (e, chain) => {
+    switchChain({ chainId: chain.id })
+    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
+    setDefaultChain(chain)
+    setShowNetworks(false)
+    document.documentElement.style.setProperty('--color-primary', chains.primaryColor);
+    window.location.reload()
+  }
+
   useEffect(() => {
-    setChains(config.chains)
-    setDefaultChain(config.chains.filter((filterItem) => filterItem.name === `LUKSO Testnet`)[0])
+    const activeChain = getActiveChain()
+    setDefaultChain(activeChain[0])
   }, [])
 
   return !mounted ? null : (
@@ -47,18 +58,18 @@ export const ConnectWallet = () => {
           <div className={`${styles.networks}`}>
             <button onClick={(e) => setShowNetworks(!showNetworks)} title={`${defaultChain.name}`}>
               <span className={`rounded`} dangerouslySetInnerHTML={{ __html: defaultChain.icon }} />
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
 
             {showNetworks && (
               <div className={`${styles.dropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
                 <ul>
-                  {chains.map((item, i) => (
-                    <li key={i} onClick={() => setShowNetworks(false)} disabled={item.name !== `LUKSO Testnet`} className={`flex flex-row align-items-center justify-content-start gap-050`} disabled={item.name !== `LUKSO Testnet`}>
-                      <figure className={`rounded`} dangerouslySetInnerHTML={{ __html: item.icon }} />
-                      <small>{item.name}</small>
+                  {chains.map((chain, i) => (
+                    <li key={i} onClick={(e) => handleSwitchChain(e, chain)} className={`flex flex-row align-items-center justify-content-start gap-050`}>
+                      <figure className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
+                      <small>{chain.name}</small>
                     </li>
                   ))}
                 </ul>
@@ -110,52 +121,41 @@ export function WalletOptions() {
 const Profile = ({ addr }) => {
   const [data, setData] = useState()
 
-  const getProfile = async (addr) => {
-    const myHeaders = new Headers()
-    myHeaders.append('Content-Type', `application/json`)
-    myHeaders.append('Accept', `application/json`)
-
-    const requestOptions = {
-      method: 'POST',
-      headers: myHeaders,
-      body: JSON.stringify({
-        query: `query MyQuery {
-  search_profiles(
-    args: {search: "${addr}"}
-    limit: 1
-  ) {
-    fullName
-    name
-    description
-    id
-    profileImages {
-      src
-    }
-  }
-}`,
-      }),
-    }
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}`, requestOptions)
-    if (!response.ok) {
-      throw new Response('Failed to ', { status: 500 })
-    }
-    const data = await response.json()
-    setData(data)
-    return data
-  }
-
   useEffect(() => {
-    getProfile(addr).then(console.log)
+    getUniversalProfile(addr).then((res) => {
+      console.log(res)
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+        setData({
+          wallet: res.data.Profile[0].id,
+          name: res.data.Profile[0].name,
+          description: res.data.Profile[0].description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.Profile[0].tags),
+          links:JSON.stringify( res.data.Profile[0].links_),
+          lastUpdate: '',
+        })
+      } else {
+        getProfile(addr).then((res) => {
+          console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+           res.profileImage = profileImage
+            setData(res)
+          }
+        })
+      }
+    })
   }, [])
 
-  if (!data || data.data?.search_profiles.length === 0) return <Shimmer style={{ width: `32px`, height: `32px`, borderRadius: `999px` }} />
+  if (!data || data.profileImage === '') return <Shimmer style={{ width: `32px`, height: `32px`, borderRadius: `999px` }} />
 
   return (
     <Link href={`/u/${addr}`}>
-      <figure className={`${styles.pfp} d-f-c flex-column grid--gap-050 rounded`} title={data.data.search_profiles[0].name}>
+      <figure className={`${styles.pfp} d-f-c flex-column grid--gap-050 rounded`} title={data.name}>
         <img
-          alt={data.data.search_profiles[0].fullName}
-          src={`${data.data.search_profiles[0].profileImages.length > 0 ? data.data.search_profiles[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+          alt={data.name}
+          src={`${data.profileImage}`}
           className={`rounded`}
         />
       </figure>

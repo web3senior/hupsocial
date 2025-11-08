@@ -1,4 +1,9 @@
-export async function getProfile(addr) {
+/**
+ * Get Universal Profile
+ * @param {*} addr 
+ * @returns 
+ */
+export async function getUniversalProfile(addr) {
   const myHeaders = new Headers()
   myHeaders.append('Content-Type', `application/json`)
   myHeaders.append('Accept', `application/json`)
@@ -13,6 +18,7 @@ export async function getProfile(addr) {
     fullName
     name
     tags
+    links_
     standard
     transactions_aggregate {
       aggregate {
@@ -61,6 +67,52 @@ const getLocalToken = () => {
   if (localStorage.getItem('token') === null) return
   return localStorage.getItem('token').slice(1, localStorage.getItem('token').length - 1)
 }
+
+export async function getProfile(addr) {
+  let requestOptions = {
+    method: 'GET',
+    redirect: 'follow',
+  }
+
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}profile/get?wallet=${addr}`, requestOptions)
+  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
+  return response.json()
+}
+
+/**
+ * Update profile
+ * @param {string} addr
+ * @returns
+ */
+export async function updateProfile(formData, addr) {
+  var requestOptions = {
+    method: 'POST',
+    body: formData,
+    redirect: 'follow',
+  }
+  const params = new URLSearchParams({ wallet: addr }).toString()
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}profile/update?${params}`, requestOptions)
+  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
+  return response.json()
+}
+
+// export async function updateProfile(post) {
+//   var myHeaders = new Headers()
+//   myHeaders.append('Authorization', `Bearer ${getLocalToken()}`)
+
+//   var requestOptions = {
+//     method: 'POST',
+//     headers: myHeaders,
+//     body: JSON.stringify(post),
+//     redirect: 'follow',
+//   }
+//   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}profile/update`, requestOptions)
+//   if (!response.ok) {
+//     throw new Response('Failed to ', { status: 500 })
+//   }
+//   return response.json()
+// }
+
 
 export async function getCarousel() {
   let requestOptions = {
@@ -387,22 +439,7 @@ export async function updateTicket(data, id) {
   return response.json()
 }
 
-export async function updateProfile(post) {
-  var myHeaders = new Headers()
-  myHeaders.append('Authorization', `Bearer ${getLocalToken()}`)
 
-  var requestOptions = {
-    method: 'POST',
-    headers: myHeaders,
-    body: JSON.stringify(post),
-    redirect: 'follow',
-  }
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}profile/update`, requestOptions)
-  if (!response.ok) {
-    throw new Response('Failed to ', { status: 500 })
-  }
-  return response.json()
-}
 
 export async function getInvoice() {
   var myHeaders = new Headers()

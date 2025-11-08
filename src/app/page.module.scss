@@ -279,6 +279,7 @@
   cursor: pointer;
   transition: transform 0.2s ease;
   box-shadow: 0 2px 8px 0 var(--box-shadow-15);
+  z-index: 1000;
 
   > ul {
     width: 100%;
@@ -334,7 +335,7 @@ button.btnPostMenu {
   color: var(--black-600);
 
   @media (max-width: 600px) {
-    padding: 3px 9px;
+    padding: 3px;
   }
 
   &:active {
@@ -378,6 +379,10 @@ button.btnPostMenu {
     @media (max-width: 600px) {
       padding: 0.7rem 0.7rem;
     }
+
+    &:hover {
+         background-color: var(--gray-50);
+    }
   }
 
   &__header {
@@ -396,7 +401,6 @@ button.btnPostMenu {
     line-height: 1.4;
     font-size: 13px;
     padding: 0.2rem 0 0.2rem 0.3rem;
-    cursor: text;
   }
 
   &__btnShowMore {
