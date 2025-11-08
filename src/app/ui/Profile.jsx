@@ -38,6 +38,7 @@ moment.defineLocale('en-short', {
  */
 export default function Profile({ creator, createdAt }) {
   const [profile, setProfile] = useState()
+  const [isItUp, setIsItUp] = useState()
   const activeChain = getActiveChain()
   const defaultUsername = `hup-user`
   //   const { web3, contract } = initPostContract()
