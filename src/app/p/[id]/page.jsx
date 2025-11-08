@@ -274,6 +274,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
   const { address, isConnected } = useAccount()
+    const [activeChain, setActiveChain] = useState(getActiveChain())
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
   const {
@@ -298,7 +299,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
     console.log(parentId)
     writeContract({
       abi: commentAbi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST_COMMENT,
+      address: activeChain[1].comment,
       functionName: 'addComment',
       args: [web3.utils.toNumber(item.postId), parentId, commentContent, ''],
     })
