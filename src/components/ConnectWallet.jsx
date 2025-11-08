@@ -8,7 +8,7 @@ import { useAccount, useDisconnect, Connector, useConnect } from 'wagmi'
 import Shimmer from '@/helper/Shimmer'
 import Link from 'next/link'
 import { useSwitchChain } from 'wagmi'
-import {getActiveChain} from "@/util/communication"
+import { getActiveChain } from '@/util/communication'
 import styles from './ConnectWallet.module.scss'
 import { getProfile, getUniversalProfile } from '@/util/api'
 
@@ -28,13 +28,16 @@ export const ConnectWallet = () => {
   //   }
   // }
 
-  const handleSwitchChain = (e, chain) => {
-    switchChain({ chainId: chain.id })
+  const handleSwitchChain = async (e, chain) => {
+    switchChain(config, { chainId: chain.id })
     localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
     setDefaultChain(chain)
     setShowNetworks(false)
-    document.documentElement.style.setProperty('--color-primary', chains.primaryColor);
-    window.location.reload()
+    document.documentElement.style.setProperty('--color-primary', chains.primaryColor)
+
+    setTimeout(() => {
+      window.location.reload()
+    }, 1000)
   }
 
   useEffect(() => {
@@ -132,7 +135,7 @@ const Profile = ({ addr }) => {
           profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
           profileHeader: '',
           tags: JSON.stringify(res.data.Profile[0].tags),
-          links:JSON.stringify( res.data.Profile[0].links_),
+          links: JSON.stringify(res.data.Profile[0].links_),
           lastUpdate: '',
         })
       } else {
@@ -140,7 +143,7 @@ const Profile = ({ addr }) => {
           console.log(res)
           if (res.wallet) {
             const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
-           res.profileImage = profileImage
+            res.profileImage = profileImage
             setData(res)
           }
         })
@@ -153,11 +156,7 @@ const Profile = ({ addr }) => {
   return (
     <Link href={`/u/${addr}`}>
       <figure className={`${styles.pfp} d-f-c flex-column grid--gap-050 rounded`} title={data.name}>
-        <img
-          alt={data.name}
-          src={`${data.profileImage}`}
-          className={`rounded`}
-        />
+        <img alt={data.name} src={`${data.profileImage}`} className={`rounded`} />
       </figure>
     </Link>
   )
