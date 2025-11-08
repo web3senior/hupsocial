@@ -6,8 +6,8 @@ const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ``
 
 export const CONTRACTS = {
   chain4201: {
-    post: '',
-    comment: '',
+    post: '0x362E7A7F46eF78aE3aAFF6e0698Dd7270a744Dc5',
+    comment: '0x0de084F1b81e48C9bA64BC486C99DB81Ff803406',
     status: '0x6B10B966C3369332De8c976da62249F38D6898ca',
   },
   chain11142220: {
