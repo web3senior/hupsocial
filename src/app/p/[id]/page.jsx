@@ -20,8 +20,9 @@ import {
   getPostCount,
   getVoteCountsForPoll,
   getVoterChoices,
+  getActiveChain,
 } from '@/util/communication'
-import { getProfile } from '@/util/api'
+import { getProfile, getUniversalProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -250,7 +251,8 @@ export default function Page() {
           <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: post, type: `post` })}>
             <ProfileImage addr={address} />
             <p>
-              Reply to {address.slice(0, 4)}…${address.slice(38)}
+              Reply 
+              {/* to {post.creator.slice(0, 4)}…{post.creator.slice(38)} */}
             </p>
           </div>
         )}
@@ -534,38 +536,37 @@ const LikeComment = ({ commentId: id, likeCount }) => {
  * @param {String} addr
  * @returns
  */
-const ConnectedProfile = ({ addr, chainId = 4201 }) => {
+const ConnectedProfile = ({ addr }) => {
   const [profile, setProfile] = useState()
-  const [chain, setChain] = useState()
+  const activeChain = getActiveChain()
   const defaultUsername = `hup-user`
-
+  const [isItUp, setIsItUp] = useState()
   useEffect(() => {
-    getProfile(addr).then((res) => {
+    getUniversalProfile(addr).then((res) => {
+      console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
-      } else {
+        setIsItUp(true)
         setProfile({
-          data: {
-            Profile: [
-              {
-                fullName: 'annonymous',
-                name: 'annonymous',
-                tags: ['profile'],
-                profileImages: [
-                  {
-                    isSVG: true,
-                    src: `${toSvg(`${creator}`, 36)}`,
-                    url: 'ipfs://',
-                  },
-                ],
-              },
-            ],
-          },
+          wallet: res.data.Profile[0].id,
+          name: res.data.Profile[0].name,
+          description: res.data.Profile[0].description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.Profile[0].tags),
+          links: JSON.stringify(res.data.Profile[0].links_),
+          lastUpdate: '',
+        })
+      } else {
+        getProfile(addr).then((res) => {
+          console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            res.profileImage = profileImage
+            setProfile(res)
+          }
         })
       }
     })
-
-    setChain(config.chains.filter((filterItem) => filterItem.id === chainId)[0])
   }, [])
 
   if (!profile)
@@ -587,20 +588,14 @@ const ConnectedProfile = ({ addr, chainId = 4201 }) => {
         router.push(`/u/${addr}`)
       }}
     >
-      {!profile.data.Profile[0].profileImages[0]?.isSVG ? (
-        <img
-          alt={profile.data.Profile[0].name || `Default PFP`}
-          src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-          className={`rounded`}
-        />
-      ) : (
-        <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div>
-      )}
+
+      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
-          <b>{profile.data.Profile[0].name ?? defaultUsername}</b>
+          <b>{profile.name ?? defaultUsername}</b>
           <BlueCheckMarkIcon />
-          <div className={`${styles.badge}`} title={chain && chain.name} dangerouslySetInnerHTML={{ __html: `${chain && chain.icon}` }}></div>
+          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
         </div>
         <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
       </figcaption>
