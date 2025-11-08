@@ -51,7 +51,7 @@ export default function Profile({ creator, createdAt }) {
         setIsItUp(true)
         setProfile({
           wallet: res.data.id,
-          name: res.data.name,
+          name: res.data.Profile[0].name,
           description: res.data.description,
           profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
           profileHeader: '',
