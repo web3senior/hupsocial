@@ -227,7 +227,7 @@ const Profile = ({ addr }) => {
     return <>{...tagList}</>
   }
 
-  const editProfile = ()=>{
+  const editProfile = () => {
     console.log(isItUp)
     if (isItUp) {
       toast(`Please update your profile through Universal Profile`, `error`)
@@ -248,7 +248,7 @@ const Profile = ({ addr }) => {
           profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
           profileHeader: '',
           tags: JSON.stringify(res.data.Profile[0].tags),
-          links:JSON.stringify( res.data.Profile[0].links_),
+          links: JSON.stringify(res.data.Profile[0].links_),
           lastUpdate: '',
         })
         setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
@@ -257,7 +257,7 @@ const Profile = ({ addr }) => {
           console.log(res)
           if (res.wallet) {
             const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
-           res.profileImage = profileImage
+            res.profileImage = profileImage
             setData(res)
             setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
           }
@@ -317,8 +317,7 @@ const Profile = ({ addr }) => {
               <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
                 {address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
                   <>
-                    <button className={`${styles.profile__btnFollow}`}
-                    onClick={() => editProfile()}>
+                    <button className={`${styles.profile__btnFollow}`} onClick={() => editProfile()}>
                       Edit profile
                     </button>
                     <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
@@ -477,11 +476,8 @@ const Status = ({ addr, profile, selfView }) => {
 
             <main className={`flex flex-column align-items-center gap-1 `}>
               <div className={`${styles.statusModal__pfp} rounded relative`}>
-                <figure className={``}>
-                  <img
-                    alt={`hup profile ${profile.name}`}
-                    src={`${profile.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${profile.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`}`}
-                  />
+                <figure className={`rounded`}>
+                  <img src={`${profile.profileImage}`} />
                 </figure>
 
                 <div className={`d-f-c`} title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}>
