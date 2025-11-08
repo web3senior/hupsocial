@@ -167,7 +167,7 @@ export default function Page() {
             posts.list.map((item, i) => {
               return (
                 <article key={i} className={`${styles.post} animate fade`} 
-                onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
+                onClick={() => router.push(`p/${item.postId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                     <header className={`${styles.post__header} flex align-items-start justify-content-between`}>
                       <Profile creator={item.creator} createdAt={item.createdAt} />
