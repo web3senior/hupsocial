@@ -256,9 +256,9 @@ const Profile = ({ addr }) => {
         getProfile(addr).then((res) => {
           console.log(res)
           if (res.wallet) {
+            res.profileImageName = res.profileImage
             const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
-            res.profileImageName = res.profileImage
             setData(res)
             setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
           }
