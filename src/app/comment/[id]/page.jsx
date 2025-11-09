@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
-import { FluentProvider, webLightTheme, Badge } from '@fluentui/react-components'
 import Link from 'next/link'
 import moment from 'moment'
 import txIcon from '@/../public/icons/tx.svg'

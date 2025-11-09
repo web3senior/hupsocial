@@ -4,8 +4,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense, useRef } from 'react'
-import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, InteractionTag } from '@fluentui/react-components'
-import { useId, Button } from '@fluentui/react-components'
 import Icon from '@/helper/MaterialIcon'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useAuth } from '@/contexts/AuthContext'
@@ -1123,7 +1121,7 @@ const PostForm = ({ addr }) => {
             </div>
 
             <div className={`flex flex-column`}>
-              <Label htmlFor={``}>Voting Limit</Label>
+              <label htmlFor={``}>Voting Limit</label>
               <input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
               <small>Each account is limited to {votingLimit} votes for this poll.</small>
             </div>
