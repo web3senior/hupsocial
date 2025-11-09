@@ -35,7 +35,7 @@ import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
-import Profile, { ProfileImage } from '../../ui/Profile'
+import Profile, { ProfileImage } from '../../../components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon } from '@/components/Icons'
 import styles from './page.module.scss'
 

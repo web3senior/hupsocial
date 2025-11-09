@@ -20,7 +20,7 @@ import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
-import Profile from '@/app/ui/Profile'
+import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
 import styles from './Post.module.scss'
 

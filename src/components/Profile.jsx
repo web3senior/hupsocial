@@ -9,7 +9,6 @@ import web3 from 'web3'
 import moment from 'moment'
 import { toSvg } from 'jdenticon'
 import { getActiveChain } from '@/util/communication'
-import { BlueCheckMarkIcon } from '@/components/Icons'
 import styles from './Profile.module.scss'
 
 moment.defineLocale('en-short', {
