@@ -71,7 +71,7 @@ export default function Page() {
 
 const loadMorePosts = async (totalPosts) => {
     // Use a sensible page size (10 is better than 1 for performance)
-    const POSTS_PER_PAGE = 20;
+    const POSTS_PER_PAGE = 10;
     
     // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
     if (isLoadedPoll) return;
@@ -171,8 +171,9 @@ const handleScroll = () => {
 };
 
 
-useEffect(() => {
 
+// --- Re-Attach Scroll Handler (Optional, if not handled elsewhere) ---
+useEffect(() => {
       getPostCount().then((count) => {
       const totalPosts = web3.utils.toNumber(count)
       setTotalPosts(totalPosts)
@@ -193,10 +194,7 @@ useEffect(() => {
             element.removeEventListener('scroll', handleScroll);
         };
     }
-}, [totalPosts, postsLoaded, isLoadedPoll]); // Dependencies ensure state updates are correctly captured
-
-
-
+}, [totalPosts, postsLoaded, isLoadedPoll]);
 
 
   return (
