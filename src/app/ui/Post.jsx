@@ -20,9 +20,9 @@ import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
-import Profile from '@/app/ui/profile'
+import Profile from '@/app/ui/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
-import styles from './post.module.scss'
+import styles from './Post.module.scss'
 
 moment.defineLocale('en-short', {
   relativeTime: {

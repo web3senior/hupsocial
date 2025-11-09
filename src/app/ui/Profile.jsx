@@ -10,7 +10,7 @@ import moment from 'moment'
 import { toSvg } from 'jdenticon'
 import { getActiveChain } from '@/util/communication'
 import { BlueCheckMarkIcon } from '@/components/Icons'
-import styles from './profile.module.scss'
+import styles from './Profile.module.scss'
 
 moment.defineLocale('en-short', {
   relativeTime: {
