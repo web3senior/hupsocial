@@ -1,25 +1,25 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { networks } from '@/config/wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import { useAccount, useDisconnect, Connector, useConnect } from 'wagmi'
-import Shimmer from '@/helper/Shimmer'
-import Link from 'next/link'
-import { useSwitchChain } from 'wagmi'
+import { useSwitchChain, useConfig } from 'wagmi'
 import { getActiveChain } from '@/util/communication'
-import styles from './ConnectWallet.module.scss'
 import { getProfile, getUniversalProfile } from '@/util/api'
+import Shimmer from '@/helper/Shimmer'
+import styles from './ConnectWallet.module.scss'
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
   const [showNetworks, setShowNetworks] = useState(false)
   const { disconnect } = useDisconnect()
-  const [defaultChain, setDefaultChain] = useState()
+  const [activeChain, setActiveChain] = useState(getActiveChain())
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
-  const { chains, switchChain } = useSwitchChain()
+  const { switchChain } = useSwitchChain()
+
   // const handleDisconnect = async () => {
   //   try {
   //     await disconnect()
@@ -28,22 +28,23 @@ export const ConnectWallet = () => {
   //   }
   // }
 
-  const handleSwitchChain = async (e, chain) => {
-    switchChain(config, { chainId: chain.id })
-    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
-    setDefaultChain(chain)
-    setShowNetworks(false)
-    document.documentElement.style.setProperty('--color-primary', chains.primaryColor)
-
-    setTimeout(() => {
-      window.location.reload()
-    }, 1000)
+  const handleSwitchChain = (e, chain) => {
+    switchChain(
+      { chainId: chain.id },
+      {
+        onSuccess: () => {
+          localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
+          window.location.reload()
+        },
+        onError: (error) => {
+          console.error('Switch chain failed:', error)
+          // Error logic
+        },
+      }
+    )
   }
 
-  useEffect(() => {
-    const activeChain = getActiveChain()
-    setDefaultChain(activeChain[0])
-  }, [])
+  useEffect(() => {}, [])
 
   return !mounted ? null : (
     <>
@@ -56,11 +57,11 @@ export const ConnectWallet = () => {
         </button>
       )}
 
-      {isConnected && chains && defaultChain && (
+      {isConnected && activeChain[0] && (
         <>
           <div className={`${styles.networks}`}>
-            <button onClick={(e) => setShowNetworks(!showNetworks)} title={`${defaultChain.name}`}>
-              <span className={`rounded`} dangerouslySetInnerHTML={{ __html: defaultChain.icon }} />
+            <button onClick={(e) => setShowNetworks(!showNetworks)} title={`${activeChain[0].name}`}>
+              <span className={`rounded`} dangerouslySetInnerHTML={{ __html: activeChain[0].icon }} />
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
@@ -69,7 +70,7 @@ export const ConnectWallet = () => {
             {showNetworks && (
               <div className={`${styles.dropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
                 <ul>
-                  {chains.map((chain, i) => (
+                  {config.chains.map((chain, i) => (
                     <li key={i} onClick={(e) => handleSwitchChain(e, chain)} className={`flex flex-row align-items-center justify-content-start gap-050`}>
                       <figure className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
                       <small>{chain.name}</small>

@@ -10,7 +10,7 @@ import moment from 'moment'
 import { toSvg } from 'jdenticon'
 import { getActiveChain } from '@/util/communication'
 import { BlueCheckMarkIcon } from '@/components/Icons'
-import styles from './Profile.module.scss'
+import styles from './profile.module.scss'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -112,7 +112,7 @@ export default function Profile({ creator, createdAt }) {
 
 export function ProfileImage({ addr }) {
   const [profile, setProfile] = useState()
-    const [isItUp, setIsItUp] = useState()
+  const [isItUp, setIsItUp] = useState()
   const defaultUsername = `hup-user`
   //   const { web3, contract } = initPostContract()
   const router = useRouter()
@@ -164,7 +164,7 @@ export function ProfileImage({ addr }) {
         router.push(`/u/${creator}`)
       }}
     >
-         <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
       {/* {!profile.profileImages[0]?.isSVG ? (
         <img
           alt={profile.name || `Default PFP`}

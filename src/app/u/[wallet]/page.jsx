@@ -1,16 +1,14 @@
 'use client'
 
+import Image from 'next/image'
+import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { FluentProvider, webLightTheme, Badge, Textarea, Input, Label, InteractionTag } from '@fluentui/react-components'
 import { useId, Button } from '@fluentui/react-components'
-import Image from 'next/image'
-import Link from 'next/link'
 import Icon from '@/helper/MaterialIcon'
-import Nav from '../nav'
-
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useAuth } from '@/contexts/AuthContext'
-import { useParams } from 'next/navigation'
 import Web3 from 'web3'
 import { getUniversalProfile, getProfile, updateProfile } from '@/util/api'
 import { initPostContract, initStatusContract, getEmoji, getStatus, getCreatorPostCount, getMaxLength, getPostsByCreator } from '@/util/communication'
@@ -19,11 +17,12 @@ import abi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
+import Post from '@/app/ui/post'
 import { getActiveChain } from '@/util/communication'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
+import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
 import { InlineLoading } from '@/components/Loading'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon } from '@/components/Icons'
 import styles from './page.module.scss'
 
 export default function Page() {
@@ -34,6 +33,7 @@ export default function Page() {
   const [data, setData] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
+    const router = useRouter()
   const [postCount, setPostCount] = useState(0)
   const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
@@ -70,7 +70,7 @@ export default function Page() {
 
       // 3. Fetch the next batch of polls
       console.log(startIndex, postsPerPage)
-      const newPosts = await getPostsByCreator(params.wallet, startIndex, postsPerPage, isConnected && address)
+      const newPosts = await getPostsByCreator(params.wallet, startIndex, postsPerPage, isConnected ? address : `0x0000000000000000000000000000000000000000`)
       console.log(`newPosts => `, newPosts)
       newPosts.reverse()
 
@@ -131,8 +131,22 @@ export default function Page() {
         </ul>
 
         {activeTab === 'posts' && (
-          <div className={`${styles.tabContent} ${styles.posts} relative`}>
-            <Post addr={params.wallet} />
+          <div className={`${styles.tabContent} ${styles.postTab} relative`}>
+            <PostForm addr={params.wallet} />
+
+            <div className={`${styles.grid} flex flex-column`}>
+              {posts &&
+                posts.list.length > 0 &&
+                posts.list.map((item, i) => {
+                  return (
+                    <article key={i} className={`${styles.post} animate fade`} 
+                    onClick={() => router.push(`/p/${item.postId}`)}>
+                      <Post item={item} />
+                      {i < posts.list.length - 1 && <hr />}
+                    </article>
+                  )
+                })}
+            </div>
           </div>
         )}
 
@@ -171,6 +185,33 @@ const NoData = ({ name }) => {
   )
 }
 
+const Nav = ({ item }) => {
+  const [showPostDropdown, setShowPostDropdown] = useState()
+
+  return (
+    <div className={`relative`}>
+      <button
+        className={`${styles.btnPostMenu} rounded`}
+        onClick={(e) => {
+          e.stopPropagation()
+          setShowPostDropdown(!showPostDropdown)
+        }}
+      >
+        <ThreeDotIcon />
+      </button>
+
+      {showPostDropdown && (
+        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
+          <ul>
+            <li>
+              <Link href={`p/${item.postId}`}>View post</Link>
+            </li>
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
 /**
  * Profile
  * @param {String} addr
@@ -746,20 +787,8 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
  * @param {String} addr
  * @returns
  */
-const Post = ({ addr }) => {
-  const [profile, setProfile] = useState({
-    data: {
-      Profile: [
-        {
-          fullName: 'anonymous',
-          name: 'anonymous',
-          description: ``,
-          id: '0x188eec07287d876a23565c3c568cbe0bb1984b83',
-          profileImages: [],
-        },
-      ],
-    },
-  })
+const PostForm = ({ addr }) => {
+  const [profile, setProfile] = useState()
   const [content, setContent] = useState('Question?')
   const [showForm, setShowForm] = useState(`post`)
   const [votingLimit, setVotingLimit] = useState(1)
@@ -768,8 +797,8 @@ const Post = ({ addr }) => {
   const [whitelist, setWhitelist] = useState({ list: [] })
   const [filteredProfiles, setFilteredProfiles] = useState()
   const [options, setOptions] = useState({ list: [``, ``] })
-  const [activeChain, setActiveChain] = useState()
-    const mounted = useClientMounted()
+  const [activeChain, setActiveChain] = useState(getActiveChain())
+  const mounted = useClientMounted()
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
@@ -1012,12 +1041,29 @@ const Post = ({ addr }) => {
   }
 
   useEffect(() => {
-    setActiveChain(getActiveChain())
-
-    getProfile(addr).then((res) => {
+    getUniversalProfile(addr).then((res) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
+        // setIsItUp(true)
+        setProfile({
+          wallet: res.data.id,
+          name: res.data.Profile[0].name,
+          description: res.data.description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.tags),
+          links: JSON.stringify(res.data.links_),
+          lastUpdate: '',
+        })
+      } else {
+        getProfile(addr).then((res) => {
+          console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            res.profileImage = profileImage
+            setProfile(res)
+          }
+        })
       }
     })
 
@@ -1027,12 +1073,8 @@ const Post = ({ addr }) => {
   if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
 
   return (
-    <div className={`${styles.post} flex flex-row align-items-start justify-content-between gap-1`}>
-      <img
-        alt={profile.data.Profile[0].name || `PFP`}
-        src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-        className={`${styles.post__pfp} rounded`}
-      />
+    <div className={`${styles.postForm} flex flex-row align-items-start justify-content-between gap-1`}>
+      <img alt={profile.name || `PFP`} src={`${profile.profileImage.length !== '' ? profile.profileImage : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`} className={`${styles.postForm__pfp} rounded`} />
       <div className={`flex-1`}>
         {showForm === `poll` && (
           <form ref={createFormRef} className={`form flex flex-column gap-050`} onSubmit={(e) => handleCreatePoll(e)}>
@@ -1241,5 +1283,212 @@ const Post = ({ addr }) => {
         )}
       </div>
     </div>
+  )
+}
+
+const CommentModal = ({ item, setShowCommentModal }) => {
+  const [hasLiked, setHasLiked] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const isMounted = useClientMounted()
+  const [commentContent, setCommentContent] = useState('')
+  const { address, isConnected } = useAccount()
+  const activeChain = getActiveChain()
+  const { web3, contract } = initPostCommentContract()
+  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
+    hash,
+  })
+
+  const getHasLiked = async () => {
+    return isConnected ? await getHasLikedPost(id, address) : false
+  }
+
+  const postComment = (e, id) => {
+    e.stopPropagation()
+
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi: commentAbi,
+      address: activeChain[1].comment,
+      functionName: 'addComment',
+      args: [web3.utils.toNumber(id), 0, commentContent, ''],
+    })
+  }
+
+  const unlikePost = (e, id) => {
+    e.stopPropagation()
+
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi,
+      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      functionName: 'unlikePost',
+      args: [id],
+    })
+  }
+
+  useEffect(() => {
+    // getHasLiked()
+    //   .then((result) => {
+    //     setHasLiked(result)
+    //     setLoading(false)
+    //   })
+    //   .catch((err) => {
+    //     console.log(err)
+    //     setError(`⚠️`)
+    //     setLoading(false)
+    //   })
+  }, [item])
+
+  // if (loading) {
+  //   return <InlineLoading />
+  // }
+
+  if (error) {
+    return <span>{error}</span>
+  }
+
+  return (
+    <div className={`${styles.commentModal} animate fade`} onClick={() => setShowCommentModal()}>
+      <div className={`${styles.commentModal__container}`} onClick={(e) => e.stopPropagation()}>
+        <header className={`${styles.commentModal__container__header}`}>
+          <div className={``} aria-label="Close" onClick={() => setShowCommentModal()}>
+            Cancel
+          </div>
+          <div className={`flex-1`}>
+            <h3>Post your reply</h3>
+          </div>
+          <div className={`pointer`} onClick={(e) => updateStatus(e)}>
+            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
+          </div>
+        </header>
+
+        <main className={`${styles.commentModal__container__main}`}>
+          <article className={`${styles.commentModal__post}`}>
+            <section className={`flex flex-column align-items-start justify-content-between`}>
+              <header className={`${styles.commentModal__post__header}`}>
+                <Profile creator={item.creator} createdAt={item.createdAt} />
+              </header>
+              <main className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}>
+                <div
+                  className={`${styles.post__content} `}
+                  // onClick={(e) => e.stopPropagation()}
+                  id={`post${item.postId}`}
+                >
+                  {item.content}
+                </div>
+              </main>
+            </section>
+          </article>
+        </main>
+
+        <footer className={`${styles.commentModal__footer}  flex flex-column align-items-start`}>
+          <ConnectedProfile addr={address} />
+          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
+          <button className="btn" onClick={(e) => postComment(e, item.postId)}>
+            Post comment
+          </button>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Like
+ * @param {*} param0
+ * @returns
+ */
+const Like = ({ id, likeCount, hasLiked }) => {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const isMounted = useClientMounted()
+  const activeChain = getActiveChain()
+  const { address, isConnected } = useAccount()
+  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
+
+  const getHasLiked = async () => {
+    return isConnected ? await getHasLikedPost(Web3.utils.toNumber(id), address) : false
+  }
+
+  const likePost = (e, id) => {
+    e.stopPropagation()
+
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi,
+      address: activeChain[1].post,
+      functionName: 'likePost',
+      args: [id],
+    })
+  }
+
+  const unlikePost = (e, id) => {
+    e.stopPropagation()
+
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi,
+      address: activeChain[1].post,
+      functionName: 'unlikePost',
+      args: [id],
+    })
+  }
+
+  useEffect(() => {
+    // getHasLiked()
+    //   .then((result) => {
+    //     setHasLiked(result)
+    //     setLoading(false)
+    //   })
+    //   .catch((err) => {
+    //     console.log(err)
+    //     setError(`⚠️`)
+    //     setLoading(false)
+    //   })
+  }, [id])
+
+  // if (loading) {
+  //   return <InlineLoading />
+  // }
+
+  if (error) {
+    return <span>{error}</span>
+  }
+
+  return (
+    <button onClick={(e) => (hasLiked ? unlikePost(e, id) : likePost(e, id))}>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill={hasLiked ? `#EC3838` : `none`} xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
+          stroke={hasLiked ? `#EC3838` : `#424242`}
+        />
+      </svg>
+      <span>{likeCount}</span>
+    </button>
   )
 }
