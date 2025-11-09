@@ -10,7 +10,7 @@ import { useConnectorClient, useConnections, useClient, networks, useWaitForTran
 import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile, getUniversalProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
-import Profile from './ui/profile'
+import Profile from '@/app/ui/profile'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
 import { isPollActive } from '@/util/utils'
