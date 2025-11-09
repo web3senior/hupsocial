@@ -197,6 +197,8 @@ export default function Page() {
                         <span>{item.replyCount}</span>
                       </button>
 
+                      
+
                       <button>
                         <ShareIcon />
                         <span>0</span>

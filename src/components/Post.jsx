@@ -7,7 +7,7 @@ import txIcon from '@/../public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
-import { getProfile, getUniversalProfile } from '@/util/api'
+import { getProfile, getUniversalProfile, getViewPost } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -21,7 +21,7 @@ import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
 import styles from './Post.module.scss'
 
 moment.defineLocale('en-short', {
@@ -58,6 +58,7 @@ export default function Post({ item }) {
   const activeChain = getActiveChain()
   const { address, isConnected } = useAccount()
   const router = useRouter()
+    const [viewCount,setViewCount] = useState(0)
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -128,6 +129,12 @@ export default function Post({ item }) {
     })
      */
 
+        // View
+        getViewPost(params.id).then(result =>{
+          console.log(result)
+          setViewCount(result)
+        })
+
     console.log(config)
     getPostCount().then((count) => {
       const totalPoll = web3.utils.toNumber(count)
@@ -179,6 +186,11 @@ export default function Post({ item }) {
                 <span>{item.commentCount}</span>
               </button>
             )}
+
+            <button>
+              <ViewIcon />
+              <span>{viewCount}</span>
+            </button>
 
             <button>
               <TipIcon />

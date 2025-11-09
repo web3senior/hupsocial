@@ -22,6 +22,7 @@ import moment from 'moment'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
 import { InlineLoading } from '@/components/Loading'
 import styles from './page.module.scss'
+import Post from '@/components/Post'
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
