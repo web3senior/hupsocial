@@ -96,6 +96,20 @@ export async function updateProfile(formData, addr) {
   return response.json()
 }
 
+
+export async function getViewPost(postId) {
+  let requestOptions = {
+    method: 'GET',
+    redirect: 'follow',
+  }
+
+  const params = new URLSearchParams({ post_id: postId }).toString()
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}view/post?${params}`, requestOptions)
+  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
+  return response.json()
+}
+
+
 // export async function updateProfile(post) {
 //   var myHeaders = new Headers()
 //   myHeaders.append('Authorization', `Bearer ${getLocalToken()}`)
@@ -114,16 +128,7 @@ export async function updateProfile(formData, addr) {
 // }
 
 
-export async function getCarousel() {
-  let requestOptions = {
-    method: 'GET',
-    redirect: 'follow',
-  }
 
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}carousel`, requestOptions)
-  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
-  return response.json()
-}
 
 export async function getClaim() {
   let requestOptions = {
@@ -552,20 +557,6 @@ export async function getEventChart(wallet_addr) {
   }
   const params = new URLSearchParams({ wallet_addr: wallet_addr }).toString()
   const response = await fetch(`${import.meta.env.VITE_API_URL}event/chart?${params}`, requestOptions)
-  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
-  return response.json()
-}
-/**
- * View
- * @returns
- */
-export async function getView(wallet_addr) {
-  let requestOptions = {
-    method: 'GET',
-    redirect: 'follow',
-  }
-  const params = new URLSearchParams({ wallet_addr: wallet_addr }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}view/get?${params}`, requestOptions)
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }

@@ -15,7 +15,7 @@ import abi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-import Post from '../../../components/Post'
+
 import { getActiveChain } from '@/util/communication'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'

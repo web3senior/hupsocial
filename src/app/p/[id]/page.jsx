@@ -20,7 +20,7 @@ import {
   getVoterChoices,
   getActiveChain,
 } from '@/util/communication'
-import { getProfile, getUniversalProfile } from '@/util/api'
+import { getProfile, getUniversalProfile, newView, getViewPost } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -35,6 +35,7 @@ import { InlineLoading } from '@/components/Loading'
 import Profile, { ProfileImage } from '../../../components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon } from '@/components/Icons'
 import styles from './page.module.scss'
+import Post from '@/components/Post'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -59,7 +60,7 @@ export default function Page() {
   const [post, setPost] = useState()
   const [comments, setComments] = useState({ list: [] })
   const [commentsLoaded, setcommentsLoaded] = useState(0)
-  const [reactionCounter, setReactionCounter] = useState(0)
+  const [viewCount,setViewCount] = useState(0)
   const [commentCount, setCommentCount] = useState(0)
   const [isLoadedComment, setIsLoadedPoll] = useState(false)
   const [showCommentModal, setShowCommentModal] = useState()
@@ -131,6 +132,12 @@ export default function Page() {
   }
 
   useEffect(() => {
+    // View
+    getViewPost(params.id).then(result =>{
+      console.log(result)
+      setViewCount(result)
+    })
+
     getPostByIndex(params.id, address).then((res) => {
       console.log(res)
       res.postId = params.id
@@ -154,7 +161,7 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title flex flex-column`}>
         <span>post</span>
-        <code>10 views</code>
+        <code>{viewCount} views</code>
       </h3>
 
       {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} 
@@ -165,48 +172,7 @@ export default function Page() {
         <div className={`${styles.grid} flex flex-column`}>
           {post && (
             <article className={`${styles.post} animate fade`}>
-              <section data-name={post.name} className={`flex flex-column align-items-start justify-content-between`}>
-                <header className={`${styles.post__header}`}>
-                  <Profile creator={post.creator} createdAt={post.createdAt} />
-                </header>
-                <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-                  <div
-                    className={`${styles.post__content} `}
-                    // onClick={(e) => e.stopPropagation()}
-                    id={`pollQuestion${post.pollId}`}
-                  >
-                    {post.content}
-                  </div>
-
-                  <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
-                    <Like id={post.postId} likeCount={post.likeCount} hasLiked={post.hasLiked} />
-
-                    {post.allowedComments && (
-                      <button onClick={() => setShowCommentModal({ data: post, parentId: 0, type: `post` })}>
-                        <CommentIcon />
-                        <span>{post.commentCount}</span>
-                      </button>
-                    )}
-
-                    <button>
-                      <RepostIcon />
-                    </button>
-
-                    <button>
-                      <ShareIcon />
-                      <span>0</span>
-                    </button>
-
-                    <button>
-                      <TipIcon />
-                      <span>{new Intl.NumberFormat().format(0)}</span>
-                    </button>
-                    {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
-                          <img alt={`blue checkmark icon`} src={txIcon.src} />
-                        </Link> */}
-                  </div>
-                </main>
-              </section>
+             <Post item={post} />
               <hr />
             </article>
           )}
