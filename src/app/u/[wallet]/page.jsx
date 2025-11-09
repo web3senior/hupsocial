@@ -71,7 +71,7 @@ export default function Page() {
       console.log(startIndex, postsPerPage)
       const newPosts = await getPostsByCreator(params.wallet, startIndex, postsPerPage, isConnected ? address : `0x0000000000000000000000000000000000000000`)
       console.log(`newPosts => `, newPosts)
-      newPosts.reverse()
+      // newPosts.reverse()
 
       if (Array.isArray(newPosts) && newPosts.length > 0) {
         setPosts((prevPolls) => ({ list: [...prevPolls.list, ...newPosts] }))
