@@ -3,27 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
-    "@fluentui/react-components": "^9.70.0",
-    "@tanstack/react-query": "^5.89.0",
+    "@tanstack/react-query": "^5.90.7",
     "jdenticon": "^3.3.0",
     "moment": "^2.30.1",
-    "next": "15.5.3",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "sass": "^1.93.0",
-    "viem": "~2.37.7",
-    "wagmi": "^2.17.1",
+    "next": "16.0.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "sass": "^1.93.3",
+    "viem": "^2.38.6",
+    "wagmi": "^2.19.2",
     "web3": "^4.16.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
     "eslint": "^9",
-    "eslint-config-next": "15.5.3"
+    "eslint-config-next": "16.0.1"
   }
 }
