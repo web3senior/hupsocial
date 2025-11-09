@@ -48,7 +48,8 @@ export default function Page() {
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [reactionCounter, setReactionCounter] = useState(0)
-  const [postCount, setPostCount] = useState()
+    const [totalPosts, setTotalPosts] = useState(0)
+
   const [showCommentModal, setShowCommentModal] = useState()
   const { web3, contract } = initPostContract()
   const giftModal = useRef()
@@ -63,91 +64,140 @@ export default function Page() {
     hash,
   })
 
-  const loadMorePosts = async (totalPoll) => {
-    // 1. **Add a guard clause to prevent re-entry**
-    if (isLoadedPoll) return
+// Assumes:
+// - totalPosts is the contract's total post count (e.g., 100)
+// - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
+// - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
+
+const loadMorePosts = async (totalPosts) => {
+    // Use a sensible page size (10 is better than 1 for performance)
+    const POSTS_PER_PAGE = 20;
+    
+    // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
+    if (isLoadedPoll) return;
 
     // 2. Set to true *before* starting the async operation
-    setIsLoadedPoll(true)
+    setIsLoadedPoll(true);
+    
+    // Check if we have loaded everything
+    if (postsLoaded >= totalPosts) {
+        console.log('All posts loaded (Guard Check).');
+        setIsLoadedPoll(false);
+        return;
+    }
 
     try {
-      let postsPerPage = 20
-      let startIndex = totalPoll - postsLoaded - postsPerPage
+        // The correct 1-based index for the *first* post of the next batch.
+        // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
+        const startIndex = postsLoaded + 1;
+        
+        // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
+        const remainingPosts = totalPosts - postsLoaded;
+        const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts);
 
-      // **Stop loading if all posts are accounted for**
-      if (postsLoaded >= totalPoll) {
-        console.log('All polls loaded.')
-        // We can return here, but still need to handle setIsLoadedPoll(false)
-      }
-
-      if (startIndex < 0) {
-        // Check if we are trying to load past the first post
-        postsPerPage = totalPoll - postsLoaded
-        startIndex = 0
-        if (postsPerPage <= 0) {
-          // All loaded
-          console.log('All polls loaded.')
-          return // Exit early
+        // Safety check (should be redundant if the initial guard passes)
+        if (postsToFetch <= 0) {
+            console.log('No posts to fetch after calculation.');
+            return;
         }
-      }
 
-      // ... (rest of your logic for calculating startIndex/postsPerPage) ...
+        console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`);
+        
+        // 3. Fetch the next batch of posts (the contract handles reverse order internally)
+        // Note: startIndex is passed as the 1-based chronological position.
+        const newPosts = await getPosts(startIndex, postsToFetch, address);
 
-      // 3. Fetch the next batch of polls
-      //console.log(startIndex + 1, postsPerPage)
-      const newPosts = await getPosts(startIndex + 1, postsPerPage, address)
-      // console.log(`newPosts => `, newPosts)
-      // newPosts.reverse()
+        if (Array.isArray(newPosts) && newPosts.length > 0) {
+            // Append new posts and update the loaded count
+            setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }));
+            setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length);
+        } else if (postsToFetch > 0) {
+             // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
+             // To prevent infinite loop, update postsLoaded to totalPosts.
+             console.log('Fetched an empty batch; marking all as loaded for safety.');
+             setPostsLoaded(totalPosts);
+        }
 
-      if (Array.isArray(newPosts) && newPosts.length > 0) {
-        setPosts((prevPolls) => ({ list: [...prevPolls.list, ...newPosts] }))
-        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
-      }
     } catch (error) {
-      console.error('Error loading more polls:', error)
+        console.error('Error loading more posts:', error);
     } finally {
-      // 4. **Crucial: Set to false in finally block**
-      // This re-enables loading for the next scroll event.
-      setIsLoadedPoll(false)
+        // 4. Crucial: Set to false in finally block
+        setIsLoadedPoll(false);
     }
-  }
-
+}
   const openModal = (e, item) => {
     e.target.innerText = `Sending...`
     setSelectedEmoji({ e: e.target, item: item, message: null })
     giftModal.current.showModal()
   }
+/**
+ * Handles scroll events for infinite loading.
+ * * Assumes:
+ * - scrollContainerRef: A React Ref attached to the scrollable DOM element.
+ * - totalPosts: The total number of posts available from the contract.
+ * - postsLoaded: The number of posts currently rendered.
+ * - isLoadedPoll: The loading lock (set by loadMorePosts).
+ * - loadMorePosts: The function to fetch the next batch.
+ */
+const handleScroll = () => {
+    const scrollElement = document.documentElement; 
 
-  useEffect(() => {
-    /**
-     * 
-     *getPollByIndex(params.id).then((res) => {
-      console.log(res)
-      res.pollId = params.id
-      setPolls({ list: res })
-    })
-     */
+    // 1. Guard against a null reference (element not yet mounted)
+    if (!scrollElement) return; 
 
-    getPostCount().then((count) => {
-      const totalPoll = web3.utils.toNumber(count)
-      setPostCount(totalPoll)
+    // Destructuring values for clarity
+    const { 
+        scrollTop,    // The distance from the top of the element to the top of the viewport
+        clientHeight, // The height of the visible part of the container
+        scrollHeight  // The total height of the content inside the container
+    } = scrollElement;
+    
+    // Define a threshold (e.g., load posts when 300px from the bottom)
+    const SCROLL_THRESHOLD = 200;
+
+    // 2. Check if the user is near the bottom
+    // scrollTop + clientHeight = how far the bottom of the viewport is from the top of the content
+    // scrollHeight - SCROLL_THRESHOLD = the point before the very end of the content
+    const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - SCROLL_THRESHOLD);
+
+    // 3. Check for available posts and the loading lock
+    const hasMorePosts = postsLoaded < totalPosts;
+    
+    // 4. Trigger load only if all conditions are met
+    if (isNearBottom && hasMorePosts && !isLoadedPoll) {
+        console.log("Scrolled near bottom. Triggering load.");
+        loadMorePosts(totalPosts);
+    }
+};
+
+
+useEffect(() => {
+
+      getPostCount().then((count) => {
+      const totalPosts = web3.utils.toNumber(count)
+      setTotalPosts(totalPosts)
+     
 
       if (postsLoaded === 0 && !isLoadedPoll) {
-        loadMorePosts(totalPoll)
+        loadMorePosts(totalPosts)
       }
     })
 
-    const handleScroll = () => {
-      const scrolledTo = window.scrollY + window.innerHeight
-      // Use a small buffer (e.g., -100px) for better UX
-      const isReachBottom = document.body.scrollHeight - 100 < scrolledTo
 
-      // **Now this check prevents simultaneous loads**
-      if (isReachBottom && !isLoadedPoll) {
-        loadMorePosts()
-      }
+
+    const element = document;
+    if (element) {
+        element.addEventListener('scroll', handleScroll);
+        // Clean up the event listener when the component unmounts or dependencies change
+        return () => {
+            element.removeEventListener('scroll', handleScroll);
+        };
     }
-  }, [showCommentModal]) // Added necessary dependencies  [isLoadedPoll, postsLoaded]
+}, [totalPosts, postsLoaded, isLoadedPoll]); // Dependencies ensure state updates are correctly captured
+
+
+
+
 
   return (
     <div className={`${styles.page} ms-motion-slideDownIn`}>
@@ -186,6 +236,7 @@ export default function Page() {
 
                         <button>
                           <RepostIcon />
+                          <span>0</span>
                         </button>
 
                         <button>
@@ -210,8 +261,8 @@ export default function Page() {
         </div>
       </div>
 
-      {postsLoaded !== postCount && (
-        <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(postCount)}>
+      {postsLoaded !== totalPosts && (
+        <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(totalPosts)}>
           Load More
         </button>
       )}
@@ -694,7 +745,6 @@ const ConnectedProfile = ({ addr }) => {
         router.push(`/u/${addr}`)
       }}
     >
-
       <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
 
       <figcaption className={`flex flex-column`}>
