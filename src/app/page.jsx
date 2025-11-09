@@ -94,9 +94,9 @@ export default function Page() {
       // ... (rest of your logic for calculating startIndex/postsPerPage) ...
 
       // 3. Fetch the next batch of polls
-      console.log(startIndex + 1, postsPerPage)
+      //console.log(startIndex + 1, postsPerPage)
       const newPosts = await getPosts(startIndex + 1, postsPerPage, address)
-      console.log(`newPosts => `, newPosts)
+      // console.log(`newPosts => `, newPosts)
       // newPosts.reverse()
 
       if (Array.isArray(newPosts) && newPosts.length > 0) {
@@ -128,7 +128,6 @@ export default function Page() {
     })
      */
 
-    console.log(config)
     getPostCount().then((count) => {
       const totalPoll = web3.utils.toNumber(count)
       setPostCount(totalPoll)

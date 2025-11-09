@@ -127,7 +127,7 @@ const Profile = ({ addr }) => {
 
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
-      console.log(res)
+//      console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setData({
           wallet: res.data.Profile[0].id,
@@ -141,7 +141,7 @@ const Profile = ({ addr }) => {
         })
       } else {
         getProfile(addr).then((res) => {
-          console.log(res)
+       //   console.log(res)
           if (res.wallet) {
             const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage

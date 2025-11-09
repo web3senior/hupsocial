@@ -418,7 +418,7 @@ const Status = ({ addr, profile, selfView }) => {
   const [expirationTimestamp, setExpirationTimestamp] = useState(24)
   const [maxLength, setMaxLength] = useState()
   const { web3, contract } = initPostContract()
-  const [activeChain, setActiveChain] = useState()
+  const [activeChain, setActiveChain] = useState(getActiveChain())
   const { contract: statusContract } = initStatusContract()
   const statusRef = useRef(``)
 
@@ -482,8 +482,6 @@ const Status = ({ addr, profile, selfView }) => {
   // }
 
   useEffect(() => {
-    setActiveChain(getActiveChain())
-
     getStatus(addr).then((res) => {
       console.log(res)
       setStatus(res)

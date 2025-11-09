@@ -60,7 +60,7 @@ export default function Page() {
   const [post, setPost] = useState()
   const [comments, setComments] = useState({ list: [] })
   const [commentsLoaded, setcommentsLoaded] = useState(0)
-  const [viewCount,setViewCount] = useState(0)
+  const [viewCount, setViewCount] = useState(0)
   const [commentCount, setCommentCount] = useState(0)
   const [isLoadedComment, setIsLoadedPoll] = useState(false)
   const [showCommentModal, setShowCommentModal] = useState()
@@ -133,7 +133,7 @@ export default function Page() {
 
   useEffect(() => {
     // View
-    getViewPost(params.id).then(result =>{
+    getViewPost(params.id).then((result) => {
       console.log(result)
       setViewCount(result)
     })
@@ -164,15 +164,14 @@ export default function Page() {
         <code>{viewCount} views</code>
       </h3>
 
-      {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} 
-      setShowCommentModal={setShowCommentModal} />}
+      {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
         {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
         <div className={`${styles.grid} flex flex-column`}>
           {post && (
             <article className={`${styles.post} animate fade`}>
-             <Post item={post} />
+              <Post item={post} />
               <hr />
             </article>
           )}
@@ -197,8 +196,6 @@ export default function Page() {
                         <span>{item.replyCount}</span>
                       </button>
 
-                      
-
                       <button>
                         <ShareIcon />
                         <span>0</span>
@@ -215,7 +212,7 @@ export default function Page() {
           <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: post, type: `post` })}>
             <ProfileImage addr={address} />
             <p>
-              Reply 
+              Reply
               {/* to {post.creator.slice(0, 4)}…{post.creator.slice(38)} */}
             </p>
           </div>
@@ -238,7 +235,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
   const { address, isConnected } = useAccount()
-    const [activeChain, setActiveChain] = useState(getActiveChain())
+  const [activeChain, setActiveChain] = useState(getActiveChain())
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
   const {
@@ -279,7 +276,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      address: activeChain[1].post,
       functionName: 'unlikePost',
       args: [id],
     })
@@ -350,6 +347,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const { address, isConnected } = useAccount()
+  const [activeChain, setActiveChain] = useState(getActiveChain())
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -369,7 +367,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      address: activeChain[1].post,
       functionName: 'likePost',
       args: [id],
     })
@@ -385,7 +383,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
 
     writeContract({
       abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
+      address: activeChain[1].post,
       functionName: 'unlikePost',
       args: [id],
     })
@@ -424,6 +422,7 @@ const LikeComment = ({ commentId: id, likeCount }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
+  const [activeChain, setActiveChain] = useState(getActiveChain())
   const { address, isConnected } = useAccount()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -440,9 +439,11 @@ const LikeComment = ({ commentId: id, likeCount }) => {
       return
     }
 
+    console.log(id)
+
     writeContract({
       abi: commentAbi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST_COMMENT,
+      address: activeChain[1].comment,
       functionName: 'likeComment',
       args: [Web3.utils.toNumber(id)],
     })
@@ -456,7 +457,7 @@ const LikeComment = ({ commentId: id, likeCount }) => {
 
     writeContract({
       abi: commentAbi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST_COMMENT,
+      address: activeChain[1].comment,
       functionName: 'unlikeComment',
       args: [Web3.utils.toNumber(id)],
     })
@@ -553,7 +554,6 @@ const ConnectedProfile = ({ addr }) => {
         router.push(`/u/${addr}`)
       }}
     >
-
       <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
 
       <figcaption className={`flex flex-column`}>

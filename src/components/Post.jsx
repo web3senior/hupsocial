@@ -58,7 +58,7 @@ export default function Post({ item }) {
   const activeChain = getActiveChain()
   const { address, isConnected } = useAccount()
   const router = useRouter()
-    const [viewCount,setViewCount] = useState(0)
+  const [viewCount, setViewCount] = useState(0)
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -129,11 +129,11 @@ export default function Post({ item }) {
     })
      */
 
-        // View
-        getViewPost(params.id).then(result =>{
-          console.log(result)
-          setViewCount(result)
-        })
+    // View
+    getViewPost(params.id).then((result) => {
+      console.log(result)
+      setViewCount(result)
+    })
 
     console.log(config)
     getPostCount().then((count) => {
@@ -186,6 +186,11 @@ export default function Post({ item }) {
                 <span>{item.commentCount}</span>
               </button>
             )}
+
+            <button>
+              <RepostIcon />
+              <span>0</span>
+            </button>
 
             <button>
               <ViewIcon />
