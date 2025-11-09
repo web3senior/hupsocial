@@ -4,7 +4,6 @@ import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import { FluentProvider, webLightTheme, Badge } from '@fluentui/react-components'
 import Link from 'next/link'
 import moment from 'moment'
-import txIcon from '@/../public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import {
@@ -59,7 +58,6 @@ moment.defineLocale('en-short', {
 
 export default function Page() {
   const [post, setPost] = useState()
-
   const [comments, setComments] = useState({ list: [] })
   const [commentsLoaded, setcommentsLoaded] = useState(0)
   const [reactionCounter, setReactionCounter] = useState(0)
@@ -68,7 +66,6 @@ export default function Page() {
   const [showCommentModal, setShowCommentModal] = useState()
   const { web3, contract } = initPostContract()
   const giftModal = useRef()
-  const giftModalMessage = useRef()
   const mounted = useClientMounted()
   const [chains, setChains] = useState()
   const params = useParams()
