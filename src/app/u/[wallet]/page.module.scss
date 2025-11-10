@@ -197,7 +197,7 @@
 }
 
 .postForm {
-    padding: 0.5rem 1.5rem;
+  padding: 0.5rem 1.5rem;
   textarea {
   }
 
@@ -253,6 +253,26 @@
   }
 
   ul {
+  }
+}
+
+.links {
+  a {
+    padding: 0.4rem 1rem;
+    background-color: var(--gray-50);
+    border-radius: .5rem;
+    &:not(:first-child) {
+      margin-top: 1rem;
+    }
+
+&:hover {
+  background-color: var(--gray-100);
+}
+
+    code {
+      font-size: 10px;
+      opacity: .4;
+    }
   }
 }
 

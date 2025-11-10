@@ -32,7 +32,7 @@ export default function Page() {
   const [data, setData] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
-    const router = useRouter()
+  const router = useRouter()
   const [postCount, setPostCount] = useState(0)
   const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
@@ -138,8 +138,7 @@ export default function Page() {
                 posts.list.length > 0 &&
                 posts.list.map((item, i) => {
                   return (
-                    <article key={i} className={`${styles.post} animate fade`} 
-                    onClick={() => router.push(`/p/${item.postId}`)}>
+                    <article key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`/p/${item.postId}`)}>
                       <Post item={item} />
                       {i < posts.list.length - 1 && <hr />}
                     </article>
@@ -163,7 +162,7 @@ export default function Page() {
 
         {activeTab === 'links' && (
           <div className={`${styles.tabContent} ${styles.links} relative`}>
-            <NoData name={`links`} />
+            <Links />
           </div>
         )}
       </div>
@@ -297,7 +296,7 @@ const Profile = ({ addr }) => {
           console.log(res, `==`)
           if (res.wallet) {
             res.profileImageName = res.profileImage
-            const profileImage =`${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
+            const profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
             res.profileImage = profileImage
             setData(res)
             setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
@@ -379,6 +378,77 @@ const Profile = ({ addr }) => {
         </footer>
       </section>
     </>
+  )
+}
+/**
+ * Profile
+ * @param {String} addr
+ * @returns
+ */
+const Links = () => {
+  const [data, setData] = useState()
+  const [selfView, setSelfView] = useState()
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [isItUp, setIsItUp] = useState(false)
+  const params = useParams()
+  const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
+  const activeChain = getActiveChain()
+
+  useEffect(() => {
+    getUniversalProfile(params.wallet).then((res) => {
+      console.log(res)
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+        setIsItUp(true)
+        setData({
+          wallet: res.data.Profile[0].id,
+          name: res.data.Profile[0].name,
+          description: res.data.Profile[0].description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(res.data.Profile[0].tags),
+          links: JSON.stringify(res.data.Profile[0].links_),
+          lastUpdate: '',
+        })
+        setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
+      } else {
+        getProfile(params.wallet).then((res) => {
+          console.log(res, `==`)
+          if (res.wallet) {
+            res.profileImageName = res.profileImage
+            const profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
+            res.profileImage = profileImage
+            setData(res)
+            setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
+          }
+        })
+      }
+    })
+  }, [])
+
+  if (!data) return <div className={`shimmer ${styles.shimmer}`} />
+
+  if (JSON.parse(data.links).length < 1) return <NoData name={`links`} />
+
+  return (
+    <div className={`${styles.links}`}>
+      {JSON.parse(data.links).length > 0 &&
+        JSON.parse(data.links).map((link, i) => (
+          <Link key={i} href={link.url} target='_blank' className={`flex flex-row align-items-center justify-content-between`}>
+            <div className={`flex flex-column`}>
+              <p>{link.name}</p>
+              <code>{link.url}</code>
+            </div>
+
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M3.98081 15.375C3.60194 15.375 3.28125 15.2438 3.01875 14.9813C2.75625 14.7188 2.625 14.3981 2.625 14.0192V3.98081C2.625 3.60194 2.75625 3.28125 3.01875 3.01875C3.28125 2.75625 3.60194 2.625 3.98081 2.625H8.71144V3.75H3.98081C3.92306 3.75 3.87019 3.77406 3.82219 3.82219C3.77406 3.87019 3.75 3.92306 3.75 3.98081V14.0192C3.75 14.0769 3.77406 14.1298 3.82219 14.1778C3.87019 14.2259 3.92306 14.25 3.98081 14.25H14.0192C14.0769 14.25 14.1298 14.2259 14.1778 14.1778C14.2259 14.1298 14.25 14.0769 14.25 14.0192V9.28856H15.375V14.0192C15.375 14.3981 15.2438 14.7188 14.9813 14.9813C14.7188 15.2438 14.3981 15.375 14.0192 15.375H3.98081ZM7.28944 11.5009L6.49913 10.7106L13.4597 3.75H10.5V2.625H15.375V7.5H14.25V4.54031L7.28944 11.5009Z"
+                fill="#424242"
+              />
+            </svg>
+          </Link>
+        ))}
+    </div>
   )
 }
 
