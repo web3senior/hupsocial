@@ -18,11 +18,11 @@
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
-  background-color: var(--gray-200);
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-primary);
+  background: var(--black-200);
   background-clip: padding-box;
   border: 2px solid #0000;
   border-radius: 100vh;
