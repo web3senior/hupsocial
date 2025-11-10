@@ -434,7 +434,7 @@ const Links = () => {
     <div className={`${styles.links}`}>
       {JSON.parse(data.links).length > 0 &&
         JSON.parse(data.links).map((link, i) => (
-          <a key={i} href={link.url} target='_blank' className={`flex flex-row align-items-center justify-content-between`}>
+          <a key={i} href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`} target={`_blank`} rel="noopener noreferrer" className={`flex flex-row align-items-center justify-content-between`}>
             <div className={`flex flex-column`}>
               <p>{link.name}</p>
               <code>{link.url}</code>

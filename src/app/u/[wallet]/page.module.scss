@@ -258,20 +258,21 @@
 
 .links {
   a {
-    padding: 0.4rem 1rem;
-    background-color: var(--gray-50);
-    border-radius: .5rem;
+    padding: 1.5rem 2rem;
+    border:2px solid var(--gray-50);
+    border-radius: 1rem;
     &:not(:first-child) {
       margin-top: 1rem;
     }
 
 &:hover {
-  background-color: var(--gray-100);
+  background-color: var(--gray-50);
 }
 
     code {
       font-size: 10px;
       opacity: .4;
+      color: var(--rose-700)
     }
   }
 }
