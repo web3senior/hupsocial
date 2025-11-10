@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useState, Suspense, useRef } from 'react'
+import { useEffect, useState, Suspense, useRef, useTransition } from 'react'
 import Icon from '@/helper/MaterialIcon'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useAuth } from '@/contexts/AuthContext'
@@ -23,6 +23,7 @@ import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIco
 import { InlineLoading } from '@/components/Loading'
 import styles from './page.module.scss'
 import Post from '@/components/Post'
+import { useFormStatus } from 'react-dom'
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
@@ -37,72 +38,71 @@ export default function Page() {
   const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
 
-// Assumes:
-// - totalPosts is the contract's total post count (e.g., 100)
-// - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
-// - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
+  // Assumes:
+  // - totalPosts is the contract's total post count (e.g., 100)
+  // - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
+  // - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
 
-const loadMorePosts = async (totalPosts) => {
+  const loadMorePosts = async (totalPosts) => {
     // Use a sensible page size (10 is better than 1 for performance)
-    const POSTS_PER_PAGE = 10;
-    
+    const POSTS_PER_PAGE = 10
+
     // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
-    if (isLoadedPoll) return;
+    if (isLoadedPoll) return
 
     // 2. Set to true *before* starting the async operation
-    setIsLoadedPoll(true);
-    
+    setIsLoadedPoll(true)
+
     // Check if we have loaded everything
     if (postsLoaded >= totalPosts) {
-        console.log('All posts loaded (Guard Check).');
-        setIsLoadedPoll(false);
-        return;
+      console.log('All posts loaded (Guard Check).')
+      setIsLoadedPoll(false)
+      return
     }
 
     try {
-        // The correct 1-based index for the *first* post of the next batch.
-        // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
-        const startIndex = postsLoaded + 1;
-        
-        // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
-        const remainingPosts = totalPosts - postsLoaded;
-        const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts);
+      // The correct 1-based index for the *first* post of the next batch.
+      // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
+      const startIndex = postsLoaded + 1
 
-        // Safety check (should be redundant if the initial guard passes)
-        if (postsToFetch <= 0) {
-            console.log('No posts to fetch after calculation.');
-            return;
-        }
+      // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
+      const remainingPosts = totalPosts - postsLoaded
+      const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts)
 
-        console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`);
-        
-        // 3. Fetch the next batch of posts (the contract handles reverse order internally)
-        // Note: startIndex is passed as the 1-based chronological position.
-        const newPosts = await getPostsByCreator(params.wallet, startIndex, postsToFetch, address);
+      // Safety check (should be redundant if the initial guard passes)
+      if (postsToFetch <= 0) {
+        console.log('No posts to fetch after calculation.')
+        return
+      }
 
-        if (Array.isArray(newPosts) && newPosts.length > 0) {
-            // Append new posts and update the loaded count
-            setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }));
-            setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length);
-        } else if (postsToFetch > 0) {
-             // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
-             // To prevent infinite loop, update postsLoaded to totalPosts.
-             console.log('Fetched an empty batch; marking all as loaded for safety.');
-             setPostsLoaded(totalPosts);
-        }
+      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
 
+      // 3. Fetch the next batch of posts (the contract handles reverse order internally)
+      // Note: startIndex is passed as the 1-based chronological position.
+      const newPosts = await getPostsByCreator(params.wallet, startIndex, postsToFetch, address)
+
+      if (Array.isArray(newPosts) && newPosts.length > 0) {
+        // Append new posts and update the loaded count
+        setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }))
+        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
+      } else if (postsToFetch > 0) {
+        // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
+        // To prevent infinite loop, update postsLoaded to totalPosts.
+        console.log('Fetched an empty batch; marking all as loaded for safety.')
+        setPostsLoaded(totalPosts)
+      }
     } catch (error) {
-        console.error('Error loading more posts:', error);
+      console.error('Error loading more posts:', error)
     } finally {
-        // 4. Crucial: Set to false in finally block
-        setIsLoadedPoll(false);
+      // 4. Crucial: Set to false in finally block
+      setIsLoadedPoll(false)
     }
-}
+  }
 
   useEffect(() => {
     getCreatorPostCount(params.wallet).then((count) => {
       const totalPosts = web3.utils.toNumber(count)
-     setTotalPosts(totalPosts)
+      setTotalPosts(totalPosts)
 
       if (postsLoaded === 0 && !isLoadedPoll) {
         loadMorePosts(totalPosts)
@@ -649,11 +649,14 @@ const Status = ({ addr, profile, selfView }) => {
  * @returns
  */
 const ProfileModal = ({ profile, setShowProfileModal }) => {
-  console.log(profile)
+  const [error, setError] = useState(null)
+  const [isPending, setIsPending] = useState(false)
   const [tags, setTags] = useState({ list: JSON.parse(profile.tags) || [] })
   const [links, setLinks] = useState({ list: JSON.parse(profile.links) || [] })
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useAccount()
+
+  // Refs
   const pfpRef = useRef()
   const tagRef = useRef()
   const linkNameRef = useRef()
@@ -670,23 +673,11 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
     hash,
   })
 
-  const clearStatus = () => {
-    try {
-      const result = writeContract({
-        abi: statusAbi,
-        address: activeChain[1].status,
-        functionName: 'clearStatus',
-        args: [],
-      })
-      console.log('Transaction sent:', result)
-    } catch (error) {
-      console.error('Contract write failed:', error)
-    }
-  }
-
-  const handleUpdateProfile = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isConnected) return
+
+    setIsPending(true)
 
     const formData = new FormData(e.target)
     const name = formData.get('name')
@@ -696,8 +687,10 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
     const errors = {}
 
     updateProfile(formData, address).then((res) => {
-      console.log(res)
-      toast(`${res.data.message}`, 'success')
+      if (res.success) {
+        setIsPending(false)
+        toast(`Your profile has been updated.`, 'success')
+      }
     })
   }
 
@@ -772,7 +765,7 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
 
           <main className={`flex flex-column align-items-center gap-1 `}>
             {isConfirmed && <p className="text-center badge badge-success">Done</p>}
-            <form className={`form`} action="" onSubmit={(e) => handleUpdateProfile(e)} encType={`multipart/form-data`}>
+            <form className={`form`} action="" onSubmit={(e) => handleSubmit(e)} encType={`multipart/form-data`}>
               <div className={`form-group`}>
                 <figure className={`rounded`}>
                   <img ref={pfpRef} src={`${profile.profileImage}`} />
@@ -845,9 +838,10 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
               </details>
 
               <div className={`form-group`}>
-                <button type="submit" className="btn">
+                <button type="submit" className="btn" disabled={isPending}>
                   Update
                 </button>
+                {error && <p>{error}</p>}
               </div>
             </form>
           </main>

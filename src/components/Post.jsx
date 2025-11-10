@@ -63,9 +63,7 @@ export default function Post({ item }) {
   })
 
   useEffect(() => {
-    // View
     getViewPost(item.postId).then((result) => {
-      console.log(result)
       setViewCount(result)
     })
   }, [viewCount, showCommentModal])
