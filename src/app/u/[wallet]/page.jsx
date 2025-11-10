@@ -294,10 +294,10 @@ const Profile = ({ addr }) => {
         setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
       } else {
         getProfile(addr).then((res) => {
-          console.log(res)
+          console.log(res, `==`)
           if (res.wallet) {
             res.profileImageName = res.profileImage
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =`${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
             res.profileImage = profileImage
             setData(res)
             setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())

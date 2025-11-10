@@ -194,7 +194,7 @@ export default function Post({ item }) {
 
             <button>
               <ViewIcon />
-              <span>{viewCount}</span>
+              <span>{new Intl.NumberFormat("en", {notation: "compact", maximumFractionDigits: 1}).format(viewCount)}</span>
             </button>
 
             <button>

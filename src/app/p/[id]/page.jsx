@@ -161,7 +161,7 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title flex flex-column`}>
         <span>post</span>
-        <code>{viewCount} views</code>
+        <small>{new Intl.NumberFormat("en", {notation: "compact", maximumFractionDigits: 1}).format(viewCount)} views</small>
       </h3>
 
       {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
