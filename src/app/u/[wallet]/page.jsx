@@ -9,7 +9,7 @@ import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
 import { getUniversalProfile, getProfile, updateProfile } from '@/util/api'
-import { initPostContract, initStatusContract, getEmoji, getStatus, getCreatorPostCount, getMaxLength, getPostsByCreator } from '@/util/communication'
+import { initPostContract, initStatusContract, getEmoji, getStatus, getCreatorPostCount, getMaxLength, getPostsByCreator, getPosts } from '@/util/communication'
 import { toast } from '@/components/NextToast'
 import abi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
@@ -28,71 +28,84 @@ export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
+  const [totalPosts, setTotalPosts] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [data, setData] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const router = useRouter()
-  const [postCount, setPostCount] = useState(0)
   const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
 
-  const loadMorePosts = async (totalPoll) => {
-    // 1. **Add a guard clause to prevent re-entry**
-    if (isLoadedPoll) return
+// Assumes:
+// - totalPosts is the contract's total post count (e.g., 100)
+// - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
+// - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
+
+const loadMorePosts = async (totalPosts) => {
+    // Use a sensible page size (10 is better than 1 for performance)
+    const POSTS_PER_PAGE = 10;
+    
+    // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
+    if (isLoadedPoll) return;
 
     // 2. Set to true *before* starting the async operation
-    setIsLoadedPoll(true)
+    setIsLoadedPoll(true);
+    
+    // Check if we have loaded everything
+    if (postsLoaded >= totalPosts) {
+        console.log('All posts loaded (Guard Check).');
+        setIsLoadedPoll(false);
+        return;
+    }
 
     try {
-      let postsPerPage = 20
-      let startIndex = totalPoll - postsLoaded - postsPerPage
+        // The correct 1-based index for the *first* post of the next batch.
+        // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
+        const startIndex = postsLoaded + 1;
+        
+        // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
+        const remainingPosts = totalPosts - postsLoaded;
+        const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts);
 
-      // **Stop loading if all posts are accounted for**
-      if (postsLoaded >= totalPoll) {
-        console.log('All polls loaded.')
-        // We can return here, but still need to handle setIsLoadedPoll(false)
-      }
-
-      if (startIndex < 0) {
-        // Check if we are trying to load past the first post
-        postsPerPage = totalPoll - postsLoaded
-        startIndex = 0
-        if (postsPerPage <= 0) {
-          // All loaded
-          console.log('All polls loaded.')
-          return // Exit early
+        // Safety check (should be redundant if the initial guard passes)
+        if (postsToFetch <= 0) {
+            console.log('No posts to fetch after calculation.');
+            return;
         }
-      }
 
-      // ... (rest of your logic for calculating startIndex/postsPerPage) ...
+        console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`);
+        
+        // 3. Fetch the next batch of posts (the contract handles reverse order internally)
+        // Note: startIndex is passed as the 1-based chronological position.
+        const newPosts = await getPostsByCreator(params.wallet, startIndex, postsToFetch, address);
 
-      // 3. Fetch the next batch of polls
-      console.log(startIndex, postsPerPage)
-      const newPosts = await getPostsByCreator(params.wallet, startIndex, postsPerPage, isConnected ? address : `0x0000000000000000000000000000000000000000`)
-      console.log(`newPosts => `, newPosts)
-      // newPosts.reverse()
+        if (Array.isArray(newPosts) && newPosts.length > 0) {
+            // Append new posts and update the loaded count
+            setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }));
+            setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length);
+        } else if (postsToFetch > 0) {
+             // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
+             // To prevent infinite loop, update postsLoaded to totalPosts.
+             console.log('Fetched an empty batch; marking all as loaded for safety.');
+             setPostsLoaded(totalPosts);
+        }
 
-      if (Array.isArray(newPosts) && newPosts.length > 0) {
-        setPosts((prevPolls) => ({ list: [...prevPolls.list, ...newPosts] }))
-        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
-      }
     } catch (error) {
-      console.error('Error loading more polls:', error)
+        console.error('Error loading more posts:', error);
     } finally {
-      // 4. **Crucial: Set to false in finally block**
-      // This re-enables loading for the next scroll event.
-      setIsLoadedPoll(false)
+        // 4. Crucial: Set to false in finally block
+        setIsLoadedPoll(false);
     }
-  }
+}
 
   useEffect(() => {
     getCreatorPostCount(params.wallet).then((count) => {
-      const totalPoll = web3.utils.toNumber(count)
-      setPostCount(totalPoll)
+      const totalPosts = web3.utils.toNumber(count)
+     setTotalPosts(totalPosts)
 
       if (postsLoaded === 0 && !isLoadedPoll) {
-        loadMorePosts(totalPoll)
+        loadMorePosts(totalPosts)
       }
     })
   }, [])
@@ -109,7 +122,7 @@ export default function Page() {
         <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
           <li>
             <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
-              Posts <span className={`lable lable-dark`}>{postCount}</span>
+              Posts <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
             </button>
           </li>
           <li>
@@ -387,13 +400,7 @@ const Profile = ({ addr }) => {
  */
 const Links = () => {
   const [data, setData] = useState()
-  const [selfView, setSelfView] = useState()
-  const [showProfileModal, setShowProfileModal] = useState(false)
-  const [isItUp, setIsItUp] = useState(false)
   const params = useParams()
-  const { address, isConnected } = useAccount()
-  const { disconnect } = useDisconnect()
-  const activeChain = getActiveChain()
 
   useEffect(() => {
     getUniversalProfile(params.wallet).then((res) => {
@@ -410,7 +417,6 @@ const Links = () => {
           links: JSON.stringify(res.data.Profile[0].links_),
           lastUpdate: '',
         })
-        setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
       } else {
         getProfile(params.wallet).then((res) => {
           console.log(res, `==`)
@@ -419,7 +425,6 @@ const Links = () => {
             const profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
             res.profileImage = profileImage
             setData(res)
-            setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
           }
         })
       }
@@ -433,21 +438,24 @@ const Links = () => {
   return (
     <div className={`${styles.links}`}>
       {JSON.parse(data.links).length > 0 &&
-        JSON.parse(data.links).map((link, i) => (
-          <a key={i} href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`} target={`_blank`} rel="noopener noreferrer" className={`flex flex-row align-items-center justify-content-between`}>
-            <div className={`flex flex-column`}>
-              <p>{link.name}</p>
-              <code>{link.url}</code>
-            </div>
+        JSON.parse(data.links).map((link, i) => {
+          if (!link.name) return
+          return (
+            <a key={i} href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`} target={`_blank`} rel="noopener noreferrer" className={`flex flex-row align-items-center justify-content-between`}>
+              <div className={`flex flex-column`}>
+                <p>{link.name}</p>
+                <code>{link.url}</code>
+              </div>
 
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M3.98081 15.375C3.60194 15.375 3.28125 15.2438 3.01875 14.9813C2.75625 14.7188 2.625 14.3981 2.625 14.0192V3.98081C2.625 3.60194 2.75625 3.28125 3.01875 3.01875C3.28125 2.75625 3.60194 2.625 3.98081 2.625H8.71144V3.75H3.98081C3.92306 3.75 3.87019 3.77406 3.82219 3.82219C3.77406 3.87019 3.75 3.92306 3.75 3.98081V14.0192C3.75 14.0769 3.77406 14.1298 3.82219 14.1778C3.87019 14.2259 3.92306 14.25 3.98081 14.25H14.0192C14.0769 14.25 14.1298 14.2259 14.1778 14.1778C14.2259 14.1298 14.25 14.0769 14.25 14.0192V9.28856H15.375V14.0192C15.375 14.3981 15.2438 14.7188 14.9813 14.9813C14.7188 15.2438 14.3981 15.375 14.0192 15.375H3.98081ZM7.28944 11.5009L6.49913 10.7106L13.4597 3.75H10.5V2.625H15.375V7.5H14.25V4.54031L7.28944 11.5009Z"
-                fill="#424242"
-              />
-            </svg>
-          </a>
-        ))}
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M3.98081 15.375C3.60194 15.375 3.28125 15.2438 3.01875 14.9813C2.75625 14.7188 2.625 14.3981 2.625 14.0192V3.98081C2.625 3.60194 2.75625 3.28125 3.01875 3.01875C3.28125 2.75625 3.60194 2.625 3.98081 2.625H8.71144V3.75H3.98081C3.92306 3.75 3.87019 3.77406 3.82219 3.82219C3.77406 3.87019 3.75 3.92306 3.75 3.98081V14.0192C3.75 14.0769 3.77406 14.1298 3.82219 14.1778C3.87019 14.2259 3.92306 14.25 3.98081 14.25H14.0192C14.0769 14.25 14.1298 14.2259 14.1778 14.1778C14.2259 14.1298 14.25 14.0769 14.25 14.0192V9.28856H15.375V14.0192C15.375 14.3981 15.2438 14.7188 14.9813 14.9813C14.7188 15.2438 14.3981 15.375 14.0192 15.375H3.98081ZM7.28944 11.5009L6.49913 10.7106L13.4597 3.75H10.5V2.625H15.375V7.5H14.25V4.54031L7.28944 11.5009Z"
+                  fill="#424242"
+                />
+              </svg>
+            </a>
+          )
+        })}
     </div>
   )
 }
