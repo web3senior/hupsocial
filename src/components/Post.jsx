@@ -120,17 +120,8 @@ export default function Post({ item }) {
   }
 
   useEffect(() => {
-    /**
-     * 
-     *getPollByIndex(params.id).then((res) => {
-      console.log(res)
-      res.pollId = params.id
-      setPolls({ list: res })
-    })
-     */
-
     // View
-    getViewPost(params.id).then((result) => {
+    getViewPost(item.postId).then((result) => {
       console.log(result)
       setViewCount(result)
     })
@@ -194,7 +185,7 @@ export default function Post({ item }) {
 
             <button>
               <ViewIcon />
-              <span>{new Intl.NumberFormat("en", {notation: "compact", maximumFractionDigits: 1}).format(viewCount)}</span>
+              <span>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)}</span>
             </button>
 
             <button>
