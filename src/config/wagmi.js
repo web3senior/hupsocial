@@ -28,7 +28,7 @@ celoSepolia.textColor = `#fff`
 // CELO
 celoSepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10733_2648)"> <path d="M0 0H18V18H0V0Z" fill="#FCFE52"/> <path d="M5 5H13V8H11.83C11.5941 7.33279 11.1299 6.77045 10.5195 6.41237C9.90911 6.05429 9.19176 5.92353 8.49427 6.0432C7.79677 6.16288 7.16404 6.52527 6.70789 7.06634C6.25175 7.60741 6.00157 8.29231 6.00157 9C6.00157 9.70769 6.25175 10.3926 6.70789 10.9337C7.16404 11.4747 7.79677 11.8371 8.49427 11.9568C9.19176 12.0765 9.90911 11.9457 10.5195 11.5876C11.1299 11.2296 11.5941 10.6672 11.83 10H13V13H5V5Z" fill="black"/> </g> <defs> <clipPath id="clip0_10733_2648"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
 celoSepolia.faucetUrl = `https://faucet.celo.org/celo-sepolia/`
-celoSepolia.primaryColor = `#F2F423`
+celoSepolia.primaryColor = `#fcff52`
 celoSepolia.textColor = `#333`
 
 // Base

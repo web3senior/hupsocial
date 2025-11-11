@@ -171,10 +171,6 @@
     color: var(--gray-60);
     transition: background-color 0.2s ease-in-out;
 
-    &:hover {
-      background-color: var(--gray-100);
-    }
-
     button {
       all: unset;
       padding: 0.8rem 0;
@@ -183,6 +179,15 @@
       width: 100%;
       height: 100%;
       border-bottom: 2px solid transparent;
+      transition-property: all;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
+
+      &:hover {
+        &:not(.activeTab) {
+          border-color: var(--gray-300) !important;
+        }
+      }
     }
   }
 }
@@ -259,20 +264,20 @@
 .links {
   a {
     padding: 1.5rem 2rem;
-    border:2px solid var(--gray-50);
+    border: 2px solid var(--gray-50);
     border-radius: 1rem;
     &:not(:first-child) {
       margin-top: 1rem;
     }
 
-&:hover {
-  background-color: var(--gray-50);
-}
+    &:hover {
+      background-color: var(--gray-50);
+    }
 
     code {
       font-size: 10px;
-      opacity: .4;
-      color: var(--brand-700)
+      opacity: 0.4;
+      color: var(--brand-700);
     }
   }
 }
