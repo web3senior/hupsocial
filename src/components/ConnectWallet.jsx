@@ -29,19 +29,25 @@ export const ConnectWallet = () => {
   // }
 
   const handleSwitchChain = (e, chain) => {
-    switchChain(
-      { chainId: chain.id },
-      {
-        onSuccess: () => {
-          localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
-          window.location.reload()
-        },
-        onError: (error) => {
-          console.error('Switch chain failed:', error)
-          // Error logic
-        },
-      }
-    )
+    console.log(`Switch network: `, chain.id)
+    if (isConnected) {
+      switchChain(
+        { chainId: chain.id },
+        {
+          onSuccess: () => {
+            localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
+            window.location.reload()
+          },
+          onError: (error) => {
+            console.error('Switch chain failed:', error)
+            // Error logic
+          },
+        }
+      )
+    } else {
+      localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
+      window.location.reload()
+    }
   }
 
   useEffect(() => {}, [])
