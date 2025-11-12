@@ -23,11 +23,14 @@
     // background-position: 125% top;
   }
 }
-
+// Shimmer
 .shimmer {
   height: 200px;
 }
-
+.linkShimmer {
+  height: 40px;
+  border-radius: .5rem;
+}
 .form-tag {
   display: block;
   padding: 0.1rem 0.4rem;
