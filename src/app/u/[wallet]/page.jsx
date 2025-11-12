@@ -400,6 +400,7 @@ const Profile = ({ addr }) => {
  */
 const Links = () => {
   const [data, setData] = useState()
+  const [isItUp, setIsItUp] = useState()
   const params = useParams()
 
   useEffect(() => {
@@ -414,7 +415,7 @@ const Links = () => {
           profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
           profileHeader: '',
           tags: JSON.stringify(res.data.Profile[0].tags),
-          links: JSON.stringify(res.data.Profile[0].links_),
+          links: JSON.stringify(res.data.Profile[0].links),
           lastUpdate: '',
         })
       } else {
@@ -446,14 +447,12 @@ const Links = () => {
     <div className={`${styles.links}`}>
       {JSON.parse(data.links).length > 0 &&
         JSON.parse(data.links).map((link, i) => {
-          if (!link.name) return
           return (
             <a key={i} href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`} target={`_blank`} rel="noopener noreferrer" className={`flex flex-row align-items-center justify-content-between`}>
               <div className={`flex flex-column`}>
-                <p>{link.name}</p>
+                <p>{link.title || link.name}</p>
                 <code>{link.url}</code>
               </div>
-
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M4.16531 14.625L3.375 13.8347L11.9597 5.25H6.75V4.125H13.875V11.25H12.75V6.04031L4.16531 14.625Z" fill="#424242" />
               </svg>

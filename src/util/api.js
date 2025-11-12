@@ -18,7 +18,11 @@ export async function getUniversalProfile(addr) {
     fullName
     name
     tags
-    links_
+        links {
+      id
+      title
+      url
+    }
     standard
     transactions_aggregate {
       aggregate {
