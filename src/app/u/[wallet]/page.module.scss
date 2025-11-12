@@ -263,8 +263,8 @@
 
 .links {
   a {
-    padding: 1.5rem 2rem;
-    border: 2px solid var(--gray-50);
+    padding: .7Srem 1rem;
+    border: 1px solid var(--gray-200);
     border-radius: 1rem;
     &:not(:first-child) {
       margin-top: 1rem;
@@ -276,8 +276,8 @@
 
     code {
       font-size: 10px;
-      opacity: 0.4;
-      color: var(--brand-700);
+      //opacity: 0.4;
+      color: var(--black-400);
     }
   }
 }

@@ -45,7 +45,7 @@ opBNBTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"
 
 export const config = createConfig({
   chains: [luksoTestnet, celoSepolia],//arbitrumSepolia, monadTestnet, baseSepoliaPreconf, lineaGoerli, somniaTestnet, opBNBTestnet
-  connectors: [injected(), walletConnect({ projectId }), metaMask()], //, safe()
+  connectors: [ walletConnect({ projectId }), metaMask()], //, safe() //injected(),
   transports: {
     [luksoTestnet.id]: http(),
     [celoSepolia.id]: http(),
