@@ -942,7 +942,7 @@
     }
 
     &:hover {
-         background-color: var(--gray-50);
+      background-color: var(--gray-50);
     }
   }
 
@@ -962,6 +962,10 @@
     line-height: 1.4;
     font-size: 13px;
     padding: 0.2rem 0 0.2rem 0.3rem;
+    
+    a {
+      color: var(--blue-500) !important;
+    }
   }
 
   &__btnShowMore {
