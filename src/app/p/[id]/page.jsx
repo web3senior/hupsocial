@@ -171,7 +171,7 @@ export default function Page() {
         <div className={`${styles.grid} flex flex-column`}>
           {post && (
             <article className={`${styles.post} animate fade`}>
-              <Post item={post} />
+              <Post item={post} showContent={true}/>
               <hr />
             </article>
           )}

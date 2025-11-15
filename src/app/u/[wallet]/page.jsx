@@ -45,7 +45,7 @@ export default function Page() {
 
   const loadMorePosts = async (totalPosts) => {
     // Use a sensible page size (10 is better than 1 for performance)
-    const POSTS_PER_PAGE = 10
+    const POSTS_PER_PAGE = 30
 
     // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
     if (isLoadedPoll) return
@@ -63,7 +63,7 @@ export default function Page() {
     try {
       // The correct 1-based index for the *first* post of the next batch.
       // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
-      const startIndex = postsLoaded + 1
+      const startIndex = postsLoaded
 
       // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
       const remainingPosts = totalPosts - postsLoaded
@@ -191,7 +191,7 @@ export default function Page() {
 const NoData = ({ name }) => {
   return (
     <div className={`${styles.tabContent} ${styles.posts} d-f-c`}>
-      <p>No {name} yet.</p>
+      <p style={{ color: `var(--gray-400)` }}>No {name} yet.</p>
     </div>
   )
 }
@@ -874,13 +874,44 @@ const PostForm = ({ addr }) => {
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
-  const { data: hash, isPending: isSigning, error: submitError /* Error during submission (e.g., user rejected)  */, writeContract } = useWriteContract()
+
+  /* Error during submission (e.g., user rejected)  */
+  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+
+  const handleSuccess = (receipt) => {
+    console.log('🎉 Transaction Confirmed! Receipt:', receipt)
+    alert('Transaction Successful!')
+
+    // --- 🎯 TanStack Query Step: Invalidate/Refetch Data ---
+    // If this transaction changed some on-chain state (e.g., token balance, list of NFTs),
+    // you must invalidate the relevant queries to refetch the latest data.
+    queryClient.invalidateQueries({ queryKey: ['balanceOf', 'your-address'] })
+    queryClient.invalidateQueries({ queryKey: ['totalSupply'] })
+    // --------------------------------------------------------
+
+    // Optional: Reset the write contract state to allow a new transaction
+    // resetWriteContract();
+  }
+
+  const handleError = (error) => {
+    console.error('🔥 Transaction Reverted/Failed:', error)
+    alert(`Transaction Failed: ${error.shortMessage || error.message}`)
+
+    // Optional: Reset the write contract state
+    // resetWriteContract();
+  }
+
   const {
     isLoading: isConfirming,
     isSuccess: isConfirmed,
     error: receiptError /* Error after mining (e.g., transaction reverted) */,
   } = useWaitForTransactionReceipt({
     hash,
+    query: {
+      enabled: !!hash, // Only run the query once we have a transaction hash
+      onSuccess: handleSuccess, // Call our success function
+      onError: handleError, // Call our error function
+    },
   })
   const { web3, contract } = initPostContract()
 
@@ -1084,35 +1115,11 @@ const PostForm = ({ addr }) => {
     setWhitelist({ list: newWhitelist })
   }
 
-  const post = () => {
-    try {
-      // window.lukso.request({ method: 'eth_requestAccounts' }).then((accounts) => {})
-      const web3 = new Web3(window.ethereum)
-
-      // Create a Contract instance
-      const contract = new web3.eth.Contract(ABI, process.env.NEXT_PUBLIC_SOMNIA_CONTRACT)
-      contract.methods
-        .react(auth.contextAccounts[0], selectedEmoji.item.emojiId, web3.utils.toHex(message))
-        .send({
-          from: auth.accounts[0],
-          value: selectedEmoji.item.price,
-        })
-        .then((res) => {
-          console.log(res)
-
-          toast.success(`Done`)
-
-          party.confetti(document.body, {
-            count: party.variation.range(20, 40),
-          })
-        })
-        .catch((error) => {})
-    } catch (error) {
-      console.log(error)
-    }
-  }
-
   useEffect(() => {
+    if (isConfirmed) {
+      localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, '')
+      toast(`Post sent.`, `success`)
+    }
     getUniversalProfile(addr).then((res) => {
       console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
@@ -1140,7 +1147,7 @@ const PostForm = ({ addr }) => {
     })
 
     setPostContent(localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`))
-  }, [])
+  }, [isConfirmed])
 
   if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
 

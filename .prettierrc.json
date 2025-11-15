@@ -1,7 +1,7 @@
 {
   "semi": false,
   "singleQuote": true,
-  "printWidth": 250,
+  "printWidth": 200,
   "overrides": [
     {
       "files": "*.sol",

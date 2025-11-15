@@ -22,6 +22,8 @@ import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import styles from './Post.module.scss'
 
 moment.defineLocale('en-short', {
@@ -43,7 +45,7 @@ moment.defineLocale('en-short', {
   },
 })
 
-export default function Post({ item }) {
+export default function Post({ item, showContent }) {
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
@@ -80,9 +82,12 @@ export default function Post({ item }) {
           <Nav item={item} />
         </header>
         <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-          <div className={`${styles.post__content} `} id={`pollQuestion${item.pollId}`}>
-            {item.content}
-          </div>
+          <div
+            className={`${styles.post__content} `}
+            id={`post${item.postId}`}
+            style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(`${item.content}`)) }}
+          />
 
           <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
             <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
@@ -572,7 +577,8 @@ const ConnectedProfile = ({ addr }) => {
         getProfile(addr).then((res) => {
           console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
