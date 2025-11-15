@@ -22,6 +22,8 @@ import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import styles from './page.module.scss'
 
 moment.defineLocale('en-short', {
@@ -48,7 +50,7 @@ export default function Page() {
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [reactionCounter, setReactionCounter] = useState(0)
-    const [totalPosts, setTotalPosts] = useState(0)
+  const [totalPosts, setTotalPosts] = useState(0)
 
   const [showCommentModal, setShowCommentModal] = useState()
   const { web3, contract } = initPostContract()
@@ -64,138 +66,131 @@ export default function Page() {
     hash,
   })
 
-// Assumes:
-// - totalPosts is the contract's total post count (e.g., 100)
-// - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
-// - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
+  // Assumes:
+  // - totalPosts is the contract's total post count (e.g., 100)
+  // - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
+  // - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
 
-const loadMorePosts = async (totalPosts) => {
+  const loadMorePosts = async (totalPosts) => {
     // Use a sensible page size (10 is better than 1 for performance)
-    const POSTS_PER_PAGE = 10;
-    
+    const POSTS_PER_PAGE = 10
+
     // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
-    if (isLoadedPoll) return;
+    if (isLoadedPoll) return
 
     // 2. Set to true *before* starting the async operation
-    setIsLoadedPoll(true);
-    
+    setIsLoadedPoll(true)
+
     // Check if we have loaded everything
     if (postsLoaded >= totalPosts) {
-        console.log('All posts loaded (Guard Check).');
-        setIsLoadedPoll(false);
-        return;
+      console.log('All posts loaded (Guard Check).')
+      setIsLoadedPoll(false)
+      return
     }
 
     try {
-        // The correct 1-based index for the *first* post of the next batch.
-        // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
-        const startIndex = postsLoaded + 1;
-        
-        // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
-        const remainingPosts = totalPosts - postsLoaded;
-        const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts);
+      // The correct 1-based index for the *first* post of the next batch.
+      // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
+      const startIndex = postsLoaded + 1
 
-        // Safety check (should be redundant if the initial guard passes)
-        if (postsToFetch <= 0) {
-            console.log('No posts to fetch after calculation.');
-            return;
-        }
+      // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
+      const remainingPosts = totalPosts - postsLoaded
+      const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts)
 
-        console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`);
-        
-        // 3. Fetch the next batch of posts (the contract handles reverse order internally)
-        // Note: startIndex is passed as the 1-based chronological position.
-        const newPosts = await getPosts(startIndex, postsToFetch, address);
+      // Safety check (should be redundant if the initial guard passes)
+      if (postsToFetch <= 0) {
+        console.log('No posts to fetch after calculation.')
+        return
+      }
 
-        if (Array.isArray(newPosts) && newPosts.length > 0) {
-            // Append new posts and update the loaded count
-            setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }));
-            setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length);
-        } else if (postsToFetch > 0) {
-             // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
-             // To prevent infinite loop, update postsLoaded to totalPosts.
-             console.log('Fetched an empty batch; marking all as loaded for safety.');
-             setPostsLoaded(totalPosts);
-        }
+      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
 
+      // 3. Fetch the next batch of posts (the contract handles reverse order internally)
+      // Note: startIndex is passed as the 1-based chronological position.
+      const newPosts = await getPosts(startIndex, postsToFetch, address)
+
+      if (Array.isArray(newPosts) && newPosts.length > 0) {
+        // Append new posts and update the loaded count
+        setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }))
+        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
+      } else if (postsToFetch > 0) {
+        // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
+        // To prevent infinite loop, update postsLoaded to totalPosts.
+        console.log('Fetched an empty batch; marking all as loaded for safety.')
+        setPostsLoaded(totalPosts)
+      }
     } catch (error) {
-        console.error('Error loading more posts:', error);
+      console.error('Error loading more posts:', error)
     } finally {
-        // 4. Crucial: Set to false in finally block
-        setIsLoadedPoll(false);
+      // 4. Crucial: Set to false in finally block
+      setIsLoadedPoll(false)
     }
-}
+  }
   const openModal = (e, item) => {
     e.target.innerText = `Sending...`
     setSelectedEmoji({ e: e.target, item: item, message: null })
     giftModal.current.showModal()
   }
-/**
- * Handles scroll events for infinite loading.
- * * Assumes:
- * - scrollContainerRef: A React Ref attached to the scrollable DOM element.
- * - totalPosts: The total number of posts available from the contract.
- * - postsLoaded: The number of posts currently rendered.
- * - isLoadedPoll: The loading lock (set by loadMorePosts).
- * - loadMorePosts: The function to fetch the next batch.
- */
-const handleScroll = () => {
-    const scrollElement = document.documentElement; 
+  /**
+   * Handles scroll events for infinite loading.
+   * * Assumes:
+   * - scrollContainerRef: A React Ref attached to the scrollable DOM element.
+   * - totalPosts: The total number of posts available from the contract.
+   * - postsLoaded: The number of posts currently rendered.
+   * - isLoadedPoll: The loading lock (set by loadMorePosts).
+   * - loadMorePosts: The function to fetch the next batch.
+   */
+  const handleScroll = () => {
+    const scrollElement = document.documentElement
 
     // 1. Guard against a null reference (element not yet mounted)
-    if (!scrollElement) return; 
+    if (!scrollElement) return
 
     // Destructuring values for clarity
-    const { 
-        scrollTop,    // The distance from the top of the element to the top of the viewport
-        clientHeight, // The height of the visible part of the container
-        scrollHeight  // The total height of the content inside the container
-    } = scrollElement;
-    
+    const {
+      scrollTop, // The distance from the top of the element to the top of the viewport
+      clientHeight, // The height of the visible part of the container
+      scrollHeight, // The total height of the content inside the container
+    } = scrollElement
+
     // Define a threshold (e.g., load posts when 300px from the bottom)
-    const SCROLL_THRESHOLD = 200;
+    const SCROLL_THRESHOLD = 200
 
     // 2. Check if the user is near the bottom
     // scrollTop + clientHeight = how far the bottom of the viewport is from the top of the content
     // scrollHeight - SCROLL_THRESHOLD = the point before the very end of the content
-    const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - SCROLL_THRESHOLD);
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD
 
     // 3. Check for available posts and the loading lock
-    const hasMorePosts = postsLoaded < totalPosts;
-    
+    const hasMorePosts = postsLoaded < totalPosts
+
     // 4. Trigger load only if all conditions are met
     if (isNearBottom && hasMorePosts && !isLoadedPoll) {
-        console.log("Scrolled near bottom. Triggering load.");
-        loadMorePosts(totalPosts);
+      console.log('Scrolled near bottom. Triggering load.')
+      loadMorePosts(totalPosts)
     }
-};
+  }
 
-
-
-// --- Re-Attach Scroll Handler (Optional, if not handled elsewhere) ---
-useEffect(() => {
-      getPostCount().then((count) => {
+  // --- Re-Attach Scroll Handler (Optional, if not handled elsewhere) ---
+  useEffect(() => {
+    getPostCount().then((count) => {
       const totalPosts = web3.utils.toNumber(count)
       setTotalPosts(totalPosts)
-     
 
       if (postsLoaded === 0 && !isLoadedPoll) {
         loadMorePosts(totalPosts)
       }
     })
 
-
-
-    const element = document;
+    const element = document
     if (element) {
-        element.addEventListener('scroll', handleScroll);
-        // Clean up the event listener when the component unmounts or dependencies change
-        return () => {
-            element.removeEventListener('scroll', handleScroll);
-        };
+      element.addEventListener('scroll', handleScroll)
+      // Clean up the event listener when the component unmounts or dependencies change
+      return () => {
+        element.removeEventListener('scroll', handleScroll)
+      }
     }
-}, [totalPosts, postsLoaded, isLoadedPoll]);
-
+  }, [totalPosts, postsLoaded, isLoadedPoll])
 
   return (
     <div className={`${styles.page} ms-motion-slideDownIn`}>
@@ -218,9 +213,12 @@ useEffect(() => {
                       <Nav item={item} />
                     </header>
                     <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-                      <div className={`${styles.post__content} `} id={`pollQuestion${item.pollId}`}>
-                        {item.content}
-                      </div>
+                      <div
+                        className={`${styles.post__content} `}
+                        id={`post${item.postId}`}
+                        //style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(`${item.content}`)) }}
+                      />
 
                       <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
                         <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
@@ -715,7 +713,8 @@ const ConnectedProfile = ({ addr }) => {
         getProfile(addr).then((res) => {
           console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
