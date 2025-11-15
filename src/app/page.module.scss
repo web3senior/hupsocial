@@ -286,7 +286,7 @@
 
     li {
       width: 100%;
-      padding: .9em;
+      padding: 0.9em;
       border-radius: 8px;
 
       &:hover {
@@ -307,7 +307,7 @@
       }
 
       a {
- white-space: nowrap;
+        white-space: nowrap;
       }
 
       small {
@@ -381,7 +381,7 @@ button.btnPostMenu {
     }
 
     &:hover {
-         background-color: var(--gray-50);
+      background-color: var(--gray-50);
     }
   }
 
@@ -402,6 +402,9 @@ button.btnPostMenu {
     font-size: 13px;
     padding: 0.2rem 0 0.2rem 0.3rem;
     
+    a {
+      color: var(--blue-500) !important;
+    }
   }
 
   &__btnShowMore {
