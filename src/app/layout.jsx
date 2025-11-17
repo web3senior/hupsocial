@@ -68,6 +68,7 @@ export default async function RootLayout({ children }) {
     <html lang="en-US">
       <Head>
         <link rel="icon" href="https://example.com/favicon.ico" type="image/svg+xml" />
+        <script id="Cookiebot" src="https://consent.cookiebot.com/uc.js" data-cbid="972927ef-8d2e-46cd-99f0-3f650c14d50f" data-blockingmode="auto" type="text/javascript"></script>
       </Head>
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
         <NextToast />
