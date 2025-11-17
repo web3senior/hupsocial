@@ -238,7 +238,7 @@ export default function Page() {
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {posts.list.length === 0 && (
+        {posts.list.length < 1 && (
           <>
             <PostShimmer />
             <PostShimmer />
@@ -313,15 +313,15 @@ const PostShimmer = () => {
   return (
     <div className={`${styles.pageShimmer} flex flex-column gap-1`}>
       <div className={`flex flex-row gap-050`}>
-        <div className={`shimmer rounded`} style={{ width: `40px`, height: `40px` }} />
+        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
         <div className={`flex flex-column gap-050`}>
-          <div className={`shimmer rounded`} style={{ width: `100px`, height: `20px` }} />
+          <div className={`shimmer rounded`} style={{ width: `100px`, height: `15px` }} />
           <div className={`shimmer rounded`} style={{ width: `100px`, height: `10px` }} />
         </div>
       </div>
       <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `80%`, height: `10px` }} />
       <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `60%`, height: `10px` }} />
-      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `30%`, height: `10px` }} />
+      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `70%`, height: `10px` }} />
       <ul className={`flex gap-1`} style={{ marginLeft: `3rem` }}>
         <li>
           <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
