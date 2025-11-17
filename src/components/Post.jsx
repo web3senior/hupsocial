@@ -406,7 +406,7 @@ const TipModal = ({ item, setShowTipModal }) => {
           </div>
 
           <div className={`flex flex-column align-items-start justify-content-between`}>
-            <label htmlFor="">To ({address.toLowerCase() === item.creator.toLowerCase() && `Yourself`})</label>
+            <label htmlFor="">To {address.toLowerCase() === item.creator.toLowerCase() && `(Yourself)`}</label>
             <input type="text" name="" id="" value={`${item.creator}`} placeholder={``} disabled />
           </div>
 
