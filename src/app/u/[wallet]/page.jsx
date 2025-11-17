@@ -1166,7 +1166,7 @@ const PostForm = ({ addr }) => {
     const secondPart = originalString.slice(safeIndex)
 
     // 3. Concatenate the three parts: first part + new string + second part
-    return firstPart + stringToInsert + secondPart
+    return  firstPart + stringToInsert + secondPart
   }
   const makeBold = () => {
     const { start, end, selectedText, value, textarea } = getSelectedText()

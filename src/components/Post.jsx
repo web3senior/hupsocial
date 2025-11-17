@@ -52,6 +52,7 @@ export default function Post({ item, showContent }) {
   const [reactionCounter, setReactionCounter] = useState(0)
   const [postCount, setPostCount] = useState()
   const [showCommentModal, setShowCommentModal] = useState()
+  const [showTipModal, setShowTipModal] = useState()
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const params = useParams()
@@ -94,9 +95,9 @@ export default function Post({ item, showContent }) {
 
     // 5. Sanitize the HTML using DOMPurify
     // DOMPurify is crucial for preventing XSS attacks from the rendered content
-    const cleanHtml = DOMPurify.sanitize(dirtyHtml,{
-    ADD_ATTR: ['target', 'rel']
-  })
+    const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
+      ADD_ATTR: ['target', 'rel'],
+    })
 
     return cleanHtml
   }
@@ -105,11 +106,12 @@ export default function Post({ item, showContent }) {
     getViewPost(item.postId).then((result) => {
       setViewCount(result)
     })
-  }, [viewCount, showCommentModal])
+  }, [viewCount, showCommentModal, showTipModal])
 
   return (
     <>
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
+      {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
 
       {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
 
@@ -150,7 +152,11 @@ export default function Post({ item, showContent }) {
               <span>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)}</span>
             </button>
 
-            <button>
+            <button
+              onClick={() => {
+                isConnected ? setShowTipModal(item) : toast(`Please connect wallet`, `error`)
+              }}
+            >
               <TipIcon />
               <span>{new Intl.NumberFormat().format(0)}</span>
             </button>
@@ -265,9 +271,9 @@ const CommentModal = ({ item, setShowCommentModal }) => {
   }
 
   return (
-    <div className={`${styles.commentModal} animate fade`} onClick={() => setShowCommentModal()}>
-      <div className={`${styles.commentModal__container}`} onClick={(e) => e.stopPropagation()}>
-        <header className={`${styles.commentModal__container__header}`}>
+    <div className={`${styles.modal} animate fade`} onClick={() => setShowCommentModal()}>
+      <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
+        <header className={`${styles.modal__container__header}`}>
           <div className={``} aria-label="Close" onClick={() => setShowCommentModal()}>
             Cancel
           </div>
@@ -279,13 +285,13 @@ const CommentModal = ({ item, setShowCommentModal }) => {
           </div>
         </header>
 
-        <main className={`${styles.commentModal__container__main}`}>
-          <article className={`${styles.commentModal__post}`}>
+        <main className={`${styles.modal__container__main}`}>
+          <article className={`${styles.modal__post}`}>
             <section className={`flex flex-column align-items-start justify-content-between`}>
-              <header className={`${styles.commentModal__post__header}`}>
+              <header className={`${styles.modal__post__header}`}>
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
-              <main className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}>
+              <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
                 <div
                   className={`${styles.post__content} `}
                   // onClick={(e) => e.stopPropagation()}
@@ -298,11 +304,134 @@ const CommentModal = ({ item, setShowCommentModal }) => {
           </article>
         </main>
 
-        <footer className={`${styles.commentModal__footer}  flex flex-column align-items-start`}>
+        <footer className={`${styles.modal__footer}  flex flex-column align-items-start`}>
           <ConnectedProfile addr={address} />
           <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
           <button className="btn" onClick={(e) => postComment(e, item.postId)}>
             Post comment
+          </button>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
+const TipModal = ({ item, setShowTipModal }) => {
+  const [hasLiked, setHasLiked] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [amount, setAmount] = useState(1)
+  const isMounted = useClientMounted()
+  const [commentContent, setCommentContent] = useState('')
+  const { address, isConnected } = useAccount()
+  const activeChain = getActiveChain()
+  const { web3, contract } = initPostCommentContract()
+  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
+    hash,
+  })
+
+  const getHasLiked = async () => {
+    return isConnected ? await getHasLikedPost(id, address) : false
+  }
+
+  const handleTip = (e, id) => {
+    e.stopPropagation()
+
+    toast(`Coming soon`)
+    return
+
+    if (!isConnected) {
+      console.log(`Please connect your wallet first`, 'error')
+      return
+    }
+
+    writeContract({
+      abi: commentAbi,
+      address: activeChain[1].comment,
+      functionName: 'addComment',
+      args: [web3.utils.toNumber(id), 0, commentContent, ''],
+    })
+  }
+
+  useEffect(() => {
+    // getHasLiked()
+    //   .then((result) => {
+    //     setHasLiked(result)
+    //     setLoading(false)
+    //   })
+    //   .catch((err) => {
+    //     console.log(err)
+    //     setError(`⚠️`)
+    //     setLoading(false)
+    //   })
+  }, [item])
+
+  // if (loading) {
+  //   return <InlineLoading />
+  // }
+
+  if (error) {
+    return <span>{error}</span>
+  }
+
+  return (
+    <div className={`${styles.modal} ${styles.modalTip} animate fade`} onClick={() => setShowTipModal()}>
+      <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
+        <header>
+          <div className={``} aria-label="Close" onClick={() => setShowTipModal()}>
+            Cancel
+          </div>
+          <div className={`flex-1`}>
+            <h3>Support creator</h3>
+          </div>
+          <div className={`pointer`} onClick={(e) => updateStatus(e)}>
+            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : ``}
+          </div>
+        </header>
+
+        <main className={`flex flex-column align-items-start justify-content-between gap-050`}>
+          <div className={`flex flex-column align-items-start justify-content-between`}>
+            <label htmlFor="">Post ID</label>
+            <input type="text" name="" id="" value={`${item.postId}`} placeholder={``} disabled />
+          </div>
+
+          <div className={`flex flex-column align-items-start justify-content-between`}>
+            <label htmlFor="">From</label>
+            <input type="text" name="" id="" value={`${address}`} placeholder={``} disabled />
+          </div>
+
+          <div className={`flex flex-column align-items-start justify-content-between`}>
+            <label htmlFor="">To ({address.toLowerCase() === item.creator.toLowerCase() && `Yourself`})</label>
+            <input type="text" name="" id="" value={`${item.creator}`} placeholder={``} disabled />
+          </div>
+
+          <div className={`flex flex-column align-items-start justify-content-between`}>
+            <label htmlFor="">Token</label>
+            <select name="" id="">
+              <option value="">{`${activeChain[0].nativeCurrency.name} (${activeChain[0].nativeCurrency.symbol})`}</option>
+            </select>
+          </div>
+
+          <div className={`flex flex-column align-items-start justify-content-between`}>
+            <label htmlFor="">Amount</label>
+
+            <div className={`${styles.tipAmount} w-100 flex flex-row align-items-start justify-content-between gap-025`}>
+              <input type="number" name="" id="" value={amount} min={1} onChange={(e) => setAmount(e.target.value)} placeholder={`0`} />
+              <button onClick={() => setAmount(2)}>2</button>
+              <button onClick={() => setAmount(5)}>5</button>
+              <button onClick={() => setAmount(10)}>10</button>
+            </div>
+          </div>
+        </main>
+
+        <footer className={``}>
+          <button className="" onClick={(e) => handleTip(e, item.postId)} disabled={amount < 1}>
+            Send
           </button>
         </footer>
       </div>

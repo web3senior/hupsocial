@@ -278,10 +278,6 @@ export default function Page() {
                           <span>0</span>
                         </button>
 
-                        <button>
-                          <TipIcon />
-                          <span>{new Intl.NumberFormat().format(0)}</span>
-                        </button>
                         {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
                           <img alt={`blue checkmark icon`} src={txIcon.src} />
                         </Link> */}
