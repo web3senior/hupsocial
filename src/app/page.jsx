@@ -211,6 +211,7 @@ export default function Page() {
 
   // --- Re-Attach Scroll Handler (Optional, if not handled elsewhere) ---
   useEffect(() => {
+    console.log(activeChain)
     getPostCount().then((count) => {
       const totalPosts = web3.utils.toNumber(count)
       setTotalPosts(totalPosts)
@@ -244,7 +245,7 @@ export default function Page() {
             posts.list.length > 0 &&
             posts.list.map((item, i) => {
               return (
-                <article key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`p/${item.postId}`)}>
+                <article key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
                   <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                     <header className={`${styles.post__header} flex align-items-start justify-content-between`}>
                       <Profile creator={item.creator} createdAt={item.createdAt} />
