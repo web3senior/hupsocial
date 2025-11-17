@@ -132,43 +132,43 @@ export default function Page() {
     giftModal.current.showModal()
   }
 
-    /**
-     * Converts Markdown to sanitized HTML with links set to open in a new tab.
-     * @param {string} markdown - The markdown content to process.
-     * @returns {string} The sanitized HTML.
-     */
-    function renderMarkdown(markdown) {
-      // 1. Create a custom renderer
-      const renderer = new marked.Renderer()
-  
-      // 2. Override the link method to add target="_blank" and rel attributes
-      renderer.link = (href, title, text) => {
-        // Use the default marked behavior, but insert the desired attributes
-        const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
-  
-        // Add target="_blank" to open in a new tab
-        // Add rel="noopener noreferrer" for security and performance best practices
-        return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
-      }
-  
-      // 3. Configure marked to use the custom renderer
-      marked.setOptions({
-        renderer: renderer,
-        gfm: true, // Generally good to enable GitHub Flavored Markdown
-      })
-  
-      // 4. Render the markdown to HTML using the custom renderer
-      const dirtyHtml = marked.parse(markdown)
-  
-      // 5. Sanitize the HTML using DOMPurify
-      // DOMPurify is crucial for preventing XSS attacks from the rendered content
-      const cleanHtml = DOMPurify.sanitize(dirtyHtml,{
-      ADD_ATTR: ['target', 'rel']
-    })
-  
-      return cleanHtml
+  /**
+   * Converts Markdown to sanitized HTML with links set to open in a new tab.
+   * @param {string} markdown - The markdown content to process.
+   * @returns {string} The sanitized HTML.
+   */
+  function renderMarkdown(markdown) {
+    // 1. Create a custom renderer
+    const renderer = new marked.Renderer()
+
+    // 2. Override the link method to add target="_blank" and rel attributes
+    renderer.link = (href, title, text) => {
+      // Use the default marked behavior, but insert the desired attributes
+      const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
+
+      // Add target="_blank" to open in a new tab
+      // Add rel="noopener noreferrer" for security and performance best practices
+      return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
     }
-  
+
+    // 3. Configure marked to use the custom renderer
+    marked.setOptions({
+      renderer: renderer,
+      gfm: true, // Generally good to enable GitHub Flavored Markdown
+    })
+
+    // 4. Render the markdown to HTML using the custom renderer
+    const dirtyHtml = marked.parse(markdown)
+
+    // 5. Sanitize the HTML using DOMPurify
+    // DOMPurify is crucial for preventing XSS attacks from the rendered content
+    const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
+      ADD_ATTR: ['target', 'rel'],
+    })
+
+    return cleanHtml
+  }
+
   /**
    * Handles scroll events for infinite loading.
    * * Assumes:
@@ -238,7 +238,15 @@ export default function Page() {
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
+        {posts.list.length === 0 && (
+          <>
+            <PostShimmer />
+            <PostShimmer />
+            <PostShimmer />
+            <PostShimmer />
+            <PostShimmer />
+          </>
+        )}
 
         <div className={`${styles.grid} flex flex-column`}>
           {posts &&
@@ -297,6 +305,38 @@ export default function Page() {
           Load More
         </button>
       )}
+    </div>
+  )
+}
+
+const PostShimmer = () => {
+  return (
+    <div className={`${styles.pageShimmer} flex flex-column gap-1`}>
+      <div className={`flex flex-row gap-050`}>
+        <div className={`shimmer rounded`} style={{ width: `40px`, height: `40px` }} />
+        <div className={`flex flex-column gap-050`}>
+          <div className={`shimmer rounded`} style={{ width: `100px`, height: `20px` }} />
+          <div className={`shimmer rounded`} style={{ width: `100px`, height: `10px` }} />
+        </div>
+      </div>
+      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `80%`, height: `10px` }} />
+      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `80%`, height: `10px` }} />
+      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `80%`, height: `10px` }} />
+      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `80%`, height: `10px` }} />
+      <ul className={`flex gap-1`} style={{ marginLeft: `3rem` }}>
+        <li>
+          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+        </li>
+        <li>
+          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+        </li>
+        <li>
+          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+        </li>
+        <li>
+          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+        </li>
+      </ul>
     </div>
   )
 }
