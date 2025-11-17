@@ -131,6 +131,44 @@ export default function Page() {
     setSelectedEmoji({ e: e.target, item: item, message: null })
     giftModal.current.showModal()
   }
+
+    /**
+     * Converts Markdown to sanitized HTML with links set to open in a new tab.
+     * @param {string} markdown - The markdown content to process.
+     * @returns {string} The sanitized HTML.
+     */
+    function renderMarkdown(markdown) {
+      // 1. Create a custom renderer
+      const renderer = new marked.Renderer()
+  
+      // 2. Override the link method to add target="_blank" and rel attributes
+      renderer.link = (href, title, text) => {
+        // Use the default marked behavior, but insert the desired attributes
+        const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
+  
+        // Add target="_blank" to open in a new tab
+        // Add rel="noopener noreferrer" for security and performance best practices
+        return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
+      }
+  
+      // 3. Configure marked to use the custom renderer
+      marked.setOptions({
+        renderer: renderer,
+        gfm: true, // Generally good to enable GitHub Flavored Markdown
+      })
+  
+      // 4. Render the markdown to HTML using the custom renderer
+      const dirtyHtml = marked.parse(markdown)
+  
+      // 5. Sanitize the HTML using DOMPurify
+      // DOMPurify is crucial for preventing XSS attacks from the rendered content
+      const cleanHtml = DOMPurify.sanitize(dirtyHtml,{
+      ADD_ATTR: ['target', 'rel']
+    })
+  
+      return cleanHtml
+    }
+  
   /**
    * Handles scroll events for infinite loading.
    * * Assumes:
@@ -217,7 +255,7 @@ export default function Page() {
                         className={`${styles.post__content} `}
                         id={`post${item.postId}`}
                         //style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }}
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(`${item.content}`)) }}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
                       />
 
                       <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>

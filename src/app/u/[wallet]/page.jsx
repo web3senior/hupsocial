@@ -15,15 +15,14 @@ import abi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-
+import Post from '@/components/Post'
+import { useFormStatus } from 'react-dom'
 import { getActiveChain } from '@/util/communication'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
 import { InlineLoading } from '@/components/Loading'
 import styles from './page.module.scss'
-import Post from '@/components/Post'
-import { useFormStatus } from 'react-dom'
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
@@ -448,7 +447,13 @@ const Links = () => {
       {JSON.parse(data.links).length > 0 &&
         JSON.parse(data.links).map((link, i) => {
           return (
-            <a key={i} href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`} target={`_blank`} rel="noopener noreferrer" className={`flex flex-row align-items-center justify-content-between`}>
+            <a
+              key={i}
+              href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`}
+              target={`_blank`}
+              rel="noopener noreferrer"
+              className={`flex flex-row align-items-center justify-content-between`}
+            >
               <div className={`flex flex-column`}>
                 <p>{link.title || link.name}</p>
                 <code>{link.url}</code>
@@ -601,7 +606,13 @@ const Status = ({ addr, profile, selfView }) => {
                 </figure>
 
                 <div className={`d-f-c`} title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}>
-                  <textarea autoFocus defaultValue={status && status !== '' ? status.content : statusContent} onInput={(e) => setStatusContent(e.target.value)} placeholder={`${getRandomPlaceholder()}`} maxLength={maxLength ? maxLength : 60} />
+                  <textarea
+                    autoFocus
+                    defaultValue={status && status !== '' ? status.content : statusContent}
+                    onInput={(e) => setStatusContent(e.target.value)}
+                    placeholder={`${getRandomPlaceholder()}`}
+                    maxLength={maxLength ? maxLength : 60}
+                  />
                 </div>
               </div>
 
@@ -619,7 +630,9 @@ const Status = ({ addr, profile, selfView }) => {
 
               {isConfirmed && <p className="text-center badge badge-success">Done</p>}
 
-              <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>{status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}</div>
+              <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
+                {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}
+              </div>
 
               <div className={`flex flex-row align-items-center gap-025`}>
                 <InfoIcon />
@@ -1114,6 +1127,68 @@ const PostForm = ({ addr }) => {
     console.log(newWhitelist)
     setWhitelist({ list: newWhitelist })
   }
+  /**
+   * Function to get the text currently selected by the cursor in a textarea.
+   * @param {HTMLTextAreaElement} textarea - The textarea element to check.
+   * @returns {string} The selected text.
+   */
+  function getSelectedText() {
+    const textarea = document.querySelector(`[name="q"]`)
+    const value = textarea.value
+    // 1. Get the starting index of the selection
+    const start = textarea.selectionStart
+
+    // 2. Get the ending index of the selection
+    const end = textarea.selectionEnd
+
+    // 3. Use the 'substring' method on the textarea's whole value,
+    //    passing the start and end indices.
+    const selectedText = value.substring(start, end)
+
+    return { start, end, selectedText, value, textarea }
+  }
+
+  /**
+   * Inserts a string into another string at a specified index.
+   * @param {string} originalString - The string to insert into.
+   * @param {string} stringToInsert - The string to be added.
+   * @param {number} index - The index where the insertion should occur.
+   * @returns {string} The new combined string.
+   */
+  function insertStringAtIndex(originalString, stringToInsert, index) {
+    // Ensure the index is within bounds
+    const safeIndex = Math.max(0, Math.min(index, originalString.length))
+
+    // 1. Get the part of the string BEFORE the insertion point (up to the index)
+    const firstPart = originalString.slice(0, safeIndex)
+
+    // 2. Get the part of the string AFTER the insertion point (starting from the index)
+    const secondPart = originalString.slice(safeIndex)
+
+    // 3. Concatenate the three parts: first part + new string + second part
+    return firstPart + stringToInsert + secondPart
+  }
+  const makeBold = () => {
+    const { start, end, selectedText, value, textarea } = getSelectedText()
+    if (selectedText === '') return
+
+    const startString = insertStringAtIndex(value, `**`, start)
+    const endString = insertStringAtIndex(startString, `**`, end + 2)
+    console.log(endString)
+    setPostContent(endString)
+    textarea.value = endString
+  }
+
+  const makeItalic = () => {
+    const { start, end, selectedText, value, textarea } = getSelectedText()
+    if (selectedText === '') return
+
+    const startString = insertStringAtIndex(value, `*`, start)
+    const endString = insertStringAtIndex(startString, `*`, end + 2)
+    console.log(endString)
+    setPostContent(endString)
+    textarea.value = endString
+  }
 
   useEffect(() => {
     if (isConfirmed) {
@@ -1138,7 +1213,8 @@ const PostForm = ({ addr }) => {
         getProfile(addr).then((res) => {
           console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
@@ -1153,7 +1229,11 @@ const PostForm = ({ addr }) => {
 
   return (
     <div className={`${styles.postForm} flex flex-row align-items-start justify-content-between gap-1`}>
-      <img alt={profile.name || `PFP`} src={`${profile.profileImage.length !== '' ? profile.profileImage : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`} className={`${styles.postForm__pfp} rounded`} />
+      <img
+        alt={profile.name || `PFP`}
+        src={`${profile.profileImage.length !== '' ? profile.profileImage : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+        className={`${styles.postForm__pfp} rounded`}
+      />
       <div className={`flex-1`}>
         {showForm === `poll` && (
           <form ref={createFormRef} className={`form flex flex-column gap-050`} onSubmit={(e) => handleCreatePoll(e)}>
@@ -1234,7 +1314,10 @@ const PostForm = ({ addr }) => {
                       return (
                         <div key={i} className={`d-flex grid--gap-050 ms-motion-slideDownIn`}>
                           <figure>
-                            <img src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`} alt={`${profile.fullName}`} />
+                            <img
+                              src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`}
+                              alt={`${profile.fullName}`}
+                            />
                           </figure>
                           <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
                             <div className={`d-flex flex-column`}>
@@ -1260,7 +1343,10 @@ const PostForm = ({ addr }) => {
                       return (
                         <div key={i} id={`profileCard${i}`} className={`d-flex grid--gap-050`}>
                           <figure>
-                            <img src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`} alt={`${profile.fullName}`} />
+                            <img
+                              src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`}
+                              alt={`${profile.fullName}`}
+                            />
                           </figure>
                           <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
                             <div className={`d-flex flex-column`}>
@@ -1312,6 +1398,18 @@ const PostForm = ({ addr }) => {
         {showForm === `post` && (
           <form ref={createFormRef} className={`form flex flex-column gap-050 ${styles.postForm}`} onSubmit={(e) => handleCreatePost(e)}>
             <div className={`form-group ${styles.postForm__postContent}`}>
+              <ul className={`flex gap-025`}>
+                <li>
+                  <button type="button" style={{ width: `20px` }} onClick={() => makeBold()}>
+                    B
+                  </button>
+                </li>
+                <li>
+                  <button type="button" style={{ width: `20px` }} onClick={() => makeItalic()}>
+                    <i>I</i>
+                  </button>
+                </li>
+              </ul>
               <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={postContent} onChange={(e) => handlePostContentChange(e)} rows={10} />
               <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
             </div>
