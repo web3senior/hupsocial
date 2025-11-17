@@ -238,7 +238,7 @@ export default function Page() {
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
 
       <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {posts.list.length === 10 && (
+        {posts.list.length === 0 && (
           <>
             <PostShimmer />
             <PostShimmer />
