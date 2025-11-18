@@ -36,7 +36,7 @@ export default function Page() {
   const router = useRouter()
   const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
-
+  const activeChain = getActiveChain()
   // Assumes:
   // - totalPosts is the contract's total post count (e.g., 100)
   // - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
@@ -150,10 +150,10 @@ export default function Page() {
                 posts.list.length > 0 &&
                 posts.list.map((item, i) => {
                   return (
-                    <article key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`/p/${item.postId}`)}>
+                    <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
                       <Post item={item} />
                       {i < posts.list.length - 1 && <hr />}
-                    </article>
+                    </section>
                   )
                 })}
             </div>
