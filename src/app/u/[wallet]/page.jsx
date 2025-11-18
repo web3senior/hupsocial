@@ -151,7 +151,7 @@ export default function Page() {
                 posts.list.map((item, i) => {
                   return (
                     <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
-                      <Post item={item} />
+                      <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]}/>
                       {i < posts.list.length - 1 && <hr />}
                     </section>
                   )

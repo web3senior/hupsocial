@@ -161,7 +161,6 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title flex flex-column`}>
         <span>post</span>
-        <small>{new Intl.NumberFormat("en", {notation: "compact", maximumFractionDigits: 1}).format(viewCount)} views</small>
       </h3>
 
       {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
@@ -171,7 +170,7 @@ export default function Page() {
         <div className={`${styles.grid} flex flex-column`}>
           {post && (
             <article className={`${styles.post} animate fade`}>
-              <Post item={post} showContent={true}/>
+              <Post item={post} showContent={true} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
               <hr />
             </article>
           )}
@@ -328,7 +327,12 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
 
         <footer className={`${styles.commentModal__footer}  flex flex-column align-items-start`}>
           <ConnectedProfile addr={address} />
-          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`${type === `post` ? `Comment` : `Reply`} to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
+          <textarea
+            autoFocus
+            defaultValue={commentContent}
+            onInput={(e) => setCommentContent(e.target.value)}
+            placeholder={`${type === `post` ? `Comment` : `Reply`} to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`}
+          />
           <button className="btn" onClick={(e) => postComment(e)}>
             Post {type === `post` ? `comment` : `reply`}
           </button>

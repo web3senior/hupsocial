@@ -3,13 +3,11 @@
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
-import txIcon from '@/../public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
-import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
+import { useWaitForTransactionReceipt, useAccount, useWriteContract } from 'wagmi'
+import { initPostContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
 import { getProfile, getUniversalProfile, getViewPost } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
-import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
 import { isPollActive } from '@/util/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -45,12 +43,8 @@ moment.defineLocale('en-short', {
   },
 })
 
-export default function Post({ item, showContent }) {
+export default function Post({ item, showContent, actions }) {
   const [posts, setPosts] = useState({ list: [] })
-  const [postsLoaded, setPostsLoaded] = useState(0)
-  const [isLoadedPoll, setIsLoadedPoll] = useState(false)
-  const [reactionCounter, setReactionCounter] = useState(0)
-  const [postCount, setPostCount] = useState()
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const { web3, contract } = initPostContract()
@@ -121,45 +115,52 @@ export default function Post({ item, showContent }) {
           <Nav item={item} />
         </header>
         <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-          <div
-            className={`${styles.post__content} `}
-            id={`post${item.postId}`}
-            style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }}
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
-          />
+          <div className={`${styles.post__content} `} id={`post${item.postId}`} style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
 
           <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
-            <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
+            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />}
 
-            {item.allowedComments && (
-              <button
-                onClick={() => {
-                  isConnected ? setShowCommentModal(item) : toast(`Please connect wallet`, `error`)
-                }}
-              >
-                <CommentIcon />
-                <span>{item.commentCount}</span>
+            {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
+              <>
+                {item.allowedComments && (
+                  <button
+                    onClick={() => {
+                      isConnected ? setShowCommentModal(item) : toast(`Please connect wallet`, `error`)
+                    }}
+                  >
+                    <CommentIcon />
+                    <span>{item.commentCount}</span>
+                  </button>
+                )}
+              </>
+            )}
+            {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && (
+              <button>
+                <RepostIcon />
+                <span>0</span>
               </button>
             )}
-
-            <button>
-              <RepostIcon />
-              <span>0</span>
-            </button>
-
-            <button>
-              <ViewIcon />
-              <span>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                isConnected ? setShowTipModal(item) : toast(`Please connect wallet`, `error`)
-              }}
-            >
-              <TipIcon />
-              <span>{new Intl.NumberFormat().format(0)}</span>
-            </button>
+            {actions.find((action) => action.toLowerCase() === 'tip') !== undefined && (
+              <button
+                onClick={() => {
+                  isConnected ? setShowTipModal(item) : toast(`Please connect wallet`, `error`)
+                }}
+              >
+                <TipIcon />
+                <span>{new Intl.NumberFormat().format(0)}</span>
+              </button>
+            )}
+            {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
+              <button>
+                <ViewIcon />
+                <span>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)}</span>
+              </button>
+            )}
+            {actions.find((action) => action.toLowerCase() === 'share') !== undefined && (
+              <button>
+                <ShareIcon />
+              </button>
+            )}
           </div>
         </main>
       </section>
@@ -743,8 +744,7 @@ const ConnectedProfile = ({ addr }) => {
         getProfile(addr).then((res) => {
           console.log(res)
           if (res.wallet) {
-            const profileImage =
-              res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }

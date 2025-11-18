@@ -3,7 +3,6 @@
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
-import txIcon from '@/../public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
@@ -25,6 +24,7 @@ import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIco
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import styles from './page.module.scss'
+import Post from '@/components/Post'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -253,48 +253,10 @@ export default function Page() {
             posts.list.length > 0 &&
             posts.list.map((item, i) => {
               return (
-                <article key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
-                  <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
-                    <header className={`${styles.post__header} flex align-items-start justify-content-between`}>
-                      <Profile creator={item.creator} createdAt={item.createdAt} />
-                      <Nav item={item} />
-                    </header>
-                    <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-                      <div
-                        className={`${styles.post__content} `}
-                        id={`post${item.postId}`}
-                        //style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }}
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
-                      />
-
-                      <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
-                        <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
-
-                        {item.allowedComments && (
-                          <button onClick={() => setShowCommentModal(item)}>
-                            <CommentIcon />
-                            <span>{item.commentCount}</span>
-                          </button>
-                        )}
-
-                        <button>
-                          <RepostIcon />
-                          <span>0</span>
-                        </button>
-
-                        <button>
-                          <ShareIcon />
-                          <span>0</span>
-                        </button>
-
-                        {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
-                          <img alt={`blue checkmark icon`} src={txIcon.src} />
-                        </Link> */}
-                      </div>
-                    </main>
-                  </section>
+                <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
+                  <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
                   {i < posts.list.length - 1 && <hr />}
-                </article>
+                </section>
               )
             })}
         </div>
@@ -311,29 +273,28 @@ export default function Page() {
 
 const PostShimmer = () => {
   return (
-    <div className={`${styles.pageShimmer} flex flex-column gap-1`}>
+    <div className={`${styles.pageShimmer} flex flex-column gap-025`}>
       <div className={`flex flex-row gap-050`}>
         <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
         <div className={`flex flex-column gap-050`}>
-          <div className={`shimmer rounded`} style={{ width: `100px`, height: `15px` }} />
+          <div className={`shimmer rounded`} style={{ width: `100px`, height: `12px` }} />
           <div className={`shimmer rounded`} style={{ width: `100px`, height: `10px` }} />
         </div>
       </div>
       <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `80%`, height: `10px` }} />
       <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `60%`, height: `10px` }} />
-      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `70%`, height: `10px` }} />
-      <ul className={`flex gap-1`} style={{ marginLeft: `3rem` }}>
+      <ul className={`flex gap-1 mt-10`} style={{ marginLeft: `3rem` }}>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `50px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
         </li>
       </ul>
     </div>
@@ -787,8 +748,7 @@ const ConnectedProfile = ({ addr }) => {
         getProfile(addr).then((res) => {
           console.log(res)
           if (res.wallet) {
-            const profileImage =
-              res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
