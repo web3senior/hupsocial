@@ -15,6 +15,11 @@ export const CONTRACTS = {
     comment: '0x07F1BCE9585Fea0d72da07428A98293116634E4E',
     status: '0x13A71b258b685dFAC3bCe8b1530aAFD8daa180E1',
   },
+  chain10143: {
+    post: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
+    comment: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    status: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
+  },
 }
 
 // Expand the properties
@@ -44,13 +49,13 @@ monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"
 opBNBTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10769_2638)"> <path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10769_2638)"/> <path d="M5.93 4.84L9 3L12.07 4.84L10.94 5.52L9 4.36L7.06 5.52L5.93 4.84ZM12.07 7.16L10.94 6.48L9 7.64L7.06 6.48L5.93 7.16V8.5L7.87 9.66V12L9 12.68L10.13 12V9.67L12.07 8.51V7.16ZM12.07 10.83V9.47L10.94 10.15V11.51L12.07 10.83ZM12.87 11.31L10.93 12.47V13.83L14 11.99V8.32L12.87 8.99V11.31ZM11.74 6L12.87 6.68V8.03L14 7.36V6L12.87 5.32L11.74 6ZM7.87 12.96V14.32L9 15L10.13 14.32V12.96L9 13.64L7.87 12.96ZM5.93 10.83L7.06 11.51V10.15L5.93 9.47V10.83ZM7.87 6L9 6.68L10.13 6L9 5.32L7.87 6ZM5.13 6.68L6.26 6L5.13 5.32L4 6V7.36L5.13 8.03V6.68ZM5.13 8.99L4 8.32V11.99L7.07 13.83V12.47L5.13 11.31V9V8.99Z" fill="#F0B90B"/> </g> <defs> <linearGradient id="paint0_linear_10769_2638" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"> <stop stop-color="#1A1E21"/> <stop offset="1" stop-color="#06060A"/> </linearGradient> <clipPath id="clip0_10769_2638"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
 
 export const config = createConfig({
-  chains: [luksoTestnet, celoSepolia],//arbitrumSepolia, monadTestnet, baseSepoliaPreconf, lineaGoerli, somniaTestnet, opBNBTestnet
-  connectors: [ walletConnect({ projectId }), metaMask()], //, safe() //injected(),
+  chains: [luksoTestnet, celoSepolia, monadTestnet], //arbitrumSepolia,  baseSepoliaPreconf, lineaGoerli, somniaTestnet, opBNBTestnet
+  connectors: [walletConnect({ projectId }), metaMask(), injected()], //, safe() //injected(),
   transports: {
     [luksoTestnet.id]: http(),
     [celoSepolia.id]: http(),
     // [arbitrumSepolia.id]: http(),
-    // [monadTestnet.id]: http(),
+    [monadTestnet.id]: http(),
     // [baseSepoliaPreconf.id]: http(),
     // [lineaGoerli.id]: http(),
     // [somniaTestnet.id]: http(),

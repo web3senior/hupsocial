@@ -301,33 +301,6 @@ const PostShimmer = () => {
   )
 }
 
-const Nav = ({ item }) => {
-  const [showPostDropdown, setShowPostDropdown] = useState()
-
-  return (
-    <div className={`relative`}>
-      <button
-        className={`${styles.btnPostMenu} rounded`}
-        onClick={(e) => {
-          e.stopPropagation()
-          setShowPostDropdown(!showPostDropdown)
-        }}
-      >
-        <ThreeDotIcon />
-      </button>
-
-      {showPostDropdown && (
-        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
-          <ul>
-            <li>
-              <Link href={`p/${item.postId}`}>View post</Link>
-            </li>
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
 
 const CommentModal = ({ item, setShowCommentModal }) => {
   const [hasLiked, setHasLiked] = useState(false)
