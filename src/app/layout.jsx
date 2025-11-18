@@ -31,7 +31,7 @@ export const metadata = {
   author: { name: process.env.NEXT_PUBLIC_AUTHOR, url: process.env.NEXT_PUBLIC_AUTHOR_URL },
   creator: process.env.NEXT_PUBLIC_CREATOR,
   openGraph: {
-    images: '/og-image.png',
+    images: '/open-graph.png',
   },
   robots: {
     index: true,
@@ -40,7 +40,7 @@ export const metadata = {
     googleBot: {
       index: true,
       follow: true,
-      noimageindex: true,
+      noimageindex: false,
       'max-video-preview': -1,
       'max-image-preview': 'large',
       'max-snippet': -1,
@@ -67,13 +67,13 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en-US">
       <Head>
-        <link rel="icon" href="https://example.com/favicon.ico" type="image/svg+xml" />
+        <link rel="icon" href="favicon.svg" type="image/svg+xml" />
       </Head>
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
         <NextToast />
         <WagmiContext>
           <Header />
-          <main className={`${styles.main}`}>{children}</main>
+          <main className={styles.main}>{children}</main>
           <Footer />
         </WagmiContext>
       </body>
