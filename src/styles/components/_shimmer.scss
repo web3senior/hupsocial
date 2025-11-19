@@ -8,16 +8,16 @@
     position: absolute;
     inset: 0;
     background-repeat: no-repeat;
-    background-image: linear-gradient(90deg, var(--gray-100) 0%, var(--white) 50%, var(--gray-100) 100%);
-    animation-name: react-loading-skeleton;
+    background-image: linear-gradient(90deg, var(--gray-100) 0%, var(--white) 10%, var(--gray-100) 100%);
+    animation-name: pulse;
     animation-direction: 1.5s;
-    animation-duration: 1.5s;
+    animation-duration: 2s;
     animation-timing-function: ease-in-out;
     animation-iteration-count: infinite;
   }
 }
 
-@keyframes react-loading-skeleton {
+@keyframes pulse {
   100% {
     transform: translateX(100%);
   }

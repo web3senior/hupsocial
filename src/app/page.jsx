@@ -301,7 +301,6 @@ const PostShimmer = () => {
   )
 }
 
-
 const CommentModal = ({ item, setShowCommentModal }) => {
   const [hasLiked, setHasLiked] = useState(false)
   const [loading, setLoading] = useState(true)
