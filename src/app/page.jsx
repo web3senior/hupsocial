@@ -103,7 +103,7 @@ export default function Page() {
         return
       }
 
-      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
+//      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
 
       // 3. Fetch the next batch of posts (the contract handles reverse order internally)
       // Note: startIndex is passed as the 1-based chronological position.
@@ -211,7 +211,6 @@ export default function Page() {
 
   // --- Re-Attach Scroll Handler (Optional, if not handled elsewhere) ---
   useEffect(() => {
-    console.log(activeChain)
     getPostCount().then((count) => {
       const totalPosts = web3.utils.toNumber(count)
       setTotalPosts(totalPosts)
