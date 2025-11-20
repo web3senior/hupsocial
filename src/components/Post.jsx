@@ -43,7 +43,7 @@ moment.defineLocale('en-short', {
   },
 })
 
-export default function Post({ item, showContent, actions }) {
+export default function Post({ item, showContent, actions, chainId }) {
   const [posts, setPosts] = useState({ list: [] })
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
@@ -97,10 +97,10 @@ export default function Post({ item, showContent, actions }) {
   }
 
   useEffect(() => {
-    getViewPost(item.postId).then((result) => {
+    getViewPost(chainId, item.postId).then((result) => {
       setViewCount(result)
     })
-  }, [viewCount, showCommentModal, showTipModal])
+  }, [showCommentModal, showTipModal])
 
   return (
     <>

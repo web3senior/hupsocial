@@ -1,7 +1,7 @@
 /**
  * Get Universal Profile
- * @param {*} addr 
- * @returns 
+ * @param {*} addr
+ * @returns
  */
 export async function getUniversalProfile(addr) {
   const myHeaders = new Headers()
@@ -100,19 +100,29 @@ export async function updateProfile(formData, addr) {
   return response.json()
 }
 
-
-export async function getViewPost(postId) {
+export async function getViewPost(chainId, postId) {
   let requestOptions = {
     method: 'GET',
     redirect: 'follow',
   }
 
-  const params = new URLSearchParams({ post_id: postId }).toString()
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}view/post?${params}`, requestOptions)
+  const params = new URLSearchParams({ chain_id: chainId, post_id: postId }).toString()
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}view/get?${params}`, requestOptions)
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
 
+export async function addViewPost(chainId, postId) {
+  let requestOptions = {
+    method: 'GET',
+    redirect: 'follow',
+  }
+
+  const params = new URLSearchParams({ chain_id: chainId, post_id: postId }).toString()
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}view/add?${params}`, requestOptions)
+  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
+  return response.json()
+}
 
 // export async function updateProfile(post) {
 //   var myHeaders = new Headers()
@@ -130,9 +140,6 @@ export async function getViewPost(postId) {
 //   }
 //   return response.json()
 // }
-
-
-
 
 export async function getClaim() {
   let requestOptions = {
@@ -447,8 +454,6 @@ export async function updateTicket(data, id) {
   }
   return response.json()
 }
-
-
 
 export async function getInvoice() {
   var myHeaders = new Headers()

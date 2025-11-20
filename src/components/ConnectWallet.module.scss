@@ -52,12 +52,14 @@ button.btnConnect {
     all: unset;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.2rem;
-    width: auto;
+    width: 32px;
     height: 32px;
-    padding: 0 0.4rem;
     will-change: transform;
     transition: all 0.2s ease;
+    border-radius: 1000px;
+    background-color: var(--gray-100);
 
     cursor: pointer;
 

@@ -121,7 +121,7 @@ body {
   font-size: 12px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
- // min-height: calc(100svh - 4rem);
+  // min-height: calc(100svh - 4rem);
   // display: grid;
   // grid-template-rows: auto 1fr auto;
   // grid-template-columns: 1fr;
@@ -169,6 +169,7 @@ button {
   justify-content: center;
   transform: translateX(-50%);
   user-select: none;
+  text-transform: capitalize;
   font-size: var(--15-font-size);
 }
 

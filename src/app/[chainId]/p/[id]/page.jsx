@@ -20,7 +20,7 @@ import {
   getVoterChoices,
   getActiveChain,
 } from '@/util/communication'
-import { getProfile, getUniversalProfile, newView, getViewPost } from '@/util/api'
+import { getProfile, getUniversalProfile, newView, getViewPost, addViewPost } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -85,7 +85,7 @@ export default function Page() {
     setIsLoadedPoll(true)
 
     try {
-      let showingCommentCount = 7
+      let showingCommentCount = 20
       let startIndex = totalComment - commentsLoaded - showingCommentCount
 
       // **Stop loading if all posts are accounted for**
@@ -132,11 +132,13 @@ export default function Page() {
   }
 
   useEffect(() => {
+
+      console.log(params.chainId, params.id)
     // View
-    getViewPost(params.id).then((result) => {
-      console.log(result)
+    addViewPost(params.chainId, params.id).then((result) => {
       setViewCount(result)
     })
+
 
     getPostByIndex(params.id, address).then((res) => {
       console.log(res)
@@ -170,7 +172,9 @@ export default function Page() {
         <div className={`${styles.grid} flex flex-column`}>
           {post && (
             <article className={`${styles.post} animate fade`}>
-              <Post item={post} showContent={true} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
+              <Post item={post} showContent={true} 
+              chainId={params.chainId}
+              actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
               <hr />
             </article>
           )}
