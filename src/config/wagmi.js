@@ -64,5 +64,3 @@ export const config = createConfig({
     // [opBNBTestnet.id]: http(),
   },
 })
-
-console.log(config)
