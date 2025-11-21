@@ -124,22 +124,50 @@ export async function addViewPost(chainId, postId) {
   return response.json()
 }
 
-// export async function updateProfile(post) {
-//   var myHeaders = new Headers()
-//   myHeaders.append('Authorization', `Bearer ${getLocalToken()}`)
+export async function subscribeUser(sub, wallet) {
+  const subscription = sub
+  var raw = JSON.stringify({
+    "subscription":subscription,
+    "wallet": wallet
+  })
 
-//   var requestOptions = {
-//     method: 'POST',
-//     headers: myHeaders,
-//     body: JSON.stringify(post),
-//     redirect: 'follow',
-//   }
-//   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}profile/update`, requestOptions)
-//   if (!response.ok) {
-//     throw new Response('Failed to ', { status: 500 })
-//   }
-//   return response.json()
-// }
+  var requestOptions = {
+    method: 'POST',
+    body: raw,
+    redirect: 'follow',
+  }
+  // const params = new URLSearchParams({ wallet: wallet}).toString()
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}subscription`, requestOptions)
+  if (!response.ok) throw new Response('Failed to provinces', { status: 500 })
+  return response.json()
+}
+
+export async function unsubscribeUser(wallet) {
+  const subscription = null
+  var raw = JSON.stringify(subscription)
+
+  var requestOptions = {
+    method: 'POST',
+    body: raw,
+    redirect: 'follow',
+  }
+
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}subscription/unsubscribe`, requestOptions)
+  if (!response.ok) throw new Response('Failed to provinces', { status: 500 })
+  return response.json()
+}
+
+export async function sendNotification(message ,address) {
+  var requestOptions = {
+    method: 'POST',
+    body: JSON.stringify({message: message, address: address}),
+    redirect: 'follow',
+  }
+
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}sendNotification`, requestOptions)
+  if (!response.ok) throw new Response('Failed to provinces', { status: 500 })
+  return response.json()
+}
 
 export async function getClaim() {
   let requestOptions = {

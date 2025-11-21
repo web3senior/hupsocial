@@ -1,8 +1,5 @@
-'use client'
-
 import { WalletOptions } from '@/components/ConnectWallet'
 import styles from './page.module.scss'
-// import { getCategory, getFood } from '../util/api'
 
 export default function Page() {
   return (

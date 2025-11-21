@@ -162,7 +162,8 @@ figure.pfp {
     border-radius: var(--global-border-radius);
     box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
     padding: 0.5rem 1rem;
-
+    background-color: var(--color-primary);
+    color: var(--white);
     &:hover {
       transform: scale(1.025);
       transition: all 0.3s ease-in-out;

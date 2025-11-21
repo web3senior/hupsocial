@@ -10,10 +10,15 @@
 }
 
 .badge {
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
   border-radius: 1000px;
   overflow: hidden;
+
+  svg {
+    width: inherit;
+    height: inherit;
+  }
 }
 
 figure.profile {

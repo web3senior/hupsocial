@@ -100,7 +100,8 @@ export default function Profile({ creator, createdAt }) {
         <div className={`flex align-items-center gap-025`}>
           <b>{profile.name ?? defaultUsername}</b>
           <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
-          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
+          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} 
+          dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
           <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
         </div>
         <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>

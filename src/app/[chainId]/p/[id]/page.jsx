@@ -56,6 +56,20 @@ moment.defineLocale('en-short', {
   },
 })
 
+// export async function generateMetadata({ params, searchParams }, parent) {
+//   const slug = (await params).slug
+
+//   // fetch post information
+//   const post = await fetch(`https://api.vercel.app/blog/${slug}`).then((res) =>
+//     res.json()
+//   )
+
+//   return {
+//     title: post.title,
+//     description: post.description,
+//   }
+// }
+
 export default function Page() {
   const [post, setPost] = useState()
   const [comments, setComments] = useState({ list: [] })
@@ -132,13 +146,11 @@ export default function Page() {
   }
 
   useEffect(() => {
-
-      console.log(params.chainId, params.id)
+    console.log(params.chainId, params.id)
     // View
     addViewPost(params.chainId, params.id).then((result) => {
       setViewCount(result)
     })
-
 
     getPostByIndex(params.id, address).then((res) => {
       console.log(res)
@@ -157,6 +169,8 @@ export default function Page() {
     })
 
     setChains(config.chains)
+
+    navigator.vibrate(200)
   }, [showCommentModal]) // Added necessary dependencies  [isLoadedComment, commentsLoaded]
 
   return (
@@ -172,9 +186,7 @@ export default function Page() {
         <div className={`${styles.grid} flex flex-column`}>
           {post && (
             <article className={`${styles.post} animate fade`}>
-              <Post item={post} showContent={true} 
-              chainId={params.chainId}
-              actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
+              <Post item={post} showContent={true} chainId={params.chainId} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
               <hr />
             </article>
           )}

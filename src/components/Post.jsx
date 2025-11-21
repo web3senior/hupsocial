@@ -97,9 +97,11 @@ export default function Post({ item, showContent, actions, chainId }) {
   }
 
   useEffect(() => {
-    getViewPost(chainId, item.postId).then((result) => {
-      setViewCount(result)
-    })
+    if (chainId !== undefined) {
+      getViewPost(chainId, item.postId).then((result) => {
+        setViewCount(result)
+      })
+    }
   }, [showCommentModal, showTipModal])
 
   return (
@@ -110,7 +112,7 @@ export default function Post({ item, showContent, actions, chainId }) {
       {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
 
       <section className={`${styles.post} flex flex-column align-items-start justify-content-between`}>
-        <header className={`${styles.post__header} flex align-items-start justify-content-between`}>
+        <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile creator={item.creator} createdAt={item.createdAt} />
           <Nav item={item} />
         </header>

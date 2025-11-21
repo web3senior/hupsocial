@@ -50,9 +50,7 @@ export const ConnectWallet = () => {
     }
   }
 
-  useEffect(() => {
-    console.log(`%c hup`, 'font-size:10rem;color:rgba(255,255,255,.1)')
-  }, [])
+  useEffect(() => console.log(`%c ░▒▓█ Hup █▓▒░`, 'font-size:1.5rem;color:#38bdf8'), [])
 
   return !mounted ? null : (
     <>
