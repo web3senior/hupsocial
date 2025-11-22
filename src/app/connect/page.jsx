@@ -1,4 +1,5 @@
 import { WalletOptions } from '@/components/ConnectWallet'
+import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 
 export default function Page() {
