@@ -25,6 +25,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import styles from './page.module.scss'
 import Post from '@/components/Post'
+import DefaultNetwork from '@/components/DefaultNetwork'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -46,30 +47,17 @@ moment.defineLocale('en-short', {
 })
 
 export default function Page() {
+  const [showDefaultNetwork, setShowDefaultNetwork] = useState(true)
+
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
-  const [reactionCounter, setReactionCounter] = useState(0)
   const [totalPosts, setTotalPosts] = useState(0)
-
-  const [showCommentModal, setShowCommentModal] = useState()
   const { web3, contract } = initPostContract()
-  const giftModal = useRef()
-  const giftModalMessage = useRef()
   const mounted = useClientMounted()
-  const params = useParams()
   const activeChain = getActiveChain()
   const { address, isConnected } = useAccount()
   const router = useRouter()
-  const { data: hash, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  })
-
-  // Assumes:
-  // - totalPosts is the contract's total post count (e.g., 100)
-  // - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
-  // - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
 
   const loadMorePosts = async (totalPosts) => {
     // Use a sensible page size (10 is better than 1 for performance)
@@ -103,7 +91,7 @@ export default function Page() {
         return
       }
 
-//      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
+      //      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
 
       // 3. Fetch the next batch of posts (the contract handles reverse order internally)
       // Note: startIndex is passed as the 1-based chronological position.
@@ -125,11 +113,6 @@ export default function Page() {
       // 4. Crucial: Set to false in finally block
       setIsLoadedPoll(false)
     }
-  }
-  const openModal = (e, item) => {
-    e.target.innerText = `Sending...`
-    setSelectedEmoji({ e: e.target, item: item, message: null })
-    giftModal.current.showModal()
   }
 
   /**
@@ -230,47 +213,44 @@ export default function Page() {
     }
   }, [totalPosts, postsLoaded, isLoadedPoll])
 
+  if (showDefaultNetwork && localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`)===null) return <DefaultNetwork setShowDefaultNetwork={setShowDefaultNetwork} />
+
   return (
     <>
-     <h3 className={`page-title`}>home</h3>
-    <div className={`${styles.page} ms-motion-slideDownIn`}>
-     
+      <h3 className={`page-title`}>home</h3>
+      <div className={`${styles.page} ms-motion-slideDownIn`}>
+        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+          {posts.list.length < 1 && (
+            <>
+              <PostShimmer />
+              <PostShimmer />
+              <PostShimmer />
+              <PostShimmer />
+              <PostShimmer />
+            </>
+          )}
 
-      {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
-
-      <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {posts.list.length < 1 && (
-          <>
-            <PostShimmer />
-            <PostShimmer />
-            <PostShimmer />
-            <PostShimmer />
-            <PostShimmer />
-          </>
-        )}
-
-        <div className={`${styles.grid} flex flex-column`}>
-          {posts &&
-            posts.list.length > 0 &&
-            posts.list.map((item, i) => {
-              return (
-                <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
-                  <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
-                  {i < posts.list.length - 1 && <hr />}
-                </section>
-              )
-            })}
+          <div className={`${styles.grid} flex flex-column`}>
+            {posts &&
+              posts.list.length > 0 &&
+              posts.list.map((item, i) => {
+                return (
+                  <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
+                    <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
+                    {i < posts.list.length - 1 && <hr />}
+                  </section>
+                )
+              })}
+          </div>
         </div>
+
+        {postsLoaded !== totalPosts && (
+          <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(totalPosts)}>
+            Load More
+          </button>
+        )}
       </div>
-
-      {postsLoaded !== totalPosts && (
-        <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(totalPosts)}>
-          Load More
-        </button>
-      )}
-    </div>
     </>
-
   )
 }
 
@@ -301,213 +281,6 @@ const PostShimmer = () => {
         </li>
       </ul>
     </div>
-  )
-}
-
-const CommentModal = ({ item, setShowCommentModal }) => {
-  const [hasLiked, setHasLiked] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const isMounted = useClientMounted()
-  const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useAccount()
-  const activeChain = getActiveChain()
-  const { web3, contract } = initPostCommentContract()
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: receiptError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  })
-
-  const getHasLiked = async () => {
-    return isConnected ? await getHasLikedPost(id, address) : false
-  }
-
-  const postComment = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi: commentAbi,
-      address: activeChain[1].comment,
-      functionName: 'addComment',
-      args: [web3.utils.toNumber(id), 0, commentContent, ''],
-    })
-  }
-
-  const unlikePost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
-      functionName: 'unlikePost',
-      args: [id],
-    })
-  }
-
-  useEffect(() => {
-    // getHasLiked()
-    //   .then((result) => {
-    //     setHasLiked(result)
-    //     setLoading(false)
-    //   })
-    //   .catch((err) => {
-    //     console.log(err)
-    //     setError(`⚠️`)
-    //     setLoading(false)
-    //   })
-  }, [item])
-
-  // if (loading) {
-  //   return <InlineLoading />
-  // }
-
-  if (error) {
-    return <span>{error}</span>
-  }
-
-  return (
-    <div className={`${styles.commentModal} animate fade`} onClick={() => setShowCommentModal()}>
-      <div className={`${styles.commentModal__container}`} onClick={(e) => e.stopPropagation()}>
-        <header className={`${styles.commentModal__container__header}`}>
-          <div className={``} aria-label="Close" onClick={() => setShowCommentModal()}>
-            Cancel
-          </div>
-          <div className={`flex-1`}>
-            <h3>Post your reply</h3>
-          </div>
-          <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
-          </div>
-        </header>
-
-        <main className={`${styles.commentModal__container__main}`}>
-          <article className={`${styles.commentModal__post}`}>
-            <section className={`flex flex-column align-items-start justify-content-between`}>
-              <header className={`${styles.commentModal__post__header}`}>
-                <Profile creator={item.creator} createdAt={item.createdAt} />
-              </header>
-              <main className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}>
-                <div
-                  className={`${styles.post__content} `}
-                  // onClick={(e) => e.stopPropagation()}
-                  id={`post${item.postId}`}
-                >
-                  {item.content}
-                </div>
-              </main>
-            </section>
-          </article>
-        </main>
-
-        <footer className={`${styles.commentModal__footer}  flex flex-column align-items-start`}>
-          <ConnectedProfile addr={address} />
-          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
-          <button className="btn" onClick={(e) => postComment(e, item.postId)}>
-            Post comment
-          </button>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Like
- * @param {*} param0
- * @returns
- */
-const Like = ({ id, likeCount, hasLiked }) => {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const isMounted = useClientMounted()
-  const activeChain = getActiveChain()
-  const { address, isConnected } = useAccount()
-  const { data: hash, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  })
-
-  const getHasLiked = async () => {
-    return isConnected ? await getHasLikedPost(Web3.utils.toNumber(id), address) : false
-  }
-
-  const likePost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: activeChain[1].post,
-      functionName: 'likePost',
-      args: [id],
-    })
-  }
-
-  const unlikePost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: activeChain[1].post,
-      functionName: 'unlikePost',
-      args: [id],
-    })
-  }
-
-  useEffect(() => {
-    // getHasLiked()
-    //   .then((result) => {
-    //     setHasLiked(result)
-    //     setLoading(false)
-    //   })
-    //   .catch((err) => {
-    //     console.log(err)
-    //     setError(`⚠️`)
-    //     setLoading(false)
-    //   })
-  }, [id])
-
-  // if (loading) {
-  //   return <InlineLoading />
-  // }
-
-  if (error) {
-    return <span>{error}</span>
-  }
-
-  return (
-    <button onClick={(e) => (hasLiked ? unlikePost(e, id) : likePost(e, id))}>
-      <svg width="18" height="18" viewBox="0 0 18 18" fill={hasLiked ? `#EC3838` : `none`} xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
-          stroke={hasLiked ? `#EC3838` : `#424242`}
-        />
-      </svg>
-      <span>{likeCount}</span>
-    </button>
   )
 }
 
@@ -578,11 +351,6 @@ const Poll = ({ polls }) => {
   )
 }
 
-/**
- * Options
- * @param {Object} item
- * @returns
- */
 const Options = ({ item }) => {
   const [status, setStatus] = useState(`loading`)
   const [optionsVoteCount, setOptionsVoteCount] = useState()
@@ -691,76 +459,5 @@ const Options = ({ item }) => {
         <PollTimer startTime={item.startTime} endTime={item.endTime} pollId={item.pollId} />
       </p>
     </>
-  )
-}
-
-/**
- * Profile
- * @param {String} addr
- * @returns
- */
-const ConnectedProfile = ({ addr }) => {
-  const [profile, setProfile] = useState()
-  const activeChain = getActiveChain()
-  const defaultUsername = `hup-user`
-  const [isItUp, setIsItUp] = useState()
-  useEffect(() => {
-    getUniversalProfile(addr).then((res) => {
-      console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setIsItUp(true)
-        setProfile({
-          wallet: res.data.Profile[0].id,
-          name: res.data.Profile[0].name,
-          description: res.data.Profile[0].description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
-          profileHeader: '',
-          tags: JSON.stringify(res.data.Profile[0].tags),
-          links: JSON.stringify(res.data.Profile[0].links_),
-          lastUpdate: '',
-        })
-      } else {
-        getProfile(addr).then((res) => {
-          console.log(res)
-          if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
-            res.profileImage = profileImage
-            setProfile(res)
-          }
-        })
-      }
-    })
-  }, [])
-
-  if (!profile)
-    return (
-      <div className={`${styles.profileShimmer} flex align-items-center gap-050`}>
-        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
-        <div className={`flex flex-column justify-content-between gap-025`}>
-          <span className={`shimmer rounded`} style={{ width: `60px`, height: `10px` }} />
-          <span className={`shimmer rounded`} style={{ width: `40px`, height: `10px` }} />
-        </div>
-      </div>
-    )
-
-  return (
-    <figure
-      className={`${styles.profile} flex align-items-center`}
-      onClick={(e) => {
-        e.stopPropagation()
-        router.push(`/u/${addr}`)
-      }}
-    >
-      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
-
-      <figcaption className={`flex flex-column`}>
-        <div className={`flex align-items-center gap-025`}>
-          <b>{profile.name ?? defaultUsername}</b>
-          <BlueCheckMarkIcon />
-          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
-        </div>
-        <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
-      </figcaption>
-    </figure>
   )
 }

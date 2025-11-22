@@ -8,11 +8,6 @@
   }
 }
 
-::backdrop {
-  background-image: linear-gradient(45deg, magenta, rebeccapurple, dodgerblue, green);
-  opacity: 0.5;
-  filter: blur(100px);
-}
 
 // Scrollbar
 ::-webkit-scrollbar {
@@ -139,7 +134,6 @@ a {
 }
 
 button {
-  border: none;
   cursor: pointer;
 }
 

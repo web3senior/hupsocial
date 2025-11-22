@@ -1,0 +1,53 @@
+.networkDialog {
+  width: 460px;
+
+  h3 {
+
+  }
+
+  p {
+    color: var(--black-500)
+  }
+
+  .networks {
+    button {
+      background-color: var(--gray-50);
+      border: 2px solid transparent;
+      width: 100%;
+      padding: 1.5rem 1rem;
+      border-radius: 1rem;
+      will-change: transform;
+      transition: transform 0.2s ease;
+      transition: background-color 0.3s allow-discrete, border 0.3s allow-discrete, transform 0.1s allow-discrete;
+      outline: none;
+      user-select: none;
+
+      @media (max-width: 300px) {
+        padding: 0.5rem 0.2rem;
+      }
+
+      &:hover {
+        border: 2px solid var(--blue-light-400);
+        background-color: var(--blue-light-100);
+        transform: scale(1.04);
+      }
+
+      &:active {
+        transform: scale(0.95);
+      }
+
+      svg {
+        --r: 32px;
+        width: var(--r);
+        height: var(--r);
+      }
+
+      b {
+        font-size: 0.8rem;
+        @media (max-width: 300px) {
+          font-size: 0.6rem;
+        }
+      }
+    }
+  }
+}

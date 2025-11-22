@@ -4,28 +4,7 @@
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
-
   height: 100%;
-
-  // &:before {
-  //   content: '';
-  //   position: fixed;
-  //   left: 50%;
-  //   transform: translateX(-50%);
-  //   width: 90svw;
-  //   max-width: 639px;
-  //   height: 100svh;
-  //   z-index: 1;
-  //   overflow: hidden;
-  //   border-radius: var(--global-border-radius);
-  //   box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-  //   border: 1px solid var(--gray-200);
-  //   border-top: none;
-  //       pointer-events: none;
-  //   @media (max-width: 700px) {
-  //     display: none;
-  //   }
-  // }
 
   &__container {
     position: relative;
