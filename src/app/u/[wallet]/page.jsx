@@ -184,7 +184,7 @@ export default function Page() {
           )}
 
           {activeTab === 'settings' && (
-            <div className={`${styles.tabContent} ${styles.settings} relative`}>
+            <div className={`${styles.tabContent} ${styles.settings} relative`} style={{display: `none`}}>
               <Settings />
             </div>
           )}
