@@ -74,6 +74,12 @@ button.btnConnect {
     span {
       overflow: hidden;
     }
+
+     svg {
+              --r: 32px;
+        width: var(--r);
+        height: var(--r);
+     }
   }
 
   .dropdown {
@@ -127,7 +133,7 @@ figure.pfp {
 
   &:hover {
     transform: scale(1.025);
-    outline: 3px solid var(--gray-200);
+
   }
 
   &:active {
@@ -135,9 +141,9 @@ figure.pfp {
   }
 
   img {
-    --r: 32px;
-    width: var(--r);
-    height: var(--r);
+              --r: 32px;
+        width: var(--r);
+        height: var(--r);
     aspect-ratio: 1/1;
   }
 }

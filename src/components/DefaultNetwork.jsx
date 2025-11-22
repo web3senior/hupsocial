@@ -3,7 +3,7 @@ import { config } from '@/config/wagmi'
 import { useAccount, useDisconnect, Connector, useConnect, useSwitchChain, useConfig } from 'wagmi'
 import styles from './DefaultNetwork.module.scss'
 
-export default function DefaultNetwork({ setShowDefaultNetwork }) {
+export default function DefaultNetwork({ setShowNetworks }) {
   const networkDialog = useRef()
   const { address, isConnected } = useAccount()
   const { switchChain } = useSwitchChain()
@@ -16,6 +16,7 @@ export default function DefaultNetwork({ setShowDefaultNetwork }) {
         {
           onSuccess: () => {
             localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
+            window.location.href = '/'
           },
           onError: (error) => {
             console.error('Switch chain failed:', error)
@@ -33,13 +34,13 @@ export default function DefaultNetwork({ setShowDefaultNetwork }) {
 
     networkDialog.current.addEventListener('close', (e) => {
       const returnValue = networkDialog.current.returnValue
-      console.log(returnValue)
-      //if (returnValue==="")
-          //handleSwitchChain(returnValue)
- 
-    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, returnValue)
-       setShowDefaultNetwork(false)
-      networkDialog.current.close()
+      if (returnValue === `close`) return
+
+      localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, returnValue)
+      handleSwitchChain(returnValue)
+      // setShowNetworks(false)
+
+      // networkDialog.current.close()
     })
   }, [])
 
@@ -48,7 +49,7 @@ export default function DefaultNetwork({ setShowDefaultNetwork }) {
       <h2>Select Your Hup Network</h2>
       <p>Your choice determines the content you see. Each network holds a separate, immutable history of posts, identities, and governance votes.</p>
       <form method={`dialog`} className={`mt-20`}>
-        <div className={`${styles.networks} flex flex-column align-items-center justify-content-start gap-050`}>
+        <div className={`${styles.networks} grid grid--fit gap-1`} style={{ '--data-width': `150px` }}>
           {config.chains.map((chain, i) => (
             <button
               key={i}
@@ -56,13 +57,13 @@ export default function DefaultNetwork({ setShowDefaultNetwork }) {
                 e.preventDefault()
                 networkDialog.current.close(chain.id)
               }}
-              className={`w-100 flex flex-row align-items-center justify-content-start gap-050`}
             >
               <div className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
               <b>{chain.name}</b>
             </button>
           ))}
         </div>
+        <button value={`close`}>Close</button>
       </form>
     </dialog>
   )

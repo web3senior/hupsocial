@@ -6,7 +6,8 @@ dialog {
   border-color: rgb(0 0 0 / 0.3);
   padding: 2rem;
   outline: none;
-
+  margin: auto;
+  background-color: var(--white, #fff);
   &:open {
     opacity: 1;
     transform: translateY(0);
@@ -24,8 +25,7 @@ dialog {
 
 // Dialog or modal
 :modal {
-  margin: auto;
-  background-color: var(--white, #fff);
+
   // border: none;
 }
 

@@ -10,6 +10,7 @@ import { getActiveChain } from '@/util/communication'
 import { getProfile, getUniversalProfile } from '@/util/api'
 import Shimmer from '@/helper/Shimmer'
 import styles from './ConnectWallet.module.scss'
+import DefaultNetwork from './DefaultNetwork'
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
@@ -61,7 +62,8 @@ export const ConnectWallet = () => {
               <span className={`rounded`} dangerouslySetInnerHTML={{ __html: activeChain[0].icon }} />
             </button>
 
-            {showNetworks && (
+{showNetworks && <DefaultNetwork setShowNetworks={setShowNetworks}/>}
+            {/* {showNetworks && (
               <div className={`${styles.dropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
                 <ul>
                   {config.chains.map((chain, i) => (
@@ -72,7 +74,7 @@ export const ConnectWallet = () => {
                   ))}
                 </ul>
               </div>
-            )}
+            )} */}
           </div>
         </>
       )}

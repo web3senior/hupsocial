@@ -149,24 +149,6 @@ button {
   border: 1px solid red;
 }
 
-.page-title {
-  text-align: center;
-  font-weight: 600;
-  color: var(--black-900);
-  z-index: 1000;
-  position: fixed;
-  top: 0;
-  left: 50%;
-  height: 3.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: translateX(-50%);
-  user-select: none;
-  text-transform: capitalize;
-  font-size: var(--15-font-size);
-}
-
 .ms-motion-slideDownIn {
   /* Apply the animation */
   animation-name: slideDownIn;

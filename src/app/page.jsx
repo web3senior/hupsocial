@@ -26,6 +26,7 @@ import { marked } from 'marked'
 import styles from './page.module.scss'
 import Post from '@/components/Post'
 import DefaultNetwork from '@/components/DefaultNetwork'
+import PageTitle from '@/components/PageTitle'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -47,8 +48,6 @@ moment.defineLocale('en-short', {
 })
 
 export default function Page() {
-  const [showDefaultNetwork, setShowDefaultNetwork] = useState(true)
-
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
@@ -213,11 +212,9 @@ export default function Page() {
     }
   }, [totalPosts, postsLoaded, isLoadedPoll])
 
-  if (showDefaultNetwork && localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`)===null) return <DefaultNetwork setShowDefaultNetwork={setShowDefaultNetwork} />
-
   return (
     <>
-      <h3 className={`page-title`}>home</h3>
+        <PageTitle name={`Home`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           {posts.list.length < 1 && (

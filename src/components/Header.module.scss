@@ -30,12 +30,12 @@ a.logo {
   forced-color-adjust: auto;
 
   svg {
-    --r: 20px;
+    --r: 32px;
     width: auto !important;
     height: var(--r) !important;
   }
 
   &:hover {
-    transform: scale(1.04);
+    transform: scale(1.025);
   }
 }

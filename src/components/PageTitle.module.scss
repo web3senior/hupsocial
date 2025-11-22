@@ -1,12 +1,16 @@
 .pageTitle {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-
-  h1 {
-    font-size: calc(.8em + 0.2vw);
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--black);
-  }
+  color: var(--black-900);
+  position: fixed;
+  top: 0;
+  left: 50%;
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+  font-size: var(--14-font-size) !important;
+  font-weight: 600;
+  user-select: none;
+  text-transform: capitalize;
+  z-index: 1000;
 }
