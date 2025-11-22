@@ -174,72 +174,71 @@ export default function Page() {
   }, [showCommentModal]) // Added necessary dependencies  [isLoadedComment, commentsLoaded]
 
   return (
-    <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <h3 className={`page-title flex flex-column`}>
-        <span>post</span>
-      </h3>
+    <>
+      <h3 className={`page-title`}>post</h3>
+      <div className={`${styles.page} ms-motion-slideDownIn`}>
+        {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
 
-      {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
+        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+          {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
+          <div className={`${styles.grid} flex flex-column`}>
+            {post && (
+              <article className={`${styles.post} animate fade`}>
+                <Post item={post} showContent={true} chainId={params.chainId} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
+                <hr />
+              </article>
+            )}
+          </div>
 
-      <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
-        <div className={`${styles.grid} flex flex-column`}>
-          {post && (
-            <article className={`${styles.post} animate fade`}>
-              <Post item={post} showContent={true} chainId={params.chainId} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
-              <hr />
-            </article>
+          {comments &&
+            comments.list.length > 0 &&
+            comments.list.map((item, i) => {
+              return (
+                <div key={i}>
+                  <div className={`${styles.comment}`} onClick={() => router.push(`/comment/${item.commentId}`)}>
+                    <Profile creator={item.creator} createdAt={item.createdAt} />
+
+                    <div className={`${styles.comment__content}`}>
+                      <p>{item.content}</p>
+
+                      <div onClick={(e) => e.stopPropagation()} className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}>
+                        <LikeComment commentId={item.commentId} likeCount={item.likeCount} />
+
+                        <button onClick={() => setShowCommentModal({ data: item, parentId: item.commentId, type: `comment` })}>
+                          <CommentIcon />
+                          <span>{item.replyCount}</span>
+                        </button>
+
+                        <button>
+                          <ShareIcon />
+                          <span>0</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <hr />
+                </div>
+              )
+            })}
+
+          {mounted && isConnected && (
+            <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: post, type: `post` })}>
+              <ProfileImage addr={address} />
+              <p>
+                Reply
+                {/* to {post.creator.slice(0, 4)}…{post.creator.slice(38)} */}
+              </p>
+            </div>
           )}
         </div>
 
-        {comments &&
-          comments.list.length > 0 &&
-          comments.list.map((item, i) => {
-            return (
-              <div key={i}>
-                <div className={`${styles.comment}`} onClick={() => router.push(`/comment/${item.commentId}`)}>
-                  <Profile creator={item.creator} createdAt={item.createdAt} />
-
-                  <div className={`${styles.comment__content}`}>
-                    <p>{item.content}</p>
-
-                    <div onClick={(e) => e.stopPropagation()} className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}>
-                      <LikeComment commentId={item.commentId} likeCount={item.likeCount} />
-
-                      <button onClick={() => setShowCommentModal({ data: item, parentId: item.commentId, type: `comment` })}>
-                        <CommentIcon />
-                        <span>{item.replyCount}</span>
-                      </button>
-
-                      <button>
-                        <ShareIcon />
-                        <span>0</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <hr />
-              </div>
-            )
-          })}
-
-        {mounted && isConnected && (
-          <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: post, type: `post` })}>
-            <ProfileImage addr={address} />
-            <p>
-              Reply
-              {/* to {post.creator.slice(0, 4)}…{post.creator.slice(38)} */}
-            </p>
-          </div>
+        {commentsLoaded !== commentCount && (
+          <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(postCount)}>
+            Load More
+          </button>
         )}
       </div>
-
-      {commentsLoaded !== commentCount && (
-        <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(postCount)}>
-          Load More
-        </button>
-      )}
-    </div>
+    </>
   )
 }
 

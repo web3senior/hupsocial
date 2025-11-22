@@ -231,8 +231,10 @@ export default function Page() {
   }, [totalPosts, postsLoaded, isLoadedPoll])
 
   return (
+    <>
+     <h3 className={`page-title`}>home</h3>
     <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <h3 className={`page-title`}>home</h3>
+     
 
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
 
@@ -267,6 +269,8 @@ export default function Page() {
         </button>
       )}
     </div>
+    </>
+
   )
 }
 

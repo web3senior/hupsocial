@@ -47,6 +47,7 @@ export default function Post({ item, showContent, actions, chainId }) {
   const [posts, setPosts] = useState({ list: [] })
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
+  const [showShareModal, setShowShareModal] = useState()
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const params = useParams()
@@ -108,6 +109,7 @@ export default function Post({ item, showContent, actions, chainId }) {
     <>
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
+      {showShareModal && <ShareModal item={showShareModal} setShowShareModal={setShowShareModal} />}
 
       {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
 
@@ -136,12 +138,14 @@ export default function Post({ item, showContent, actions, chainId }) {
                 )}
               </>
             )}
+
             {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && (
               <button>
                 <RepostIcon />
                 <span>0</span>
               </button>
             )}
+
             {actions.find((action) => action.toLowerCase() === 'tip') !== undefined && (
               <button
                 onClick={() => {
@@ -152,14 +156,20 @@ export default function Post({ item, showContent, actions, chainId }) {
                 <span>{new Intl.NumberFormat().format(0)}</span>
               </button>
             )}
+
             {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
               <button>
                 <ViewIcon />
                 <span>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)}</span>
               </button>
             )}
+
             {actions.find((action) => action.toLowerCase() === 'share') !== undefined && (
-              <button>
+              <button
+                onClick={() => {
+                  isConnected ? setShowShareModal(item) : toast(`Please connect wallet`, `error`)
+                }}
+              >
                 <ShareIcon />
               </button>
             )}
@@ -274,7 +284,13 @@ const CommentModal = ({ item, setShowCommentModal }) => {
   }
 
   return (
-    <div className={`${styles.modal} animate fade`} onClick={() => setShowCommentModal()}>
+    <div
+      className={`${styles.modal} animate fade`}
+      onClick={(e) => {
+        e.stopPropagation()
+        setShowCommentModal()
+      }}
+    >
       <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
         <header className={`${styles.modal__container__header}`}>
           <div className={``} aria-label="Close" onClick={() => setShowCommentModal()}>
@@ -383,7 +399,13 @@ const TipModal = ({ item, setShowTipModal }) => {
   }
 
   return (
-    <div className={`${styles.modal} ${styles.modalTip} animate fade`} onClick={() => setShowTipModal()}>
+    <div
+      className={`${styles.modal} ${styles.modalTip} animate fade`}
+      onClick={(e) => {
+        e.stopPropagation()
+        setShowTipModal()
+      }}
+    >
       <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
         <header>
           <div className={``} aria-label="Close" onClick={() => setShowTipModal()}>
@@ -437,6 +459,63 @@ const TipModal = ({ item, setShowTipModal }) => {
             Send
           </button>
         </footer>
+      </div>
+    </div>
+  )
+}
+
+const ShareModal = ({ item, setShowShareModal }) => {
+  const [hasLiked, setHasLiked] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+
+  // --- Dynamic Content ---
+  const postUrl = window.location.href
+  const postTitle = item.content
+  const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
+  const postContent = `${postTitle}\n\n`
+  // --- Constructing the Share Link ---
+  const shareLink = `https://twitter.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
+
+  useEffect(() => {
+
+  }, [item])
+
+  // if (loading) {
+  //   return <InlineLoading />
+  // }
+
+  if (error) {
+    return <span>{error}</span>
+  }
+
+  return (
+    <div
+      className={`${styles.modal} ${styles.shareModal} animate fade`}
+      onClick={(e) => {
+        e.stopPropagation()
+        setShowShareModal()
+      }}
+    >
+      <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
+        <header>
+          <div className={``} aria-label="Close" onClick={() => setShowShareModal()}>
+            Cancel
+          </div>
+          <div className={`flex-1`}>
+            <h3>Share post</h3>
+          </div>
+      
+        </header>
+
+        <main className={`flex flex-column align-items-start justify-content-between gap-050`}>
+          <a href={`${shareLink}`} target={`_blank`} className="">
+            Share on 𝕏
+          </a>
+        </main>
+
+        <footer className={``}></footer>
       </div>
     </div>
   )

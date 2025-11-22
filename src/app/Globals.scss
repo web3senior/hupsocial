@@ -173,6 +173,31 @@ button {
   font-size: var(--15-font-size);
 }
 
+.ms-motion-slideDownIn {
+  /* Apply the animation */
+  animation-name: slideDownIn;
+
+  /* Set duration (e.g., 0.5 seconds) */
+  animation-duration: 0.5s;
+
+  /* Set easing function */
+  animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1);
+
+  /* Ensure element stays in the final state after animation */
+  animation-fill-mode: forwards;
+}
+@keyframes slideDownIn {
+  0% {
+    opacity: 0;
+    /* Move element up by, say, 10px (you can adjust this value) */
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    /* Move it to its final resting position */
+    transform: translateY(0);
+  }
+}
 .relative {
   position: relative;
 }

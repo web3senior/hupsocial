@@ -110,86 +110,87 @@ export default function Page() {
   }, [])
 
   return (
-    <div className={`${styles.page} ms-motion-slideDownIn`}>
+    <>
       <h3 className={`page-title`}>profile</h3>
+      <div className={`${styles.page} ms-motion-slideDownIn`}>
+        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+          <div className={`${styles.profileWrapper}`}>
+            <Profile addr={params.wallet} />
+          </div>
 
-      <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        <div className={`${styles.profileWrapper}`}>
-          <Profile addr={params.wallet} />
-        </div>
+          <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
+            <li>
+              <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
+                Posts <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
+              </button>
+            </li>
+            <li>
+              <button className={activeTab === 'activity' ? styles.activeTab : ''} onClick={() => setActiveTab('activity')}>
+                Activity
+              </button>
+            </li>
+            <li>
+              <button className={activeTab === 'reposts' ? styles.activeTab : ''} onClick={() => setActiveTab('reposts')}>
+                Reposts
+              </button>
+            </li>
+            <li>
+              <button className={activeTab === 'links' ? styles.activeTab : ''} onClick={() => setActiveTab('links')}>
+                Links
+              </button>
+            </li>
+            <li>
+              <button className={activeTab === 'settings' ? styles.activeTab : ''} onClick={() => setActiveTab('settings')}>
+                Settings
+              </button>
+            </li>
+          </ul>
 
-        <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
-          <li>
-            <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
-              Posts <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
-            </button>
-          </li>
-          <li>
-            <button className={activeTab === 'activity' ? styles.activeTab : ''} onClick={() => setActiveTab('activity')}>
-              Activity
-            </button>
-          </li>
-          <li>
-            <button className={activeTab === 'reposts' ? styles.activeTab : ''} onClick={() => setActiveTab('reposts')}>
-              Reposts
-            </button>
-          </li>
-          <li>
-            <button className={activeTab === 'links' ? styles.activeTab : ''} onClick={() => setActiveTab('links')}>
-              Links
-            </button>
-          </li>
-          <li>
-            <button className={activeTab === 'settings' ? styles.activeTab : ''} onClick={() => setActiveTab('settings')}>
-              Settings
-            </button>
-          </li>
-        </ul>
+          {activeTab === 'posts' && (
+            <div className={`${styles.tabContent} ${styles.postTab} relative`}>
+              <PostForm addr={params.wallet} />
 
-        {activeTab === 'posts' && (
-          <div className={`${styles.tabContent} ${styles.postTab} relative`}>
-            <PostForm addr={params.wallet} />
-
-            <div className={`${styles.grid} flex flex-column`}>
-              {posts &&
-                posts.list.length > 0 &&
-                posts.list.map((item, i) => {
-                  return (
-                    <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`/${activeChain[0].id}/p/${item.postId}`)}>
-                      <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
-                      {i < posts.list.length - 1 && <hr />}
-                    </section>
-                  )
-                })}
+              <div className={`${styles.grid} flex flex-column`}>
+                {posts &&
+                  posts.list.length > 0 &&
+                  posts.list.map((item, i) => {
+                    return (
+                      <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`/${activeChain[0].id}/p/${item.postId}`)}>
+                        <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
+                        {i < posts.list.length - 1 && <hr />}
+                      </section>
+                    )
+                  })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'activity' && (
-          <div className={`${styles.tabContent} ${styles.activity} relative`}>
-            <NoData name={`activity`} />
-          </div>
-        )}
+          {activeTab === 'activity' && (
+            <div className={`${styles.tabContent} ${styles.activity} relative`}>
+              <NoData name={`activity`} />
+            </div>
+          )}
 
-        {activeTab === 'reposts' && (
-          <div className={`${styles.tabContent} ${styles.reposts} relative`}>
-            <NoData name={`reposts`} />
-          </div>
-        )}
+          {activeTab === 'reposts' && (
+            <div className={`${styles.tabContent} ${styles.reposts} relative`}>
+              <NoData name={`reposts`} />
+            </div>
+          )}
 
-        {activeTab === 'links' && (
-          <div className={`${styles.tabContent} ${styles.links} relative`}>
-            <Links />
-          </div>
-        )}
+          {activeTab === 'links' && (
+            <div className={`${styles.tabContent} ${styles.links} relative`}>
+              <Links />
+            </div>
+          )}
 
-        {activeTab === 'settings' && (
-          <div className={`${styles.tabContent} ${styles.settings} relative`}>
-            <Settings />
-          </div>
-        )}
+          {activeTab === 'settings' && (
+            <div className={`${styles.tabContent} ${styles.settings} relative`}>
+              <Settings />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -522,21 +523,19 @@ function PushNotificationManager() {
   const [subscription, setSubscription] = useState(null)
   const [message, setMessage] = useState('')
   const { address, isConnected } = useAccount()
-  
+
   function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64 = (base64String + padding)
-    .replace(/\\-/g, '+')
-    .replace(/_/g, '/')
- 
-  const rawData = window.atob(base64)
-  const outputArray = new Uint8Array(rawData.length)
- 
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i)
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+    const base64 = (base64String + padding).replace(/\\-/g, '+').replace(/_/g, '/')
+
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray
   }
-  return outputArray
-}
 
   async function registerServiceWorker() {
     const registration = await navigator.serviceWorker.register('/sw.js', {

@@ -735,6 +735,7 @@
   z-index: 2000;
   user-select: none;
   isolation: isolate;
+  max-height: 100svh;
 
   &__container {
     column-gap: 0.5rem;
@@ -919,11 +920,9 @@
     }
 
     input {
-
     }
 
     select {
-      
     }
 
     select,
@@ -1087,23 +1086,22 @@ button.btnPostMenu {
 
 .post {
   -webkit-tap-highlight-color: transparent;
- 
-    position: relative;
-    background-color: var(--white, #fff);
-    transition: background-color 0.1s ease-out;
-    isolation: isolate;
-    cursor: pointer;
-    padding: 1.7rem 1.7rem 0 1.7rem;
-    place-items: stretch;
 
-    @media (max-width: 600px) {
-      padding: 0.7rem 0.7rem;
-    }
+  position: relative;
+  background-color: var(--white, #fff);
+  transition: background-color 0.1s ease-out;
+  isolation: isolate;
+  cursor: pointer;
+  padding: 1.7rem 1.7rem 0 1.7rem;
+  place-items: stretch;
 
-    &:hover {
-      background-color: var(--gray-50);
-    }
+  @media (max-width: 600px) {
+    padding: 0.7rem 0.7rem;
+  }
 
+  &:hover {
+    background-color: var(--gray-50);
+  }
 
   &__header {
     user-select: none;
@@ -1354,6 +1352,30 @@ button.btnPostMenu {
           opacity: 1;
         }
         cursor: pointer;
+      }
+    }
+  }
+}
+
+.shareModal {
+  main {
+    a {
+      width: 100%;
+      padding: 0.5rem 0.7rem;
+      background-color: var(--color-primary);
+      color: var(--white, #fff);
+      will-change: transform;
+      border-radius: 1000px;
+      text-align: center;
+
+      &:hover {
+        transform: scale(1.025);
+        transition: all 0.3s ease-in-out;
+      }
+
+      &:active {
+        transform: scale(0.95);
+        transition: all 0.3s ease;
       }
     }
   }
