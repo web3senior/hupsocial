@@ -468,10 +468,10 @@ const ShareModal = ({ item, setShowShareModal }) => {
   const [hasLiked, setHasLiked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
+  const activeChain = getActiveChain()
 
   // --- Dynamic Content ---
-  const postUrl = window.location.href
+  const postUrl = `${location.protocol}//${window.location.host}/${activeChain[0].id}/p/${item.postId}`
   const postTitle = item.content
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const postContent = `${postTitle}\n\n Creator: ${item.creator} \n\n`
