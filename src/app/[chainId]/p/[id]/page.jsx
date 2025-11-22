@@ -34,8 +34,9 @@ import Shimmer from '@/helper/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile, { ProfileImage } from '../../../../components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon } from '@/components/Icons'
-import styles from './page.module.scss'
 import Post from '@/components/Post'
+import PageTitle from '@/components/PageTitle'
+import styles from './page.module.scss'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -175,7 +176,7 @@ export default function Page() {
 
   return (
     <>
-      <h3 className={`page-title`}>post</h3>
+      <PageTitle name={`post`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
 

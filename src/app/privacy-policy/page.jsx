@@ -1,10 +1,10 @@
-import { WalletOptions } from '@/components/ConnectWallet'
+import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 
 export default function Page() {
   return (
     <>
-      <h3 className={`page-title`}>Privacy policy</h3>
+    <PageTitle name={`privacy policy`}/>
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`}
          data-width={`medium`}>

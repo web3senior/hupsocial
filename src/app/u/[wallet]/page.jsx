@@ -22,6 +22,7 @@ import { useConnectorClient, useConnections, useClient, networks, useWaitForTran
 import moment from 'moment'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
 import { InlineLoading } from '@/components/Loading'
+import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 
 export default function Page() {
@@ -111,7 +112,7 @@ export default function Page() {
 
   return (
     <>
-      <h3 className={`page-title`}>profile</h3>
+      <PageTitle name={`profile`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`${styles.profileWrapper}`}>
@@ -184,7 +185,7 @@ export default function Page() {
           )}
 
           {activeTab === 'settings' && (
-            <div className={`${styles.tabContent} ${styles.settings} relative`} style={{display: `none`}}>
+            <div className={`${styles.tabContent} ${styles.settings} relative`} style={{ display: `none` }}>
               <Settings />
             </div>
           )}
