@@ -6,13 +6,13 @@ export default function Page() {
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <h3 className={`page-title`}>Privacy policy</h3>
 
-      <div className={`__container ${styles.page__container} flex flex-column align-items-start justify-content-start`} data-width={`medium`} style={{ padding: `1rem` }}>
+      <div className={`__container ${styles.page__container}`} data-width={`medium`} style={{ padding: `1rem` }}>
         <h1>
           <strong>Hup social Privacy Policy</strong>
         </h1>
 
         <p>
-          <strong>Effective Date: [Date]</strong>
+          <strong>Effective Date: 11/22/2025</strong>
         </p>
 
         <h2>
@@ -56,7 +56,6 @@ export default function Page() {
 
         <p>&nbsp;</p>
 
-        <hr />
         <h2>
           <strong>1. How Hup Stores Your Data</strong>
         </h2>
@@ -453,9 +452,16 @@ export default function Page() {
         <p>Questions about privacy on Hup? Reach out via:</p>
 
         <ul>
-          <li>[Discord/Telegram link]</li>
-          <li>[Documentation site]</li>
-          <li>[GitHub repository]</li>
+          <li>
+            <b>
+              Discord: <a href="http://discord.gg/dWBT7UuvEM">discord.gg/dWBT7UuvEM</a>
+            </b>
+          </li>
+          <li>
+            <b>
+              GitHub: <a href="https://github.com/web3senior/hupsocial">github.com/web3senior/hupsocial</a>
+            </b>
+          </li>
         </ul>
 
         <p>&nbsp;</p>
