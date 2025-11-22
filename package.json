@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ngrok": "ngrok http 3000"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.7",
