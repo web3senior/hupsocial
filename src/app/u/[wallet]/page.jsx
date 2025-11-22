@@ -185,7 +185,7 @@ export default function Page() {
 
         {activeTab === 'settings' && (
           <div className={`${styles.tabContent} ${styles.settings} relative`}>
-           <NoData name={`Settings`}/>
+            <Settings />
           </div>
         )}
       </div>
