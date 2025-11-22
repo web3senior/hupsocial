@@ -474,7 +474,7 @@ const ShareModal = ({ item, setShowShareModal }) => {
   const postUrl = window.location.href
   const postTitle = item.content
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
-  const postContent = `${postTitle}\n\n`
+  const postContent = `${postTitle}\n\n Creator: ${item.creator} \n\n`
   // --- Constructing the Share Link ---
   const shareLink = `https://twitter.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
 
