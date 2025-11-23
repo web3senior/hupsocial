@@ -43,23 +43,6 @@ moment.defineLocale('en-short', {
   },
 })
 
-export default function Post({ item, showContent, actions, chainId }) {
-  const [posts, setPosts] = useState({ list: [] })
-  const [showCommentModal, setShowCommentModal] = useState()
-  const [showTipModal, setShowTipModal] = useState()
-  const [showShareModal, setShowShareModal] = useState()
-  const { web3, contract } = initPostContract()
-  const mounted = useClientMounted()
-  const params = useParams()
-  const activeChain = getActiveChain()
-  const { address, isConnected } = useAccount()
-  const router = useRouter()
-  const [viewCount, setViewCount] = useState(0)
-  const { data: hash, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  })
-
   /**
    * Converts Markdown to sanitized HTML with links set to open in a new tab.
    * @param {string} markdown - The markdown content to process.
@@ -97,6 +80,25 @@ export default function Post({ item, showContent, actions, chainId }) {
     return cleanHtml
   }
 
+
+export default function Post({ item, showContent, actions, chainId }) {
+  const [posts, setPosts] = useState({ list: [] })
+  const [showCommentModal, setShowCommentModal] = useState()
+  const [showTipModal, setShowTipModal] = useState()
+  const [showShareModal, setShowShareModal] = useState()
+  const { web3, contract } = initPostContract()
+  const mounted = useClientMounted()
+  const params = useParams()
+  const activeChain = getActiveChain()
+  const { address, isConnected } = useAccount()
+  const router = useRouter()
+  const [viewCount, setViewCount] = useState(0)
+  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
+
+
   useEffect(() => {
     if (chainId !== undefined) {
       getViewPost(chainId, item.postId).then((result) => {
@@ -119,7 +121,9 @@ export default function Post({ item, showContent, actions, chainId }) {
           <Nav item={item} />
         </header>
         <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-          <div className={`${styles.post__content} `} id={`post${item.postId}`} style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
+          <div className={`${styles.post__content} `} id={`post${item.postId}`} 
+          style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }}
+           dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
 
           <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />}
@@ -312,13 +316,9 @@ const CommentModal = ({ item, setShowCommentModal }) => {
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
-                <div
-                  className={`${styles.post__content} `}
-                  // onClick={(e) => e.stopPropagation()}
-                  id={`post${item.postId}`}
-                >
-                  {item.content}
-                </div>
+                <div className={`${styles.post__content} `} id={`post${item.postId}`} 
+          style={{ maxHeight:'fit-content'}}
+           dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
               </main>
             </section>
           </article>
@@ -806,24 +806,24 @@ const ConnectedProfile = ({ addr }) => {
   const [isItUp, setIsItUp] = useState()
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
-      console.log(res)
+      // console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setIsItUp(true)
         setProfile({
-          wallet: res.data.Profile[0].id,
+          wallet: res.data.id,
           name: res.data.Profile[0].name,
-          description: res.data.Profile[0].description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          description: res.data.description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
-          tags: JSON.stringify(res.data.Profile[0].tags),
-          links: JSON.stringify(res.data.Profile[0].links_),
+          tags: JSON.stringify(res.data.tags),
+          links: JSON.stringify(res.data.links_),
           lastUpdate: '',
         })
       } else {
         getProfile(addr).then((res) => {
-          console.log(res)
+          //  console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }

@@ -1,9 +1,8 @@
 'use client'
 
-import Image from 'next/image'
-import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense, useRef, useTransition } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Icon from '@/helper/MaterialIcon'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { useAuth } from '@/contexts/AuthContext'
@@ -16,9 +15,8 @@ import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import Post from '@/components/Post'
-import { useFormStatus } from 'react-dom'
 import { getActiveChain } from '@/util/communication'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
+import { useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import moment from 'moment'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
 import { InlineLoading } from '@/components/Loading'
@@ -1052,7 +1050,7 @@ const PostForm = ({ addr }) => {
   const [whitelist, setWhitelist] = useState({ list: [] })
   const [filteredProfiles, setFilteredProfiles] = useState()
   const [options, setOptions] = useState({ list: [``, ``] })
-  const [activeChain, setActiveChain] = useState(getActiveChain())
+  const activeChain = getActiveChain()
   const mounted = useClientMounted()
   const createFormRef = useRef()
   const whitelistInputRef = useRef()
@@ -1338,6 +1336,7 @@ const PostForm = ({ addr }) => {
     // 3. Concatenate the three parts: first part + new string + second part
     return firstPart + stringToInsert + secondPart
   }
+
   const makeBold = () => {
     const { start, end, selectedText, value, textarea } = getSelectedText()
     if (selectedText === '') return
@@ -1365,32 +1364,32 @@ const PostForm = ({ addr }) => {
       localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, '')
       toast(`Post sent.`, `success`)
     }
+
     getUniversalProfile(addr).then((res) => {
-      console.log(res)
+      // console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        // setIsItUp(true)
+        //setIsItUp(true)
         setProfile({
           wallet: res.data.id,
           name: res.data.Profile[0].name,
           description: res.data.description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
           lastUpdate: '',
         })
       } else {
-        getProfile(addr).then((res) => {
-          console.log(res)
+        getProfile(creator).then((res) => {
+          //  console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
         })
       }
     })
-
     setPostContent(localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`))
   }, [isConfirmed])
 
