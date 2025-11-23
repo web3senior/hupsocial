@@ -58,11 +58,11 @@ export const ConnectWallet = () => {
       {activeChain[0] && (
         <>
           <div className={`${styles.networks}`}>
-            <button onClick={(e) => setShowNetworks(!showNetworks)} title={`${activeChain[0].name}`}>
+            <button className={`${styles.btnNetwork}`} onClick={(e) => setShowNetworks(!showNetworks)} title={`${activeChain[0].name}`}>
               <span className={`rounded`} dangerouslySetInnerHTML={{ __html: activeChain[0].icon }} />
             </button>
 
-{showNetworks && <DefaultNetwork setShowNetworks={setShowNetworks}/>}
+            {showNetworks && <DefaultNetwork currentNetwork={activeChain[0].id} setShowNetworks={setShowNetworks} />}
             {/* {showNetworks && (
               <div className={`${styles.dropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
                 <ul>

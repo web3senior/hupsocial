@@ -214,7 +214,7 @@ export default function Page() {
 
   return (
     <>
-        <PageTitle name={`Home`} />
+      <PageTitle name={`Home`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           {posts.list.length < 1 && (
@@ -232,7 +232,14 @@ export default function Page() {
               posts.list.length > 0 &&
               posts.list.map((item, i) => {
                 return (
-                  <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`${activeChain[0].id}/p/${item.postId}`)}>
+                  <section
+                    key={i}
+                    className={`${styles.post} animate fade`}
+                    onClick={() => {
+                      navigator.vibrate(200)
+                      router.push(`${activeChain[0].id}/p/${item.postId}`)
+                    }}
+                  >
                     <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
                     {i < posts.list.length - 1 && <hr />}
                   </section>

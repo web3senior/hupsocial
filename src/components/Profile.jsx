@@ -99,7 +99,7 @@ export default function Profile({ creator, createdAt }) {
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
           <b>{profile.name ?? defaultUsername}</b>
-          <img alt={`blue checkmark icon`} src={blueCheckMarkIcon.src} />
+          <img alt={`checkmark icon`} src={blueCheckMarkIcon.src} />
           <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} 
           dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
           <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>

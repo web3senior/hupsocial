@@ -147,7 +147,6 @@ export default function Page() {
   }
 
   useEffect(() => {
-    console.log(params.chainId, params.id)
     // View
     addViewPost(params.chainId, params.id).then((result) => {
       setViewCount(result)
@@ -170,8 +169,6 @@ export default function Page() {
     })
 
     setChains(config.chains)
-
-    navigator.vibrate(200)
   }, [showCommentModal]) // Added necessary dependencies  [isLoadedComment, commentsLoaded]
 
   return (

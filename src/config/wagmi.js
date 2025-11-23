@@ -25,12 +25,17 @@ export const CONTRACTS = {
     comment: '0x927826f56603aD465504fe2Adb516EDCD16911ED',
     status: '0x9aE36e2aF99c918e679c2A92f216EdA3b2d895dA',
   },
+  chain84532: {
+    post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
+    comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
+    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+  },
 }
 
 // Expand the properties
 
 // LUKSO
-luksoTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10950_4143)"><mask id="mask0_10950_4143" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18"><path d="M18 0H0V18H18V0Z" fill="white"/></mask><g mask="url(#mask0_10950_4143)"><path d="M0 0H18V18H0V0Z" fill="#F0F3FA"/><path d="M9.59219 3.26602L13.408 5.2667C14.08 5.62682 14.5 6.27704 14.5 6.98729V10.9986C14.5 11.7089 14.08 12.3691 13.408 12.7293L9.59219 14.7299C8.9202 15.09 8.08023 15.09 7.40826 14.7299L3.59237 12.7293C3.25034 12.5407 2.97094 12.2832 2.78006 11.9807C2.58917 11.6782 2.49298 11.3404 2.5004 10.9986V6.99729C2.5004 6.27704 2.92039 5.62682 3.59237 5.2667L7.40826 3.26602C7.73434 3.0923 8.11323 3 8.50022 3C8.8872 3 9.2661 3.0923 9.59219 3.26602ZM9.95214 10.6885L10.8161 9.30808C10.9361 9.10801 10.9361 8.87794 10.8161 8.68787L9.94014 7.3074C9.88746 7.21668 9.80586 7.13978 9.70422 7.0851C9.6027 7.0304 9.48506 7.00003 9.36419 6.99729H7.63624C7.39626 6.99729 7.16825 7.11733 7.06027 7.29739L6.18429 8.69787C6.06429 8.87794 6.06429 9.11801 6.18429 9.29807L7.06027 10.6985C7.18025 10.8786 7.39626 10.9986 7.63624 10.9986H9.36419C9.60419 10.9986 9.83214 10.8786 9.94014 10.6985L9.95214 10.6885Z" fill="#FE005B"/></g></g><defs><clipPath id="clip0_10950_4143"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+luksoTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10950_4143)"><mask id="mask0_10950_4143" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18"><path d="M18 0H0V18H18V0Z" fill="white"/></mask><g mask="url(#mask0_10950_4143)"><path d="M0 0H18V18H0V0Z" fill="#F0F3FA"/><path d="M10.0922 3.26602L13.908 5.2667C14.58 5.62682 15 6.27704 15 6.98729V10.9986C15 11.7089 14.58 12.3691 13.908 12.7293L10.0922 14.7299C9.4202 15.09 8.58023 15.09 7.90826 14.7299L4.09237 12.7293C3.75034 12.5407 3.47094 12.2832 3.28006 11.9807C3.08917 11.6782 2.99298 11.3404 3.0004 10.9986V6.99729C3.0004 6.27704 3.42039 5.62682 4.09237 5.2667L7.90826 3.26602C8.23434 3.0923 8.61323 3 9.00022 3C9.3872 3 9.7661 3.0923 10.0922 3.26602ZM10.4521 10.6885L11.3161 9.30808C11.4361 9.10802 11.4361 8.87794 11.3161 8.68787L10.4401 7.3074C10.3875 7.21668 10.3059 7.13978 10.2042 7.0851C10.1027 7.0304 9.98506 7.00003 9.86419 6.99729H8.13624C7.89626 6.99729 7.66825 7.11733 7.56027 7.29739L6.68429 8.69787C6.56429 8.87794 6.56429 9.11801 6.68429 9.29807L7.56027 10.6985C7.68025 10.8786 7.89626 10.9986 8.13624 10.9986H9.86419C10.1042 10.9986 10.3321 10.8786 10.4401 10.6985L10.4521 10.6885Z" fill="#FE005B"/></g></g><defs><clipPath id="clip0_10950_4143"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
 luksoTestnet.faucetUrl = `https://faucet.testnet.lukso.network/`
 luksoTestnet.primaryColor = `#FD1669`
 celoSepolia.textColor = `#fff`
@@ -58,16 +63,18 @@ monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"
 opBNBTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10769_2638)"> <path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10769_2638)"/> <path d="M5.93 4.84L9 3L12.07 4.84L10.94 5.52L9 4.36L7.06 5.52L5.93 4.84ZM12.07 7.16L10.94 6.48L9 7.64L7.06 6.48L5.93 7.16V8.5L7.87 9.66V12L9 12.68L10.13 12V9.67L12.07 8.51V7.16ZM12.07 10.83V9.47L10.94 10.15V11.51L12.07 10.83ZM12.87 11.31L10.93 12.47V13.83L14 11.99V8.32L12.87 8.99V11.31ZM11.74 6L12.87 6.68V8.03L14 7.36V6L12.87 5.32L11.74 6ZM7.87 12.96V14.32L9 15L10.13 14.32V12.96L9 13.64L7.87 12.96ZM5.93 10.83L7.06 11.51V10.15L5.93 9.47V10.83ZM7.87 6L9 6.68L10.13 6L9 5.32L7.87 6ZM5.13 6.68L6.26 6L5.13 5.32L4 6V7.36L5.13 8.03V6.68ZM5.13 8.99L4 8.32V11.99L7.07 13.83V12.47L5.13 11.31V9V8.99Z" fill="#F0B90B"/> </g> <defs> <linearGradient id="paint0_linear_10769_2638" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"> <stop stop-color="#1A1E21"/> <stop offset="1" stop-color="#06060A"/> </linearGradient> <clipPath id="clip0_10769_2638"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
 
 export const config = createConfig({
-  chains: [luksoTestnet, celoSepolia, monadTestnet, lineaSepolia], //arbitrumSepolia,  baseSepoliaPreconf, lineaSepolia, somniaTestnet, opBNBTestnet
+  chains: [baseSepoliaPreconf, luksoTestnet, celoSepolia, monadTestnet, lineaSepolia], //arbitrumSepolia,  , lineaSepolia, somniaTestnet, opBNBTestnet
   connectors: [walletConnect({ projectId }), metaMask()], //, safe() //injected(),
   transports: {
     [luksoTestnet.id]: http(),
     [celoSepolia.id]: http(),
     [monadTestnet.id]: http(),
     [lineaSepolia.id]: http(),
+    [baseSepoliaPreconf.id]: http(),
     // [arbitrumSepolia.id]: http(),
-    // [baseSepoliaPreconf.id]: http(),
     // [somniaTestnet.id]: http(),
     // [opBNBTestnet.id]: http(),
   },
 })
+
+// console.log(config)
