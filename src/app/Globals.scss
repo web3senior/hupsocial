@@ -8,7 +8,6 @@
   }
 }
 
-
 // Scrollbar
 ::-webkit-scrollbar {
   width: 8px;
@@ -28,6 +27,7 @@
   border-radius: 100vh;
 }
 
+// Dark theme
 @media (prefers-color-scheme: dark) {
   :root {
     // --background: #0a0a0a;
@@ -39,6 +39,7 @@
 details {
   cursor: pointer;
 }
+
 details::details-content {
   opacity: 0;
   transition: opacity 400ms, content-visibility 400ms allow-discrete;
@@ -47,6 +48,7 @@ details::details-content {
 details[open]::details-content {
   opacity: 1;
 }
+
 // details {
 //   border-radius: var(--global-border-radius);
 //   color: var(--black);

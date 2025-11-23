@@ -182,6 +182,7 @@ export default function Post({ item, showContent, actions, chainId }) {
 
 const Nav = ({ item }) => {
   const [showPostDropdown, setShowPostDropdown] = useState()
+  const activeChain = getActiveChain()
 
   return (
     <div className={`relative`}>
@@ -199,7 +200,7 @@ const Nav = ({ item }) => {
         <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
           <ul>
             <li>
-              <Link href={`p/${item.postId}`}>View post</Link>
+              <Link href={`${activeChain[0].id}p/${item.postId}`}>View post</Link>
             </li>
           </ul>
         </div>
@@ -478,9 +479,7 @@ const ShareModal = ({ item, setShowShareModal }) => {
   // --- Constructing the Share Link ---
   const shareLink = `https://twitter.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
 
-  useEffect(() => {
-
-  }, [item])
+  useEffect(() => {}, [item])
 
   // if (loading) {
   //   return <InlineLoading />
@@ -506,7 +505,6 @@ const ShareModal = ({ item, setShowShareModal }) => {
           <div className={`flex-1`}>
             <h3>Share post</h3>
           </div>
-      
         </header>
 
         <main className={`flex flex-column align-items-start justify-content-between gap-050`}>
