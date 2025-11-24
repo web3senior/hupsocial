@@ -1,8 +1,5 @@
 dialog {
   --shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-  //opacity: 0;
-  transform: scale(1);
-  transition: opacity 0.3s ease-out, transform 0.3s ease-out, overlay 0.3s ease-out allow-discrete, display 0.3s ease-out allow-discrete;
   border-radius: var(--global-border-radius);
   border-color: rgb(0 0 0 / 0.5);
   padding: 1.5rem;
@@ -19,15 +16,15 @@ dialog {
   //   transform: scale(1);
 
   //   &::backdrop {
-  //     background-color: rgb(255 255 255 / 60%);
-  //     backdrop-filter: blur(2px);
+  //    
   //   }
   // }
 
-  // &::backdrop {
-  //   background-color: transparent;
-  //   transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
-  // }
+  &::backdrop {
+ background-color: rgb(255 255 255 / 60%);
+backdrop-filter: blur(2px);
+    transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
+  }
 
   button {
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, box-shadow 0.1s ease-in-out;
@@ -50,34 +47,20 @@ dialog {
     }
   }
 }
-dialog:open {
-  /* This animation will override the opacity and transform */
-  animation: dialog-open 0.3s ease-out forwards;
-}
-/* 3. Define the opening keyframes */
-@keyframes dialog-open {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
+
 // Dialog or modal
 // :modal {
 // }
 
-// @starting-style {
-//   dialog:open {
-//     opacity: 0;
-//     transform: scale(0.9);
-//   }
-// }
+@starting-style {
+  dialog:open {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
 
-// @starting-style {
-//   dialog:open::backdrop {
-//     background-color: transparent;
-//   }
-// }
+@starting-style {
+  dialog:open::backdrop {
+    background-color: transparent;
+  }
+}
