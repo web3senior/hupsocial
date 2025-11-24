@@ -1,13 +1,8 @@
 dialog {
   --shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-  /* * FIX: These lines must be UNCOMMENTED.
-   * They define the closed state (STARTING POINT for the transition).
-   */
-  opacity: 0;
-  transform: scale(0.9);
-
+  //opacity: 0;
+  transform: scale(1);
   transition: opacity 0.3s ease-out, transform 0.3s ease-out, overlay 0.3s ease-out allow-discrete, display 0.3s ease-out allow-discrete;
-  
   border-radius: var(--global-border-radius);
   border-color: rgb(0 0 0 / 0.5);
   padding: 1.5rem;
@@ -17,26 +12,23 @@ dialog {
   box-shadow: var(--shadow);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
-  /* The line below is redundant and should be removed if the one above is active */
-  /* transform: scale(0.9); */ 
+  transform: scale(0.9);
 
-  /* * FIX: These lines must also be UNCOMMENTED.
-   * They define the open state (ENDING POINT for the transition).
-   */
-  &::backdrop {
-    background-color: transparent;
-    transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
-  }
+  // &:open {
+  //   opacity: 1;
+  //   transform: scale(1);
 
-  &:open {
-    opacity: 1;
-    transform: scale(1);
+  //   &::backdrop {
+  //     background-color: rgb(255 255 255 / 60%);
+  //     backdrop-filter: blur(2px);
+  //   }
+  // }
 
-    &::backdrop {
-      background-color: rgb(255 255 255 / 60%);
-      backdrop-filter: blur(2px);
-    }
-  }
+  // &::backdrop {
+  //   background-color: transparent;
+  //   transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
+  // }
+
   button {
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, box-shadow 0.1s ease-in-out;
     background-color: transparent;
@@ -58,60 +50,21 @@ dialog {
     }
   }
 }
-
-// dialog {
-//   --shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-//   //opacity: 0;
-//   transform: scale(1);
-//   transition: opacity 0.3s ease-out, transform 0.3s ease-out, overlay 0.3s ease-out allow-discrete, display 0.3s ease-out allow-discrete;
-//   border-radius: var(--global-border-radius);
-//   border-color: rgb(0 0 0 / 0.5);
-//   padding: 1.5rem;
-//   outline: none;
-//   margin: auto;
-//   background-color: var(--white, #fff);
-//   box-shadow: var(--shadow);
-//   border: 1px solid var(--global-border-color);
-//   border-radius: var(--global-border-radius);
-//   transform: scale(0.9);
-
-//   // &:open {
-//   //   opacity: 1;
-//   //   transform: scale(1);
-
-//   //   &::backdrop {
-//   //     background-color: rgb(255 255 255 / 60%);
-//   //     backdrop-filter: blur(2px);
-//   //   }
-//   // }
-
-//   // &::backdrop {
-//   //   background-color: transparent;
-//   //   transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
-//   // }
-
-//   button {
-//     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, box-shadow 0.1s ease-in-out;
-//     background-color: transparent;
-//     border: none;
-//     border-radius: 1000px;
-
-//     &:hover {
-//       background-color: var(--gray-100);
-//     }
-
-//     &:active {
-//       transform: scale(0.95);
-//     }
-
-//     &[action='close'] {
-//       position: fixed;
-//       right: 1rem;
-//       top: 1rem;
-//     }
-//   }
-// }
-
+dialog:open {
+  /* This animation will override the opacity and transform */
+  animation: dialog-open 0.3s ease-out forwards;
+}
+/* 3. Define the opening keyframes */
+@keyframes dialog-open {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 // Dialog or modal
 // :modal {
 // }
