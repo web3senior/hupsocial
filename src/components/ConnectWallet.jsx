@@ -59,6 +59,7 @@ export const ConnectWallet = () => {
         <>
           <div className={`${styles.networks}`}>
             <button className={`${styles.btnNetwork}`} onClick={(e) => {
+              document.querySelector(`#networkDialog`).classList.add(`is-open`)
               document.querySelector(`#networkDialog`).showModal()
             }} title={`${activeChain[0].name}`}>
               <span className={`rounded`} dangerouslySetInnerHTML={{ __html: activeChain[0].icon }} />
