@@ -186,7 +186,7 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
         {
           onSuccess: () => {
             localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
-            window.location.reload()
+            window.location.href = `/`
           },
           onError: (error) => {
             console.error('Switch chain failed:', error)
@@ -195,6 +195,7 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
       )
     } else {
       localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
+      window.location.href = `/`
     }
   }
 
