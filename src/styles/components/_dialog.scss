@@ -1,6 +1,6 @@
 dialog {
   --shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-  opacity: 0;
+  //opacity: 0;
   transform: scale(1);
   transition: opacity 0.3s ease-out, transform 0.3s ease-out, overlay 0.3s ease-out allow-discrete, display 0.3s ease-out allow-discrete;
   border-radius: var(--global-border-radius);
@@ -14,20 +14,20 @@ dialog {
   border-radius: var(--global-border-radius);
   transform: scale(0.9);
 
-  &:open {
-    opacity: 1;
-    transform: scale(1);
+  // &:open {
+  //   opacity: 1;
+  //   transform: scale(1);
 
-    &::backdrop {
-      background-color: rgb(255 255 255 / 60%);
-      backdrop-filter: blur(2px);
-    }
-  }
+  //   &::backdrop {
+  //     background-color: rgb(255 255 255 / 60%);
+  //     backdrop-filter: blur(2px);
+  //   }
+  // }
 
-  &::backdrop {
-    background-color: transparent;
-    transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
-  }
+  // &::backdrop {
+  //   background-color: transparent;
+  //   transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
+  // }
 
   button {
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, box-shadow 0.1s ease-in-out;
