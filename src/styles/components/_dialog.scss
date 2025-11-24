@@ -12,6 +12,7 @@ dialog {
   box-shadow: var(--shadow);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
+  transform: scale(0.9);
 
   &:open {
     opacity: 1;

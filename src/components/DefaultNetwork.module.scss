@@ -44,8 +44,7 @@
       }
 
       &:hover {
-        border: 1px solid var(--blue-200);
-        background-color: var(--blue-100);
+        border: 1px solid var(--gray-300);
         transform: scale(1.04);
       }
 
@@ -54,6 +53,7 @@
       }
 
       &[data-current='true'] {
+        border: 1px solid var(--gray-300);
         &:after {
           content: '✓ current';
           font-size: 9px;
@@ -78,7 +78,7 @@
         height: var(--r);
       }
 
-      b {
+      span {
         font-size: 0.9em;
         text-align: center;
         @media (max-width: 300px) {

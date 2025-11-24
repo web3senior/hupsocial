@@ -60,7 +60,7 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
               data-current={chain.id.toString() === currentNetwork.toString()}
             >
               <div className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
-              <b>{chain.name}</b>
+              <span>{chain.name}</span>
             </button>
           ))}
         </div>

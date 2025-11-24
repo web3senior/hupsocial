@@ -43,43 +43,42 @@ moment.defineLocale('en-short', {
   },
 })
 
-  /**
-   * Converts Markdown to sanitized HTML with links set to open in a new tab.
-   * @param {string} markdown - The markdown content to process.
-   * @returns {string} The sanitized HTML.
-   */
-  function renderMarkdown(markdown) {
-    // 1. Create a custom renderer
-    const renderer = new marked.Renderer()
+/**
+ * Converts Markdown to sanitized HTML with links set to open in a new tab.
+ * @param {string} markdown - The markdown content to process.
+ * @returns {string} The sanitized HTML.
+ */
+function renderMarkdown(markdown) {
+  // 1. Create a custom renderer
+  const renderer = new marked.Renderer()
 
-    // 2. Override the link method to add target="_blank" and rel attributes
-    renderer.link = (href, title, text) => {
-      // Use the default marked behavior, but insert the desired attributes
-      const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
+  // 2. Override the link method to add target="_blank" and rel attributes
+  renderer.link = (href, title, text) => {
+    // Use the default marked behavior, but insert the desired attributes
+    const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
 
-      // Add target="_blank" to open in a new tab
-      // Add rel="noopener noreferrer" for security and performance best practices
-      return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
-    }
-
-    // 3. Configure marked to use the custom renderer
-    marked.setOptions({
-      renderer: renderer,
-      gfm: true, // Generally good to enable GitHub Flavored Markdown
-    })
-
-    // 4. Render the markdown to HTML using the custom renderer
-    const dirtyHtml = marked.parse(markdown)
-
-    // 5. Sanitize the HTML using DOMPurify
-    // DOMPurify is crucial for preventing XSS attacks from the rendered content
-    const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
-      ADD_ATTR: ['target', 'rel'],
-    })
-
-    return cleanHtml
+    // Add target="_blank" to open in a new tab
+    // Add rel="noopener noreferrer" for security and performance best practices
+    return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
   }
 
+  // 3. Configure marked to use the custom renderer
+  marked.setOptions({
+    renderer: renderer,
+    gfm: true, // Generally good to enable GitHub Flavored Markdown
+  })
+
+  // 4. Render the markdown to HTML using the custom renderer
+  const dirtyHtml = marked.parse(markdown)
+
+  // 5. Sanitize the HTML using DOMPurify
+  // DOMPurify is crucial for preventing XSS attacks from the rendered content
+  const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
+    ADD_ATTR: ['target', 'rel'],
+  })
+
+  return cleanHtml
+}
 
 export default function Post({ item, showContent, actions, chainId }) {
   const [posts, setPosts] = useState({ list: [] })
@@ -97,7 +96,6 @@ export default function Post({ item, showContent, actions, chainId }) {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
-
 
   useEffect(() => {
     if (chainId !== undefined) {
@@ -121,9 +119,7 @@ export default function Post({ item, showContent, actions, chainId }) {
           <Nav item={item} />
         </header>
         <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-          <div className={`${styles.post__content} `} id={`post${item.postId}`} 
-          style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }}
-           dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
+          <div className={`${styles.post__content} `} id={`post${item.postId}`} style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
 
           <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />}
@@ -316,9 +312,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
-                <div className={`${styles.post__content} `} id={`post${item.postId}`} 
-          style={{ maxHeight:'fit-content'}}
-           dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
+                <div className={`${styles.post__content} `} id={`post${item.postId}`} style={{ maxHeight: 'fit-content' }} dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
               </main>
             </section>
           </article>
