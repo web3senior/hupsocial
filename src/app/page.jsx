@@ -25,7 +25,6 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import styles from './page.module.scss'
 import Post from '@/components/Post'
-import DefaultNetwork from '@/components/DefaultNetwork'
 import PageTitle from '@/components/PageTitle'
 
 moment.defineLocale('en-short', {

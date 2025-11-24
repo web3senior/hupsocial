@@ -52,18 +52,18 @@ dialog {
 }
 
 // Dialog or modal
-:modal {
-}
+// :modal {
+// }
 
-@starting-style {
-  dialog:open {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-}
+// @starting-style {
+//   dialog:open {
+//     opacity: 0;
+//     transform: scale(0.9);
+//   }
+// }
 
-@starting-style {
-  dialog:open::backdrop {
-    background-color: transparent;
-  }
-}
+// @starting-style {
+//   dialog:open::backdrop {
+//     background-color: transparent;
+//   }
+// }
