@@ -9,18 +9,9 @@ dialog {
   box-shadow: var(--shadow);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
-  transform: scale(0.9);
-opacity: 0;
+  opacity: 0;
   transform: scale(0.95);
   transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-  // &:open {
-  //   opacity: 1;
-  //   transform: scale(1);
-
-  //   &::backdrop {
-  //
-  //   }
-  // }
 
   &::backdrop {
     background-color: rgb(255 255 255 / 60%);
@@ -48,6 +39,10 @@ opacity: 0;
       top: 1rem;
     }
   }
+}
+
+.dialog-body {
+ 
 }
 
 dialog.is-open {
