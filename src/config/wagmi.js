@@ -1,5 +1,20 @@
 import { http, createConfig } from 'wagmi'
-import { base, baseSepoliaPreconf, celoSepolia, opBNBTestnet, arbitrumSepolia, monadTestnet, somniaTestnet, mainnet, unichainSepolia, optimismSepolia, lukso, luksoTestnet, lineaSepolia } from 'wagmi/chains'
+import {
+  base,
+  baseSepoliaPreconf,
+  celoSepolia,
+  zenchainTestnet,
+  opBNBTestnet,
+  arbitrumSepolia,
+  monadTestnet,
+  somniaTestnet,
+  mainnet,
+  unichainSepolia,
+  optimismSepolia,
+  lukso,
+  luksoTestnet,
+  lineaSepolia,
+} from 'wagmi/chains'
 import { injected, metaMask, safe, walletConnect } from 'wagmi/connectors'
 
 const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ``
@@ -39,6 +54,16 @@ export const CONTRACTS = {
     post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
     comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+  },
+    chain8408: {
+    post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
+    comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
+    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+  },
+    chain421614: {
+    post: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
+    comment: '0xA724524E11c971B8a98165DEc9065eBa563d424a',
+    status: '0x167486b8d7879351345378e1302EaD995CA9c505',
   },
 }
 
@@ -82,8 +107,12 @@ somniaTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none
 // BNB
 opBNBTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10769_2638)"> <path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10769_2638)"/> <path d="M5.93 4.84L9 3L12.07 4.84L10.94 5.52L9 4.36L7.06 5.52L5.93 4.84ZM12.07 7.16L10.94 6.48L9 7.64L7.06 6.48L5.93 7.16V8.5L7.87 9.66V12L9 12.68L10.13 12V9.67L12.07 8.51V7.16ZM12.07 10.83V9.47L10.94 10.15V11.51L12.07 10.83ZM12.87 11.31L10.93 12.47V13.83L14 11.99V8.32L12.87 8.99V11.31ZM11.74 6L12.87 6.68V8.03L14 7.36V6L12.87 5.32L11.74 6ZM7.87 12.96V14.32L9 15L10.13 14.32V12.96L9 13.64L7.87 12.96ZM5.93 10.83L7.06 11.51V10.15L5.93 9.47V10.83ZM7.87 6L9 6.68L10.13 6L9 5.32L7.87 6ZM5.13 6.68L6.26 6L5.13 5.32L4 6V7.36L5.13 8.03V6.68ZM5.13 8.99L4 8.32V11.99L7.07 13.83V12.47L5.13 11.31V9V8.99Z" fill="#F0B90B"/> </g> <defs> <linearGradient id="paint0_linear_10769_2638" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"> <stop stop-color="#1A1E21"/> <stop offset="1" stop-color="#06060A"/> </linearGradient> <clipPath id="clip0_10769_2638"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
 
+// Zenchain
+zenchainTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10969_3623)"><path d="M18 0H0V18H18V0Z" fill="white"/><path d="M8.97446 4.72349C11.4921 4.72349 13.865 4.10066 15.9489 3V4.17787C15.9489 4.46431 15.7844 4.72609 15.523 4.84028C14.9783 5.0776 14.421 5.28498 13.8536 5.46149H15.2148V5.83032C15.215 5.92698 15.1963 6.02274 15.1595 6.11214C15.1228 6.20154 15.0687 6.28283 15.0006 6.35135C14.9324 6.41988 14.8514 6.47431 14.7622 6.51154C14.673 6.54877 14.5773 6.56806 14.4807 6.56831H3.46823C3.37157 6.56806 3.27591 6.54877 3.1867 6.51154C3.0975 6.47431 3.0165 6.41988 2.94833 6.35135C2.88017 6.28283 2.82616 6.20154 2.78941 6.11214C2.75266 6.02274 2.73387 5.92698 2.73413 5.83032V5.46149H4.0956C3.52826 5.28498 2.97099 5.0776 2.42628 4.84028C2.2984 4.78334 2.18993 4.69029 2.1142 4.57255C2.03848 4.45481 1.9988 4.31752 2.00003 4.17754V3C4.14929 4.13523 6.54381 4.72695 8.97446 4.72349Z" fill="url(#paint0_linear_10969_3623)"/><path d="M13.091 7.21485C13.1888 7.21438 13.2858 7.23319 13.3764 7.2702C13.467 7.30722 13.5494 7.36171 13.6189 7.43057C13.6884 7.49943 13.7437 7.58131 13.7816 7.67153C13.8195 7.76176 13.8392 7.85856 13.8397 7.95641V14.2587C13.8392 14.3566 13.8195 14.4534 13.7816 14.5436C13.7437 14.6338 13.6884 14.7157 13.6189 14.7845C13.5494 14.8534 13.467 14.9079 13.3764 14.9449C13.2858 14.9819 13.1888 15.0007 13.091 15.0003H11.9683V9.43921C11.9683 9.23452 11.8005 9.06843 11.5939 9.06843H6.35368C6.14704 9.06843 5.97933 9.23452 5.97933 9.43921V15.0003H4.85661C4.75875 15.0007 4.66177 14.9819 4.57119 14.9449C4.4806 14.9079 4.3982 14.8534 4.32867 14.7845C4.25915 14.7157 4.20387 14.6338 4.16599 14.5436C4.12811 14.4534 4.10838 14.3566 4.10791 14.2587V7.95641C4.10838 7.85856 4.12811 7.76176 4.16599 7.67153C4.20387 7.58131 4.25915 7.49943 4.32867 7.43057C4.3982 7.36171 4.4806 7.30722 4.57119 7.2702C4.66177 7.23319 4.75875 7.21438 4.85661 7.21485H13.091Z" fill="url(#paint1_linear_10969_3623)"/></g><defs><linearGradient id="paint0_linear_10969_3623" x1="2.00003" y1="4.78416" x2="15.9489" y2="4.78416" gradientUnits="userSpaceOnUse"><stop stop-color="#F9F128"/><stop offset="0.5" stop-color="#C2F147"/><stop offset="1" stop-color="#2CEAA3"/></linearGradient><linearGradient id="paint1_linear_10969_3623" x1="4.10791" y1="11.1076" x2="13.8397" y2="11.1076" gradientUnits="userSpaceOnUse"><stop stop-color="#F9F128"/><stop offset="0.5" stop-color="#C2F147"/><stop offset="1" stop-color="#2CEAA3"/></linearGradient><clipPath id="clip0_10969_3623"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+
 export const config = createConfig({
-  chains: [baseSepoliaPreconf, luksoTestnet, celoSepolia, monadTestnet, lineaSepolia, optimismSepolia, unichainSepolia], //arbitrumSepolia,  , lineaSepolia, somniaTestnet, opBNBTestnet
+  chains: [baseSepoliaPreconf, luksoTestnet, arbitrumSepolia, celoSepolia, monadTestnet, 
+    lineaSepolia, optimismSepolia, unichainSepolia], //somniaTestnet, opBNBTestnet
   connectors: [walletConnect({ projectId }), metaMask()], //, safe() //injected(),
   transports: {
     [luksoTestnet.id]: http(),
@@ -93,10 +122,10 @@ export const config = createConfig({
     [baseSepoliaPreconf.id]: http(),
     [optimismSepolia.id]: http(),
     [unichainSepolia.id]: http(),
-    // [arbitrumSepolia.id]: http(),
+    [arbitrumSepolia.id]: http(),
     // [somniaTestnet.id]: http(),
     // [opBNBTestnet.id]: http(),
   },
 })
 
-// console.log(config)
+console.log(config)
