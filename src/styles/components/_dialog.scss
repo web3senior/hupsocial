@@ -1,9 +1,9 @@
-dialog {
+.dialog {
+  position: relative;
   --shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
   border-radius: var(--global-border-radius);
   border-color: rgb(0 0 0 / 0.5);
-  padding: 1.5rem;
-  outline: none;
+  padding: 2.5rem 1.5rem;
   margin: auto;
   background-color: var(--white, #fff);
   box-shadow: var(--shadow);
@@ -12,6 +12,11 @@ dialog {
   opacity: 0;
   transform: scale(0.95);
   transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  user-select: none;
+  outline: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  isolation: isolate;
 
   &::backdrop {
     background-color: rgb(255 255 255 / 60%);
@@ -19,40 +24,30 @@ dialog {
     transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
   }
 
-  button {
+  .close {
+    position: fixed;
+    right: 1rem;
+    top: 1rem;
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, box-shadow 0.1s ease-in-out;
     background-color: transparent;
     border: none;
     border-radius: 1000px;
+    -webkit-tap-highlight-color: transparent;
 
     &:hover {
       background-color: var(--gray-100);
     }
 
     &:active {
-      transform: scale(0.95);
-    }
-
-    &[action='close'] {
-      position: fixed;
-      right: 1rem;
-      top: 1rem;
+      transform: scale(0.91);
     }
   }
-}
 
-.dialog-body {
- 
+  &.is-open {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
-
-dialog.is-open {
-  opacity: 1;
-  transform: scale(1);
-}
-
-// Dialog or modal
-// :modal {
-// }
 
 @starting-style {
   dialog:open {

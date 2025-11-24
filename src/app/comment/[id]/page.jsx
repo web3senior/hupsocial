@@ -22,8 +22,9 @@ import {
   getPostCount,
   getVoteCountsForPoll,
   getVoterChoices,
+  getActiveChain,
 } from '@/util/communication'
-import { getProfile } from '@/util/api'
+import { getProfile, getUniversalProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -38,6 +39,7 @@ import { InlineLoading } from '@/components/Loading'
 import Profile, { ProfileImage } from '../../../components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon } from '@/components/Icons'
 import styles from './page.module.scss'
+import PageTitle from '@/components/PageTitle'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -154,112 +156,110 @@ export default function Page() {
   }, [showCommentModal]) // Added necessary dependencies  [isLoadedComment, commentsLoaded]
 
   return (
-    <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <h3 className={`page-title flex flex-column`}>
-        <span>post</span>
-        <code>10 views</code>
-      </h3>
+    <>
+      <PageTitle name={`Comment`} />
+     
+      <div className={`${styles.page} ms-motion-slideDownIn`}>
+        {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
 
-      {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
+        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+          {!comment && <div className={`shimmer ${styles.pollShimmer}`} />}
+          <div className={`${styles.grid} flex flex-column`}>
+            {comment && (
+              <article className={`${styles.post} animate fade`}>
+                <section data-name={comment.name} className={`flex flex-column align-items-start justify-content-between`}>
+                  <header className={`${styles.post__header}`}>
+                    <Profile creator={comment.creator} createdAt={comment.createdAt} />
+                  </header>
+                  <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
+                    <div
+                      className={`${styles.post__content} `}
+                      // onClick={(e) => e.stopPropagation()}
+                      id={`pollQuestion${comment.pollId}`}
+                    >
+                      {comment.content}
+                    </div>
 
-      <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-        {!comment && <div className={`shimmer ${styles.pollShimmer}`} />}
-        <div className={`${styles.grid} flex flex-column`}>
-          {comment && (
-            <article className={`${styles.post} animate fade`}>
-              <section data-name={comment.name} className={`flex flex-column align-items-start justify-content-between`}>
-                <header className={`${styles.post__header}`}>
-                  <Profile creator={comment.creator} createdAt={comment.createdAt} />
-                </header>
-                <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-                  <div
-                    className={`${styles.post__content} `}
-                    // onClick={(e) => e.stopPropagation()}
-                    id={`pollQuestion${comment.pollId}`}
-                  >
-                    {comment.content}
-                  </div>
+                    <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
+                      <Like id={comment.commentId} likeCount={comment.likeCount} hasLiked={comment.hasLiked} />
 
-                  <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
-                    <Like id={comment.commentId} likeCount={comment.likeCount} hasLiked={comment.hasLiked} />
-
-                    <button onClick={() => setShowCommentModal({ data: comment, parentId: params.id, type: `post` })}>
-                      <CommentIcon />
-                      <span>{comment.replyCount}</span>
-                    </button>
-
-                    <button>
-                      <RepostIcon />
-                    </button>
-
-                    <button>
-                      <ShareIcon />
-                      <span>0</span>
-                    </button>
-
-                    <button>
-                      <TipIcon />
-                      <span>{new Intl.NumberFormat().format(0)}</span>
-                    </button>
-                    {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
-                          <img alt={`blue checkmark icon`} src={txIcon.src} />
-                        </Link> */}
-                  </div>
-                </main>
-              </section>
-              <hr />
-            </article>
-          )}
-        </div>
-
-        {replies &&
-          replies.list.length > 0 &&
-          replies.list.map((item, i) => {
-            return (
-              <div key={i} onClick={() => router.push(`/comment/${item.commentId}`)}>
-                <div className={`${styles.comment}`}>
-                  <Profile creator={item.creator} createdAt={item.createdAt} />
-
-                  <div className={`${styles.comment__content}`}>
-                    <p>{item.content}</p>
-
-                    <div onClick={(e) => e.stopPropagation()} className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}>
-                      <LikeComment commentId={item.commentId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
-
-                      <button onClick={() => setShowCommentModal({ data: item, parentId: item.commentId, type: `comment` })}>
+                      <button onClick={() => setShowCommentModal({ data: comment, parentId: params.id, type: `post` })}>
                         <CommentIcon />
-                        <span>{item.replyCount}</span>
+                        <span>{comment.replyCount}</span>
+                      </button>
+
+                      <button>
+                        <RepostIcon />
                       </button>
 
                       <button>
                         <ShareIcon />
                         <span>0</span>
                       </button>
+
+                      <button>
+                        <TipIcon />
+                        <span>{new Intl.NumberFormat().format(0)}</span>
+                      </button>
+                      {/* <Link target={`_blank`} href={`https://exmaple.com/tx/`} className={`flex flex-row align-items-center gap-025  `}>
+                          <img alt={`blue checkmark icon`} src={txIcon.src} />
+                        </Link> */}
+                    </div>
+                  </main>
+                </section>
+                <hr />
+              </article>
+            )}
+          </div>
+
+          {replies &&
+            replies.list.length > 0 &&
+            replies.list.map((item, i) => {
+              return (
+                <div key={i} onClick={() => router.push(`/comment/${item.commentId}`)}>
+                  <div className={`${styles.comment}`}>
+                    <Profile creator={item.creator} createdAt={item.createdAt} />
+
+                    <div className={`${styles.comment__content}`}>
+                      <p>{item.content}</p>
+
+                      <div onClick={(e) => e.stopPropagation()} className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}>
+                        <LikeComment commentId={item.commentId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
+
+                        <button onClick={() => setShowCommentModal({ data: item, parentId: item.commentId, type: `comment` })}>
+                          <CommentIcon />
+                          <span>{item.replyCount}</span>
+                        </button>
+
+                        <button>
+                          <ShareIcon />
+                          <span>0</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  <hr />
                 </div>
-                <hr />
-              </div>
-            )
-          })}
+              )
+            })}
 
-        {mounted && isConnected && (
-          <div className={`${styles.reply} flex align-items-center gap-025`} 
-          onClick={() => setShowCommentModal({ data: comment, type: `comment` })}>
-            <ProfileImage addr={address} />
-            <p>
-              Reply to {address.slice(0, 4)}…${address.slice(38)}
-            </p>
-          </div>
+          {mounted && isConnected && (
+            <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: comment, type: `comment` })}>
+              <ProfileImage addr={address} />
+              <p>
+                Reply to {address.slice(0, 4)}…${address.slice(38)}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {commentsLoaded !== replyCount && (
+          <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(replyCount)}>
+            Load More
+          </button>
         )}
       </div>
-
-      {commentsLoaded !== replyCount && (
-        <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(replyCount)}>
-          Load More
-        </button>
-      )}
-    </div>
+    </>
   )
 }
 
@@ -362,7 +362,12 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
 
         <footer className={`${styles.commentModal__footer}  flex flex-column align-items-start`}>
           <ConnectedProfile addr={address} />
-          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`${type === `post` ? `Comment` : `Reply`} to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
+          <textarea
+            autoFocus
+            defaultValue={commentContent}
+            onInput={(e) => setCommentContent(e.target.value)}
+            placeholder={`${type === `post` ? `Comment` : `Reply`} to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`}
+          />
           <button className="btn" onClick={(e) => postComment(e)}>
             Post {type === `post` ? `comment` : `reply`}
           </button>
@@ -371,6 +376,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
     </div>
   )
 }
+
 /**
  * Like
  * @param {*} param0
@@ -532,38 +538,37 @@ const LikeComment = ({ commentId: id, likeCount, hasLiked }) => {
  * @param {String} addr
  * @returns
  */
-const ConnectedProfile = ({ addr, chainId = 4201 }) => {
+const ConnectedProfile = ({ addr }) => {
   const [profile, setProfile] = useState()
-  const [chain, setChain] = useState()
+  const activeChain = getActiveChain()
   const defaultUsername = `hup-user`
-
+  const [isItUp, setIsItUp] = useState()
   useEffect(() => {
-    getProfile(addr).then((res) => {
+    getUniversalProfile(addr).then((res) => {
+      // console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setProfile(res)
-      } else {
+       // setIsItUp(true)
         setProfile({
-          data: {
-            Profile: [
-              {
-                fullName: 'annonymous',
-                name: 'annonymous',
-                tags: ['profile'],
-                profileImages: [
-                  {
-                    isSVG: true,
-                    src: `${toSvg(`${creator}`, 36)}`,
-                    url: 'ipfs://',
-                  },
-                ],
-              },
-            ],
-          },
+          wallet: res.data.id,
+          name: res.data.Profile[0].name,
+          description: res.data.description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+          profileHeader: '',
+          tags: JSON.stringify(res.data.tags),
+          links: JSON.stringify(res.data.links_),
+          lastUpdate: '',
+        })
+      } else {
+        getProfile(addr).then((res) => {
+          //  console.log(res)
+          if (res.wallet) {
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            res.profileImage = profileImage
+            setProfile(res)
+          }
         })
       }
     })
-
-    setChain(config.chains.filter((filterItem) => filterItem.id === chainId)[0])
   }, [])
 
   if (!profile)
@@ -585,20 +590,13 @@ const ConnectedProfile = ({ addr, chainId = 4201 }) => {
         router.push(`/u/${addr}`)
       }}
     >
-      {!profile.data.Profile[0].profileImages[0]?.isSVG ? (
-        <img
-          alt={profile.data.Profile[0].name || `Default PFP`}
-          src={`${profile.data.Profile[0].profileImages.length > 0 ? profile.data.Profile[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-          className={`rounded`}
-        />
-      ) : (
-        <div dangerouslySetInnerHTML={{ __html: profile.data.Profile[0].profileImages[0].src }}></div>
-      )}
+      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
-          <b>{profile.data.Profile[0].name ?? defaultUsername}</b>
+          <b>{profile.name ?? defaultUsername}</b>
           <BlueCheckMarkIcon />
-          <div className={`${styles.badge}`} title={chain && chain.name} dangerouslySetInnerHTML={{ __html: `${chain && chain.icon}` }}></div>
+          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
         </div>
         <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
       </figcaption>

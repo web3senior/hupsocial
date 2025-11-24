@@ -12,25 +12,7 @@
   }
 }
 
-.footer {
-  grid-row-start: 3;
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
 
-  .large-nav {
-    // @include medium-down() {
-    //   display: none;
-    // }
-  }
-
-  a {
-    text-wrap: nowrap;
-    background-color: var(--global-background-color);
-    padding: 0.7rem;
-    text-align: center;
-  }
-}
 
 @media (prefers-color-scheme: dark) {
   .page {

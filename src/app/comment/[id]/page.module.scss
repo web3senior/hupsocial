@@ -6,15 +6,16 @@
   --button-secondary-hover: #f2f2f2;
 
   height: 100%;
+  min-height: 85svh;
 
   &__container {
     position: relative;
     top: 0rem;
     background-color: var(--white, #fff);
-    filter: drop-shadow(0px 0px 1rem rgba(0, 0, 0, 0.04));
+    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f7f9f9;
     border-radius: var(--global-border-radius);
     overflow: hidden;
-    border: 1px solid var(--gray-300);
     isolation: isolate;
 
     @media (max-width: 600px) {

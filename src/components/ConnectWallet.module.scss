@@ -42,6 +42,39 @@ button.btnConnect {
   }
 }
 
+button.btnNetwork {
+  --r: 24px;
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: var(--r);
+  height: var(--r);
+  will-change: transform;
+  transition: all 0.2s ease;
+  border-radius: 1000px;
+  background-color: var(--gray-100);
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.025);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  span {
+    overflow: hidden;
+  }
+
+  svg {
+    width: var(--r);
+    height: var(--r);
+  }
+}
+
 figure.pfp {
   will-change: transform outline;
   transition: transform 0.2s ease;
@@ -116,8 +149,8 @@ figure.pfp {
 
 // Default Network
 .networkDialog {
-  width: 460px;
-  overflow: hidden;
+  max-width: 460px;
+  // max-height: 450px;
 
   h2 {
     @media (max-width: 300px) {
@@ -127,9 +160,6 @@ figure.pfp {
 
   p {
     color: var(--black-500);
-  }
-
-  p {
     text-wrap: balance;
     @media (max-width: 300px) {
       font-size: 9px;
@@ -138,8 +168,7 @@ figure.pfp {
   }
 
   .networks {
-    overflow-y: auto;
-    max-height: 400px;
+    margin-top: 1rem;
 
     button {
       all: unset;
@@ -173,9 +202,10 @@ figure.pfp {
       }
 
       &[data-current='true'] {
-        border: 1px solid var(--gray-300);
+        border: 1px solid var(--black-900);
+
         &:after {
-          content: '✓ current';
+          content: '✓ Current';
           font-size: 9px;
           background-color: var(--gray-200);
           padding: 0.05rem 0.3rem;

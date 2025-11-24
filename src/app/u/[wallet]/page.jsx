@@ -358,7 +358,7 @@ const Profile = ({ addr }) => {
 
           <div className={`${styles.profile__pfp} rounded relative`}>
             <figure className={``}>
-              <img alt={`hup profile ${data.name}`} src={`${data.profileImage}`} />
+              <img alt={`PFP`} src={`${data.profileImage}`} />
             </figure>
 
             <Status addr={addr} profile={data} selfView={selfView} />

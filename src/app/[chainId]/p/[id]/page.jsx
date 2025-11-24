@@ -526,24 +526,24 @@ const ConnectedProfile = ({ addr }) => {
   const [isItUp, setIsItUp] = useState()
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
-      console.log(res)
+      // console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setIsItUp(true)
         setProfile({
-          wallet: res.data.Profile[0].id,
+          wallet: res.data.id,
           name: res.data.Profile[0].name,
-          description: res.data.Profile[0].description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          description: res.data.description,
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
-          tags: JSON.stringify(res.data.Profile[0].tags),
-          links: JSON.stringify(res.data.Profile[0].links_),
+          tags: JSON.stringify(res.data.tags),
+          links: JSON.stringify(res.data.links_),
           lastUpdate: '',
         })
       } else {
         getProfile(addr).then((res) => {
-          console.log(res)
+          //  console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }

@@ -214,6 +214,7 @@ export default function Page() {
   return (
     <>
       <PageTitle name={`Home`} />
+      
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           {posts.list.length < 1 && (
