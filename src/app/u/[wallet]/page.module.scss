@@ -1,6 +1,5 @@
 .page {
   height: 100%;
-  // background-color: var(--gray-50);
 
   &__title {
     font-weight: 600;
@@ -13,8 +12,8 @@
     position: relative;
     top: 0rem;
     background-color: var(--white, #fff);
-   box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #f7f9f9;
+    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f7f9f9;
     border-radius: var(--global-border-radius);
     overflow: hidden;
     isolation: isolate;

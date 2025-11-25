@@ -1,16 +1,16 @@
 .pageTitle {
+  background-color: var(--white);
   color: var(--black-900);
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 50%;
   height: 3.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: translateX(-50%);
-  font-size: var(--14-font-size) !important;
+  padding: 0rem 2rem;
   font-weight: 600;
   user-select: none;
-  text-transform: capitalize;
-  z-index: 1000;
+  z-index: 999;
+
+  p {
+    text-transform: capitalize;
+    font-size: var(--14-font-size) !important;
+  }
 }

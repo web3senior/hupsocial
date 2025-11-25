@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
@@ -18,36 +19,6 @@ export const ConnectWallet = () => {
   const mounted = useClientMounted()
   const { address, isConnected } = useAccount()
   const { switchChain } = useSwitchChain()
-
-  // const handleDisconnect = async () => {
-  //   try {
-  //     await disconnect()
-  //   } catch (error) {
-  //     console.error('Failed to disconnect:', error)
-  //   }
-  // }
-
-  const handleSwitchChain = (e, chain) => {
-    console.log(`Switch network: `, chain.id)
-    if (isConnected) {
-      switchChain(
-        { chainId: chain.id },
-        {
-          onSuccess: () => {
-            localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
-            window.location.reload()
-          },
-          onError: (error) => {
-            console.error('Switch chain failed:', error)
-            // Error logic
-          },
-        }
-      )
-    } else {
-      localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chain.id)
-      window.location.reload()
-    }
-  }
 
   useEffect(() => console.log(`%c ░▒▓█ Hup █▓▒░`, 'font-size:1.5rem;color:#38bdf8'), [])
 
@@ -68,18 +39,6 @@ export const ConnectWallet = () => {
             </button>
 
             <DefaultNetwork currentNetwork={activeChain[0].id} />
-            {/* {showNetworks && (
-              <div className={`${styles.dropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
-                <ul>
-                  {config.chains.map((chain, i) => (
-                    <li key={i} onClick={(e) => handleSwitchChain(e, chain)} className={`flex flex-row align-items-center justify-content-start gap-050`}>
-                      <figure className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
-                      <small>{chain.name}</small>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )} */}
           </div>
         </>
       )}
@@ -99,16 +58,7 @@ export const ConnectWallet = () => {
     </>
   )
 }
-{
-  /* <Link href={`/networks`} title={`Networks`}>
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M8.4375 12.5625H9.5625V8.25H8.4375V12.5625ZM9 6.96637C9.17163 6.96637 9.3155 6.90831 9.43163 6.79219C9.54775 6.67606 9.60581 6.53219 9.60581 6.36056C9.60581 6.18894 9.54775 6.04506 9.43163 5.92894C9.3155 5.81294 9.17163 5.75494 9 5.75494C8.82838 5.75494 8.6845 5.81294 8.56838 5.92894C8.45225 6.04506 8.39419 6.18894 8.39419 6.36056C8.39419 6.53219 8.45225 6.67606 8.56838 6.79219C8.6845 6.90831 8.82838 6.96637 9 6.96637ZM9.00131 16.125C8.01581 16.125 7.0895 15.938 6.22237 15.564C5.35525 15.19 4.601 14.6824 3.95962 14.0413C3.31825 13.4002 2.81044 12.6463 2.43619 11.7795C2.06206 10.9128 1.875 9.98669 1.875 9.00131C1.875 8.01581 2.062 7.0895 2.436 6.22237C2.81 5.35525 3.31756 4.601 3.95869 3.95962C4.59981 3.31825 5.35375 2.81044 6.2205 2.43619C7.08725 2.06206 8.01331 1.875 8.99869 1.875C9.98419 1.875 10.9105 2.062 11.7776 2.436C12.6448 2.81 13.399 3.31756 14.0404 3.95869C14.6818 4.59981 15.1896 5.35375 15.5638 6.2205C15.9379 7.08725 16.125 8.01331 16.125 8.99869C16.125 9.98419 15.938 10.9105 15.564 11.7776C15.19 12.6448 14.6824 13.399 14.0413 14.0404C13.4002 14.6818 12.6463 15.1896 11.7795 15.5638C10.9128 15.9379 9.98669 16.125 9.00131 16.125ZM9 15C10.675 15 12.0938 14.4188 13.2563 13.2563C14.4188 12.0938 15 10.675 15 9C15 7.325 14.4188 5.90625 13.2563 4.74375C12.0938 3.58125 10.675 3 9 3C7.325 3 5.90625 3.58125 4.74375 4.74375C3.58125 5.90625 3 7.325 3 9C3 10.675 3.58125 12.0938 4.74375 13.2563C5.90625 14.4188 7.325 15 9 15Z"
-                      fill="#1F1F1F"
-                    />
-                  </svg>
-                </Link> */
-}
+
 export function WalletConnectModal({ setShowModal }) {
   return (
     <div className={`${styles.walletConnectModal}`} onClick={() => setShowModal(false)}>
@@ -177,6 +127,7 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
   const networkDialog = useRef()
   const { address, isConnected } = useAccount()
   const { switchChain } = useSwitchChain()
+ const router = useRouter()
 
   const handleSwitchChain = (chainId) => {
     console.log(`Switch network: `, chainId)
@@ -236,6 +187,16 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
           </svg>
         </button>
       </form>
+
+      <p
+        className={`text-center mt-10 ${styles.link}`}
+        onClick={() => {
+      router.push(`/networks`)
+          networkDialog.current.close(`close`)
+        }}
+      >
+        View networks
+      </p>
     </dialog>
   )
 }

@@ -1,25 +1,21 @@
 'use client'
 
-import { useEffect, useState, Suspense, useRef, useTransition } from 'react'
-import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Icon from '@/helper/MaterialIcon'
-import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
-import { useAuth } from '@/contexts/AuthContext'
-import Web3 from 'web3'
+import { useEffect, useState, useRef } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { getUniversalProfile, getProfile, updateProfile, subscribeUser, unsubscribeUser, sendNotification } from '@/util/api'
-import { initPostContract, initStatusContract, getEmoji, getStatus, getCreatorPostCount, getMaxLength, getPostsByCreator, getPosts } from '@/util/communication'
+import { initPostContract, initStatusContract, getStatus, getCreatorPostCount, getMaxLength, getPostsByCreator } from '@/util/communication'
 import { toast } from '@/components/NextToast'
+import Web3 from 'web3'
 import abi from '@/abi/post.json'
+import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { config } from '@/config/wagmi'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/util/communication'
-import { useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
+import { useWaitForTransactionReceipt, useAccount, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon } from '@/components/Icons'
-import { InlineLoading } from '@/components/Loading'
+import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 
@@ -97,6 +93,7 @@ export default function Page() {
     }
   }
 
+
   useEffect(() => {
     getCreatorPostCount(params.wallet).then((count) => {
       const totalPosts = web3.utils.toNumber(count)
@@ -111,7 +108,9 @@ export default function Page() {
   return (
     <>
       <PageTitle name={`profile`} />
+
       <div className={`${styles.page} ms-motion-slideDownIn`}>
+        
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
@@ -1494,7 +1493,7 @@ const PostForm = ({ addr }) => {
                             </div>
 
                             <button className={`rounded d-f-c`} type={`button`} title={`Clear ${profile.fullName}`} onClick={(e) => handleRemoveWhitelist(e, i)}>
-                              <Icon name={`close`} />
+                              close
                             </button>
                           </div>
                         </div>

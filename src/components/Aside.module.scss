@@ -11,10 +11,12 @@
   top: 0;
   bottom: 0;
   height: 100svh;
-z-index: 1;
+  z-index: 1;
+
   @media (max-width: 639px) {
     display: none !important;
   }
+
   &__container {
     height: inherit;
     position: relative;
@@ -29,7 +31,6 @@ z-index: 1;
       border: none;
       filter: none;
       border-radius: unset;
-      
     }
   }
 
@@ -43,6 +44,40 @@ z-index: 1;
 
     @media (max-width: 600px) {
       padding: 0.7rem 0.7rem;
+    }
+  }
+
+  button {
+    --r: 24px;
+    width: var(--r);
+    height: var(--r);
+    position: absolute;
+    bottom: 4rem;
+    left: 0;
+    display: flex;
+    place-items: center;
+    place-content: center;
+    background-color: var(--white);
+    border: 1px solid var(--gray-300);
+    box-shadow: var(--global-box-shadow);
+    cursor: pointer;
+    display: none;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .aside {
+    button {
+      will-change: transform;
+      transition: transform 0.2s allow-discrete;
+
+      &:hover {
+        transform: scale(1.1);
+      }
+
+      &:active {
+        transform: scale(0.95);
+      }
     }
   }
 }

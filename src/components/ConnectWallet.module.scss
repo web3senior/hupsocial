@@ -152,6 +152,13 @@ figure.pfp {
   max-width: 460px;
   // max-height: 450px;
 
+  .link {
+    color: var(--blue-400);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+  }
+
   h2 {
     @media (max-width: 300px) {
       font-size: 12px;

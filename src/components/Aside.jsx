@@ -1,19 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { useParams, usePathname } from 'next/navigation'
+import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { getActiveChain } from '@/util/communication'
 import { useAccount } from 'wagmi'
+import { BackIcon } from './Icons'
 import styles from './Aside.module.scss'
 
 export default function Aside() {
   const mounted = useClientMounted()
-  const pathname = usePathname()
   const { address, isConnected } = useAccount()
   const params = useParams()
   const activeChain = getActiveChain()
-
+  const router = useRouter()
+  const pathname = usePathname()
+  const isHomePage = pathname === `/`
   const pages = [
     {
       name: `Home`,
@@ -46,7 +48,10 @@ export default function Aside() {
       disabled: false,
     },
   ]
-
+  const handleClick = () => {
+    // Navigates to the previous URL in the history stack
+    router.back()
+  }
   /**
    * Get the last visited page
    * @returns string
@@ -69,6 +74,10 @@ export default function Aside() {
               )
             })}
       </ul>
+
+       <button className={`rounded`} onClick={handleClick}>
+            <BackIcon />
+          </button>
     </aside>
   )
 }
