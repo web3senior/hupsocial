@@ -31,20 +31,41 @@
 }
 
 .tab {
+  position: relative;
   margin: 0 2em;
-  padding: 0 0.2em 0.5em 0.2em;
-  display: flex;
-  flex: none;
-  gap: 1rem;
-  overflow: auto;
-  width: calc(100% - 4em);
-  flex-flow: row nowrap;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  user-select: none;
 
-  div {
-    width: 100%;
+  &:after {
+    right: 0;
+    background: linear-gradient(to right, transparent 10%, rgba(255, 255, 255, 0.9));
+  }
+
+  &:before {
+    left: 0;
+    background: linear-gradient(to left, transparent 10%, rgba(255, 255, 255, 0.9));
+  }
+
+  &:before,
+  &:after {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: 80%;
+    width: 20px;
+    z-index: 1;
+  }
+
+  &__container {
+    padding: 0 0.2em 0.5em 0.2em;
+    display: flex;
+    flex: none;
+    gap: 1rem;
+    overflow: auto;
+    width: calc(100% - 4em);
+    flex-flow: row nowrap;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    user-select: none;
+    isolation: isolate;
 
     button {
       all: unset;
@@ -55,6 +76,7 @@
       place-items: center;
       gap: 0.2rem;
       width: 100%;
+      min-width: 80px;
       border-radius: 0.5rem;
       border-bottom: 2px solid transparent;
       transition-property: all;

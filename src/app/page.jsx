@@ -218,31 +218,31 @@ export default function Page() {
 
       <div className={`__container`} data-width={`medium`}>
         <section className={`${styles.tab}`}>
-          <div>
-            <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
+    
+          <div className={`${styles.tab__container}`}>
+   <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
               Feed <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
             </button>
-          </div>
-          <div>
+
+      
             <button className={activeTab === 'communities' ? styles.activeTab : ''} onClick={() => setActiveTab('communities')}>
               Communities
             </button>
-          </div>
-          <div>
+   
             <button className={activeTab === 'events' ? styles.activeTab : ''} onClick={() => setActiveTab('events')}>
               Events
             </button>
-          </div>
-          <div>
+     
             <button className={activeTab === 'jobboard' ? styles.activeTab : ''} onClick={() => setActiveTab('jobboard')}>
               Job board
             </button>
-          </div>
-          <div>
+    
             <button className={activeTab === 'appstore' ? styles.activeTab : ''} onClick={() => setActiveTab('appstore')}>
               App Store
             </button>
+
           </div>
+   
         </section>
       </div>
 
