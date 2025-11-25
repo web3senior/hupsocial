@@ -1380,7 +1380,7 @@ const PostForm = ({ addr }) => {
           lastUpdate: '',
         })
       } else {
-        getProfile(creator).then((res) => {
+        getProfile(addr).then((res) => {
           //  console.log(res)
           if (res.wallet) {
             const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`

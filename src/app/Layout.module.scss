@@ -22,14 +22,13 @@
   grid-row: 1/3;
   grid-column: 1/1;
   height: 100%;
-  gap: 32px;
+  gap: 1rem;
   overflow: hidden;
   padding: 4rem 0.3rem 7rem 0.3rem;
-
   @media (max-width: 600px) {
     padding: 4.5rem 0rem 6rem 0rem;
   }
-  
+
   // --pattern-fg: color-mix(in oklab, var(--grey-90-a50) 5%, transparent);
   // background-attachment: fixed;
   // background-size: 10px 10px;

@@ -5,9 +5,9 @@ import { useParams, usePathname } from 'next/navigation'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { getActiveChain } from '@/util/communication'
 import { useAccount } from 'wagmi'
-import styles from './Footer.module.scss'
+import styles from './Aside.module.scss'
 
-export default function Footer() {
+export default function Aside() {
   const mounted = useClientMounted()
   const pathname = usePathname()
   const { address, isConnected } = useAccount()
@@ -54,8 +54,8 @@ export default function Footer() {
   const getLastVisitedPage = async () => await JSON.parse(localStorage.getItem(`lastVisitedPage`))
 
   return !mounted ? null : (
-    <footer className={`${styles.footer}`}>
-      <ul className={`flex flex-row aling-items-center justify-content-between`}>
+    <aside className={`${styles.aside}`}>
+      <ul className={`flex flex-column aling-items-center justify-content-center gap-1`}>
         {pages &&
           pages
             .filter((filterItem) => !filterItem.disabled)
@@ -69,6 +69,6 @@ export default function Footer() {
               )
             })}
       </ul>
-    </footer>
+    </aside>
   )
 }

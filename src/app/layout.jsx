@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import NextToast from '../components/NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
 import Header from '../components/Header'
+import Aside from '../components/Aside'
 import Footer from '../components/Footer'
 import styles from './Layout.module.scss'
 
@@ -73,6 +74,7 @@ export default async function RootLayout({ children }) {
         <NextToast />
         <WagmiContext>
           <Header />
+          <Aside />
           <main className={styles.main}>{children}</main>
           <Footer />
         </WagmiContext>
