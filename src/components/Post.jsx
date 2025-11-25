@@ -200,7 +200,7 @@ const Nav = ({ item }) => {
         <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
           <ul>
             <li>
-              <Link href={`${activeChain[0].id}/p/${item.postId}`}>View post</Link>
+              <Link href={`/${activeChain[0].id}/p/${item.postId}`}>View post</Link>
             </li>
           </ul>
         </div>
