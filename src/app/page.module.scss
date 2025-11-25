@@ -30,6 +30,61 @@
   }
 }
 
+.tab {
+  margin: 0 2em;
+  padding: 0 0.2em 0.5em 0.2em;
+  display: flex;
+  flex: none;
+  gap: 1rem;
+  overflow: auto;
+  width: calc(100% - 4em);
+  flex-flow: row nowrap;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  user-select: none;
+
+  div {
+    width: 100%;
+
+    button {
+      all: unset;
+      padding: 0.4rem 0;
+      font-weight: 500;
+      display: flex;
+      place-content: center;
+      place-items: center;
+      gap: 0.2rem;
+      width: 100%;
+      border-radius: 0.5rem;
+      border-bottom: 2px solid transparent;
+      transition-property: all;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
+      text-wrap: nowrap;
+      cursor: pointer;
+
+      &:hover {
+        &:not(.activeTab) {
+          background: var(--gray-100);
+        }
+      }
+    }
+  }
+}
+
+.activeTab {
+  background-color: var(--gray-200) !important;
+  color: var(--black-900) !important;
+}
+
+.tabContent {
+  padding: 0 0 0 0;
+}
+
+.tabContentEmpty {
+  padding: 4rem 0;
+}
+
 .commentModal {
   position: fixed;
   inset: 0;

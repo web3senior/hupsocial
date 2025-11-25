@@ -51,6 +51,7 @@ export default function Page() {
   const [postsLoaded, setPostsLoaded] = useState(0)
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [totalPosts, setTotalPosts] = useState(0)
+  const [activeTab, setActiveTab] = useState('feed')
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const activeChain = getActiveChain()
@@ -213,51 +214,126 @@ export default function Page() {
 
   return (
     <>
-      <PageTitle name={`Home`} />
-      
-      <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-          {posts.list.length < 1 && (
-            <>
-              <PostShimmer />
-              <PostShimmer />
-              <PostShimmer />
-              <PostShimmer />
-              <PostShimmer />
-            </>
-          )}
+      <PageTitle name={`home`} />
 
-          <div className={`${styles.grid} flex flex-column`}>
-            {posts &&
-              posts.list.length > 0 &&
-              posts.list.map((item, i) => {
-                return (
-                  <section
-                    key={i}
-                    className={`${styles.post} animate fade`}
-                    onClick={() => {
-                      navigator.vibrate(200)
-                      router.push(`${activeChain[0].id}/p/${item.postId}`)
-                    }}
-                  >
-                    <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
-                    {i < posts.list.length - 1 && <hr />}
-                  </section>
-                )
-              })}
+      <div className={`__container`} data-width={`medium`}>
+        <section className={`${styles.tab}`}>
+          <div>
+            <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
+              Feed <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
+            </button>
+          </div>
+          <div>
+            <button className={activeTab === 'communities' ? styles.activeTab : ''} onClick={() => setActiveTab('communities')}>
+              Communities
+            </button>
+          </div>
+          <div>
+            <button className={activeTab === 'events' ? styles.activeTab : ''} onClick={() => setActiveTab('events')}>
+              Events
+            </button>
+          </div>
+          <div>
+            <button className={activeTab === 'jobboard' ? styles.activeTab : ''} onClick={() => setActiveTab('jobboard')}>
+              Job board
+            </button>
+          </div>
+          <div>
+            <button className={activeTab === 'appstore' ? styles.activeTab : ''} onClick={() => setActiveTab('appstore')}>
+              App Store
+            </button>
+          </div>
+        </section>
+      </div>
+
+      {activeTab === 'feed' && (
+        <div className={`${styles.tabContent} ${styles.feedTab} relative`}>
+          <div className={`${styles.page} ms-motion-slideDownIn`}>
+            <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+              {posts.list.length < 1 && (
+                <>
+                  <PostShimmer />
+                  <PostShimmer />
+                  <PostShimmer />
+                  <PostShimmer />
+                  <PostShimmer />
+                </>
+              )}
+
+              <div className={`${styles.grid} flex flex-column`}>
+                {posts &&
+                  posts.list.length > 0 &&
+                  posts.list.map((item, i) => {
+                    return (
+                      <section
+                        key={i}
+                        className={`${styles.post} animate fade`}
+                        onClick={() => {
+                          navigator.vibrate(200)
+                          router.push(`${activeChain[0].id}/p/${item.postId}`)
+                        }}
+                      >
+                        <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
+                        {i < posts.list.length - 1 && <hr />}
+                      </section>
+                    )
+                  })}
+              </div>
+            </div>
+
+            {postsLoaded !== totalPosts && (
+              <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(totalPosts)}>
+                Load More
+              </button>
+            )}
           </div>
         </div>
+      )}
 
-        {postsLoaded !== totalPosts && (
-          <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(totalPosts)}>
-            Load More
-          </button>
-        )}
-      </div>
+      {activeTab === 'communities' && (
+        <div className={`${styles.tabContent} ${styles.communitiesTab} relative`}>
+          <div className={`__container`} data-width={`medium`}>
+            <NoData name={`communities`} />
+          </div>
+        </div>
+      )}
+      {activeTab === 'events' && (
+        <div className={`${styles.tabContent} ${styles.eventsTab} relative`}>
+          <div className={`__container`} data-width={`medium`}>
+            <NoData name={`events`} />
+          </div>
+        </div>
+      )}
+      {activeTab === 'jobboard' && (
+        <div className={`${styles.tabContent} ${styles.jobboardTab} relative`}>
+          <div className={`__container`} data-width={`medium`}>
+            <NoData name={`job board`} />
+          </div>
+        </div>
+      )}
+      {activeTab === 'appstore' && (
+        <div className={`${styles.tabContent} ${styles.appstoreTab} relative`}>
+          <div className={`__container`} data-width={`medium`}>
+            <NoData name={`app store`} />
+          </div>
+        </div>
+      )}
     </>
   )
 }
 
+/**
+ * No data in tab content
+ * @param {*} param0
+ * @returns
+ */
+const NoData = ({ name }) => {
+  return (
+    <div className={`${styles.tabContentEmpty} d-f-c`}>
+      <p style={{ color: `var(--gray-400)` }}>No {name} yet.</p>
+    </div>
+  )
+}
 const PostShimmer = () => {
   return (
     <div className={`${styles.pageShimmer} flex flex-column gap-025`}>
