@@ -218,31 +218,27 @@ export default function Page() {
 
       <div className={`__container`} data-width={`medium`}>
         <section className={`${styles.tab}`}>
-    
           <div className={`${styles.tab__container}`}>
-   <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
+            <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
               Feed <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
             </button>
 
-      
             <button className={activeTab === 'communities' ? styles.activeTab : ''} onClick={() => setActiveTab('communities')}>
               Communities
             </button>
-   
+
             <button className={activeTab === 'events' ? styles.activeTab : ''} onClick={() => setActiveTab('events')}>
               Events
             </button>
-     
-            <button className={activeTab === 'jobboard' ? styles.activeTab : ''} onClick={() => setActiveTab('jobboard')}>
-              Job board
-            </button>
-    
-            <button className={activeTab === 'appstore' ? styles.activeTab : ''} onClick={() => setActiveTab('appstore')}>
-              App Store
+
+            <button className={activeTab === 'jobs' ? styles.activeTab : ''} onClick={() => setActiveTab('jobs')}>
+              Jobs
             </button>
 
+            <button className={activeTab === 'apps' ? styles.activeTab : ''} onClick={() => setActiveTab('apps')}>
+              Apps
+            </button>
           </div>
-   
         </section>
       </div>
 
@@ -304,17 +300,17 @@ export default function Page() {
           </div>
         </div>
       )}
-      {activeTab === 'jobboard' && (
-        <div className={`${styles.tabContent} ${styles.jobboardTab} relative`}>
+      {activeTab === 'jobs' && (
+        <div className={`${styles.tabContent} ${styles.jobsTab} relative`}>
           <div className={`__container`} data-width={`medium`}>
-            <NoData name={`job board`} />
+            <NoData name={`jobs`} />
           </div>
         </div>
       )}
-      {activeTab === 'appstore' && (
-        <div className={`${styles.tabContent} ${styles.appstoreTab} relative`}>
+      {activeTab === 'apps' && (
+        <div className={`${styles.tabContent} ${styles.appsTab} relative`}>
           <div className={`__container`} data-width={`medium`}>
-            <NoData name={`app store`} />
+            <NoData name={`apps`} />
           </div>
         </div>
       )}
