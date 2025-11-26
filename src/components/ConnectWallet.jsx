@@ -29,7 +29,7 @@ export const ConnectWallet = () => {
           <div className={`${styles.networks}`}>
             <button
               className={`${styles.btnNetwork}`}
-              onMouseDown={(e) => {
+              onClick={(e) => {
                 document.querySelector(`#networkDialog`).classList.add(`is-open`)
                 document.querySelector(`#networkDialog`).showModal()
               }}
