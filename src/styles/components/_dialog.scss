@@ -21,6 +21,7 @@
   &::backdrop {
     background-color: rgb(255 255 255 / 60%);
     backdrop-filter: blur(2px);
+    max-height: 100svh;
     transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete, background-color 0.3s;
   }
 
@@ -33,12 +34,11 @@
     border: none;
     border-radius: 1000px;
     will-change: trasform;
-     background-color: var(--gray-100);
+    background-color: var(--gray-100);
     -webkit-tap-highlight-color: transparent;
 
     &:hover {
-     
-       transform: scale(1.1);
+      transform: scale(1.1);
     }
 
     &:active {

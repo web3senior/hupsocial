@@ -395,9 +395,15 @@
   border-radius: 4px;
   box-shadow: var(--shadow-10);
   cursor: help;
+  transition: all 0.2s ease-in-out;
+
 
   &:hover {
     background-color: var(--gray-50);
+        border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+    -webkit-transform: translateY(-2px);
+    transform: translateY(-2px);
   }
 
   &__body {

@@ -571,7 +571,10 @@ export default function Page() {
         <section className={`${styles.tab}`}>
           <div className={`${styles.tab__container}`}>
             <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
-              Feed <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
+              Feed{' '}
+              <span style={{ padding: `.1rem .32rem`, fontSize: `9px`, borderRadius: `4px`, background: `var(--network-color-primary)`, color: `var(--network-color-text)` }}>
+                {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}
+              </span>
             </button>
 
             <button className={activeTab === 'communities' ? styles.activeTab : ''} onClick={() => setActiveTab('communities')}>

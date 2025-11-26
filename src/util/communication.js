@@ -1,6 +1,5 @@
 import Web3 from 'web3'
-import { config, CONTRACTS } from '@/config/wagmi'
-
+import { config, CONTRACTS, setNetworkColor } from '@/config/wagmi'
 import postAbi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import commentAbi from '@/abi/post-comment.json'
@@ -20,9 +19,7 @@ export const getActiveChain = () => {
     // Ensure a chain was actually found
     if (userSelectedChain.length > 0) {
       // Change primary color of the app
-      // document.documentElement.style.setProperty('--color-primary', userSelectedChain[0].primaryColor)
-      // document.documentElement.style.setProperty('--color-text', userSelectedChain[0].textColor)
-
+      setNetworkColor(userSelectedChain[0])
       return [userSelectedChain[0], CONTRACTS[`chain${userSelectedChain[0].id}`]]
     }
   }

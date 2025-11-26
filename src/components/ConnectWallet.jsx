@@ -127,10 +127,12 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
   const networkDialog = useRef()
   const { address, isConnected } = useAccount()
   const { switchChain } = useSwitchChain()
- const router = useRouter()
+  const router = useRouter()
 
-  const handleSwitchChain = (chainId) => {
-    console.log(`Switch network: `, chainId)
+  const handleSwitchChain = (selectedChain) => {
+    const chain = JSON.parse(selectedChain)
+    const chainId = chain.id
+
     if (isConnected) {
       switchChain(
         { chainId: parseInt(chainId) },
@@ -154,7 +156,9 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
     // networkDialog.current.showModal()
     networkDialog.current.addEventListener('close', (e) => {
       const returnValue = networkDialog.current.returnValue
-      if (returnValue === `close`) return
+      if (returnValue === `close`) {
+        return
+      }
       handleSwitchChain(returnValue)
       // networkDialog.current.close()
     })
@@ -170,9 +174,8 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
           {config.chains.map((chain, i) => (
             <button
               key={i}
-              onClick={(e) => {
-                e.preventDefault()
-                networkDialog.current.close(chain.id)
+              onClick={() => {
+                networkDialog.current.close(JSON.stringify(chain))
               }}
               data-current={chain.id.toString() === currentNetwork.toString()}
             >
@@ -191,7 +194,7 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
       <p
         className={`text-center mt-10 ${styles.link}`}
         onClick={() => {
-      router.push(`/networks`)
+          router.push(`/networks`)
           networkDialog.current.close(`close`)
         }}
       >

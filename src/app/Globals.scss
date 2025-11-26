@@ -16,7 +16,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--black-200);
+  background: var(--network-color-primary); //var(--black-200);
   background-clip: padding-box;
   border: 2px solid #0000;
   border-radius: 100vh;
@@ -33,6 +33,10 @@
     // --background: #0a0a0a;
     // --foreground: #ededed;
   }
+}
+
+.no-scroll {
+  overflow: hidden;
 }
 
 // Details
