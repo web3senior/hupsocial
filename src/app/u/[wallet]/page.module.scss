@@ -424,8 +424,8 @@
     width: 100%;
     padding: 0.5rem 1rem;
     border-radius: var(--global-border-radius);
-    background-color: var(--gray-900, #000);
-    color: var(--white, #fff);
+    background-color: var(--network-color-primary, --gray-900, #000);
+    color: var(--network-color-text, --white, #fff);
     will-change: transform;
     transition: transform 0.2s ease;
 
