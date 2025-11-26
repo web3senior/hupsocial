@@ -389,3 +389,65 @@
 
 @media (prefers-color-scheme: dark) {
 }
+.app {
+  background-color: var(--white);
+  border: 1px solid var(--gray-100);
+  border-radius: 4px;
+  box-shadow: var(--shadow-10);
+  cursor: help;
+
+  &:hover {
+    background-color: var(--gray-50);
+  }
+
+  &__body {
+    padding: 1.2rem;
+  }
+
+  a {
+    color: var(--blue-400);
+  }
+
+  &__icon {
+    svg {
+      --r: 24px;
+      width: var(--r);
+      height: var(--r);
+      box-shadow: var(--shadow-10);
+    }
+  }
+
+  span {
+    font-weight: 500;
+    border-radius: 1000px;
+
+    &:last-child {
+      font-size: 11px;
+      background-color: var(--gray-50);
+    }
+  }
+
+  small {
+    color: var(--text-color-pale);
+  }
+
+  a {
+    background-color: var(--black);
+    color: var(--white);
+    padding: 6px 12px;
+    will-change: transform;
+    font-size: 11px;
+    border: none;
+    border-radius: 1000px;
+
+    &:hover {
+      transform: scale(1.015);
+      transition: all 0.3s ease-in-out;
+    }
+
+    &:active {
+      transform: scale(0.95);
+      transition: all 0.3s ease;
+    }
+  }
+}
