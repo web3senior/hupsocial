@@ -34,7 +34,9 @@
 .tab {
   position: relative;
   margin: 0 2em;
-
+  @media (max-width: 600px) {
+    margin: 0;
+  }
   &:after {
     right: 0;
     background: linear-gradient(to right, transparent 10%, rgba(255, 255, 255, 0.9));
