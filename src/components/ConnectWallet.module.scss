@@ -160,6 +160,7 @@ figure.pfp {
   }
 
   h2 {
+    color: var(--black);
     @media (max-width: 300px) {
       font-size: 12px;
     }
@@ -236,6 +237,7 @@ figure.pfp {
       }
 
       span {
+        color: var(--black);
         font-size: 0.9em;
         text-align: center;
         @media (max-width: 300px) {

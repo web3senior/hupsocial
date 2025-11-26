@@ -27,60 +27,59 @@
 
 .network {
   background-color: var(--white);
-  border:1px solid var(--gray-200);
-  border-radius: var(--global-border-radius);
+  border: 1px solid var(--gray-100);
+  border-radius: 1rem;
+box-shadow: var(--shadow-10);
 
   &__body {
-    padding: 2rem 2.5rem;
+    padding: 1.2rem;
+  }
 
-    ul {
-      li {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
+  a {
+    color: var(--blue-400);
+  }
 
-        @media (max-width: 600px) {
-          flex-direction: column;
-        }
-      }
+  &__icon {
+    svg {
+      --r: 64px;
+      width: var(--r);
+      height: var(--r);
+        border-radius: 1rem;
+      box-shadow: var(--shadow-10);
     }
+  }
 
-    a {
-      color: var(--blue-700)
-    }
+  span {
+    font-weight: 500;
+    border-radius: 1000px;
 
-    code {
-      font-size: 10px;
-      background-color: var(--gray-50);
-      padding: 0.12rem 0.4rem;
-      border-radius: 1000px;
-      overflow-x: hidden;
-      width: max-content;
-      max-width: 100%;
-      max-height: 60px;
-      white-space: wrap;
-      text-overflow: ellipsis;
-    }
-
-    button {
-      outline: 1px solid var(--orange-400);
-      background-color: var(--orange-100);
-      color: var(--orange-400);
-      padding: 0.25rem 0.7rem;
-      will-change: transform;
+    &:last-child {
       font-size: 11px;
-      width: 100%;
+      background-color: var(--gray-50);
+    }
+  }
 
-      &:hover {
-        transform: scale(1.015);
-        transition: all 0.3s ease-in-out;
-      }
+  small {
+    color: var(--text-color-pale);
+  }
 
-      &:active {
-        transform: scale(0.95);
-        transition: all 0.3s ease;
-      }
+  button {
+    background-color: var(--black);
+    color: var(--white);
+    padding: 4px 12px;
+    will-change: transform;
+    font-size: 11px;
+    border: none;
+    border-radius: 1000px;
+
+    &:hover {
+      transform: scale(1.015);
+      transition: all 0.3s ease-in-out;
+    }
+
+    &:active {
+      transform: scale(0.95);
+      transition: all 0.3s ease;
     }
   }
 }

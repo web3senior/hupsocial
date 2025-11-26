@@ -6,7 +6,11 @@ export const ThreeDotIcon = () => (
     <circle cx="18" cy="12" r="1.5"></circle>
   </svg>
 )
-
+export const OpenIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4.16531 14.625L3.375 13.8347L11.9597 5.25H6.75V4.125H13.875V11.25H12.75V6.04031L4.16531 14.625Z" fill="#424242" />
+  </svg>
+)
 export const BackIcon = () => (
   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M1 6H11ZM1 6L5 2ZM1 6L5 10Z" fill="#424242" />

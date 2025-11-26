@@ -1,16 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { toast } from '@/components/NextToast'
 import { config } from '@/config/wagmi'
+import { toast } from '@/components/NextToast'
 import PageTitle from '@/components/PageTitle'
 import Web3 from 'web3'
 import styles from './page.module.scss'
 
 export default function Page() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [chains, setChains] = useState()
-
+  /**
+   * Add network
+   * @param {json} network
+   * @returns
+   */
   const addNetwork = async (network) => {
     const ethereum = window.ethereum
 
@@ -54,56 +55,30 @@ export default function Page() {
     }
   }
 
-  useEffect(() => {
-    setChains(config.chains)
-  }, [])
-
   return (
     <>
-      <PageTitle name={`networks (${config.chains.length})`} />
+      <PageTitle name={`networks`} />
+
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container`} data-width={`medium`}>
-          <div className={`flex flex-column gap-1`}>
-            {chains &&
-              chains.map((item, i) => {
+          <div className={`grid grid--fill gap-1`} style={{ '--data-width': `400px` }}>
+            {config.chains &&
+              config.chains.map((item, i) => {
                 return (
-                  <div key={i} className={`${styles.network}`}>
-                    <div className={`${styles.network__body}`}>
-                      <ul className={`flex flex-column align-items-center justify-content-between gap-050`}>
-                        <li className={``}>
-                          <span>Network name</span>
-                          <code>{item.name}</code>
-                        </li>
-                        <li className={``}>
-                          <span> Default RPC URL</span>
-                          <code>{item.rpcUrls.default.http[0]}</code>
-                        </li>
-                        <li className={``}>
-                          <span> Chain ID</span>
-                          <code>{item.id}</code>
-                        </li>
-                        <li className={``}>
-                          <span> Currency symbol</span>
-                          <code>{item.nativeCurrency.symbol}</code>
-                        </li>
-                        <li className={``}>
-                          <span>Block explorer URL</span>
-                          <code title={item.blockExplorers.default.name}>{item.blockExplorers.default.url}</code>
-                        </li>
-                        {item.faucetUrl && (
-                          <li className={``}>
-                            <span>Faucet URL</span>
-                            <a href={item.faucetUrl} target={`_blank`}>
-                              <code>{item.faucetUrl}</code>
-                            </a>
-                          </li>
-                        )}
-                        <li>
-                          <button className={styles.button} onClick={(e) => addNetwork(item)}>
-                            🦊 Add {item.name} network
-                          </button>
-                        </li>
-                      </ul>
+                  <div key={i} className={`${styles.network}`} data-shadow="none" data-hover="none">
+                    <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}>
+                      <div className={`flex flex-row align-items-start justify-content-start gap-1 flex-1`}>
+                        <div className={`rounded ${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
+                        <div className={`flex flex-column align-items-start justify-content-start gap-025`}>
+                          <span>{item.name}</span>
+                          <span className={``}>{item.rpcUrls.default.http[0]}</span>
+                          <small className={``}>Add to your browser wallet</small>
+                        </div>
+                      </div>
+
+                      <button className={styles.button} onClick={(e) => addNetwork(item)}>
+                        Add network
+                      </button>
                     </div>
                   </div>
                 )
