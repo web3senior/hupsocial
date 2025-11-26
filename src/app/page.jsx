@@ -665,15 +665,17 @@ export default function Page() {
         <div className={`${styles.tabContent} ${styles.appsTab} relative`}>
           <div className={`${styles.page} ms-motion-slideDownIn`}>
             <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-              <div className={`grid grid--fill gap-1`} style={{ '--data-width': `400px`, padding: `2rem` }}>
+              <div className={`grid grid--fill gap-1`} style={{ '--data-width': `200px`, padding: `2rem` }}>
                 {apps &&
                   apps.map((item, i) => {
                     return (
                       <div key={i} className={`${styles.app}`}>
                         <div className={`${styles.app__body} d-f-c flex-row justify-content-between gap-025`}>
                           <div className={`flex flex-row align-items-center justify-content-start gap-050 flex-1`}>
-                            <img src={`${item.logo}`} style={{ width: `42px`, height: `42px`, aspectRatio: `1/1` }} />
-                            <span>{item.name}</span>
+                            <div key={i} className={`${styles.app__icon}`}>
+                              <img src={`${item.logo}`} />
+                            </div>
+                            <small>{item.name}</small>
                           </div>
 
                           <a target="_blank" rel="noopener noreferrer" href={`${item.url}`}>

@@ -10,6 +10,7 @@
   &__container {
     position: relative;
     top: 0rem;
+    padding-bottom: 4rem;
     background-color: var(--white, #fff);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
     border: 1px solid #f7f9f9;
@@ -389,19 +390,23 @@
 
 @media (prefers-color-scheme: dark) {
 }
+
+.appsTab {
+}
+.apps {
+ 
+}
 .app {
   background-color: var(--white);
   border: 1px solid var(--gray-100);
-  border-radius: 4px;
-  box-shadow: var(--shadow-10);
+  border-radius: 20px;
+  box-shadow: var(--shadow-xs);
   cursor: help;
-  transition: all 0.2s ease-in-out;
-
+  transition: all 0.2s var(--transition-soft);
 
   &:hover {
-    background-color: var(--gray-50);
-        border-color: var(--color-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+    border-color: var(--black);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     -webkit-transform: translateY(-2px);
     transform: translateY(-2px);
   }
@@ -415,30 +420,25 @@
   }
 
   &__icon {
-    svg {
+    background-color: var(--gray-50);
+    padding: .8rem;
+      border-radius: 8px;
+
+    img {
+      aspect-ratio: 1/1;
       --r: 24px;
       width: var(--r);
       height: var(--r);
-      box-shadow: var(--shadow-10);
-    }
-  }
-
-  span {
-    font-weight: 500;
-    border-radius: 1000px;
-
-    &:last-child {
-      font-size: 11px;
-      background-color: var(--gray-50);
     }
   }
 
   small {
-    color: var(--text-color-pale);
+    font-weight: 500;
+    border-radius: 1000px;
   }
 
   a {
-    background-color: var(--black);
+    background-color: var(--network-color-primary);
     color: var(--white);
     padding: 6px 12px;
     will-change: transform;
