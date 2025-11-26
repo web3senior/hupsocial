@@ -34,6 +34,7 @@
 .tab {
   position: relative;
   margin: 0 2em;
+
   @media (max-width: 600px) {
     margin: 0;
   }
@@ -53,7 +54,7 @@
     position: absolute;
     top: 0;
     height: 80%;
-    width: 20px;
+    width: 40px;
     z-index: 1;
   }
 
@@ -69,6 +70,7 @@
     isolation: isolate;
     scrollbar-color: var(--gray-100) transparent;
     scrollbar-width: thin;
+    padding-bottom: 1px;
 
     button {
       all: unset;
@@ -92,8 +94,8 @@
 }
 
 .activeTab {
-  border-color: var(--black) !important;
-  color: var(--black-900) !important;
+  border-color: var(--network-color-primary) !important;
+  color: var(--network-color-primary) !important;
 }
 
 .tabContent {

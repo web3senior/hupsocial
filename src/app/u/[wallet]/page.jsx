@@ -119,7 +119,7 @@ export default function Page() {
           <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
             <li>
               <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
-                Posts <span className={`lable lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
+                Posts <span className={`lable lable-pill lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
               </button>
             </li>
             <li>
