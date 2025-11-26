@@ -28,8 +28,13 @@
 .network {
   background-color: var(--white);
   border: 1px solid var(--gray-100);
-  border-radius: 1rem;
-box-shadow: var(--shadow-10);
+  border-radius: 4px;
+  box-shadow: var(--shadow-10);
+  cursor: help;
+
+  &:hover {
+    background-color: var(--gray-50);
+  }
 
   &__body {
     padding: 1.2rem;
@@ -41,10 +46,9 @@ box-shadow: var(--shadow-10);
 
   &__icon {
     svg {
-      --r: 64px;
+      --r: 24px;
       width: var(--r);
       height: var(--r);
-        border-radius: 1rem;
       box-shadow: var(--shadow-10);
     }
   }

@@ -58,22 +58,17 @@ export default function Page() {
   return (
     <>
       <PageTitle name={`networks`} />
-
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container`} data-width={`medium`}>
           <div className={`grid grid--fill gap-1`} style={{ '--data-width': `400px` }}>
             {config.chains &&
               config.chains.map((item, i) => {
                 return (
-                  <div key={i} className={`${styles.network}`} data-shadow="none" data-hover="none">
+                  <div key={i} className={`${styles.network}`} title={item.rpcUrls.default.http[0]}>
                     <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}>
-                      <div className={`flex flex-row align-items-start justify-content-start gap-1 flex-1`}>
+                      <div className={`flex flex-row align-items-center justify-content-start gap-1 flex-1`}>
                         <div className={`rounded ${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
-                        <div className={`flex flex-column align-items-start justify-content-start gap-025`}>
-                          <span>{item.name}</span>
-                          <span className={``}>{item.rpcUrls.default.http[0]}</span>
-                          <small className={``}>Add to your browser wallet</small>
-                        </div>
+                       <span>{item.name}</span>
                       </div>
 
                       <button className={styles.button} onClick={(e) => addNetwork(item)}>
