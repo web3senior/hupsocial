@@ -23,9 +23,9 @@
   grid-column: 1/1;
   height: 100%;
   gap: 1rem;
-  //padding: 4rem 0.3rem 7rem 0.3rem;
+  padding: 0 0.3rem 4rem 0.3rem;
   @media (max-width: 600px) {
-   // padding: 4.5rem 0rem 6rem 0rem;
+    // padding: 4.5rem 0rem 6rem 0rem;
   }
 
   // --pattern-fg: color-mix(in oklab, var(--grey-90-a50) 5%, transparent);

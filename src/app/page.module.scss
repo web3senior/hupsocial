@@ -10,7 +10,6 @@
   &__container {
     position: relative;
     top: 0rem;
-    padding-bottom: 4rem;
     background-color: var(--white, #fff);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
     border: 1px solid #f7f9f9;
@@ -95,7 +94,7 @@
 
 .activeTab {
   border-color: var(--network-color-primary) !important;
-  color: var(--network-color-primary) !important;
+  color: var(--black) !important;
 }
 
 .tabContent {
