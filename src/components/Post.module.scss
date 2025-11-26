@@ -1113,13 +1113,19 @@ button.btnPostMenu {
 
   &__content {
     height: auto;
-    width: fit-content;
-    max-height: 150px;
+    //width: fit-content;
+    // max-height: 150px;
     overflow: hidden;
     line-height: 1.4;
     font-size: 13px;
     padding: 0.2rem 0 0.2rem 0.3rem;
     user-select: none;
+
+    video {
+      width: fit-content;
+      height: 100%;
+      margin: 0 auto;
+    }
 
     a {
       color: var(--blue-500) !important;
@@ -1307,23 +1313,17 @@ button.btnPostMenu {
     button {
       all: unset;
       position: relative;
-      padding: 2px 9px;
-      transition: all 0.02s ease-in-out;
-
-      min-width: 20px;
-      height: 35px;
-
+      padding: 8px;
+      transition: all 0.01s ease-in;
       display: flex;
-      flex-direction: row;
       align-items: center;
-      justify-content: space-around;
+      justify-content: center;
       gap: 0.5rem;
-
-      border-radius: 999px;
+      border-radius: 1000px;
       color: var(--black-600);
 
       @media (max-width: 600px) {
-        padding: 3px 9px;
+        padding: 2px 9px;
       }
 
       &:active {
@@ -1332,8 +1332,8 @@ button.btnPostMenu {
 
       &:before {
         content: '';
-        width: 50%;
-        height: 50%;
+        width: 70%;
+        height: 70%;
         position: absolute;
         left: 50%;
         top: 50%;

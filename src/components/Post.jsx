@@ -118,8 +118,10 @@ export default function Post({ item, showContent, actions, chainId }) {
           <Profile creator={item.creator} createdAt={item.createdAt} />
           <Nav item={item} />
         </header>
-        <main className={`${styles.post__main} w-100 flex flex-column grid--gap-050`}>
-          <div className={`${styles.post__content} `} id={`post${item.postId}`} style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
+        <main className={`${styles.post__main}`}>
+          <div className={`${styles.post__content} `} id={`post${item.postId}`} 
+           dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
+           {/* style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} */}
 
           <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />}
