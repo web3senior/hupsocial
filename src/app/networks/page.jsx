@@ -66,7 +66,7 @@ export default function Page() {
                 return (
                   <div key={i} className={`${styles.network}`} title={item.rpcUrls.default.http[0]}>
                     <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}>
-                      <div className={`flex flex-row align-items-center justify-content-start gap-1 flex-1`}>
+                      <div className={`flex flex-row align-items-center justify-content-start gap-050 flex-1`}>
                         <div className={`rounded ${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
                        <span>{item.name}</span>
                       </div>
