@@ -193,7 +193,7 @@ export default function Page() {
   }
 
   useEffect(() => {
-    getApps().then((res) => {
+    getApps(activeChain[0].id).then((res) => {
       console.log(res)
       setApps({ list: res })
     })

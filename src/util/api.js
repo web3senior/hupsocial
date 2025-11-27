@@ -127,8 +127,8 @@ export async function addViewPost(chainId, postId) {
 export async function subscribeUser(sub, wallet) {
   const subscription = sub
   var raw = JSON.stringify({
-    "subscription":subscription,
-    "wallet": wallet
+    subscription: subscription,
+    wallet: wallet,
   })
 
   var requestOptions = {
@@ -157,10 +157,10 @@ export async function unsubscribeUser(wallet) {
   return response.json()
 }
 
-export async function sendNotification(message ,address) {
+export async function sendNotification(message, address) {
   var requestOptions = {
     method: 'POST',
-    body: JSON.stringify({message: message, address: address}),
+    body: JSON.stringify({ message: message, address: address }),
     redirect: 'follow',
   }
 
@@ -169,13 +169,14 @@ export async function sendNotification(message ,address) {
   return response.json()
 }
 
-export async function getApps() {
+export async function getApps(chainId) {
   let requestOptions = {
     method: 'GET',
     redirect: 'follow',
   }
 
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}app/list`, requestOptions)
+  const params = new URLSearchParams({ chain_id: chainId }).toString()
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}app/list?${params}`, requestOptions)
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
