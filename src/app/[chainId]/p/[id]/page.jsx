@@ -147,6 +147,8 @@ export default function Page() {
   }
 
   useEffect(() => {
+    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, params.chainId)
+
     // View
     addViewPost(params.chainId, params.id).then((result) => {
       setViewCount(result)

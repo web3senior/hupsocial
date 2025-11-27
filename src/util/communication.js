@@ -36,21 +36,6 @@ export const getActiveChain = () => {
   return [null, null]
 }
 
-// /**
-//  * Get user selected chain
-//  * @returns Array
-//  */
-// export const getActiveChain = () => {
-
-//   if (typeof window !== 'undefined') {
-//   const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || 4201
-//   const userSelectedChain = config.chains.filter((filterItem) => filterItem.id.toString() === activeChain.toString())
-
-//   return [userSelectedChain[0], CONTRACTS[`chain${userSelectedChain[0].id}`]]
-//   }
-
-// }
-
 /**
  * Initialize post contract
  */
