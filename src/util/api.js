@@ -169,6 +169,16 @@ export async function sendNotification(message ,address) {
   return response.json()
 }
 
+export async function getApps() {
+  let requestOptions = {
+    method: 'GET',
+    redirect: 'follow',
+  }
+
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}app/list`, requestOptions)
+  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
+  return response.json()
+}
 export async function getClaim() {
   let requestOptions = {
     method: 'GET',
@@ -179,7 +189,6 @@ export async function getClaim() {
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
-
 export async function getChillwhale() {
   let requestOptions = {
     method: 'GET',

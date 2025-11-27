@@ -20,7 +20,7 @@ import {
   getVoterChoices,
   getActiveChain,
 } from '@/util/communication'
-import { getProfile, getUniversalProfile, newView, getViewPost, addViewPost } from '@/util/api'
+import { getProfile, getUniversalProfile, newView, getViewPost, addViewPost, getApps } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'

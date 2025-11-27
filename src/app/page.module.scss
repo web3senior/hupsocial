@@ -39,12 +39,12 @@
   }
   &:after {
     right: 0;
-    background: linear-gradient(to right, transparent 10%, rgba(255, 255, 255, 0.9));
+    background: linear-gradient(to right, transparent 10%, var(--gray-50));
   }
 
   &:before {
     left: 0;
-    background: linear-gradient(to left, transparent 10%, rgba(255, 255, 255, 0.9));
+    background: linear-gradient(to left, transparent 10%, var(--gray-50));
   }
 
   &:before,
@@ -391,6 +391,7 @@
 .appsTab {
 }
 .apps {
+  
 }
 .app {
   background-color: var(--white);
@@ -434,8 +435,8 @@
   }
 
   a {
-    background-color: var(--network-color-primary);
-    color: var(--white);
+    background-color: var(--gray-100);
+    color: var(--black);
     padding: 6px 12px;
     will-change: transform;
     font-size: 11px;

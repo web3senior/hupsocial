@@ -6,7 +6,7 @@ import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/util/communication'
-import { getProfile, getUniversalProfile } from '@/util/api'
+import { getApps, getProfile, getUniversalProfile } from '@/util/api'
 import PollTimer from '@/components/PollTimer'
 import Profile from '@/components/Profile'
 import { useAuth } from '@/contexts/AuthContext'
@@ -192,8 +192,12 @@ export default function Page() {
     }
   }
 
-  // --- Re-Attach Scroll Handler (Optional, if not handled elsewhere) ---
   useEffect(() => {
+    getApps().then((res) => {
+      console.log(res)
+      setApps({ list: res })
+    })
+
     getPostCount().then((count) => {
       const totalPosts = web3.utils.toNumber(count)
       setTotalPosts(totalPosts)
@@ -222,7 +226,7 @@ export default function Page() {
           <div className={`${styles.tab__container}`}>
             <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
               Feed
-              <span className={`lable lable-pill`} style={{background: `var(--network-color-primary)`, color: `var(--network-color-text)` }}>
+              <span className={`lable lable-pill`} style={{ background: `var(--network-color-primary)`, color: `var(--network-color-text)` }}>
                 {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}
               </span>
             </button>
