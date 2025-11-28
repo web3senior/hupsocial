@@ -452,7 +452,7 @@ const Links = () => {
   useEffect(() => {
     getUniversalProfile(params.wallet).then((res) => {
       console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
         setIsItUp(true)
         setData({
           wallet: res.data.Profile[0].id,
@@ -1403,7 +1403,7 @@ const PostForm = ({ addr }) => {
 
     getUniversalProfile(addr).then((res) => {
       // console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
         //setIsItUp(true)
         setProfile({
           wallet: res.data.id,

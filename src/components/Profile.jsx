@@ -46,7 +46,7 @@ export default function Profile({ creator, createdAt }) {
   useEffect(() => {
     getUniversalProfile(creator).then((res) => {
       // console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
         setIsItUp(true)
         setProfile({
           wallet: res.data.id,
