@@ -29,7 +29,7 @@ const NetworkGrid = () => {
         config.chains.map((item, i) => {
           return (
             <Link key={i} href={`networks/${item.id}`} className={styles.button}>
-              <div className={`${styles.network}`} title={item.rpcUrls.default.http[0]}>
+              <div className={`${styles.network}`} title={`View details`}>
                 <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}>
                   <div className={`flex flex-row align-items-center justify-content-start gap-050 flex-1`}>
                     <div className={`rounded ${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
