@@ -35,7 +35,6 @@ const NetworkGrid = () => {
                     <div className={`rounded ${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
                     <span>{item.name}</span>
                   </div>
-
                   <small>View</small>
                 </div>
               </div>
