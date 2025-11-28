@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { getCategory } from '../util/api'
+import { getCategory } from '../lib/api'
 import styles from './Category.module.scss'
 
 export default function Category() {

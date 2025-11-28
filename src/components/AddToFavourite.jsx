@@ -2,7 +2,7 @@
 import { Component, useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { getCategory } from '../util/api'
+import { getCategory } from '../lib/api'
 import { toast } from 'react-hot-toast'
 import Icon from '../helper/MaterialIcon'
 import styles from './AddToFavourite.module.scss'

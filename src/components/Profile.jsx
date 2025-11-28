@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { getProfile, getUniversalProfile } from '@/util/api'
+import { getProfile, getUniversalProfile } from '@/lib/api'
 import { config } from '@/config/wagmi'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import web3 from 'web3'
 import moment from 'moment'
 import { toSvg } from 'jdenticon'
-import { getActiveChain } from '@/util/communication'
+import { getActiveChain } from '@/lib/communication'
 import styles from './Profile.module.scss'
 
 moment.defineLocale('en-short', {

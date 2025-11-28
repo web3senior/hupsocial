@@ -1,0 +1,36 @@
+// Shimmer.module.scss
+
+// Shimmer Configuration Variables
+$shimmer-color-light: var(--gray-100);
+$shimmer-duration: 2s;
+
+// Shimmer container
+.shimmer {
+  position: relative;
+  background-color: $shimmer-color-light;
+  overflow: hidden;
+  border-radius: 4px;
+
+  &:after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, rgb(243, 242, 241) 0%, rgb(237, 235, 233) 50%, rgb(243, 242, 241) 100%) 0px 0px / 90% 100% no-repeat rgb(243, 242, 241);
+    transform: translateX(-100%);
+    animation-duration: $shimmer-duration;
+    animation-timing-function: ease-in-out;
+    animation-direction: normal;
+    animation-iteration-count: infinite;
+    animation-name: shimmer-move;
+  }
+}
+
+// Keyframes
+@keyframes shimmer-move {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

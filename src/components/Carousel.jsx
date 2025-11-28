@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { getCarousel } from './../util/api'
+import { getCarousel } from '../lib/api'
 import './../node_modules/react-responsive-carousel/lib/styles/carousel.min.css'
 import { Carousel } from 'react-responsive-carousel'
 import useEmblaCarousel from 'embla-carousel-react'

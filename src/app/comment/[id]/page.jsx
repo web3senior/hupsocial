@@ -23,18 +23,18 @@ import {
   getVoteCountsForPoll,
   getVoterChoices,
   getActiveChain,
-} from '@/util/communication'
-import { getProfile, getUniversalProfile } from '@/util/api'
+} from '@/lib/communication'
+import { getProfile, getUniversalProfile } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
-import { isPollActive } from '@/util/utils'
+import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
-import Shimmer from '@/helper/Shimmer'
+import Shimmer from '@/components/ui/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile, { ProfileImage } from '../../../components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon } from '@/components/Icons'

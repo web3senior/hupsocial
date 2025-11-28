@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import Web3 from 'web3'
 import Icon from '../helper/MaterialIcon'
-import Shimmer from '../helper/Shimmer'
+import Shimmer from './ui/Shimmer'
 import styles from './CartButton.module.scss'
 
 export default function CartButton() {

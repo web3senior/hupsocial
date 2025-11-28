@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react' // ⬅️ IMPORT HOOKS
-import { getApps } from '@/util/api'
-import { getActiveChain } from '@/util/communication'
+import { getApps } from '@/lib/api'
+import { getActiveChain } from '@/lib/communication'
 import NoData from '../NoData'
 import * as Loading from '@/components/Loading'
 import styles from './AppsTab.module.scss'

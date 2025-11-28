@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { getActiveChain } from '@/util/communication'
+import { getActiveChain } from '@/lib/communication'
 import { useAccount } from 'wagmi'
 import { BackIcon } from './Icons'
 import styles from './Aside.module.scss'

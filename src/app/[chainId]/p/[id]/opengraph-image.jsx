@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { getPostByIndex } from '@/util/communication'
+import { getPostByIndex } from '@/lib/communication'
  
 // Image metadata
 export const size = {

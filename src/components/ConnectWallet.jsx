@@ -6,9 +6,9 @@ import { useEffect, useState, useRef } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import { useAccount, useDisconnect, Connector, useConnect, useSwitchChain, useConfig } from 'wagmi'
-import { getActiveChain } from '@/util/communication'
-import { getProfile, getUniversalProfile } from '@/util/api'
-import Shimmer from '@/helper/Shimmer'
+import { getActiveChain } from '@/lib/communication'
+import { getProfile, getUniversalProfile } from '@/lib/api'
+import Shimmer from '@/components/ui/Shimmer'
 import styles from './ConnectWallet.module.scss'
 
 export const ConnectWallet = () => {
