@@ -145,3 +145,5 @@ export const getNetworkColor = () => {
   const secondaryColor = rootElement.style.getPropertyValue(`--network-color-text`)
   return { primaryColor, secondaryColor }
 }
+
+console.log(config)

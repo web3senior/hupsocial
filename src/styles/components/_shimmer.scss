@@ -1,24 +1,15 @@
 .shimmer {
-  position: relative;
-  overflow: hidden;
   background: var(--gray-100);
-
-  &:after {
-    content: ' ';
-    position: absolute;
-    inset: 0;
-    background-repeat: no-repeat;
-    background-image: linear-gradient(90deg, var(--gray-100) 0%, var(--white) 10%, var(--gray-100) 100%);
-    animation-name: pulse;
-    animation-direction: 1.5s;
-    animation-duration: 2s;
-    animation-timing-function: ease-in-out;
-    animation-iteration-count: infinite;
-  }
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  // animation-name: pulse;
+  // animation-direction: 1.5s;
+  // animation-duration: 2s;
+  // animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  // animation-iteration-count: infinite;
 }
 
 @keyframes pulse {
-  100% {
-    transform: translateX(100%);
+  50% {
+    opacity: 0.5;
   }
 }

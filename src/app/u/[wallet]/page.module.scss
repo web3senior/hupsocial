@@ -664,6 +664,7 @@
   position: fixed;
   inset: 0;
   display: flex;
+  max-height: 100svh;
   justify-content: center;
   align-items: center;
   row-gap: 1rem;

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useId, useRef, useCallback } from 'react'
+import { useState, useEffect, lazy, Suspense, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
@@ -16,16 +16,20 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import { getActiveChain } from '@/util/communication'
-import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/helper/Shimmer'
-import { InlineLoading } from '@/components/Loading'
+
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import styles from './page.module.scss'
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
+
+import NoData from '@/components/NoData'
+
+const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
+const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -58,6 +62,19 @@ export default function Page() {
   const activeChain = getActiveChain()
   const { address, isConnected } = useAccount()
   const router = useRouter()
+  const TABS_DATA = [
+    { id: 'feed', label: 'Feed', count: totalPosts },
+    { id: 'events', label: 'Events' },
+    { id: 'jobs', label: 'Jobs' },
+    { id: 'apps', label: 'Apps' },
+  ]
+  const TabContentMap = {
+    events: EventsTab,
+    //  jobs: JobsTab,
+    apps: AppsTab,
+    // feed: FeedTab,
+  }
+  const ActiveComponent = TabContentMap[activeTab]
 
   const loadMorePosts = async (totalPosts) => {
     // Use a sensible page size (10 is better than 1 for performance)
@@ -153,8 +170,6 @@ export default function Page() {
   }
 
   /**
-   * Handles scroll events for infinite loading.
-   * * Assumes:
    * - scrollContainerRef: A React Ref attached to the scrollable DOM element.
    * - totalPosts: The total number of posts available from the contract.
    * - postsLoaded: The number of posts currently rendered.
@@ -222,33 +237,30 @@ export default function Page() {
       <PageTitle name={`home`} />
 
       <div className={`__container`} data-width={`medium`}>
-        <section className={`${styles.tab}`}>
-          <div className={`${styles.tab__container}`}>
-            <button className={activeTab === 'feed' ? styles.activeTab : ''} onClick={() => setActiveTab('feed')}>
-              Feed
-              <span className={`lable lable-pill`} style={{ background: `var(--network-color-primary)`, color: `var(--network-color-text)` }}>
-                {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}
-              </span>
-            </button>
+        <section className={styles.tab}>
+          <div className={`${styles.tab__container} flex align-items-center justify-content-around`}>
+            {TABS_DATA.map((tab) => (
+              <button key={tab.id} className={activeTab === tab.id ? styles.activeTab : ''} onClick={() => setActiveTab(tab.id)}>
+                {tab.label}
 
-            <button className={activeTab === 'communities' ? styles.activeTab : ''} onClick={() => setActiveTab('communities')}>
-              Communities
-            </button>
-
-            <button className={activeTab === 'events' ? styles.activeTab : ''} onClick={() => setActiveTab('events')}>
-              Events
-            </button>
-
-            <button className={activeTab === 'jobs' ? styles.activeTab : ''} onClick={() => setActiveTab('jobs')}>
-              Jobs
-            </button>
-
-            <button className={activeTab === 'apps' ? styles.activeTab : ''} onClick={() => setActiveTab('apps')}>
-              Apps
-            </button>
+                {tab.count && (
+                  <span
+                    className={`lable lable-pill`}
+                    style={{
+                      background: `var(--network-color-primary)`,
+                      color: `var(--network-color-text)`,
+                    }}
+                  >
+                    {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(tab.count)}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
         </section>
       </div>
+
+      <Suspense fallback={<div>Loading Tab Content...</div>}>{ActiveComponent && <ActiveComponent />}</Suspense>
 
       {activeTab === 'feed' && (
         <div className={`${styles.tabContent} ${styles.feedTab} relative`}>
@@ -293,76 +305,13 @@ export default function Page() {
           </div>
         </div>
       )}
-
-      {activeTab === 'communities' && (
-        <div className={`${styles.tabContent} ${styles.communitiesTab} relative`}>
-          <div className={`__container`} data-width={`medium`}>
-            <NoData name={`communities`} />
-          </div>
-        </div>
-      )}
-      {activeTab === 'events' && (
-        <div className={`${styles.tabContent} ${styles.eventsTab} relative`}>
-          <div className={`__container`} data-width={`medium`}>
-            <NoData name={`events`} />
-          </div>
-        </div>
-      )}
-      {activeTab === 'jobs' && (
-        <div className={`${styles.tabContent} ${styles.jobsTab} relative`}>
-          <div className={`__container`} data-width={`medium`}>
-            <NoData name={`jobs`} />
-          </div>
-        </div>
-      )}
-      {activeTab === 'apps' && (
-        <div className={`${styles.tabContent} ${styles.appsTab} relative`}>
-          <div className={`${styles.page} ms-motion-slideDownIn`}>
-            <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-              <div className={`grid grid--fill gap-1`} style={{ '--data-width': `200px`, padding: `2rem` }}>
-                {apps.list.length > 0 &&
-                  apps.list.map((item, i) => {
-                    return (
-                      <div key={i} className={`${styles.app}`}>
-                        <div className={`${styles.app__body} d-f-c flex-row justify-content-between gap-025`}>
-                          <div className={`flex flex-row align-items-center justify-content-start gap-050 flex-1`}>
-                            <div key={i} className={`${styles.app__icon}`}>
-                              <img src={`${item.logo}`} />
-                            </div>
-                            <small>{item.name}</small>
-                          </div>
-
-                          <a target="_blank" rel="noopener noreferrer" href={`${item.url}`}>
-                            View
-                          </a>
-                        </div>
-                      </div>
-                    )
-                  })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
 
-/**
- * No data in tab content
- * @param {*} param0
- * @returns
- */
-const NoData = ({ name }) => {
-  return (
-    <div className={`${styles.tabContentEmpty} d-f-c`}>
-      <p style={{ color: `var(--gray-400)` }}>No {name} yet.</p>
-    </div>
-  )
-}
 const PostShimmer = () => {
   return (
-    <div className={`${styles.pageShimmer} flex flex-column gap-025`}>
+    <div className={`${styles.pageShimmer} flex flex-column gap-025`}> 
       <div className={`flex flex-row gap-050`}>
         <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
         <div className={`flex flex-column gap-050`}>
@@ -374,16 +323,16 @@ const PostShimmer = () => {
       <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `60%`, height: `10px` }} />
       <ul className={`flex gap-1 mt-10`} style={{ marginLeft: `3rem` }}>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `30px`, height: `30px` }} />
+          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
         </li>
       </ul>
     </div>

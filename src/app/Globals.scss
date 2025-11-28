@@ -149,8 +149,8 @@ button {
   cursor: pointer;
 }
 
-.rounded {
-  border-radius: 999px;
+.rounded,.rounded-full {
+  border-radius: 9999px;
 }
 
 .debug {

@@ -32,11 +32,11 @@
 
 .tab {
   position: relative;
-  margin: 0 2em;
-
+  margin: 0 4em;
   @media (max-width: 600px) {
     margin: 0;
   }
+
   &:after {
     right: 0;
     background: linear-gradient(to right, transparent 10%, var(--gray-50));
@@ -53,7 +53,7 @@
     position: absolute;
     top: 0;
     height: 80%;
-    width: 40px;
+    width: 20px;
     z-index: 1;
   }
 
@@ -63,7 +63,6 @@
     flex: none;
     gap: 1rem;
     width: calc(100% - 4em);
-    flex-flow: row nowrap;
     overflow-y: hidden;
     user-select: none;
     isolation: isolate;
@@ -74,14 +73,13 @@
     button {
       all: unset;
       color: var(--gray-500);
-      padding: 0.4rem 0;
+      padding: 0.7em 0;
       font-weight: 500;
       display: flex;
       place-content: center;
       place-items: center;
       gap: 0.2rem;
       width: 100%;
-      min-width: 80px;
       border-bottom: 2px solid transparent;
       transition-property: all;
       transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -386,71 +384,4 @@
 }
 
 @media (prefers-color-scheme: dark) {
-}
-
-.appsTab {
-}
-.apps {
-  
-}
-.app {
-  background-color: var(--white);
-  border: 1px solid var(--gray-100);
-  border-radius: 20px;
-  box-shadow: var(--shadow-xs);
-  cursor: help;
-  transition: all 0.2s var(--transition-soft);
-
-  &:hover {
-    border-color: var(--black);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    -webkit-transform: translateY(-2px);
-    transform: translateY(-2px);
-  }
-
-  &__body {
-    padding: 1.2rem;
-  }
-
-  a {
-    color: var(--blue-400);
-  }
-
-  &__icon {
-    background-color: var(--gray-50);
-    padding: 0.8rem;
-    border-radius: 8px;
-
-    img {
-      aspect-ratio: 1/1;
-      --r: 24px;
-      width: var(--r);
-      height: var(--r);
-    }
-  }
-
-  small {
-    font-weight: 500;
-    border-radius: 1000px;
-  }
-
-  a {
-    background-color: var(--gray-100);
-    color: var(--black);
-    padding: 6px 12px;
-    will-change: transform;
-    font-size: 11px;
-    border: none;
-    border-radius: 1000px;
-
-    &:hover {
-      transform: scale(1.015);
-      transition: all 0.3s ease-in-out;
-    }
-
-    &:active {
-      transform: scale(0.95);
-      transition: all 0.3s ease;
-    }
-  }
 }

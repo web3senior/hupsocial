@@ -4,7 +4,7 @@ import React, { useContext, useEffect, useState } from 'react'
 // import ABI from './../abi/pollpal.json'
 // import LSP0ERC725Account from '@lukso/lsp0-contracts/compatibility-abis/LSP0ERC725Account-v0.12.0.json'
 import { toast } from '../components/NextToast'
-import { FullPageLoading as Loading } from './../components/Loading'
+import { Spinner as Loading } from './../components/Loading'
 import Web3 from 'web3'
 
 export const AuthContext = React.createContext()

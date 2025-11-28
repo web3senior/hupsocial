@@ -15,7 +15,7 @@ import Post from '@/components/Post'
 import { getActiveChain } from '@/util/communication'
 import { useWaitForTransactionReceipt, useAccount, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
-import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
+import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 
@@ -25,7 +25,8 @@ export default function Page() {
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [totalPosts, setTotalPosts] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  const [data, setData] = useState()
+
+  const [POAPs, setPOAPs] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const router = useRouter()
@@ -92,9 +93,26 @@ export default function Page() {
       setIsLoadedPoll(false)
     }
   }
+  // Example of how a component fetches data from your new API route
+  async function getPoapsForAddress(address) {
+    const res = await fetch(`/api/poap-scan/${address}`)
 
+    if (!res.ok) {
+      // Handle error on the client side
+      throw new Error('Failed to fetch POAPs')
+    }
+
+    return res.json()
+  }
+
+  // In a component:
+  // const data = await getPoapsForAddress('atenyun.eth');
 
   useEffect(() => {
+    getPoapsForAddress(`atenyun.eth`).then((res) => {
+      console.log(res)
+      setPOAPs(res)
+    })
     getCreatorPostCount(params.wallet).then((count) => {
       const totalPosts = web3.utils.toNumber(count)
       setTotalPosts(totalPosts)
@@ -110,10 +128,23 @@ export default function Page() {
       <PageTitle name={`profile`} />
 
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
+
+            <div className={`grid grid--fill gap-1 mt-10`} style={{ '--data-width': `64px` }} role="list">
+              {POAPs &&
+                POAPs.length > 0 &&
+                POAPs.map((POAP, key) => {
+                  return (
+                    <figure className={``}>
+                      <img src={POAP.event.image_url} style={{ width: `64px` }} className={`rounded-full`} />
+                      <figcaption style={{ color: `black` }}>{POAP.event.name}</figcaption>
+                      <small className={`lable lable-dark`}>{POAP.event.year}</small>
+                    </figure>
+                  )
+                })}
+            </div>
           </div>
 
           <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
@@ -300,7 +331,7 @@ const Profile = ({ addr }) => {
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
       console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
         setIsItUp(true)
         setData({
           wallet: res.data.Profile[0].id,
@@ -367,13 +398,19 @@ const Profile = ({ addr }) => {
         <footer className={`w-100`}>
           <ul className={`flex flex-column align-items-center justify-content-between gap-1`}>
             <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
-              <button className={`${styles.btnFollowers}`}>
-                <span className={`mt-20 text-secondary`}>{100} followers</span>
-              </button>
-              <span>•</span>
-              <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
-                hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
-              </Link>
+              <div className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
+                <button className={`${styles.btnFollowers}`}>
+                  <span className={`mt-20 text-secondary`}>{100} followers</span>
+                </button>
+                <span>•</span>
+                <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
+                  hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
+                </Link>
+              </div>
+
+              <div role='list'>
+                <POAPIcon />
+              </div>
             </li>
             {isConnected && selfView && (
               <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
