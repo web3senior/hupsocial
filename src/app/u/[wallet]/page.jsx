@@ -109,7 +109,7 @@ export default function Page() {
   // const data = await getPoapsForAddress('atenyun.eth');
 
   useEffect(() => {
-    getPoapsForAddress(`atenyun.eth`).then((res) => {
+    getPoapsForAddress(params.wallet).then((res) => {
       console.log(res)
       setPOAPs(res)
     })

@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
  */
 export async function GET(request, context) {
   const { address } =await context.params;
-
+console.log(address)
   if (!address) {
     return NextResponse.json({ error: 'Missing address parameter' }, { status: 400 });
   }
