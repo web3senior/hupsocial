@@ -19,11 +19,11 @@
     overflow: hidden;
     isolation: isolate;
     padding: 2rem;
-    @media (max-width: 600px) {
-      padding: 0.5em 0;
-    }
 
     @media (max-width: 600px) {
+      padding: 0;
+      background-color: transparent;
+      box-shadow: none;
       border: none;
       filter: none;
       border-radius: unset;
@@ -38,7 +38,12 @@
   box-shadow: var(--shadow-xs);
   cursor: pointer;
   transition: all 0.2s var(--transition-soft);
+  will-change: transform;
   user-select: none;
+
+  &:active {
+    transform: scale(0.99) !important;
+  }
 
   &__body {
     padding: 1.2rem;
@@ -58,13 +63,9 @@
   }
 
   span {
+    font-size: 11px;
     font-weight: 500;
     border-radius: 1000px;
-
-    &:last-child {
-      font-size: 11px;
-      background-color: var(--gray-50);
-    }
   }
 
   small {

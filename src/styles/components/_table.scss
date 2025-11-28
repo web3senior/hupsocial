@@ -9,25 +9,33 @@ table {
 
 table caption {
   font-size: 1.5em;
-  margin: .5em 0 .75em;
+  margin: 0.5em 0 0.75em;
 }
 
 table tr {
   background-color: #fff;
-  border: 1px solid #ddd;
-  padding: .35em;
+  border: 1px solid var(--gray-300);
+  padding: 0.35em;
+
+  &:hover {
+    background-color: var(--gray-50);
+  }
 }
 
 table th,
 table td {
-  padding: .625em;
+  padding: 0.625em;
   text-align: center;
 }
 
 table th {
-  font-size: .85em;
-  letter-spacing: .1em;
+  font-size: 0.85em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+table thead th {
+  background-color: var(--gray-200);
 }
 
 @media screen and (max-width: 600px) {
@@ -38,7 +46,7 @@ table th {
   table caption {
     font-size: 1.3em;
   }
-  
+
   table thead {
     border: none;
     clip: rect(0 0 0 0);
@@ -49,20 +57,18 @@ table th {
     position: absolute;
     width: 1px;
   }
-  
+
   table tr {
-    border-bottom: 3px solid #ddd;
     display: block;
-    margin-bottom: .625em;
+    margin-bottom: 0.625em;
   }
-  
+
   table td {
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--gray-200);
     display: block;
-    font-size: .8em;
-    text-align: right;
+    font-size: 0.8em;
   }
-  
+
   table td::before {
     /*
     * aria-label has no advantage, it won't be read inside a table
@@ -73,7 +79,7 @@ table th {
     font-weight: bold;
     text-transform: uppercase;
   }
-  
+
   table td:last-child {
     border-bottom: 0;
   }

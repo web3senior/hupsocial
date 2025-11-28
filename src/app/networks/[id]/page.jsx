@@ -1,11 +1,11 @@
-import React from 'react'
+import Link from 'next/link'
 import { config } from '@/config/wagmi'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 
-
 export default async function Page({ params }) {
   const id = (await params).id
+
   return (
     <>
       <PageTitle name={`networks`} />
@@ -30,12 +30,47 @@ const NetworkDetails = ({ id }) => {
                 <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`} style={{ '--bg-color': `${item.primaryColor}` }}>
                   <div className={`flex flex-column align-items-center justify-content-start gap-050 flex-1`}>
                     <div className={`${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
-                    <span>{item.name}</span>
-                    <span className={`lable lable-dark`}>{item.nativeCurrency.symbol}</span>
-                    <code>{item.rpcUrls.default.http[0]}</code>
-                    <a href={item.blockExplorers.default.url} target="_blank" rel="noopener noreferrer">
-                      {item.blockExplorers.default.url}↗️
-                    </a>
+                    <h3>{item.name}</h3>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th width="30%">Setting</th>
+                          <th>Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>Name</td>
+                          <td>
+                            {item.name}
+                            {item.testnet && <span className={`lable lable-warning ml-10`}>TESTNET</span>}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Chain Id</td>
+                          <td>{item.id}</td>
+                        </tr>
+                        <tr>
+                          <td>Currency Symbol</td>
+                          <td>{item.nativeCurrency.symbol}</td>
+                        </tr>
+                        <tr>
+                          <td>RPC</td>
+                          <td>
+                            <code>{item.rpcUrls.default.http[0]}</code>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Block Eplorer</td>
+                          <td>
+                            <a href={item.blockExplorers.default.url} target="_blank" rel="noopener noreferrer">
+                              {item.blockExplorers.default.url} ↗
+                            </a>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <Link href={`/networks`}>Back</Link>
                   </div>
                 </div>
               </div>

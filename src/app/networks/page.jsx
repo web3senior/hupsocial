@@ -2,8 +2,8 @@ import Link from 'next/link'
 import React, { Suspense } from 'react'
 import { config } from '@/config/wagmi'
 import PageTitle from '@/components/PageTitle'
-import styles from './page.module.scss'
 import Shimmer from '@/components/ui/Shimmer'
+import styles from './page.module.scss'
 
 export default function Page() {
   return (
@@ -11,7 +11,7 @@ export default function Page() {
       <PageTitle name={`networks`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-          <div className={`grid grid--fill gap-1`} style={{ '--data-width': `300px` }}>
+          <div className={`flex flex-column gap-1`}>
             <Suspense fallback={<NetworksFallback />}>
               <NetworkGrid />
             </Suspense>

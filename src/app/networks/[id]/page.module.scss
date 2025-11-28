@@ -10,9 +10,25 @@
     isolation: isolate;
 
     @media (max-width: 600px) {
+      padding: 0;
+      background-color: transparent;
+      box-shadow: none;
       border: none;
       filter: none;
       border-radius: unset;
+    }
+  }
+
+  a {
+    color: var(--blue-600);
+  }
+
+  table {
+    tr {
+      th,
+      td {
+        text-align: left;
+      }
     }
   }
 }
@@ -22,15 +38,13 @@
   background-color: var(--white);
   border: 1px solid transparent;
   border-radius: 20px;
-  cursor: help;
   transition: all 0.2s var(--transition-soft);
-  user-select: none;
   isolation: isolate;
 
   &__body {
-    padding: 2rem;
+    padding: 4rem;
     @media (max-width: 600px) {
-      padding: 0.5em 0;
+      padding: 1em 0;
     }
 
     &:before {
@@ -39,13 +53,12 @@
       left: 0;
       right: 0;
       top: 0;
-      height: 60px;
+      height: 90px;
       background-color: var(--bg-color);
+      @media (max-width: 600px) {
+        height: 40px;
+      }
     }
-  }
-
-  a {
-    color: var(--blue-400);
   }
 
   &__icon {
@@ -60,29 +73,6 @@
       width: var(--r);
       height: var(--r);
     }
-  }
-
-  span {
-    font-weight: 500;
-    border-radius: 1000px;
-
-    &:last-child {
-      font-size: 11px;
-      background-color: var(--gray-50);
-    }
-  }
-
-  small {
-    color: var(--text-color-pale);
-  }
-
-  small {
-    background-color: var(--gray-100);
-    color: var(--black);
-    padding: 6px 12px;
-    font-size: 11px;
-    border: none;
-    border-radius: 1000px;
   }
 }
 
