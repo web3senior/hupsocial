@@ -24,7 +24,7 @@ import { marked } from 'marked'
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import NoData from '@/components/NoData'
-import styles from './Page.module.scss'
+import styles from './page.module.scss'
 
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
