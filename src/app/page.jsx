@@ -3,7 +3,7 @@
 import { useState, useEffect, lazy, Suspense, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
-import { useParams, useRouter } from 'next/navigation'
+import {  useRouter } from 'next/navigation'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getApps, getProfile, getUniversalProfile } from '@/lib/api'
@@ -18,15 +18,13 @@ import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/components/ui/Shimmer'
-
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import styles from './page.module.scss'
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
-
 import NoData from '@/components/NoData'
+import styles from './Page.module.scss'
 
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
@@ -311,7 +309,7 @@ export default function Page() {
 
 const PostShimmer = () => {
   return (
-    <div className={`${styles.pageShimmer} flex flex-column gap-025`}> 
+    <div className={`${styles.pageShimmer} flex flex-column gap-025`}>
       <div className={`flex flex-row gap-050`}>
         <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
         <div className={`flex flex-column gap-050`}>
