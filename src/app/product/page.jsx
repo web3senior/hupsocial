@@ -17,17 +17,11 @@ export default async function Page({ params, searchParams }) {
   return (
     <div className={`${styles.page} ms-motion-slideDownIn`}>
       <div className={`__container d-f-c`} data-width={`small `}>
-        <br />
-        <br />
-        <br />
-        <br />
-        <br />
-        <br />
-        <br />
-        <br />
-        <br />
-        <br />
-        <Link href={`./product/1/${slugify(`test`)}`}>another page</Link>
+   <br />
+   <br /><br /><br /><br /><br /><br /><br /><br /><br />
+ <Link href={`./product/1/${slugify(`test`)}`}>
+another page
+</Link>
       </div>
     </div>
   )
