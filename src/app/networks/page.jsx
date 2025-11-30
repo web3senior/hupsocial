@@ -15,6 +15,10 @@ export default function Page() {
             <Suspense fallback={<NetworksFallback />}>
               <NetworkGrid />
             </Suspense>
+
+            <Link href={`networks/4201`} className={styles.backButton}>
+              check 4201 network details
+            </Link>
           </div>
         </div>
       </div>

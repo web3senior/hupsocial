@@ -296,7 +296,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
     })
   }
 
-  useEffect(() => {}, [item])
+  useEffect(() => { }, [item])
 
   // if (loading) {
   //   return <InlineLoading />
@@ -408,7 +408,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
     })
   }
 
-  useEffect(() => {}, [id])
+  useEffect(() => { }, [id])
 
   // if (loading) {
   //   return <InlineLoading />
