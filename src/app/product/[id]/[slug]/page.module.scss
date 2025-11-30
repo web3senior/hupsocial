@@ -1,0 +1,124 @@
+.page {
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+  --button-primary-hover: #383838;
+  --button-secondary-hover: #f2f2f2;
+  padding-top: 1rem;
+
+  h1 {
+    font-size: calc(0.9em + 0.3vw);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    margin-bottom: 1rem;
+  }
+}
+
+
+.soldout {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  padding: 0.2rem;
+  background-color: var(--red);
+  color: var(--white);
+  border-top: 2px solid var(--red-900);
+  border-left: 2px solid var(--red-900);
+}
+
+.comment {
+  li {
+    &:not(:first-child) {
+      margin-top: 1rem;
+    }
+
+    &:not(:last-child) {
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--black-200);
+    }
+  }
+
+  &__respond {
+    position: relative;
+    padding: 1.5rem 0.5rem;
+    background-color: var(--red-050);
+    color: var(--color-primary);
+    border-radius: var(--global-border-radius);
+    border-top-right-radius: 0;
+
+    &:after {
+      content: 'Respond';
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 0.1rem 0.5rem;
+      font-size: 9px;
+      background: var(--red-100);
+      color: var(--color-primary);
+      border-radius: 999px;
+      border-top-right-radius: 0;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+    --button-primary-hover: #ccc;
+    --button-secondary-hover: #1a1a1a;
+  }
+}
+
+.price {
+  font-size: 1.5rem;
+}
+
+.menu {
+  background: #ffffff;
+  border: 1px solid #e0e3eb;
+  border-radius: 4px;
+  isolation: isolate;
+
+  > div {
+    flex: 1 0 0;
+    padding: 0.5rem;
+
+    a {
+      display: block;
+      text-align: center;
+      padding: 1rem 0;
+      width: 100%;
+      background: var(--global-background-color);
+      border-radius: 8px;
+      color: var(--black);
+      font-family: var(--ff-vazir);
+      font-weight: bolder;
+    }
+  }
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  a.primary:hover {
+    background: var(--button-primary-hover);
+    border-color: transparent;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 1rem 0.5rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo {
+    filter: invert(100%);
+  }
+}

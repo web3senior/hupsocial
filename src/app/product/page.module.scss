@@ -1,0 +1,152 @@
+.page {
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+  --button-primary-hover: #383838;
+  --button-secondary-hover: #f2f2f2;
+  padding: 0 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+    --button-primary-hover: #ccc;
+    --button-secondary-hover: #1a1a1a;
+  }
+}
+
+.pagination {
+  position: relative;
+  padding-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2rem 0;
+  font-family: var(--ff-vazir);
+
+  >div {
+    column-gap: 0.25rem;
+  }
+
+  a {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:not(:first-child, :last-child) {
+      font-size: 11px;
+    }
+
+    &:focus {
+      outline: none;
+      transform: scale(0.9);
+    }
+  }
+}
+
+.active {
+  background-color: var(--color-primary);
+  color: var(--white);
+}
+
+.color {
+  width: 14px;
+  height: 14px;
+  background-color: var(--code);
+}
+
+.soldout {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  padding: .2rem;
+  background-color: var(--red);
+  color: var(--white);
+  border-top: 2px solid var(--red-900);
+  border-left: 2px solid var(--red-900);
+}
+
+.product {
+  gap: 2rem;
+  isolation: isolate;
+
+  &__item {
+    position: relative;
+    padding: 1px;
+
+    figure {
+      background-color: #f6f6f6;
+      height: auto;
+      width: 100%;
+
+      img {
+        height: inherit;
+        width: inherit;
+      }
+    }
+
+    a {
+      h1 {
+        font-size: calc(0.9em + 0.1vw);
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+        margin: 0;
+        padding: 0;
+      }
+    }
+
+    ul {
+      font-family: var(--ff-vazir);
+    }
+
+    button {
+      width: 43px;
+      height: 43px;
+    }
+
+    &__price {
+      small {}
+    }
+  }
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  a.primary:hover {
+    background: var(--button-primary-hover);
+    border-color: transparent;
+  }
+
+  a.secondary:hover {
+    background: var(--button-secondary-hover);
+    border-color: transparent;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {}
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo {
+    filter: invert(100%);
+  }
+}

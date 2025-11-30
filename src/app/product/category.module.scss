@@ -1,0 +1,33 @@
+.category {
+  border-bottom: 1px solid var(--black-100);
+  label {
+    cursor: pointer;
+  }
+
+  button {
+    padding:  8px 1rem ;
+
+    &[data-active="true"] {
+     background-color: var(--color-primary);
+     color: var(--white)
+    }
+  }
+}
+
+.miniCategory {
+  display: none;
+  padding: 1rem;
+  width: 100%;
+  border-radius: 999px;
+  margin: 1rem 0;
+}
+
+@media (max-width: 600px) {
+  .category {
+    display: none;
+  }
+
+  .miniCategory {
+    display: block !important;
+  }
+}
