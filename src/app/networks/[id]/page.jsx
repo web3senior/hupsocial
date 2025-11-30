@@ -1,12 +1,12 @@
+'use client'
+
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
 import { config } from '@/config/wagmi'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 
-export default function Page() {
-  const params = useParams()
-  const id = params.id
+export default async function Page({ params }) {
+  const id = (await params).id
 
   return (
     <>
