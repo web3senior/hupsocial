@@ -31,7 +31,7 @@ const NetworkDetails = ({ id }) => {
                   <div className={`flex flex-column align-items-center justify-content-start gap-050 flex-1`}>
                     <div className={`${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
                     <h3>{item.name}</h3>
-                    <table>
+                    <table className={`mt-10 mb-10`}>
                       <thead>
                         <tr>
                           <th width="30%">Setting</th>

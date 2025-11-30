@@ -514,3 +514,27 @@ const Options = ({ item }) => {
     </>
   )
 }
+
+
+
+const NetworksFallback = () => {
+  return (
+    <>
+      {Array.from({ length: 4 }, (_, i) => (
+        <ShimmerCard key={i} />
+      ))}
+    </>
+  )
+}
+
+const ShimmerCard = () => {
+  return (
+    <div className={`${styles.shimmer} flex align-items-center justify-content-between`}>
+      <div className={`flex align-items-center justify-content-between gap-050`}>
+        <Shimmer style={{ borderRadius: `0`, width: `24px`, height: `24px` }} />
+        <Shimmer style={{ borderRadius: `20px`, width: `70px`, height: `12px` }} />
+      </div>
+      <Shimmer style={{ borderRadius: `20px`, width: `90px`, height: `27px` }} />
+    </div>
+  )
+}

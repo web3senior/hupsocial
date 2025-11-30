@@ -1,5 +1,5 @@
-import ContentSpinner from "@/components/Loading";
+import { GlobalLoader } from '@/components/Loading'
 
 export default function Loading() {
-  return <ContentSpinner />
+  return <GlobalLoader />
 }
