@@ -1,5 +1,3 @@
-'use client'
-
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { config } from '@/config/wagmi'
