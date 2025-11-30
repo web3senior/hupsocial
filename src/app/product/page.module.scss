@@ -1,152 +1,108 @@
 .page {
-  --gray-rgb: 0, 0, 0;
-  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
-  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+  height: 100%;
+  min-height: 80svh;
+  ::view-transition-group(.slide-in) {
+    border: 4px solid red;
+  }
+  &__title {
+    font-weight: 600;
+    color: var(--black-900);
+    margin: 1rem 0;
+    z-index: 1000;
+  }
 
-  --button-primary-hover: #383838;
-  --button-secondary-hover: #f2f2f2;
-  padding: 0 1rem;
-}
+  &__container {
+    position: relative;
+    top: 0rem;
+    border: 1px solid #f7f9f9;
+    background-color: var(--white, #fff);
+    border-radius: var(--global-border-radius);
+    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    isolation: isolate;
+    padding: 2rem;
 
-@media (prefers-color-scheme: dark) {
-  .page {
-    --gray-rgb: 255, 255, 255;
-    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
-    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
-
-    --button-primary-hover: #ccc;
-    --button-secondary-hover: #1a1a1a;
+    @media (max-width: 600px) {
+      padding: 0;
+      background-color: transparent;
+      box-shadow: none;
+      border: none;
+      filter: none;
+      border-radius: unset;
+    }
   }
 }
 
-.pagination {
-  position: relative;
-  padding-top: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 2rem 0;
-  font-family: var(--ff-vazir);
+.network {
+  background-color: var(--white);
+  border: 1px solid transparent;
+  border-radius: 20px;
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: border 0.2s var(--transition-soft), transform 0.1s var(--transition-soft);
+  will-change: transform;
+  user-select: none;
 
-  >div {
-    column-gap: 0.25rem;
+  // &:active {
+  //   transform: scale(0.99) !important;
+  // }
+
+  &__body {
+    padding: 1.2rem;
   }
 
   a {
-    width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
+    color: var(--blue-400);
+  }
+
+  &__icon {
+    svg {
+      --r: 24px;
+      width: var(--r);
+      height: var(--r);
+      box-shadow: var(--shadow-10);
+    }
+  }
+
+  span {
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 1000px;
+  }
+
+  small {
+    color: var(--text-color-pale);
+  }
+
+  small {
+    background-color: var(--gray-100);
+    color: var(--black);
+    padding: 6px 12px;
+    font-size: 11px;
     border: none;
-    border-radius: 999px;
-    cursor: pointer;
-
-    &:not(:first-child, :last-child) {
-      font-size: 11px;
-    }
-
-    &:focus {
-      outline: none;
-      transform: scale(0.9);
-    }
+    border-radius: 1000px;
   }
 }
 
-.active {
-  background-color: var(--color-primary);
-  color: var(--white);
-}
-
-.color {
-  width: 14px;
-  height: 14px;
-  background-color: var(--code);
-}
-
-.soldout {
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: 1;
-  padding: .2rem;
-  background-color: var(--red);
-  color: var(--white);
-  border-top: 2px solid var(--red-900);
-  border-left: 2px solid var(--red-900);
-}
-
-.product {
-  gap: 2rem;
-  isolation: isolate;
-
-  &__item {
-    position: relative;
-    padding: 1px;
-
-    figure {
-      background-color: #f6f6f6;
-      height: auto;
-      width: 100%;
-
-      img {
-        height: inherit;
-        width: inherit;
-      }
-    }
-
-    a {
-      h1 {
-        font-size: calc(0.9em + 0.1vw);
-        text-overflow: ellipsis;
-        overflow: hidden;
-        white-space: nowrap;
-        margin: 0;
-        padding: 0;
-      }
-    }
-
-    ul {
-      font-family: var(--ff-vazir);
-    }
-
-    button {
-      width: 43px;
-      height: 43px;
-    }
-
-    &__price {
-      small {}
-    }
-  }
+// Shimmer
+.shimmer {
+  padding: 1.2rem;
+  border-radius: 20px;
+  box-shadow: var(--shadow-xs);
 }
 
 /* Enable hover only on non-touch devices */
 @media (hover: hover) and (pointer: fine) {
-  a.primary:hover {
-    background: var(--button-primary-hover);
-    border-color: transparent;
-  }
-
-  a.secondary:hover {
-    background: var(--button-secondary-hover);
-    border-color: transparent;
-  }
-
-  .footer a:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
+  .network {
+    &:hover {
+      border-color: var(--network-color-primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      -webkit-transform: translateY(-2px);
+      transform: translateY(-2px);
+    }
   }
 }
 
-@media (max-width: 600px) {
-  .page {}
-}
-
+/* Styles for dark color theme. */
 @media (prefers-color-scheme: dark) {
-  .logo {
-    filter: invert(100%);
-  }
 }

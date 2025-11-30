@@ -1,28 +1,57 @@
 import Link from 'next/link'
+import { config } from '@/config/wagmi'
+import PageTitle from '@/components/PageTitle'
+import Shimmer from '@/components/ui/Shimmer'
 import styles from './page.module.scss'
 
-export default async function Page({ params, searchParams }) {
-  const filter = await searchParams
-  const page = filter.page
-
-  const slugify = (str) => {
-    str = str.replace(/^\s+|\s+$/g, '') // trim leading/trailing white space
-    str = str.toLowerCase() // convert string to lowercase
-    str = str
-      .replace(/\s+/g, '-') // replace spaces with hyphens
-      .replace(/-+/g, '-') // remove consecutive hyphens
-    return str
-  }
-
+export default function Page() {
   return (
-    <div className={`${styles.page} ms-motion-slideDownIn`}>
-      <div className={`__container d-f-c`} data-width={`small `}>
-   <br />
-   <br /><br /><br /><br /><br /><br /><br /><br /><br />
- <Link href={`./product/1/${slugify(`test`)}`}>
-another page
-</Link>
+    <>
+      <PageTitle name={`networks`} />
+      <div className={`${styles.page} ms-motion-slideDownIn`}>
+        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+          <div className={`flex flex-column gap-1`}>
+            {config.chains &&
+              config.chains.map((item, i) => {
+                return (
+                  <Link key={i} href={`./product/${item.id}/${item.name}`} className={styles.button}>
+                    <div className={`${styles.network}`} title={`View details`}>
+                      <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}>
+                        <div className={`flex flex-row align-items-center justify-content-start gap-050 flex-1`}>
+                          <div className={`${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
+                          <span>{item.name}</span>
+                        </div>
+                        <small>View</small>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+          </div>
+        </div>
       </div>
+    </>
+  )
+}
+
+const NetworksFallback = () => {
+  return (
+    <>
+      {Array.from({ length: 4 }, (_, i) => (
+        <ShimmerCard key={i} />
+      ))}
+    </>
+  )
+}
+
+const ShimmerCard = () => {
+  return (
+    <div className={`${styles.shimmer} flex align-items-center justify-content-between`}>
+      <div className={`flex align-items-center justify-content-between gap-050`}>
+        <Shimmer style={{ borderRadius: `0`, width: `24px`, height: `24px` }} />
+        <Shimmer style={{ borderRadius: `20px`, width: `70px`, height: `12px` }} />
+      </div>
+      <Shimmer style={{ borderRadius: `20px`, width: `90px`, height: `27px` }} />
     </div>
   )
 }
