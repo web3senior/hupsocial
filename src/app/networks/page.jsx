@@ -12,13 +12,9 @@ export default function Page() {
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`flex flex-column gap-1`}>
-            <Suspense fallback={<NetworksFallback />}>
+            {/* <Suspense fallback={<NetworksFallback />}> */}
               <NetworkGrid />
-            </Suspense>
-
-            <Link href={`networks/4201`} className={styles.backButton}>
-              check 4201 network details
-            </Link>
+            {/* </Suspense> */}
           </div>
         </div>
       </div>
