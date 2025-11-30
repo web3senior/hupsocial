@@ -1,0 +1,89 @@
+// @import '@/../../../styles/components/responsive';
+
+.page {
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+  --button-primary-hover: #383838;
+  --button-secondary-hover: #f2f2f2;
+
+  &__container {
+  }
+}
+
+.footer {
+  grid-row-start: 3;
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+
+  .large-nav {
+    // @include medium-down() {
+    //   display: none;
+    // }
+  }
+
+  a {
+    text-wrap: nowrap;
+    background-color: var(--global-background-color);
+    padding: 0.7rem;
+    text-align: center;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+    --button-primary-hover: #ccc;
+    --button-secondary-hover: #1a1a1a;
+  }
+}
+
+.main {
+  grid-row: 2/3;
+  grid-column: 1/1;
+  height: 100%;
+  gap: 32px;
+}
+
+// @include medium-down() {
+// }
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  a.primary:hover {
+    background: var(--button-primary-hover);
+    border-color: transparent;
+  }
+
+  a.secondary:hover {
+    background: var(--button-secondary-hover);
+    border-color: transparent;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+  }
+
+  .footer {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo {
+    filter: invert(100%);
+  }
+}
