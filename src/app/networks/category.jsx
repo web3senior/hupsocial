@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getCategory } from './../../util/api'
 import { toast } from './../../components/Toaster'
-import Icon from './../../helper/MaterialIcon'
+import Icon from '../../helper/MaterialIcon'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 import styles from './category.module.scss'
 
