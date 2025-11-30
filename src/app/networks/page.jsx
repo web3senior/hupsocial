@@ -1,3 +1,4 @@
+'use client'
 import Link from 'next/link'
 import React, { Suspense } from 'react'
 import { config } from '@/config/wagmi'
