@@ -1,4 +1,3 @@
-'use client'
 import Link from 'next/link'
 import React, { Suspense } from 'react'
 import { config } from '@/config/wagmi'
@@ -14,7 +13,7 @@ export default function Page() {
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`flex flex-column gap-1`}>
             {/* <Suspense fallback={<NetworksFallback />}> */}
-              <NetworkGrid />
+            <NetworkGrid />
             {/* </Suspense> */}
           </div>
         </div>

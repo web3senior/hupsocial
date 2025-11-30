@@ -1,4 +1,3 @@
-'use client'
 import Link from 'next/link'
 import { config } from '@/config/wagmi'
 import PageTitle from '@/components/PageTitle'
