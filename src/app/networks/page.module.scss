@@ -37,7 +37,7 @@
   background-color: var(--white);
   border: 1px solid transparent;
   border-radius: 20px;
-  box-shadow: var(--shadow-xs);
+  // box-shadow: var(--shadow-xs);
   cursor: pointer;
   transition: border 0.2s var(--transition-soft), transform 0.1s var(--transition-soft);
   will-change: transform;
@@ -57,7 +57,7 @@
 
   &__icon {
     svg {
-      --r: 24px;
+      --r: 32px;
       width: var(--r);
       height: var(--r);
       box-shadow: var(--shadow-10);
@@ -65,7 +65,7 @@
   }
 
   span {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 500;
     border-radius: 1000px;
   }
@@ -95,8 +95,7 @@
 @media (hover: hover) and (pointer: fine) {
   .network {
     &:hover {
-      border-color: var(--network-color-primary);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+     background-color: var(--gray-100);
       -webkit-transform: translateY(-2px);
       transform: translateY(-2px);
     }
