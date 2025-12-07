@@ -12,7 +12,7 @@ import {
   luksoTestnet,
   lineaSepolia,
 } from 'wagmi/chains'
-import { injected, metaMask, safe, walletConnect } from 'wagmi/connectors'
+import { metaMask, walletConnect } from 'wagmi/connectors'
 
 const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ``
 

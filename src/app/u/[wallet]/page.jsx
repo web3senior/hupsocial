@@ -13,7 +13,7 @@ import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
-import { useWaitForTransactionReceipt, useAccount, useDisconnect, useWriteContract } from 'wagmi'
+import { useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import PageTitle from '@/components/PageTitle'
@@ -25,12 +25,11 @@ export default function Page() {
   const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [totalPosts, setTotalPosts] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-
   const [POAPs, setPOAPs] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const router = useRouter()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { web3, contract } = initPostContract()
   const activeChain = getActiveChain()
   // Assumes:
