@@ -4,7 +4,7 @@ import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
+import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useConnection, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import {
   initPostContract,
   initPostCommentContract,
@@ -85,7 +85,7 @@ export default function Page() {
   const [chains, setChains] = useState()
   const params = useParams()
 
-  const { address, isConnected } = useAccount()
+const { address, isConnected } = useConnection()
   const router = useRouter()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -248,7 +248,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useAccount()
+const { address, isConnected } = useConnection()
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -365,7 +365,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
-  const { address, isConnected } = useAccount()
+const { address, isConnected } = useConnection()
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -442,7 +442,7 @@ const LikeComment = ({ commentId: id, likeCount }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [activeChain, setActiveChain] = useState(getActiveChain())
-  const { address, isConnected } = useAccount()
+const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,

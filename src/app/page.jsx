@@ -3,9 +3,30 @@
 import { useState, useEffect, lazy, Suspense, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
-import {  useRouter } from 'next/navigation'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
-import { initPostContract, initPostCommentContract, getPosts, getHasLikedPost, getPollLikeCount, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
+import { useRouter } from 'next/navigation'
+import {
+  useConnectorClient,
+  useConnections,
+  useClient,
+  networks,
+  useWaitForTransactionReceipt,
+  useConnection,
+  useDisconnect,
+  Connector,
+  useConnect,
+  useWriteContract,
+  useReadContract,
+} from 'wagmi'
+import {
+  initPostContract,
+  initPostCommentContract,
+  getPosts,
+  getHasLikedPost,
+  getPollLikeCount,
+  getPostCount,
+  getVoteCountsForPoll,
+  getVoterChoices,
+} from '@/lib/communication'
 import { getApps, getProfile, getUniversalProfile } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import Profile from '@/components/Profile'
@@ -58,7 +79,7 @@ export default function Page() {
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const activeChain = getActiveChain()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const router = useRouter()
   const TABS_DATA = [
     { id: 'feed', label: 'Feed', count: totalPosts },
@@ -350,7 +371,12 @@ const Poll = ({ polls }) => {
                   <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
                 </header>
                 <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
-                  <div className={`${styles.poll__question} `} onClick={(e) => e.stopPropagation()} id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
+                  <div
+                    className={`${styles.poll__question} `}
+                    onClick={(e) => e.stopPropagation()}
+                    id={`pollQuestion${item.pollId}`}
+                    dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }}
+                  />
 
                   {item.question.length > 150 && (
                     <button
@@ -364,7 +390,10 @@ const Poll = ({ polls }) => {
                       <b className={`text-primary`}>Show More</b>
                     </button>
                   )}
-                  <div onClick={(e) => e.stopPropagation()} className={`${styles.poll__actions} flex flex-row align-items-center justify-content-start`}>
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className={`${styles.poll__actions} flex flex-row align-items-center justify-content-start`}
+                  >
                     {<LikeCount pollId={item.pollId} />}
 
                     {item.allowedComments && (
@@ -411,7 +440,7 @@ const Options = ({ item }) => {
   const [topOption, setTopOption] = useState()
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initPostContract()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -514,8 +543,6 @@ const Options = ({ item }) => {
     </>
   )
 }
-
-
 
 const NetworksFallback = () => {
   return (

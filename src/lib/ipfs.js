@@ -21,7 +21,7 @@ export const getIPFS = async (CID) => {
     const url = `${gatewayUrl}${CID}`;
 
     try {
-        console.log(`Fetching from IPFS: ${url}`);
+        // console.log(`Fetching from IPFS: ${url}`);
         
         const requestOptions = {
             method: 'GET',

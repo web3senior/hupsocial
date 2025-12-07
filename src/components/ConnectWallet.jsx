@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-import { useAccount, useDisconnect, Connector, useConnect, useSwitchChain, useConfig } from 'wagmi'
+import { useConnection, useDisconnect, Connector, useConnect, useSwitchChain, useConfig } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { getProfile, getUniversalProfile } from '@/lib/api'
 import Shimmer from '@/components/ui/Shimmer'
@@ -17,7 +17,7 @@ export const ConnectWallet = () => {
   const { disconnect } = useDisconnect()
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const mounted = useClientMounted()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { switchChain } = useSwitchChain()
 
   useEffect(() => console.log(`%c ░▒▓█ Hup █▓▒░`, 'font-size:1.5rem;color:#38bdf8'), [])
@@ -125,7 +125,7 @@ const Profile = ({ addr }) => {
 
 export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
   const networkDialog = useRef()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { switchChain } = useSwitchChain()
   const router = useRouter()
 

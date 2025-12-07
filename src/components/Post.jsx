@@ -4,7 +4,7 @@ import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
-import { useWaitForTransactionReceipt, useAccount, useWriteContract } from 'wagmi'
+import { useWaitForTransactionReceipt, useConnection, useWriteContract } from 'wagmi'
 import { initPostContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
@@ -88,7 +88,7 @@ export default function Post({ item, showContent, actions, chainId }) {
   const [showShareModal, setShowShareModal] = useState()
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const router = useRouter()
   const [viewCount, setViewCount] = useState(0)
   const { data: hash, isPending, writeContract } = useWriteContract()
@@ -105,7 +105,6 @@ export default function Post({ item, showContent, actions, chainId }) {
 
     if (item.metadata !== ``) {
       getIPFS(item.metadata).then((result) => {
-        console.log(result)
         setPostContent(result)
       })
     }
@@ -148,7 +147,7 @@ export default function Post({ item, showContent, actions, chainId }) {
                           </figure>
                         </>
                       ) : (
-                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls style={{ width: `100%`, }} />
+                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls style={{ width: `100%`, aspectRatio: `1/1` }} />
                       )}
                     </div>
                   ))}
@@ -264,7 +263,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -396,7 +395,7 @@ const TipModal = ({ item, setShowTipModal }) => {
   const [amount, setAmount] = useState(1)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -583,7 +582,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const activeChain = getActiveChain()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -752,7 +751,7 @@ const Options = ({ item }) => {
   const [topOption, setTopOption] = useState()
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initPostContract()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,

@@ -12,8 +12,9 @@ import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
+import Balance from './_components/balance'
 import { getActiveChain } from '@/lib/communication'
-import { useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
+import {useBalance , useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import PageTitle from '@/components/PageTitle'
@@ -32,6 +33,9 @@ export default function Page() {
   const { address, isConnected } = useConnection()
   const { web3, contract } = initPostContract()
   const activeChain = getActiveChain()
+  const balance = useBalance({
+    address: address,
+  })
   // Assumes:
   // - totalPosts is the contract's total post count (e.g., 100)
   // - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
@@ -92,6 +96,7 @@ export default function Page() {
       setIsLoadedPoll(false)
     }
   }
+
   // Example of how a component fetches data from your new API route
   async function getPoapsForAddress(address) {
     const res = await fetch(`/api/poap-scan/${address}`)
@@ -130,6 +135,8 @@ export default function Page() {
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
+
+            <Balance/>
 
             <details className="mt-10">
               <summary>View POAPs</summary>
@@ -283,7 +290,7 @@ const Profile = ({ addr }) => {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [isItUp, setIsItUp] = useState(false)
   const params = useParams()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { disconnect } = useDisconnect()
   const activeChain = getActiveChain()
 
@@ -574,7 +581,7 @@ function PushNotificationManager() {
   const [isSupported, setIsSupported] = useState(false)
   const [subscription, setSubscription] = useState(null)
   const [message, setMessage] = useState('')
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
 
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -919,7 +926,7 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
   const [tags, setTags] = useState({ list: JSON.parse(profile.tags) || [] })
   const [links, setLinks] = useState({ list: JSON.parse(profile.links) || [] })
   const [activeChain, setActiveChain] = useState()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
 
   // Refs
   const pfpRef = useRef()
@@ -1166,7 +1173,7 @@ const PostForm = ({ addr }) => {
   const createFormRef = useRef()
   const fileInputRef = useRef()
   const whitelistInputRef = useRef()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { web3, contract } = initPostContract()
   const [selectedMediaType, setSelectedMediaType] = useState(null) // Tracks if we're expecting image or video
 
@@ -1327,7 +1334,7 @@ const PostForm = ({ addr }) => {
 
     const formData = new FormData(e.target)
 
-    const resultIPFS = await uploadObjectToIPFS((postContent))
+    const resultIPFS = await uploadObjectToIPFS(postContent)
     if (!resultIPFS.cid) {
       console.error(`CID not found`)
     }
@@ -1920,10 +1927,10 @@ const PostForm = ({ addr }) => {
               {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
             </button>
 
-            <button type={`button`} onClick={() => triggerFileInput(`image`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(`image`)} disabled={postContent.elements[1].data.items.length === 4}>
               Add image
             </button>
-            <button type={`button`} onClick={() => triggerFileInput(`video`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(`video`)} disabled={postContent.elements[1].data.items.length === 4}>
               Add video
             </button>
           </div>
@@ -1968,7 +1975,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -2098,7 +2105,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const activeChain = getActiveChain()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,

@@ -10,9 +10,7 @@
     "ngrok": "ngrok http 3000"
   },
   "dependencies": {
-    "@metamask/sdk": "^0.33.1",
     "@tanstack/react-query": "^5.90.12",
-    "@walletconnect/ethereum-provider": "^2.21.10",
     "dompurify": "^3.3.0",
     "jdenticon": "^3.3.0",
     "marked": "^17.0.1",
