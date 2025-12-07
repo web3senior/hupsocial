@@ -12,7 +12,7 @@ import {
   luksoTestnet,
   lineaSepolia,
 } from 'wagmi/chains'
-import { walletConnect } from '@wagmi/connectors'
+
 
 const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ``
 
@@ -134,11 +134,7 @@ sepolia.textColor = `#fff`
 
 export const config = createConfig({
   chains: [baseSepoliaPreconf, luksoTestnet, arbitrumSepolia, celoSepolia, monadTestnet, lineaSepolia, optimismSepolia, unichainSepolia], //somniaTestnet, opBNBTestnet
-    connectors: [
-    walletConnect({
-      projectId: projectId,
-    }),
-  ],
+
   transports: {
     [luksoTestnet.id]: http(),
     [celoSepolia.id]: http(),
