@@ -41,10 +41,12 @@ export default function Balance({ params }) {
     >
       <h3>💰 Account Balance</h3>
 
-      <code className={`flex gap-025`}>
-        <span> {Number(web3.utils.fromWei(balanceData?.value, `ether`)).toFixed(2)}</span>
-        <span>{balanceData?.symbol}</span>
-      </code>
+      {balanceData !== undefined && (
+        <code className={`flex gap-025`}>
+          <span> {Number(web3.utils.fromWei(balanceData?.value, `ether`)).toFixed(2)}</span>
+          <span>{balanceData?.symbol}</span>
+        </code>
+      )}
     </div>
   )
 }
