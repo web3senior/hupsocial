@@ -1,18 +1,20 @@
 'use client'
 
-import { initPostContract } from '@/lib/communication'
+import { getActiveChain, initPostContract } from '@/lib/communication'
 import { useConnection, useBalance } from 'wagmi'
 
 export default function Balance({ addr }) {
   const { web3, contract } = initPostContract()
   const { address, isConnected } = useConnection()
-  
+  const activeChain = getActiveChain()
+
   const {
     data: balanceData,
     isLoading: isBalanceLoading,
     isError: isBalanceError,
   } = useBalance({
     address: addr,
+    chainId: activeChain[0].id,
   })
 
   // Handle loading and error states for the balance fetch
