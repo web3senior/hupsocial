@@ -118,7 +118,7 @@ export default function Post({ item, showContent, actions, chainId }) {
     <>
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
-      {showShareModal && <ShareModal item={showShareModal} setShowShareModal={setShowShareModal} />}
+      {showShareModal && <ShareModal metadata={postContent} item={showShareModal} setShowShareModal={setShowShareModal} />}
       {/* 
       {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />} */}
 
@@ -517,15 +517,17 @@ const TipModal = ({ item, setShowTipModal }) => {
   )
 }
 
-const ShareModal = ({ item, setShowShareModal }) => {
+const ShareModal = ({ item, metadata, setShowShareModal }) => {
   const [hasLiked, setHasLiked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const activeChain = getActiveChain()
 
+  console.log(metadata)
+
   // --- Dynamic Content ---
   const postUrl = `${location.protocol}//${window.location.host}/${activeChain[0].id}/p/${item.postId}`
-  const postTitle = item.content
+  const postTitle = metadata && metadata.elements && metadata.elements.length > 1 ? metadata.elements[0].data.text : item.content
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const postContent = `${postTitle}\n\n Creator: ${item.creator} \n\n`
   // --- Constructing the Share Link ---
