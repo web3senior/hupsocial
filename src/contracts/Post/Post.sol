@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./../Counters.sol";
 import "./PostEvent.sol";
 import "./PostError.sol";
@@ -11,11 +12,11 @@ import "./IPostCommentManager.sol"; // Import the updated interface
 
 /// @title Post
 /// @author Aratta Labs
-/// @notice Core contract for Status/Post creation and liking.
-/// @custom:version 1
+/// @notice Core contract for Status/Post creation and liking, now supporting gasless Meta Transactions via EIP-2771.
+/// @custom:version 1.1
 /// @custom:emoji 📝
 /// @custom:security-contact atenyun@gmail.com
-contract Post is Ownable, Pausable, ReentrancyGuard {
+contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
     // State Variables
     using Counters for Counters.Counter;
 
@@ -79,13 +80,17 @@ contract Post is Ownable, Pausable, ReentrancyGuard {
     // Modifiers
     ///@dev Throws if called by any account other than the post creator.
     modifier onlyPostCreator(uint256 _postId) {
+        // _msgSender() now correctly returns the original signer, even for meta transactions
         require(posts[_postId].creator == _msgSender(), "Only the post creator can update a post.");
         _;
     }
 
     // Constructor
-    constructor() Ownable(msg.sender) {
-        // Added explicit constructor call for Ownable
+    // [3] UPDATED CONSTRUCTOR: Takes the trusted forwarder address and initializes ERC2771Context.
+    constructor(address _trustedForwarder) Ownable(_msgSender()) ERC2771Context(_trustedForwarder) {
+        // Note: Ownable(_msgSender()) ensures the actual deployer (signer) becomes the owner,
+        // even if deployment is done via a forwarder.
+
         postCount.increment();
         uint256 postId = postCount.current();
         PostData storage newPost = posts[postId];
@@ -93,7 +98,7 @@ contract Post is Ownable, Pausable, ReentrancyGuard {
         newPost.metadata = "";
         newPost.content = unicode"Welcome! This is the first post on the new system.";
         newPost.createdAt = block.timestamp;
-        newPost.creator = _msgSender();
+        newPost.creator = _msgSender(); // _msgSender() resolves to the deployer's address
         newPost.allowedComments = true;
         newPost.isDeleted = false;
         newPost.isUpdated = false;
@@ -110,7 +115,7 @@ contract Post is Ownable, Pausable, ReentrancyGuard {
     /// @dev This function is critical for cheap reading in view functions like getPosts.
     /// @param _postId The ID of the post being commented on.
     function updateCommentStats(uint256 _postId) external {
-        require(msg.sender == commentManagerAddress, "Only the Comment Manager can update stats.");
+        require(_msgSender() == commentManagerAddress, "Only the Comment Manager can update stats.");
         PostData storage post = posts[_postId];
         require(!post.isDeleted, "Cannot update stats for a deleted post.");
 
@@ -134,7 +139,7 @@ contract Post is Ownable, Pausable, ReentrancyGuard {
         newPost.metadata = _metadata;
         newPost.content = _content;
         newPost.createdAt = block.timestamp;
-        newPost.creator = _msgSender();
+        newPost.creator = _msgSender(); // Correctly identifies the original signer
         newPost.allowedComments = _allowedComments;
         newPost.isDeleted = false;
         newPost.isUpdated = false;
@@ -372,4 +377,19 @@ contract Post is Ownable, Pausable, ReentrancyGuard {
             require(success, "Failed to process fee.");
         }
     }
+function _msgData() internal view virtual override(Context, ERC2771Context) returns (bytes calldata) {
+    return ERC2771Context._msgData();
+}
+function _msgSender() internal view virtual override(Context, ERC2771Context) returns (address) {
+    return ERC2771Context._msgSender();
+}
+function _contextSuffixLength()
+    internal
+    view
+    virtual
+    override(Context, ERC2771Context)
+    returns (uint256)
+{
+    return ERC2771Context._contextSuffixLength();
+}
 }

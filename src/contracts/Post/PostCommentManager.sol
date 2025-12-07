@@ -3,6 +3,8 @@ pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+// [1] NEW IMPORT: ERC2771Context for Gasless Transactions
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./../Counters.sol"; // Assumed path
 
 // --- Interface for Post.sol ---
@@ -29,8 +31,9 @@ library CommentEvent {
 
 /// @title PostCommentManager
 /// @author Aratta Labs
-/// @notice Handles all comment-related logic, interacting with the Post contract for caching.
-contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
+/// @notice Handles all comment-related logic, interacting with the Post contract for caching, now with meta transaction support.
+// [2] UPDATED INHERITANCE: Inherit from ERC2771Context
+contract PostCommentManager is Ownable, ReentrancyGuard, ERC2771Context {
     using Counters for Counters.Counter;
 
     /// @dev Global counter for all comments across all posts.
@@ -84,7 +87,12 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
 
     // Constructor
     /// @param _postContractAddress The address of the main Post contract.
-    constructor(address _postContractAddress) {
+    // [3] UPDATED CONSTRUCTOR: Now accepts the trusted forwarder address.
+    constructor(address _postContractAddress, address _trustedForwarder) 
+        Ownable(_msgSender()) 
+        ERC2771Context(_trustedForwarder) 
+    {
+        // Note: _msgSender() ensures the original signer (deployer) is set as owner, even if deployment is gasless.
         require(_postContractAddress != address(0), "Invalid post contract address.");
         postContractAddress = _postContractAddress;
     }
@@ -115,7 +123,7 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
             parentId: _parentId, // Storing the parent ID
             content: _content,
             metadata: _metadata, 
-            creator: _msgSender(),
+            creator: _msgSender(), // _msgSender() correctly resolves the original signer
             createdAt: block.timestamp,
             isDeleted: false
         });
@@ -144,7 +152,7 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
     function updateComment(uint256 _commentId, string calldata _newContent, string calldata _newMetadata) external nonReentrant {
         Comment storage comment = comments[_commentId];
         require(comment.creator != address(0), "Comment not found.");
-        require(comment.creator == _msgSender(), "Only comment creator can update.");
+        require(comment.creator == _msgSender(), "Only comment creator can update."); // _msgSender() correctly resolves the original signer
         require(!comment.isDeleted, "Cannot update a deleted comment.");
         require(bytes(_newContent).length > 0, "Comment content cannot be empty.");
 
@@ -159,7 +167,7 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
     function deleteComment(uint256 _commentId) external {
         Comment storage comment = comments[_commentId];
         require(comment.creator != address(0), "Comment not found.");
-        require(comment.creator == _msgSender() || _msgSender() == owner(), "Only comment creator or owner can delete.");
+        require(comment.creator == _msgSender() || _msgSender() == owner(), "Only comment creator or owner can delete."); // _msgSender() correctly resolves the original signer
         require(!comment.isDeleted, "Comment is already deleted.");
 
         comment.isDeleted = true;
@@ -174,7 +182,7 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
         Comment storage comment = comments[_commentId];
         require(comment.creator != address(0), "Comment not found.");
         require(!comment.isDeleted, "Cannot like a deleted comment.");
-        require(!commentLikedBy[_commentId][_msgSender()], "Comment already liked.");
+        require(!commentLikedBy[_commentId][_msgSender()], "Comment already liked."); // _msgSender() correctly resolves the original signer
 
         commentLikes[_commentId]++;
         commentLikedBy[_commentId][_msgSender()] = true;
@@ -187,7 +195,7 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
         Comment storage comment = comments[_commentId];
         require(comment.creator != address(0), "Comment not found.");
         require(!comment.isDeleted, "Cannot unlike a deleted comment.");
-        require(commentLikedBy[_commentId][_msgSender()], "Comment has not been liked by this account.");
+        require(commentLikedBy[_commentId][_msgSender()], "Comment has not been liked by this account."); // _msgSender() correctly resolves the original signer
 
         commentLikes[_commentId]--;
         commentLikedBy[_commentId][_msgSender()] = false;
@@ -195,6 +203,20 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
         emit CommentEvent.CommentUnliked(comment.postId, _commentId, _msgSender());
     }
 
+    // --- Owner & EIP-2771 Functions ---
+    
+    // [4] EIP-2771 HELPER: Allows the owner to change the trusted forwarder address
+    /// @notice Sets a new trusted forwarder address, updating EIP-2771 compatibility.
+    function setTrustedForwarder(address _trustedForwarder) public onlyOwner {
+        _setTrustedForwarder(_trustedForwarder);
+    }
+
+    // [5] REQUIRED EIP-2771 OVERRIDE: Declares the trusted forwarder address.
+    /// @dev See EIP-2771. Returns true if the address is the trusted forwarder.
+    function _isTrustedForwarder(address forwarder) internal view override returns (bool) {
+        return forwarder == _trustedForwarder();
+    }
+    
     // View Functions
     
     /// @notice Gets the number of direct replies for a specific comment.
@@ -218,7 +240,7 @@ contract PostCommentManager is Ownable(msg.sender), ReentrancyGuard {
             isDeleted: comment.isDeleted,
             likeCount: commentLikes[_commentId],
             replyCount: getReplyCount(_commentId), // Including the reply count
-            hasLiked: _addr != address(0) ? hasLikedComment(_commentId, _addr) : false // Only check if address is provided
+            hasLiked: _addr != address(0) ? hasLikedComment(_commentId, _addr) : false // View functions are safe and do not need _msgSender()
         });
     }
 

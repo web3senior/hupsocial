@@ -3,15 +3,18 @@ pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+// NEW IMPORT: ERC2771Context for Gasless Transactions
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
 /// @title StatusManager
 /// @author Aratta Labs
-/// @notice A decentralized status manager where each user stores a single, publicly viewable status with an optional expiration period.
+/// @notice A decentralized status manager where each user stores a single, publicly viewable status with an optional expiration period, now supporting meta transactions via EIP-2771.
 /// @dev Implements Ownable for administration and Pausable for emergency shutdown. Uses a mapping to store one StatusData struct per address.
-/// @custom:version 1
+/// @custom:version 1.1
 /// @custom:emoji 📝
 /// @custom:security-contact atenyun@gmail.com
-contract StatusManager is Ownable(msg.sender), Pausable {
+// UPDATED INHERITANCE: Inherit from ERC2771Context
+contract StatusManager is Ownable, Pausable, ERC2771Context {
     // --- State Variables ---
 
     /// @notice The maximum allowed byte length for a user's status message. Set by the contract owner.
@@ -55,8 +58,13 @@ contract StatusManager is Ownable(msg.sender), Pausable {
      * @notice Initializes the contract and sets the maximum allowed length for user status messages.
      * @dev The contract deploys with the caller as the initial owner and sets the initial content length limit.
      * @param _maxLength The initial maximum byte length for status content.
+     * @param _trustedForwarder The address of the EIP-2771 compatible meta transaction relayer.
      */
-    constructor(uint256 _maxLength) {
+    // UPDATED CONSTRUCTOR: Now accepts the trusted forwarder address.
+    constructor(uint256 _maxLength, address _trustedForwarder) 
+        Ownable(_msgSender()) // Use _msgSender() to ensure correct owner is set even in gasless deployment
+        ERC2771Context(_trustedForwarder) 
+    {
         maxLength = _maxLength;
     }
 
@@ -86,6 +94,19 @@ contract StatusManager is Ownable(msg.sender), Pausable {
     function updateMaxLength(uint256 _maxLength) public onlyOwner {
         maxLength = _maxLength;
     }
+    
+    // EIP-2771 HELPER: Allows the owner to change the trusted forwarder address
+    /// @notice Sets a new trusted forwarder address, updating EIP-2771 compatibility.
+    function setTrustedForwarder(address _trustedForwarder) public onlyOwner {
+        _setTrustedForwarder(_trustedForwarder);
+    }
+
+    // REQUIRED EIP-2771 OVERRIDE: Declares the trusted forwarder address.
+    /// @dev See EIP-2771. Returns true if the address is the trusted forwarder.
+    function _isTrustedForwarder(address forwarder) internal view override returns (bool) {
+        return forwarder == _trustedForwarder();
+    }
+
 
     // --- Core User Functions ---
 
@@ -111,12 +132,15 @@ contract StatusManager is Ownable(msg.sender), Pausable {
             // Converts input hours to seconds and adds to the current timestamp.
             expirationTimestamp = block.timestamp + (_periodHours * 1 hours);
         }
+        
+        // Use _msgSender() to get the original signer's address, supporting meta transactions.
+        address user = _msgSender();
 
         // Store the new StatusData, overwriting the previous one.
-        statuses[msg.sender] = StatusData(_statusContent, _statusType, _metadata, expirationTimestamp, block.timestamp);
+        statuses[user] = StatusData(_statusContent, _statusType, _metadata, expirationTimestamp, block.timestamp);
 
         // Emit an event to log the update, which is crucial for off-chain indexing.
-        emit StatusUpdated(msg.sender, _statusContent, _statusType, _metadata, _periodHours, block.timestamp);
+        emit StatusUpdated(user, _statusContent, _statusType, _metadata, _periodHours, block.timestamp);
     }
 
     /**
@@ -124,8 +148,11 @@ contract StatusManager is Ownable(msg.sender), Pausable {
      * @dev Performs a soft delete by setting the `content` field to an empty string (""). This signals off-chain applications to stop displaying the status. This function is restricted by the Pausable modifier `whenNotPaused`.
      */
     function clearStatus() public whenNotPaused {
+        // Use _msgSender() to get the original signer's address, supporting meta transactions.
+        address user = _msgSender();
+        
         // Only modify the content field, effectively 'deleting' the status visually.
-        statuses[msg.sender].content = "";
-        emit StatusCleared(msg.sender, block.timestamp);
+        statuses[user].content = "";
+        emit StatusCleared(user, block.timestamp);
     }
 }
