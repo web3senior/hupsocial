@@ -1,10 +1,27 @@
 import { http, createConfig } from 'wagmi'
-import { base, mainnet, lukso, baseSepoliaPreconf, celoSepolia, opBNBTestnet, arbitrumSepolia, monadTestnet, somniaTestnet, unichainSepolia, optimismSepolia, luksoTestnet, lineaSepolia } from 'wagmi/chains'
+import {
+  sepolia,
+  baseSepoliaPreconf,
+  celoSepolia,
+  opBNBTestnet,
+  arbitrumSepolia,
+  monadTestnet,
+  somniaTestnet,
+  unichainSepolia,
+  optimismSepolia,
+  luksoTestnet,
+  lineaSepolia,
+} from 'wagmi/chains'
 import { injected, metaMask, safe, walletConnect } from 'wagmi/connectors'
 
 const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || ``
 
 export const CONTRACTS = {
+  chain11155111: {
+    post: '',
+    comment: '',
+    status: '',
+  },
   chain4201: {
     post: '0xCb885C28D1b005701249F92E43089b44204a7313',
     comment: '0x2a357c53cf617eb23a99A3E7fb0Be363e9dE8f04',
@@ -52,8 +69,7 @@ export const CONTRACTS = {
   },
 }
 
-// Networks
-
+// Customize chains object
 // LUKSO
 luksoTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10950_4143)"><mask id="mask0_10950_4143" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18"><path d="M18 0H0V18H18V0Z" fill="white"/></mask><g mask="url(#mask0_10950_4143)"><path d="M0 0H18V18H0V0Z" fill="#F0F3FA"/><path d="M10.0922 3.26602L13.908 5.2667C14.58 5.62682 15 6.27704 15 6.98729V10.9986C15 11.7089 14.58 12.3691 13.908 12.7293L10.0922 14.7299C9.4202 15.09 8.58023 15.09 7.90826 14.7299L4.09237 12.7293C3.75034 12.5407 3.47094 12.2832 3.28006 11.9807C3.08917 11.6782 2.99298 11.3404 3.0004 10.9986V6.99729C3.0004 6.27704 3.42039 5.62682 4.09237 5.2667L7.90826 3.26602C8.23434 3.0923 8.61323 3 9.00022 3C9.3872 3 9.7661 3.0923 10.0922 3.26602ZM10.4521 10.6885L11.3161 9.30808C11.4361 9.10802 11.4361 8.87794 11.3161 8.68787L10.4401 7.3074C10.3875 7.21668 10.3059 7.13978 10.2042 7.0851C10.1027 7.0304 9.98506 7.00003 9.86419 6.99729H8.13624C7.89626 6.99729 7.66825 7.11733 7.56027 7.29739L6.68429 8.69787C6.56429 8.87794 6.56429 9.11801 6.68429 9.29807L7.56027 10.6985C7.68025 10.8786 7.89626 10.9986 8.13624 10.9986H9.86419C10.1042 10.9986 10.3321 10.8786 10.4401 10.6985L10.4521 10.6885Z" fill="#FE005B"/></g></g><defs><clipPath id="clip0_10950_4143"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
 luksoTestnet.faucetUrl = `https://faucet.testnet.lukso.network/`
@@ -67,8 +83,8 @@ celoSepolia.primaryColor = `#fcff52`
 celoSepolia.textColor = `#333`
 
 // Base
-baseSepoliaPreconf.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" fill="white"/><path d="M4 4H14V14H4V4Z" fill="#0000FF"/></svg>`
-baseSepoliaPreconf.primaryColor = `#0000FF`
+baseSepoliaPreconf.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_11007_5115)"><path d="M18 0H0V18H18V0Z" fill="#0052FF"/><path d="M8.94604 14.1103C11.7979 14.1103 14.1098 11.8024 14.1098 8.95553C14.1098 6.10863 11.7979 3.80078 8.94604 3.80078C6.24039 3.80078 4.02074 5.87808 3.80029 8.52223H10.6256V9.38883H3.80029C4.02074 12.0329 6.24039 14.1103 8.94604 14.1103Z" fill="white"/></g><defs><clipPath id="clip0_11007_5115"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+baseSepoliaPreconf.primaryColor = `#0052FF`
 baseSepoliaPreconf.textColor = `#fff`
 
 // Monad
@@ -108,13 +124,19 @@ opBNBTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"
 opBNBTestnet.primaryColor = `#F0B90B`
 opBNBTestnet.textColor = `#fff`
 
+// Sepolia
+sepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10996_4352)"><path d="M18 0H0V18H18V0Z" fill="#627EEA"/><mask id="mask0_10996_4352" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="1" width="16" height="16"><path d="M16.5 1.5H1.5V16.5H16.5V1.5Z" fill="white"/></mask><g mask="url(#mask0_10996_4352)"><path d="M9 16.5C13.1421 16.5 16.5 13.1421 16.5 9C16.5 4.85787 13.1421 1.5 9 1.5C4.85787 1.5 1.5 4.85787 1.5 9C1.5 13.1421 4.85787 16.5 9 16.5Z" fill="#627EEA"/><path d="M9.2334 3.375V7.5328L12.7476 9.1031L9.2334 3.375Z" fill="white" fill-opacity="0.602"/><path d="M9.23345 3.375L5.71875 9.1031L9.23345 7.5328V3.375Z" fill="white"/><path d="M9.2334 11.7978V14.623L12.7499 9.75781L9.2334 11.7978Z" fill="white" fill-opacity="0.602"/><path d="M9.23345 14.623V11.7974L5.71875 9.75781L9.23345 14.623Z" fill="white"/><path d="M9.2334 11.1431L12.7476 9.10255L9.2334 7.5332V11.1431Z" fill="white" fill-opacity="0.2"/><path d="M5.71875 9.10255L9.23345 11.1431V7.5332L5.71875 9.10255Z" fill="white" fill-opacity="0.602"/></g></g><defs><clipPath id="clip0_10996_4352"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+sepolia.primaryColor = `#627EEA`
+sepolia.textColor = `#fff`
+
 // Polygon
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [baseSepoliaPreconf, luksoTestnet, arbitrumSepolia, celoSepolia, monadTestnet, lineaSepolia, optimismSepolia, unichainSepolia], //somniaTestnet, opBNBTestnet
+  chains: [sepolia, baseSepoliaPreconf, luksoTestnet, arbitrumSepolia, celoSepolia, monadTestnet, lineaSepolia, optimismSepolia, unichainSepolia], //somniaTestnet, opBNBTestnet
   connectors: [walletConnect({ projectId }), metaMask()], //, safe() //injected(),
   transports: {
+    [sepolia.id]: http(),
     [luksoTestnet.id]: http(),
     [celoSepolia.id]: http(),
     [monadTestnet.id]: http(),
@@ -123,8 +145,6 @@ export const config = createConfig({
     [optimismSepolia.id]: http(),
     [unichainSepolia.id]: http(),
     [arbitrumSepolia.id]: http(),
-    // [somniaTestnet.id]: http(),
-    // [opBNBTestnet.id]: http(),
   },
 })
 
