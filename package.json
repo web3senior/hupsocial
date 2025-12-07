@@ -6,26 +6,26 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "ngrok": "ngrok http 3000"
+    "lint": "eslint"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.90.7",
+    "@tanstack/react-query": "^5.90.12",
     "dompurify": "^3.3.0",
     "jdenticon": "^3.3.0",
-    "marked": "^17.0.0",
+    "marked": "^17.0.1",
     "moment": "^2.30.1",
-    "next": "16.0.1",
+    "next": "16.0.7",
     "pinata": "^2.5.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "sass": "^1.93.3",
-    "viem": "^2.38.6",
-    "wagmi": "^2.19.2",
+    "sass": "^1.94.2",
+    "viem": "^2.41.2",
+    "wagmi": "^3.1.0",
     "web3": "^4.16.0"
   },
   "devDependencies": {
+    "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.1"
+    "eslint-config-next": "16.0.7"
   }
 }
