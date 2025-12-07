@@ -1377,7 +1377,7 @@ const PostForm = ({ addr }) => {
   /**
    * Triggers the hidden file input with the correct acceptance mime types.
    */
-  const triggerFileInput = (type) => {
+  const triggerFileInput = (e, type) => {
     if (postContent.elements[1].data.items.length >= 4) {
       console.error('Maximum 4 media items reached.')
       return
@@ -1927,10 +1927,10 @@ const PostForm = ({ addr }) => {
               {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
             </button>
 
-            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(`image`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(e,`image`)} disabled={postContent.elements[1].data.items.length === 4}>
               Add image
             </button>
-            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(`video`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(e,`video`)} disabled={postContent.elements[1].data.items.length === 4}>
               Add video
             </button>
           </div>
