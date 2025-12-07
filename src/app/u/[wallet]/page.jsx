@@ -136,7 +136,7 @@ export default function Page() {
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 
-            <Balance/>
+            <Balance addr={params.wallet}/>
 
             <details className="mt-10">
               <summary>View POAPs</summary>

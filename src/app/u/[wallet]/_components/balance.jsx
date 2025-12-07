@@ -3,15 +3,16 @@
 import { initPostContract } from '@/lib/communication'
 import { useConnection, useBalance } from 'wagmi'
 
-export default function Balance({ params }) {
+export default function Balance({ addr }) {
   const { web3, contract } = initPostContract()
   const { address, isConnected } = useConnection()
+  
   const {
     data: balanceData,
     isLoading: isBalanceLoading,
     isError: isBalanceError,
   } = useBalance({
-    address: address,
+    address: addr,
   })
 
   // Handle loading and error states for the balance fetch
