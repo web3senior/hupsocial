@@ -129,8 +129,8 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
     // Post Management
     /// @notice Creates a new status post.
     function createPost(string memory _metadata, string memory _content, bool _allowedComments) external payable whenNotPaused {
-        _processFee(); // FIX: Call _processFee to handle payment logic
-        require(bytes(_content).length > 0, "Post content cannot be empty.");
+        _processFee(); // Payment logic
+        require(bytes(_metadata).length > 0 || bytes(_content).length > 0, "Post metadata/ content cannot be empty.");
 
         postCount.increment();
         uint256 postId = postCount.current();

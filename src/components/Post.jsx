@@ -19,9 +19,10 @@ import { toast } from '@/components/NextToast'
 import Shimmer from '@/components/ui/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon, RepostIcon, TipIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
+import { getIPFS } from '@/lib/ipfs'
 import styles from './Post.module.scss'
 
 moment.defineLocale('en-short', {
@@ -81,14 +82,12 @@ function renderMarkdown(markdown) {
 }
 
 export default function Post({ item, showContent, actions, chainId }) {
-  const [posts, setPosts] = useState({ list: [] })
+  const [postContent, setPostContent] = useState()
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showShareModal, setShowShareModal] = useState()
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
-  const params = useParams()
-  const activeChain = getActiveChain()
   const { address, isConnected } = useAccount()
   const router = useRouter()
   const [viewCount, setViewCount] = useState(0)
@@ -104,6 +103,13 @@ export default function Post({ item, showContent, actions, chainId }) {
       })
     }
 
+    if (item.metadata !== ``) {
+      getIPFS(item.metadata).then((result) => {
+        console.log(result)
+        setPostContent(result)
+      })
+    }
+
     // document.querySelectorAll(`video`).forEach((element) => {
     //   element.addEventListener(`clikc`, (e) => e.stopPropagation())
     // })
@@ -114,8 +120,8 @@ export default function Post({ item, showContent, actions, chainId }) {
       {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
       {showShareModal && <ShareModal item={showShareModal} setShowShareModal={setShowShareModal} />}
-
-      {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />}
+      {/* 
+      {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />} */}
 
       <section className={`${styles.post} flex flex-column align-items-start justify-content-between`}>
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
@@ -123,11 +129,47 @@ export default function Post({ item, showContent, actions, chainId }) {
           <Nav item={item} />
         </header>
         <main className={`${styles.post__main}`}>
-          <div className={`${styles.post__content} `} id={`post${item.postId}`} dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
+          {/* Check if post contains metadata or not */}
+          {postContent && postContent.elements && postContent.elements.length > 1 ? (
+            <>
+              <div
+                className={`${styles.post__content} `}
+                id={`post${item.postId}`}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text}`) }}
+              />
+              <div className="flex flex-wrap gap-4 mb-4">
+                {postContent &&
+                  postContent.elements[1].data.items.map((item, index) => (
+                    <div key={index} className="">
+                      {item.type === 'image' ? (
+                        <>
+                          <figure>
+                            <img src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} alt="" style={{ width: `100%`, aspectRatio: `1/1` }} />
+                          </figure>
+                        </>
+                      ) : (
+                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls style={{ width: `100%`, }} />
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className={`${styles.post__content} `}
+                id={`post${item.postId}`}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
+              />
+            </>
+          )}
+
           {/* style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} */}
 
           <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
-            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />}
+            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
+              <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
+            )}
 
             {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
               <>
@@ -184,6 +226,8 @@ export default function Post({ item, showContent, actions, chainId }) {
     </>
   )
 }
+
+const PostImage = () => {}
 
 const Nav = ({ item }) => {
   const [showPostDropdown, setShowPostDropdown] = useState()
@@ -317,7 +361,12 @@ const CommentModal = ({ item, setShowCommentModal }) => {
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
-                <div className={`${styles.post__content} `} id={`post${item.postId}`} style={{ maxHeight: 'fit-content' }} dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }} />
+                <div
+                  className={`${styles.post__content} `}
+                  id={`post${item.postId}`}
+                  style={{ maxHeight: 'fit-content' }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
+                />
               </main>
             </section>
           </article>
@@ -325,7 +374,12 @@ const CommentModal = ({ item, setShowCommentModal }) => {
 
         <footer className={`${styles.modal__footer}  flex flex-column align-items-start`}>
           <ConnectedProfile addr={address} />
-          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
+          <textarea
+            autoFocus
+            defaultValue={commentContent}
+            onInput={(e) => setCommentContent(e.target.value)}
+            placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`}
+          />
           <button className="btn" onClick={(e) => postComment(e, item.postId)}>
             Post comment
           </button>
@@ -476,7 +530,8 @@ const ShareModal = ({ item, setShowShareModal }) => {
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const postContent = `${postTitle}\n\n Creator: ${item.creator} \n\n`
   // --- Constructing the Share Link ---
-  const shareLink = `https://twitter.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
+  const shareLink =
+    `https://twitter.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
 
   useEffect(() => {}, [item])
 
@@ -623,7 +678,12 @@ const Poll = ({ polls }) => {
                   <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
                 </header>
                 <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
-                  <div className={`${styles.poll__question} `} onClick={(e) => e.stopPropagation()} id={`pollQuestion${item.pollId}`} dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }} />
+                  <div
+                    className={`${styles.poll__question} `}
+                    onClick={(e) => e.stopPropagation()}
+                    id={`pollQuestion${item.pollId}`}
+                    dangerouslySetInnerHTML={{ __html: `<p>${item.question}</p>` }}
+                  />
 
                   {item.question.length > 150 && (
                     <button
@@ -637,7 +697,10 @@ const Poll = ({ polls }) => {
                       <b className={`text-primary`}>Show More</b>
                     </button>
                   )}
-                  <div onClick={(e) => e.stopPropagation()} className={`${styles.poll__actions} flex flex-row align-items-center justify-content-start`}>
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className={`${styles.poll__actions} flex flex-row align-items-center justify-content-start`}
+                  >
                     {<LikeCount pollId={item.pollId} />}
 
                     {item.allowedComments && (
@@ -812,7 +875,10 @@ const ConnectedProfile = ({ addr }) => {
           wallet: res.data.id,
           name: res.data.Profile[0].name,
           description: res.data.description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+          profileImage:
+            res.data.Profile[0].profileImages.length > 0
+              ? res.data.Profile[0].profileImages[0].src
+              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
@@ -822,7 +888,10 @@ const ConnectedProfile = ({ addr }) => {
         getProfile(addr).then((res) => {
           //  console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== ''
+                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
+                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
@@ -856,7 +925,11 @@ const ConnectedProfile = ({ addr }) => {
         <div className={`flex align-items-center gap-025`}>
           <b>{profile.name ?? defaultUsername}</b>
           <BlueCheckMarkIcon />
-          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
+          <div
+            className={`${styles.badge}`}
+            title={activeChain && activeChain[0].name}
+            dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}
+          ></div>
         </div>
         <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
       </figcaption>

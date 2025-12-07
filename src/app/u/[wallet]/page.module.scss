@@ -384,11 +384,10 @@
     font-size: 1.3rem;
     line-height: 0;
     font-weight: 700;
-    height: 8px;
   }
 
   &__checkmark {
-    --r: 0.8rem;
+    --r: 14px;
     width: var(--r);
     height: var(--r);
   }
@@ -396,6 +395,7 @@
   &__wallet {
     position: relative;
     top: 0.2em;
+    color: var(--gray-500);
   }
 
   &__description {

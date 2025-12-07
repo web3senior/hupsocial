@@ -132,25 +132,31 @@ export default function Page() {
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 
-            <div className={`grid grid--fill gap-1 mt-10`} style={{ '--data-width': `64px` }} role="list">
-              {POAPs &&
-                POAPs.length > 0 &&
-                POAPs.map((POAP, key) => {
-                  return (
-                    <figure className={``}>
-                      <img src={POAP.event.image_url} style={{ width: `64px` }} className={`rounded-full`} />
-                      <figcaption style={{ color: `black` }}>{POAP.event.name}</figcaption>
-                      <small className={`lable lable-dark`}>{POAP.event.year}</small>
-                    </figure>
-                  )
-                })}
-            </div>
+            <details className="mt-10">
+              <summary>View POAPs</summary>
+              <div className={`grid grid--fill gap-1 mt-10`} style={{ '--data-width': `64px` }} role="list">
+                {POAPs &&
+                  POAPs.length > 0 &&
+                  POAPs.map((POAP, i) => {
+                    return (
+                      <figure key={i} className={``}>
+                        <img src={POAP.event.image_url} style={{ width: `64px` }} className={`rounded-full`} />
+                        <figcaption style={{ color: `black` }}>{POAP.event.name}</figcaption>
+                        <small className={`lable lable-dark`}>{POAP.event.year}</small>
+                      </figure>
+                    )
+                  })}
+              </div>
+            </details>
           </div>
 
           <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
             <li>
               <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
-                Posts <span className={`lable lable-pill lable-dark`}>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}</span>
+                Posts{' '}
+                <span className={`lable lable-pill lable-dark`}>
+                  {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}
+                </span>
               </button>
             </li>
             <li>
@@ -184,7 +190,11 @@ export default function Page() {
                   posts.list.length > 0 &&
                   posts.list.map((item, i) => {
                     return (
-                      <section key={i} className={`${styles.post} animate fade`} onClick={() => router.push(`/${activeChain[0].id}/p/${item.postId}`)}>
+                      <section
+                        key={i}
+                        className={`${styles.post} animate fade`}
+                        onClick={() => router.push(`/${activeChain[0].id}/p/${item.postId}`)}
+                      >
                         <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
                         {i < posts.list.length - 1 && <hr />}
                       </section>
@@ -331,7 +341,7 @@ const Profile = ({ addr }) => {
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
       console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0 && res.data.Profile[0].isContract) {
         setIsItUp(true)
         setData({
           wallet: res.data.Profile[0].id,
@@ -369,7 +379,7 @@ const Profile = ({ addr }) => {
         <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
           <div className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}>
             <div className={`flex align-items-center gap-025`}>
-              <h1 className={`${styles.profile__name}`}>{data.name !== '' ? data.name : `hup-user`}</h1>
+              <b className={`${styles.profile__name}`}>{data.name !== '' ? data.name : `hup-user`}</b>
               <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
             </div>
 
@@ -408,10 +418,11 @@ const Profile = ({ addr }) => {
                 </Link>
               </div>
 
-              <div role='list'>
+              <div role="list">
                 <POAPIcon />
               </div>
             </li>
+
             {isConnected && selfView && (
               <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
                 {address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
@@ -426,6 +437,7 @@ const Profile = ({ addr }) => {
                 )}
               </li>
             )}
+
             {!selfView && (
               <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
                 <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
@@ -452,7 +464,7 @@ const Links = () => {
   useEffect(() => {
     getUniversalProfile(params.wallet).then((res) => {
       console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0 && res.data.Profile[0].isContract) {
         setIsItUp(true)
         setData({
           wallet: res.data.Profile[0].id,
@@ -494,7 +506,13 @@ const Links = () => {
       {JSON.parse(data.links).length > 0 &&
         JSON.parse(data.links).map((link, i) => {
           return (
-            <a key={i} href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`} target={`_blank`} rel="noopener noreferrer" className={`flex flex-row align-items-center justify-content-between`}>
+            <a
+              key={i}
+              href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`}
+              target={`_blank`}
+              rel="noopener noreferrer"
+              className={`flex flex-row align-items-center justify-content-between`}
+            >
               <div className={`flex flex-column`}>
                 <p>{link.title || link.name}</p>
                 <code>{link.url}</code>
@@ -791,8 +809,28 @@ const Status = ({ addr, profile, selfView }) => {
               <div className={``} aria-label="Close" onClick={() => setShowModal(false)}>
                 <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
                   <title>Close</title>
-                  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="3" y2="21"></line>
-                  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="21" y2="3"></line>
+                  <line
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    x1="21"
+                    x2="3"
+                    y1="3"
+                    y2="21"
+                  ></line>
+                  <line
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    x1="21"
+                    x2="3"
+                    y1="21"
+                    y2="3"
+                  ></line>
                 </svg>
               </div>
               <div className={`flex-1`}>
@@ -809,7 +847,10 @@ const Status = ({ addr, profile, selfView }) => {
                   <img src={`${profile.profileImage}`} />
                 </figure>
 
-                <div className={`d-f-c`} title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}>
+                <div
+                  className={`d-f-c`}
+                  title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}
+                >
                   <textarea
                     autoFocus
                     defaultValue={status && status !== '' ? status.content : statusContent}
@@ -854,7 +895,12 @@ const Status = ({ addr, profile, selfView }) => {
         }}
       >
         {status && (
-          <p title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
+          <p
+            title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment
+              .unix(web3.utils.toNumber(status.expirationTimestamp))
+              .utc()
+              .fromNow()}`}
+          >
             {status.content !== '' ? <>{status.content}</> : <> Status...</>}
           </p>
         )}
@@ -973,8 +1019,28 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
             <div className={``} aria-label="Close" onClick={() => setShowProfileModal(false)}>
               <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
                 <title>Close</title>
-                <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="3" y2="21"></line>
-                <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="21" x2="3" y1="21" y2="3"></line>
+                <line
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  x1="21"
+                  x2="3"
+                  y1="3"
+                  y2="21"
+                ></line>
+                <line
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  x1="21"
+                  x2="3"
+                  y1="21"
+                  y2="3"
+                ></line>
               </svg>
             </div>
             <div className={`flex-1`}>
@@ -1071,17 +1137,27 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
   )
 }
 
-/**
- * Post
- * @param {String} addr
- * @returns
- */
 const PostForm = ({ addr }) => {
-  const [profile, setProfile] = useState()
   const [content, setContent] = useState('Question?')
   const [showForm, setShowForm] = useState(`post`)
   const [votingLimit, setVotingLimit] = useState(1)
-  const [postContent, setPostContent] = useState()
+  const [postContent, setPostContent] = useState({
+    version: '1.1',
+    elements: [
+      { type: 'text', data: { text: '' } },
+      {
+        type: 'media',
+        data: {
+          items: [
+            // { type: 'image', cid: 'Qm1234...image-cid-1', alt: 'Photo of the launch party.', mimeType: 'image/jpeg' },
+            // { type: 'image', cid: 'Qm5678...image-cid-2', alt: 'Screenshot of the new interface.', mimeType: 'image/jpeg' },
+            // { type: 'video', cid: 'Qm9012...video-cid-3', format: 'mp4', duration: 45 },
+          ],
+        },
+      },
+    ],
+  })
+
   const [showWhitelist, setShowWhitelist] = useState(false)
   const [whitelist, setWhitelist] = useState({ list: [] })
   const [filteredProfiles, setFilteredProfiles] = useState()
@@ -1089,8 +1165,11 @@ const PostForm = ({ addr }) => {
   const activeChain = getActiveChain()
   const mounted = useClientMounted()
   const createFormRef = useRef()
+  const fileInputRef = useRef()
   const whitelistInputRef = useRef()
   const { address, isConnected } = useAccount()
+  const { web3, contract } = initPostContract()
+  const [selectedMediaType, setSelectedMediaType] = useState(null) // Tracks if we're expecting image or video
 
   /* Error during submission (e.g., user rejected)  */
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -1130,31 +1209,6 @@ const PostForm = ({ addr }) => {
       onError: handleError, // Call our error function
     },
   })
-  const { web3, contract } = initPostContract()
-
-  const handleForm = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    const formData = new FormData(e.target)
-    const fullname = formData.get('fullname')
-    const phone = formData.get('phone')
-    const address = formData.get('address')
-    const wallet = formData.get('wallet')
-    const errors = {}
-
-    const post = {
-      fullname: fullname,
-      phone: phone,
-      address: address,
-      wallet: wallet,
-    }
-
-    updateProfile(post).then((res) => {
-      console.log(res)
-      toast(`${res.message}`, 'success')
-    })
-  }
 
   const handleCreatePoll = async (e) => {
     e.preventDefault()
@@ -1220,24 +1274,216 @@ const PostForm = ({ addr }) => {
       ],
     })
   }
+  const uploadFileToIPFS = async (file) => {
+    try {
+      if (!file) {
+        console.error('No file selected.')
+        return
+      }
 
-  const handlePostContentChange = (e) => {
-    const value = e.target.value
-    setPostContent(value)
-    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, value)
+      const data = new FormData()
+      data.set('file', file)
+
+      const uploadRequest = await fetch(`/api/ipfs/file`, {
+        method: 'POST',
+        body: data,
+      })
+      const signedUrl = await uploadRequest.json()
+      return signedUrl
+    } catch (e) {
+      console.log(e)
+      console.error('Trouble uploading file')
+    }
+  }
+
+  const uploadObjectToIPFS = async (json) => {
+    try {
+      const uploadRequest = await fetch(`/api/ipfs/object`, {
+        method: 'POST',
+        // Set the Content-Type header
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Stringify the JSON object directly (no extra wrapper)
+        body: JSON.stringify(json),
+      })
+
+      // Check for non-200 status codes
+      if (!uploadRequest.ok) {
+        const errorData = await uploadRequest.json()
+        throw new Error(errorData.error || `HTTP error! Status: ${uploadRequest.status}`)
+      }
+
+      const responseData = await uploadRequest.json()
+      return responseData
+    } catch (e) {
+      console.error('Trouble uploading file/object:', e)
+      // Re-throw the error or return null/undefined depending on your error handling preference
+      throw e
+    }
   }
 
   const handleCreatePost = async (e) => {
     e.preventDefault()
 
     const formData = new FormData(e.target)
-    const metadata = ''
+
+    const resultIPFS = await uploadObjectToIPFS((postContent))
+    if (!resultIPFS.cid) {
+      console.error(`CID not found`)
+    }
+    const metadata = resultIPFS.cid
+    const content = `─`
 
     writeContract({
       abi,
       address: activeChain[1].post,
       functionName: 'createPost',
-      args: [metadata, postContent, formData.get(`allowComments`) === 'true' ? true : false],
+      args: [metadata, content, formData.get(`allowComments`) === 'true' ? true : false],
+    })
+  }
+
+  const handleTextContentChange = (newText) => {
+    setPostContent((prevContent) => {
+      // 1. Copy the elements array
+      const newElements = [...prevContent.elements]
+
+      // 2. Deep copy the specific element being modified (Element 0: text)
+      const newTextElement = {
+        ...newElements[0],
+        data: {
+          ...newElements[0].data,
+          text: newText, // Set the new text value
+        },
+      }
+
+      // 3. Update the elements array with the new element copy
+      newElements[0] = newTextElement
+
+      // 4. Return the new top-level state object copy
+      return {
+        ...prevContent,
+        elements: newElements,
+      }
+    })
+  }
+
+  /**
+   * Triggers the hidden file input with the correct acceptance mime types.
+   */
+  const triggerFileInput = (type) => {
+    if (postContent.elements[1].data.items.length >= 4) {
+      console.error('Maximum 4 media items reached.')
+      return
+    }
+    setSelectedMediaType(type)
+    fileInputRef.current.accept = type === 'image' ? 'image/*' : 'video/*'
+    fileInputRef.current.click()
+  }
+
+  /**
+   * Handles file selection from the hidden input.
+   * Simulates IPFS upload and CID generation.
+   */
+  const handleFileSelect = async (event) => {
+    const file = event.target.files[0]
+    if (!file || postContent.elements[1].data.items.length >= 4) return
+
+    // Size of the file
+    const sizeInBytes = file.size
+    const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2)
+
+    if (sizeInMB > 5) {
+      toast(`File size error. Maximum size is 5MB`)
+      return
+    }
+
+    // console.log(`File Name: ${file.name}`);
+    // console.log(`File Type: ${file.type}`);
+    // console.log(`File Size: ${sizeInBytes} bytes`);
+    // console.log(`File Size (MB): ${sizeInMB} MB`);
+
+    // 1. Determine media type based on MIME type and the button clicked
+    const isImage = file.type.startsWith('image/')
+    const isVideo = file.type.startsWith('video/')
+    let type
+
+    if ((isImage && selectedMediaType === 'image') || (isVideo && selectedMediaType === 'video')) {
+      type = selectedMediaType
+    } else {
+      // Handle type mismatch (e.g., user selects video but clicked 'Add Image')
+      console.error(`File type mismatch. Expected ${selectedMediaType}, got ${file.type}`)
+      return
+    }
+
+    // Upload to IPFS
+    const resultIPFS = await uploadFileToIPFS(file, `file`)
+
+    if (!resultIPFS.url || !resultIPFS.cid) return
+
+    // 2. Create a temporary local URL for immediate preview
+    const localUrl = URL.createObjectURL(file)
+
+    // 3. Create a placeholder item with an 'isUploading' flag
+    const newItem = {
+      type: type,
+      cid: resultIPFS.cid, // Placeholder CID
+      alt: `Hup asset ${type}`,
+      mimeType: file.type,
+      localUrl: localUrl, // Use this as a temporary unique ID
+      isUploading: true,
+      duration: type === 'video' ? 0 : undefined,
+    }
+
+    // 4. Add the placeholder item to the state immediately
+    setPostContent((prevContent) => {
+      const currentContent = prevContent || INITIAL_POST_CONTENT
+      const newElements = [...currentContent.elements]
+      const mediaElement = newElements[1]
+      const newMediaItems = [...mediaElement.data.items, newItem]
+
+      const newMediaElement = {
+        ...mediaElement,
+        data: { ...mediaElement.data, items: newMediaItems },
+      }
+
+      newElements[1] = newMediaElement
+      return { ...currentContent, elements: newElements }
+    })
+
+    // 5. --- Simulate IPFS Upload (Asynchronous Task) ---
+    console.log(`Done. file selected`)
+
+    // Reset the file input value so the same file can be selected again
+    event.target.value = null
+  }
+
+  const handleRemoveMedia = (itemIndex) => {
+    setPostContent((prevContent) => {
+      // 1. Get a copy of the elements array
+      const newElements = [...prevContent.elements]
+      const mediaElement = newElements[1]
+
+      // 2. Filter the items array immutably
+      const newMediaItems = mediaElement.data.items.filter((_, idx) => idx !== itemIndex)
+
+      // 3. Create a deep copy of the media element with the new items array
+      const newMediaElement = {
+        ...mediaElement,
+        data: {
+          ...mediaElement.data,
+          items: newMediaItems,
+        },
+      }
+
+      // 4. Update the elements array
+      newElements[1] = newMediaElement
+
+      // 5. Return the new top-level state
+      return {
+        ...prevContent,
+        elements: newElements,
+      }
     })
   }
 
@@ -1331,6 +1577,7 @@ const PostForm = ({ addr }) => {
     console.log(newWhitelist)
     setWhitelist({ list: newWhitelist })
   }
+
   /**
    * Function to get the text currently selected by the cursor in a textarea.
    * @param {HTMLTextAreaElement} textarea - The textarea element to check.
@@ -1395,54 +1642,32 @@ const PostForm = ({ addr }) => {
     textarea.value = endString
   }
 
+  // const mainTextIndex = postContent.elements.findIndex((el) => el.type === 'text')
+  // const mediaBlockIndex = postContent.elements.findIndex((el) => el.type === 'media')
+  // const initialText = 0 !== -1 ? postContent.elements[0].data.text : ''
+  // const mediaItems = 1 !== -1 ? postContent.elements[1].data.items : []
+
   useEffect(() => {
     if (isConfirmed) {
       localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, '')
       toast(`Post sent.`, `success`)
     }
-
-    getUniversalProfile(addr).then((res) => {
-      // console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
-        //setIsItUp(true)
-        setProfile({
-          wallet: res.data.id,
-          name: res.data.Profile[0].name,
-          description: res.data.description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
-          profileHeader: '',
-          tags: JSON.stringify(res.data.tags),
-          links: JSON.stringify(res.data.links_),
-          lastUpdate: '',
-        })
-      } else {
-        getProfile(addr).then((res) => {
-          //  console.log(res)
-          if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
-            res.profileImage = profileImage
-            setProfile(res)
-          }
-        })
-      }
-    })
-    setPostContent(localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`))
   }, [isConfirmed])
-
-  if (!profile) return <div className={`shimmer ${styles.shimmer}`} />
 
   return (
     <div className={`${styles.postForm} flex flex-row align-items-start justify-content-between gap-1`}>
-      <img
-        alt={profile.name || `PFP`}
-        src={`${profile.profileImage.length !== '' ? profile.profileImage : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-        className={`${styles.postForm__pfp} rounded`}
-      />
       <div className={`flex-1`}>
         {showForm === `poll` && (
           <form ref={createFormRef} className={`form flex flex-column gap-050`} onSubmit={(e) => handleCreatePoll(e)}>
             <div>
-              <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={content} onChange={(e) => setContent(e.target.value)} rows={10} />
+              <textarea
+                type="text"
+                name="q"
+                placeholder={`What's up!`}
+                defaultValue={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={10}
+              />
               <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
             </div>
             <div>
@@ -1519,7 +1744,11 @@ const PostForm = ({ addr }) => {
                         <div key={i} className={`d-flex grid--gap-050 ms-motion-slideDownIn`}>
                           <figure>
                             <img
-                              src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`}
+                              src={`${
+                                profile.profileImages.length > 0
+                                  ? profile.profileImages[0].src
+                                  : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`
+                              }`}
                               alt={`${profile.fullName}`}
                             />
                           </figure>
@@ -1529,7 +1758,12 @@ const PostForm = ({ addr }) => {
                               <span>{`${profile.id.slice(0, 4)}...${profile.id.slice(38)}`}</span>
                             </div>
 
-                            <button className={`rounded d-f-c`} type={`button`} title={`Clear ${profile.fullName}`} onClick={(e) => handleRemoveWhitelist(e, i)}>
+                            <button
+                              className={`rounded d-f-c`}
+                              type={`button`}
+                              title={`Clear ${profile.fullName}`}
+                              onClick={(e) => handleRemoveWhitelist(e, i)}
+                            >
                               close
                             </button>
                           </div>
@@ -1539,7 +1773,14 @@ const PostForm = ({ addr }) => {
                   </div>
                 )}
 
-                <input ref={whitelistInputRef} type={`text`} name={`whitelist`} autoComplete={`off`} placeholder={`Search profile by name or address`} onChange={(e) => handleSearchProfile(e)} />
+                <input
+                  ref={whitelistInputRef}
+                  type={`text`}
+                  name={`whitelist`}
+                  autoComplete={`off`}
+                  placeholder={`Search profile by name or address`}
+                  onChange={(e) => handleSearchProfile(e)}
+                />
 
                 {filteredProfiles && filteredProfiles?.data && (
                   <div className={`${styles['filter-profile']} ms-depth-8`}>
@@ -1548,7 +1789,11 @@ const PostForm = ({ addr }) => {
                         <div key={i} id={`profileCard${i}`} className={`d-flex grid--gap-050`}>
                           <figure>
                             <img
-                              src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`}`}
+                              src={`${
+                                profile.profileImages.length > 0
+                                  ? profile.profileImages[0].src
+                                  : `https://ipfs.io/ipfs/bafkreic63gdzkdiye7vlcvbchillkszl6wbf2t3ysxcmr3ovpah3rf4h7i`
+                              }`}
                               alt={`${profile.fullName}`}
                             />
                           </figure>
@@ -1599,40 +1844,91 @@ const PostForm = ({ addr }) => {
           </form>
         )}
 
-        {showForm === `post` && (
-          <form ref={createFormRef} className={`form flex flex-column gap-050 ${styles.postForm}`} onSubmit={(e) => handleCreatePost(e)}>
-            <div className={`form-group ${styles.postForm__postContent}`}>
-              <ul className={`flex gap-025`}>
-                <li>
-                  <button type="button" style={{ width: `20px` }} onClick={() => makeBold()}>
-                    B
-                  </button>
-                </li>
-                <li>
-                  <button type="button" style={{ width: `20px` }} onClick={() => makeItalic()}>
-                    <i>I</i>
-                  </button>
-                </li>
-              </ul>
-              <textarea type="text" name="q" placeholder={`What's up!`} defaultValue={postContent} onChange={(e) => handlePostContentChange(e)} rows={10} />
-              <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
+        {/* {showForm === `post` && ( */}
+        <form ref={createFormRef} className={`form flex flex-column gap-050 ${styles.postForm}`} onSubmit={(e) => handleCreatePost(e)}>
+          <div className={`form-group ${styles.postForm__postContent}`}>
+            <ul className={`flex gap-025`}>
+              <li>
+                <button type="button" style={{ width: `20px` }} onClick={() => makeBold()}>
+                  B
+                </button>
+              </li>
+              <li>
+                <button type="button" style={{ width: `20px` }} onClick={() => makeItalic()}>
+                  <i>I</i>
+                </button>
+              </li>
+            </ul>
+
+            {/* HIDDEN FILE INPUT */}
+            <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} multiple={false} />
+
+            {/* --- Text Editor --- */}
+            <div className="mb-6">
+              <textarea
+                className="w-full p-4 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition duration-150 resize-none text-gray-800"
+                name="postText"
+                placeholder="What's happening?"
+                value={postContent && postContent.elements[0].data.text}
+                onChange={(e) => handleTextContentChange(e.target.value)}
+                rows={5}
+              />
             </div>
 
-            <div>
-              <label htmlFor={`allowComments`}>Allow comments</label>
-              <select name={`allowComments`} id="">
-                <option value={true}>Yes</option>
-                <option value={false}>No</option>
-              </select>
-            </div>
+            <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
+          </div>
 
-            <div className={`mt-10`}>
-              <button className={`btn`} type="submit" disabled={isSigning}>
-                {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
-              </button>
+          <div>
+            <label htmlFor={`allowComments`}>Allow comments</label>
+            <select name={`allowComments`} id="">
+              <option value={true}>Yes</option>
+              <option value={false}>No</option>
+            </select>
+          </div>
+
+          <>
+            <h3 className="text-lg font-medium text-gray-700 mb-3 flex items-center">
+              {/* <Image className="w-5 h-5 mr-2 text-indigo-500" /> */}
+              Media Gallery ({postContent && postContent.elements[1].data.items.length})
+            </h3>
+
+            <div className="flex flex-wrap gap-4 mb-4">
+              {postContent &&
+                postContent.elements[1].data.items.map((item, index) => (
+                  <div key={index} className="">
+                    <div className="" style={{ width: `100px`, height: `100px`, backgroundColor: item.type === 'image' ? '#3B82F6' : '#DC2626' }}>
+                      {item.type === 'image' ? (
+                        <>
+                          <figure>
+                            <img src={item.localUrl} alt="" style={{ aspectRatio: `1/1` }} />
+                          </figure>
+                        </>
+                      ) : (
+                        <video src={item.localUrl} controls style={{ aspectRatio: `1/1` }} />
+                      )}
+                    </div>
+
+                    <button type={`button`} onClick={() => handleRemoveMedia(index)} aria-label={`Remove ${item.type}`}>
+                      remove
+                    </button>
+                  </div>
+                ))}
             </div>
-          </form>
-        )}
+          </>
+
+          <div className={`mt-10 flex gap-1`}>
+            <button className={`btn`} type="submit" disabled={isSigning}>
+              {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
+            </button>
+
+            <button type={`button`} onClick={() => triggerFileInput(`image`)} disabled={postContent.elements[1].data.items.length === 4}>
+              Add image
+            </button>
+            <button type={`button`} onClick={() => triggerFileInput(`video`)} disabled={postContent.elements[1].data.items.length === 4}>
+              Add video
+            </button>
+          </div>
+        </form>
 
         {!mounted && isConnected && (
           <ul className={`flex ${styles.post__actions}`}>
@@ -1778,7 +2074,12 @@ const CommentModal = ({ item, setShowCommentModal }) => {
 
         <footer className={`${styles.commentModal__footer}  flex flex-column align-items-start`}>
           <ConnectedProfile addr={address} />
-          <textarea autoFocus defaultValue={commentContent} onInput={(e) => setCommentContent(e.target.value)} placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`} />
+          <textarea
+            autoFocus
+            defaultValue={commentContent}
+            onInput={(e) => setCommentContent(e.target.value)}
+            placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`}
+          />
           <button className="btn" onClick={(e) => postComment(e, item.postId)}>
             Post comment
           </button>
