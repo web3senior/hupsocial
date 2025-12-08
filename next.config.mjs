@@ -1,4 +1,23 @@
 /** @type {import('next').NextConfig} */
+
+const securityHeaders = [
+  // The key directive to fix Mixed Content
+  {
+    key: 'Content-Security-Policy',
+    value:
+      "upgrade-insecure-requests; default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; connect-src 'self' https://ipfs.io;",
+  },
+  // Other recommended security headers
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff',
+  },
+  {
+    key: 'X-Frame-Options',
+    value: 'SAMEORIGIN', // Or 'DENY'
+  },
+]
+
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
@@ -6,20 +25,7 @@ const nextConfig = {
     return [
       {
         source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          // {
-          //   key: 'X-Frame-Options',
-          //   value: 'DENY',
-          // },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-        ],
+        headers: securityHeaders,
       },
       {
         source: '/sw.js',
