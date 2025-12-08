@@ -139,32 +139,28 @@ export default function Post({ item, showContent, actions, chainId }) {
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text}`) }}
               />
 
-              <div className={`${styles[`post__main__media`]} flex flex-row gap-1`}>
+              <div className={`${styles.post__main__media} flex flex-row gap-1`}>
                 {postContent &&
                   postContent.elements[1].data.items.map((item, index) => (
-                    <>
+                    <div key={index}>
                       {item.type === 'image' ? (
-                        <figure key={index}>
+                        <figure>
                           <img alt={`${item?.alt}`} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} />
                         </figure>
                       ) : (
-                        <video key={index} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls />
+                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls />
                       )}
-                    </>
+                    </div>
                   ))}
               </div>
             </>
           ) : (
-            <>
-              <div
-                className={`${styles.post__content} `}
-                id={`post${item.postId}`}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
-              />
-            </>
+            <div
+              className={`${styles.post__content} `}
+              id={`post${item.postId}`}
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
+            />
           )}
-
-          {/* style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} */}
         </main>
 
         <footer className={`${styles.post__footer}`}>
