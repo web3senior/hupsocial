@@ -3,14 +3,16 @@
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
-import txIcon from '@/../public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useAccount, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
+import { useConnectorClient, useConnections, useClient, networks,
+   useWaitForTransactionReceipt, useAccount, useDisconnect, Connector,
+    useConnect, useWriteContract, useReadContract } from 'wagmi'
 import {
   initPostContract,
   initPostCommentContract,
   getPosts,
   getPostByIndex,
+
   getPostCommentCount,
   getCommentsByPostId,
   getHasLikedPost,
@@ -67,7 +69,7 @@ export default function Page() {
   const [chains, setChains] = useState()
   const params = useParams()
   const [activeChain, setActiveChain] = useState(getActiveChain())
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnections()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,

@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
+  reactCompiler: true,
   async headers() {
     return [
       {
@@ -38,6 +39,12 @@ const nextConfig = {
         ],
       },
     ]
+  },
+  experimental: {
+    // This makes the bundler treat these modules as if they are
+    // only available in the Node.js environment (server-side).
+    // This prevents the bundler from trying to process all the test/doc files.
+    serverComponentsExternalPackages: ['pino', 'thread-stream'],
   },
 }
 

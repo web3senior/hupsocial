@@ -37,5 +37,4 @@ export const LinearLoading = () => (
   </div>
 )
 
-export { LinearLoading, GlobalLoader, ContentSpinner, Spinner }
 export default GlobalLoader

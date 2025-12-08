@@ -1,6 +1,6 @@
 {
   "name": "hup",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,8 +11,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.12",
-    "@wagmi/connectors": "^7.0.2",
-    "@walletconnect/ethereum-provider": "~2.21.1",
+    "@walletconnect/ethereum-provider": "~2.21.10",
     "dompurify": "^3.3.0",
     "jdenticon": "^3.3.0",
     "marked": "^17.0.1",
@@ -22,7 +21,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "sass": "^1.94.2",
-    "viem": "^2.41.2",
+    "viem": "2.x",
     "wagmi": "^3.1.0",
     "web3": "^4.16.0"
   },

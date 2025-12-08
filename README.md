@@ -1,22 +1,5 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Contract version 1.0
-0x06D446741eC8dE2EE4749BDD9161907fe539b34f
-
-## Contract version 2.0
-NEXT_PUBLIC_CONTRACT_POST=0x3E1E25B214d39edC1d11ea03425d3c7C0160A8Cb
-NEXT_PUBLIC_CONTRACT_POST_COMMENT=0x116778e5623eea92770146B08e9098A61c47e51E
-NEXT_PUBLIC_CONTRACT_STATUS=0x6B10B966C3369332De8c976da62249F38D6898ca
-
-### Problem Being Solved
-
-The primary challenge facing decentralized public goods is the loss of digital sovereignty due to reliance on centralized infrastructure. PGF coordination and history are tethered to centralized services (AWS, Discord), creating a single point of failure for censorship and data loss, which undermines the community's trust and resilience. Furthermore, the ecosystem lacks a unified, resilient, and user-controlled on-chain identity and reputation layer that is portable and immutable. 
-
-Hup solves this by building a sovereign social data layer while resolving a critical governance UX pain point: the threat of voter coercion. 
-
-We eliminate this by integrating Zero-Knowledge Proof (ZKP) tooling into community polls, ensuring all sensitive signaling is conducted with cryptographic privacy, thereby fostering honest, autonomous coordination.
-
-
 ## Getting Started
 
 First, run the development server:
@@ -44,7 +27,7 @@ To learn more about Next.js, take a look at the following resources:
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome !
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
 ## Deploy on Vercel
 

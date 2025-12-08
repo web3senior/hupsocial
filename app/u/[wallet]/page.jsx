@@ -8,7 +8,7 @@ import { initPostContract, initStatusContract, getStatus, getCreatorPostCount, g
 import { toast } from '@/components/NextToast'
 import Web3 from 'web3'
 import abi from '@/abi/post.json'
-import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
+import blueCheckMarkIcon from '@/public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'

@@ -3,7 +3,7 @@
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
-import txIcon from '@/../public/icons/tx.svg'
+import txIcon from '@/public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useConnection, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
 import {
