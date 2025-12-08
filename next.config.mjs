@@ -1,13 +1,6 @@
 /** @type {import('next').NextConfig} */
 
 const securityHeaders = [
-  // The key directive to fix Mixed Content
-  {
-    key: 'Content-Security-Policy',
-    value:
-      "upgrade-insecure-requests; default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; connect-src 'self' https://ipfs.io;",
-  },
-  // Other recommended security headers
   {
     key: 'X-Content-Type-Options',
     value: 'nosniff',
@@ -15,6 +8,10 @@ const securityHeaders = [
   {
     key: 'X-Frame-Options',
     value: 'SAMEORIGIN', // Or 'DENY'
+  },
+  {
+    key: 'Referrer-Policy',
+    value: 'strict-origin-when-cross-origin',
   },
 ]
 

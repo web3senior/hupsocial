@@ -136,7 +136,7 @@ export default function Post({ item, showContent, actions, chainId }) {
               <div
                 className={`${styles.post__content} `}
                 id={`post${item.postId}`}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text}`) }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text.replace(`http://`,`https://`)}`) }}
               />
               <div className="flex flex-wrap gap-4 mb-4">
                 {postContent &&
