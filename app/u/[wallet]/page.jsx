@@ -1927,10 +1927,10 @@ const PostForm = ({ addr }) => {
               {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
             </button>
 
-            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(e,`image`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={(e) => triggerFileInput(e,`image`)} disabled={postContent.elements[1].data.items.length === 4}>
               Add image
             </button>
-            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={() => triggerFileInput(e,`video`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={(e) => triggerFileInput(e,`video`)} disabled={postContent.elements[1].data.items.length === 4}>
               Add video
             </button>
           </div>
