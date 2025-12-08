@@ -127,6 +127,8 @@ export default function Post({ item, showContent, actions, chainId }) {
           <Profile creator={item.creator} createdAt={item.createdAt} />
           <Nav item={item} />
         </header>
+        
+        {/* Main */}
         <main className={`${styles.post__main}`}>
           {/* Check if post contains metadata or not */}
           {postContent && postContent.elements && postContent.elements.length > 1 ? (
@@ -143,11 +145,11 @@ export default function Post({ item, showContent, actions, chainId }) {
                       {item.type === 'image' ? (
                         <>
                           <figure>
-                            <img src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} alt="" style={{ width: `100%`, aspectRatio: `1/1` }} />
+                            <img alt={`${item?.alt}`} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`}/>
                           </figure>
                         </>
                       ) : (
-                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls style={{ width: `100%`, aspectRatio: `1/1` }} />
+                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls/>
                       )}
                     </div>
                   ))}
@@ -164,8 +166,10 @@ export default function Post({ item, showContent, actions, chainId }) {
           )}
 
           {/* style={{ maxHeight: `${showContent ? 'fit-content' : '150px'}` }} */}
+        </main>
 
-          <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
+        <footer className={`${styles.post__footer}`}>
+                    <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
               <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
             )}
@@ -220,7 +224,7 @@ export default function Post({ item, showContent, actions, chainId }) {
               </button>
             )}
           </div>
-        </main>
+        </footer>
       </section>
     </>
   )

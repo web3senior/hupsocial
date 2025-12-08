@@ -56,9 +56,11 @@
     height: 48px;
     min-width: 48px;
     max-height: 48px;
+
     &:hover {
       background: #eef3f6;
     }
+
     img {
       border-radius: var(--global-border-radius);
     }
@@ -1298,6 +1300,7 @@ button.btnPostMenu {
     color: var(--black-400);
     font-size: 11px;
     user-select: none;
+    padding-left: 3rem;
   }
 
   &__actions {

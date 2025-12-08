@@ -12,11 +12,11 @@ const pinata = new PinataSDK({
 // Next.js configuration to tell the framework NOT to parse the request body as JSON/text.
 // This is CRITICAL for handling file uploads (FormData).
 // Example for file uploads (what you are likely trying to achieve)
-export const config = {
-  api: {
-    bodyParser: false, // This is deprecated for App Router, you should use the Request object
-  }
-}
+// export const config = {
+//   api: {
+//     bodyParser: false, // This is deprecated for App Router, you should use the Request object
+//   }
+// }
 // For App Router, you would typically use this:
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
