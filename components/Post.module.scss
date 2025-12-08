@@ -1111,26 +1111,39 @@ button.btnPostMenu {
 
   &__main {
     padding-left: 3rem;
-  }
 
-  &__content {
-    height: auto;
-    //width: fit-content;
-    // max-height: 150px;
-    overflow: hidden;
-    line-height: 1.4;
-    font-size: 13px;
-    padding: 0.2rem 0 0.2rem 0.3rem;
-    user-select: none;
-
-    video {
-      width: fit-content;
-      height: 100%;
-      margin: 0 auto;
+    &__media {
+      max-height: 400px !important;
+      overflow: hidden;
+      background-color: var(--gray-100);
+      border-radius: var(--global-border-radius);
     }
 
-    a {
-      color: var(--blue-500) !important;
+    figure {
+      overflow: hidden;
+      width: 100%;
+      height: auto;
+
+      img {
+        width: auto;
+        height: 100%;
+           margin: 0 auto;
+      }
+    }
+
+    &__content {
+      height: auto;
+      //width: fit-content;
+      // max-height: 150px;
+      overflow: hidden;
+      line-height: 1.4;
+      font-size: 13px;
+      padding: 0.2rem 0 0.2rem 0.3rem;
+      user-select: none;
+
+      a {
+        color: var(--blue-500) !important;
+      }
     }
   }
 
@@ -1299,7 +1312,7 @@ button.btnPostMenu {
   &__footer {
     color: var(--black-400);
     font-size: 11px;
-    margin-top: .5em;
+    margin-top: 0.5em;
     user-select: none;
     padding-left: 3rem;
   }

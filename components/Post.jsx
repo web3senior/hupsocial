@@ -127,31 +127,30 @@ export default function Post({ item, showContent, actions, chainId }) {
           <Profile creator={item.creator} createdAt={item.createdAt} />
           <Nav item={item} />
         </header>
-        
+
         {/* Main */}
         <main className={`${styles.post__main}`}>
           {/* Check if post contains metadata or not */}
           {postContent && postContent.elements && postContent.elements.length > 1 ? (
             <>
               <div
-                className={`${styles.post__content} `}
+                className={`${styles.post__main__content} `}
                 id={`post${item.postId}`}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text.replace(`http://`,`https://`)}`) }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text}`) }}
               />
-              <div className="flex flex-wrap gap-4 mb-4">
+
+              <div className={`${styles[`post__main__media`]} flex flex-row gap-1`}>
                 {postContent &&
                   postContent.elements[1].data.items.map((item, index) => (
-                    <div key={index} className="">
+                    <>
                       {item.type === 'image' ? (
-                        <>
-                          <figure>
-                            <img alt={`${item?.alt}`} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`}/>
-                          </figure>
-                        </>
+                        <figure key={index}>
+                          <img alt={`${item?.alt}`} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} />
+                        </figure>
                       ) : (
-                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls/>
+                        <video key={index} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls />
                       )}
-                    </div>
+                    </>
                   ))}
               </div>
             </>
@@ -169,7 +168,7 @@ export default function Post({ item, showContent, actions, chainId }) {
         </main>
 
         <footer className={`${styles.post__footer}`}>
-                    <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
+          <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
               <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
             )}
