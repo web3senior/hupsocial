@@ -1299,6 +1299,7 @@ button.btnPostMenu {
   &__footer {
     color: var(--black-400);
     font-size: 11px;
+    margin-top: .5em;
     user-select: none;
     padding-left: 3rem;
   }
@@ -1326,7 +1327,7 @@ button.btnPostMenu {
       color: var(--black-600);
 
       @media (max-width: 600px) {
-        padding: 2px 9px;
+        padding: 4px 8px;
       }
 
       &:active {

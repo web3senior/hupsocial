@@ -1632,8 +1632,8 @@ const PostForm = ({ addr }) => {
 
     const startString = insertStringAtIndex(value, `**`, start)
     const endString = insertStringAtIndex(startString, `**`, end + 2)
-    console.log(endString)
-    setPostContent(endString)
+
+    handleTextContentChange(endString)
     textarea.value = endString
   }
 
@@ -1643,8 +1643,8 @@ const PostForm = ({ addr }) => {
 
     const startString = insertStringAtIndex(value, `*`, start)
     const endString = insertStringAtIndex(startString, `*`, end + 2)
-    console.log(endString)
-    setPostContent(endString)
+
+    handleTextContentChange(endString)
     textarea.value = endString
   }
 
@@ -1873,7 +1873,7 @@ const PostForm = ({ addr }) => {
             <div className="mb-6">
               <textarea
                 className="w-full p-4 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition duration-150 resize-none text-gray-800"
-                name="postText"
+                name="q"
                 placeholder="What's happening?"
                 value={postContent && postContent.elements[0].data.text}
                 onChange={(e) => handleTextContentChange(e.target.value)}
