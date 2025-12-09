@@ -142,7 +142,7 @@ export default function Post({ item, showContent, actions, chainId }) {
               <div className={`${styles.post__main__media} flex flex-row gap-1`}>
                 {postContent &&
                   postContent.elements[1].data.items.map((item, index) => (
-                    <div key={index}>
+                    <div key={index} className={`flex-1`}>
                       {item.type === 'image' ? (
                         <figure>
                           <img alt={`${item?.alt}`} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} />
