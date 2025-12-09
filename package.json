@@ -22,7 +22,7 @@
     "react-dom": "19.2.0",
     "sass": "^1.94.2",
     "viem": "2.x",
-    "wagmi": "^3.1.0",
+    "wagmi": "^3.0.2",
     "web3": "^4.16.0"
   },
   "devDependencies": {
