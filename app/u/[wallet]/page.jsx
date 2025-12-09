@@ -14,11 +14,12 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import Balance from './_components/balance'
 import { getActiveChain } from '@/lib/communication'
-import {useBalance , useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
+import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
+import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
@@ -136,7 +137,7 @@ export default function Page() {
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 
-            <Balance addr={params.wallet}/>
+            <Balance addr={params.wallet} />
 
             <details className="mt-10">
               <summary>View POAPs</summary>
@@ -1144,6 +1145,7 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
 }
 
 const PostForm = ({ addr }) => {
+  const [isUploading, setIsUploading] = useState(false)
   const [content, setContent] = useState('Question?')
   const [showForm, setShowForm] = useState(`post`)
   const [votingLimit, setVotingLimit] = useState(1)
@@ -1280,7 +1282,10 @@ const PostForm = ({ addr }) => {
       ],
     })
   }
+
   const uploadFileToIPFS = async (file) => {
+    setIsUploading(true)
+
     try {
       if (!file) {
         console.error('No file selected.')
@@ -1295,14 +1300,17 @@ const PostForm = ({ addr }) => {
         body: data,
       })
       const signedUrl = await uploadRequest.json()
+      setIsUploading(false)
       return signedUrl
     } catch (e) {
+      setIsUploading(false)
       console.log(e)
       console.error('Trouble uploading file')
     }
   }
 
   const uploadObjectToIPFS = async (json) => {
+    setIsUploading(true)
     try {
       const uploadRequest = await fetch(`/api/ipfs/object`, {
         method: 'POST',
@@ -1321,8 +1329,10 @@ const PostForm = ({ addr }) => {
       }
 
       const responseData = await uploadRequest.json()
+      setIsUploading(false)
       return responseData
     } catch (e) {
+      setIsUploading(false)
       console.error('Trouble uploading file/object:', e)
       // Re-throw the error or return null/undefined depending on your error handling preference
       throw e
@@ -1382,7 +1392,9 @@ const PostForm = ({ addr }) => {
       console.error('Maximum 4 media items reached.')
       return
     }
+
     setSelectedMediaType(type)
+
     fileInputRef.current.accept = type === 'image' ? 'image/*' : 'video/*'
     fileInputRef.current.click()
   }
@@ -1899,6 +1911,7 @@ const PostForm = ({ addr }) => {
             </h3>
 
             <div className="flex flex-wrap gap-4 mb-4">
+              {isUploading && <ContentSpinner />}
               {postContent &&
                 postContent.elements[1].data.items.map((item, index) => (
                   <div key={index} className="">
@@ -1927,10 +1940,22 @@ const PostForm = ({ addr }) => {
               {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
             </button>
 
-            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={(e) => triggerFileInput(e,`image`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button
+              className="btn"
+              style={{ background: `var(--orange-500)` }}
+              type={`button`}
+              onClick={(e) => triggerFileInput(e, `image`)}
+              disabled={postContent.elements[1].data.items.length === 4 || isUploading}
+            >
               Add image
             </button>
-            <button className='btn' style={{background:`var(--orange-500)`}} type={`button`} onClick={(e) => triggerFileInput(e,`video`)} disabled={postContent.elements[1].data.items.length === 4}>
+            <button
+              className="btn"
+              style={{ background: `var(--orange-500)` }}
+              type={`button`}
+              onClick={(e) => triggerFileInput(e, `video`)}
+              disabled={postContent.elements[1].data.items.length === 4 || isUploading}
+            >
               Add video
             </button>
           </div>
