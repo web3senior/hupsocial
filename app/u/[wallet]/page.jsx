@@ -37,6 +37,20 @@ export default function Page() {
   const balance = useBalance({
     address: address,
   })
+  const TABS_DATA = [
+    { id: 'posts', label: 'Posts', count: totalPosts },
+    { id: 'assets', label: 'Assets' },
+    { id: 'reposts', label: 'Reposts' },
+    { id: 'links', label: 'Links' },
+    { id: 'settings', label: 'Settings' },
+  ]
+  const TabContentMap = {
+    events: <></>,
+    //  jobs: JobsTab,
+    apps: <></>,
+    // feed: FeedTab,
+  }
+    const ActiveComponent = TabContentMap[activeTab]
   // Assumes:
   // - totalPosts is the contract's total post count (e.g., 100)
   // - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
@@ -137,8 +151,6 @@ export default function Page() {
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 
-            <Balance addr={params.wallet} />
-
             <details className="mt-10">
               <summary>View POAPs</summary>
               <div className={`grid grid--fill gap-1 mt-10`} style={{ '--data-width': `64px` }} role="list">
@@ -157,36 +169,26 @@ export default function Page() {
             </details>
           </div>
 
-          <ul className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
-            <li>
-              <button className={activeTab === 'posts' ? styles.activeTab : ''} onClick={() => setActiveTab('posts')}>
-                Posts{' '}
-                <span className={`lable lable-pill lable-dark`}>
-                  {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}
-                </span>
-              </button>
-            </li>
-            <li>
-              <button className={activeTab === 'activity' ? styles.activeTab : ''} onClick={() => setActiveTab('activity')}>
-                Activity
-              </button>
-            </li>
-            <li>
-              <button className={activeTab === 'reposts' ? styles.activeTab : ''} onClick={() => setActiveTab('reposts')}>
-                Reposts
-              </button>
-            </li>
-            <li>
-              <button className={activeTab === 'links' ? styles.activeTab : ''} onClick={() => setActiveTab('links')}>
-                Links
-              </button>
-            </li>
-            <li>
-              <button className={activeTab === 'settings' ? styles.activeTab : ''} onClick={() => setActiveTab('settings')}>
-                Settings
-              </button>
-            </li>
-          </ul>
+          <section className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
+            <div className={`${styles.tab__container} flex align-items-center justify-content-around`}>
+              {TABS_DATA.map((tab) => (
+                <button key={tab.id} className={`${activeTab === tab.id ? styles.activeTab : ''} flex gap-1`} onClick={() => setActiveTab(tab.id)}>
+                  <span>{tab.label}</span>
+                  {tab.count && (
+                    <span
+                      className={`lable lable-pill`}
+                      style={{
+                        background: `var(--network-color-primary)`,
+                        color: `var(--network-color-text)`,
+                      }}
+                    >
+                      {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {activeTab === 'posts' && (
             <div className={`${styles.tabContent} ${styles.postTab} relative`}>
@@ -208,6 +210,12 @@ export default function Page() {
                     )
                   })}
               </div>
+            </div>
+          )}
+
+ {activeTab === 'assets' && (
+            <div className={`${styles.tabContent} ${styles.activity} relative`}>
+              <Balance addr={params.wallet} />
             </div>
           )}
 

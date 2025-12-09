@@ -171,44 +171,78 @@
 }
 
 .tab {
-  border-bottom: 1px solid var(--global-border-color);
+  position: relative;
+  margin: 0 4em;
+  @media (max-width: 600px) {
+    margin: 0;
+  }
 
-  li {
-    flex: 1;
+  &:after {
+    right: 0;
+    background: linear-gradient(to right, transparent 10%, var(--gray-50));
+  }
+
+  &:before {
+    left: 0;
+    background: linear-gradient(to left, transparent 10%, var(--gray-50));
+  }
+
+  &:before,
+  &:after {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: 80%;
+    width: 20px;
+    z-index: 1;
+  }
+
+  &__container {
+    padding: 0 0.2em 0 0.2em;
     display: flex;
-    cursor: pointer;
-    color: var(--gray-60);
-    transition: background-color 0.2s ease-in-out;
+    flex: none;
+    gap: 1rem;
+    width: calc(100% - 4em);
+    overflow-y: hidden;
+    user-select: none;
+    isolation: isolate;
+    scrollbar-color: var(--gray-100) transparent;
+    scrollbar-width: thin;
+    padding-bottom: 1px;
 
     button {
       all: unset;
-      padding: 0.8rem 0;
-      text-align: center;
+      color: var(--gray-500);
+      padding: 0.7em 0;
       font-weight: 500;
+      display: flex;
+      place-content: center;
+      place-items: center;
+      gap: 0.2rem;
       width: 100%;
-      height: 100%;
       border-bottom: 2px solid transparent;
       transition-property: all;
       transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
       transition-duration: 150ms;
-
-      &:hover {
-        &:not(.activeTab) {
-          border-color: var(--gray-300) !important;
-        }
-      }
+      text-wrap: nowrap;
+      cursor: pointer;
     }
   }
 }
 
 .activeTab {
-  border-color: var(--blue-400) !important;
-  color: var(--black-900) !important;
+  border-color: var(--network-color-primary) !important;
+  color: var(--black) !important;
 }
 
 .tabContent {
-  padding: 2rem;
+  padding: 0 0 0 0;
 }
+
+.tabContentEmpty {
+  padding: 4rem 0;
+}
+
 
 .postForm {
   padding: 0.5rem 1.5rem;
