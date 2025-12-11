@@ -12,12 +12,18 @@
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@tanstack/react-query": "^5.90.12",
+<<<<<<< HEAD
     "dompurify": "^3.3.1",
+=======
+    "@walletconnect/ethereum-provider": "~2.21.10",
+    "dompurify": "^3.3.0",
+>>>>>>> parent of 4d3709a (Update Nextjs)
     "jdenticon": "^3.3.0",
     "marked": "^17.0.1",
     "moment": "^2.30.1",
-    "next": "16.0.8",
+    "next": "16.0.7",
     "pinata": "^2.5.1",
+<<<<<<< HEAD
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "sass": "^1.96.0",
@@ -27,10 +33,18 @@
     "wagmi": "3.1.0",
     "web3": "^4.16.0",
     "why-is-node-running": "^3.2.2"
+=======
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "sass": "^1.94.2",
+    "viem": "2.x",
+    "wagmi": "^3.0.2",
+    "web3": "^4.16.0"
+>>>>>>> parent of 4d3709a (Update Nextjs)
   },
   "devDependencies": {
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.8"
+    "eslint-config-next": "16.0.7"
   }
 }
