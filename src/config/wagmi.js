@@ -1,4 +1,4 @@
-import { createConfig, http, cookieStorage, createStorage } from 'wagmi';
+import { createConfig, http, cookieStorage, createStorage } from 'wagmi'
 import {
   sepolia,
   baseSepoliaPreconf,
@@ -12,14 +12,16 @@ import {
   luksoTestnet,
   lineaSepolia,
 } from 'wagmi/chains'
-import { walletConnect } from 'wagmi/connectors'
+import { injected, walletConnect } from 'wagmi/connectors'
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
+
 const noopStorage = {
   getItem: () => null,
   setItem: () => {},
   removeItem: () => {},
-};
+}
+
 export const CONTRACTS = {
   // chain11155111: {
   //   post: '',
@@ -139,13 +141,14 @@ sepolia.textColor = `#fff`
 export const config = createConfig({
   chains: [baseSepoliaPreconf, luksoTestnet, arbitrumSepolia, celoSepolia, monadTestnet, lineaSepolia, optimismSepolia, unichainSepolia], //somniaTestnet, opBNBTestnet
   connectors: [
+    injected(),
     walletConnect({
       projectId: projectId,
-      // metadata: {
-      //   name: process.env.NEXT_PUBLIC_NAME,
-      //   description: process.env.NEXT_PUBLIC_DESCRIPTION,
-      //   url: 'https://hup.social',
-      // },
+      metadata: {
+        name: process.env.NEXT_PUBLIC_NAME,
+        description: process.env.NEXT_PUBLIC_DESCRIPTION,
+        url: 'https://hup.social',
+      },
     }),
   ],
   transports: {
@@ -158,6 +161,7 @@ export const config = createConfig({
     [unichainSepolia.id]: http(),
     [arbitrumSepolia.id]: http(),
   },
+  ssr: true,
   storage: createStorage({
     storage: noopStorage, // <-- Tell wagmi to use a no-op storage on the server
   }),
