@@ -1,11 +1,11 @@
 'use client'
 
 import { getActiveChain, initPostContract } from '@/lib/communication'
-import { useConnection, useBalance } from 'wagmi'
+import { useAccount, useBalance } from 'wagmi'
 
 export default function Balance({ addr }) {
   const { web3, contract } = initPostContract()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const activeChain = getActiveChain()
 
   const {

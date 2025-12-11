@@ -142,14 +142,14 @@ export const config = createConfig({
   chains: [baseSepoliaPreconf, luksoTestnet, arbitrumSepolia, celoSepolia, monadTestnet, lineaSepolia, optimismSepolia, unichainSepolia], //somniaTestnet, opBNBTestnet
   connectors: [
     injected(),
-    walletConnect({
-      projectId: projectId,
-      metadata: {
-        name: process.env.NEXT_PUBLIC_NAME,
-        description: process.env.NEXT_PUBLIC_DESCRIPTION,
-        url: 'https://hup.social',
-      },
-    }),
+    // walletConnect({
+    //   projectId: projectId,
+    //   // metadata: {
+    //   //   name: process.env.NEXT_PUBLIC_NAME,
+    //   //   description: process.env.NEXT_PUBLIC_DESCRIPTION,
+    //   //   url: 'https://hup.social',
+    //   // },
+    // }),
   ],
   transports: {
     [luksoTestnet.id]: http(),
@@ -161,10 +161,7 @@ export const config = createConfig({
     [unichainSepolia.id]: http(),
     [arbitrumSepolia.id]: http(),
   },
-  ssr: true,
-  storage: createStorage({
-    storage: noopStorage, // <-- Tell wagmi to use a no-op storage on the server
-  }),
+ ssr: true
 })
 
 /**

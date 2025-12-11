@@ -1,27 +1,16 @@
 'use client'
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
-import Link from 'next/link'
 import moment from 'moment'
-import txIcon from '@/public/icons/tx.svg'
 import { useParams, useRouter } from 'next/navigation'
-import { useConnectorClient, useConnections, useClient, networks, useWaitForTransactionReceipt, useConnection, useDisconnect, Connector, useConnect, useWriteContract, useReadContract } from 'wagmi'
+import { useWaitForTransactionReceipt, useAccount, useWriteContract, useReadContract } from 'wagmi'
 import {
   initPostContract,
   initPostCommentContract,
-  getPosts,
-  getPostByIndex,
-  getPostCommentCount,
-  getCommentsByPostId,
   getHasLikedPost,
   getHasLikedComment,
-  getReplyCount,
   getComment,
   getRepliesByCommentId,
-  getPollLikeCount,
-  getPostCount,
-  getVoteCountsForPoll,
-  getVoterChoices,
   getActiveChain,
 } from '@/lib/communication'
 import { getProfile, getUniversalProfile } from '@/lib/api'
@@ -76,7 +65,7 @@ export default function Page() {
   const [chains, setChains] = useState()
   const params = useParams()
 
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const router = useRouter()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -158,9 +147,16 @@ export default function Page() {
   return (
     <>
       <PageTitle name={`Comment`} />
-     
+
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        {showCommentModal && <CommentModal item={showCommentModal.data} parentId={showCommentModal.parentId} type={showCommentModal.type} setShowCommentModal={setShowCommentModal} />}
+        {showCommentModal && (
+          <CommentModal
+            item={showCommentModal.data}
+            parentId={showCommentModal.parentId}
+            type={showCommentModal.type}
+            setShowCommentModal={setShowCommentModal}
+          />
+        )}
 
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           {!comment && <div className={`shimmer ${styles.pollShimmer}`} />}
@@ -180,7 +176,10 @@ export default function Page() {
                       {comment.content}
                     </div>
 
-                    <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
+                    >
                       <Like id={comment.commentId} likeCount={comment.likeCount} hasLiked={comment.hasLiked} />
 
                       <button onClick={() => setShowCommentModal({ data: comment, parentId: params.id, type: `post` })}>
@@ -223,7 +222,10 @@ export default function Page() {
                     <div className={`${styles.comment__content}`}>
                       <p>{item.content}</p>
 
-                      <div onClick={(e) => e.stopPropagation()} className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}>
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}
+                      >
                         <LikeComment commentId={item.commentId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
 
                         <button onClick={() => setShowCommentModal({ data: item, parentId: item.commentId, type: `comment` })}>
@@ -244,7 +246,10 @@ export default function Page() {
             })}
 
           {mounted && isConnected && (
-            <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: comment, type: `comment` })}>
+            <div
+              className={`${styles.reply} flex align-items-center gap-025`}
+              onClick={() => setShowCommentModal({ data: comment, type: `comment` })}
+            >
               <ProfileImage addr={address} />
               <p>
                 Reply to {address.slice(0, 4)}…${address.slice(38)}
@@ -269,7 +274,7 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
   const {
@@ -386,7 +391,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -461,7 +466,7 @@ const LikeComment = ({ commentId: id, likeCount, hasLiked }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -547,12 +552,15 @@ const ConnectedProfile = ({ addr }) => {
     getUniversalProfile(addr).then((res) => {
       // console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-       // setIsItUp(true)
+        // setIsItUp(true)
         setProfile({
           wallet: res.data.id,
           name: res.data.Profile[0].name,
           description: res.data.description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+          profileImage:
+            res.data.Profile[0].profileImages.length > 0
+              ? res.data.Profile[0].profileImages[0].src
+              : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
@@ -562,7 +570,10 @@ const ConnectedProfile = ({ addr }) => {
         getProfile(addr).then((res) => {
           //  console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== ''
+                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
+                : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
@@ -596,7 +607,11 @@ const ConnectedProfile = ({ addr }) => {
         <div className={`flex align-items-center gap-025`}>
           <b>{profile.name ?? defaultUsername}</b>
           <BlueCheckMarkIcon />
-          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
+          <div
+            className={`${styles.badge}`}
+            title={activeChain && activeChain[0].name}
+            dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}
+          ></div>
         </div>
         <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
       </figcaption>

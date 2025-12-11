@@ -14,7 +14,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import Balance from './_components/balance'
 import { getActiveChain } from '@/lib/communication'
-import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
+import { useBalance, useWaitForTransactionReceipt, useAccount, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import PageTitle from '@/components/PageTitle'
@@ -31,7 +31,7 @@ export default function Page() {
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const router = useRouter()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
   const activeChain = getActiveChain()
   const balance = useBalance({
@@ -299,7 +299,7 @@ const Profile = ({ addr }) => {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [isItUp, setIsItUp] = useState(false)
   const params = useParams()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
   const activeChain = getActiveChain()
 
@@ -590,7 +590,7 @@ function PushNotificationManager() {
   const [isSupported, setIsSupported] = useState(false)
   const [subscription, setSubscription] = useState(null)
   const [message, setMessage] = useState('')
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
 
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -935,7 +935,7 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
   const [tags, setTags] = useState({ list: JSON.parse(profile.tags) || [] })
   const [links, setLinks] = useState({ list: JSON.parse(profile.links) || [] })
   const [activeChain, setActiveChain] = useState()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
 
   // Refs
   const pfpRef = useRef()
@@ -1183,7 +1183,7 @@ const PostForm = ({ addr }) => {
   const createFormRef = useRef()
   const fileInputRef = useRef()
   const whitelistInputRef = useRef()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { web3, contract } = initPostContract()
   const [selectedMediaType, setSelectedMediaType] = useState(null) // Tracks if we're expecting image or video
 
@@ -2008,7 +2008,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -2138,7 +2138,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const activeChain = getActiveChain()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,

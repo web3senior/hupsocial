@@ -6,11 +6,10 @@ import moment from 'moment'
 import { useRouter } from 'next/navigation'
 import {
   useConnectorClient,
-  useConnections,
   useClient,
   networks,
   useWaitForTransactionReceipt,
-  useConnection,
+  useAccount,
   useDisconnect,
   Connector,
   useConnect,
@@ -79,7 +78,7 @@ export default function Page() {
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const activeChain = getActiveChain()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const router = useRouter()
   const TABS_DATA = [
     { id: 'feed', label: 'Feed', count: totalPosts },
@@ -440,7 +439,7 @@ const Options = ({ item }) => {
   const [topOption, setTopOption] = useState()
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initPostContract()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,

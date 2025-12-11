@@ -10,8 +10,8 @@
     "ngrok": "ngrok http 3000"
   },
   "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.10",
     "@tanstack/react-query": "^5.90.12",
-    "@walletconnect/ethereum-provider": "~2.21.10",
     "dompurify": "^3.3.1",
     "jdenticon": "^3.3.0",
     "marked": "^17.0.1",
@@ -21,9 +21,12 @@
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "sass": "^1.96.0",
-    "viem": "~2.41.2",
-    "wagmi": "^3.1.0",
-    "web3": "^4.16.0"
+    "tape": "^5.9.0",
+    "thread-stream": "^4.0.0",
+    "viem": "2.x",
+    "wagmi": "3.1.0",
+    "web3": "^4.16.0",
+    "why-is-node-running": "^3.2.2"
   },
   "devDependencies": {
     "babel-plugin-react-compiler": "1.0.0",

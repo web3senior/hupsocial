@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-import { useConnection, useDisconnect, Connector, useConnect, useSwitchChain, useConfig } from 'wagmi'
+import { useAccount, useDisconnect, Connector, useConnect, useSwitchChain, useConfig } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { getProfile, getUniversalProfile } from '@/lib/api'
 import Shimmer from '@/components/ui/Shimmer'
 import styles from './ConnectWallet.module.scss'
+
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
@@ -17,7 +19,7 @@ export const ConnectWallet = () => {
   const { disconnect } = useDisconnect()
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const mounted = useClientMounted()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { switchChain } = useSwitchChain()
 
   useEffect(() => console.log(`%c ░▒▓█ Hup █▓▒░`, 'font-size:1.5rem;color:#38bdf8'), [])
@@ -62,7 +64,9 @@ export const ConnectWallet = () => {
 export function WalletConnectModal({ setShowModal }) {
   return (
     <div className={`${styles.walletConnectModal}`} onClick={() => setShowModal(false)}>
-      <WalletOptions />
+      {/* <WalletOptions /> */}
+      <hr />
+      <ConnectButton />
     </div>
   )
 }
@@ -125,7 +129,7 @@ const Profile = ({ addr }) => {
 
 export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
   const networkDialog = useRef()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const { switchChain } = useSwitchChain()
   const router = useRouter()
 
