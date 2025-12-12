@@ -4,33 +4,40 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "dev:webpack": "next dev --webpack",
+    "build:webpack": "next build --webpack",
     "ngrok": "ngrok http 3000"
   },
   "dependencies": {
-    "@rainbow-me/rainbowkit": "^2.2.10",
+    "@base-org/account": "~2.4.0",
+    "@coinbase/coinbase-sdk": "^0.25.0",
+    "@coinbase/wallet-sdk": "^4.3.7",
+    "@gemini-wallet/core": "^0.3.2",
+    "@metamask/sdk": "^0.33.1",
+    "@safe-global/safe-apps-provider": "^0.18.6",
+    "@safe-global/safe-apps-sdk": "~9.1.0",
     "@tanstack/react-query": "^5.90.12",
+    "@walletconnect/ethereum-provider": "~2.21.1",
     "dompurify": "^3.3.1",
     "jdenticon": "^3.3.0",
     "marked": "^17.0.1",
     "moment": "^2.30.1",
-    "next": "16.0.7",
+    "next": "16.0.10",
     "pinata": "^2.5.1",
+    "porto": "^0.2.37",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "sass": "^1.96.0",
-    "tape": "^5.9.0",
-    "thread-stream": "^4.0.0",
-    "viem": "2.x",
-    "wagmi": "3.1.0",
-    "web3": "^4.16.0",
-    "why-is-node-running": "^3.2.2"
+    "viem": "^2.41.2",
+    "wagmi": "^3.1.0",
+    "web3": "^4.16.0"
   },
   "devDependencies": {
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.7"
+    "eslint-config-next": "16.0.10"
   }
 }

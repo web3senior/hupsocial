@@ -1,4 +1,3 @@
-import Head from 'next/head'
 import { Geist, Geist_Mono } from 'next/font/google'
 import NextToast from '../components/NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
@@ -67,9 +66,6 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   return (
     <html lang="en-US">
-      <Head>
-        <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-      </Head>
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
         <NextToast />
         <WagmiContext>
