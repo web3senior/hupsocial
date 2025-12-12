@@ -253,7 +253,6 @@ export default function Page() {
   return (
     <>
       <PageTitle name={`home`} />
-
       <div className={`__container`} data-width={`medium`}>
         <section className={styles.tab}>
           <div className={`${styles.tab__container} flex align-items-center justify-content-around`}>

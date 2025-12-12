@@ -12,7 +12,7 @@
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
-  background-color:  var(--gray-200);
+  background-color: var(--gray-200);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -38,6 +38,7 @@
 .no-scroll {
   overflow: hidden;
 }
+
 
 // Details
 details {
@@ -121,8 +122,8 @@ body {
   font-family: var(--font-geist-sans) !important;
   font-size: 12px;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale; 
-   background-color: var(--gray-50);
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--gray-50);
   // min-height: calc(100svh - 4rem);
   // display: grid;
   // grid-template-rows: 400px 1fr;
@@ -149,7 +150,8 @@ button {
   cursor: pointer;
 }
 
-.rounded,.rounded-full {
+.rounded,
+.rounded-full {
   border-radius: 9999px;
 }
 
@@ -167,12 +169,12 @@ button {
 // @keyframes slideDownIn {
 //   0% {
 //     opacity: 0;
-  
+
 //    // transform: translateY(-10px);
 //   }
 //   100% {
 //     opacity: 1;
-   
+
 //    // transform: translateY(0);
 //   }
 // }

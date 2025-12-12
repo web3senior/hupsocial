@@ -23,6 +23,7 @@ import { CommentIcon, ShareIcon, RepostIcon, TipIcon, BlueCheckMarkIcon, ThreeDo
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { getIPFS } from '@/lib/ipfs'
+import { ImageGallery, VideoList } from './Gallery'
 import styles from './Post.module.scss'
 
 moment.defineLocale('en-short', {
@@ -139,19 +140,27 @@ export default function Post({ item, showContent, actions, chainId }) {
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text}`) }}
               />
 
-              <div className={`${styles.post__main__media} flex flex-row gap-1`}>
-                {postContent &&
-                  postContent.elements[1].data.items.map((item, index) => (
-                    <div key={index} className={`flex-1`}>
-                      {item.type === 'image' ? (
-                        <figure>
-                          <img alt={`${item?.alt}`} src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} />
-                        </figure>
-                      ) : (
-                        <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls />
-                      )}
-                    </div>
-                  ))}
+              <div className={`${styles.post__main__media}`}>
+                {postContent && (
+                  <>
+                    <ImageGallery data={postContent.elements[1].data.items} />
+                    <VideoList data={postContent.elements[1].data.items} />
+                  </>
+                )}
+
+                {/* {postContent &&
+                  postContent.elements[1].data.items.map((item, index) => ( 
+                     <div key={index} className={`flex-1`}>
+                       {item.type === 'image' ? (
+                         <figure>
+                           <img alt={`${item?.alt}`} 
+                           src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} />
+                         </figure>
+                       ) : (
+                         <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls />
+                       )}
+                     </div>
+                  ))}*/}
               </div>
             </>
           ) : (
@@ -224,8 +233,6 @@ export default function Post({ item, showContent, actions, chainId }) {
     </>
   )
 }
-
-const PostImage = () => {}
 
 const Nav = ({ item }) => {
   const [showPostDropdown, setShowPostDropdown] = useState()
