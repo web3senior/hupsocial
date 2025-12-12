@@ -5,14 +5,8 @@ import Link from 'next/link'
 import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  useConnectorClient,
-  useClient,
-  networks,
   useWaitForTransactionReceipt,
   useAccount,
-  useDisconnect,
-  Connector,
-  useConnect,
   useWriteContract,
   useReadContract,
 } from 'wagmi'
@@ -25,10 +19,6 @@ import {
   getCommentsByPostId,
   getHasLikedPost,
   getHasLikedComment,
-  getPollLikeCount,
-  getPostCount,
-  getVoteCountsForPoll,
-  getVoterChoices,
   getActiveChain,
 } from '@/lib/communication'
 import { getProfile, getUniversalProfile, newView, getViewPost, addViewPost, getApps } from '@/lib/api'

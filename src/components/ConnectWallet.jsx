@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-import { useConnection, useDisconnect, Connector, useConnect, useSwitchChain, useConfig } from 'wagmi'
+import { useConnection, useDisconnect, useConnect, useChains, useSwitchChain } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { getProfile, getUniversalProfile } from '@/lib/api'
 import Shimmer from '@/components/ui/Shimmer'
@@ -18,9 +18,10 @@ export const ConnectWallet = () => {
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
-  const { switchChain } = useSwitchChain()
 
-  useEffect(() => console.log(`%c ░▒▓█ Hup █▓▒░`, 'font-size:1.5rem;color:#38bdf8'), [])
+  useEffect(() => {
+    console.log(`%c ░▒▓█ Hup █▓▒░`, 'font-size:1.5rem;color:#38bdf8')
+  }, [])
 
   return !mounted ? null : (
     <>
@@ -93,7 +94,10 @@ const Profile = ({ addr }) => {
           wallet: res.data.Profile[0].id,
           name: res.data.Profile[0].name,
           description: res.data.Profile[0].description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+          profileImage:
+            res.data.Profile[0].profileImages.length > 0
+              ? res.data.Profile[0].profileImages[0].src
+              : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
           tags: JSON.stringify(res.data.Profile[0].tags),
           links: JSON.stringify(res.data.Profile[0].links_),
@@ -103,7 +107,10 @@ const Profile = ({ addr }) => {
         getProfile(addr).then((res) => {
           //   console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== ''
+                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
+                : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setData(res)
           }
@@ -126,7 +133,8 @@ const Profile = ({ addr }) => {
 export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
   const networkDialog = useRef()
   const { address, isConnected } = useConnection()
-  const { switchChain } = useSwitchChain()
+  const switchChain = useSwitchChain({config})
+  const chains = useChains()
   const router = useRouter()
 
   const handleSwitchChain = (selectedChain) => {
@@ -134,10 +142,14 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
     const chainId = chain.id
 
     if (isConnected) {
-      switchChain(
-        { chainId: parseInt(chainId) },
+      console.log(`Connected`)
+
+
+      switchChain.mutate(
+        { chainId: chainId },
         {
-          onSuccess: () => {
+          onSuccess: (data) => {
+            console.log('onSuccess:', data)
             localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
             window.location.href = `/`
           },
@@ -147,12 +159,14 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
         }
       )
     } else {
+      console.log(`Not Connected`)
       localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
       window.location.href = `/`
     }
   }
 
   useEffect(() => {
+    console.log(address, isConnected)
     // networkDialog.current.showModal()
     networkDialog.current.addEventListener('close', (e) => {
       const returnValue = networkDialog.current.returnValue
@@ -162,12 +176,14 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
       handleSwitchChain(returnValue)
       // networkDialog.current.close()
     })
-  }, [])
+  }, [isConnected])
 
   return (
     <dialog ref={networkDialog} id={`networkDialog`} className={`dialog ${styles.networkDialog} `}>
       <h2>Select Your Network</h2>
-      <p>Your choices shape the content you experience. Each network carries a unique, unalterable history of posts, identities, and governance votes.</p>
+      <p>
+        Your choices shape the content you experience. Each network carries a unique, unalterable history of posts, identities, and governance votes.
+      </p>
 
       <form method={`dialog`}>
         <div className={`${styles.networks} grid grid--fit gap-050`} style={{ '--data-width': `150px` }}>
