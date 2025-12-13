@@ -46,6 +46,7 @@ import PageTitle from '@/components/PageTitle'
 import NoData from '@/components/NoData'
 import styles from './page.module.scss'
 
+const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
 
@@ -82,11 +83,13 @@ export default function Page() {
   const router = useRouter()
   const TABS_DATA = [
     { id: 'feed', label: 'Feed', count: totalPosts },
+    { id: 'polls', label: 'Polls' },
     { id: 'events', label: 'Events' },
     { id: 'jobs', label: 'Jobs' },
     { id: 'apps', label: 'Apps' },
   ]
   const TabContentMap = {
+    polls: PollsTab,
     events: EventsTab,
     //  jobs: JobsTab,
     apps: AppsTab,

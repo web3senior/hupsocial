@@ -172,7 +172,7 @@
 
 .tab {
   position: relative;
-  margin: 0 4em;
+
   @media (max-width: 600px) {
     margin: 0;
   }
@@ -245,26 +245,12 @@
 
 
 .postForm {
-  padding: 0.5rem 1.5rem;
+  padding: 0.5em 1em;
   textarea {
   }
 
   &__postContent {
     position: relative;
-
-    &:after {
-      content: 'auto save';
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      font-size: 8px;
-      background-color: var(--black-100);
-      color: var(--black-600);
-      border-bottom-left-radius: 4px;
-      padding: 0.5rem 0.4rem;
-      line-height: 0;
-      opacity: 0.7;
-    }
   }
 }
 
