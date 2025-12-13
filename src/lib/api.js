@@ -55,7 +55,7 @@ export async function getUniversalProfile(addr) {
 }`,
     }),
   }
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_ENDPOINT}`, requestOptions)
+  const response = await fetch(`${process.env.NEXT_PUBLIC_LUKSO_API_ENDPOINT}`, requestOptions)
   if (!response.ok) {
     throw new Response('Failed to ', { status: 500 })
   }

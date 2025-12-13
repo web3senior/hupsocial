@@ -12,7 +12,7 @@ import styles from './Gallery.module.scss';
  * @param {Array<Object>} data - The array of media items.
  */
 export function ImageGallery({ data }) {
-  const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL;
+  const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL;
 
   // State for FsLightbox
   const [toggler, setToggler] = useState(false);
@@ -81,7 +81,7 @@ export function ImageGallery({ data }) {
  * @param {Array<Object>} data - The array of media items.
  */
 export function VideoList({ data }) {
-  const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL;
+  const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL;
 
   useEffect(() => {
     // console.log('Received data for Video List:', data);
@@ -96,7 +96,7 @@ export function VideoList({ data }) {
         <div className={styles.videoGrid}>
           {videos.map((item, i) => (
             <div key={i} className={styles.videoItem} onClick={(e) => e.stopPropagation()}>
-              <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls />
+              <video src={`${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${item.cid}`} controls />
             </div>
           ))}
         </div>

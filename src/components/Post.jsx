@@ -154,10 +154,10 @@ export default function Post({ item, showContent, actions, chainId }) {
                        {item.type === 'image' ? (
                          <figure>
                            <img alt={`${item?.alt}`} 
-                           src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} />
+                           src={`${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${item.cid}`} />
                          </figure>
                        ) : (
-                         <video src={`${process.env.NEXT_PUBLIC_GATEWAY_URL}${item.cid}`} controls />
+                         <video src={`${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${item.cid}`} controls />
                        )}
                      </div>
                   ))}*/}
@@ -885,7 +885,7 @@ const ConnectedProfile = ({ addr }) => {
           profileImage:
             res.data.Profile[0].profileImages.length > 0
               ? res.data.Profile[0].profileImages[0].src
-              : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
@@ -898,7 +898,7 @@ const ConnectedProfile = ({ addr }) => {
             const profileImage =
               res.profileImage !== ''
                 ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-                : `${process.env.NEXT_PUBLIC_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
