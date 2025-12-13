@@ -20,7 +20,7 @@ export function ImageGallery({ data }) {
 
   // Original useEffect is preserved
   useEffect(() => {
-    console.log('Received data for Image Gallery:', data);
+    // console.log('Received data for Image Gallery:', data);
   }, [data]);
 
   // Filter data to only include images (maintaining original filter logic)
@@ -84,7 +84,7 @@ export function VideoList({ data }) {
   const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL;
 
   useEffect(() => {
-    console.log('Received data for Video List:', data);
+    // console.log('Received data for Video List:', data);
   }, [data]);
 
   // Filter data to only include videos
