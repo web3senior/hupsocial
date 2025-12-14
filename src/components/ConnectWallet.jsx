@@ -123,7 +123,7 @@ const Profile = ({ addr }) => {
 
   return (
     <Link href={`/u/${addr}`}>
-      <figure className={`${styles.pfp} d-f-c flex-column grid--gap-050 rounded`} title={data.name}>
+      <figure className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`} title={data.name}>
         <img alt={data.name || `PFP`} src={`${data.profileImage}`} className={`rounded`} />
       </figure>
     </Link>

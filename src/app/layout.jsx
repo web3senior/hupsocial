@@ -98,9 +98,6 @@ export const metadata = {
   },
   manifest: '/manifest.json',
 
-  // --- MISCELLANEOUS ---
-  themeColor: process.env.NEXT_PUBLIC_THEME_COLOR || '#ffffff', // Recommended for PWA/Mobile
-  
   // --- CUSTOM META TAGS ---
   other: {
     'base:app_id': '693d9afbd19763ca26ddc27d', // The meta tag you want to add
