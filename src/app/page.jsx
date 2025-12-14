@@ -9,12 +9,12 @@ import {
   useClient,
   networks,
   useWaitForTransactionReceipt,
-  useAccount,
   useDisconnect,
   Connector,
   useConnect,
   useWriteContract,
   useReadContract,
+  useConnection,
 } from 'wagmi'
 import {
   initPostContract,
@@ -79,7 +79,7 @@ export default function Page() {
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const activeChain = getActiveChain()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const router = useRouter()
   const TABS_DATA = [
     { id: 'feed', label: 'Feed', count: totalPosts },
@@ -129,10 +129,10 @@ export default function Page() {
         return
       }
 
-      //      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
-
+      // console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
       // 3. Fetch the next batch of posts (the contract handles reverse order internally)
       // Note: startIndex is passed as the 1-based chronological position.
+
       const newPosts = await getPosts(startIndex, postsToFetch, address)
 
       if (Array.isArray(newPosts) && newPosts.length > 0) {
@@ -234,24 +234,25 @@ export default function Page() {
       setApps({ list: res })
     })
 
-    getPostCount().then((count) => {
-      const totalPosts = web3.utils.toNumber(count)
-      setTotalPosts(totalPosts)
+    if (mounted) {
+      getPostCount().then((count) => {
+        const totalPosts = web3.utils.toNumber(count)
+        setTotalPosts(totalPosts)
 
-      if (postsLoaded === 0 && !isLoadedPoll) {
-        loadMorePosts(totalPosts)
-      }
-    })
+        if (postsLoaded === 0 && !isLoadedPoll) {
+          loadMorePosts(totalPosts)
+        }
+      })
+    }
 
-    const element = document
-    if (element) {
-      element.addEventListener('scroll', handleScroll)
+    if (document) {
+      document.addEventListener('scroll', handleScroll)
       // Clean up the event listener when the component unmounts or dependencies change
       return () => {
-        element.removeEventListener('scroll', handleScroll)
+        document.removeEventListener('scroll', handleScroll)
       }
     }
-  }, [totalPosts, postsLoaded, isLoadedPoll])
+  }, [totalPosts, postsLoaded, isLoadedPoll, address])
 
   return (
     <>
@@ -441,7 +442,7 @@ const Options = ({ item }) => {
   const [topOption, setTopOption] = useState()
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initPostContract()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
