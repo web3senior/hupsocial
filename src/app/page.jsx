@@ -252,7 +252,7 @@ export default function Page() {
         document.removeEventListener('scroll', handleScroll)
       }
     }
-  }, [totalPosts, postsLoaded, isLoadedPoll, address])
+  }, [totalPosts, postsLoaded, isLoadedPoll, address, mounted])
 
   return (
     <>
