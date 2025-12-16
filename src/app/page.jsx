@@ -1,44 +1,19 @@
 'use client'
 
-import { useState, useEffect, lazy, Suspense, useId, useRef, useCallback } from 'react'
-import Link from 'next/link'
-import moment from 'moment'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  useConnectorClient,
-  useClient,
-  networks,
-  useWaitForTransactionReceipt,
-  useDisconnect,
-  Connector,
-  useConnect,
-  useWriteContract,
-  useReadContract,
-  useConnection,
-} from 'wagmi'
-import {
-  initPostContract,
-  initPostCommentContract,
-  getPosts,
-  getHasLikedPost,
-  getPollLikeCount,
-  getPostCount,
-  getVoteCountsForPoll,
-  getVoterChoices,
-} from '@/lib/communication'
-import { getApps, getProfile, getUniversalProfile } from '@/lib/api'
+import { useWaitForTransactionReceipt, useWriteContract, useReadContract, useConnection } from 'wagmi'
+import { initPostContract, getPosts, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
+import { getApps } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import Profile from '@/components/Profile'
-import { useAuth } from '@/contexts/AuthContext'
-import Web3 from 'web3'
 import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Shimmer from '@/components/ui/Shimmer'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon } from '@/components/Icons'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import Post from '@/components/Post'
@@ -49,25 +24,6 @@ import styles from './page.module.scss'
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
-
-moment.defineLocale('en-short', {
-  relativeTime: {
-    future: 'in %s',
-    past: '%s', //'%s ago'
-    s: '1s',
-    ss: '%ds',
-    m: '1m',
-    mm: '%dm',
-    h: '1h',
-    hh: '%dh',
-    d: '1d',
-    dd: '%dd',
-    M: '1mo',
-    MM: '%dmo',
-    y: '1y',
-    yy: '%dy',
-  },
-})
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
