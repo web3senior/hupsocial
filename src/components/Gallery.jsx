@@ -136,6 +136,7 @@ export function VideoList({ data, fullHeight }) {
                 ref={videoRef}
                 className={fullHeight ? styles.fullHeight : ''}
                 src={`${GATEWAY_URL}${item.cid}`}
+                autoPlay={fullHeight}
                 onVolumeChange={volumechange}
                 controls
                 loop
