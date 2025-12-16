@@ -67,8 +67,8 @@ export const metadata = {
   // --- TWITTER CARD - ESSENTIAL FOR TWITTER SHARING ---
   twitter: {
     card: 'summary_large_image', // Best practice for visuals
-    site: process.env.NEXT_PUBLIC_TWITTER_SITE || '@YourTwitterHandle', // Your site's Twitter handle
-    creator: process.env.NEXT_PUBLIC_TWITTER_CREATOR || '@YourTwitterHandle', // Creator's Twitter handle
+    site: process.env.NEXT_PUBLIC_TWITTER_SITE || '@hupsocial', // Your site's Twitter handle
+    creator: process.env.NEXT_PUBLIC_TWITTER_CREATOR || '@atenyun', // Creator's Twitter handle
     title: process.env.NEXT_PUBLIC_NAME,
     description: process.env.NEXT_PUBLIC_DESCRIPTION,
     images: ['/open-graph.png'], // Re-use OG image
