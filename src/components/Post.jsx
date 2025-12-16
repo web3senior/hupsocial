@@ -144,23 +144,9 @@ export default function Post({ item, showContent, actions, chainId }) {
                 {postContent && (
                   <>
                     <ImageGallery data={postContent.elements[1].data.items} />
-                    <VideoList data={postContent.elements[1].data.items} />
+                    <VideoList data={postContent.elements[1].data.items} fullHeight={showContent} />
                   </>
                 )}
-
-                {/* {postContent &&
-                  postContent.elements[1].data.items.map((item, index) => ( 
-                     <div key={index} className={`flex-1`}>
-                       {item.type === 'image' ? (
-                         <figure>
-                           <img alt={`${item?.alt}`} 
-                           src={`${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${item.cid}`} />
-                         </figure>
-                       ) : (
-                         <video src={`${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${item.cid}`} controls />
-                       )}
-                     </div>
-                  ))}*/}
               </div>
             </>
           ) : (

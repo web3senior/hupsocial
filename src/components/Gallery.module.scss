@@ -2,7 +2,6 @@
   > div {
     a {
       flex: 1 1;
-      // aspect-ratio: 1/1;
       object-fit: contain;
 
       video {
@@ -22,30 +21,34 @@
   gap: 1em;
   width: 100%;
   overflow-x: auto;
-  scroll-snap-type: x mandatory; 
+  scroll-snap-type: x mandatory;
 
   > div {
-    flex-shrink: 0; 
-    
+    flex-shrink: 0;
+
     width: 100%;
     height: auto;
-    scroll-snap-align: start; 
+    scroll-snap-align: start;
   }
-  
+
   img {
     width: 100%;
     height: auto;
     max-height: 450px;
     object-fit: contain;
-
   }
 }
 
 .videoGrid {
   > div {
     video {
-      width: 100%;
-      height: auto;
+      aspect-ratio: 1/1;
     }
+  }
+
+  .fullHeight {
+    aspect-ratio: unset;
+    width: 100%;
+    height: auto;
   }
 }

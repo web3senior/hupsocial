@@ -82,7 +82,7 @@ export default function Page() {
   const { address, isConnected } = useConnection()
   const router = useRouter()
   const TABS_DATA = [
-    { id: 'feed', label: 'Feed', count: totalPosts },
+    { id: 'feed', label: 'Feed', count: totalPosts || 0 },
     { id: 'polls', label: 'Polls' },
     { id: 'events', label: 'Events' },
     { id: 'jobs', label: 'Jobs' },
@@ -262,8 +262,7 @@ export default function Page() {
           <div className={`${styles.tab__container} flex align-items-center justify-content-around`}>
             {TABS_DATA.map((tab) => (
               <button key={tab.id} className={activeTab === tab.id ? styles.activeTab : ''} onClick={() => setActiveTab(tab.id)}>
-                {tab.label}
-
+                <span>{tab.label}</span>
                 {tab.count && (
                   <span
                     className={`lable lable-pill`}
