@@ -44,7 +44,8 @@
 .videoGrid {
   > div {
     video {
-      aspect-ratio: 1/1;
+      width: 100%;
+      height: auto;
     }
   }
 }
