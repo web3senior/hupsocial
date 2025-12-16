@@ -53,62 +53,6 @@ export default function Page() {
   }
   const ActiveComponent = TabContentMap[activeTab]
 
-  const loadMorePosts = async (totalPosts) => {
-    // Use a sensible page size (10 is better than 1 for performance)
-    const POSTS_PER_PAGE = 10
-
-    // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
-    if (isLoadedPoll) return
-
-    // 2. Set to true *before* starting the async operation
-    setIsLoadedPoll(true)
-
-    // Check if we have loaded everything
-    if (postsLoaded >= totalPosts) {
-      console.log('All posts loaded (Guard Check).')
-      setIsLoadedPoll(false)
-      return
-    }
-
-    try {
-      // The correct 1-based index for the *first* post of the next batch.
-      // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
-      const startIndex = postsLoaded + 1
-
-      // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
-      const remainingPosts = totalPosts - postsLoaded
-      const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts)
-
-      // Safety check (should be redundant if the initial guard passes)
-      if (postsToFetch <= 0) {
-        console.log('No posts to fetch after calculation.')
-        return
-      }
-
-      // console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
-      // 3. Fetch the next batch of posts (the contract handles reverse order internally)
-      // Note: startIndex is passed as the 1-based chronological position.
-
-      const newPosts = await getPosts(startIndex, postsToFetch, address)
-
-      if (Array.isArray(newPosts) && newPosts.length > 0) {
-        // Append new posts and update the loaded count
-        setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }))
-        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
-      } else if (postsToFetch > 0) {
-        // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
-        // To prevent infinite loop, update postsLoaded to totalPosts.
-        console.log('Fetched an empty batch; marking all as loaded for safety.')
-        setPostsLoaded(totalPosts)
-      }
-    } catch (error) {
-      console.error('Error loading more posts:', error)
-    } finally {
-      // 4. Crucial: Set to false in finally block
-      setIsLoadedPoll(false)
-    }
-  }
-
   /**
    * Converts Markdown to sanitized HTML with links set to open in a new tab.
    * @param {string} markdown - The markdown content to process.
@@ -184,33 +128,96 @@ export default function Page() {
     }
   }
 
-  useEffect(() => {
-    getApps(activeChain[0].id).then((res) => {
-      console.log(res)
-      setApps({ list: res })
-    })
+  const loadMorePosts = async (totalPosts) => {
+    // Use a sensible page size (10 is better than 1 for performance)
+    const POSTS_PER_PAGE = 10
 
-    if (mounted) {
-      getPostCount().then((count) => {
-        const totalPosts = web3.utils.toNumber(count)
-        setTotalPosts(totalPosts)
+    // Add a guard clause to prevent re-entry (scroll events firing too quickly)
+    if (isLoadedPoll) return
 
-        if (postsLoaded === 0 && !isLoadedPoll) {
-          loadMorePosts(totalPosts)
-        }
-      })
+    // Set to true *before* starting the async operation
+    setIsLoadedPoll(true)
+
+    // Check if we have loaded everything
+    if (postsLoaded >= totalPosts) {
+      console.log('All posts loaded (Guard Check).')
+      setIsLoadedPoll(false)
+      return
     }
 
-    if (document) {
-      document.addEventListener('scroll', handleScroll)
-      // Clean up the event listener when the component unmounts or dependencies change
-      return () => {
-        document.removeEventListener('scroll', handleScroll)
+    try {
+      // The correct 1-based index for the *first* post of the next batch.
+      // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
+      const startIndex = postsLoaded + 1
+
+      // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
+      const remainingPosts = totalPosts - postsLoaded
+      const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts)
+
+      // Safety check (should be redundant if the initial guard passes)
+      if (postsToFetch <= 0) {
+        console.log('No posts to fetch after calculation.')
+        return
       }
-    }
-  }, [totalPosts, postsLoaded, isLoadedPoll, address, mounted])
 
-  return (
+      // console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
+      // Fetch the next batch of posts (the contract handles reverse order internally)
+      // Note: startIndex is passed as the 1-based chronological position.
+
+      const newPosts = await getPosts(startIndex, postsToFetch, address)
+
+      if (Array.isArray(newPosts) && newPosts.length > 0) {
+        // Append new posts and update the loaded count
+        setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }))
+        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
+      } else if (postsToFetch > 0) {
+        // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
+        // To prevent infinite loop, update postsLoaded to totalPosts.
+        console.log('Fetched an empty batch; marking all as loaded for safety.')
+        setPostsLoaded(totalPosts)
+      }
+    } catch (error) {
+      console.error('Error loading more posts:', error)
+    } finally {
+      setIsLoadedPoll(false)
+    }
+  }
+
+useEffect(() => {
+    // Fetch initial list of apps (runs once)
+    getApps(activeChain[0].id).then((res) => {
+        setApps({ list: res });
+    });
+
+    // 1A. Fetch Total Post Count
+    if (mounted) {
+        getPostCount().then((count) => {
+            // Convert and save total count
+            const totalPosts = web3.utils.toNumber(count);
+            setTotalPosts(totalPosts);
+        })
+        .catch(error => console.error("Error getting post count:", error));
+    }
+
+    // 1B. Set up Scroll Listener
+    if (document) {
+        document.addEventListener('scroll', handleScroll);
+        // Cleanup function for when the component unmounts
+        return () => {
+            document.removeEventListener('scroll', handleScroll);
+        };
+    }
+}, [address, mounted, activeChain]); // Dependencies: only external inputs needed for setup
+  
+useEffect(() => {
+    // Only proceed if we know the total count and haven't loaded any posts yet.
+    if (totalPosts > 0 && postsLoaded === 0 && !isLoadedPoll) {
+        // totalPosts is a dependency, so this will run once totalPosts is set from the first useEffect.
+        loadMorePosts(totalPosts);
+    }
+}, [totalPosts, postsLoaded, isLoadedPoll]);
+
+return (
     <>
       <PageTitle name={`home`} />
       <div className={`__container`} data-width={`medium`}>
