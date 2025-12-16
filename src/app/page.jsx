@@ -183,39 +183,52 @@ export default function Page() {
     }
   }
 
-useEffect(() => {
-    // Fetch initial list of apps (runs once)
-    getApps(activeChain[0].id).then((res) => {
-        setApps({ list: res });
-    });
+// NOTE: This assumes you have access to state setters like setTotalPosts, setPostsLoaded, and setIsLoadedPoll.
 
-    // 1A. Fetch Total Post Count
-    if (mounted) {
-        getPostCount().then((count) => {
-            // Convert and save total count
+useEffect(() => {
+    // 1. Initial Data Fetching Logic
+    const initializeData = async () => {
+        // Prevent re-entry if the flag is already set
+        if (isLoadedPoll) return; 
+
+        try {
+            // Get total count (using activeChain[0].id for dependency tracking)
+            const count = await getPostCount();
             const totalPosts = web3.utils.toNumber(count);
             setTotalPosts(totalPosts);
-        })
-        .catch(error => console.error("Error getting post count:", error));
-    }
 
-    // 1B. Set up Scroll Listener
+            // Fetch initial apps list
+            getApps(activeChain[0].id).then((res) => setApps({ list: res }));
+            
+            // 2. Trigger initial post load if count is available
+            if (totalPosts > 0) {
+                 // **Prevent Loop:** Set flag to true immediately before fetching
+                 setIsLoadedPoll(true); 
+                 loadMorePosts(totalPosts);
+            }
+        } catch (error) {
+            console.error("Initialization error:", error);
+            // Handle error, maybe reset isLoadedPoll if necessary
+        }
+    };
+
+    // Only run if authentication/mounting is ready and totalPosts is 0 (first run)
+    if (mounted && totalPosts === 0) {
+        initializeData();
+    }
+    
+}, [address, mounted, activeChain]); // Dependencies: only external inputs needed for setup
+
+useEffect(() => {
+    // 3. Scroll Listener Setup (kept separate for clean cleanup)
     if (document) {
         document.addEventListener('scroll', handleScroll);
-        // Cleanup function for when the component unmounts
+        // Cleanup function
         return () => {
             document.removeEventListener('scroll', handleScroll);
         };
     }
-}, [address, mounted, activeChain]); // Dependencies: only external inputs needed for setup
-  
-useEffect(() => {
-    // Only proceed if we know the total count and haven't loaded any posts yet.
-    if (totalPosts > 0 && postsLoaded === 0 && !isLoadedPoll) {
-        // totalPosts is a dependency, so this will run once totalPosts is set from the first useEffect.
-        loadMorePosts(totalPosts);
-    }
-}, [totalPosts, postsLoaded, isLoadedPoll]);
+}, []); // Only runs on mount/unmount (or if 'document' could change, which it won't)
 
 return (
     <>
