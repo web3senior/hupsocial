@@ -126,6 +126,7 @@ export async function addViewPost(chainId, postId) {
 
 export async function subscribeUser(sub, wallet) {
   const subscription = sub
+  
   var raw = JSON.stringify({
     subscription: subscription,
     wallet: wallet,

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, lazy, Suspense } from 'react'
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useWaitForTransactionReceipt, useWriteContract, useReadContract, useConnection } from 'wagmi'
 import { initPostContract, getPosts, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getApps } from '@/lib/api'
@@ -24,6 +25,8 @@ import styles from './page.module.scss'
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
+
+
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
@@ -254,8 +257,6 @@ return (
             ))}
           </div>
         </section>
-      </div>
-
       <Suspense fallback={<div>Loading Tab Content...</div>}>{ActiveComponent && <ActiveComponent />}</Suspense>
 
       {activeTab === 'feed' && (
@@ -301,6 +302,7 @@ return (
           </div>
         </div>
       )}
+       </div>
     </>
   )
 }

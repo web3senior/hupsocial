@@ -236,7 +236,7 @@
 }
 
 .tabContent {
-  padding: 0 0 0 0;
+  padding: 1.5em;
 }
 
 .tabContentEmpty {
@@ -291,6 +291,7 @@
     padding: 0.7rem 1rem;
     border: 1px solid var(--gray-200);
     border-radius: 1rem;
+
     &:not(:first-child) {
       margin-top: 1rem;
     }

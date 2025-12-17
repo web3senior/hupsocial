@@ -17,9 +17,9 @@ import { getActiveChain } from '@/lib/communication'
 import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
+import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
-import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
@@ -214,7 +214,7 @@ export default function Page() {
           )}
 
           {activeTab === 'assets' && (
-            <div className={`${styles.tabContent} ${styles.activity} relative`}>
+            <div className={`${styles.tabContent} ${styles.balance} relative`}>
               <Balance addr={params.wallet} />
             </div>
           )}

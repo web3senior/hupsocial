@@ -1,11 +1,12 @@
 'use client'
 
 import { getActiveChain, initPostContract } from '@/lib/communication'
-import { useAccount, useBalance } from 'wagmi'
+import { useConnection, useBalance } from 'wagmi'
+import styles from './balance.module.scss'
 
 export default function Balance({ addr }) {
   const { web3, contract } = initPostContract()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
 
   const {
@@ -16,6 +17,22 @@ export default function Balance({ addr }) {
     address: addr,
     chainId: activeChain[0].id,
   })
+
+  const getNativeTokenPrice = async (symbol) => {
+    const myHeaders = new Headers()
+    myHeaders.append('Content-Type', `application/json`)
+    myHeaders.append('Accept', `application/json`)
+
+    let requestOptions = {
+      method: 'GET',
+      redirect: 'follow',
+      headers: myHeaders,
+    }
+
+    const response = await fetch(`https://api.diadata.org/v1/quotation/${symbol}`, requestOptions)
+    if (!response.ok) throw new Response('Failed to get data', { status: 500 })
+    return response.json()
+  }
 
   // Handle loading and error states for the balance fetch
   if (isBalanceLoading) {
@@ -38,17 +55,14 @@ export default function Balance({ addr }) {
 
   // Display the balance when successful
   return (
-    <div
-      className="mt-10 flex align-items-center justify-content-between"
-      style={{ padding: '20px', border: '2px solid var(--network-color-primary)', borderRadius: '8px' }}
-    >
-      <h3>💰 Account Balance</h3>
+    <div className={`${styles.balance} mt-10 flex align-items-center justify-content-between`}>
+      <span>Account Balance</span>
 
       {balanceData !== undefined && (
-        <code className={`flex gap-025`}>
+        <span className={`flex gap-025`}>
           <span> {Number(web3.utils.fromWei(balanceData?.value, `ether`)).toFixed(2)}</span>
           <span>{balanceData?.symbol}</span>
-        </code>
+        </span>
       )}
     </div>
   )
