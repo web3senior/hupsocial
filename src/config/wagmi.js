@@ -95,7 +95,7 @@ baseSepoliaPreconf.textColor = `#fff`
 // Monad
 monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" fill="white"/><path d="M8.99996 3C7.26731 3 3 7.2672 3 8.99996C3 10.7327 7.26731 15 8.99996 15C10.7326 15 15 10.7326 15 8.99996C15 7.26727 10.7327 3 8.99996 3ZM8.06498 12.431C7.33433 12.2319 5.36993 8.79563 5.56906 8.06498C5.76819 7.33429 9.20437 5.36992 9.93499 5.56905C10.6657 5.76815 12.6301 9.20434 12.431 9.93503C12.2318 10.6657 8.79563 12.6301 8.06498 12.431Z" fill="#836EF9"/></svg>`
 monadTestnet.faucetUrl = `https://faucet.monad.xyz/`
-monadTestnet.rpcUrls.default.http = ['https://monad-testnet.infura.io/v3/1bf318989b004f7d824245a05db1096d']
+// monadTestnet.rpcUrls.default.http = ['https://monad-testnet.infura.io/v3/1bf318989b004f7d824245a05db1096d']
 monadTestnet.primaryColor = `#836EF9`
 monadTestnet.textColor = `#fff`
 
