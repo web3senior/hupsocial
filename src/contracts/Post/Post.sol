@@ -45,7 +45,7 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
     /// @dev A struct to represent a single status post.
     struct PostData {
         /// @dev The post's metadata, which can contain a URI or other off-chain data.
-        bytes32 metadata; //■■■■■■■■■■■■■■■ use bytes32 instead of string; making the transaction cheap and efficient.
+        string metadata; 
         /// @dev The main text content of the post.
         string content;
         /// @dev The Unix timestamp when the post was created.
@@ -200,7 +200,7 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
         emit PostEvent.PostUnliked(_postId, _msgSender());
     }
 
-    // Owner Functions
+    // ■■■■■■■ Owner Functions ■■■■■■■
 
     function togglePause() external onlyOwner {
         if (paused()) {
