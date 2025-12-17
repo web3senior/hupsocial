@@ -1,8 +1,8 @@
 'use client'
 
-import dynamic from 'next/dynamic';
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense, useCallback, useRef } from 'react'
 import { useWaitForTransactionReceipt, useWriteContract, useReadContract, useConnection } from 'wagmi'
 import { initPostContract, getPosts, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getApps } from '@/lib/api'
@@ -26,12 +26,10 @@ const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
 
-
-
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
-  const [isLoadedPoll, setIsLoadedPoll] = useState(false)
+  const [isLoadedPost, setIsLoadedPost] = useState(false)
   const [totalPosts, setTotalPosts] = useState(0)
   const [activeTab, setActiveTab] = useState('feed')
   const [apps, setApps] = useState({ list: [] })
@@ -93,147 +91,106 @@ export default function Page() {
     return cleanHtml
   }
 
-  /**
-   * - scrollContainerRef: A React Ref attached to the scrollable DOM element.
-   * - totalPosts: The total number of posts available from the contract.
-   * - postsLoaded: The number of posts currently rendered.
-   * - isLoadedPoll: The loading lock (set by loadMorePosts).
-   * - loadMorePosts: The function to fetch the next batch.
-   */
-  const handleScroll = () => {
-    const scrollElement = document.documentElement
+  const postsLoadedRef = useRef(0)
+  const isFetchingRef = useRef(false)
+  const totalPostsRef = useRef(0)
 
-    // 1. Guard against a null reference (element not yet mounted)
-    if (!scrollElement) return
+  // Update refs whenever state changes so handleScroll sees latest data
+  useEffect(() => {
+    postsLoadedRef.current = postsLoaded
+  }, [postsLoaded])
+  useEffect(() => {
+    isFetchingRef.current = isLoadedPost
+  }, [isLoadedPost])
+  useEffect(() => {
+    totalPostsRef.current = totalPosts
+  }, [totalPosts])
 
-    // Destructuring values for clarity
-    const {
-      scrollTop, // The distance from the top of the element to the top of the viewport
-      clientHeight, // The height of the visible part of the container
-      scrollHeight, // The total height of the content inside the container
-    } = scrollElement
+  const loadMorePosts = useCallback(
+    async (total) => {
+      const POSTS_PER_PAGE = 20
 
-    // Define a threshold (e.g., load posts when 300px from the bottom)
-    const SCROLL_THRESHOLD = 200
+      if (isFetchingRef.current || postsLoadedRef.current >= total) return
 
-    // 2. Check if the user is near the bottom
-    // scrollTop + clientHeight = how far the bottom of the viewport is from the top of the content
-    // scrollHeight - SCROLL_THRESHOLD = the point before the very end of the content
-    const isNearBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD
+      setIsLoadedPost(true)
+      isFetchingRef.current = true // Sync ref immediately
 
-    // 3. Check for available posts and the loading lock
-    const hasMorePosts = postsLoaded < totalPosts
+      try {
+        const startIndex = postsLoadedRef.current + 1
+        const remainingPosts = total - postsLoadedRef.current
+        const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts)
 
-    // 4. Trigger load only if all conditions are met
-    if (isNearBottom && hasMorePosts && !isLoadedPoll) {
-      console.log('Scrolled near bottom. Triggering load.')
-      loadMorePosts(totalPosts)
-    }
-  }
+        if (postsToFetch <= 0) return
 
-  const loadMorePosts = async (totalPosts) => {
-    // Use a sensible page size (10 is better than 1 for performance)
-    const POSTS_PER_PAGE = 10
+        const newPosts = await getPosts(startIndex, postsToFetch, address)
 
-    // Add a guard clause to prevent re-entry (scroll events firing too quickly)
-    if (isLoadedPoll) return
-
-    // Set to true *before* starting the async operation
-    setIsLoadedPoll(true)
-
-    // Check if we have loaded everything
-    if (postsLoaded >= totalPosts) {
-      console.log('All posts loaded (Guard Check).')
-      setIsLoadedPoll(false)
-      return
-    }
-
-    try {
-      // The correct 1-based index for the *first* post of the next batch.
-      // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
-      const startIndex = postsLoaded + 1
-
-      // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
-      const remainingPosts = totalPosts - postsLoaded
-      const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts)
-
-      // Safety check (should be redundant if the initial guard passes)
-      if (postsToFetch <= 0) {
-        console.log('No posts to fetch after calculation.')
-        return
-      }
-
-      // console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
-      // Fetch the next batch of posts (the contract handles reverse order internally)
-      // Note: startIndex is passed as the 1-based chronological position.
-
-      const newPosts = await getPosts(startIndex, postsToFetch, address)
-
-      if (Array.isArray(newPosts) && newPosts.length > 0) {
-        // Append new posts and update the loaded count
-        setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }))
-        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
-      } else if (postsToFetch > 0) {
-        // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
-        // To prevent infinite loop, update postsLoaded to totalPosts.
-        console.log('Fetched an empty batch; marking all as loaded for safety.')
-        setPostsLoaded(totalPosts)
-      }
-    } catch (error) {
-      console.error('Error loading more posts:', error)
-    } finally {
-      setIsLoadedPoll(false)
-    }
-  }
-
-// NOTE: This assumes you have access to state setters like setTotalPosts, setPostsLoaded, and setIsLoadedPoll.
-
-useEffect(() => {
-    // 1. Initial Data Fetching Logic
-    const initializeData = async () => {
-        // Prevent re-entry if the flag is already set
-        if (isLoadedPoll) return; 
-
-        try {
-            // Get total count (using activeChain[0].id for dependency tracking)
-            const count = await getPostCount();
-            const totalPosts = web3.utils.toNumber(count);
-            setTotalPosts(totalPosts);
-
-            // Fetch initial apps list
-            getApps(activeChain[0].id).then((res) => setApps({ list: res }));
-            
-            // 2. Trigger initial post load if count is available
-            if (totalPosts > 0) {
-                 // **Prevent Loop:** Set flag to true immediately before fetching
-                 setIsLoadedPoll(true); 
-                 loadMorePosts(totalPosts);
-            }
-        } catch (error) {
-            console.error("Initialization error:", error);
-            // Handle error, maybe reset isLoadedPoll if necessary
+        if (Array.isArray(newPosts) && newPosts.length > 0) {
+          setPosts((prev) => ({ list: [...prev.list, ...newPosts] }))
+          setPostsLoaded((prev) => prev + newPosts.length)
+        } else {
+          // Safety: if API returns empty but we expected more, stop further attempts
+          setPostsLoaded(total)
         }
-    };
+      } catch (error) {
+        console.error('Error loading more posts:', error)
+      } finally {
+        setIsLoadedPost(false)
+        isFetchingRef.current = false
+      }
+    },
+    [address]
+  ) // Only recreate if address changes
 
-    // Only run if authentication/mounting is ready and totalPosts is 0 (first run)
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollElement = document.documentElement
+      if (!scrollElement) return
+
+      const { scrollTop, clientHeight, scrollHeight } = scrollElement
+      const SCROLL_THRESHOLD = 300 // Increased slightly for smoother UX
+
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD
+      const hasMorePosts = postsLoadedRef.current < totalPostsRef.current
+
+      if (isNearBottom && hasMorePosts && !isFetchingRef.current) {
+        loadMorePosts(totalPostsRef.current)
+      }
+    }
+
+    if (mounted) {
+      window.addEventListener('scroll', handleScroll)
+      return () => window.removeEventListener('scroll', handleScroll)
+    }
+  }, [mounted, loadMorePosts])
+
+  useEffect(() => {
+    const initializeData = async () => {
+      if (isFetchingRef.current || totalPosts > 0) return
+
+      try {
+        const count = await getPostCount()
+        const total = Number(count) // Clean conversion
+        setTotalPosts(total)
+        totalPostsRef.current = total
+
+        // Fetch apps
+        const appsRes = await getApps(activeChain[0].id)
+        setApps({ list: appsRes })
+
+        if (total > 0) {
+          await loadMorePosts(total)
+        }
+      } catch (error) {
+        console.error('Initialization error:', error)
+      }
+    }
+
     if (mounted && totalPosts === 0) {
-        initializeData();
+      initializeData()
     }
-    
-}, [address, mounted, activeChain]); // Dependencies: only external inputs needed for setup
+  }, [address, mounted, activeChain, loadMorePosts])
 
-useEffect(() => {
-    // 3. Scroll Listener Setup (kept separate for clean cleanup)
-    if (document) {
-        document.addEventListener('scroll', handleScroll);
-        // Cleanup function
-        return () => {
-            document.removeEventListener('scroll', handleScroll);
-        };
-    }
-}, []); // Only runs on mount/unmount (or if 'document' could change, which it won't)
-
-return (
+  return (
     <>
       <PageTitle name={`home`} />
       <div className={`__container`} data-width={`medium`}>
@@ -257,52 +214,52 @@ return (
             ))}
           </div>
         </section>
-      <Suspense fallback={<div>Loading Tab Content...</div>}>{ActiveComponent && <ActiveComponent />}</Suspense>
+        <Suspense fallback={<div>Loading Tab Content...</div>}>{ActiveComponent && <ActiveComponent />}</Suspense>
 
-      {activeTab === 'feed' && (
-        <div className={`${styles.tabContent} ${styles.feedTab} relative`}>
-          <div className={`${styles.page} ms-motion-slideDownIn`}>
-            <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-              {posts.list.length < 1 && (
-                <>
-                  <PostShimmer />
-                  <PostShimmer />
-                  <PostShimmer />
-                  <PostShimmer />
-                  <PostShimmer />
-                </>
-              )}
+        {activeTab === 'feed' && (
+          <div className={`${styles.tabContent} ${styles.feedTab} relative`}>
+            <div className={`${styles.page} ms-motion-slideDownIn`}>
+              <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+                {posts.list.length < 1 && (
+                  <>
+                    <PostShimmer />
+                    <PostShimmer />
+                    <PostShimmer />
+                    <PostShimmer />
+                    <PostShimmer />
+                  </>
+                )}
 
-              <div className={`${styles.grid} flex flex-column`}>
-                {posts &&
-                  posts.list.length > 0 &&
-                  posts.list.map((item, i) => {
-                    return (
-                      <section
-                        key={i}
-                        className={`${styles.post} animate fade`}
-                        onClick={() => {
-                          navigator.vibrate(200)
-                          router.push(`${activeChain[0].id}/p/${item.postId}`)
-                        }}
-                      >
-                        <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
-                        {i < posts.list.length - 1 && <hr />}
-                      </section>
-                    )
-                  })}
+                <div className={`${styles.grid} flex flex-column`}>
+                  {posts &&
+                    posts.list.length > 0 &&
+                    posts.list.map((item, i) => {
+                      return (
+                        <section
+                          key={i}
+                          className={`${styles.post} animate fade`}
+                          onClick={() => {
+                            navigator.vibrate(200)
+                            router.push(`${activeChain[0].id}/p/${item.postId}`)
+                          }}
+                        >
+                          <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
+                          {i < posts.list.length - 1 && <hr />}
+                        </section>
+                      )
+                    })}
+                </div>
               </div>
-            </div>
 
-            {postsLoaded !== totalPosts && (
-              <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(totalPosts)}>
-                Load More
-              </button>
-            )}
+              {postsLoaded !== totalPosts && (
+                <button className={`${styles.loadMore}`} onClick={() => loadMorePosts(totalPosts)}>
+                  Load More
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-       </div>
+        )}
+      </div>
     </>
   )
 }

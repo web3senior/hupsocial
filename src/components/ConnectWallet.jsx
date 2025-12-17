@@ -144,7 +144,6 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
     if (isConnected) {
       console.log(`Connected`)
 
-
       switchChain.mutate(
         { chainId: chainId },
         {
@@ -166,7 +165,6 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
   }
 
   useEffect(() => {
-    console.log(address, isConnected)
     // networkDialog.current.showModal()
     networkDialog.current.addEventListener('close', (e) => {
       const returnValue = networkDialog.current.returnValue
