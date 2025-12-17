@@ -34,7 +34,7 @@
   img {
     width: 100%;
     height: auto;
-    max-height: 450px;
+    max-height: calc(450px * 3);
     object-fit: contain;
   }
 }
