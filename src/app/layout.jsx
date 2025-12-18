@@ -1,11 +1,5 @@
 import { Geist, Geist_Mono } from 'next/font/google'
-import NextToast from '../components/NextToast'
-import WagmiContext from '@/contexts/WagmiContext'
-import Header from '../components/Header'
-import Aside from '../components/Aside'
-import Footer from '../components/Footer'
-import styles from './Layout.module.scss'
-
+import ClientLayout from '../components/ClientLayout'
 import './Globals.scss'
 import './GoogleFont.css'
 import './../styles/Global.scss'
@@ -23,24 +17,24 @@ const geistMono = Geist_Mono({
 export const metadata = {
   // --- BASE & CORE METADATA ---
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL),
-  
+
   // Title (SEO best practice for better click-through)
   title: {
     template: `%s | ${process.env.NEXT_PUBLIC_NAME}`, // Moved NAME to the end for better SEO
     default: process.env.NEXT_PUBLIC_NAME,
   },
-  
+
   description: process.env.NEXT_PUBLIC_DESCRIPTION,
-  
+
   // Keywords (As an array, but ensure there are multiple keywords for impact)
-  keywords: Array.isArray(process.env.NEXT_PUBLIC_KEYWORDS) 
-    ? process.env.NEXT_PUBLIC_KEYWORDS 
-    : (process.env.NEXT_PUBLIC_KEYWORDS || '').split(',').map(k => k.trim()), // Ensures keywords are an array and handles common string format
-  
+  keywords: Array.isArray(process.env.NEXT_PUBLIC_KEYWORDS)
+    ? process.env.NEXT_PUBLIC_KEYWORDS
+    : (process.env.NEXT_PUBLIC_KEYWORDS || '').split(',').map((k) => k.trim()), // Ensures keywords are an array and handles common string format
+
   // Authorship
-  author: { 
-    name: process.env.NEXT_PUBLIC_AUTHOR, 
-    url: process.env.NEXT_PUBLIC_AUTHOR_URL 
+  author: {
+    name: process.env.NEXT_PUBLIC_AUTHOR,
+    url: process.env.NEXT_PUBLIC_AUTHOR_URL,
   },
   creator: process.env.NEXT_PUBLIC_CREATOR,
   category: process.env.NEXT_PUBLIC_CATEGORY || 'Technology', // Use ENV var, default to 'Technology' if undefined
@@ -63,7 +57,7 @@ export const metadata = {
       // You can add more images here (e.g., smaller ones)
     ],
   },
-  
+
   // --- TWITTER CARD - ESSENTIAL FOR TWITTER SHARING ---
   twitter: {
     card: 'summary_large_image', // Best practice for visuals
@@ -89,11 +83,11 @@ export const metadata = {
       'max-snippet': -1,
     },
   },
-  
+
   // --- ICONS & MANIFEST ---
   icons: {
     icon: '/favicon.ico', // Generally use .ico or .svg for main icon
-    shortcut: '/shortcut-icon.png', 
+    shortcut: '/shortcut-icon.png',
     apple: '/apple-icon.png',
   },
   manifest: '/manifest.json',
@@ -106,20 +100,17 @@ export const metadata = {
 }
 
 export const viewport = {
-  themeColor:process.env.NEXT_PUBLIC_THEME_COLOR || '#ffffff',
+  themeColor: process.env.NEXT_PUBLIC_THEME_COLOR || '#ffffff',
 }
 
 export default async function RootLayout({ children }) {
+
   return (
     <html lang="en-US">
       <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
-        <NextToast />
-        <WagmiContext>
-          <Header />
-          <Aside />
-          <main className={styles.main}>{children}</main>
-          <Footer />
-        </WagmiContext>
+<ClientLayout>
+          {children}
+        </ClientLayout>
       </body>
     </html>
   )
