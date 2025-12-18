@@ -10,7 +10,7 @@ import styles from './Footer.module.scss'
 
 const NAV_ITEMS = [
   { name: 'Home', path: '/', icon: House },
-  { name: 'Search', path: '/inbox', icon: Search },
+  { name: 'Search', path: '/search', icon: Search },
   { name: 'New', path: '/new', icon: Plus },
   { name: 'Activity', path: '/activity', icon: Heart },
 ]
