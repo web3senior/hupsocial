@@ -315,7 +315,8 @@ export async function getAllEvents() {
     console.error('Error fetching past events:', error)
   }
 }
-export async function getAllReacted() {
+
+export async function getPostLikedEvents() {
   const { web3, contract } = initPostContract()
 
   try {
@@ -323,7 +324,7 @@ export async function getAllReacted() {
     const latestBlock = await web3.eth.getBlockNumber()
 
     // Fetch specific events (e.g., 'Transfer' events)
-    const reactEvents = await contract.getPastEvents('Reacted', {
+    const reactEvents = await contract.getPastEvents('PostLiked', {
       fromBlock: 0, // Example: fetch events from the last 1000 blocks
       toBlock: 'latest',
     })
@@ -341,29 +342,54 @@ export async function getAllReacted() {
     return error
   }
 }
-export async function getLastGift() {
-  const { web3, contract } = initPostContract()
+
+/**
+ * Fetches "PostLiked" events in chunks to prevent RPC timeouts and handle large datasets.
+ * * @param {number} startBlock - The block number where the contract was deployed.
+ * @param {number} endBlock - The block number to start scanning backwards from (usually latest).
+ * @param {number} chunkSize - Number of blocks to scan per request (default 5000).
+ * @returns {Promise<Array>} - Array of Web3.js event objects.
+ */
+export async function getLikesPaginated(startBlock, endBlock, chunkSize = 5000) {
+  const { web3, contract } = initPostContract();
+
+  // If endBlock isn't provided, fetch the current head of the chain
+  const effectiveEndBlock = endBlock || await web3.eth.getBlockNumber();
+  let allEvents = [];
 
   try {
-    // Get the latest block number (optional, but good for defining a range)
-    const latestBlock = await web3.eth.getBlockNumber()
 
-    // Fetch specific events (e.g., 'Transfer' events)
-    const reactEvents = await contract.getPastEvents('Reacted', {
-      fromBlock: 0, // Example: fetch events from the last 1000 blocks
-      toBlock: 'latest',
-    })
+    // Iterate backwards from the endBlock to find the most recent events first
+    for (let i = effectiveEndBlock; i >= startBlock; i -= chunkSize) {
+      const from = Math.max(startBlock, i - chunkSize);
+      const to = i;
 
-    // reactEvents.forEach(event => {
-    //     console.log('---');
-    //     console.log(`Block Number: ${event.blockNumber}`);
-    //     console.log(`From: ${event.returnValues.from}`);
-    //     console.log(`To: ${event.returnValues.to}`);
-    //     console.log(`Value: ${event.returnValues.value}`);
-    // });
-    return reactEvents
+      console.log(`Scanning Hup Ledger: Blocks ${from} to ${to}...`);
+
+
+      console.log(from, to)
+
+      const events = await contract.getPastEvents('PostLiked', {
+        fromBlock: from,
+        toBlock: `latest` //to,
+      });
+
+      // Add newly found events to our collection
+      allEvents.push(...events);
+
+      // UI/UX Optimization: 
+      // Stop once we have enough results to fill the feed (e.g., 50 items)
+      // This prevents unnecessary RPC calls if the user only sees the top of the feed.
+      if (allEvents.length >= 50) {
+        break;
+      }
+    }
+
+    // Sort events by block number descending to ensure the newest are always at the top
+    return allEvents //.sort((a, b) => b.blockNumber - a.blockNumber);
+
   } catch (error) {
-    console.error('Error fetching past events:', error)
-    return error
+    console.error('Critical error in Hup paginated event fetch:', error);
+    throw error;
   }
 }

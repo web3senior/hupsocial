@@ -1,15 +1,24 @@
-.pageTitle {
-  background-color: var(--gray-50);
-  color: var(--black-900);
+.stickyHeader {
   position: sticky;
   top: 0;
-  height: 3rem;
-  font-weight: 600;
-  user-select: none;
   z-index: 999;
+  background-color: var(--gray-50);
+}
 
-  p {
-    text-transform: capitalize;
-    font-size: var(--14-font-size) !important;
+.pageTitle {
+  margin: 0;
+  height: 3rem;
+  
+  color: var(--black-900);
+  font-weight: 500;
+  font-size: var(--font-size-15);
+  text-transform: capitalize;
+  user-select: none;
+
+  span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
   }
 }

@@ -1,83 +1,101 @@
-@use './../styles/components/responsive' as *;
-
 .aside {
-  grid-row: 1/1;
-  grid-column: 1/1;
-  width: 80px;
-  isolation: isolate;
-  background-color: var(--gray-50);
+  // Layout
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
+  width: 80px;
   height: 100svh;
-  z-index: 1;
+  z-index: 10;
+  isolation: isolate;
 
+  // Aesthetics
+  background-color: var(--gray-50);
+  color: #c7c7c7;
+
+  // Responsive: Hide on mobile
   @media (max-width: 639px) {
     display: none !important;
   }
 
-  &__container {
-    height: inherit;
-    position: relative;
-    top: 0rem;
-    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-    border: 1px solid #f7f9f9;
-    border-radius: var(--global-border-radius);
-    overflow: hidden;
-    isolation: isolate;
-
-    @media (max-width: 600px) {
-      border: none;
-      filter: none;
-      border-radius: unset;
-    }
-  }
-
-  h3 {
-    font-weight: normal;
+  nav {
+    height: 100%;
   }
 
   ul {
     height: 100%;
-    padding: 0.7rem 1.5rem;
+    padding: 1.5rem 0; // Centered icons vertically in the bar
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    list-style: none;
+    margin: 0;
+  }
 
-    @media (max-width: 600px) {
-      padding: 0.7rem 0.7rem;
+  .link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border-radius: 12px;
+    color: inherit;
+    transition: all 0.2s ease;
+    will-change: transform, color;
+
+    // The Icon inside the link
+    svg {
+      transition: transform 0.2s ease, fill 0.2s ease;
+    }
+
+    // Hover State (Desktop only)
+    @media (hover: hover) {
+      &:hover {
+        color: var(--black, #000);
+        background-color: var(--gray-100);
+
+        svg {
+          transform: scale(1.1);
+        }
+      }
+    }
+
+    &[aria-label='New'] {
+      background-color: var(--gray-100);
+    }
+
+    // Active State (Based on the data-active attribute from React)
+    &[data-active='true'] {
+      color: var(--black, #000);
+
+      svg {
+        // We use currentColor in React, so changing 'color' here
+        // automatically updates the icon's fill/stroke.
+        stroke-width: 2.5px;
+      }
+    }
+
+    &:active {
+      transform: scale(0.95);
     }
   }
 
+  // Settings/Collapse button logic
   button {
-    --r: 24px;
-    width: var(--r);
-    height: var(--r);
     position: absolute;
-    bottom: 4rem;
-    left: 0;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 32px;
     display: flex;
     place-items: center;
     place-content: center;
     background-color: var(--white);
     border: 1px solid var(--gray-300);
+    border-radius: 50%;
     box-shadow: var(--global-box-shadow);
     cursor: pointer;
+    // Keep hidden if you aren't using the collapse feature yet
     display: none;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .aside {
-    button {
-      will-change: transform;
-      transition: transform 0.2s allow-discrete;
-
-      &:hover {
-        transform: scale(1.1);
-      }
-
-      &:active {
-        transform: scale(0.95);
-      }
-    }
   }
 }
