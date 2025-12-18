@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAccount } from 'wagmi' 
+import { useAccount } from 'wagmi'
 import { Heart, UserRound, Search, House, Plus } from 'lucide-react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import styles from './Footer.module.scss'
@@ -44,10 +44,8 @@ export default function Footer() {
                 >
                   <Icon
                     size={24}
-                    // strokeWidth 0 when active creates a "bold" filled look 
-                    // if the icon has a fill, otherwise use 2.5
-                    strokeWidth={isActive ? 2.5 : 1.5}
-                    fill={isActive ? 'currentColor' : 'none'}
+                    strokeWidth={isActive ? 0 : 1.5}
+                    fill={isActive && name !== 'Search' ? 'currentColor' : 'none'}
                   />
                 </Link>
               </li>
