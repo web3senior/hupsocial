@@ -1,106 +1,66 @@
+@use './../styles/components/responsive' as *;
+
 .footer {
-  --color: #6e6e6e;
-  --hover-color: #8d8d8d;
   position: fixed;
-  left: 50%;
-  bottom: 1rem;
-  transform: translateX(-50%);
-  background-color: var(--ff, #fff);
-  box-shadow: 0px 12px 16px -4px rgba(10, 13, 18, 0.08), 0px 4px 6px -2px rgba(10, 13, 18, 0.03);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  
+  // Aesthetics
+  background-color: rgba(var(--gray-50-rgb), 0.8); // Assumes an RGB variable
+  backdrop-filter: blur(10px); // Premium glass effect
+  border-top: 1px solid var(--gray-200);
+  color: #c7c7c7;
+  
+  // Handle iOS home indicator bar
+  padding-bottom: env(safe-area-inset-bottom);
 
-  @media (min-width: 639px) {
-    width: calc(639px - 4rem);
-    display: none;
-  }
-
-  @media (max-width: 600px) {
-    bottom: 0;
-    left: 0;
-    right: 0;
-    transform: translate(0);
-    box-shadow: var(--shadow8);
+  // Hide on Desktop
+  @media (min-width: 640px) {
+    display: none !important;
   }
 
   ul {
-    gap: 0.5rem;
-    @media (min-width: 600px) {
-      padding: 1rem;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 60px; // Standard mobile nav height
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: inherit;
+    transition: color 0.2s ease, transform 0.1s ease;
+
+    // Special styling for the 'New' button (Central Action)
+    &[aria-label='New'] {
+      svg {
+        background-color: var(--black);
+        color: var(--white);
+        border-radius: 8px;
+        padding: 4px;
+        width: 32px;
+        height: 32px;
+      }
     }
 
-    li {
-      position: relative;
-      width: 100%;
+    &[data-active='true'] {
+      color: var(--black, #000);
+    }
 
-      a {
-        position: relative;
-        display: block;
-        text-wrap: nowrap;
-        text-align: center;
-        will-change: transform;
-        transition: transform 0.2s ease;
-        padding: 0.8rem;
-        @media (max-width: 600px) {
-          padding: 20px;
-        }
-
-        svg {
-          fill: var(--white, #fff) !important;
-        }
-
-        &[data-active='true'] {
-          transform: scale(1.2);
-          svg {
-            path {
-              fill: var(--blue-500);
-            }
-          }
-
-          small {
-            color: var(--blue-500);
-          }
-        }
-
-        &:hover {
-          &:not([data-active='true']) {
-            transform: scale(1.1);
-          }
-        }
-
-        &:active {
-          transform: scale(0.9);
-        }
-
-        &:hover {
-          &:not([data-active='true']) {
-            svg {
-              path {
-                fill: var(--hover-color);
-              }
-            }
-
-            small {
-              color: var(--hover-color);
-            }
-          }
-        }
-
-        svg {
-          path {
-            fill: var(--color);
-          }
-        }
-
-        small {
-          color: var(--color);
-        }
-
-        svg path,
-        small {
-          transition-property: all;
-          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-          transition-duration: 150ms;
-        }
-      }
+    // Haptic-like feedback on tap
+    &:active {
+      transform: scale(0.9);
+      color: var(--black);
     }
   }
 }

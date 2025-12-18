@@ -32,7 +32,7 @@ export default function Aside() {
   return (
     <aside className={`${styles.aside} d-f-c flex-column gap-1`}>
       <nav aria-label="Main Navigation">
-        <ul className="d-f-c flex-column gap-1 list-none p-0 m-0">
+        <ul className="d-f-c flex-column gap-1">
           {navLinks.map(({ name, path, icon: Icon }) => {
             const isActive = pathname === path
 
@@ -44,6 +44,7 @@ export default function Aside() {
                   data-active={isActive}
                   aria-label={name}
                   aria-current={isActive ? 'page' : undefined}
+                  title={name}
                 >
                   <Icon
                     size={24}

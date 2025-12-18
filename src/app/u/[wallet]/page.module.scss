@@ -13,7 +13,7 @@
     top: 0rem;
     background-color: var(--white, #fff);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-    border: 1px solid #f7f9f9;
+    border: 1px solid var(--gray-200);
     border-radius: var(--global-border-radius);
     overflow: hidden;
     isolation: isolate;
@@ -242,7 +242,6 @@
 .tabContentEmpty {
   padding: 4rem 0;
 }
-
 
 .postForm {
   padding: 0.5em 1em;
