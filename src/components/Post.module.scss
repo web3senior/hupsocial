@@ -2,7 +2,6 @@
 .post {
   -webkit-tap-highlight-color: transparent;
   position: relative;
-  background-color: var(--white, #fff);
   transition: background-color 0.1s ease-out;
   isolation: isolate;
   cursor: pointer;
@@ -26,7 +25,7 @@
 
     &__media {
       overflow: hidden;
-      background-color: var(--gray-100);
+      // background-color: var(--gray-100);
       border-radius: var(--global-border-radius);
     }
     
@@ -256,7 +255,7 @@
         transform: translate(-50%, -50%);
         background-color: var(--gray-alpha-100);
         border-radius: 999px;
-        transition: all 0.2s ease-in-out;
+        transition: all 0.15s ease-in-out;
         will-change: width, height;
         opacity: 0;
       }

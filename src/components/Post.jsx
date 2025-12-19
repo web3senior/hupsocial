@@ -23,7 +23,7 @@ import { CommentIcon, ShareIcon, RepostIcon, TipIcon, BlueCheckMarkIcon, ThreeDo
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { getIPFS } from '@/lib/ipfs'
-import { ImageGallery, VideoList } from './Gallery'
+import  MediaGallery  from './Gallery'
 import styles from './Post.module.scss'
 
 moment.defineLocale('en-short', {
@@ -143,8 +143,7 @@ export default function Post({ item, showContent, actions, chainId }) {
               <div className={`${styles.post__main__media}`}>
                 {postContent && (
                   <>
-                    <ImageGallery data={postContent.elements[1].data.items} />
-                    <VideoList data={postContent.elements[1].data.items} fullHeight={showContent} />
+                    <MediaGallery data={postContent.elements[1].data.items} />
                   </>
                 )}
               </div>
