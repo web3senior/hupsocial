@@ -4,57 +4,81 @@
   padding: 1rem 0;
 }
 
+.mediaItem {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: var(--gray-100); // Fallback for loading
+}
+
+/* CAROUSEL STATE */
 .embla {
-  overflow: hidden; // This is the 'viewport'
+  overflow: hidden;
   cursor: grab;
+
+  .mediaItem {
+    width: 320px;
+    height: 400px; // Fixed height for carousel items
+
+    img,
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover; // Ensures media fills the area without distortion
+    }
+  }
 
   &:active {
     cursor: grabbing;
   }
-
-  
-.mediaItem {
-  width: 320px;
-  aspect-ratio: 2 / 3;
-  border-radius: 12px;
-  overflow: hidden;
-  background-color: var(--gray-100);
-  position: relative;
-
-  @media (max-width: 639px) {
-    width: 260px;
-  }
-
-  .videoPlayer, .displayImage {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-}
-
 }
 
 .embla__container {
   display: flex;
   backface-visibility: hidden;
   touch-action: pan-y pinch-zoom;
-  margin-left: -12px; // Offset the slide padding
+  margin-left: -12px;
 }
 
 .embla__slide {
   flex: 0 0 auto;
   min-width: 0;
-  padding-left: 12px; // Gap between slides
+  padding-left: 12px;
 }
 
+/* SINGLE VIEW STATE */
+.singleView {
+  width: fit-content;
+
+  .mediaItem {
+    width: fit-content;
+    overflow: hidden;
+
+    video,
+    img {
+      width: auto;
+      height: auto;
+      max-height: 450px; // Sync with parent max-height
+      max-width: 100%;
+      object-fit: contain; // Ensures no cropping
+    }
+
+    @media (max-width: 639px) {
+      video,
+      img {
+        width: 100%;
+        max-height: 350px; // Smaller height for mobile
+      }
+    }
+  }
+}
 
 .muteButton {
   position: absolute;
-  right: 1em;
-  bottom: 1em;
+  right: 1rem;
+  bottom: 1rem;
   z-index: 10;
-  
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -66,14 +90,10 @@
   justify-content: center;
   cursor: pointer;
   backdrop-filter: blur(8px);
-  transition: transform 0.2s ease;
-}
+  transition: transform 0.2s ease, background 0.2s;
 
-.singleView {
-  img,video {
-    max-width: 100%;
-    max-height: 550px;
-    border-radius: 12px;
-    object-fit: contain;
+  &:hover {
+    background: rgba(0, 0, 0, 0.7);
+    transform: scale(1.1);
   }
 }
