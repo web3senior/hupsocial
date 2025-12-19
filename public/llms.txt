@@ -1,0 +1,49 @@
+Hup: Decentralized Social Layer
+
+Hup is a high-performance, decentralized social protocol designed for permanent, user-owned social graphs and creator-centric economic value. It leverages blockchain for immutability and IPFS for scalable content storage.
+
+Core Project Mission
+
+User Ownership: Social graphs are verifiable on-chain and portable across applications.
+
+Economic Value: Native tipping and capital allocation features are built directly into the social layer.
+
+Sustainability: Low-fee architecture using IPFS CID pinning on-chain rather than raw data storage.
+
+Technical Architecture (Milestone 1 - Complete)
+
+1. Identity & Social Graph
+
+On-Chain Identity: Profiles are linked to wallet addresses with metadata fetched via a Profile Bridge (Gravatar-style).
+
+Verifiable Graph: Following and unfollowing actions are recorded on the blockchain, creating a portable, non-custodial social graph.
+
+2. Content Layer (IPFS + CID)
+
+Editor: A custom markdown/media editor that handles the IPFS upload lifecycle.
+
+Immutable Links: Only the IPFS Content Identifier (CID) is stored on-chain.
+
+Scalable Feeds: Client-side logic utilizes paginated Web3.js getPastEvents calls (chunked by 5000 blocks) to rebuild social feeds from logs.
+
+3. Economic Layer
+
+Creator Tipping: Fully functional on-chain tipping logic allowing users to send value directly to post authors.
+
+Capital Allocation: Designed for seamless value flow between supporters and creators without centralized intermediaries.
+
+Key Technical Specifications for LLMs
+
+Chain: Ethereum-compatible Layer 2 (e.g., Base/Testnet).
+
+Storage: IPFS (InterPlanetary File System).
+
+Communication: Web3.js / Wagmi for blockchain interaction.
+
+Data Retrieval: Event-based indexing.
+
+Documentation & Resources
+
+GitHub: https://github.com/web3senior/hupsocial
+
+Live Testnet: https://hup.social
