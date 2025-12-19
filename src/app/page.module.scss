@@ -14,7 +14,7 @@
     background-color: var(--white, #fff);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
     border: 1px solid var(--gray-300);
-    border-radius: var(--global-border-radius);
+    border-radius: 24px;
     overflow: hidden;
     isolation: isolate;
 
@@ -60,7 +60,6 @@
   }
 
   &__container {
-    padding: 0 0.2em 0 0.2em;
     display: flex;
     flex: none;
     gap: 1rem;
@@ -70,7 +69,6 @@
     isolation: isolate;
     scrollbar-color: var(--gray-100) transparent;
     scrollbar-width: thin;
-    padding-bottom: 1px;
 
     button {
       all: unset;
@@ -82,7 +80,7 @@
       place-items: center;
       gap: 0.2rem;
       width: 100%;
-      border-bottom: 2px solid transparent;
+      border-bottom: 1px solid transparent;
       transition-property: all;
       transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
       transition-duration: 150ms;
