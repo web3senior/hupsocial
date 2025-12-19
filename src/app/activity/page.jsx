@@ -130,9 +130,10 @@ export default function Page() {
     <>
       <PageTitle name={`Activity`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+        <div className={` __container ${styles.page__container}`} data-width={`medium`}>
           {/* <div className={`grid grid--fill gap-1`} style={{ '--data-width': `150px` }}> */}
-          <div className="min-h-screen bg-slate-50 p-4 md:p-12 font-sans text-slate-900">
+          Coming soon: Activity feed and notifications.
+          <div className="d-none min-h-screen bg-slate-50 p-4 md:p-12 font-sans text-slate-900">
             <script src="https://cdn.tailwindcss.com"></script>
 
             <div className="max-w-3xl mx-auto">
@@ -215,7 +216,7 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="ms-motion-slideDownIn p-4 md:p-8 font-sans text-slate-900">
+          <div className="d-none ms-motion-slideDownIn p-4 md:p-8 font-sans text-slate-900">
             <div className="max-w-2xl mx-auto">
               <header className="flex items-center justify-between mb-8">
                 <div>
