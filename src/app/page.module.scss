@@ -39,25 +39,25 @@
     margin: 0;
   }
 
-  &:after {
-    right: 0;
-    background: linear-gradient(to right, transparent 10%, var(--gray-50));
-  }
+  // &:after {
+  //   right: 0;
+  //   background: linear-gradient(to right, transparent 10%, var(--gray-50));
+  // }
 
-  &:before {
-    left: 0;
-    background: linear-gradient(to left, transparent 10%, var(--gray-50));
-  }
+  // &:before {
+  //   left: 0;
+  //   background: linear-gradient(to left, transparent 10%, var(--gray-50));
+  // }
 
-  &:before,
-  &:after {
-    content: '';
-    position: absolute;
-    top: 0;
-    height: 80%;
-    width: 20px;
-    z-index: 1;
-  }
+  // &:before,
+  // &:after {
+  //   content: '';
+  //   position: absolute;
+  //   top: 0;
+  //   height: 80%;
+  //   width: 20px;
+  //   z-index: 1;
+  // }
 
   &__container {
     display: flex;

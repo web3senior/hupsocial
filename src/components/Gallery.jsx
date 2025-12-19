@@ -9,28 +9,34 @@ export default function MediaGallery({ data }) {
   const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
   const [isMuted, setIsMuted] = useState(true)
 
-  // Initialize Embla with options
-  // 'align: start' keeps the first item flush to the left
+  const isCarousel = data?.length > 1
+
+  // We only hook into Embla if we have multiple items
   const [emblaRef] = useEmblaCarousel({
+    active: isCarousel, // Embla won't run if this is false
     align: 'start',
     containScroll: 'trimSnaps',
-    dragFree: true, // Smooth dragging like a native scroll
+    dragFree: true,
   })
-
-  const hasVideos = useMemo(() => data?.some((item) => item.type === 'video'), [data])
 
   if (!data || data.length === 0) return null
 
   return (
     <div className={styles.galleryWrapper} onClick={(e) => e.stopPropagation()}>
-      <div className={styles.embla} ref={emblaRef} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.embla__container}>
+      {/* We conditionally apply the embla class. 
+         If only 1 item, we use a simple 'singleView' class to avoid overflow hidden 
+      */}
+      <div
+        className={isCarousel ? styles.embla : styles.singleView}
+        ref={isCarousel ? emblaRef : null}
+      >
+        <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
           {data.map((item, i) => {
             const isVideo = item.type === 'video'
             const url = `${GATEWAY_URL}${item.cid}`
 
             return (
-              <div key={i} className={styles.embla__slide}>
+              <div key={i} className={isCarousel ? styles.embla__slide : styles.singleSlide}>
                 <div className={styles.mediaItem}>
                   {isVideo ? (
                     <div className={styles.videoWrapper}>

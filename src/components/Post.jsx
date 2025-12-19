@@ -209,7 +209,8 @@ export default function Post({ item, showContent, actions, chainId }) {
                   isConnected ? setShowShareModal(item) : toast(`Please connect wallet`, `error`)
                 }}
               >
-                <ShareIcon />
+                <ShareIcon /> 
+                <span>0</span>
               </button>
             )}
           </div>
