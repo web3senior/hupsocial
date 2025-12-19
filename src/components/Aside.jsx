@@ -48,7 +48,7 @@ export default function Aside() {
                 >
                   <Icon
                     size={24}
-                     strokeWidth={isActive ? 0 : 1.5}
+                     strokeWidth={isActive ? 0 : 2}
                     fill={isActive && name !== 'Search' ? 'currentColor' : 'none'}
                   />
                 </Link>

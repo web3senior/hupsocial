@@ -48,12 +48,12 @@
     // Hover State (Desktop only)
     @media (hover: hover) {
       &:hover {
-        color: var(--black, #000);
+        // color: var(--black, #000);
         background-color: var(--gray-100);
 
-        svg {
-          transform: scale(1.1);
-        }
+        // svg {
+        //   transform: scale(1.1);
+        // }
       }
     }
 
@@ -68,7 +68,7 @@
       svg {
         // We use currentColor in React, so changing 'color' here
         // automatically updates the icon's fill/stroke.
-        stroke-width: 2.5px;
+        stroke-width: 1.5px;
       }
     }
 
