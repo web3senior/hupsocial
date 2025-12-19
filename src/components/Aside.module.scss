@@ -1,17 +1,15 @@
 .aside {
-  // Layout
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
-  padding: 0 1rem;
+  padding: 0 .5em;
   height: 100svh;
   z-index: 10;
   isolation: isolate;
-
-  // Aesthetics
+  
   background-color: var(--gray-50);
-  color: #c7c7c7;
+  color: var(--gray-300);
 
   // Responsive: Hide on mobile
   @media (max-width: 639px) {

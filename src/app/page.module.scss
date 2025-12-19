@@ -308,11 +308,14 @@
     transform: scale(0.95);
   }
 }
+.pageShimmer {
+  padding: 1.7rem 1.7rem 0 1.7rem;
+}
 
 .shimmer {
   width: 548px;
   height: 48px;
-  border-radius: 999px;
+  border-radius: var(--global-border-radius);
 }
 
 .optionShimmer {
@@ -324,9 +327,6 @@
   border-radius: 4px;
 }
 
-.pageShimmer {
-  padding: 1.7rem 1.7rem 0 1.7rem;
-}
 
 .profileShimmer {
   &__pfp {

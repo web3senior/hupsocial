@@ -23,6 +23,7 @@ $primary-color-rgb: 2, 2, 2;
   // Tailwind-style Greys
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
+  --gray-150: #f5f5f5;
   --gray-200: #e5e7eb;
   --gray-300: #d1d5db;
   --gray-400: #9ca3af;
@@ -178,6 +179,10 @@ $primary-color-rgb: 2, 2, 2;
   --fs-3xl: 2.25rem;  
   
   // Legacy Pixel Sizes
+  --font-size-7: 7px;
+  --font-size-8: 8px;
+  --font-size-9: 9px;
+  --font-size-10: 10px;
   --font-size-12: 12px;
   --font-size-14: 14px;
   --font-size-15: 15px;

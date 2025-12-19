@@ -3,8 +3,19 @@
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, lazy, Suspense, useCallback, useRef } from 'react'
-import { useWaitForTransactionReceipt, useWriteContract, useReadContract, useConnection } from 'wagmi'
-import { initPostContract, getPosts, getPostCount, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
+import {
+  useWaitForTransactionReceipt,
+  useWriteContract,
+  useReadContract,
+  useConnection,
+} from 'wagmi'
+import {
+  initPostContract,
+  getPosts,
+  getPostCount,
+  getVoteCountsForPoll,
+  getVoterChoices,
+} from '@/lib/communication'
 import { getApps } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import Profile from '@/components/Profile'
@@ -195,9 +206,15 @@ export default function Page() {
       <PageTitle name={`home`} />
       <div className={`__container`} data-width={`medium`}>
         <section className={styles.tab}>
-          <div className={`${styles.tab__container} flex align-items-center justify-content-around`}>
+          <div
+            className={`${styles.tab__container} flex align-items-center justify-content-around`}
+          >
             {TABS_DATA.map((tab) => (
-              <button key={tab.id} className={activeTab === tab.id ? styles.activeTab : ''} onClick={() => setActiveTab(tab.id)}>
+              <button
+                key={tab.id}
+                className={activeTab === tab.id ? styles.activeTab : ''}
+                onClick={() => setActiveTab(tab.id)}
+              >
                 <span>{tab.label}</span>
                 {tab.count && (
                   <span
@@ -207,28 +224,25 @@ export default function Page() {
                       color: `var(--network-color-text)`,
                     }}
                   >
-                    {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(tab.count)}
+                    {new Intl.NumberFormat('en', {
+                      notation: 'compact',
+                      maximumFractionDigits: 1,
+                    }).format(tab.count)}
                   </span>
                 )}
               </button>
             ))}
           </div>
         </section>
-        <Suspense fallback={<div>Loading Tab Content...</div>}>{ActiveComponent && <ActiveComponent />}</Suspense>
+        <Suspense fallback={<div>Loading Tab Content...</div>}>
+          {ActiveComponent && <ActiveComponent />}
+        </Suspense>
 
         {activeTab === 'feed' && (
           <div className={`${styles.tabContent} ${styles.feedTab} relative`}>
             <div className={`${styles.page} ms-motion-slideDownIn`}>
               <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-                {posts.list.length < 1 && (
-                  <>
-                    <PostShimmer />
-                    <PostShimmer />
-                    <PostShimmer />
-                    <PostShimmer />
-                    <PostShimmer />
-                  </>
-                )}
+                {postsLoaded === 0 && <PostSkeletonGrid count={14} />}
 
                 <div className={`${styles.grid} flex flex-column`}>
                   {posts &&
@@ -264,36 +278,102 @@ export default function Page() {
   )
 }
 
+const PostSkeletonGrid = ({ count = 5 }) => (
+  <div className={`flex flex-column gap-2 mb-10`}>
+    {Array.from({ length: count }).map((_, i) => (
+      <PostShimmer key={i} />
+    ))}
+  </div>
+)
+
 const PostShimmer = () => {
   return (
-    <div className={`${styles.pageShimmer} flex flex-column gap-025`}>
-      <div className={`flex flex-row gap-050`}>
+    <div className={`${styles.pageShimmer}`}>
+      <div className={`flex flex-row align-items-start gap-1`}>
         <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
-        <div className={`flex flex-column gap-050`}>
-          <div className={`shimmer rounded`} style={{ width: `100px`, height: `12px` }} />
-          <div className={`shimmer rounded`} style={{ width: `100px`, height: `10px` }} />
+
+        <div className={`flex flex-column gap-025 flex-1`}>
+          <div className={`shimmer rounded`} style={{ width: `20%`, height: `12px` }} />
+          <div className={`shimmer rounded`} style={{ width: `90%`, height: `12px` }} />
+          <div className={`shimmer rounded`} style={{ width: `70%`, height: `12px` }} />
         </div>
       </div>
-      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `80%`, height: `10px` }} />
-      <div className={`shimmer rounded`} style={{ marginLeft: `3rem`, width: `60%`, height: `10px` }} />
-      <ul className={`flex gap-1 mt-10`} style={{ marginLeft: `3rem` }}>
+    </div>
+  )
+}
+const FollowingShimmer = () => {
+  return (
+    <div className={`${styles.pageShimmer} flex flex-column gap-025`}>
+      <div className={`flex flex-row align-items-center gap-050`}>
+        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
+        <div className={`flex flex-column gap-025`}>
+          <div className={`shimmer rounded`} style={{ width: `100px`, height: `12px` }} />
+          <div className={`shimmer rounded`} style={{ width: `100px`, height: `12px` }} />
+        </div>
+      </div>
+      <div
+        className={`shimmer rounded`}
+        style={{ marginLeft: `3rem`, width: `80%`, height: `12px` }}
+      />
+      <div
+        className={`shimmer rounded`}
+        style={{ marginLeft: `3rem`, width: `60%`, height: `12px` }}
+      />
+      <ul className={`flex mt-10`} style={{ marginLeft: `3rem` }}>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
+          <div
+            className={`shimmer rounded`}
+            style={{ width: `14px`, height: `14px`, border: `1px solid var(--white,#fff)` }}
+          />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
+          <div
+            className={`shimmer rounded`}
+            style={{
+              width: `14px`,
+              height: `14px`,
+              border: `1px solid var(--white,#fff)`,
+              marginLeft: `-4px`,
+            }}
+          />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
+          <div
+            className={`shimmer rounded`}
+            style={{
+              width: `14px`,
+              height: `14px`,
+              border: `1px solid var(--white,#fff)`,
+              marginLeft: `-4px`,
+            }}
+          />
         </li>
         <li>
-          <div className={`shimmer rounded`} style={{ width: `25px`, height: `25px` }} />
+          <div
+            className={`shimmer rounded`}
+            style={{
+              width: `14px`,
+              height: `14px`,
+              border: `1px solid var(--white,#fff)`,
+              marginLeft: `-4px`,
+            }}
+          />
+        </li>
+        <li>
+          <div
+            className={`shimmer rounded`}
+            style={{
+              width: `80px`,
+              height: `14px`,
+              border: `1px solid var(--white,#fff)`,
+              marginLeft: `4px`,
+            }}
+          />
         </li>
       </ul>
     </div>
   )
 }
-
 const Poll = ({ polls }) => {
   return (
     <>
@@ -301,8 +381,15 @@ const Poll = ({ polls }) => {
         polls.list.length > 0 &&
         polls.list.map((item, i) => {
           return (
-            <article key={i} className={`${styles.poll} animate fade`} onClick={() => router.push(`p/${item.pollId}`)}>
-              <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
+            <article
+              key={i}
+              className={`${styles.poll} animate fade`}
+              onClick={() => router.push(`p/${item.pollId}`)}
+            >
+              <section
+                data-name={item.name}
+                className={`flex flex-column align-items-start justify-content-between`}
+              >
                 <header className={`${styles.poll__header}`}>
                   <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
                 </header>
@@ -319,7 +406,9 @@ const Poll = ({ polls }) => {
                       className={`${styles.poll__btnShowMore} text-left`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        document.querySelector(`#pollQuestion${item.pollId}`).style.maxHeight = `unset !important`
+                        document.querySelector(
+                          `#pollQuestion${item.pollId}`
+                        ).style.maxHeight = `unset !important`
                         e.target.remove()
                       }}
                     >
@@ -347,7 +436,13 @@ const Poll = ({ polls }) => {
                     </button>
 
                     <button>
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 18 18"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
                         <path
                           d="M12 8.16338C12.1836 8.16338 12.3401 8.09875 12.4695 7.9695C12.5988 7.84012 12.6634 7.68363 12.6634 7.5C12.6634 7.31638 12.5988 7.15988 12.4695 7.0305C12.3401 6.90125 12.1836 6.83663 12 6.83663C11.8164 6.83663 11.6599 6.90125 11.5305 7.0305C11.4013 7.15988 11.3366 7.31638 11.3366 7.5C11.3366 7.68363 11.4013 7.84012 11.5305 7.9695C11.6599 8.09875 11.8164 8.16338 12 8.16338ZM6 6.5625H9.75V5.4375H6V6.5625ZM3.65625 15.375C3.26013 14.0076 2.86425 12.6471 2.46863 11.2933C2.07288 9.93944 1.875 8.55 1.875 7.125C1.875 6.08075 2.23894 5.19469 2.96681 4.46681C3.69469 3.73894 4.58075 3.375 5.625 3.375H9.5625C9.90575 2.924 10.3176 2.56125 10.7979 2.28675C11.2782 2.01225 11.8039 1.875 12.375 1.875C12.5818 1.875 12.7584 1.94831 12.9051 2.09494C13.0517 2.24156 13.125 2.41825 13.125 2.625C13.125 2.676 13.118 2.72694 13.104 2.77781C13.0901 2.82881 13.0755 2.87594 13.0601 2.91919C12.9909 3.09994 12.9319 3.28506 12.8833 3.47456C12.8348 3.66394 12.7933 3.85525 12.7586 4.0485L14.7101 6H16.125V10.5821L14.0783 11.2543L12.8438 15.375H9.375V13.875H7.125V15.375H3.65625ZM4.5 14.25H6V12.75H10.5V14.25H12L13.1625 10.3875L15 9.76875V7.125H14.25L11.625 4.5C11.625 4.25 11.6406 4.00938 11.6719 3.77813C11.7031 3.54688 11.7548 3.31488 11.8269 3.08213C11.4644 3.18213 11.1481 3.35644 10.8778 3.60506C10.6077 3.85356 10.4005 4.15188 10.2563 4.5H5.625C4.9 4.5 4.28125 4.75625 3.76875 5.26875C3.25625 5.78125 3 6.4 3 7.125C3 8.35 3.16875 9.54688 3.50625 10.7156C3.84375 11.8844 4.175 13.0625 4.5 14.25Z"
                           fill="#424242"
@@ -449,7 +544,10 @@ const Options = ({ item }) => {
     <>
       <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
         {item.options.map((option, i) => {
-          const votePercentage = totalVotes > 0 ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed() : 0
+          const votePercentage =
+            totalVotes > 0
+              ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed()
+              : 0
           return (
             <li
               key={i}
@@ -461,7 +559,9 @@ const Options = ({ item }) => {
               data-isactive={isPollActive(item.startTime, item.endTime).isActive}
               data-top-option={topOption && topOption === i + 1 ? true : false}
               className={`${voted && voted > 0 && styles.showPercentage} ${
-                isPollActive(item.startTime, item.endTime).status === `endeed` ? styles.poll__options__optionEndeed : styles.poll__options__option
+                isPollActive(item.startTime, item.endTime).status === `endeed`
+                  ? styles.poll__options__optionEndeed
+                  : styles.poll__options__option
               } flex flex-row align-items-center justify-content-between`}
               onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}
               disabled={isPending || isConfirming}
