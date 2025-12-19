@@ -13,7 +13,7 @@
     min-height: 100svh;
     background-color: var(--white, #fff);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--gray-300);
     border-radius: var(--global-border-radius);
     overflow: hidden;
     isolation: isolate;
@@ -26,8 +26,9 @@
   }
 
   hr {
-    border: 1px solid #f7f9f9;
-    transform: rotate(-180deg);
+    border: none;
+    border-top: 0.5px solid var(--gray-300);
+    opacity: 0.6; // Softens it further to look thinner
   }
 }
 
@@ -326,7 +327,6 @@
   }
   border-radius: 4px;
 }
-
 
 .profileShimmer {
   &__pfp {
