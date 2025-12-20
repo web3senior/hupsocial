@@ -119,8 +119,8 @@ html {
 body {
   color: var(--foreground);
   background: var(--white);
-  font-family: var(--font-geist-sans) !important;
-  font-size: 12px;
+  font-family: var(--font-family-system) !important;
+  font-size: var(--system-15-font-size);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--gray-50);

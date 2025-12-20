@@ -5,13 +5,16 @@
   grid-column: 1/1;
   position: fixed;
   top: 0;
-  left: 0;
   right: 0;
   z-index: 1000;
-  width: 100svw;
-  height: 55px;
+  width: fit-content;
+padding: 1em;
   user-select: none;
   isolation: isolate;
+
+@media (max-width: 600px) {
+    padding: 0.2em;
+  }
 
   ul {
     height: 100%;
@@ -20,22 +23,5 @@
     @media (max-width: 600px) {
       padding: 0.7rem 0.7rem;
     }
-  }
-}
-
-a.logo {
-  position: relative;
-  transition-duration: 0.2s;
-  transition-property: transform;
-  forced-color-adjust: auto;
-
-  svg {
-    --r: 32px;
-    width: auto !important;
-    height: var(--r) !important;
-  }
-
-  &:hover {
-    transform: scale(1.025);
   }
 }

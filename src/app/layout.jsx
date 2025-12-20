@@ -1,18 +1,7 @@
-import { Geist, Geist_Mono } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import './Globals.scss'
 import './GoogleFont.css'
 import './../styles/Global.scss'
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
 
 export const metadata = {
   // --- BASE & CORE METADATA ---
@@ -104,13 +93,10 @@ export const viewport = {
 }
 
 export default async function RootLayout({ children }) {
-
   return (
     <html lang="en-US">
-      <body className={`${geistSans.variable} ${geistMono.variable} ms-Fabric`}>
-<ClientLayout>
-          {children}
-        </ClientLayout>
+      <body>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   )

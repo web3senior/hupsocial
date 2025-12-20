@@ -103,9 +103,9 @@ export default function Profile({ creator, createdAt }) {
           <img alt={`checkmark icon`} src={blueCheckMarkIcon.src} />
           <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} 
           dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
-          <small className={`text-secondary`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</small>
+          <span className={`${styles.createdAt}`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</span>
         </div>
-        <code className={`text-secondary`}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
+        <code style={{opacity: 0.7}}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
       </figcaption>
     </figure>
   )

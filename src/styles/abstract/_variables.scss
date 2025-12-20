@@ -160,9 +160,9 @@ $primary-color-rgb: 2, 2, 2;
      ------------------------------------------------------------------------ */
   
   // Font Families
-  --font-family-sans-serif: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  --theme-body-font-family: var(--font-family-sans-serif);
+      --font-family-monospace: Menlo, Monaco, Consolas, Courier New, monospace;
+    --font-family-system: system-ui, -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    --font-family-serif: ui-serif, New York Small, New York, Georgia, Times New Roman, Times, serif;
   
   // Font Weights
   --font-weight-normal: 400;
@@ -188,6 +188,40 @@ $primary-color-rgb: 2, 2, 2;
   --font-size-15: 15px;
   --font-size-16: 16px;
   --font-size: var(--font-size-16);
+
+
+  --system-10-font-size: 10px;
+    --system-10-line-height: 12px;
+    --system-11-font-size: 11px;
+    --system-11-line-height: 13px;
+    --system-12-font-size: 12px;
+    --system-13-font-size: 13px;
+    --system-12-line-height: 16px;
+    --system-14-font-size: 14px;
+    --system-14-line-height: 18px;
+    --system-15-font-size: 15px;
+    --system-15-line-height: 21px;
+    --system-16-font-size: 16px;
+    --system-17-font-size: 17px;
+    --system-16-line-height: 20px;
+    --system-18-font-size: 18px;
+    --system-18-line-height: 24px;
+    --system-20-font-size: 20px;
+    --system-20-line-height: 25px;
+    --system-22-font-size: 22px;
+    --system-22-line-height: 26px;
+    --system-24-font-size: 24px;
+    --system-24-line-height: 27px;
+    --system-26-font-size: 26px;
+    --system-26-line-height: 28px;
+    --system-28-font-size: 28px;
+    --system-28-line-height: 32px;
+    --system-30-font-size: 30px;
+    --system-30-line-height: 36px;
+    --system-32-font-size: 32px;
+    --system-32-line-height: 40px;
+    --system-40-font-size: 40px;
+    --system-40-line-height: 46px;
 
   // Line Heights
   --line-height-base: 1.5;

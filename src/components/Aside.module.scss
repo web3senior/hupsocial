@@ -3,11 +3,11 @@
   left: 0;
   top: 0;
   bottom: 0;
-  padding: 0 1em;
+  padding: 1em 1em;
   height: 100svh;
   z-index: 10;
   isolation: isolate;
-  
+
   background-color: var(--gray-50);
   color: var(--gray-300);
 
@@ -95,5 +95,22 @@
     cursor: pointer;
     // Keep hidden if you aren't using the collapse feature yet
     display: none;
+  }
+}
+
+a.logo {
+  position: relative;
+  transition-duration: 0.2s;
+  transition-property: transform;
+  forced-color-adjust: auto;
+
+  svg {
+    --r: 32px;
+    width: auto !important;
+    height: var(--r) !important;
+  }
+
+  &:hover {
+    transform: scale(1.05);
   }
 }
