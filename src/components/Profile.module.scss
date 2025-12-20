@@ -25,6 +25,7 @@ figure.profile {
   column-gap: 0.5rem;
   cursor: pointer;
   width: fit-content;
+
   figcaption {
     height: 100%;
 
@@ -41,6 +42,11 @@ figure.profile {
     border: 1px solid var(--gray-200);
     background: var(--gray-100);
     aspect-ratio: 1/1;
+  }
+
+  code {
+    color: var(--gray-400);
+    font-size: var(--system-12-font-size);
   }
 }
 

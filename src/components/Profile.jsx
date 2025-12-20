@@ -105,7 +105,7 @@ export default function Profile({ creator, createdAt }) {
           dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
           <span className={`${styles.createdAt}`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</span>
         </div>
-        <code style={{opacity: 0.7}}>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
+        <code>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
       </figcaption>
     </figure>
   )
