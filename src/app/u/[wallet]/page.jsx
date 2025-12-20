@@ -3,8 +3,22 @@
 import Link from 'next/link'
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getUniversalProfile, getProfile, updateProfile, subscribeUser, unsubscribeUser, sendNotification } from '@/lib/api'
-import { initPostContract, initStatusContract, getStatus, getCreatorPostCount, getMaxLength, getPostsByCreator } from '@/lib/communication'
+import {
+  getUniversalProfile,
+  getProfile,
+  updateProfile,
+  subscribeUser,
+  unsubscribeUser,
+  sendNotification,
+} from '@/lib/api'
+import {
+  initPostContract,
+  initStatusContract,
+  getStatus,
+  getCreatorPostCount,
+  getMaxLength,
+  getPostsByCreator,
+} from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Web3 from 'web3'
 import abi from '@/abi/post.json'
@@ -14,7 +28,13 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import Balance from './_components/balance'
 import { getActiveChain } from '@/lib/communication'
-import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
+import {
+  useBalance,
+  useWaitForTransactionReceipt,
+  useConnection,
+  useDisconnect,
+  useWriteContract,
+} from 'wagmi'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
@@ -153,13 +173,21 @@ export default function Page() {
 
             <details className="mt-10">
               <summary>View POAPs</summary>
-              <div className={`grid grid--fill gap-1 mt-10`} style={{ '--data-width': `64px` }} role="list">
+              <div
+                className={`grid grid--fill gap-1 mt-10`}
+                style={{ '--data-width': `64px` }}
+                role="list"
+              >
                 {POAPs &&
                   POAPs.length > 0 &&
                   POAPs.map((POAP, i) => {
                     return (
                       <figure key={i} className={``}>
-                        <img src={POAP.event.image_url} style={{ width: `64px` }} className={`rounded-full`} />
+                        <img
+                          src={POAP.event.image_url}
+                          style={{ width: `64px` }}
+                          className={`rounded-full`}
+                        />
                         <figcaption style={{ color: `black` }}>{POAP.event.name}</figcaption>
                         <small className={`lable lable-dark`}>{POAP.event.year}</small>
                       </figure>
@@ -169,10 +197,18 @@ export default function Page() {
             </details>
           </div>
 
-          <section className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
-            <div className={`${styles.tab__container} flex align-items-center justify-content-around`}>
+          <section
+            className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}
+          >
+            <div
+              className={`${styles.tab__container} flex align-items-center justify-content-around`}
+            >
               {TABS_DATA.map((tab) => (
-                <button key={tab.id} className={`${activeTab === tab.id ? styles.activeTab : ''} flex gap-1`} onClick={() => setActiveTab(tab.id)}>
+                <button
+                  key={tab.id}
+                  className={`${activeTab === tab.id ? styles.activeTab : ''} flex gap-1`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
                   <span>{tab.label}</span>
                   {tab.count && (
                     <span
@@ -182,7 +218,10 @@ export default function Page() {
                         color: `var(--network-color-text)`,
                       }}
                     >
-                      {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(totalPosts)}
+                      {new Intl.NumberFormat('en', {
+                        notation: 'compact',
+                        maximumFractionDigits: 1,
+                      }).format(totalPosts)}
                     </span>
                   )}
                 </button>
@@ -204,7 +243,10 @@ export default function Page() {
                         className={`${styles.post} animate fade`}
                         onClick={() => router.push(`/${activeChain[0].id}/p/${item.postId}`)}
                       >
-                        <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
+                        <Post
+                          item={item}
+                          actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]}
+                        />
                         {i < posts.list.length - 1 && <hr />}
                       </section>
                     )
@@ -238,7 +280,10 @@ export default function Page() {
           )}
 
           {activeTab === 'settings' && (
-            <div className={`${styles.tabContent} ${styles.settings} relative`} style={{ display: `none` }}>
+            <div
+              className={`${styles.tabContent} ${styles.settings} relative`}
+              style={{ display: `none` }}
+            >
               <Settings />
             </div>
           )}
@@ -277,7 +322,9 @@ const Nav = ({ item }) => {
       </button>
 
       {showPostDropdown && (
-        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
+        <div
+          className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}
+        >
           <ul>
             <li>
               <Link href={`p/${item.postId}`}>View post</Link>
@@ -356,13 +403,21 @@ const Profile = ({ addr }) => {
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
       console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0 && res.data.Profile[0].isContract) {
+      if (
+        res.data &&
+        Array.isArray(res.data.Profile) &&
+        res.data.Profile.length > 0 &&
+        res.data.Profile[0].isContract
+      ) {
         setIsItUp(true)
         setData({
           wallet: res.data.Profile[0].id,
           name: res.data.Profile[0].name,
           description: res.data.Profile[0].description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileImage:
+            res.data.Profile[0].profileImages.length > 0
+              ? res.data.Profile[0].profileImages[0].src
+              : '',
           profileHeader: '',
           tags: JSON.stringify(res.data.Profile[0].tags),
           links: JSON.stringify(res.data.Profile[0].links_),
@@ -388,25 +443,42 @@ const Profile = ({ addr }) => {
 
   return (
     <>
-      {showProfileModal && data && <ProfileModal profile={data} setShowProfileModal={setShowProfileModal} />}
+      {showProfileModal && data && (
+        <ProfileModal profile={data} setShowProfileModal={setShowProfileModal} />
+      )}
 
-      <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
+      <section
+        className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}
+      >
         <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
-          <div className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}>
-            <div className={`flex align-items-center gap-025`}>
-              <b className={`${styles.profile__name}`}>{data.name !== '' ? data.name : `hup-user`}</b>
-              <img className={`${styles.profile__checkmark}`} alt={`Checkmark`} src={blueCheckMarkIcon.src} />
+          <div
+            className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}
+          >
+            <div className={`${styles.profile__header}`}>
+              <b className={styles.profile__name}>{data.name !== '' ? data.name : `hup-user`}</b>
+              <img
+                className={styles.profile__checkmark}
+                alt="Checkmark"
+                src={blueCheckMarkIcon.src}
+              />
             </div>
 
             <code className={`${styles.profile__wallet}`}>
-              <Link href={`${activeChain[0].blockExplorers.default.url}/address/${data.wallet}`} target={`_blank`}>
+              <Link
+                href={`${activeChain[0].blockExplorers.default.url}/address/${data.wallet}`}
+                target={`_blank`}
+              >
                 {`${data.wallet.slice(0, 4)}…${data.wallet.slice(38)}`}
               </Link>
             </code>
 
-            <p className={`${styles.profile__description} mt-20`}>{data.description || `This user has not set up a bio yet.`}</p>
+            <p className={`${styles.profile__description} mt-20`}>
+              {data.description || `This user has not set up a bio yet.`}
+            </p>
 
-            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
+            <div
+              className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}
+            >
               <Tags tags={data.tags} />
             </div>
           </div>
@@ -423,12 +495,18 @@ const Profile = ({ addr }) => {
         <footer className={`w-100`}>
           <ul className={`flex flex-column align-items-center justify-content-between gap-1`}>
             <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
-              <div className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
+              <div
+                className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}
+              >
                 <button className={`${styles.btnFollowers}`}>
                   <span className={`mt-20 text-secondary`}>{100} followers</span>
                 </button>
                 <span>•</span>
-                <Link className={`${styles.link}`} target={`_blank`} href={`https://hup.social/u/${addr}`}>
+                <Link
+                  className={`${styles.link}`}
+                  target={`_blank`}
+                  href={`https://hup.social/u/${addr}`}
+                >
                   hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
                 </Link>
               </div>
@@ -442,10 +520,16 @@ const Profile = ({ addr }) => {
               <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
                 {address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
                   <>
-                    <button className={`${styles.profile__btnFollow}`} onClick={() => editProfile()}>
+                    <button
+                      className={`${styles.profile__btnFollow}`}
+                      onClick={() => editProfile()}
+                    >
                       Edit profile
                     </button>
-                    <button className={`${styles.profile__btnDisconnect}`} onClick={() => handleDisconnect()}>
+                    <button
+                      className={`${styles.profile__btnDisconnect}`}
+                      onClick={() => handleDisconnect()}
+                    >
                       Disconnect
                     </button>
                   </>
@@ -479,13 +563,21 @@ const Links = () => {
   useEffect(() => {
     getUniversalProfile(params.wallet).then((res) => {
       console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0 && res.data.Profile[0].isContract) {
+      if (
+        res.data &&
+        Array.isArray(res.data.Profile) &&
+        res.data.Profile.length > 0 &&
+        res.data.Profile[0].isContract
+      ) {
         setIsItUp(true)
         setData({
           wallet: res.data.Profile[0].id,
           name: res.data.Profile[0].name,
           description: res.data.Profile[0].description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
+          profileImage:
+            res.data.Profile[0].profileImages.length > 0
+              ? res.data.Profile[0].profileImages[0].src
+              : '',
           profileHeader: '',
           tags: JSON.stringify(res.data.Profile[0].tags),
           links: JSON.stringify(res.data.Profile[0].links),
@@ -532,8 +624,17 @@ const Links = () => {
                 <p>{link.title || link.name}</p>
                 <code>{link.url}</code>
               </div>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4.16531 14.625L3.375 13.8347L11.9597 5.25H6.75V4.125H13.875V11.25H12.75V6.04031L4.16531 14.625Z" fill="#424242" />
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M4.16531 14.625L3.375 13.8347L11.9597 5.25H6.75V4.125H13.875V11.25H12.75V6.04031L4.16531 14.625Z"
+                  fill="#424242"
+                />
               </svg>
             </a>
           )
@@ -655,7 +756,12 @@ function PushNotificationManager() {
         <>
           <p>You are subscribed to push notifications.</p>
           <button onClick={unsubscribeFromPush}>Unsubscribe</button>
-          <input type="text" placeholder="Enter notification message" value={message} onChange={(e) => setMessage(e.target.value)} />
+          <input
+            type="text"
+            placeholder="Enter notification message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
           <button onClick={sendTestNotification}>Send Test</button>
         </>
       ) : (
@@ -822,7 +928,14 @@ const Status = ({ addr, profile, selfView }) => {
           <div className={`${styles.statusModal__card}`} onClick={(e) => e.stopPropagation()}>
             <header className={``}>
               <div className={``} aria-label="Close" onClick={() => setShowModal(false)}>
-                <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
+                <svg
+                  class="x1lliihq x1n2onr6 x5n08af"
+                  fill="currentColor"
+                  height="16"
+                  role="img"
+                  viewBox="0 0 24 24"
+                  width="16"
+                >
                   <title>Close</title>
                   <line
                     fill="none"
@@ -852,7 +965,13 @@ const Status = ({ addr, profile, selfView }) => {
                 <h3>Set your status</h3>
               </div>
               <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-                {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
+                {isSigning
+                  ? `Signing...`
+                  : isConfirming
+                  ? 'Confirming...'
+                  : status && status.content !== ''
+                  ? `Update`
+                  : `Share`}
               </div>
             </header>
 
@@ -864,7 +983,11 @@ const Status = ({ addr, profile, selfView }) => {
 
                 <div
                   className={`d-f-c`}
-                  title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}
+                  title={
+                    status &&
+                    status.content !== '' &&
+                    moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()
+                  }
                 >
                   <textarea
                     autoFocus
@@ -890,8 +1013,15 @@ const Status = ({ addr, profile, selfView }) => {
 
               {isConfirmed && <p className="text-center badge badge-success">Done</p>}
 
-              <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
-                {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}
+              <div
+                title={`Expire: ${
+                  status &&
+                  moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()
+                }`}
+              >
+                {status && status.content !== '' && selfView && (
+                  <button onClick={(e) => clearStatus(e)}>Delete status</button>
+                )}
               </div>
 
               <div className={`flex flex-row align-items-center gap-025`}>
@@ -911,7 +1041,10 @@ const Status = ({ addr, profile, selfView }) => {
       >
         {status && (
           <p
-            title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment
+            title={`Updated at ${moment
+              .unix(web3.utils.toNumber(status.timestamp))
+              .utc()
+              .fromNow()} - Expiration ${moment
               .unix(web3.utils.toNumber(status.expirationTimestamp))
               .utc()
               .fromNow()}`}
@@ -1010,7 +1143,8 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
     if (newLinkName === '' || newLinkURL === '') return
 
     const isReduntant = links.list.filter((filterItem) => filterItem.name === newLinkName)
-    if (isReduntant.length === 0) setLinks({ list: links.list.concat({ name: newLinkName, url: newLinkURL }) })
+    if (isReduntant.length === 0)
+      setLinks({ list: links.list.concat({ name: newLinkName, url: newLinkURL }) })
     linkNameRef.current.value = null
     linkURLRef.current.value = null
   }
@@ -1028,11 +1162,21 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
   }, [])
   return (
     <>
-      <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
+      <div
+        className={`${styles.profileModal} animate fade`}
+        onMouseDown={() => setShowProfileModal(false)}
+      >
         <div className={`${styles.profileModal__card}`} onMouseDown={(e) => e.stopPropagation()}>
           <header className={``}>
             <div className={``} aria-label="Close" onClick={() => setShowProfileModal(false)}>
-              <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
+              <svg
+                class="x1lliihq x1n2onr6 x5n08af"
+                fill="currentColor"
+                height="16"
+                role="img"
+                viewBox="0 0 24 24"
+                width="16"
+              >
                 <title>Close</title>
                 <line
                   fill="none"
@@ -1066,7 +1210,12 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
 
           <main className={`flex flex-column align-items-center gap-1 `}>
             {isConfirmed && <p className="text-center badge badge-success">Done</p>}
-            <form className={`form`} action="" onSubmit={(e) => handleSubmit(e)} encType={`multipart/form-data`}>
+            <form
+              className={`form`}
+              action=""
+              onSubmit={(e) => handleSubmit(e)}
+              encType={`multipart/form-data`}
+            >
               <div className={`form-group`}>
                 <figure className={`rounded`}>
                   <img ref={pfpRef} src={`${profile.profileImage}`} />
@@ -1075,15 +1224,30 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
               <div className={`form-group`}>
                 <label htmlFor="">Profile picture</label>
                 <input type="file" name="profileImage" id="" onChange={(e) => showPFP(e)} />
-                <input type="hidden" name="profileImage_hidden" defaultValue={profile.profileImageName} />
+                <input
+                  type="hidden"
+                  name="profileImage_hidden"
+                  defaultValue={profile.profileImageName}
+                />
               </div>
               <div className={`form-group`}>
                 <label htmlFor="">Name</label>
-                <input type="text" name="name" id="" defaultValue={profile.name} placeholder={`Name`} />
+                <input
+                  type="text"
+                  name="name"
+                  id=""
+                  defaultValue={profile.name}
+                  placeholder={`Name`}
+                />
               </div>
               <div className={`form-group`}>
                 <label htmlFor="">Bio</label>
-                <textarea name="description" id="" defaultValue={profile.description} placeholder="Profile bio"></textarea>
+                <textarea
+                  name="description"
+                  id=""
+                  defaultValue={profile.description}
+                  placeholder="Profile bio"
+                ></textarea>
               </div>
 
               <details open>
@@ -1128,8 +1292,20 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
                     </div>
 
                     <div className={`form-group flex`}>
-                      <input ref={linkNameRef} type="text" name="links" id="" placeholder={`Link Name`} />
-                      <input ref={linkURLRef} type="text" name="links" id="" placeholder={`Link URL`} />
+                      <input
+                        ref={linkNameRef}
+                        type="text"
+                        name="links"
+                        id=""
+                        placeholder={`Link Name`}
+                      />
+                      <input
+                        ref={linkURLRef}
+                        type="text"
+                        name="links"
+                        id=""
+                        placeholder={`Link URL`}
+                      />
                       <button type="button" onClick={(e) => addLink(e)}>
                         Add
                       </button>
@@ -1459,6 +1635,7 @@ const PostForm = ({ addr }) => {
       localUrl: localUrl, // Use this as a temporary unique ID
       isUploading: true,
       duration: type === 'video' ? 0 : undefined,
+      spoiler: false,
     }
 
     // 4. Add the placeholder item to the state immediately
@@ -1512,6 +1689,41 @@ const PostForm = ({ addr }) => {
       }
     })
   }
+
+const makeSpoiler = (itemIndex) => {
+  setPostContent((prevContent) => {
+    // 1. Map through the elements to find the one at index 1
+    const newElements = prevContent.elements.map((element, elIdx) => {
+      if (elIdx !== 1) return element; // Return other elements as they are
+
+      // 2. Map through the items within that element's data
+      const newMediaItems = element.data.items.map((item, itIdx) => {
+        if (itIdx !== itemIndex) return item; // Return other items as they are
+
+        // 3. Toggle the spoiler property for the target item
+        return {
+          ...item,
+          spoiler: !item.spoiler, 
+        };
+      });
+
+      // 4. Return the updated media element
+      return {
+        ...element,
+        data: {
+          ...element.data,
+          items: newMediaItems,
+        },
+      };
+    });
+
+    // 5. Return the new top-level state
+    return {
+      ...prevContent,
+      elements: newElements,
+    };
+  });
+};
 
   const addOption = () => {
     let optionList = options.list
@@ -1581,7 +1793,11 @@ const PostForm = ({ addr }) => {
     console.log(whitelist.list)
     console.log(profile)
     // Check if the wallet address isn't repetitive
-    if (whitelist.list.length > 0 && whitelist.list.find((item) => item.id === profile.id) !== undefined) return
+    if (
+      whitelist.list.length > 0 &&
+      whitelist.list.find((item) => item.id === profile.id) !== undefined
+    )
+      return
 
     let newVal = whitelist.list
     newVal.push(profile)
@@ -1681,10 +1897,16 @@ const PostForm = ({ addr }) => {
   }, [isConfirmed])
 
   return (
-    <div className={`${styles.postForm} flex flex-row align-items-start justify-content-between gap-1`}>
+    <div
+      className={`${styles.postForm} flex flex-row align-items-start justify-content-between gap-1`}
+    >
       <div className={`flex-1`}>
         {showForm === `poll` && (
-          <form ref={createFormRef} className={`form flex flex-column gap-050`} onSubmit={(e) => handleCreatePoll(e)}>
+          <form
+            ref={createFormRef}
+            className={`form flex flex-column gap-050`}
+            onSubmit={(e) => handleCreatePoll(e)}
+          >
             <div>
               <textarea
                 type="text"
@@ -1694,7 +1916,9 @@ const PostForm = ({ addr }) => {
                 onChange={(e) => setContent(e.target.value)}
                 rows={10}
               />
-              <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
+              <small className={`text-secondary`}>
+                Only the first 280 characters will be visible on the timeline.
+              </small>
             </div>
             <div>
               Options:
@@ -1702,10 +1926,22 @@ const PostForm = ({ addr }) => {
                 options.list.map((item, i) => {
                   return (
                     <div key={i} className={`flex mt-10 gap-1`}>
-                      <input type="text" name={`option`} onChange={(e) => updateOption(e, i)} defaultValue={``} placeholder={`Option ${i + 1}`} />
+                      <input
+                        type="text"
+                        name={`option`}
+                        onChange={(e) => updateOption(e, i)}
+                        defaultValue={``}
+                        placeholder={`Option ${i + 1}`}
+                      />
 
                       <button type={`button`} className="btn" onClick={(e) => delOption(e, i)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#fff">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          height="24px"
+                          viewBox="0 -960 960 960"
+                          width="24px"
+                          fill="#fff"
+                        >
                           <path d="M304.62-160q-27.62 0-46.12-18.5Q240-197 240-224.62V-720h-40v-40h160v-30.77h240V-760h160v40h-40v495.38q0 27.62-18.5 46.12Q683-160 655.38-160H304.62Zm87.69-120h40v-360h-40v360Zm135.38 0h40v-360h-40v360Z" />
                         </svg>
                       </button>
@@ -1715,7 +1951,11 @@ const PostForm = ({ addr }) => {
               {options.list.length < 8 && (
                 <>
                   <div className={`mt-10`}>
-                    <button className={`${styles.btnAddOption}`} type="button" onClick={(e) => addOption(e)}>
+                    <button
+                      className={`${styles.btnAddOption}`}
+                      type="button"
+                      onClick={(e) => addOption(e)}
+                    >
                       Add option
                     </button>
                   </div>
@@ -1738,7 +1978,13 @@ const PostForm = ({ addr }) => {
 
             <div className={`flex flex-column`}>
               <label htmlFor={``}>Voting Limit</label>
-              <input type={`number`} name={`votesPerAccount`} list={`sign-limit`} defaultValue={1} onChange={(e) => setVotingLimit(e.target.value)} />
+              <input
+                type={`number`}
+                name={`votesPerAccount`}
+                list={`sign-limit`}
+                defaultValue={1}
+                onChange={(e) => setVotingLimit(e.target.value)}
+              />
               <small>Each account is limited to {votingLimit} votes for this poll.</small>
             </div>
             <div>
@@ -1764,7 +2010,10 @@ const PostForm = ({ addr }) => {
                 <label htmlFor={`whitelist`}>Whitelist</label>
 
                 {whitelist && whitelist.list.length > 0 && (
-                  <div className={`${styles['selected-whitelist']} grid grid--fill grid--gap-1`} style={{ '--data-width': `200px` }}>
+                  <div
+                    className={`${styles['selected-whitelist']} grid grid--fill grid--gap-1`}
+                    style={{ '--data-width': `200px` }}
+                  >
                     {whitelist.list.map((profile, i) => {
                       return (
                         <div key={i} className={`d-flex grid--gap-050 ms-motion-slideDownIn`}>
@@ -1778,7 +2027,9 @@ const PostForm = ({ addr }) => {
                               alt={`${profile.fullName}`}
                             />
                           </figure>
-                          <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
+                          <div
+                            className={`w-100 d-flex flex-row align-items-center justify-content-between`}
+                          >
                             <div className={`d-flex flex-column`}>
                               <small className={`ms-fontWeight-bold`}>{profile.fullName}</small>
                               <span>{`${profile.id.slice(0, 4)}...${profile.id.slice(38)}`}</span>
@@ -1823,12 +2074,18 @@ const PostForm = ({ addr }) => {
                               alt={`${profile.fullName}`}
                             />
                           </figure>
-                          <div className={`w-100 d-flex flex-row align-items-center justify-content-between`}>
+                          <div
+                            className={`w-100 d-flex flex-row align-items-center justify-content-between`}
+                          >
                             <div className={`d-flex flex-column`}>
                               <b>{profile.fullName}</b>
                               <span>{`${profile.id.slice(0, 4)}…${profile.id.slice(38)}`}</span>
                             </div>
-                            <button className={`btn`} type={`button`} onClick={(e) => handleAddWhitelist(e, profile, `profileCard${i}`)}>
+                            <button
+                              className={`btn`}
+                              type={`button`}
+                              onClick={(e) => handleAddWhitelist(e, profile, `profileCard${i}`)}
+                            >
                               Add profile
                             </button>
                           </div>
@@ -1871,7 +2128,11 @@ const PostForm = ({ addr }) => {
         )}
 
         {/* {showForm === `post` && ( */}
-        <form ref={createFormRef} className={`form flex flex-column gap-050 ${styles.postForm}`} onSubmit={(e) => handleCreatePost(e)}>
+        <form
+          ref={createFormRef}
+          className={`form flex flex-column gap-050 ${styles.postForm}`}
+          onSubmit={(e) => handleCreatePost(e)}
+        >
           <div className={`form-group ${styles.postForm__postContent}`}>
             <ul className={`flex gap-025`}>
               <li>
@@ -1887,7 +2148,13 @@ const PostForm = ({ addr }) => {
             </ul>
 
             {/* HIDDEN FILE INPUT */}
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} multiple={false} />
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+              multiple={false}
+            />
 
             {/* --- Text Editor --- */}
             <div className="mb-6">
@@ -1901,7 +2168,9 @@ const PostForm = ({ addr }) => {
               />
             </div>
 
-            <small className={`text-secondary`}>Only the first 280 characters will be visible on the timeline.</small>
+            <small className={`text-secondary`}>
+              Only the first 280 characters will be visible on the timeline.
+            </small>
           </div>
 
           <div>
@@ -1923,21 +2192,45 @@ const PostForm = ({ addr }) => {
               {postContent &&
                 postContent.elements[1].data.items.map((item, index) => (
                   <div key={index} className="">
-                    <div className="" style={{ width: `100px`, height: `100px`, backgroundColor: item.type === 'image' ? '#3B82F6' : '#DC2626' }}>
+                    <div
+                      className=""
+                      style={{
+                        width: `100px`,
+                        height: `100px`,
+                        backgroundColor: item.type === 'image' ? '#3B82F6' : '#DC2626',
+                      }}
+                    >
                       {item.type === 'image' ? (
                         <>
                           <figure>
-                            <img src={item.localUrl} alt="" style={{ aspectRatio: `1/1` }} />
+                            <img src={item.localUrl} alt="" style={{ filter: item.spoiler ? 'blur(8px)' : 'none',  aspectRatio: `1/1` }} />
                           </figure>
                         </>
                       ) : (
-                        <video src={item.localUrl} controls style={{ aspectRatio: `1/1` }} />
+                        <video src={item.localUrl} controls style={{ filter: item.spoiler ? 'blur(8px)' : 'none', aspectRatio: `1/1` }} />
                       )}
                     </div>
 
-                    <button type={`button`} onClick={() => handleRemoveMedia(index)} aria-label={`Remove ${item.type}`}>
-                      remove
-                    </button>
+                    <ul className={`d-f-c flex-column gap-025`}>
+                      <li>
+                        <button
+                          type={`button`}
+                          onClick={() => handleRemoveMedia(index)}
+                          aria-label={`Remove ${item.type}`}
+                        >
+                          remove
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type={`button`}
+                          onClick={() => makeSpoiler(index)}
+                          aria-label={`Remove ${item.type}`}
+                        >
+                          Make spoiler
+                        </button>
+                      </li>
+                    </ul>
                   </div>
                 ))}
             </div>
@@ -1972,7 +2265,13 @@ const PostForm = ({ addr }) => {
         {!mounted && isConnected && (
           <ul className={`flex ${styles.post__actions}`}>
             <li title={`Write post`} onClick={() => setShowForm(`post`)}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
                 <path
                   d="M5 19H6.098L16.7962 8.302L15.698 7.20375L5 17.902V19ZM4 20V17.4807L17.1807 4.2865C17.2832 4.19517 17.3963 4.12458 17.52 4.07475C17.6438 4.02492 17.7729 4 17.9072 4C18.0416 4 18.1717 4.02117 18.2977 4.0635C18.4236 4.10583 18.5397 4.18208 18.6462 4.29225L19.7135 5.3655C19.8237 5.47183 19.899 5.5885 19.9395 5.7155C19.9798 5.84267 20 5.96975 20 6.09675C20 6.23225 19.9772 6.36192 19.9315 6.48575C19.8858 6.60942 19.8132 6.7225 19.7135 6.825L6.51925 20H4ZM16.2375 7.7625L15.698 7.20375L16.7962 8.302L16.2375 7.7625Z"
                   fill="#1F1F1F"
@@ -1980,18 +2279,36 @@ const PostForm = ({ addr }) => {
               </svg>
             </li>
             <li title={`Attach media`}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
                 <path d="M5.6155 20C5.15517 20 4.77083 19.8458 4.4625 19.5375C4.15417 19.2292 4 18.8448 4 18.3845V5.6155C4 5.15517 4.15417 4.77083 4.4625 4.4625C4.77083 4.15417 5.15517 4 5.6155 4H18.3845C18.8448 4 19.2292 4.15417 19.5375 4.4625C19.8458 4.77083 20 5.15517 20 5.6155V18.3845C20 18.8448 19.8458 19.2292 19.5375 19.5375C19.2292 19.8458 18.8448 20 18.3845 20H5.6155ZM5.6155 19H18.3845C18.5385 19 18.6796 18.9359 18.8077 18.8077C18.9359 18.6796 19 18.5385 19 18.3845V5.6155C19 5.4615 18.9359 5.32042 18.8077 5.19225C18.6796 5.06408 18.5385 5 18.3845 5H5.6155C5.4615 5 5.32042 5.06408 5.19225 5.19225C5.06408 5.32042 5 5.4615 5 5.6155V18.3845C5 18.5385 5.06408 18.6796 5.19225 18.8077C5.32042 18.9359 5.4615 19 5.6155 19ZM7.5 16.5H16.6538L13.827 12.7308L11.2115 16.0385L9.4615 13.923L7.5 16.5Z" />
               </svg>
             </li>
             <li title={`Add a gif`}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
                 <path d="M5.6155 20C5.15517 20 4.77083 19.8458 4.4625 19.5375C4.15417 19.2292 4 18.8448 4 18.3845V5.6155C4 5.15517 4.15417 4.77083 4.4625 4.4625C4.77083 4.15417 5.15517 4 5.6155 4H18.3845C18.8448 4 19.2292 4.15417 19.5375 4.4625C19.8458 4.77083 20 5.15517 20 5.6155V18.3845C20 18.8448 19.8458 19.2292 19.5375 19.5375C19.2292 19.8458 18.8448 20 18.3845 20H5.6155ZM5.6155 19H18.3845C18.5385 19 18.6796 18.9359 18.8077 18.8077C18.9359 18.6796 19 18.5385 19 18.3845V5.6155C19 5.4615 18.9359 5.32042 18.8077 5.19225C18.6796 5.06408 18.5385 5 18.3845 5H5.6155C5.4615 5 5.32042 5.06408 5.19225 5.19225C5.06408 5.32042 5 5.4615 5 5.6155V18.3845C5 18.5385 5.06408 18.6796 5.19225 18.8077C5.32042 18.9359 5.4615 19 5.6155 19Z" />
                 <path d="M11.3333 14V10H12.3333V14H11.3333ZM7.66667 14C7.46667 14 7.30556 13.9306 7.18333 13.7917C7.06111 13.6528 7 13.5 7 13.3333V10.6667C7 10.5 7.06111 10.3472 7.18333 10.2083C7.30556 10.0694 7.46667 10 7.66667 10H9.66667C9.86667 10 10.0278 10.0694 10.15 10.2083C10.2722 10.3472 10.3333 10.5 10.3333 10.6667V11H8V13H9.33333V12H10.3333V13.3333C10.3333 13.5 10.2722 13.6528 10.15 13.7917C10.0278 13.9306 9.86667 14 9.66667 14H7.66667ZM13.3333 14V10H16.3333V11H14.3333V11.6667H15.6667V12.6667H14.3333V14H13.3333Z" />
               </svg>
             </li>
             <li title={`Add a poll`} onClick={() => setShowForm(`poll`)}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
                 <path d="M12 10H16.6155V9H12V10ZM12 15H16.6155V14H12V15ZM9 10.7307C9.34483 10.7307 9.63617 10.6118 9.874 10.374C10.1118 10.1362 10.2308 9.84483 10.2308 9.5C10.2308 9.15517 10.1118 8.86383 9.874 8.626C9.63617 8.38817 9.34483 8.26925 9 8.26925C8.65517 8.26925 8.36383 8.38817 8.126 8.626C7.88817 8.86383 7.76925 9.15517 7.76925 9.5C7.76925 9.84483 7.88817 10.1362 8.126 10.374C8.36383 10.6118 8.65517 10.7307 9 10.7307ZM9 15.7308C9.34483 15.7308 9.63617 15.6118 9.874 15.374C10.1118 15.1362 10.2308 14.8448 10.2308 14.5C10.2308 14.1552 10.1118 13.8638 9.874 13.626C9.63617 13.3882 9.34483 13.2692 9 13.2692C8.65517 13.2692 8.36383 13.3882 8.126 13.626C7.88817 13.8638 7.76925 14.1552 7.76925 14.5C7.76925 14.8448 7.88817 15.1362 8.126 15.374C8.36383 15.6118 8.65517 15.7308 9 15.7308ZM5.6155 20C5.15517 20 4.77083 19.8458 4.4625 19.5375C4.15417 19.2292 4 18.8448 4 18.3845V5.6155C4 5.15517 4.15417 4.77083 4.4625 4.4625C4.77083 4.15417 5.15517 4 5.6155 4H18.3845C18.8448 4 19.2292 4.15417 19.5375 4.4625C19.8458 4.77083 20 5.15517 20 5.6155V18.3845C20 18.8448 19.8458 19.2292 19.5375 19.5375C19.2292 19.8458 18.8448 20 18.3845 20H5.6155ZM5.6155 19H18.3845C18.5385 19 18.6796 18.9359 18.8077 18.8077C18.9359 18.6796 19 18.5385 19 18.3845V5.6155C19 5.4615 18.9359 5.32042 18.8077 5.19225C18.6796 5.06408 18.5385 5 18.3845 5H5.6155C5.4615 5 5.32042 5.06408 5.19225 5.19225C5.06408 5.32042 5 5.4615 5 5.6155V18.3845C5 18.5385 5.06408 18.6796 5.19225 18.8077C5.32042 18.9359 5.4615 19 5.6155 19Z" />
               </svg>
             </li>
@@ -2088,7 +2405,13 @@ const CommentModal = ({ item, setShowCommentModal }) => {
             <h3>Post your reply</h3>
           </div>
           <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
+            {isSigning
+              ? `Signing...`
+              : isConfirming
+              ? 'Confirming...'
+              : status && status.content !== ''
+              ? `Update`
+              : `Share`}
           </div>
         </header>
 
@@ -2098,7 +2421,9 @@ const CommentModal = ({ item, setShowCommentModal }) => {
               <header className={`${styles.commentModal__post__header}`}>
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
-              <main className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}>
+              <main
+                className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}
+              >
                 <div
                   className={`${styles.post__content} `}
                   // onClick={(e) => e.stopPropagation()}
@@ -2203,7 +2528,13 @@ const Like = ({ id, likeCount, hasLiked }) => {
 
   return (
     <button onClick={(e) => (hasLiked ? unlikePost(e, id) : likePost(e, id))}>
-      <svg width="18" height="18" viewBox="0 0 18 18" fill={hasLiked ? `#EC3838` : `none`} xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill={hasLiked ? `#EC3838` : `none`}
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
           stroke={hasLiked ? `#EC3838` : `#424242`}

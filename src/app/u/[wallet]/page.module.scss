@@ -399,17 +399,29 @@
     }
   }
 
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    line-height: 21px;
+  }
+  /* The Name */
   &__name {
-    all: unset;
-    font-size: 1.3rem;
-    line-height: 0;
+    font-size: var(--system-20-font-size);
     font-weight: 700;
+    height: fit-content;
+    margin: 0;    
+    margin-top: -4px;
   }
 
+  /* The Checkmark */
   &__checkmark {
-    --r: 14px;
+    --r: 14px;    
     width: var(--r);
     height: var(--r);
+    display: block;
+    white-space: nowrap;
+        margin-inline-start: 4px;
   }
 
   &__wallet {

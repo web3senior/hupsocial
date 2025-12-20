@@ -7,10 +7,10 @@ import styles from './Gallery.module.scss'
 
 export default function MediaGallery({ data = [] }) {
   const [isMuted, setIsMuted] = useState(true)
-  
-  // Use a fallback for the gateway to prevent URL construction errors
-  const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
+  // Track which spoilers have been clicked/revealed locally
+  const [revealedItems, setRevealedItems] = useState({})
 
+  const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
   const isCarousel = data.length > 1
 
   const [emblaRef] = useEmblaCarousel({
@@ -22,6 +22,10 @@ export default function MediaGallery({ data = [] }) {
 
   if (!data.length) return null
 
+  const handleReveal = (index) => {
+    setRevealedItems((prev) => ({ ...prev, [index]: true }))
+  }
+
   return (
     <div className={styles.galleryWrapper} onClick={(e) => e.stopPropagation()}>
       <div
@@ -32,10 +36,22 @@ export default function MediaGallery({ data = [] }) {
           {data.map((item, i) => {
             const isVideo = item.type === 'video'
             const url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+            
+            // Item is blurred if it is marked as a spoiler AND hasn't been revealed yet
+            const isBlurred = item.spoiler && !revealedItems[i]
 
             return (
-              <div key={item.cid || i} className={isCarousel ? styles.embla__slide : styles.singleSlide}>
-                <div className={styles.mediaItem}>
+              <div
+                key={item.cid || i}
+                className={isCarousel ? styles.embla__slide : styles.singleSlide}
+              >
+                <div 
+                  className={styles.mediaItem} 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (isBlurred) handleReveal(i)
+                  }}
+                >
                   {isVideo ? (
                     <>
                       <video
@@ -45,6 +61,7 @@ export default function MediaGallery({ data = [] }) {
                         muted={isMuted}
                         playsInline
                         className={styles.videoPlayer}
+                        style={{ filter: isBlurred ? 'blur(20px)' : 'none' }}
                       />
                       <button
                         className={styles.muteButton}
@@ -63,7 +80,13 @@ export default function MediaGallery({ data = [] }) {
                       alt={item.alt || `Gallery item ${i}`}
                       className={styles.displayImage}
                       loading="lazy"
+                      style={{ filter: isBlurred ? 'blur(20px)' : 'none' }}
                     />
+                  )}
+
+                  {/* Only show the Spoiler overlay if it is currently blurred */}
+                  {isBlurred && (
+                    <span className={styles.spolier}>Spoiler</span>
                   )}
                 </div>
               </div>

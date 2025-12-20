@@ -9,6 +9,25 @@
   border-radius: 12px;
   overflow: hidden;
   background-color: var(--gray-100); // Fallback for loading
+
+  &:hover {
+    .spolier {
+   background: rgba(0, 0, 0, 0.4);
+    }
+  }
+}
+
+.spolier {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 10;
+  padding: 4px 12px;
+  border-radius: 1000px;
+  border: none;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  cursor: pointer;
 }
 
 /* CAROUSEL STATE */
@@ -26,6 +45,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover; // Ensures media fills the area without distortion
+      aspect-ratio: 0.75; // 4:3 aspect ratio
     }
   }
 
@@ -54,6 +74,7 @@
   .mediaItem {
     width: fit-content;
     overflow: hidden;
+
 
     video,
     img {

@@ -99,7 +99,7 @@ export default function Profile({ creator, createdAt }) {
 
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
-          <b>{profile.name ?? defaultUsername}</b>
+          <span className={`${styles.name}`}>{profile.name ?? defaultUsername}</span>
           <img alt={`checkmark icon`} src={blueCheckMarkIcon.src} />
           <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} 
           dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
