@@ -2,68 +2,72 @@
 
 .footer {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: auto 0 0 0;
   z-index: 100;
-  
-  background-color: rgba($color: #fff, $alpha: 0.85);
-  
-  // Blur effect
-  -webkit-backdrop-filter: blur(28.5px);
+  background-color: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(28.5px);
-  
+  -webkit-backdrop-filter: blur(28.5px);
   border-top: 1px solid var(--gray-200);
-  color: #c7c7c7;
   
-  // Handle iOS home indicator bar
-  padding-bottom: env(safe-area-inset-bottom);
+  // Important: No vertical padding here, let the links handle the height
+  padding-bottom: env(safe-area-inset-bottom, 0);
 
-  // Hide on Desktop
   @media (min-width: 640px) {
     display: none !important;
   }
 
   ul {
     display: flex;
-    justify-content: space-around;
-    align-items: center;
-    height: 60px; // Standard mobile nav height
+    height: 64px; // Increased slightly for better ergonomics
     margin: 0;
     padding: 0;
     list-style: none;
+    width: 100%;
+  }
+
+  li {
+    flex: 1; // Each list item takes equal horizontal space
+    display: flex;
   }
 
   .link {
+    // Fill the entire LI container
     display: flex;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    
+    // Centering
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    height: 100%;
-    color: inherit;
-    transition: color 0.2s ease, transform 0.1s ease;
+    
+    color: #c7c7c7;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent; // Removes mobile tap flicker
+    transition: all 0.2s ease;
 
-    // Special styling for the 'New' button (Central Action)
-    &[aria-label='New'] {
-      svg {
-        background-color: var(--black);
-        color: var(--white);
-        border-radius: 8px;
-        padding: 4px;
-        width: 32px;
-        height: 32px;
-      }
-    }
-
+    // Visual feedback
     &[data-active='true'] {
       color: var(--black, #000);
     }
 
-    // Haptic-like feedback on tap
     &:active {
-      transform: scale(0.9);
-      color: var(--black);
+      background-color: rgba(0, 0, 0, 0.03); // Subtle hint they hit the button
+      transform: scale(0.95);
+    }
+
+    // Central "New" button styling
+    &[aria-label='New'] {
+      svg {
+        background-color: var(--black);
+        color: white;
+        border-radius: 10px;
+        padding: 6px;
+        // Keep the icon fixed size, but the LINK around it stays huge
+        width: 38px; 
+        height: 38px;
+      }
     }
   }
 }
