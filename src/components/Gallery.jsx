@@ -1,15 +1,16 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { Volume2, VolumeX } from 'lucide-react'
 import styles from './Gallery.module.scss'
 
 export default function MediaGallery({ data = [] }) {
   const [isMuted, setIsMuted] = useState(true)
-  // Track which spoilers have been clicked/revealed locally
   const [revealedItems, setRevealedItems] = useState({})
-
+  
+  // Ref to store video elements
+  const videoRefs = useRef([])
   const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
   const isCarousel = data.length > 1
 
@@ -19,6 +20,36 @@ export default function MediaGallery({ data = [] }) {
     containScroll: 'trimSnaps',
     dragFree: true,
   })
+
+  // Intersection Observer Logic
+  useEffect(() => {
+    const observerOptions = {
+      root: null, // use viewport
+      threshold: 0.6, // Play when 60% of the video is visible
+    }
+
+    const handleIntersection = (entries) => {
+      entries.forEach((entry) => {
+        const video = entry.target
+        if (entry.isIntersecting) {
+          video.play().catch(() => {
+             /* Handle autoplay block by browser */ 
+          })
+        } else {
+          video.pause()
+        }
+      })
+    }
+
+    const observer = new IntersectionObserver(handleIntersection, observerOptions)
+
+    // Observe all current video refs
+    videoRefs.current.forEach((video) => {
+      if (video) observer.observe(video)
+    })
+
+    return () => observer.disconnect()
+  }, [data]) // Re-run if data changes
 
   if (!data.length) return null
 
@@ -36,8 +67,6 @@ export default function MediaGallery({ data = [] }) {
           {data.map((item, i) => {
             const isVideo = item.type === 'video'
             const url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
-            
-            // Item is blurred if it is marked as a spoiler AND hasn't been revealed yet
             const isBlurred = item.spoiler && !revealedItems[i]
 
             return (
@@ -55,8 +84,9 @@ export default function MediaGallery({ data = [] }) {
                   {isVideo ? (
                     <>
                       <video
+                        // Assign ref to the array
+                        ref={(el) => (videoRefs.current[i] = el)}
                         src={url}
-                        autoPlay
                         loop
                         muted={isMuted}
                         playsInline
@@ -84,7 +114,6 @@ export default function MediaGallery({ data = [] }) {
                     />
                   )}
 
-                  {/* Only show the Spoiler overlay if it is currently blurred */}
                   {isBlurred && (
                     <span className={styles.spolier}>Spoiler</span>
                   )}
