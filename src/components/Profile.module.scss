@@ -55,12 +55,12 @@ figure.profile {
 }
 
 .createdAt {
+  margin-left: 5px;
   font-weight: 400;
   color: var(--gray-400);
 }
 
 @media (prefers-color-scheme: dark) {
-  
 }
 
 /* Enable hover only on non-touch devices */

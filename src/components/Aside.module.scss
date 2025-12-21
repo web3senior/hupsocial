@@ -9,7 +9,7 @@
   isolation: isolate;
 
   background-color: var(--gray-50);
-  color: var(--gray-300);
+  color: var(--gray-400);
 
   // Responsive: Hide on mobile
   @media (max-width: 639px) {
@@ -58,7 +58,7 @@
     }
 
     &[aria-label='New'] {
-      background-color: var(--gray-100);
+      background-color: var(--gray-150);
     }
 
     // Active State (Based on the data-active attribute from React)

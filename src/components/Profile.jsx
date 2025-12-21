@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { getProfile, getUniversalProfile } from '@/lib/api'
 import { config } from '@/config/wagmi'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
-import {BlueCheckMarkIcon} from "@/components/Icons"
+import { BlueCheckMarkIcon } from '@/components/Icons'
 import web3 from 'web3'
 import moment from 'moment'
 import { toSvg } from 'jdenticon'
@@ -47,13 +47,21 @@ export default function Profile({ creator, createdAt }) {
   useEffect(() => {
     getUniversalProfile(creator).then((res) => {
       // console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0&& res.data.Profile[0].isContract) {
+      if (
+        res.data &&
+        Array.isArray(res.data.Profile) &&
+        res.data.Profile.length > 0 &&
+        res.data.Profile[0].isContract
+      ) {
         setIsItUp(true)
         setProfile({
           wallet: res.data.id,
           name: res.data.Profile[0].name,
           description: res.data.description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+          profileImage:
+            res.data.Profile[0].profileImages.length > 0
+              ? res.data.Profile[0].profileImages[0].src
+              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
@@ -63,7 +71,10 @@ export default function Profile({ creator, createdAt }) {
         getProfile(creator).then((res) => {
           //  console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== ''
+                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
+                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
@@ -95,16 +106,26 @@ export default function Profile({ creator, createdAt }) {
       {/* profile.profileImages[0]?.isSVG */}
       {/* <div dangerouslySetInnerHTML={{ __html: profile.profileImages[0].src }}></div> */}
 
-      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+      <img
+        alt={profile.name || `Default PFP`}
+        src={`${profile.profileImage}`}
+        className={`rounded`}
+      />
 
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
           <span className={`${styles.name}`}>{profile.name ?? defaultUsername}</span>
           <img alt={`checkmark icon`} src={blueCheckMarkIcon.src} />
-          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name} 
-          dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}></div>
-          <span className={`${styles.createdAt}`}>{moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}</span>
+          <div
+            className={`${styles.badge}`}
+            title={activeChain && activeChain[0].name}
+            dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}
+          ></div>
+          <span className={`${styles.createdAt}`}>
+            {moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}
+          </span>
         </div>
+
         <code>{`${creator.slice(0, 4)}…${creator.slice(38)}`}</code>
       </figcaption>
     </figure>
@@ -120,14 +141,17 @@ export function ProfileImage({ addr }) {
 
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
-     console.log(res)
+      console.log(res)
       if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
         setIsItUp(true)
         setProfile({
           wallet: res.data.id,
           name: res.data.Profile[0].name,
           description: res.data.description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+          profileImage:
+            res.data.Profile[0].profileImages.length > 0
+              ? res.data.Profile[0].profileImages[0].src
+              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
@@ -135,9 +159,12 @@ export function ProfileImage({ addr }) {
         })
       } else {
         getProfile(creator).then((res) => {
-       console.log(res)
+          console.log(res)
           if (res.wallet) {
-            const profileImage = res.profileImage !== '' ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}` : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+            const profileImage =
+              res.profileImage !== ''
+                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
+                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
             res.profileImage = profileImage
             setProfile(res)
           }
@@ -165,7 +192,11 @@ export function ProfileImage({ addr }) {
         router.push(`/u/${creator}`)
       }}
     >
-      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+      <img
+        alt={profile.name || `Default PFP`}
+        src={`${profile.profileImage}`}
+        className={`rounded`}
+      />
       {/* {!profile.profileImages[0]?.isSVG ? (
         <img
           alt={profile.name || `Default PFP`}

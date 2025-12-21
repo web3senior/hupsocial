@@ -1,7 +1,5 @@
 .galleryWrapper {
   position: relative;
-  width: 100%;
-  padding: 1rem 0;
 }
 
 .mediaItem {
@@ -12,14 +10,13 @@
   will-change: transform;
   transition: all 0.2s ease;
 
-
   &:active {
     transform: scale(0.99);
   }
 
   &:hover {
     .spolier {
-   background: rgba(0, 0, 0, 0.4);
+      background: rgba(0, 0, 0, 0.4);
     }
   }
 }
@@ -43,13 +40,13 @@
   cursor: grab;
 
   .mediaItem {
-    width: 320px;
-    height: 400px; // Fixed height for carousel items
+    width: auto;
+    height: 340px; // Fixed height for carousel items
 
     img,
     video {
       display: block;
-      width: 100%;
+      width: auto;
       height: 100%;
       object-fit: cover; // Ensures media fills the area without distortion
       aspect-ratio: 0.75; // 4:3 aspect ratio
@@ -79,10 +76,6 @@
   width: fit-content;
 
   .mediaItem {
-    width: fit-content;
-    overflow: hidden;
-
-
     video,
     img {
       width: auto;
@@ -90,6 +83,7 @@
       max-height: 450px; // Sync with parent max-height
       max-width: 100%;
       object-fit: contain; // Ensures no cropping
+      
     }
 
     @media (max-width: 639px) {
