@@ -22,7 +22,7 @@ export const GlobalLoader = ({ message = 'Loading, please wait...' }) => (
 )
 
 // Localized, Content-Specific Loader
-export const ContentSpinner = ({ size = '20px', color = '#424242' }) => (
+export const ContentSpinner = ({ size = '20px', color }) => (
   <div className={`${styles.contentSpinner} d-f-c`} aria-live="polite" aria-label="Content loading">
     <Spinner size={size} color={color} />
   </div>

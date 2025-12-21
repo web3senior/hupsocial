@@ -35,6 +35,7 @@ import { CommentIcon, ShareIcon, BlueCheckMarkIcon, RepostIcon } from '@/compone
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
+import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 
 moment.defineLocale('en-short', {
   relativeTime: {
