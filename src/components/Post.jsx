@@ -116,6 +116,7 @@ export default function Post({ item, showContent, actions, chainId }) {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
+  const commentCount = Number(item.commentCount)
 
   useEffect(() => {
     if (chainId !== undefined) {
@@ -198,7 +199,7 @@ export default function Post({ item, showContent, actions, chainId }) {
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
           >
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
-              <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
+              <Like id={item.postId} likeCount={Number(item.likeCount)} hasLiked={item.hasLiked} />
             )}
 
             {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
@@ -212,7 +213,7 @@ export default function Post({ item, showContent, actions, chainId }) {
                     }}
                   >
                     <CommentIcon />
-                    <span>{item.commentCount}</span>
+                    {commentCount === 0 ? '' : <span>{commentCount}</span>}
                   </button>
                 )}
               </>
@@ -221,7 +222,6 @@ export default function Post({ item, showContent, actions, chainId }) {
             {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && (
               <button>
                 <RepostIcon />
-                <span>0</span>
               </button>
             )}
 
@@ -232,7 +232,6 @@ export default function Post({ item, showContent, actions, chainId }) {
                 }}
               >
                 <TipIcon />
-                <span>{new Intl.NumberFormat().format(0)}</span>
               </button>
             )}
 
@@ -240,10 +239,12 @@ export default function Post({ item, showContent, actions, chainId }) {
               <button>
                 <ViewIcon />
                 <span>
-                  {new Intl.NumberFormat('en', {
-                    notation: 'compact',
-                    maximumFractionDigits: 1,
-                  }).format(viewCount)}
+                  {viewCount === 0
+                    ? ''
+                    : new Intl.NumberFormat('en', {
+                        notation: 'compact',
+                        maximumFractionDigits: 1,
+                      }).format(viewCount)}
                 </span>
               </button>
             )}
@@ -255,7 +256,6 @@ export default function Post({ item, showContent, actions, chainId }) {
                 }}
               >
                 <ShareIcon />
-                <span>0</span>
               </button>
             )}
           </div>
@@ -736,7 +736,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
           stroke={hasLiked ? `#EC3838` : `#424242`}
         />
       </svg>
-      <span>{likeCount}</span>
+      {likeCount === 0 ? '' : <span>{likeCount}</span>}
     </button>
   )
 }

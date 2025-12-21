@@ -193,6 +193,7 @@ export default function Page() {
           {comments &&
             comments.list.length > 0 &&
             comments.list.map((item, i) => {
+              const replyCount = Number(item.replyCount)
               return (
                 <div key={i}>
                   <div
@@ -208,7 +209,7 @@ export default function Page() {
                         onClick={(e) => e.stopPropagation()}
                         className={`${styles.comment__actions} flex flex-row align-items-center justify-content-start`}
                       >
-                        <LikeComment commentId={item.commentId} likeCount={item.likeCount} />
+                        <LikeComment commentId={item.commentId} likeCount={Number(item.likeCount)} />
 
                         <button
                           onClick={() =>
@@ -220,17 +221,17 @@ export default function Page() {
                           }
                         >
                           <CommentIcon />
-                          <span>{item.replyCount === 0 ? '' : item.replyCount}</span>
+                          <span>{replyCount === 0 ? '' : replyCount}</span>
                         </button>
 
                         <button>
                           <RepostIcon />
-                          <span>{true ? '' : 100}</span>
+                          <span></span>
                         </button>
 
                         <button>
                           <ShareIcon />
-                          <span>{true ? '' : 100}</span>
+                          <span></span>
                         </button>
                       </div>
                     </div>
@@ -556,7 +557,7 @@ const LikeComment = ({ commentId: id, likeCount }) => {
           stroke={hasLiked ? `#EC3838` : `#424242`}
         />
       </svg>
-      <span>{likeCount}</span>
+      <span>{likeCount === 0 ? '' : likeCount}</span>
     </button>
   )
 }
