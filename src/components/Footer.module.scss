@@ -7,9 +7,12 @@
   bottom: 0;
   z-index: 100;
   
-  // Aesthetics
-  background-color: rgba(var(--gray-50-rgb), 0.8); // Assumes an RGB variable
-  backdrop-filter: blur(10px); // Premium glass effect
+  background-color: rgba($color: #fff, $alpha: 0.85);
+  
+  // Blur effect
+  -webkit-backdrop-filter: blur(28.5px);
+  backdrop-filter: blur(28.5px);
+  
   border-top: 1px solid var(--gray-200);
   color: #c7c7c7;
   

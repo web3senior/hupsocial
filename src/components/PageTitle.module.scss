@@ -1,7 +1,11 @@
 .stickyHeader {
   position: sticky;
   top: 0;
-  background-color: #fafafa;
+  background-color: rgba($color: #fff, $alpha: 0.85);
+  
+  // Blur effect
+  -webkit-backdrop-filter: blur(28.5px);
+  backdrop-filter: blur(28.5px);
   z-index: 5;
 }
 

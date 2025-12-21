@@ -8,11 +8,11 @@
   right: 0;
   z-index: 1000;
   width: fit-content;
-padding: 1em;
+  padding: 1em;
   user-select: none;
   isolation: isolate;
 
-@media (max-width: 600px) {
+  @media (max-width: 600px) {
     padding: 0.2em;
   }
 
