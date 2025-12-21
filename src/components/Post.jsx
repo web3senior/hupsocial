@@ -4,8 +4,20 @@ import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
-import { useWaitForTransactionReceipt, useConnection, useWriteCont, useConnectionract, useWriteContract } from 'wagmi'
-import { initPostContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
+import {
+  useWaitForTransactionReceipt,
+  useConnection,
+  useWriteCont,
+  useConnectionract,
+  useWriteContract,
+} from 'wagmi'
+import {
+  initPostContract,
+  initPostCommentContract,
+  getHasLikedPost,
+  getVoteCountsForPoll,
+  getVoterChoices,
+} from '@/lib/communication'
 import { getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import Web3 from 'web3'
@@ -19,11 +31,19 @@ import { toast } from '@/components/NextToast'
 import Shimmer from '@/components/ui/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, BlueCheckMarkIcon, ThreeDotIcon, ViewIcon } from '@/components/Icons'
+import {
+  CommentIcon,
+  ShareIcon,
+  RepostIcon,
+  TipIcon,
+  BlueCheckMarkIcon,
+  ThreeDotIcon,
+  ViewIcon,
+} from '@/components/Icons'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { getIPFS } from '@/lib/ipfs'
-import  MediaGallery  from './Gallery'
+import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
 
 moment.defineLocale('en-short', {
@@ -117,14 +137,27 @@ export default function Post({ item, showContent, actions, chainId }) {
 
   return (
     <>
-      {showCommentModal && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
+      {showCommentModal && (
+        <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />
+      )}
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
-      {showShareModal && <ShareModal metadata={postContent} item={showShareModal} setShowShareModal={setShowShareModal} />}
+      {showShareModal && (
+        <ShareModal
+          metadata={postContent}
+          item={showShareModal}
+          setShowShareModal={setShowShareModal}
+        />
+      )}
       {/* 
       {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />} */}
 
-      <section className={`${styles.post} flex flex-column align-items-start justify-content-between`} data-content={showContent}>
-        <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
+      <section
+        className={`${styles.post} flex flex-column align-items-start justify-content-between`}
+        data-content={showContent ? true : false}
+      >
+        <header
+          className={`${styles.post__header} flex align-items-start justify-content-between w-100`}
+        >
           <Profile creator={item.creator} createdAt={item.createdAt} />
           <Nav item={item} />
         </header>
@@ -137,7 +170,9 @@ export default function Post({ item, showContent, actions, chainId }) {
               <div
                 className={`${styles.post__main__content} `}
                 id={`post${item.postId}`}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(`${postContent.elements[0].data.text}`) }}
+                dangerouslySetInnerHTML={{
+                  __html: renderMarkdown(`${postContent.elements[0].data.text}`),
+                }}
               />
 
               <div className={`${styles.post__main__media}`}>
@@ -158,7 +193,10 @@ export default function Post({ item, showContent, actions, chainId }) {
         </main>
 
         <footer className={`${styles.post__footer}`}>
-          <div onClick={(e) => e.stopPropagation()} className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
+          >
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
               <Like id={item.postId} likeCount={item.likeCount} hasLiked={item.hasLiked} />
             )}
@@ -168,7 +206,9 @@ export default function Post({ item, showContent, actions, chainId }) {
                 {item.allowedComments && (
                   <button
                     onClick={() => {
-                      isConnected ? setShowCommentModal(item) : toast(`Please connect wallet`, `error`)
+                      isConnected
+                        ? setShowCommentModal(item)
+                        : toast(`Please connect wallet`, `error`)
                     }}
                   >
                     <CommentIcon />
@@ -199,7 +239,12 @@ export default function Post({ item, showContent, actions, chainId }) {
             {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
               <button>
                 <ViewIcon />
-                <span>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)}</span>
+                <span>
+                  {new Intl.NumberFormat('en', {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  }).format(viewCount)}
+                </span>
               </button>
             )}
 
@@ -209,7 +254,7 @@ export default function Post({ item, showContent, actions, chainId }) {
                   isConnected ? setShowShareModal(item) : toast(`Please connect wallet`, `error`)
                 }}
               >
-                <ShareIcon /> 
+                <ShareIcon />
                 <span>0</span>
               </button>
             )}
@@ -237,7 +282,9 @@ const Nav = ({ item }) => {
       </button>
 
       {showPostDropdown && (
-        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
+        <div
+          className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}
+        >
           <ul>
             <li>
               <Link href={`/${activeChain[0].id}/p/${item.postId}`}>View post</Link>
@@ -341,7 +388,13 @@ const CommentModal = ({ item, setShowCommentModal }) => {
             <h3>Post your reply</h3>
           </div>
           <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
+            {isSigning
+              ? `Signing...`
+              : isConfirming
+              ? 'Confirming...'
+              : status && status.content !== ''
+              ? `Update`
+              : `Share`}
           </div>
         </header>
 
@@ -460,7 +513,13 @@ const TipModal = ({ item, setShowTipModal }) => {
             <h3>Support creator</h3>
           </div>
           <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : ``}
+            {isSigning
+              ? `Signing...`
+              : isConfirming
+              ? 'Confirming...'
+              : status && status.content !== ''
+              ? `Update`
+              : ``}
           </div>
         </header>
 
@@ -476,7 +535,9 @@ const TipModal = ({ item, setShowTipModal }) => {
           </div>
 
           <div className={`flex flex-column align-items-start justify-content-between`}>
-            <label htmlFor="">To {address.toLowerCase() === item.creator.toLowerCase() && `(Yourself)`}</label>
+            <label htmlFor="">
+              To {address.toLowerCase() === item.creator.toLowerCase() && `(Yourself)`}
+            </label>
             <input type="text" name="" id="" value={`${item.creator}`} placeholder={``} disabled />
           </div>
 
@@ -490,8 +551,18 @@ const TipModal = ({ item, setShowTipModal }) => {
           <div className={`flex flex-column align-items-start justify-content-between`}>
             <label htmlFor="">Amount</label>
 
-            <div className={`${styles.tipAmount} w-100 flex flex-row align-items-start justify-content-between gap-025`}>
-              <input type="number" name="" id="" value={amount} min={1} onChange={(e) => setAmount(e.target.value)} placeholder={`0`} />
+            <div
+              className={`${styles.tipAmount} w-100 flex flex-row align-items-start justify-content-between gap-025`}
+            >
+              <input
+                type="number"
+                name=""
+                id=""
+                value={amount}
+                min={1}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={`0`}
+              />
               <button onClick={() => setAmount(2)}>2</button>
               <button onClick={() => setAmount(5)}>5</button>
               <button onClick={() => setAmount(10)}>10</button>
@@ -519,12 +590,18 @@ const ShareModal = ({ item, metadata, setShowShareModal }) => {
 
   // --- Dynamic Content ---
   const postUrl = `${location.protocol}//${window.location.host}/${activeChain[0].id}/p/${item.postId}`
-  const postTitle = metadata && metadata.elements && metadata.elements.length > 1 ? metadata.elements[0].data.text : item.content
+  const postTitle =
+    metadata && metadata.elements && metadata.elements.length > 1
+      ? metadata.elements[0].data.text
+      : item.content
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const postContent = `${postTitle}\n\n Creator: ${item.creator} \n\n`
   // --- Constructing the Share Link ---
   const shareLink =
-    `https://twitter.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
+    `https://twitter.com/intent/tweet?` +
+    `text=${encodeURIComponent(postContent)}` +
+    `&url=${encodeURIComponent(postUrl)}` +
+    `&via=${hupHandle}` // <-- The recommended parameter for the handle
 
   useEffect(() => {}, [item])
 
@@ -647,7 +724,13 @@ const Like = ({ id, likeCount, hasLiked }) => {
         } else toast(`Please connect wallet`, `error`)
       }}
     >
-      <svg width="18" height="18" viewBox="0 0 18 18" fill={hasLiked ? `#EC3838` : `none`} xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill={hasLiked ? `#EC3838` : `none`}
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
           stroke={hasLiked ? `#EC3838` : `#424242`}
@@ -665,8 +748,15 @@ const Poll = ({ polls }) => {
         polls.list.length > 0 &&
         polls.list.map((item, i) => {
           return (
-            <article key={i} className={`${styles.poll} animate fade`} onClick={() => router.push(`p/${item.pollId}`)}>
-              <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
+            <article
+              key={i}
+              className={`${styles.poll} animate fade`}
+              onClick={() => router.push(`p/${item.pollId}`)}
+            >
+              <section
+                data-name={item.name}
+                className={`flex flex-column align-items-start justify-content-between`}
+              >
                 <header className={`${styles.poll__header}`}>
                   <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
                 </header>
@@ -683,7 +773,9 @@ const Poll = ({ polls }) => {
                       className={`${styles.poll__btnShowMore} text-left`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        document.querySelector(`#pollQuestion${item.pollId}`).style.maxHeight = `unset !important`
+                        document.querySelector(
+                          `#pollQuestion${item.pollId}`
+                        ).style.maxHeight = `unset !important`
                         e.target.remove()
                       }}
                     >
@@ -711,7 +803,13 @@ const Poll = ({ polls }) => {
                     </button>
 
                     <button>
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 18 18"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
                         <path
                           d="M12 8.16338C12.1836 8.16338 12.3401 8.09875 12.4695 7.9695C12.5988 7.84012 12.6634 7.68363 12.6634 7.5C12.6634 7.31638 12.5988 7.15988 12.4695 7.0305C12.3401 6.90125 12.1836 6.83663 12 6.83663C11.8164 6.83663 11.6599 6.90125 11.5305 7.0305C11.4013 7.15988 11.3366 7.31638 11.3366 7.5C11.3366 7.68363 11.4013 7.84012 11.5305 7.9695C11.6599 8.09875 11.8164 8.16338 12 8.16338ZM6 6.5625H9.75V5.4375H6V6.5625ZM3.65625 15.375C3.26013 14.0076 2.86425 12.6471 2.46863 11.2933C2.07288 9.93944 1.875 8.55 1.875 7.125C1.875 6.08075 2.23894 5.19469 2.96681 4.46681C3.69469 3.73894 4.58075 3.375 5.625 3.375H9.5625C9.90575 2.924 10.3176 2.56125 10.7979 2.28675C11.2782 2.01225 11.8039 1.875 12.375 1.875C12.5818 1.875 12.7584 1.94831 12.9051 2.09494C13.0517 2.24156 13.125 2.41825 13.125 2.625C13.125 2.676 13.118 2.72694 13.104 2.77781C13.0901 2.82881 13.0755 2.87594 13.0601 2.91919C12.9909 3.09994 12.9319 3.28506 12.8833 3.47456C12.8348 3.66394 12.7933 3.85525 12.7586 4.0485L14.7101 6H16.125V10.5821L14.0783 11.2543L12.8438 15.375H9.375V13.875H7.125V15.375H3.65625ZM4.5 14.25H6V12.75H10.5V14.25H12L13.1625 10.3875L15 9.76875V7.125H14.25L11.625 4.5C11.625 4.25 11.6406 4.00938 11.6719 3.77813C11.7031 3.54688 11.7548 3.31488 11.8269 3.08213C11.4644 3.18213 11.1481 3.35644 10.8778 3.60506C10.6077 3.85356 10.4005 4.15188 10.2563 4.5H5.625C4.9 4.5 4.28125 4.75625 3.76875 5.26875C3.25625 5.78125 3 6.4 3 7.125C3 8.35 3.16875 9.54688 3.50625 10.7156C3.84375 11.8844 4.175 13.0625 4.5 14.25Z"
                           fill="#424242"
@@ -818,7 +916,10 @@ const Options = ({ item }) => {
     <>
       <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
         {item.options.map((option, i) => {
-          const votePercentage = totalVotes > 0 ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed() : 0
+          const votePercentage =
+            totalVotes > 0
+              ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed()
+              : 0
           return (
             <li
               key={i}
@@ -830,7 +931,9 @@ const Options = ({ item }) => {
               data-isactive={isPollActive(item.startTime, item.endTime).isActive}
               data-top-option={topOption && topOption === i + 1 ? true : false}
               className={`${voted && voted > 0 && styles.showPercentage} ${
-                isPollActive(item.startTime, item.endTime).status === `endeed` ? styles.poll__options__optionEndeed : styles.poll__options__option
+                isPollActive(item.startTime, item.endTime).status === `endeed`
+                  ? styles.poll__options__optionEndeed
+                  : styles.poll__options__option
               } flex flex-row align-items-center justify-content-between`}
               onClick={(e) => vote(e, web3.utils.toNumber(item.pollId), i)}
               disabled={isPending || isConfirming}
@@ -912,7 +1015,11 @@ const ConnectedProfile = ({ addr }) => {
         router.push(`/u/${addr}`)
       }}
     >
-      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+      <img
+        alt={profile.name || `Default PFP`}
+        src={`${profile.profileImage}`}
+        className={`rounded`}
+      />
 
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
