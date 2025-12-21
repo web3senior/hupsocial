@@ -21,14 +21,7 @@ import {
   getHasLikedComment,
   getActiveChain,
 } from '@/lib/communication'
-import {
-  getProfile,
-  getUniversalProfile,
-  newView,
-  getViewPost,
-  addViewPost,
-  getApps,
-} from '@/lib/api'
+import { getProfile, getUniversalProfile, addViewPost, getApps } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -37,18 +30,8 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import commentAbi from '@/abi/post-comment.json'
-import { toast } from '@/components/NextToast'
-import Shimmer from '@/components/ui/Shimmer'
-import { InlineLoading } from '@/components/Loading'
 import Profile, { ProfileImage } from '../../../../components/Profile'
-import {
-  CommentIcon,
-  ShareIcon,
-  RepostIcon,
-  TipIcon,
-  InfoIcon,
-  BlueCheckMarkIcon,
-} from '@/components/Icons'
+import { CommentIcon, ShareIcon, BlueCheckMarkIcon, RepostIcon } from '@/components/Icons'
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
@@ -237,12 +220,17 @@ export default function Page() {
                           }
                         >
                           <CommentIcon />
-                          <span>{item.replyCount}</span>
+                          <span>{item.replyCount === 0 ? '' : item.replyCount}</span>
+                        </button>
+
+                        <button>
+                          <RepostIcon />
+                          <span>{true ? '' : 100}</span>
                         </button>
 
                         <button>
                           <ShareIcon />
-                          <span>0</span>
+                          <span>{true ? '' : 100}</span>
                         </button>
                       </div>
                     </div>
@@ -267,7 +255,7 @@ export default function Page() {
         </div>
 
         {commentsLoaded !== commentCount && (
-          <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(postCount)}>
+          <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(commentCount)}>
             Load More
           </button>
         )}
