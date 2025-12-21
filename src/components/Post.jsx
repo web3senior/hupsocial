@@ -123,7 +123,7 @@ export default function Post({ item, showContent, actions, chainId }) {
       {/* 
       {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />} */}
 
-      <section className={`${styles.post} flex flex-column align-items-start justify-content-between`}>
+      <section className={`${styles.post} flex flex-column align-items-start justify-content-between`} data-content={showContent}>
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile creator={item.creator} createdAt={item.createdAt} />
           <Nav item={item} />

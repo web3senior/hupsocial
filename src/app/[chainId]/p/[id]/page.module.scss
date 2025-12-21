@@ -12,16 +12,17 @@
     position: relative;
     top: 0rem;
     background-color: var(--white, #fff);
-   // filter: drop-shadow(0px 0px 1rem rgba(0, 0, 0, 0.04));
+    box-shadow: var(--shadow-md);
     border-radius: var(--global-border-radius);
     overflow: hidden;
     border: 1px solid var(--gray-300);
     isolation: isolate;
 
-    @media (max-width: 600px) {
+    @media (max-width: 640px) {
       border: none;
       filter: none;
       border-radius: unset;
+      box-shadow: none;
     }
   }
 
@@ -45,13 +46,16 @@
 }
 
 .comment {
-  padding: 1.7rem 1.7rem 0.4rem;
-  @media (max-width: 600px) {
-    padding: 0.7rem 0.7rem;
+  padding: 10px 20px;
+
+  @media (max-width: 640px) {
+    padding: 5px 10px;
   }
-cursor: pointer;
+  
+  cursor: pointer;
+
   &__content {
-    padding-left: 2.8rem;
+    padding-left: 3.3rem;
   }
 
   &__actions {

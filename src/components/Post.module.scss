@@ -1,19 +1,29 @@
-
 .post {
   -webkit-tap-highlight-color: transparent;
   position: relative;
   transition: background-color 0.1s ease-out;
   isolation: isolate;
   cursor: pointer;
-  padding: 1.7rem 1.7rem 0 1.7rem;
+  padding: 20px;
   place-items: stretch;
 
-  @media (max-width: 600px) {
-    padding: 0.7rem 0.7rem;
+  @media (max-width: 640px) {
+    padding: 10px;
   }
 
-  &:hover {
-    background-color: var(--gray-50);
+  &[data-content='false'] {
+    .post {
+      &:hover {
+        background-color: var(--gray-50);
+      }
+
+      &__main {
+        padding-left: 3rem;
+      }
+      &__footer {
+        padding-left: 3rem;
+      }
+    }
   }
 
   &__header {
@@ -21,14 +31,12 @@
   }
 
   &__main {
-    padding-left: 3rem;
-
     &__media {
       overflow: hidden;
       // background-color: var(--gray-100);
       border-radius: var(--global-border-radius);
     }
-    
+
     &__content {
       height: auto;
       //width: fit-content;
@@ -212,14 +220,13 @@
     font-size: 11px;
     margin-top: 0.5em;
     user-select: none;
-    padding-left: 3rem;
   }
 
   &__actions {
     color: var(--black-400);
     padding-bottom: 0.5rem;
     font-size: var(--system-13-font-size);
-    font-weight: 500;
+    font-weight: 400;
     gap: 0.1rem;
     cursor: default;
     width: fit-content;
@@ -228,17 +235,24 @@
     button {
       all: unset;
       position: relative;
-      padding: 8px;
+      padding: 8px 12px;
       transition: all 0.01s ease-in;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
+      gap: 5px;
       border-radius: 1000px;
       color: var(--black-600);
 
       @media (max-width: 600px) {
         padding: 4px 8px;
+      }
+
+      svg {
+        --x-height: 19px;
+        --x-width: 18.75px;
+        width: var(--x-width);
+        height: var(--x-height);
       }
 
       &:active {
@@ -255,9 +269,10 @@
         transform: translate(-50%, -50%);
         background-color: var(--gray-alpha-100);
         border-radius: 999px;
-        transition: all 0.15s ease-in-out;
+        transition: all 0.12s ease;
         will-change: width, height;
         opacity: 0;
+        z-index: -1;
       }
 
       &:hover {
@@ -1390,7 +1405,7 @@ button.btnPostMenu {
     --r: 32px;
     width: var(--r);
     height: var(--r);
-    
+
     img {
       width: var(--r);
       height: var(--r);

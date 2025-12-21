@@ -21,7 +21,14 @@ import {
   getHasLikedComment,
   getActiveChain,
 } from '@/lib/communication'
-import { getProfile, getUniversalProfile, newView, getViewPost, addViewPost, getApps } from '@/lib/api'
+import {
+  getProfile,
+  getUniversalProfile,
+  newView,
+  getViewPost,
+  addViewPost,
+  getApps,
+} from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -34,7 +41,14 @@ import { toast } from '@/components/NextToast'
 import Shimmer from '@/components/ui/Shimmer'
 import { InlineLoading } from '@/components/Loading'
 import Profile, { ProfileImage } from '../../../../components/Profile'
-import { CommentIcon, ShareIcon, RepostIcon, TipIcon, InfoIcon, BlueCheckMarkIcon } from '@/components/Icons'
+import {
+  CommentIcon,
+  ShareIcon,
+  RepostIcon,
+  TipIcon,
+  InfoIcon,
+  BlueCheckMarkIcon,
+} from '@/components/Icons'
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
@@ -93,86 +107,76 @@ export default function Page() {
     hash,
   })
 
-  const loadMoreComment = async (totalComment) => {
-    // 1. **Add a guard clause to prevent re-entry**
-    if (isLoadedComment) return
+  const loadMoreComment = async (totalCount) => {
+    // Guard clause: prevent concurrent fetches or loading beyond total
+    if (isLoadedComment || commentsLoaded >= totalCount) return
 
-    // 2. Set to true *before* starting the async operation
     setIsLoadedPoll(true)
 
     try {
-      let showingCommentCount = 20
-      let startIndex = totalComment - commentsLoaded - showingCommentCount
+      const PAGE_SIZE = 40
 
-      // **Stop loading if all posts are accounted for**
-      if (commentsLoaded >= totalComment) {
-        console.log('All polls loaded.')
-        // We can return here, but still need to handle setIsLoadedPoll(false)
-      }
+      // Calculate how many to fetch, ensuring we don't go below index 0
+      const remaining = totalCount - commentsLoaded
+      const countToFetch = Math.min(PAGE_SIZE, remaining)
+      const startIndex = Math.max(0, totalCount - commentsLoaded - countToFetch)
 
-      if (startIndex < 0) {
-        // Check if we are trying to load past the first post
-        showingCommentCount = totalComment - commentsLoaded
-        startIndex = 0
-        if (showingCommentCount <= 0) {
-          // All loaded
-          console.log('All polls loaded.')
-          return // Exit early
-        }
-      }
+      console.log(`Fetching from index ${startIndex}, count: ${countToFetch}`)
 
-      // ... (rest of your logic for calculating startIndex/showingCommentCount) ...
-
-      // 3. Fetch the next batch of polls
-      console.log(startIndex + 1, showingCommentCount)
-      const newComments = await getCommentsByPostId(params.id, startIndex, showingCommentCount, address)
-      console.log(`newComments => `, newComments)
+      const newComments = await getCommentsByPostId(params.id, startIndex, countToFetch, address)
 
       if (Array.isArray(newComments) && newComments.length > 0) {
-        setComments((prevComments) => ({ list: [...prevComments.list, ...newComments] }))
-        setcommentsLoaded((prevLoaded) => prevLoaded + newComments.length)
+        // Assuming you want the newest comments at the top or bottom?
+        // Reverse if the contract returns them in descending index order.
+        setComments((prev) => ({
+          list: [...prev.list, ...newComments],
+        }))
+        setcommentsLoaded((prev) => prev + newComments.length)
       }
     } catch (error) {
-      console.error('Error loading more polls:', error)
+      console.error('Error loading more comments:', error)
     } finally {
-      // 4. **Crucial: Set to false in finally block**
-      // This re-enables loading for the next scroll event.
       setIsLoadedPoll(false)
     }
   }
 
-  const openModal = (e, item) => {
-    e.target.innerText = `Sending...`
-    setSelectedEmoji({ e: e.target, item: item, message: null })
-    giftModal.current.showModal()
-  }
-
+  // Effect 1: Basic Post Data & Analytics
   useEffect(() => {
-    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, params.chainId)
+    localStorage.setItem(
+      `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`,
+      params.chainId
+    )
+    setChains(config.chains)
 
-    // View
-    addViewPost(params.chainId, params.id).then((result) => {
-      setViewCount(result)
-    })
-console.log(address)
+    addViewPost(params.chainId, params.id).then(setViewCount)
+
     getPostByIndex(params.id, address).then((res) => {
-      console.log(res)
-      res.postId = params.id
-      setPost(res)
-    })
-
-    // Comments
-    getPostCommentCount(params.id).then((count) => {
-      const totalComment = web3.utils.toNumber(count)
-      setCommentCount(totalComment)
-
-      if (commentsLoaded === 0 && !isLoadedComment) {
-        loadMoreComment(totalComment)
+      if (res) {
+        res.postId = params.id
+        setPost(res)
       }
     })
+  }, [params.id, params.chainId, address]) // Re-run if post or user changes
 
-    setChains(config.chains)
-  }, [showCommentModal ,address]) // Added necessary dependencies  [isLoadedComment, commentsLoaded]
+  // Effect 2: Initial Comments Load
+  useEffect(() => {
+    const initComments = async () => {
+      try {
+        const count = await getPostCommentCount(params.id)
+        const total = web3.utils.toNumber(count)
+        setCommentCount(total)
+
+        // Only auto-load if nothing has been loaded yet
+        if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
+          await loadMoreComment(total)
+        }
+      } catch (err) {
+        console.error('Failed to initialize comments', err)
+      }
+    }
+
+    initComments()
+  }, [params.id, showCommentModal]) // Trigger when modal opens or post changes
 
   return (
     <>
@@ -192,7 +196,12 @@ console.log(address)
           <div className={`${styles.grid} flex flex-column`}>
             {post && (
               <article className={`${styles.post} animate fade`}>
-                <Post item={post} showContent={true} chainId={params.chainId} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]} />
+                <Post
+                  item={post}
+                  showContent={true}
+                  chainId={params.chainId}
+                  actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]}
+                />
                 <hr />
               </article>
             )}
@@ -203,7 +212,10 @@ console.log(address)
             comments.list.map((item, i) => {
               return (
                 <div key={i}>
-                  <div className={`${styles.comment}`} onClick={() => router.push(`/comment/${item.commentId}`)}>
+                  <div
+                    className={`${styles.comment}`}
+                    onClick={() => router.push(`/comment/${item.commentId}`)}
+                  >
                     <Profile creator={item.creator} createdAt={item.createdAt} />
 
                     <div className={`${styles.comment__content}`}>
@@ -215,7 +227,15 @@ console.log(address)
                       >
                         <LikeComment commentId={item.commentId} likeCount={item.likeCount} />
 
-                        <button onClick={() => setShowCommentModal({ data: item, parentId: item.commentId, type: `comment` })}>
+                        <button
+                          onClick={() =>
+                            setShowCommentModal({
+                              data: item,
+                              parentId: item.commentId,
+                              type: `comment`,
+                            })
+                          }
+                        >
                           <CommentIcon />
                           <span>{item.replyCount}</span>
                         </button>
@@ -233,7 +253,10 @@ console.log(address)
             })}
 
           {mounted && isConnected && (
-            <div className={`${styles.reply} flex align-items-center gap-025`} onClick={() => setShowCommentModal({ data: post, type: `post` })}>
+            <div
+              className={`${styles.reply} flex align-items-center gap-025`}
+              onClick={() => setShowCommentModal({ data: post, type: `post` })}
+            >
               <ProfileImage addr={address} />
               <p>
                 Reply
@@ -328,7 +351,13 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
             <h3>Post your {type === `post` ? `comment` : `reply`}</h3>
           </div>
           <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
+            {isSigning
+              ? `Signing...`
+              : isConfirming
+              ? 'Confirming...'
+              : status && status.content !== ''
+              ? `Update`
+              : `Share`}
           </div>
         </header>
 
@@ -338,7 +367,9 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
               <header className={`${styles.commentModal__post__header}`}>
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
-              <main className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}>
+              <main
+                className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}
+              >
                 <div
                   className={`${styles.post__content} `}
                   // onClick={(e) => e.stopPropagation()}
@@ -357,7 +388,10 @@ const CommentModal = ({ item, type, parentId = 0, setShowCommentModal }) => {
             autoFocus
             defaultValue={commentContent}
             onInput={(e) => setCommentContent(e.target.value)}
-            placeholder={`${type === `post` ? `Comment` : `Reply`} to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`}
+            placeholder={`${type === `post` ? `Comment` : `Reply`} to ${item.creator.slice(
+              0,
+              4
+            )}…${item.creator.slice(38)}`}
           />
           <button className="btn" onClick={(e) => postComment(e)}>
             Post {type === `post` ? `comment` : `reply`}
@@ -431,7 +465,13 @@ const Like = ({ id, likeCount, hasLiked }) => {
 
   return (
     <button onClick={(e) => (hasLiked ? unlikePost(e, id) : likePost(e, id))}>
-      <svg width="18" height="18" viewBox="0 0 18 18" fill={hasLiked ? `#EC3838` : `none`} xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill={hasLiked ? `#EC3838` : `none`}
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
           stroke={hasLiked ? `#EC3838` : `#424242`}
@@ -516,7 +556,13 @@ const LikeComment = ({ commentId: id, likeCount }) => {
 
   return (
     <button onClick={(e) => (hasLiked ? unlikeComment(e) : likeComment(e))}>
-      <svg width="18" height="18" viewBox="0 0 18 18" fill={hasLiked ? `#EC3838` : `none`} xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill={hasLiked ? `#EC3838` : `none`}
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
           stroke={hasLiked ? `#EC3838` : `#424242`}
@@ -590,7 +636,11 @@ const ConnectedProfile = ({ addr }) => {
         router.push(`/u/${addr}`)
       }}
     >
-      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+      <img
+        alt={profile.name || `Default PFP`}
+        src={`${profile.profileImage}`}
+        className={`rounded`}
+      />
 
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>
