@@ -9,6 +9,13 @@
   border-radius: 12px;
   overflow: hidden;
   background-color: var(--gray-100); // Fallback for loading
+  will-change: transform;
+  transition: all 0.2s ease;
+
+
+  &:active {
+    transform: scale(0.99);
+  }
 
   &:hover {
     .spolier {
