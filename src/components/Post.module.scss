@@ -216,9 +216,9 @@
   }
 
   &__actions {
-    font-size: 11px;
     color: var(--black-400);
     padding-bottom: 0.5rem;
+    font-size: var(--system-13-font-size);
     font-weight: 500;
     gap: 0.1rem;
     cursor: default;
@@ -1390,6 +1390,7 @@ button.btnPostMenu {
     --r: 32px;
     width: var(--r);
     height: var(--r);
+    
     img {
       width: var(--r);
       height: var(--r);
