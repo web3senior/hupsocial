@@ -227,7 +227,7 @@
     padding-bottom: 0.5rem;
     font-size: var(--system-13-font-size);
     font-weight: 400;
-    gap: 8px;
+    gap: 4px;
     cursor: default;
     width: fit-content;
     user-select: none;
@@ -236,7 +236,7 @@
       all: unset;
       position: relative;
       padding: 8px;
-      transition: all 0.01s ease-in;
+      transition: all 0.01s ease-in-out;
       display: flex;
       place-items: center;
       border-radius: 1000px;
@@ -247,7 +247,7 @@
       }
 
       span {
-        padding-inline-start: 0.5rem;
+        padding-inline-start: 4px;
       }
 
       svg {
