@@ -1,5 +1,5 @@
 :root {
-  --background: #ffffff;
+  --background: #fafafa;
   --foreground: #171717;
 
   ::selection {
@@ -38,7 +38,6 @@
 .no-scroll {
   overflow: hidden;
 }
-
 
 // Details
 details {
@@ -118,12 +117,11 @@ html {
 
 body {
   color: var(--foreground);
-  background: var(--white);
+  background: var(--background);
   font-family: var(--font-family-system) !important;
   font-size: var(--system-15-font-size);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--gray-50);
   // min-height: calc(100svh - 4rem);
   // display: grid;
   // grid-template-rows: 400px 1fr;
