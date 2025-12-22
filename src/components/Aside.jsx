@@ -39,7 +39,7 @@ export default function Aside() {
 
       <nav className={`d-f-c flex-column align-items-center`} aria-label="Main Navigation">
         <Link href={`/`} className={`${styles.logo}`}>
-          <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME} Logo`} width={32} height={32} />
+          <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME} Logo`} width={48} height={32} />
         </Link>
 
         {/* Navigation Links */}
