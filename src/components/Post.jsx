@@ -279,7 +279,7 @@ const Nav = ({ item }) => {
           setShowPostDropdown(!showPostDropdown)
         }}
       >
-        <Ellipsis strokeWidth={1} width={18} height={18} />
+        <Ellipsis fill="currentColor" strokeWidth={1} width={18} height={18} />
       </button>
 
       {showPostDropdown && (

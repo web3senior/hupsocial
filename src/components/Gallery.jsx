@@ -8,7 +8,7 @@ import styles from './Gallery.module.scss'
 export default function MediaGallery({ data = [] }) {
   const [isMuted, setIsMuted] = useState(true)
   const [revealedItems, setRevealedItems] = useState({})
-  
+
   // Ref to store video elements
   const videoRefs = useRef([])
   const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
@@ -33,7 +33,7 @@ export default function MediaGallery({ data = [] }) {
         const video = entry.target
         if (entry.isIntersecting) {
           video.play().catch(() => {
-             /* Handle autoplay block by browser */ 
+            /* Handle autoplay block by browser */
           })
         } else {
           video.pause()
@@ -65,18 +65,18 @@ export default function MediaGallery({ data = [] }) {
       >
         <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
           {data.map((item, i) => {
-const isVideo = item.type === 'video'
-  const url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
-  const isBlurred = item.spoiler && !revealedItems[i]
+            const isVideo = item.type === 'video'
+            const url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+            const isBlurred = item.spoiler && !revealedItems[i]
 
             return (
-<div
-      // Combine cid and index to ensure uniqueness
-      key={`${item.cid}-${i}`} 
-      className={isCarousel ? styles.embla__slide : styles.singleSlide}
-    >
-                <div 
-                  className={styles.mediaItem} 
+              <div
+                // Combine cid and index to ensure uniqueness
+                key={`${item.cid}-${i}`}
+                className={isCarousel ? styles.embla__slide : styles.singleSlide}
+              >
+                <div
+                  className={styles.mediaItem}
                   onClick={(e) => {
                     e.stopPropagation()
                     if (isBlurred) handleReveal(i)
@@ -115,9 +115,7 @@ const isVideo = item.type === 'video'
                     />
                   )}
 
-                  {isBlurred && (
-                    <span className={styles.spolier}>Spoiler</span>
-                  )}
+                  {isBlurred && <span className={styles.spolier}>Spoiler</span>}
                 </div>
               </div>
             )
