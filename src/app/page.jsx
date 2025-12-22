@@ -32,16 +32,16 @@ import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import NoData from '@/components/NoData'
 import styles from './page.module.scss'
+import { usePostStore } from '@/store/usePostStore'
 
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
 
 export default function Page() {
-  const [posts, setPosts] = useState({ list: [] })
-  const [postsLoaded, setPostsLoaded] = useState(0)
+  const { posts, postsLoaded, totalPosts, hasInitialized, TABS_DATA, setInitialData, appendPosts } =
+    usePostStore()
   const [isLoadedPost, setIsLoadedPost] = useState(false)
-  const [totalPosts, setTotalPosts] = useState(0)
   const [activeTab, setActiveTab] = useState('feed')
   const [apps, setApps] = useState({ list: [] })
   const { web3, contract } = initPostContract()
@@ -49,13 +49,7 @@ export default function Page() {
   const activeChain = getActiveChain()
   const { address, isConnected } = useConnection()
   const router = useRouter()
-  const TABS_DATA = [
-    { id: 'feed', label: 'Feed', count: totalPosts || 0 },
-    { id: 'polls', label: 'Polls' },
-    { id: 'events', label: 'Events' },
-    { id: 'jobs', label: 'Jobs' },
-    { id: 'apps', label: 'Apps' },
-  ]
+
   const TabContentMap = {
     polls: PollsTab,
     events: EventsTab,
@@ -176,30 +170,27 @@ export default function Page() {
 
   useEffect(() => {
     const initializeData = async () => {
-      if (isFetchingRef.current || totalPosts > 0) return
+      // CRITICAL: If we already have data in the store, don't fetch again
+      if (hasInitialized || isFetchingRef.current) return
 
       try {
         const count = await getPostCount()
-        const total = Number(count) // Clean conversion
-        setTotalPosts(total)
-        totalPostsRef.current = total
-
-        // Fetch apps
+        const total = Number(count)
         const appsRes = await getApps(activeChain[0].id)
-        setApps({ list: appsRes })
 
-        if (total > 0) {
-          await loadMorePosts(total)
-        }
+        // Fetch the first batch
+        const initialPosts = await getPosts(1, 20, address)
+
+        setInitialData(total, appsRes, initialPosts)
       } catch (error) {
         console.error('Initialization error:', error)
       }
     }
 
-    if (mounted && totalPosts === 0) {
+    if (mounted) {
       initializeData()
     }
-  }, [address, mounted, activeChain, loadMorePosts])
+  }, [mounted, hasInitialized]) // hasInitialized prevents the loop
 
   return (
     <>

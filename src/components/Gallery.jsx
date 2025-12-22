@@ -65,15 +65,16 @@ export default function MediaGallery({ data = [] }) {
       >
         <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
           {data.map((item, i) => {
-            const isVideo = item.type === 'video'
-            const url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
-            const isBlurred = item.spoiler && !revealedItems[i]
+const isVideo = item.type === 'video'
+  const url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+  const isBlurred = item.spoiler && !revealedItems[i]
 
             return (
-              <div
-                key={item.cid || i}
-                className={isCarousel ? styles.embla__slide : styles.singleSlide}
-              >
+<div
+      // Combine cid and index to ensure uniqueness
+      key={`${item.cid}-${i}`} 
+      className={isCarousel ? styles.embla__slide : styles.singleSlide}
+    >
                 <div 
                   className={styles.mediaItem} 
                   onClick={(e) => {

@@ -4,7 +4,7 @@
   transition: background-color 0.1s ease-out;
   isolation: isolate;
   cursor: pointer;
-  padding: 20px;
+  padding: 20px 20px 0 20px;
   place-items: stretch;
 
   @media (max-width: 640px) {
@@ -20,6 +20,7 @@
       &__main {
         padding-left: 3rem;
       }
+
       &__footer {
         padding-left: 3rem;
       }
@@ -235,7 +236,7 @@
     button {
       all: unset;
       position: relative;
-      padding: 8px;
+      padding: 10px;
       transition: all 0.01s ease-in-out;
       display: flex;
       place-items: center;
@@ -243,22 +244,7 @@
       color: var(--black-600);
 
       @media (max-width: 600px) {
-        padding: 4px;
-      }
-
-      span {
-        padding-inline-start: 4px;
-      }
-
-      svg {
-        --x-height: 19px;
-        --x-width: 18.75px;
-        width: var(--x-width);
-        height: var(--x-height);
-      }
-
-      &:active {
-        transform: scale(0.88);
+        padding: 8px;
       }
 
       &:before {
@@ -284,6 +270,21 @@
           opacity: 1;
         }
         cursor: pointer;
+      }
+
+      span {
+        padding-inline-start: 4px;
+      }
+
+      svg {
+        --x-height: 19px;
+        --x-width: 18.75px;
+        width: var(--x-width);
+        height: var(--x-height);
+      }
+
+      &:active {
+        transform: scale(0.88);
       }
     }
   }
@@ -1289,7 +1290,7 @@
   border-radius: 18px;
   padding: 1rem;
   cursor: pointer;
-  transition: transform 0.2s ease;
+ transition: transform 0.15s ease-in-out;
   box-shadow: 0 2px 8px 0 var(--box-shadow-15);
   z-index: 1000;
 
@@ -1332,11 +1333,10 @@
 button.btnPostMenu {
   all: unset;
   position: relative;
-  padding: 4px;
+  padding: 6px;
   transition: all 0.02s ease-in-out;
   width: 21px;
   height: 21px;
-
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -1356,22 +1356,25 @@ button.btnPostMenu {
 
   &:before {
     content: '';
-    width: 0px;
-    height: 0px;
+    width: 50%;
+    height: 50%;
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    background-color: var(--gray-alpha-100);
+    background-color: var(--gray-150);
     border-radius: 999px;
-    transition: all 0.2s ease-in-out;
+    transition: all 0.15s ease;
     will-change: width, height;
+    opacity: 0;
+    z-index: -1;
   }
 
   &:hover {
     &:before {
       width: 100%;
       height: 100%;
+      opacity: 1;
     }
     cursor: pointer;
   }

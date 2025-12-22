@@ -45,6 +45,7 @@ import { marked } from 'marked'
 import { getIPFS } from '@/lib/ipfs'
 import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
+import { Ellipsis } from 'lucide-react'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -278,7 +279,7 @@ const Nav = ({ item }) => {
           setShowPostDropdown(!showPostDropdown)
         }}
       >
-        <ThreeDotIcon />
+        <Ellipsis strokeWidth={1} width={18} height={18} />
       </button>
 
       {showPostDropdown && (
