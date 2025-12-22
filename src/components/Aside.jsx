@@ -33,6 +33,10 @@ export default function Aside() {
 
   return (
     <aside className={`${styles.aside}`}>
+      <Link href={`/new`} className={styles.newButton}>
+        <Plus />
+      </Link>
+
       <nav className={`d-f-c flex-column align-items-center`} aria-label="Main Navigation">
         <Link href={`/`} className={`${styles.logo}`}>
           <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME} Logo`} width={32} height={32} />

@@ -45,8 +45,8 @@
       transition: transform 0.2s ease, fill 0.2s ease;
     }
 
-    // Hover State (Desktop only)
-    @media (hover: hover) {
+    /* This hover effect will ONLY trigger on a computer with a mouse */
+    @media (hover: hover) and (pointer: fine) {
       &:hover {
         // color: var(--black, #000);
         background-color: var(--gray-100);
@@ -54,6 +54,9 @@
         // svg {
         //   transform: scale(1.1);
         // }
+        .collapseButton {
+          left: 0;
+        }
       }
     }
 
@@ -76,26 +79,6 @@
       transform: scale(0.95);
     }
   }
-
-  // Settings/Collapse button logic
-  button {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 32px;
-    height: 32px;
-    display: flex;
-    place-items: center;
-    place-content: center;
-    background-color: var(--white);
-    border: 1px solid var(--gray-300);
-    border-radius: 50%;
-    box-shadow: var(--global-box-shadow);
-    cursor: pointer;
-    // Keep hidden if you aren't using the collapse feature yet
-    display: none;
-  }
 }
 
 a.logo {
@@ -112,5 +95,34 @@ a.logo {
 
   &:hover {
     transform: scale(1.05);
+  }
+}
+
+.newButton {
+  position: fixed;
+  bottom: 24px;
+  right: 2rem;
+  width: 62px;
+  height: 62px;
+  display: flex;
+  place-items: center;
+  place-content: center;
+  background-color: var(--white);
+  border: 1px solid var(--gray-100);
+  border-radius: var(--global-border-radius);
+  box-shadow: var(--shadow-md);
+  color: var(--black);
+  transition: transform 0.2s ease;
+  will-change: transform, box-shadow;
+  cursor: pointer;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.97);
   }
 }
