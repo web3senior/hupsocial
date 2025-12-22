@@ -29,7 +29,6 @@ export default function Footer() {
 
   return (
     <footer className={styles.footer}>
-      <button>+</button>
       <nav aria-label="Mobile Navigation">
         <ul>
           {navLinks.map(({ name, path, icon: Icon }) => {
