@@ -130,11 +130,7 @@ export default function Page() {
         const newPosts = await getPosts(startIndex, postsToFetch, address)
 
         if (Array.isArray(newPosts) && newPosts.length > 0) {
-          setPosts((prev) => ({ list: [...prev.list, ...newPosts] }))
-          setPostsLoaded((prev) => prev + newPosts.length)
-        } else {
-          // Safety: if API returns empty but we expected more, stop further attempts
-          setPostsLoaded(total)
+          appendPosts(newPosts)
         }
       } catch (error) {
         console.error('Error loading more posts:', error)
