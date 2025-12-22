@@ -1,5 +1,3 @@
-'use client'
-
 import PageTitle from '@/components/PageTitle'
 import PostForm from '@/components/PostForm'
 import styles from './page.module.scss'
