@@ -12,7 +12,7 @@
   color: var(--gray-400);
 
   // Responsive: Hide on mobile
-  @media (max-width: 639px) {
+  @media (max-width: 640px) {
     display: none !important;
   }
 
@@ -115,6 +115,10 @@ a.logo {
   transition: transform 0.2s ease;
   will-change: transform, box-shadow;
   cursor: pointer;
+
+  @media (max-width: 640px) {
+    display: none !important;
+  }
 
   @media (hover: hover) and (pointer: fine) {
     &:hover {
