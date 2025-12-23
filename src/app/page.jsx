@@ -239,8 +239,14 @@ export default function Page() {
                         <section
                           key={i}
                           className={`${styles.post} animate fade`}
+                          style={{ cursor: 'pointer' }} // Ensures iOS recognizes it as clickable
                           onClick={() => {
-                            navigator.vibrate(200)
+                            // 1. Safe Vibration Check
+                            if (navigator.vibrate) {
+                              navigator.vibrate(200)
+                            }
+
+                            // 2. Navigation
                             router.push(`${activeChain[0].id}/p/${item.postId}`)
                           }}
                         >

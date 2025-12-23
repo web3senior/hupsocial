@@ -41,6 +41,7 @@ import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import PageTitle from '@/components/PageTitle'
 import PostForm from '@/components/PostForm'
 import styles from './page.module.scss'
+import AISummary from '@/components/AISummary'
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
@@ -148,11 +149,14 @@ export default function Page() {
   // In a component:
   // const data = await getPoapsForAddress('atenyun.eth');
 
+
+
   useEffect(() => {
     getPoapsForAddress(params.wallet).then((res) => {
       console.log(res)
       setPOAPs(res)
     })
+
     getCreatorPostCount(params.wallet).then((count) => {
       const totalPosts = web3.utils.toNumber(count)
       setTotalPosts(totalPosts)
@@ -161,6 +165,8 @@ export default function Page() {
         loadMorePosts(totalPosts)
       }
     })
+
+
   }, [])
 
   return (
@@ -171,6 +177,11 @@ export default function Page() {
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
+
+{
+  posts && POAPs&& posts.list.length > 0 &&<AISummary addr={address} posts={posts} poaps={POAPs} />
+}
+           
 
             <details className="mt-10">
               <summary>View POAPs</summary>
@@ -403,7 +414,6 @@ const Profile = ({ addr }) => {
 
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
-      console.log(res)
       if (
         res.data &&
         Array.isArray(res.data.Profile) &&
