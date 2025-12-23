@@ -83,7 +83,6 @@
       max-height: 450px; // Sync with parent max-height
       max-width: 100%;
       object-fit: contain; // Ensures no cropping
-      
     }
 
     @media (max-width: 639px) {
@@ -101,8 +100,8 @@
   right: 1rem;
   bottom: 1rem;
   z-index: 10;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: none;
   background: rgba(0, 0, 0, 0.5);
@@ -113,6 +112,7 @@
   cursor: pointer;
   backdrop-filter: blur(8px);
   transition: transform 0.2s ease, background 0.2s;
+  will-change: transform;
 
   &:hover {
     background: rgba(0, 0, 0, 0.7);

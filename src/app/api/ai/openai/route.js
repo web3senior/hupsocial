@@ -7,7 +7,7 @@ const client = new OpenAI()
 
 export async function POST(req) {
   try {
-    // 1. Extract prompt from the request body
+    // Extract prompt from the request body
     const { profile, posts, poaps } = await req.json()
 
     if (!profile || !posts) {
@@ -45,7 +45,7 @@ export async function POST(req) {
   }
 `
 
-    // 2. Generate content using the new SDK syntax
+    // Generate content using the new SDK syntax
     const response = await client.responses.create({
       model: 'gpt-5-nano',
       input: systemPrompt,
@@ -53,7 +53,7 @@ export async function POST(req) {
 
     const text = response.output_text
 
-    // 3. Return the response text
+    // Return the response text
     return NextResponse.json(JSON.parse(text))
   } catch (error) {
     console.error('Gemini API Error:', error)
