@@ -958,7 +958,7 @@ export default function PostForm() {
             </button>
           </div>
 
-                <button className={`btn`} type="submit" disabled={isSigning}>
+                <button className={`btn`} type="submit" disabled={isSigning || postContent.elements[0].data.text.length < 1}>
               {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
             </button>
         </form>
