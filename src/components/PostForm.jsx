@@ -11,6 +11,7 @@ import { useWaitForTransactionReceipt, useConnection, useWriteContract } from 'w
 import moment from 'moment'
 import { ContentSpinner } from '@/components/Loading'
 import styles from '@/components/PostForm.module.scss'
+import { Image, SquarePlay } from 'lucide-react'
 
 export default function PostForm() {
   const [isUploading, setIsUploading] = useState(false)
@@ -935,29 +936,31 @@ export default function PostForm() {
           </>
 
           <div className={`mt-10 flex gap-1`}>
-            <button className={`btn`} type="submit" disabled={isSigning}>
-              {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
-            </button>
+      
 
             <button
-              className="btn"
-              style={{ background: `var(--orange-500)` }}
+              className={`${styles.addButton} ${styles.addImageButton}`}
               type={`button`}
               onClick={(e) => triggerFileInput(e, `image`)}
               disabled={postContent.elements[1].data.items.length === 4 || isUploading}
             >
-              Add image
+             <Image  strokeWidth={1.2} width={24}/>
+             <span>Add Image</span>
             </button>
             <button
-              className="btn"
-              style={{ background: `var(--orange-500)` }}
+            className={`${styles.addButton} ${styles.addVideoButton}`}
               type={`button`}
               onClick={(e) => triggerFileInput(e, `video`)}
               disabled={postContent.elements[1].data.items.length === 4 || isUploading}
             >
-              Add video
+          <SquarePlay strokeWidth={1.2} width={24}/>
+            <span>Add Video</span>
             </button>
           </div>
+
+                <button className={`btn`} type="submit" disabled={isSigning}>
+              {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
+            </button>
         </form>
 
         {!mounted && isConnected && (

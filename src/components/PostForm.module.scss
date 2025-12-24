@@ -7,3 +7,32 @@
     position: relative;
   }
 }
+
+.addButton {
+  border: none;
+  background: none;
+  color: var(--gray-400);
+      will-change: transform;
+    transition: transform 0.2s ease;
+display: flex;
+place-items: center;
+padding: .5em 1em;
+gap: 5px;
+
+background-color: var(--gray-100);
+border-radius: var(--global-border-radius);
+
+span {
+  font-size: var(--system-12-font-size);
+}
+
+    &:active {
+      transform: scale(0.9);
+    }
+}
+
+.addImageButton {
+}
+
+.addVideoButton {
+}
