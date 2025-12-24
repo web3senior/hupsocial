@@ -26,11 +26,13 @@ library PostEvent {
     // --- Interaction Events ---
     event PostLiked(
         uint256 indexed postId,
-        address indexed liker
+        address indexed liker,
+        address indexed creator
     );
     event PostUnliked(
         uint256 indexed postId,
-        address indexed unliker
+        address indexed unliker,
+        address indexed creator
     );
 
     // --- Caching/Manager Events ---

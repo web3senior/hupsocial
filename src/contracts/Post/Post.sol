@@ -30,14 +30,14 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
     mapping(address => uint256[]) public creatorPosts;
 
     struct PostData {
-        string metadata; 
+        string metadata;
         string content;
         uint256 createdAt;
+        uint256 commentCount;
         address creator;
         bool allowedComments;
         bool isDeleted;
         bool isUpdated;
-        uint256 commentCount;
     }
 
     struct PostWithoutMappings {
@@ -46,11 +46,11 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
         string content;
         uint256 createdAt;
         uint256 likeCount;
+        uint256 commentCount;
         address creator;
         bool allowedComments;
         bool isDeleted;
         bool isUpdated;
-        uint256 commentCount;
         bool hasLiked;
     }
 
@@ -77,21 +77,21 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
     }
 
     // --- LIKING & UNLIKING LOGIC ---
-    
+
     /// @notice Allows a user to like one or more posts in a single transaction.
     /// @param _postIds An array of post IDs to like.
     function batchLikePosts(uint256[] calldata _postIds) external nonReentrant whenNotPaused {
         uint256 length = _postIds.length;
         require(length > 0, "No post IDs provided.");
-        
+
         for (uint256 i = 0; i < length; i++) {
             uint256 pid = _postIds[i];
-            
+
             // Validation to prevent batch-reverts for invalid states
             if (pid > 0 && pid <= postCount.current() && !posts[pid].isDeleted && !postLikedBy[pid][_msgSender()]) {
                 postLikes[pid]++;
                 postLikedBy[pid][_msgSender()] = true;
-                emit PostEvent.PostLiked(pid, _msgSender());
+                emit PostEvent.PostLiked(pid, _msgSender(), posts[pid].creator);
             }
         }
     }
@@ -109,15 +109,19 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
             if (pid > 0 && pid <= postCount.current() && !posts[pid].isDeleted && postLikedBy[pid][_msgSender()]) {
                 postLikes[pid]--;
                 postLikedBy[pid][_msgSender()] = false;
-                emit PostEvent.PostUnliked(pid, _msgSender());
+                emit PostEvent.PostUnliked(pid, _msgSender(), posts[pid].creator);
             }
         }
     }
 
     // --- POST MANAGEMENT ---
 
-    function createPost(string memory _metadata, string memory _content, bool _allowedComments) external payable whenNotPaused {
-        _processFee(); 
+    function createPost(
+        string memory _metadata,
+        string memory _content,
+        bool _allowedComments
+    ) external payable whenNotPaused {
+        _processFee();
         require(bytes(_metadata).length > 0 || bytes(_content).length > 0, "Post content empty.");
 
         postCount.increment();
@@ -127,7 +131,7 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
         newPost.metadata = _metadata;
         newPost.content = _content;
         newPost.createdAt = block.timestamp;
-        newPost.creator = _msgSender(); 
+        newPost.creator = _msgSender();
         newPost.allowedComments = _allowedComments;
         newPost.isDeleted = false;
         newPost.isUpdated = false;
@@ -137,7 +141,12 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
         emit PostEvent.PostCreated(postId, _msgSender(), _metadata, _content);
     }
 
-    function updatePost(uint256 _postId, string memory _metadata, string memory _content, bool _allowedComments) external onlyPostCreator(_postId) returns (bool) {
+    function updatePost(
+        uint256 _postId,
+        string memory _metadata,
+        string memory _content,
+        bool _allowedComments
+    ) external onlyPostCreator(_postId) returns (bool) {
         PostData storage updatedPost = posts[_postId];
         require(!updatedPost.isDeleted, "Cannot update a deleted post.");
         require(bytes(_content).length > 0, "Post content cannot be empty.");
@@ -212,22 +221,28 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
         PostData storage post = posts[_index];
         require(!post.isDeleted, "Post deleted.");
 
-        return PostWithoutMappings({
-            postId: _index,
-            metadata: post.metadata,
-            content: post.content,
-            createdAt: post.createdAt,
-            likeCount: postLikes[_index],
-            creator: post.creator,
-            allowedComments: post.allowedComments,
-            isDeleted: post.isDeleted,
-            isUpdated: post.isUpdated,
-            commentCount: post.commentCount,
-            hasLiked: _addr != address(0) ? postLikedBy[_index][_addr] : false
-        });
+        return
+            PostWithoutMappings({
+                postId: _index,
+                metadata: post.metadata,
+                content: post.content,
+                createdAt: post.createdAt,
+                likeCount: postLikes[_index],
+                creator: post.creator,
+                allowedComments: post.allowedComments,
+                isDeleted: post.isDeleted,
+                isUpdated: post.isUpdated,
+                commentCount: post.commentCount,
+                hasLiked: _addr != address(0) ? postLikedBy[_index][_addr] : false
+            });
     }
 
-    function getPostsByCreator(address _creator, uint256 _startIndex, uint256 _count, address _viewer) external view returns (PostWithoutMappings[] memory) {
+    function getPostsByCreator(
+        address _creator,
+        uint256 _startIndex,
+        uint256 _count,
+        address _viewer
+    ) external view returns (PostWithoutMappings[] memory) {
         uint256[] storage postIds = creatorPosts[_creator];
         uint256 total = postIds.length;
         if (total == 0 || _startIndex >= total) return new PostWithoutMappings[](0);
@@ -245,7 +260,11 @@ contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
         return postsArray;
     }
 
-    function getPosts(uint256 _startIndex, uint256 _count, address _addr) external view returns (PostWithoutMappings[] memory) {
+    function getPosts(
+        uint256 _startIndex,
+        uint256 _count,
+        address _addr
+    ) external view returns (PostWithoutMappings[] memory) {
         require(_startIndex > 0, "Start index > 0");
         uint256 totalPosts = postCount.current();
         if (_startIndex > totalPosts) return new PostWithoutMappings[](0);
