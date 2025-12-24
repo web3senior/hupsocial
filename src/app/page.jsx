@@ -6,7 +6,6 @@ import { useState, useEffect, lazy, Suspense, useCallback, useRef } from 'react'
 import {
   useWaitForTransactionReceipt,
   useWriteContract,
-  useReadContract,
   useConnection,
 } from 'wagmi'
 import {
