@@ -139,8 +139,8 @@ export default function Post({ item, showContent, actions, chainId }) {
 
   return (
     <>
-      {showCommentModal && (
-        <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />
+      {showCommentModal && postContent && (
+        <CommentModal item={showCommentModal} postContent={postContent} setShowCommentModal={setShowCommentModal} />
       )}
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
       {showShareModal && (
@@ -297,9 +297,8 @@ const Nav = ({ item }) => {
   )
 }
 
-const CommentModal = ({ item, setShowCommentModal }) => {
-  const [hasLiked, setHasLiked] = useState(false)
-  const [loading, setLoading] = useState(true)
+const CommentModal = ({ item, postContent ,setShowCommentModal }) => {
+  const [status,setStatus] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
@@ -332,22 +331,6 @@ const CommentModal = ({ item, setShowCommentModal }) => {
       address: activeChain[1].comment,
       functionName: 'addComment',
       args: [web3.utils.toNumber(id), 0, commentContent, ''],
-    })
-  }
-
-  const unlikePost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: process.env.NEXT_PUBLIC_CONTRACT_POST,
-      functionName: 'unlikePost',
-      args: [id],
     })
   }
 
@@ -406,12 +389,21 @@ const CommentModal = ({ item, setShowCommentModal }) => {
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
-                <div
-                  className={`${styles.post__content} `}
-                  id={`post${item.postId}`}
-                  style={{ maxHeight: 'fit-content' }}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
-                />
+                
+                <div className={`${styles.post__main__media}`}>
+                {postContent && (
+                  <>
+                 <div
+                className={`${styles.post__main__content} `}
+                id={`post${item.postId}`}
+                dangerouslySetInnerHTML={{
+                  __html: renderMarkdown(`${postContent.elements[0].data.text}`),
+                }}
+              />
+                    <MediaGallery data={postContent.elements[1].data.items} />
+                  </>
+                )}
+              </div>
               </main>
             </section>
           </article>
