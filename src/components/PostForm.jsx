@@ -936,31 +936,33 @@ export default function PostForm() {
           </>
 
           <div className={`mt-10 flex gap-1`}>
-      
-
             <button
               className={`${styles.addButton} ${styles.addImageButton}`}
               type={`button`}
               onClick={(e) => triggerFileInput(e, `image`)}
               disabled={postContent.elements[1].data.items.length === 4 || isUploading}
             >
-             <Image  strokeWidth={1.2} width={24}/>
-             <span>Add Image</span>
+              <Image strokeWidth={1.2} width={24} />
+              <span>Add Image</span>
             </button>
             <button
-            className={`${styles.addButton} ${styles.addVideoButton}`}
+              className={`${styles.addButton} ${styles.addVideoButton}`}
               type={`button`}
               onClick={(e) => triggerFileInput(e, `video`)}
               disabled={postContent.elements[1].data.items.length === 4 || isUploading}
             >
-          <SquarePlay strokeWidth={1.2} width={24}/>
-            <span>Add Video</span>
+              <SquarePlay strokeWidth={1.2} width={24} />
+              <span>Add Video</span>
             </button>
           </div>
 
-                <button className={`btn`} type="submit" disabled={isSigning || postContent.elements[0].data.text.length < 1}>
-              {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
-            </button>
+          <button
+            className={`btn`}
+            type="submit"
+            disabled={isSigning || postContent.elements[0].data.text.length < 1}
+          >
+            {isConfirming ? `Posting...` : isSigning ? `Signing...` : 'Post'}
+          </button>
         </form>
 
         {!mounted && isConnected && (

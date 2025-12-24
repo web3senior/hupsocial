@@ -11,10 +11,10 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import styles from './Aside.module.scss'
 
 const NAV_ITEMS = [
-  { name: 'Home', path: '/', icon: House },
-  { name: 'Search', path: '/search', icon: Search },
-  { name: 'New', path: '/new', icon: Plus },
-  { name: 'Activity', path: '/activity', icon: Heart },
+  { name: 'Home', path: '/', icon: House, accessKey: `h` },
+  { name: 'Search', path: '/search', icon: Search, accessKey: `s` },
+  { name: 'New', path: '/new', icon: Plus, accessKey: `n` },
+  { name: 'Activity', path: '/activity', icon: Heart, accessKey: `a` },
 ]
 
 export default function Aside() {
@@ -44,7 +44,7 @@ export default function Aside() {
 
         {/* Navigation Links */}
         <ul className="d-f-c flex-column gap-1">
-          {navLinks.map(({ name, path, icon: Icon }) => {
+          {navLinks.map(({ name, path, icon: Icon, accessKey }) => {
             const isActive = pathname === path
 
             return (
@@ -56,6 +56,7 @@ export default function Aside() {
                   aria-label={name}
                   aria-current={isActive ? 'page' : undefined}
                   title={name}
+                  accessKey={accessKey}
                 >
                   <Icon
                     size={24}
