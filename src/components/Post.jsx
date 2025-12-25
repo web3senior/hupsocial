@@ -7,8 +7,6 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   useWaitForTransactionReceipt,
   useConnection,
-  useWriteCont,
-  useConnectionract,
   useWriteContract,
 } from 'wagmi'
 import {
@@ -20,7 +18,6 @@ import {
 } from '@/lib/communication'
 import { getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
-import Web3 from 'web3'
 import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
@@ -28,8 +25,6 @@ import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
-import Shimmer from '@/components/ui/Shimmer'
-import { InlineLoading } from '@/components/Loading'
 import Profile from '@/components/Profile'
 import {
   CommentIcon,
@@ -142,7 +137,9 @@ export default function Post({ item, showContent, actions, chainId }) {
       {showCommentModal && postContent && (
         <CommentModal item={showCommentModal} postContent={postContent} setShowCommentModal={setShowCommentModal} />
       )}
+
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
+      
       {showShareModal && (
         <ShareModal
           metadata={postContent}
@@ -150,8 +147,6 @@ export default function Post({ item, showContent, actions, chainId }) {
           setShowShareModal={setShowShareModal}
         />
       )}
-      {/* 
-      {posts.list.length === 0 && <div className={`shimmer ${styles.pollShimmer}`} />} */}
 
       <section
         className={`${styles.post} flex flex-column align-items-start justify-content-between`}
@@ -164,7 +159,6 @@ export default function Post({ item, showContent, actions, chainId }) {
           <Nav item={item} />
         </header>
 
-        {/* Main */}
         <main className={`${styles.post__main}`}>
           {/* Check if post contains metadata or not */}
           {postContent && postContent.elements && postContent.elements.length > 1 ? (
@@ -288,7 +282,7 @@ const Nav = ({ item }) => {
         >
           <ul>
             <li>
-              <Link href={`/${activeChain[0].id}/p/${item.postId}`}>View post</Link>
+              <Link href={`/${activeChain[0].id}/post/${item.postId}`}>View post</Link>
             </li>
           </ul>
         </div>
@@ -582,7 +576,7 @@ const ShareModal = ({ item, metadata, setShowShareModal }) => {
   console.log(metadata)
 
   // --- Dynamic Content ---
-  const postUrl = `${location.protocol}//${window.location.host}/${activeChain[0].id}/p/${item.postId}`
+  const postUrl = `${location.protocol}//${window.location.host}/${activeChain[0].id}/post/${item.postId}`
   const postTitle =
     metadata && metadata.elements && metadata.elements.length > 1
       ? metadata.elements[0].data.text
@@ -651,10 +645,6 @@ const Like = ({ id, likeCount, hasLiked }) => {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
-
-  const getHasLiked = async () => {
-    return isConnected ? await getHasLikedPost(Web3.utils.toNumber(id), address) : false
-  }
 
   const likePost = (e, id) => {
     e.stopPropagation()

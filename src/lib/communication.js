@@ -350,46 +350,27 @@ export async function getPostLikedEvents() {
  * @param {number} chunkSize - Number of blocks to scan per request (default 5000).
  * @returns {Promise<Array>} - Array of Web3.js event objects.
  */
-export async function getLikesPaginated(startBlock, endBlock, chunkSize = 5000) {
+export async function getLikesPaginated(startBlock, endBlock, chunkSize = 10000, targetCount = 20) {
   const { web3, contract } = initPostContract();
-
-  // If endBlock isn't provided, fetch the current head of the chain
-  const effectiveEndBlock = endBlock || await web3.eth.getBlockNumber();
   let allEvents = [];
+  let currentTo = endBlock;
 
-  try {
+  while (allEvents.length < targetCount && currentTo >= startBlock) {
+    const currentFrom = Math.max(startBlock, currentTo - chunkSize + 1);
+    
+    const events = await contract.getPastEvents('PostLiked', {
+      fromBlock: currentFrom,
+      toBlock: currentTo,
+    });
 
-    // Iterate backwards from the endBlock to find the most recent events first
-    for (let i = effectiveEndBlock; i >= startBlock; i -= chunkSize) {
-      const from = Math.max(startBlock, i - chunkSize);
-      const to = i;
-
-      console.log(`Scanning Hup Ledger: Blocks ${from} to ${to}...`);
-
-
-      console.log(from, to)
-
-      const events = await contract.getPastEvents('PostLiked', {
-        fromBlock: from,
-        toBlock: `latest` //to,
-      });
-
-      // Add newly found events to our collection
-      allEvents.push(...events);
-
-      // UI/UX Optimization: 
-      // Stop once we have enough results to fill the feed (e.g., 50 items)
-      // This prevents unnecessary RPC calls if the user only sees the top of the feed.
-      if (allEvents.length >= 50) {
-        break;
-      }
-    }
-
-    // Sort events by block number descending to ensure the newest are always at the top
-    return allEvents //.sort((a, b) => b.blockNumber - a.blockNumber);
-
-  } catch (error) {
-    console.error('Critical error in Hup paginated event fetch:', error);
-    throw error;
+    // Web3.js returns oldest first, so we reverse the chunk
+    allEvents.push(...events.reverse());
+    currentTo = currentFrom - 1;
   }
+
+  // RETURN AN OBJECT, NOT JUST THE ARRAY
+  return {
+    events: allEvents.slice(0, targetCount),
+    lastScannedBlock: currentTo
+  };
 }

@@ -246,7 +246,7 @@ export default function Page() {
                             }
 
                             // 2. Navigation
-                            router.push(`${activeChain[0].id}/p/${item.postId}`)
+                            router.push(`${activeChain[0].id}/post/${item.postId}`)
                           }}
                         >
                           <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />

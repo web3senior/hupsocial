@@ -253,7 +253,7 @@ export default function Page() {
                       <section
                         key={i}
                         className={`${styles.post} animate fade`}
-                        onClick={() => router.push(`/${activeChain[0].id}/p/${item.postId}`)}
+                        onClick={() => router.push(`/${activeChain[0].id}/post/${item.postId}`)}
                       >
                         <Post
                           item={item}
