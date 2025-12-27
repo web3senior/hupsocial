@@ -27,7 +27,7 @@ export const CONTRACTS = {
   //   comment: '',
   //   status: '',
   // },
-  chain4201: {
+  chain4201: { // LUKSO
     post: '0xCb885C28D1b005701249F92E43089b44204a7313',
     comment: '0x2a357c53cf617eb23a99A3E7fb0Be363e9dE8f04',
     status: '0x6B10B966C3369332De8c976da62249F38D6898ca',
@@ -37,7 +37,7 @@ export const CONTRACTS = {
     comment: '0x07F1BCE9585Fea0d72da07428A98293116634E4E',
     status: '0x13A71b258b685dFAC3bCe8b1530aAFD8daa180E1',
   },
-  chain10143: {
+  chain10143: { // Monad
     post: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
     comment: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     status: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
@@ -47,7 +47,7 @@ export const CONTRACTS = {
     comment: '0x927826f56603aD465504fe2Adb516EDCD16911ED',
     status: '0x9aE36e2aF99c918e679c2A92f216EdA3b2d895dA',
   },
-  chain84532: {
+  chain84532: { // Base
     post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
     comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',

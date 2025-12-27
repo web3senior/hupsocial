@@ -3,11 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, lazy, Suspense, useCallback, useRef } from 'react'
-import {
-  useWaitForTransactionReceipt,
-  useWriteContract,
-  useConnection,
-} from 'wagmi'
+import { useWaitForTransactionReceipt, useWriteContract, useConnection } from 'wagmi'
 import {
   initPostContract,
   getPosts,
@@ -58,43 +54,6 @@ export default function Page() {
   }
   const ActiveComponent = TabContentMap[activeTab]
 
-  /**
-   * Converts Markdown to sanitized HTML with links set to open in a new tab.
-   * @param {string} markdown - The markdown content to process.
-   * @returns {string} The sanitized HTML.
-   */
-  function renderMarkdown(markdown) {
-    // 1. Create a custom renderer
-    const renderer = new marked.Renderer()
-
-    // 2. Override the link method to add target="_blank" and rel attributes
-    renderer.link = (href, title, text) => {
-      // Use the default marked behavior, but insert the desired attributes
-      const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
-
-      // Add target="_blank" to open in a new tab
-      // Add rel="noopener noreferrer" for security and performance best practices
-      return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
-    }
-
-    // 3. Configure marked to use the custom renderer
-    marked.setOptions({
-      renderer: renderer,
-      gfm: true, // Generally good to enable GitHub Flavored Markdown
-    })
-
-    // 4. Render the markdown to HTML using the custom renderer
-    const dirtyHtml = marked.parse(markdown)
-
-    // 5. Sanitize the HTML using DOMPurify
-    // DOMPurify is crucial for preventing XSS attacks from the rendered content
-    const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
-      ADD_ATTR: ['target', 'rel'],
-    })
-
-    return cleanHtml
-  }
-
   const postsLoadedRef = useRef(0)
   const isFetchingRef = useRef(false)
   const totalPostsRef = useRef(0)
@@ -109,6 +68,34 @@ export default function Page() {
   useEffect(() => {
     totalPostsRef.current = totalPosts
   }, [totalPosts])
+
+  /**
+   * Handles navigation to a specific post detail page.
+   * * Includes logic to:
+   * 1. Prevent navigation if the user is highlighting text to copy.
+   * 2. Provide haptic feedback on supported mobile devices.
+   * 3. Route the user to the dynamic post URL.
+   * * @param {string|number} postId - The unique identifier of the post.
+   */
+  const handlePostClick = (postId) => {
+    // Get the current text selection from the window
+    const selection = window.getSelection()
+
+    // If the user has selected text (selection length > 0), assume they are
+    // trying to copy content and abort the navigation click.
+    if (selection && selection.toString().length > 0) {
+      return
+    }
+
+    // Trigger a short vibration (200ms) for haptic feedback on mobile devices.
+    // We check for 'navigator.vibrate' to prevent errors on unsupported browsers.
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(200)
+    }
+
+    // Navigate to the post detail page using the active chain ID and post ID.
+    router.push(`${activeChain[0].id}/post/${postId}`)
+  }
 
   const loadMorePosts = useCallback(
     async (total) => {
@@ -220,6 +207,7 @@ export default function Page() {
             ))}
           </div>
         </section>
+
         <Suspense fallback={<div>Loading Tab Content...</div>}>
           {ActiveComponent && <ActiveComponent />}
         </Suspense>
@@ -231,29 +219,20 @@ export default function Page() {
                 {postsLoaded === 0 && <PostSkeletonGrid count={14} />}
 
                 <div className={`${styles.grid} flex flex-column`}>
-                  {posts &&
-                    posts.list.length > 0 &&
-                    posts.list.map((item, i) => {
-                      return (
-                        <section
-                          key={i}
-                          className={`${styles.post} animate fade`}
-                          style={{ cursor: 'pointer' }} // Ensures iOS recognizes it as clickable
-                          onClick={() => {
-                            // 1. Safe Vibration Check
-                            if (navigator.vibrate) {
-                              navigator.vibrate(200)
-                            }
+                  {/* Use optional chaining to safely map through the list if it exists */}
+                  {posts?.list?.map((item, i) => (
+                    <section
+                      key={item.postId || i} // Prefer unique ID over index for better performance
+                      className={`${styles.post} animate fade`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handlePostClick(item.postId)}
+                    >
+                      <Post item={item} actions={['like', 'comment', 'repost', 'share']} />
 
-                            // 2. Navigation
-                            router.push(`${activeChain[0].id}/post/${item.postId}`)
-                          }}
-                        >
-                          <Post item={item} actions={[`like`, `comment`, `repost`, `share`]} />
-                          {i < posts.list.length - 1 && <hr />}
-                        </section>
-                      )
-                    })}
+                      {/* Render a horizontal rule between posts, but not after the last one */}
+                      {i < posts.list.length - 1 && <hr />}
+                    </section>
+                  ))}
                 </div>
               </div>
 
