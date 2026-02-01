@@ -79,18 +79,6 @@ figure.pfp {
   will-change: transform outline;
   transition: transform 0.2s ease;
 
-  &:after {
-    content: '';
-    position: absolute;
-    top: -20px;
-    right: -30px;
-    width: 60px;
-    height: 45px;
-    background-image: url('/hat.svg');
-    background-repeat: no-repeat;
-    background-size: contain;
-  }
-
   &:hover {
     transform: scale(1.025);
   }
