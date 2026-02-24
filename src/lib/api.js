@@ -1,66 +1,25 @@
 /**
- * Get Universal Profile
- * @param {*} addr
- * @returns
+ * Get Universal Profile via internal API proxy
+ * @param {string} addr
+ * @returns {Promise<Object>}
  */
 export async function getUniversalProfile(addr) {
-  const myHeaders = new Headers()
-  myHeaders.append('Content-Type', `application/json`)
-  myHeaders.append('Accept', `application/json`)
-
-  const requestOptions = {
+  /* Call your internal Next.js API route */
+  const response = await fetch('/api/v1/profile/universal-profile/', {
     method: 'POST',
-    headers: myHeaders,
-    body: JSON.stringify({
-      query: `query MyQuery {
-  Profile(where: {id: {_eq: "${addr.toLowerCase()}"}}) {
-    id
-    fullName
-    name
-    tags
-        links {
-      id
-      title
-      url
-    }
-    standard
-    transactions_aggregate {
-      aggregate {
-        count
-      }
-    }
-    profileImages {
-      src
-      url
-    }
-    name
-    isEOA
-    isContract
-    followed_aggregate {
-      aggregate {
-        count
-      }
-    }
-    following_aggregate {
-      aggregate {
-        count
-      }
-    }
-    description
-    createdBlockNumber
-    createdTimestamp
-    lastMetadataUpdate
-    url
-  }
-}`,
-    }),
-  }
-  const response = await fetch(`${process.env.NEXT_PUBLIC_LUKSO_API_ENDPOINT}`, requestOptions)
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ addr }),
+  })
+
   if (!response.ok) {
-    throw new Response('Failed to ', { status: 500 })
+    throw new Error('Failed to fetch profile through proxy')
   }
-  const data = await response.json()
-  return data
+
+  /* The response now comes from your own domain, so no CORS error! */
+  const result = await response.json()
+  return result.data
 }
 
 /**
@@ -78,7 +37,10 @@ export async function getProfile(addr) {
     redirect: 'follow',
   }
 
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}profile/get?wallet=${addr}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}profile/get?wallet=${addr}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -95,7 +57,10 @@ export async function updateProfile(formData, addr) {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ wallet: addr }).toString()
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}profile/update?${params}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}profile/update?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -107,7 +72,10 @@ export async function getViewPost(chainId, postId) {
   }
 
   const params = new URLSearchParams({ chain_id: chainId, post_id: postId }).toString()
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}view/get?${params}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}view/get?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -119,14 +87,17 @@ export async function addViewPost(chainId, postId) {
   }
 
   const params = new URLSearchParams({ chain_id: chainId, post_id: postId }).toString()
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}view/add?${params}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}view/add?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
 
 export async function subscribeUser(sub, wallet) {
   const subscription = sub
-  
+
   var raw = JSON.stringify({
     subscription: subscription,
     wallet: wallet,
@@ -153,7 +124,10 @@ export async function unsubscribeUser(wallet) {
     redirect: 'follow',
   }
 
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}subscription/unsubscribe`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}subscription/unsubscribe`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to provinces', { status: 500 })
   return response.json()
 }
@@ -177,7 +151,10 @@ export async function getApps(chainId) {
   }
 
   const params = new URLSearchParams({ chain_id: chainId }).toString()
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}app/list?${params}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}app/list?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -258,7 +235,10 @@ export async function getProductList(filter) {
 
   const params = new URLSearchParams(filter).toString()
   console.log(params)
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}productList?${params}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}productList?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -273,7 +253,10 @@ export async function getProductDetail(id) {
     redirect: 'follow',
   }
 
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}productDetail/${id}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}productDetail/${id}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -288,7 +271,10 @@ export async function getComment(id) {
     redirect: 'follow',
   }
 
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}comment/get/${id}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}comment/get/${id}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -303,7 +289,10 @@ export async function newComment(post, id) {
     body: JSON.stringify(post),
     redirect: 'follow',
   }
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}comment/new/${id}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}comment/new/${id}`,
+    requestOptions,
+  )
   if (!response.ok) {
     throw new Response('Failed to ', { status: 500 })
   }
@@ -320,7 +309,10 @@ export async function invoiceUpdate(post, id) {
     body: JSON.stringify(post),
     redirect: 'follow',
   }
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}invoiceUpdate/${id}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}invoiceUpdate/${id}`,
+    requestOptions,
+  )
   if (!response.ok) {
     throw new Response('Failed to ', { status: 500 })
   }
@@ -487,7 +479,10 @@ export async function updateTicket(data, id) {
     body: JSON.stringify(data),
     redirect: 'follow',
   }
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}ticket/update/${id}`, requestOptions)
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}ticket/update/${id}`,
+    requestOptions,
+  )
   if (!response.ok) {
     throw new Response('Failed to ', { status: 500 })
   }
@@ -550,7 +545,10 @@ export async function getTournamentList(filter = '') {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ filter: filter }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}tournamentList?${params}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}tournamentList?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -564,7 +562,10 @@ export async function getLeaderboard(tournamentId) {
     method: 'GET',
     redirect: 'follow',
   }
-  const response = await fetch(`${import.meta.env.VITE_API_URL}leaderboard/${tournamentId}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}leaderboard/${tournamentId}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -574,7 +575,10 @@ export async function getPlayer(tournamentId, walletAddr) {
     method: 'GET',
     redirect: 'follow',
   }
-  const response = await fetch(`${import.meta.env.VITE_API_URL}player/${tournamentId}/${walletAddr}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}player/${tournamentId}/${walletAddr}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -604,7 +608,10 @@ export async function getEventChart(wallet_addr) {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ wallet_addr: wallet_addr }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}event/chart?${params}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}event/chart?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -634,7 +641,10 @@ export async function getViewChart(wallet_addr) {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ wallet_addr: wallet_addr }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}view/chart?${params}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}view/chart?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -649,7 +659,10 @@ export async function getConfig(username, addr = '') {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ username: username, wallet_addr: addr }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}config/get?${params}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}config/get?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -684,7 +697,10 @@ export async function checkUser(post, wallet_addr) {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ wallet_addr: wallet_addr }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}user/check?${params}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}user/check?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -702,7 +718,10 @@ export async function updateUser(post, wallet_addr) {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ wallet_addr: wallet_addr }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}user/update?${params}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}user/update?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -720,7 +739,10 @@ export async function updateTelegramId(post, wallet_addr) {
     redirect: 'follow',
   }
   const params = new URLSearchParams({ wallet_addr: wallet_addr }).toString()
-  const response = await fetch(`${import.meta.env.VITE_API_URL}user/telegram?${params}`, requestOptions)
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}user/telegram?${params}`,
+    requestOptions,
+  )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
