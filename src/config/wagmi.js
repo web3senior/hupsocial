@@ -27,7 +27,8 @@ export const CONTRACTS = {
   //   comment: '',
   //   status: '',
   // },
-  chain4201: { // LUKSO
+  chain4201: {
+    // LUKSO
     post: '0xCb885C28D1b005701249F92E43089b44204a7313',
     comment: '0x2a357c53cf617eb23a99A3E7fb0Be363e9dE8f04',
     status: '0x6B10B966C3369332De8c976da62249F38D6898ca',
@@ -37,7 +38,8 @@ export const CONTRACTS = {
     comment: '0x07F1BCE9585Fea0d72da07428A98293116634E4E',
     status: '0x13A71b258b685dFAC3bCe8b1530aAFD8daa180E1',
   },
-  chain10143: { // Monad
+  chain10143: {
+    // Monad
     post: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
     comment: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     status: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
@@ -47,7 +49,8 @@ export const CONTRACTS = {
     comment: '0x927826f56603aD465504fe2Adb516EDCD16911ED',
     status: '0x9aE36e2aF99c918e679c2A92f216EdA3b2d895dA',
   },
-  chain84532: { // Base
+  chain84532: {
+    // Base
     post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
     comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
@@ -78,6 +81,9 @@ export const CONTRACTS = {
 // LUKSO
 luksoTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10950_4143)"><mask id="mask0_10950_4143" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18"><path d="M18 0H0V18H18V0Z" fill="white"/></mask><g mask="url(#mask0_10950_4143)"><path d="M0 0H18V18H0V0Z" fill="#F0F3FA"/><path d="M10.0922 3.26602L13.908 5.2667C14.58 5.62682 15 6.27704 15 6.98729V10.9986C15 11.7089 14.58 12.3691 13.908 12.7293L10.0922 14.7299C9.4202 15.09 8.58023 15.09 7.90826 14.7299L4.09237 12.7293C3.75034 12.5407 3.47094 12.2832 3.28006 11.9807C3.08917 11.6782 2.99298 11.3404 3.0004 10.9986V6.99729C3.0004 6.27704 3.42039 5.62682 4.09237 5.2667L7.90826 3.26602C8.23434 3.0923 8.61323 3 9.00022 3C9.3872 3 9.7661 3.0923 10.0922 3.26602ZM10.4521 10.6885L11.3161 9.30808C11.4361 9.10802 11.4361 8.87794 11.3161 8.68787L10.4401 7.3074C10.3875 7.21668 10.3059 7.13978 10.2042 7.0851C10.1027 7.0304 9.98506 7.00003 9.86419 6.99729H8.13624C7.89626 6.99729 7.66825 7.11733 7.56027 7.29739L6.68429 8.69787C6.56429 8.87794 6.56429 9.11801 6.68429 9.29807L7.56027 10.6985C7.68025 10.8786 7.89626 10.9986 8.13624 10.9986H9.86419C10.1042 10.9986 10.3321 10.8786 10.4401 10.6985L10.4521 10.6885Z" fill="#FE005B"/></g></g><defs><clipPath id="clip0_10950_4143"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
 luksoTestnet.faucetUrl = `https://faucet.testnet.lukso.network/`
+luksoTestnet.rpcUrls.default.http = [
+  `https://4201.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID}`,
+]
 luksoTestnet.primaryColor = `#FD1669`
 luksoTestnet.textColor = `#fff`
 
@@ -95,7 +101,10 @@ baseSepoliaPreconf.textColor = `#fff`
 // Monad
 monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" fill="white"/><path d="M8.99996 3C7.26731 3 3 7.2672 3 8.99996C3 10.7327 7.26731 15 8.99996 15C10.7326 15 15 10.7326 15 8.99996C15 7.26727 10.7327 3 8.99996 3ZM8.06498 12.431C7.33433 12.2319 5.36993 8.79563 5.56906 8.06498C5.76819 7.33429 9.20437 5.36992 9.93499 5.56905C10.6657 5.76815 12.6301 9.20434 12.431 9.93503C12.2318 10.6657 8.79563 12.6301 8.06498 12.431Z" fill="#836EF9"/></svg>`
 monadTestnet.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
-monadTestnet.rpcUrls.default.http = ['https://testnet-rpc.monad.xyz/']
+
+monadTestnet.rpcUrls.default.http = [
+  `https://4201.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID}`,
+]
 monadTestnet.primaryColor = `#836EF9`
 monadTestnet.textColor = `#fff`
 
@@ -138,7 +147,16 @@ sepolia.textColor = `#fff`
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [baseSepoliaPreconf, luksoTestnet, arbitrumSepolia, celoSepolia, monadTestnet, lineaSepolia, optimismSepolia, unichainSepolia], //somniaTestnet, opBNBTestnet
+  chains: [
+    baseSepoliaPreconf,
+    luksoTestnet,
+    arbitrumSepolia,
+    celoSepolia,
+    monadTestnet,
+    lineaSepolia,
+    optimismSepolia,
+    unichainSepolia,
+  ], //somniaTestnet, opBNBTestnet
   connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
   transports: {
     [luksoTestnet.id]: http(),
