@@ -1,7 +1,7 @@
 :root {
   --background: #fafafa;
   --foreground: #171717;
-
+ accent-color: var(--network-color-text);
   ::selection {
     color: var(--network-color-text);
     background-color: var(--network-color-primary);

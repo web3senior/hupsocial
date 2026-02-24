@@ -13,7 +13,6 @@ import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 /// @custom:version 1.1
 /// @custom:emoji 📝
 /// @custom:security-contact atenyun@gmail.com
-// UPDATED INHERITANCE: Inherit from ERC2771Context
 contract StatusManager is Ownable, Pausable, ERC2771Context {
     // --- State Variables ---
 
