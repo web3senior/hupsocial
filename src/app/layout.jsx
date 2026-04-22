@@ -5,7 +5,7 @@ import './../styles/Global.scss'
 
 export const metadata = {
   // --- BASE & CORE METADATA ---
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL),
+  metadataBase:process.env.NEXT_PUBLIC_BASE_URL,
 
   // Title (SEO best practice for better click-through)
   title: {
