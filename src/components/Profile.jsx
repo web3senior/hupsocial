@@ -7,29 +7,10 @@ import { config } from '@/config/wagmi'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { BlueCheckMarkIcon } from '@/components/Icons'
 import web3 from 'web3'
-import moment from 'moment'
 import { toSvg } from 'jdenticon'
 import { getActiveChain } from '@/lib/communication'
 import styles from './Profile.module.scss'
-
-moment.defineLocale('en-short', {
-  relativeTime: {
-    future: 'in %s',
-    past: '%s', //'%s ago'
-    s: '1s',
-    ss: '%ds',
-    m: '1m',
-    mm: '%dm',
-    h: '1h',
-    hh: '%dh',
-    d: '1d',
-    dd: '%dd',
-    M: '1mo',
-    MM: '%dmo',
-    y: '1y',
-    yy: '%dy',
-  },
-})
+import { toRelativeTime } from '@/lib/dateHelper'
 
 /**
  * Profile
@@ -122,7 +103,7 @@ export default function Profile({ creator, createdAt }) {
             dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}
           ></div>
           <span className={`${styles.createdAt}`}>
-            {moment.unix(web3.utils.toNumber(createdAt)).utc().fromNow()}
+            {toRelativeTime(web3.utils.toNumber(createdAt))}
           </span>
         </div>
 
