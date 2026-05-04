@@ -12,6 +12,7 @@
     "ngrok": "ngrok http 3000"
   },
   "dependencies": {
+    "@0gfoundation/0g-ts-sdk": "^1.2.8",
     "@base-org/account": "^2.4.2",
     "@coinbase/coinbase-sdk": "^0.25.0",
     "@coinbase/wallet-sdk": "^4.3.7",
@@ -24,6 +25,7 @@
     "@walletconnect/ethereum-provider": "^2.23.1",
     "dompurify": "^3.3.1",
     "embla-carousel-react": "^8.6.0",
+    "ethers": "^6.16.0",
     "jdenticon": "^3.3.0",
     "lucide-react": "^0.562.0",
     "marked": "^17.0.1",

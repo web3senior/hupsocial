@@ -164,13 +164,14 @@ export default function PostForm() {
       const data = new FormData()
       data.set('file', file)
 
-      const uploadRequest = await fetch(`/api/ipfs/file`, {
+      const uploadRequest = await fetch(`/api/v1/0g/file`, {//`/api/ipfs/file`
         method: 'POST',
         body: data,
       })
       const signedUrl = await uploadRequest.json()
       setIsUploading(false)
-      return signedUrl
+      console.log(`rootHash: ${signedUrl.rootHash}`)
+      return signedUrl.rootHash
     } catch (e) {
       setIsUploading(false)
       console.log(e)
@@ -306,7 +307,7 @@ export default function PostForm() {
     // Upload to IPFS
     const resultIPFS = await uploadFileToIPFS(file, `file`)
 
-    if (!resultIPFS.url || !resultIPFS.cid) return
+    //if (!resultIPFS.url || !resultIPFS.cid) return
 
     // 2. Create a temporary local URL for immediate preview
     const localUrl = URL.createObjectURL(file)
@@ -314,8 +315,9 @@ export default function PostForm() {
     // 3. Create a placeholder item with an 'isUploading' flag
     const newItem = {
       type: type,
-      cid: resultIPFS.cid, // Placeholder CID
+      cid: resultIPFS, // Placeholder CID
       alt: `Hup asset ${type}`,
+      storage: '0G',
       mimeType: file.type,
       localUrl: localUrl, // Use this as a temporary unique ID
       isUploading: true,

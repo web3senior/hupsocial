@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { Volume2, VolumeX } from 'lucide-react'
 import styles from './Gallery.module.scss'
@@ -8,8 +8,9 @@ import styles from './Gallery.module.scss'
 export default function MediaGallery({ data = [] }) {
   const [isMuted, setIsMuted] = useState(true)
   const [revealedItems, setRevealedItems] = useState({})
-
-  // Ref to store video elements
+  // New state to store resolved Blob URLs for 0G storage
+  const [resolvedUrls, setResolvedUrls] = useState({})
+  
   const videoRefs = useRef([])
   const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
   const isCarousel = data.length > 1
@@ -21,20 +22,49 @@ export default function MediaGallery({ data = [] }) {
     dragFree: true,
   })
 
-  // Intersection Observer Logic
+  // Resolve 0G Hashes
   useEffect(() => {
-    const observerOptions = {
-      root: null, // use viewport
-      threshold: 0.6, // Play when 60% of the video is visible
+    const urlsToRevoke = []
+
+    const load0GAssets = async () => {
+      const newResolved = { ...resolvedUrls }
+      
+      for (const item of data) {
+        // Only fetch if it's 0G, has a CID, and hasn't been resolved yet
+        if (item?.storage === '0G' && item.cid && !resolvedUrls[item.cid]) {
+          try {
+            const res = await fetch(`/api/v1/0g/download?hash=${item.cid}`)
+            if (!res.ok) throw new Error('Download failed')
+            
+            const blob = await res.blob()
+            const activeUrl = URL.createObjectURL(blob)
+            
+            newResolved[item.cid] = activeUrl
+            urlsToRevoke.push(activeUrl)
+          } catch (err) {
+            console.error('0G_RESOLVE_ERROR:', err)
+          }
+        }
+      }
+      setResolvedUrls(newResolved)
     }
 
+    load0GAssets()
+
+    // Cleanup: Revoke object URLs to prevent memory leaks
+    return () => {
+      urlsToRevoke.forEach(url => URL.revokeObjectURL(url))
+    }
+  }, [data])
+
+  // Intersection Observer for video autoplay
+  useEffect(() => {
+    const observerOptions = { threshold: 0.6 }
     const handleIntersection = (entries) => {
       entries.forEach((entry) => {
         const video = entry.target
         if (entry.isIntersecting) {
-          video.play().catch(() => {
-            /* Handle autoplay block by browser */
-          })
+          video.play().catch(() => {})
         } else {
           video.pause()
         }
@@ -42,14 +72,12 @@ export default function MediaGallery({ data = [] }) {
     }
 
     const observer = new IntersectionObserver(handleIntersection, observerOptions)
-
-    // Observe all current video refs
     videoRefs.current.forEach((video) => {
       if (video) observer.observe(video)
     })
 
     return () => observer.disconnect()
-  }, [data]) // Re-run if data changes
+  }, [data, resolvedUrls]) // Re-run when URLs resolve so observer attaches to new src
 
   if (!data.length) return null
 
@@ -66,12 +94,24 @@ export default function MediaGallery({ data = [] }) {
         <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
           {data.map((item, i) => {
             const isVideo = item.type === 'video'
-            const url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+            let url = ''
+
+            // Logic to determine source URL
+            if (item?.storage === '0G') {
+              url = resolvedUrls[item.cid] || '' // Use the blob URL from state
+            } else if (item.cid) {
+              url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+            }
+
             const isBlurred = item.spoiler && !revealedItems[i]
+
+            // Don't render until we have a URL for 0G items to prevent broken src
+            if (item?.storage === '0G' && !url) {
+                return <div key={i} className={styles.loadingPlaceholder} /> 
+            }
 
             return (
               <div
-                // Combine cid and index to ensure uniqueness
                 key={`${item.cid}-${i}`}
                 className={isCarousel ? styles.embla__slide : styles.singleSlide}
               >
@@ -85,7 +125,6 @@ export default function MediaGallery({ data = [] }) {
                   {isVideo ? (
                     <>
                       <video
-                        // Assign ref to the array
                         ref={(el) => (videoRefs.current[i] = el)}
                         src={url}
                         loop
@@ -100,7 +139,6 @@ export default function MediaGallery({ data = [] }) {
                           e.stopPropagation()
                           setIsMuted(!isMuted)
                         }}
-                        aria-label={isMuted ? 'Unmute' : 'Mute'}
                       >
                         {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                       </button>
@@ -114,7 +152,6 @@ export default function MediaGallery({ data = [] }) {
                       style={{ filter: isBlurred ? 'blur(20px)' : 'none' }}
                     />
                   )}
-
                   {isBlurred && <span className={styles.spolier}>Spoiler</span>}
                 </div>
               </div>
