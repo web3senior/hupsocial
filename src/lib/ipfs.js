@@ -11,7 +11,7 @@ export const getIPFS = async (CID) => {
     }
 
     // Ensure the gateway URL is configured
-    const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL;
+    const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_FALLBACK;
     if (!gatewayUrl) {
         console.error('getIPFS Error: NEXT_PUBLIC_IPFS_GATEWAY_URL environment variable is not set.');
         return { result: false };
