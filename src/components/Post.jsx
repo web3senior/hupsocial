@@ -576,7 +576,7 @@ const ShareModal = ({ item, metadata, setShowShareModal }) => {
   console.log(metadata)
 
   // --- Dynamic Content ---
-  const postUrl = `${location.protocol}//${window.location.host}/${activeChain[0].id}/post/${item.postId}`
+  const postUrl = `${location.protocol}//${window.location.host}/chain/${activeChain[0].id}/post/${item.postId}`
   const postTitle =
     metadata && metadata.elements && metadata.elements.length > 1
       ? metadata.elements[0].data.text
@@ -585,7 +585,7 @@ const ShareModal = ({ item, metadata, setShowShareModal }) => {
   const postContent = `${postTitle}\n\n Creator: ${item.creator} \n\n`
   // --- Constructing the Share Link ---
   const shareLink =
-    `https://twitter.com/intent/tweet?` +
+    `https://x.com/intent/tweet?` +
     `text=${encodeURIComponent(postContent)}` +
     `&url=${encodeURIComponent(postUrl)}` +
     `&via=${hupHandle}` // <-- The recommended parameter for the handle
