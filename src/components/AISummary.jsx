@@ -84,6 +84,7 @@ export default function AISummary({ addr, posts, poaps }) {
 
       const json = await response.json()
       const data = json.json
+      console.log(data)
       if (data.error) throw new Error(data.error)
 
       setData(data)
@@ -132,23 +133,23 @@ export default function AISummary({ addr, posts, poaps }) {
                 <li>
                   <div className={``}>
                     <label>Degen</label>
-                    <b>{data['personality_scores']?.degen}%</b>
+                    <b>{data['scores']?.degen}%</b>
                   </div>
-                  <progress min={0} max={100} value={data['personality_scores']?.degen}></progress>
+                  <progress min={0} max={100} value={data['scores']?.degen}></progress>
                 </li>
                 <li>
                  <div className={``}>
                   <label>Builder</label>
-                    <b>{data['personality_scores']?.builder}%</b>
+                    <b>{data['scores']?.builder}%</b>
                   </div>
-                  <progress min={0} max={100} value={data['personality_scores']?.builder}></progress>
+                  <progress min={0} max={100} value={data['scores']?.builder}></progress>
                 </li>
                 <li>
              <div className={``}>
              <label>Researcher</label>
-                    <b>{data['personality_scores']?.researcher}%</b>
+                    <b>{data['scores']?.researcher}%</b>
                   </div>
-                  <progress min={0} max={100} value={data['personality_scores']?.researcher}></progress>
+                  <progress min={0} max={100} value={data['scores']?.researcher}></progress>
                 </li>
               </ul>
             </output>
