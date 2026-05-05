@@ -81,7 +81,7 @@ export default function Profile({ creator, createdAt }) {
       className={`${styles.profile} flex align-items-center`}
       onClick={(e) => {
         e.stopPropagation()
-        router.push(`/u/${creator}`)
+        router.push(`/${creator}`)
       }}
     >
       {/* profile.profileImages[0]?.isSVG */}
@@ -170,7 +170,7 @@ export function ProfileImage({ addr }) {
       className={`${styles.profile} flex align-items-center`}
       onClick={(e) => {
         e.stopPropagation()
-        router.push(`/u/${creator}`)
+        router.push(`/${creator}`)
       }}
     >
       <img

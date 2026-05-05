@@ -94,7 +94,7 @@ export default function Page() {
     }
 
     // Navigate to the post detail page using the active chain ID and post ID.
-    router.push(`${activeChain[0].id}/post/${postId}`)
+    router.push(`chain/${activeChain[0].id}/post/${postId}`)
   }
 
   const loadMorePosts = useCallback(
