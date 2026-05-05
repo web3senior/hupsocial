@@ -7,6 +7,7 @@ import loading from '@/../public/loading.svg'
 import { getIPFS } from '@/lib/ipfs'
 import styles from './AISummary.module.scss'
 import { Sparkles } from 'lucide-react'
+import clsx from 'clsx'
 
 export default function AISummary({ addr, posts, poaps }) {
   const [profileData, setProfileData] = useState(null)
@@ -71,7 +72,7 @@ export default function AISummary({ addr, posts, poaps }) {
       const postText = resolvedPosts.join(' | ')
 
       // 3. Call your Next.js API route
-      const response = await fetch('/api/ai/openai', {
+      const response = await fetch('/api/ai/token-route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -81,7 +82,8 @@ export default function AISummary({ addr, posts, poaps }) {
         }),
       })
 
-      const data = await response.json()
+      const json = await response.json()
+      const data = json.json
       if (data.error) throw new Error(data.error)
 
       setData(data)
@@ -118,35 +120,35 @@ export default function AISummary({ addr, posts, poaps }) {
 
         {isLoading && <img src={loading.src} alt="Loading" className={styles.loading} />}
 
-        <div className={styles.content}>
+        <div className={clsx(styles.content, 'w-100')}>
           {error ? (
             <p className={`${styles.error}`}>{error}</p>
           ) : data ? (
-            <output className={styles.summary}>
+            <output className={clsx(styles.summary)}>
               <h3>{data?.web3_vibe}</h3>
               <p> {data?.summary}</p>
               <b>STATS</b>
-              <ul className={`flex flex-column`}>
+              <ul className={`flex flex-column w-100`}>
                 <li>
                   <div className={``}>
                     <label>Degen</label>
-                    <b>{data['scores']?.degen}%</b>
+                    <b>{data['personality_scores']?.degen}%</b>
                   </div>
-                  <progress min={0} max={100} value={data['scores']?.degen}></progress>
+                  <progress min={0} max={100} value={data['personality_scores']?.degen}></progress>
                 </li>
                 <li>
                  <div className={``}>
                   <label>Builder</label>
-                    <b>{data['scores']?.builder}%</b>
+                    <b>{data['personality_scores']?.builder}%</b>
                   </div>
-                  <progress min={0} max={100} value={data['scores']?.builder}></progress>
+                  <progress min={0} max={100} value={data['personality_scores']?.builder}></progress>
                 </li>
                 <li>
              <div className={``}>
              <label>Researcher</label>
-                    <b>{data['scores']?.researcher}%</b>
+                    <b>{data['personality_scores']?.researcher}%</b>
                   </div>
-                  <progress min={0} max={100} value={data['scores']?.researcher}></progress>
+                  <progress min={0} max={100} value={data['personality_scores']?.researcher}></progress>
                 </li>
               </ul>
             </output>
