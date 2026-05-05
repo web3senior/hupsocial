@@ -19,10 +19,6 @@ export const ConnectWallet = () => {
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
 
-  useEffect(() => {
-    console.log(`%c ░▒▓█ Hup █▓▒░`, 'font-size:1.5rem;color:#38bdf8')
-  }, [])
-
   return !mounted ? null : (
     <>
       {activeChain[0] && (
@@ -122,7 +118,7 @@ const Profile = ({ addr }) => {
   if (!data || data.profileImage === '') return <Shimmer style={{ width: `32px`, height: `32px`, borderRadius: `999px` }} />
 
   return (
-    <Link href={`/u/${addr}`}>
+    <Link href={`/${addr}`}>
       <figure className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`} title={data.name}>
         <img alt={data.name || `PFP`} src={`${data.profileImage}`} className={`rounded`} />
       </figure>
