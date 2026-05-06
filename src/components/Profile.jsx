@@ -1,13 +1,10 @@
 'use client'
 
-import { useState, useEffect, useId, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getProfile, getUniversalProfile } from '@/lib/api'
-import { config } from '@/config/wagmi'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
-import { BlueCheckMarkIcon } from '@/components/Icons'
 import web3 from 'web3'
-import { toSvg } from 'jdenticon'
 import { getActiveChain } from '@/lib/communication'
 import styles from './Profile.module.scss'
 import { toRelativeTime } from '@/lib/dateHelper'
@@ -116,8 +113,6 @@ export default function Profile({ creator, createdAt }) {
 export function ProfileImage({ addr }) {
   const [profile, setProfile] = useState()
   const [isItUp, setIsItUp] = useState()
-  const defaultUsername = `hup-user`
-  //   const { web3, contract } = initPostContract()
   const router = useRouter()
 
   useEffect(() => {
@@ -178,15 +173,6 @@ export function ProfileImage({ addr }) {
         src={`${profile.profileImage}`}
         className={`rounded`}
       />
-      {/* {!profile.profileImages[0]?.isSVG ? (
-        <img
-          alt={profile.name || `Default PFP`}
-          src={`${profile.profileImages.length > 0 ? profile.profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
-          className={`rounded`}
-        />
-      ) : (
-        <div dangerouslySetInnerHTML={{ __html: profile.profileImages[0].src }}></div>
-      )} */}
     </figure>
   )
 }

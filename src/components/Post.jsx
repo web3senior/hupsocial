@@ -42,25 +42,6 @@ import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
 import { Ellipsis } from 'lucide-react'
 
-moment.defineLocale('en-short', {
-  relativeTime: {
-    future: 'in %s',
-    past: '%s', //'%s ago'
-    s: '1s',
-    ss: '%ds',
-    m: '1m',
-    mm: '%dm',
-    h: '1h',
-    hh: '%dh',
-    d: '1d',
-    dd: '%dd',
-    M: '1mo',
-    MM: '%dmo',
-    y: '1y',
-    yy: '%dy',
-  },
-})
-
 /**
  * Converts Markdown to sanitized HTML with links set to open in a new tab.
  * @param {string} markdown - The markdown content to process.
@@ -568,8 +549,6 @@ const TipModal = ({ item, setShowTipModal }) => {
 }
 
 const ShareModal = ({ item, metadata, setShowShareModal }) => {
-  const [hasLiked, setHasLiked] = useState(false)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const activeChain = getActiveChain()
 
