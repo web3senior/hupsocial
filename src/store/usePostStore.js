@@ -12,8 +12,8 @@ export const usePostStore = create((set, get) => ({
     set({
       totalPosts: total,
       TABS_DATA: [
-        { id: 'feed', label: 'Feed', count: total || 0 },
-        { id: 'polls', label: 'Polls' },
+        { id: 'posts', label: 'Posts', count: total || 0 },
+        { id: 'communities', label: 'Communities' },
         { id: 'events', label: 'Events' },
         { id: 'jobs', label: 'Jobs' },
         { id: 'apps', label: 'Apps' },

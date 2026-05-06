@@ -32,14 +32,14 @@ import { usePostStore } from '@/store/usePostStore'
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
 const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
+const CommunitiesTab = lazy(() => import('@/components/tabs/CommunitiesTab'))
 
 export default function Page() {
   const { posts, postsLoaded, totalPosts, hasInitialized, TABS_DATA, setInitialData, appendPosts } =
     usePostStore()
   const [isLoadedPost, setIsLoadedPost] = useState(false)
-  const [activeTab, setActiveTab] = useState('feed')
+  const [activeTab, setActiveTab] = useState('posts')
   const [apps, setApps] = useState({ list: [] })
-  const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const activeChain = getActiveChain()
   const { address, isConnected } = useConnection()
@@ -50,6 +50,7 @@ export default function Page() {
     events: EventsTab,
     //  jobs: JobsTab,
     apps: AppsTab,
+    communities: CommunitiesTab,
     // feed: FeedTab,
   }
   const ActiveComponent = TabContentMap[activeTab]
@@ -212,9 +213,9 @@ export default function Page() {
           {ActiveComponent && <ActiveComponent />}
         </Suspense>
 
-        {activeTab === 'feed' && (
+        {activeTab === 'posts' && (
           <div className={`${styles.tabContent} ${styles.feedTab} relative`}>
-            <div className={`${styles.page} ms-motion-slideDownIn`}>
+            <div className={`${styles.page} motion-slideDownIn`}>
               <div className={`__container ${styles.page__container}`} data-width={`medium`}>
                 {postsLoaded === 0 && <PostSkeletonGrid count={14} />}
 
