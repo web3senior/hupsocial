@@ -4,11 +4,7 @@ import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
-import {
-  useWaitForTransactionReceipt,
-  useConnection,
-  useWriteContract,
-} from 'wagmi'
+import { useWaitForTransactionReceipt, useConnection, useWriteContract } from 'wagmi'
 import {
   initPostContract,
   initPostCommentContract,
@@ -41,6 +37,12 @@ import { getIPFS } from '@/lib/ipfs'
 import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
 import { Ellipsis } from 'lucide-react'
+import { Repeat2 } from 'lucide-react'
+import { MessageCircle } from 'lucide-react'
+import { Heart } from 'lucide-react'
+import { Share } from 'lucide-react'
+import { Share2 } from 'lucide-react'
+import { Send } from 'lucide-react'
 
 /**
  * Converts Markdown to sanitized HTML with links set to open in a new tab.
@@ -116,11 +118,15 @@ export default function Post({ item, showContent, actions, chainId }) {
   return (
     <>
       {showCommentModal && postContent && (
-        <CommentModal item={showCommentModal} postContent={postContent} setShowCommentModal={setShowCommentModal} />
+        <CommentModal
+          item={showCommentModal}
+          postContent={postContent}
+          setShowCommentModal={setShowCommentModal}
+        />
       )}
 
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
-      
+
       {showShareModal && (
         <ShareModal
           metadata={postContent}
@@ -188,7 +194,7 @@ export default function Post({ item, showContent, actions, chainId }) {
                         : toast(`Please connect wallet`, `error`)
                     }}
                   >
-                    <CommentIcon />
+                    <MessageCircle strokeWidth={1.5} width={17} height={17} />
                     {commentCount === 0 ? '' : <span>{commentCount}</span>}
                   </button>
                 )}
@@ -197,7 +203,7 @@ export default function Post({ item, showContent, actions, chainId }) {
 
             {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && (
               <button>
-                <RepostIcon />
+                <Repeat2 strokeWidth={1.3} width={20} height={20} />
               </button>
             )}
 
@@ -214,14 +220,14 @@ export default function Post({ item, showContent, actions, chainId }) {
             {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
               <button>
                 <ViewIcon />
-                <span>
-                  {viewCount === 0
-                    ? ''
-                    : new Intl.NumberFormat('en', {
-                        notation: 'compact',
-                        maximumFractionDigits: 1,
-                      }).format(viewCount)}
-                </span>
+                {viewCount > 0 && (
+                  <span>
+                    {new Intl.NumberFormat('en', {
+                      notation: 'compact',
+                      maximumFractionDigits: 1,
+                    }).format(viewCount)}
+                  </span>
+                )}
               </button>
             )}
 
@@ -231,7 +237,7 @@ export default function Post({ item, showContent, actions, chainId }) {
                   isConnected ? setShowShareModal(item) : toast(`Please connect wallet`, `error`)
                 }}
               >
-                <ShareIcon />
+                <Send strokeWidth={1.5} width={17} height={17} />
               </button>
             )}
           </div>
@@ -272,8 +278,8 @@ const Nav = ({ item }) => {
   )
 }
 
-const CommentModal = ({ item, postContent ,setShowCommentModal }) => {
-  const [status,setStatus] = useState(true)
+const CommentModal = ({ item, postContent, setShowCommentModal }) => {
+  const [status, setStatus] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
   const [commentContent, setCommentContent] = useState('')
@@ -350,10 +356,10 @@ const CommentModal = ({ item, postContent ,setShowCommentModal }) => {
             {isSigning
               ? `Signing...`
               : isConfirming
-              ? 'Confirming...'
-              : status && status.content !== ''
-              ? `Update`
-              : `Share`}
+                ? 'Confirming...'
+                : status && status.content !== ''
+                  ? `Update`
+                  : `Share`}
           </div>
         </header>
 
@@ -364,21 +370,20 @@ const CommentModal = ({ item, postContent ,setShowCommentModal }) => {
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
-                
                 <div className={`${styles.post__main__media}`}>
-                {postContent && (
-                  <>
-                 <div
-                className={`${styles.post__main__content} `}
-                id={`post${item.postId}`}
-                dangerouslySetInnerHTML={{
-                  __html: renderMarkdown(`${postContent.elements[0].data.text}`),
-                }}
-              />
-                    <MediaGallery data={postContent.elements[1].data.items} />
-                  </>
-                )}
-              </div>
+                  {postContent && (
+                    <>
+                      <div
+                        className={`${styles.post__main__content} `}
+                        id={`post${item.postId}`}
+                        dangerouslySetInnerHTML={{
+                          __html: renderMarkdown(`${postContent.elements[0].data.text}`),
+                        }}
+                      />
+                      <MediaGallery data={postContent.elements[1].data.items} />
+                    </>
+                  )}
+                </div>
               </main>
             </section>
           </article>
@@ -484,10 +489,10 @@ const TipModal = ({ item, setShowTipModal }) => {
             {isSigning
               ? `Signing...`
               : isConfirming
-              ? 'Confirming...'
-              : status && status.content !== ''
-              ? `Update`
-              : ``}
+                ? 'Confirming...'
+                : status && status.content !== ''
+                  ? `Update`
+                  : ``}
           </div>
         </header>
 
@@ -686,18 +691,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
         } else toast(`Please connect wallet`, `error`)
       }}
     >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 18 18"
-        fill={hasLiked ? `#EC3838` : `none`}
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
-          stroke={hasLiked ? `#EC3838` : `#424242`}
-        />
-      </svg>
+      <Heart strokeWidth={1.5} width={18} height={18} />
       {likeCount === 0 ? '' : <span>{likeCount}</span>}
     </button>
   )
@@ -735,9 +729,8 @@ const Poll = ({ polls }) => {
                       className={`${styles.poll__btnShowMore} text-left`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        document.querySelector(
-                          `#pollQuestion${item.pollId}`
-                        ).style.maxHeight = `unset !important`
+                        document.querySelector(`#pollQuestion${item.pollId}`).style.maxHeight =
+                          `unset !important`
                         e.target.remove()
                       }}
                     >

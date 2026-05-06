@@ -227,7 +227,7 @@ export default function Page() {
                       style={{ cursor: 'pointer' }}
                       onClick={() => handlePostClick(item.postId)}
                     >
-                      <Post item={item} actions={['like', 'comment', 'repost', 'share']} />
+                      <Post item={item} actions={['like','view', 'comment', 'repost', 'share']} />
 
                       {/* Render a horizontal rule between posts, but not after the last one */}
                       {i < posts.list.length - 1 && <hr />}

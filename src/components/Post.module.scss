@@ -278,12 +278,12 @@
         padding-inline-start: 4px;
       }
 
-      svg {
-        --x-height: 19px;
-        --x-width: 18.75px;
-        width: var(--x-width);
-        height: var(--x-height);
-      }
+      // svg {
+      //   --x-height: 19px;
+      //   --x-width: 18.75px;
+      //   width: var(--x-width);
+      //   height: var(--x-height);
+      // }
 
       &:active {
         transform: scale(0.88);
