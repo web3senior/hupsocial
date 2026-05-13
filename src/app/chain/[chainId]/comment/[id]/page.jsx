@@ -19,7 +19,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import commentAbi from '@/abi/post-comment.json'
-import Profile, { ProfileImage } from '@/components/Profile'
+import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon, RepostIcon, TipIcon, BlueCheckMarkIcon } from '@/components/Icons'
 import styles from './page.module.scss'
 import PageTitle from '@/components/PageTitle'
@@ -208,7 +208,12 @@ export default function Page() {
               className={`${styles.reply} flex align-items-center gap-025`}
               onClick={() => setShowCommentModal({ data: comment, type: `comment` })}
             >
-              <ProfileImage addr={address} />
+     
+               <Profile
+                          creator={address}
+                          createdAt={}
+                          chainId={42}
+                        />
               <p>
                 Reply to {address.slice(0, 4)}…{address.slice(38)}
               </p>
