@@ -114,7 +114,6 @@ export default function Post({ item, showContent, actions, chainId }) {
 
       {showShareModal && (
         <ShareModal
-          metadata={item.content.elements[0].data.text}
           item={showShareModal}
           setShowShareModal={setShowShareModal}
         />
@@ -553,20 +552,15 @@ const TipModal = ({ item, setShowTipModal }) => {
   )
 }
 
-const ShareModal = ({ item, metadata, setShowShareModal }) => {
+const ShareModal = ({ item,  setShowShareModal }) => {
   const [error, setError] = useState(null)
   const activeChain = getActiveChain()
 
-  console.log(metadata)
-
   // --- Dynamic Content ---
-  const postUrl = `${location.protocol}//${window.location.host}/chain/${activeChain[0].id}/post/${item.postId}`
-  const postTitle =
-    metadata && metadata.elements && metadata.elements.length > 1
-      ? metadata.elements[0].data.text
-      : item.content
+  const postUrl = `${location.protocol}//${window.location.host}/${item.chain_id}/${item.id}`
+  const postTitle =item?.content?.elements?.[0]?.data?.text || item?.content || ''
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
-  const postContent = `${postTitle}\n\n Creator: ${item.creator} \n\n`
+  const postContent = `${postTitle}\n\n Creator: ${item.wallet_address} \n\n`
   // --- Constructing the Share Link ---
   const shareLink =
     `https://x.com/intent/tweet?` +
