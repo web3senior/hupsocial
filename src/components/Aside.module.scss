@@ -1,132 +1,134 @@
+@use '@/styles/components/responsive' as *;
+
 .aside {
+  background-color: var(--white);
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
-  padding: 1em 1em;
-  height: 100svh;
-  z-index: 10;
+  z-index: 2;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  padding: 1.5rem 0.75rem;
   isolation: isolate;
+  user-select: none;
 
-  background-color: #fafafa;
-  color: var(--gray-400);
-
-  // Responsive: Hide on mobile
-  @media (max-width: 640px) {
-    display: none !important;
+  @include md-down() {
+    display: none;
   }
 
-  nav {
-    height: 100%;
-  }
-
-  ul {
-    height: 100%;
-    padding: 1.5rem 0; // Centered icons vertically in the bar
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    list-style: none;
-    margin: 0;
-  }
-
-  .link {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
-    border-radius: var(--global-border-radius);
-    color: inherit;
-    transition: all 0.2s ease;
-    will-change: transform, color;
-
-    // The Icon inside the link
-    svg {
-      transition: transform 0.2s ease, fill 0.2s ease;
-    }
-
-    /* This hover effect will ONLY trigger on a computer with a mouse */
-    @media (hover: hover) and (pointer: fine) {
-      &:hover {
-        // color: var(--black, #000);
-        background-color: var(--gray-100);
-
-        // svg {
-        //   transform: scale(1.1);
-        // }
-        .collapseButton {
-          left: 0;
-        }
-      }
-    }
-
-    &[aria-label='New'] {
-      background-color: var(--black-050);
-    }
-
-    // Active State (Based on the data-active attribute from React)
-    &[data-active='true'] {
-      color: var(--black, #000);
-
-      svg {
-        // We use currentColor in React, so changing 'color' here
-        // automatically updates the icon's fill/stroke.
-        stroke-width: 2px;
-      }
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
+  &.compact {
+    transition-delay: 0.1s; // Small grace period when moving mouse away
   }
 }
 
-a.logo {
-  position: relative;
-  transition-duration: 0.2s;
-  transition-property: transform;
-  forced-color-adjust: auto;
+.compact {
+  width: fit-content;
 
-  svg {
-    --r: 32px;
-    width: auto !important;
-    height: var(--r) !important;
+  .linkText {
+    display: none;
   }
+}
+
+.expanded {
+  width: 220px;
+  border-right: 1px solid var(--gray-300);
+}
+
+.navContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 2rem;
+  list-style: none;
+  padding: 0;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--black);
+  white-space: nowrap;
+  font-weight: 400;
+  cursor: pointer;
+  will-change: transform;
+  transition: transform 0.2s ease;
 
   &:hover {
-    transform: scale(1.05);
-  }
-}
-
-.newButton {
-  position: fixed;
-  bottom: 24px;
-  right: 2rem;
-  width: 62px;
-  height: 62px;
-  display: flex;
-  place-items: center;
-  place-content: center;
-  background-color: var(--white);
-  border: 1px solid var(--gray-300);
-  border-radius: var(--global-border-radius);
-  box-shadow: var(--shadow-md);
-  color: var(--black);
-  transition: transform 0.2s ease;
-  will-change: transform, box-shadow;
-  cursor: pointer;
-
-  @media (max-width: 640px) {
-    display: none !important;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    &:hover {
-      transform: scale(1.1);
-    }
+    background-color: var(--gray-100);
   }
 
   &:active {
     transform: scale(0.97);
   }
+}
+
+.iconWrapper {
+  min-width: 24px;
+  display: flex;
+  justify-content: center;
+  color: var(--black);
+}
+
+.linkText {
+  color: var(--black);
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+.linkActive {
+  background-color: var(--gray-100);
+  color: var(--white);
+  font-weight: 500;
+}
+
+.logoWrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  cursor: pointer;
+  width: fit-content;
+  will-change: transform;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+.logoCap {
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 0;
+}
+
+.divider {
+  border: none;
+  margin: 0.5rem 0;
+}
+
+.footerNav {
+  margin-top: auto;
+}
+
+.more {
+  display: flex;
+  flex-direction: column;
 }

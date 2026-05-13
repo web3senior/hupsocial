@@ -8,7 +8,7 @@ export default function SplashScreen() {
     <div className={styles.wrapper} role="status" aria-label="Loading application">
       <div className={styles.mainContent}>
         <div className={styles.logoWrapper}>
-          <Image src={logo} alt="Hup Logo" priority className={styles.mainLogo} />
+          <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME} Logo`} priority className={styles.mainLogo} />
         </div>
       </div>
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-// [1] NEW IMPORT: ERC2771Context for Gasless Transactions
+// ERC2771Context for Gasless Transactions
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./../Counters.sol"; // Assumed path
 

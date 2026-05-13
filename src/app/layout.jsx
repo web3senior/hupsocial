@@ -1,15 +1,25 @@
+import { Geist, Geist_Mono } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
-import './Globals.scss'
-import './GoogleFont.css'
+import './globals.scss'
 import './../styles/Global.scss'
+
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+})
+
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
 export const metadata = {
   // --- BASE & CORE METADATA ---
-  metadataBase:process.env.NEXT_PUBLIC_BASE_URL,
+  metadataBase: process.env.NEXT_PUBLIC_BASE_URL,
 
   // Title (SEO best practice for better click-through)
   title: {
-    template: `%s | ${process.env.NEXT_PUBLIC_NAME}`, // Moved NAME to the end for better SEO
+    template: ` %s | ${process.env.NEXT_PUBLIC_NAME}`,
     default: process.env.NEXT_PUBLIC_NAME,
   },
 
@@ -95,9 +105,9 @@ export const viewport = {
   ],
 }
 
-export default async function RootLayout({ children }) {
+export default function RootLayout({ children }) {
   return (
-    <html lang="en-US">
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
         <ClientLayout>{children}</ClientLayout>
       </body>

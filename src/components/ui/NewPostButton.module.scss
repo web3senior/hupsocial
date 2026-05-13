@@ -1,0 +1,32 @@
+@use '@/styles/components/responsive' as *;
+
+.newButton {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--global-border-radius);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.2s ease;
+  z-index: 100;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  @include md-down() {
+    display: none;
+  }
+}

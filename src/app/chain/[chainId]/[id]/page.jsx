@@ -21,7 +21,7 @@ import {
   getHasLikedComment,
   getActiveChain,
 } from '@/lib/communication'
-import { getProfile, getUniversalProfile, addViewPost, getApps } from '@/lib/api'
+import { getPostById, getProfile, getUniversalProfile, recordPostView } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { useAuth } from '@/contexts/AuthContext'
 import Web3 from 'web3'
@@ -30,7 +30,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import commentAbi from '@/abi/post-comment.json'
-import Profile, { ProfileImage } from '@/components/Profile'
+import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon, BlueCheckMarkIcon, RepostIcon } from '@/components/Icons'
 import Post from '@/components/Post'
 import Comment from '@/components/Comment'
@@ -93,15 +93,12 @@ export default function Page() {
   })
 
   const loadMoreComment = async (totalCount) => {
-    // Guard clause: prevent concurrent fetches or loading beyond total
     if (isLoadedComment || commentsLoaded >= totalCount) return
 
     setIsLoadedPoll(true)
 
     try {
       const PAGE_SIZE = 40
-
-      // Calculate how many to fetch, ensuring we don't go below index 0
       const remaining = totalCount - commentsLoaded
       const countToFetch = Math.min(PAGE_SIZE, remaining)
       const startIndex = Math.max(0, totalCount - commentsLoaded - countToFetch)
@@ -127,40 +124,45 @@ export default function Page() {
 
   // Effect 1: Basic Post Data & Analytics
   useEffect(() => {
-    localStorage.setItem(
-      `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`,
-      params.chainId
-    )
-    setChains(config.chains)
+    // localStorage.setItem(
+    //   `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`,
+    //   params.chainId,
+    // )
+   // setChains(config.chains)
 
-    addViewPost(params.chainId, params.id).then(setViewCount)
+    recordPostView(params.id, address)
 
-    getPostByIndex(params.id, address).then((res) => {
+    getPostById(params.id, address).then((res) => {
       if (res) {
-        res.postId = params.id
-        setPost(res)
+        setPost(res.data)
       }
     })
+    // getPostByIndex(params.id, address).then((res) => {
+    //   if (res) {
+    //     res.postId = params.id
+    //     setPost(res)
+    //   }
+    // })
   }, [params.id, params.chainId, address]) // Re-run if post or user changes
 
   // Effect 2: Initial Comments Load
   useEffect(() => {
-    const initComments = async () => {
-      try {
-        const count = await getPostCommentCount(params.id)
-        const total = web3.utils.toNumber(count)
-        setCommentCount(total)
+    // const initComments = async () => {
+    //   try {
+    //     const count = await getPostCommentCount(params.id)
+    //     const total = web3.utils.toNumber(count)
+    //     setCommentCount(total)
 
-        // Only auto-load if nothing has been loaded yet
-        if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
-          await loadMoreComment(total)
-        }
-      } catch (err) {
-        console.error('Failed to initialize comments', err)
-      }
-    }
+    //     // Only auto-load if nothing has been loaded yet
+    //     if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
+    //       await loadMoreComment(total)
+    //     }
+    //   } catch (err) {
+    //     console.error('Failed to initialize comments', err)
+    //   }
+    // }
 
-    initComments()
+   // initComments()
   }, [params.id, showCommentModal]) // Trigger when modal opens or post changes
 
   return (
@@ -217,7 +219,7 @@ export default function Page() {
               className={`${styles.reply} flex align-items-center gap-025`}
               onClick={() => setShowCommentModal({ data: post, type: `post` })}
             >
-              <ProfileImage addr={address} />
+              <Profile addr={address} variant='imageOnly' />
               Reply
               <p>{/* Reply to {post.creator.slice(0, 4)}…{post.creator.slice(38)} */}</p>
             </div>
@@ -297,10 +299,10 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
             {isSigning
               ? `Signing...`
               : isConfirming
-              ? 'Confirming...'
-              : status && status.content !== ''
-              ? `Update`
-              : `Share`}
+                ? 'Confirming...'
+                : status && status.content !== ''
+                  ? `Update`
+                  : `Share`}
           </div>
         </header>
 
@@ -308,7 +310,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
           <article className={`${styles.modal__post}`}>
             <section className={`flex flex-column align-items-start justify-content-between`}>
               <header className={`${styles.modal__post__header}`}>
-                <Profile creator={item.creator} createdAt={item.createdAt} />
+                <Profile variant='full' creator={item.creator} createdAt={item.createdAt} />
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
                 <div className={`${styles.post__main__media}`}>

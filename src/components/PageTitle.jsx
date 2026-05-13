@@ -14,9 +14,12 @@ const PageTitle = ({ name }) => {
 
   return (
     <header className={styles.stickyHeader}>
-      <h1 className={`${styles.pageTitle} d-f-c`}>
+        <div className={`__container`} data-width={`small`}>
+            <h1 className={`${styles.pageTitle} d-f-c`}>
         <span>{name}</span>
-      </h1>
+      </h1> 
+        </div>
+   
     </header>
   )
 }

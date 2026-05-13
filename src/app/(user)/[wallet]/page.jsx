@@ -10,6 +10,7 @@ import {
   subscribeUser,
   unsubscribeUser,
   sendNotification,
+  getPosts,
 } from '@/lib/api'
 import {
   initPostContract,
@@ -149,39 +150,39 @@ export default function Page() {
   // In a component:
   // const data = await getPoapsForAddress('atenyun.eth');
 
-
-
   useEffect(() => {
     getPoapsForAddress(params.wallet).then((res) => {
       console.log(res)
       setPOAPs(res)
     })
 
-    getCreatorPostCount(params.wallet).then((count) => {
-      const totalPosts = web3.utils.toNumber(count)
-      setTotalPosts(totalPosts)
+    // getCreatorPostCount(params.wallet).then((count) => {
+    //   const totalPosts = web3.utils.toNumber(count)
+    //   setTotalPosts(totalPosts)
 
+    // })
+    getPosts(1, 10, null, params.wallet).then((res) => {
+      console.log(res)
+      setTotalPosts(res.meta.count)
+      setPosts({ list: res.data })
       if (postsLoaded === 0 && !isLoadedPoll) {
         loadMorePosts(totalPosts)
       }
     })
-
-
   }, [])
 
   return (
     <>
-      <PageTitle name={`profile`} />
+      <PageTitle name={`Profile`} />
 
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 
-{
-  posts && POAPs&& posts.list.length > 0 &&<AISummary addr={address} posts={posts} poaps={POAPs} />
-}
-           
+            {posts && POAPs && posts.list.length > 0 && (
+              <AISummary addr={address} posts={posts} poaps={POAPs} />
+            )}
 
             <details className="mt-10">
               <summary>View POAPs</summary>
@@ -246,8 +247,7 @@ export default function Page() {
               <PostForm addr={params.wallet} />
 
               <div className={`${styles.grid} flex flex-column`}>
-                {posts &&
-                  posts.list.length > 0 &&
+                {posts.list.length > 0 &&
                   posts.list.map((item, i) => {
                     return (
                       <section
@@ -437,8 +437,7 @@ const Profile = ({ addr }) => {
         setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
       } else {
         getProfile(addr).then((res) => {
-          console.log(res, `==`)
-          if (res.wallet) {
+          if (res.wallet_address) {
             res.profileImageName = res.profileImage
             const profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
             res.profileImage = profileImage
@@ -476,10 +475,10 @@ const Profile = ({ addr }) => {
 
             <code className={`${styles.profile__wallet}`}>
               <Link
-                href={`${activeChain[0].blockExplorers.default.url}/address/${data.wallet}`}
+                href={`${activeChain[0].blockExplorers.default.url}/address/${data.wallet_address}`}
                 target={`_blank`}
               >
-                {`${data.wallet.slice(0, 4)}…${data.wallet.slice(38)}`}
+                {`${data.wallet_address.slice(0, 4)}…${data.wallet_address.slice(38)}`}
               </Link>
             </code>
 
@@ -516,9 +515,9 @@ const Profile = ({ addr }) => {
                 <Link
                   className={`${styles.link}`}
                   target={`_blank`}
-                  href={`https://hup.social/u/${addr}`}
+                  href={`https://hup.social/${addr}`}
                 >
-                  hup.social/u/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
+                  hup.social/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
                 </Link>
               </div>
 
@@ -979,10 +978,10 @@ const Status = ({ addr, profile, selfView }) => {
                 {isSigning
                   ? `Signing...`
                   : isConfirming
-                  ? 'Confirming...'
-                  : status && status.content !== ''
-                  ? `Update`
-                  : `Share`}
+                    ? 'Confirming...'
+                    : status && status.content !== ''
+                      ? `Update`
+                      : `Share`}
               </div>
             </header>
 
@@ -1428,10 +1427,10 @@ const CommentModal = ({ item, setShowCommentModal }) => {
             {isSigning
               ? `Signing...`
               : isConfirming
-              ? 'Confirming...'
-              : status && status.content !== ''
-              ? `Update`
-              : `Share`}
+                ? 'Confirming...'
+                : status && status.content !== ''
+                  ? `Update`
+                  : `Share`}
           </div>
         </header>
 

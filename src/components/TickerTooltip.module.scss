@@ -1,0 +1,16 @@
+.floatingContainer {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none; // Crucial: prevents flicker when mouse hits the ticker
+  transform: translate(-50%, -110%); // Center horizontally, place above text
+  transition: opacity 0.2s ease;
+}
+
+
+/* Make the $TICKER blue like X.com */
+:global(.ticker-trigger) {
+  color: #1d9bf0;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+}

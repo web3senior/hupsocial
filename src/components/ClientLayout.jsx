@@ -5,9 +5,11 @@ import SplashScreen from '@/components/SplashScreen'
 import NextToast from './NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
 import Header from './Header'
-import Aside from './Aside'
 import Footer from './Footer'
+import TickerTooltip from './TickerTooltip'
+import NewPostButton from './ui/NewPostButton'
 import styles from './ClientLayout.module.scss'
+import Aside from './Aside'
 
 export default function ClientLayout({ children }) {
   const [isLoading, setIsLoading] = useState(true)
@@ -24,9 +26,12 @@ export default function ClientLayout({ children }) {
   return (
     <>
       <NextToast />
+      <TickerTooltip />
+      
       <WagmiContext>
         <Header />
         <Aside />
+        <NewPostButton />
         <main className={styles.main}>{children}</main>
         <Footer />
       </WagmiContext>

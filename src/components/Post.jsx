@@ -35,92 +35,77 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { getIPFS } from '@/lib/ipfs'
 import MediaGallery from './Gallery'
-import styles from './Post.module.scss'
 import { Ellipsis } from 'lucide-react'
 import { Repeat2 } from 'lucide-react'
 import { MessageCircle } from 'lucide-react'
 import { Heart } from 'lucide-react'
-import { Share } from 'lucide-react'
-import { Share2 } from 'lucide-react'
-import { Send } from 'lucide-react'
+import { Box } from 'lucide-react'
+import { SendHorizonal } from 'lucide-react'
+import { useTicker } from '@/hooks/useTicker'
+import styles from './Post.module.scss'
+import Ticker from './Ticker'
 
 /**
- * Converts Markdown to sanitized HTML with links set to open in a new tab.
- * @param {string} markdown - The markdown content to process.
- * @returns {string} The sanitized HTML.
+ * Converts Markdown to sanitized HTML with ticker support.
  */
 function renderMarkdown(markdown) {
-  // 1. Create a custom renderer
+  // Safety: handle non-string inputs
+  const content = typeof markdown === 'string' ? markdown : ''
+
   const renderer = new marked.Renderer()
 
-  // 2. Override the link method to add target="_blank" and rel attributes
-  renderer.link = (href, title, text) => {
-    // Use the default marked behavior, but insert the desired attributes
-    const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
+  // In Marked v12, 'text' can be an object or a string
+  renderer.text = (token) => {
+    // 1. Extract the actual text content from the token/string
+    const rawText = typeof token === 'string' ? token : token.text
 
-    // Add target="_blank" to open in a new tab
-    // Add rel="noopener noreferrer" for security and performance best practices
-    return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
+    if (!rawText) return ''
+
+    // 2. Perform the regex replacement
+    return rawText.replace(/\$([A-Z]{3,5})\b/g, (match, symbol) => {
+      return `<span class="ticker-trigger" data-symbol="${symbol}">${match}</span>`
+    })
   }
 
-  // 3. Configure marked to use the custom renderer
-  marked.setOptions({
-    renderer: renderer,
-    gfm: true, // Generally good to enable GitHub Flavored Markdown
+  renderer.link = (href, title, text) => {
+    // Basic link override for target="_blank"
+    return `<a href="${href}" title="${title || ''}" rel="noopener noreferrer" target="_blank">${text}</a>`
+  }
+
+  // 3. Configure and parse
+  // Use marked.parse with a custom renderer passed in the options
+  const dirtyHtml = marked.parse(content, {
+    renderer,
+    gfm: true,
+    breaks: true,
   })
 
-  // 4. Render the markdown to HTML using the custom renderer
-  const dirtyHtml = marked.parse(markdown)
-
-  // 5. Sanitize the HTML using DOMPurify
-  // DOMPurify is crucial for preventing XSS attacks from the rendered content
-  const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
-    ADD_ATTR: ['target', 'rel'],
+  // 4. Sanitize
+  return DOMPurify.sanitize(dirtyHtml, {
+    ADD_ATTR: ['target', 'rel', 'data-symbol'],
+    ADD_TAGS: ['span'],
   })
-
-  return cleanHtml
 }
 
 export default function Post({ item, showContent, actions, chainId }) {
-  const [postContent, setPostContent] = useState()
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showShareModal, setShowShareModal] = useState()
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
-  const router = useRouter()
   const [viewCount, setViewCount] = useState(0)
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
-  const commentCount = Number(item.commentCount)
-
-  useEffect(() => {
-    if (chainId !== undefined) {
-      getViewPost(chainId, item.postId).then((result) => {
-        setViewCount(result)
-      })
-    }
-
-    if (item.metadata !== ``) {
-      getIPFS(item.metadata).then((result) => {
-        setPostContent(result)
-      })
-    }
-
-    // document.querySelectorAll(`video`).forEach((element) => {
-    //   element.addEventListener(`clikc`, (e) => e.stopPropagation())
-    // })
-  }, [showCommentModal, showTipModal])
 
   return (
     <>
-      {showCommentModal && postContent && (
+      {showCommentModal && item && (
         <CommentModal
           item={showCommentModal}
-          postContent={postContent}
+          postContent={item.content.elements[0].data.text}
           setShowCommentModal={setShowCommentModal}
         />
       )}
@@ -129,7 +114,7 @@ export default function Post({ item, showContent, actions, chainId }) {
 
       {showShareModal && (
         <ShareModal
-          metadata={postContent}
+          metadata={item.content.elements[0].data.text}
           item={showShareModal}
           setShowShareModal={setShowShareModal}
         />
@@ -142,26 +127,31 @@ export default function Post({ item, showContent, actions, chainId }) {
         <header
           className={`${styles.post__header} flex align-items-start justify-content-between w-100`}
         >
-          <Profile creator={item.creator} createdAt={item.createdAt} />
+          <Profile
+            creator={item.wallet_address}
+            createdAt={item.created_at}
+            chainId={item.chain_id}
+          />
           <Nav item={item} />
         </header>
 
         <main className={`${styles.post__main}`}>
           {/* Check if post contains metadata or not */}
-          {postContent && postContent.elements && postContent.elements.length > 1 ? (
+          {item.content && item.content.elements && item.content.elements.length > 1 ? (
             <>
               <div
-                className={`${styles.post__main__content} `}
+                className={styles.post__main__content}
                 id={`post${item.postId}`}
                 dangerouslySetInnerHTML={{
-                  __html: renderMarkdown(`${postContent.elements[0].data.text}`),
+                  __html: renderMarkdown(
+                    item?.content?.elements?.[0]?.data?.text || item?.content || '',
+                  ),
                 }}
               />
-
               <div className={`${styles.post__main__media}`}>
-                {postContent && (
+                {item.content && (
                   <>
-                    <MediaGallery data={postContent.elements[1].data.items} />
+                    <MediaGallery data={item.content.elements[1].data.items} />
                   </>
                 )}
               </div>
@@ -181,12 +171,12 @@ export default function Post({ item, showContent, actions, chainId }) {
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
           >
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
-              <Like id={item.postId} likeCount={Number(item.likeCount)} hasLiked={item.hasLiked} />
+              <Like id={item.postId} likeCount={item.like_count} hasLiked={item.hasLiked} />
             )}
 
             {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
               <>
-                {item.allowedComments && (
+                {item.allow_comment && (
                   <button
                     onClick={() => {
                       isConnected
@@ -195,7 +185,7 @@ export default function Post({ item, showContent, actions, chainId }) {
                     }}
                   >
                     <MessageCircle strokeWidth={1.5} width={17} height={17} />
-                    {commentCount === 0 ? '' : <span>{commentCount}</span>}
+                    {item.comment_count === 0 ? '' : <span>{item.comment_count}</span>}
                   </button>
                 )}
               </>
@@ -215,6 +205,16 @@ export default function Post({ item, showContent, actions, chainId }) {
               >
                 <TipIcon />
               </button>
+            )}
+
+            {actions.find((action) => action.toLowerCase() === 'hash') !== undefined && (
+              <a
+                href={`${item.explorer_url}/tx/${item.tx_hash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Box strokeWidth={1.5} width={17} height={17} />
+              </a>
             )}
 
             {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
@@ -237,7 +237,7 @@ export default function Post({ item, showContent, actions, chainId }) {
                   isConnected ? setShowShareModal(item) : toast(`Please connect wallet`, `error`)
                 }}
               >
-                <Send strokeWidth={1.5} width={17} height={17} />
+                <SendHorizonal strokeWidth={1.5} width={17} height={17} />
               </button>
             )}
           </div>

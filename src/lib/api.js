@@ -1,3 +1,5 @@
+import { getViewerId } from './viewer'
+
 /**
  * Get Universal Profile via internal API proxy
  * @param {string} addr
@@ -5,7 +7,7 @@
  */
 export async function getUniversalProfile(addr) {
   /* Call your internal Next.js API route */
-  const response = await fetch('/api/v1/profile/universal-profile/', {
+  const response = await fetch('/api/universal-profile/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -22,6 +24,59 @@ export async function getUniversalProfile(addr) {
   return result.data
 }
 
+export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null) => {
+  /* Construct the URL with query parameters */
+  let url = `/api/v1/posts?page=${page}&limit=${limit}`
+
+  if (networkId) {
+    url += `&network_id=${networkId}`
+  }
+
+  if (walletAddress) {
+    url += `&wallet_address=${walletAddress}`
+  }
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Failed to fetch posts')
+
+  return response.json()
+}
+
+
+export const getPostById = async (id, viewerAddress = null) => {
+  const url = viewerAddress 
+    ? `/api/v1/posts/${id}?viewer_address=${viewerAddress}` 
+    : `/api/v1/posts/${id}`;
+    
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Post fetch failed');
+  return response.json();
+}
+
+export const recordPostView = async (dbId, walletAddress = null) => {
+  try {
+    /* Resolve the identity (Wallet or Guest UUID) */
+    const viewerId = getViewerId(walletAddress)
+
+    /* Construct the dynamic URL using the database primary key */
+    const url = `/api/v1/posts/${dbId}/view`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ viewer_id: viewerId }),
+    })
+
+    return await response.json()
+  } catch (error) {
+    /* Fail silently to avoid interrupting the user's reading experience */
+    console.error('View tracking failed:', error)
+  }
+}
+
+
 /**
  * Get local token
  * @returns string
@@ -37,10 +92,7 @@ export async function getProfile(addr) {
     redirect: 'follow',
   }
 
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}profile/get?wallet=${addr}`,
-    requestOptions,
-  )
+  const response = await fetch(`/api/v1/users/profile/${addr}`, requestOptions)
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
@@ -92,7 +144,7 @@ export async function addViewPost(chainId, postId) {
     requestOptions,
   )
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
-  return response.json()
+  return await response.json()
 }
 
 export async function subscribeUser(sub, wallet) {

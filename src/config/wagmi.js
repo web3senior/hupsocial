@@ -191,4 +191,4 @@ export const getNetworkColor = () => {
   return { primaryColor, secondaryColor }
 }
 
-// console.log(config)
+ console.log(config)
