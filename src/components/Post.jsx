@@ -166,7 +166,7 @@ export default function Post({ item, showContent, actions, chainId }) {
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
           >
             {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
-              <Like id={item.postId} likeCount={item.like_count} hasLiked={item.hasLiked} />
+              <Like id={item.id} likeCount={item.like_count} hasLiked={item.hasLiked} />
             )}
 
             {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
@@ -610,6 +610,7 @@ const ShareModal = ({ item, setShowShareModal }) => {
  * @returns
  */
 const Like = ({ id, likeCount, hasLiked }) => {
+  console.log(id, likeCount, hasLiked)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
