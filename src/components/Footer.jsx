@@ -21,7 +21,7 @@ export default function Footer() {
   const { address, isConnected } = useAccount()
 
   const navLinks = useMemo(() => {
-    const profilePath = isConnected && address ? `/u/${address}` : '/connect'
+    const profilePath = isConnected && address ? `/${address}` : '/connect'
     return [...NAV_ITEMS, { name: 'Profile', path: profilePath, icon: UserRound }]
   }, [address, isConnected])
 
