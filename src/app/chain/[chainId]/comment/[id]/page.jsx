@@ -211,7 +211,7 @@ export default function Page() {
      
                <Profile
                           creator={address}
-                          createdAt={}
+                          createdAt={null}
                           chainId={42}
                         />
               <p>
