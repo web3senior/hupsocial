@@ -62,8 +62,8 @@ function renderMarkdown(markdown) {
     if (!rawText) return ''
 
     // 2. Perform the regex replacement
-    return rawText.replace(/\$([A-Z]{3,5})\b/g, (match, symbol) => {
-      return `<span class="ticker-trigger" data-symbol="${symbol}">${match}</span>`
+    return rawText.replace(/\$([A-Z0-9]{2,10})\b/g, (match, symbol) => {
+      return `<span class="ticker-trigger" style="cursor:help; border-bottom:1px dotted;" data-symbol="${symbol}">${match}</span>`
     })
   }
 
@@ -82,7 +82,8 @@ function renderMarkdown(markdown) {
 
   // 4. Sanitize
   return DOMPurify.sanitize(dirtyHtml, {
-    ADD_ATTR: ['target', 'rel', 'data-symbol'],
+    // Add data-chain and data-address to allowed attributes
+    ADD_ATTR: ['target', 'rel', 'data-symbol', 'data-chain', 'data-address'],
     ADD_TAGS: ['span'],
   })
 }
@@ -112,12 +113,7 @@ export default function Post({ item, showContent, actions, chainId }) {
 
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
 
-      {showShareModal && (
-        <ShareModal
-          item={showShareModal}
-          setShowShareModal={setShowShareModal}
-        />
-      )}
+      {showShareModal && <ShareModal item={showShareModal} setShowShareModal={setShowShareModal} />}
 
       <section
         className={`${styles.post} flex flex-column align-items-start justify-content-between`}
@@ -552,13 +548,13 @@ const TipModal = ({ item, setShowTipModal }) => {
   )
 }
 
-const ShareModal = ({ item,  setShowShareModal }) => {
+const ShareModal = ({ item, setShowShareModal }) => {
   const [error, setError] = useState(null)
   const activeChain = getActiveChain()
 
   // --- Dynamic Content ---
   const postUrl = `${location.protocol}//${window.location.host}/${item.chain_id}/${item.id}`
-  const postTitle =item?.content?.elements?.[0]?.data?.text || item?.content || ''
+  const postTitle = item?.content?.elements?.[0]?.data?.text || item?.content || ''
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const postContent = `${postTitle}\n\n Creator: ${item.wallet_address} \n\n`
   // --- Constructing the Share Link ---
