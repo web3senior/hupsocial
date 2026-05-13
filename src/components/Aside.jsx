@@ -123,7 +123,7 @@ export default function Aside() {
     >
       <div className={styles.navContainer}>
         <div className={styles.logoWrapper}>
-          <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={24} height={24} priority />
+          <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
           {isExpanded && (
             <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>
           )}

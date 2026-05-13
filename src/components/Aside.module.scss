@@ -105,16 +105,16 @@
   transition: transform 0.2s ease;
 
   &:hover {
-    transform: scale(1.05);
+    transform: scale(1.03);
   }
 
   &:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 }
 
 .logoCap {
-  font-size: 1.3rem;
+  font-size: 1.8rem;
   font-weight: 600;
   line-height: 0;
 }
