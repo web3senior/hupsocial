@@ -8,7 +8,7 @@ const TICKER_MAP = {
   // --- NATIVE COINS & MAJORS ---
   BTC: { chain: 'Bitcoin', address: '0x0000000000000000000000000000000000000000' },
   ETH: { chain: 'Ethereum', address: '0x0000000000000000000000000000000000000000' },
-  BNB: { chain: 'BSC', address: '0x0000000000000000000000000000000000000000' },
+  BNB: { chain: 'BinanceSmartChain', address: '0x0000000000000000000000000000000000000000' },
   SOL: { chain: 'Solana', address: '0x0000000000000000000000000000000000000000' },
   XRP: { chain: 'Ripple', address: '0x0000000000000000000000000000000000000000' },
   ADA: { chain: 'Cardano', address: '0x0000000000000000000000000000000000000000' },
@@ -34,7 +34,7 @@ const TICKER_MAP = {
   DAI: { chain: 'Ethereum', address: '0x6b175474e89094c44da98b954eedeac495271d0f' },
   PYUSD: { chain: 'Ethereum', address: '0x6c3ea9036406852006290770bedfc107456ec065' },
   USDe: { chain: 'Ethereum', address: '0x4c9edd5852cd3058041ea5995af39617e0b791e0' },
-  FDUSD: { chain: 'BSC', address: '0xc5f0f7b03112701c675600b99616dc53f306605e' },
+  FDUSD: { chain: 'BinanceSmartChain', address: '0xc5f0f7b03112701c675600b99616dc53f306605e' },
 
   // --- TOP TOKENS ---
   LINK: { chain: 'Ethereum', address: '0x514910771af9ca656af840dff83e8264ecf986ca' },
