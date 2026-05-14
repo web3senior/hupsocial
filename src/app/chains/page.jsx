@@ -14,7 +14,7 @@ export default function Page() {
             {config.chains &&
               config.chains.map((item, i) => {
                 return (
-                  <Link key={i} href={`./networks/${item.id}/${slugify(item.name)}`} className={styles.button}>
+                  <Link key={i} href={`./chains/${item.id}/${slugify(item.name)}`} className={styles.button}>
                     <div className={`${styles.network}`} title={`View details`}>
                       <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}>
                         <div className={`flex flex-column align-items-center justify-content-start gap-050 flex-1`}>

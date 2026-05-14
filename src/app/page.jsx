@@ -61,7 +61,7 @@ export default function Page() {
       navigator.vibrate(200)
     }
 
-    router.push(`chain/${chainId}/${postId}`)
+    router.push(`networks/${chainId}/${postId}`)
   }
 
   const loadMorePosts = useCallback(async () => {

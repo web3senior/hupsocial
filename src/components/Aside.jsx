@@ -148,9 +148,9 @@ export default function Aside() {
           </div>
 
           <Link
-            href={`/networks`}
-            className={clsx(styles.link, pathname === `/networks` && styles.linkActive)}
-            title={`Networks`}
+            href={`/chains`}
+            className={clsx(styles.link, pathname === `/chains` && styles.linkActive)}
+            title={`Chains`}
           >
             <div className={styles.iconWrapper}>
               <LayoutGridIcon

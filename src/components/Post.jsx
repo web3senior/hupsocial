@@ -553,7 +553,7 @@ const ShareModal = ({ item, setShowShareModal }) => {
   const activeChain = getActiveChain()
 
   // --- Dynamic Content ---
-  const postUrl = `${location.protocol}//${window.location.host}/${item.chain_id}/${item.id}`
+  const postUrl = `${location.protocol}//${window.location.host}/networks/${item.chain_id}/${item.id}`
   const postTitle = item?.content?.elements?.[0]?.data?.text || item?.content || ''
   const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const postContent = `${postTitle}\n\n Creator: ${item.wallet_address} \n\n`
