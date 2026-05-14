@@ -164,7 +164,7 @@ export default function PostForm() {
       const data = new FormData()
       data.set('file', file)
 
-      const uploadRequest = await fetch(`/api/v1/0g/file`, {//`/api/ipfs/file`
+      const uploadRequest = await fetch(`/api/0g/file`, {//`/api/ipfs/file`
         method: 'POST',
         body: data,
       })
@@ -306,7 +306,7 @@ export default function PostForm() {
 
     // Upload to IPFS
     const resultIPFS = await uploadFileToIPFS(file, `file`)
-
+    if (resultIPFS === undefined) toast(`Error uploading file`, 'error')
     //if (!resultIPFS.url || !resultIPFS.cid) return
 
     // 2. Create a temporary local URL for immediate preview

@@ -33,7 +33,7 @@ export default function MediaGallery({ data = [] }) {
         // Only fetch if it's 0G, has a CID, and hasn't been resolved yet
         if (item?.storage === '0G' && item.cid && !resolvedUrls[item.cid]) {
           try {
-            const res = await fetch(`/api/v1/0g/download?hash=${item.cid}`)
+            const res = await fetch(`/api/0g/download?hash=${item.cid}`)
             if (!res.ok) throw new Error('Download failed')
             
             const blob = await res.blob()
