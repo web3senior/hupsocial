@@ -62,7 +62,7 @@ function renderMarkdown(markdown) {
     if (!rawText) return ''
 
     // 2. Perform the regex replacement
-    return rawText.replace(/\$([A-Z0-9]{2,10})\b/g, (match, symbol) => {
+    return rawText.replace(/\$([A-Z0-9]{1,10})\b/g, (match, symbol) => {
       return `<span class="ticker-trigger" style="cursor:help; border-bottom:1px dotted;" data-symbol="${symbol}">${match}</span>`
     })
   }
