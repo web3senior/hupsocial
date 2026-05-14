@@ -64,6 +64,7 @@ const TICKER_MAP = {
   // --- SPECIAL ---
   LYX: { chain: 'Lukso', address: '0x0000000000000000000000000000000000000000' },
   GTC: { chain: 'Ethereum', address: '0xde30da39c46104798bb5aa3fe8b9e0e1f348163f' },
+  CELO: { chain: 'Celo', address: '0x471ece3750da237f93b8e339c536989b8978a438' },
 }
 
 export default function TickerTooltip() {
