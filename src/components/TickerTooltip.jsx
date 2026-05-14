@@ -55,7 +55,7 @@ const TICKER_MAP = {
   RENDER: { chain: 'Ethereum', address: '0x6de037ef9a2759834140d935c192896b73c7518f' },
   TAO: { chain: 'Ethereum', address: '0x77e06c9eCCf2E797fd462A92B6D7642EF85b0A44' }, // Wrapped TAO
   ONDO: { chain: 'Ethereum', address: '0xfaba6f8e4a5e8b00f74123c018a745ad390e2418' },
-  HYPE: { chain: 'Hyperliquid', address: '0x0000000000000000000000000000000000000000' },
+  HYPE: { chain: 'Hyperliquid', address: '0x0d01dc56dcaaca66ad901c959b4011ec' },
   KAS: { chain: 'Kaspa', address: '0x0000000000000000000000000000000000000000' },
   IMX: { chain: 'Ethereum', address: '0xf57e7e7c23978c3caec3c3548e3d615c346e79ff' },
   WLD: { chain: 'Optimism', address: '0xdc6ff2101910f0a5147ff97d620952a7b7dd3707' },
