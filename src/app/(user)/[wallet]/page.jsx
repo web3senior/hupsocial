@@ -180,7 +180,8 @@ export default function Page() {
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 
-            {posts && POAPs && posts.list.length > 0 && (
+            {/* Ensure posts, the list, and POAPs exist before mounting */}
+            {posts?.list?.length > 0 && POAPs && (
               <AISummary addr={address} posts={posts} poaps={POAPs} />
             )}
 
