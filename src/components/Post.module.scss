@@ -17,11 +17,11 @@
       }
 
       &__main {
-        padding-left: 3rem;
+        padding-left: 2.5rem;
       }
 
       &__footer {
-        padding-left: 3rem;
+        padding-left: 2.5rem;
       }
     }
   }
@@ -218,10 +218,6 @@
   }
 
   &__footer {
-    color: var(--black-400);
-    font-size: 11px;
-    padding-top: 10px;
-    user-select: none;
   }
 
   &__actions {

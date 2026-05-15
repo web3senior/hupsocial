@@ -6,7 +6,7 @@
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  background-color: #1a1a1a;
+width: fit-content;
   transition: transform 0.2s ease;
 
   &:hover .controls {
@@ -18,9 +18,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
 }
 
 .controls {
@@ -72,8 +70,9 @@
 /* Base Media Styles */
 .videoPlayer, .displayImage {
   display: block;
-  width: 100%;
+  width: auto;
   height: 100%;
+  max-height: 400px;
   object-fit: cover;
 }
 
