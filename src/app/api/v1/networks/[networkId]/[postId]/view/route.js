@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 export async function POST(request, { params }) {
   try {
     /* Extract the unique database ID from the dynamic route parameter */
-    const { id } = await params;
+    const { networkId, postId } = await params;
     
     /* Retrieve the viewer identifier from the request body */
     const { viewer_id } = await request.json();
@@ -27,12 +27,12 @@ export async function POST(request, { params }) {
 
     /* Use INSERT IGNORE to skip recording if this specific viewer has already seen this post */
     const query = `
-      INSERT IGNORE INTO post_views (post_id, viewer_id, user_agent)
-      VALUES (?, ?, ?)
+      INSERT IGNORE INTO post_views (network_id, post_id, viewer_id, user_agent)
+      VALUES (?, ?, ?, ?)
     `;
 
     /* The 'id' from the URL maps directly to your 'post_id' in the views table */
-    await pool.execute(query, [id, viewer_id, userAgent]);
+    await pool.execute(query, [networkId, postId, viewer_id, userAgent]);
 
     return NextResponse.json({ success: true });
   } catch (error) {
