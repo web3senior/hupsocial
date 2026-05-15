@@ -36,7 +36,7 @@ const profileFetcher = async (address) => {
         ...localRes,
         name: localRes.name || DEFAULT_USERNAME,
         profileImage: localRes.profileImage
-          ? DEFAULT_PFP//`${process.env.NEXT_PUBLIC_UPLOAD_URL}${localRes.profileImage}`
+          ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${localRes.profileImage}`
           : DEFAULT_PFP,
       }
     }
@@ -94,7 +94,7 @@ export default function Profile({
       tabIndex={0}
     >
       <div className={styles.imageWrapper}>
-        <Image
+        <img
           alt={profile.name}
           src={profile.profileImage}
           width={36}
