@@ -26,7 +26,7 @@ export async function GET(request) {
       FROM posts p
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
       JOIN networks n ON p.network_id = n.id
-      WHERE p.content LIKE ?
+      WHERE p.content LIKE ? LIMIT 20
     `;
 
     if (chainId) {
