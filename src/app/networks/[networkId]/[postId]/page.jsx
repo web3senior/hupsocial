@@ -105,7 +105,7 @@ export default function Page() {
 
       console.log(`Fetching from index ${startIndex}, count: ${countToFetch}`)
 
-      const newComments = await getCommentsByPostId(params.id, startIndex, countToFetch, address)
+      const newComments = await getCommentsByPostId(params.postId, startIndex, countToFetch, address)
 
       if (Array.isArray(newComments) && newComments.length > 0) {
         // Assuming you want the newest comments at the top or bottom?
@@ -126,30 +126,30 @@ export default function Page() {
   useEffect(() => {
     // localStorage.setItem(
     //   `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`,
-    //   params.chainId,
+    //   params.networkId,
     // )
    // setChains(config.chains)
 
-    recordPostView(params.id, address)
+    recordPostView(params.networkId,params.postId, address)
 
-    getPostById(params.chainId,params.id, address).then((res) => {
+    getPostById(params.networkId,params.postId, address).then((res) => {
       if (res) {
         setPost(res.data)
       }
     })
-    // getPostByIndex(params.id, address).then((res) => {
+    // getPostByIndex(params.postId, address).then((res) => {
     //   if (res) {
-    //     res.postId = params.id
+    //     res.postId = params.postId
     //     setPost(res)
     //   }
     // })
-  }, [params.id, params.chainId, address]) // Re-run if post or user changes
+  }, [params.postId, params.networkId, address]) // Re-run if post or user changes
 
   // Effect 2: Initial Comments Load
   useEffect(() => {
     // const initComments = async () => {
     //   try {
-    //     const count = await getPostCommentCount(params.id)
+    //     const count = await getPostCommentCount(params.postId)
     //     const total = web3.utils.toNumber(count)
     //     setCommentCount(total)
 
@@ -163,7 +163,7 @@ export default function Page() {
     // }
 
    // initComments()
-  }, [params.id, showCommentModal]) // Trigger when modal opens or post changes
+  }, [params.postId, showCommentModal]) // Trigger when modal opens or post changes
 
   return (
     <>
@@ -186,7 +186,7 @@ export default function Page() {
                 <Post
                   item={post}
                   showContent={true}
-                  chainId={params.chainId}
+                  chainId={params.networkId}
                   actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]}
                 />
                 <hr />
@@ -206,7 +206,7 @@ export default function Page() {
                   <Comment
                     item={item}
                     showContent={true}
-                    chainId={params.chainId}
+                    chainId={params.networkId}
                     actions={[`like`, `comment`, `repost`, `share`]}
                   />
                   <hr />

@@ -42,24 +42,23 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
   return response.json()
 }
 
+export const getPostById = async (networkId, postId, viewerAddress = null) => {
+  const url = viewerAddress
+    ? `/api/v1/networks/${networkId}/${postId}?viewer_address=${viewerAddress}`
+    : `/api/v1/networks/${networkId}/${postId}`
 
-export const getPostById = async (chainId,id, viewerAddress = null) => {
-  const url = viewerAddress 
-    ? `/api/v1/networks/${chainId}/${id}?viewer_address=${viewerAddress}` 
-    : `/api/v1/networks/${chainId}/${id}`;
-    
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Post fetch failed');
-  return response.json();
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Post fetch failed')
+  return response.json()
 }
 
-export const recordPostView = async (dbId, walletAddress = null) => {
+export const recordPostView = async (networkId, postId, walletAddress = null) => {
   try {
     /* Resolve the identity (Wallet or Guest UUID) */
     const viewerId = getViewerId(walletAddress)
 
     /* Construct the dynamic URL using the database primary key */
-    const url = `/api/v1/posts/${dbId}/view`
+    const url = `/api/v1/${networkId}/${postId}/view`
 
     const response = await fetch(url, {
       method: 'POST',
@@ -75,7 +74,6 @@ export const recordPostView = async (dbId, walletAddress = null) => {
     console.error('View tracking failed:', error)
   }
 }
-
 
 /**
  * Get local token

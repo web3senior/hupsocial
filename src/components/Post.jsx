@@ -90,7 +90,6 @@ export default function Post({ item, showContent, actions, chainId }) {
   const { web3, contract } = initPostContract()
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
-  const [viewCount, setViewCount] = useState(0)
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -210,12 +209,12 @@ export default function Post({ item, showContent, actions, chainId }) {
             {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
               <button>
                 <ViewIcon />
-                {viewCount > 0 && (
+                {item.total_views > 0 && (
                   <span>
                     {new Intl.NumberFormat('en', {
                       notation: 'compact',
                       maximumFractionDigits: 1,
-                    }).format(viewCount)}
+                    }).format(item.total_views)}
                   </span>
                 )}
               </button>
