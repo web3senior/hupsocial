@@ -26,7 +26,7 @@ export async function getUniversalProfile(addr) {
 
 export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null) => {
   /* Construct the URL with query parameters */
-  let url = `/api/v1/posts?page=${page}&limit=${limit}`
+  let url = `/api/v1/networks/posts?page=${page}&limit=${limit}`
 
   if (networkId) {
     url += `&network_id=${networkId}`
@@ -43,10 +43,10 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
 }
 
 
-export const getPostById = async (id, viewerAddress = null) => {
+export const getPostById = async (chainId,id, viewerAddress = null) => {
   const url = viewerAddress 
-    ? `/api/v1/posts/${id}?viewer_address=${viewerAddress}` 
-    : `/api/v1/posts/${id}`;
+    ? `/api/v1/networks/${chainId}/${id}?viewer_address=${viewerAddress}` 
+    : `/api/v1/networks/${chainId}/${id}`;
     
   const response = await fetch(url);
   if (!response.ok) throw new Error('Post fetch failed');

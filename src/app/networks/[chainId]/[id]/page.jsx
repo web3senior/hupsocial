@@ -132,7 +132,7 @@ export default function Page() {
 
     recordPostView(params.id, address)
 
-    getPostById(params.id, address).then((res) => {
+    getPostById(params.chainId,params.id, address).then((res) => {
       if (res) {
         setPost(res.data)
       }

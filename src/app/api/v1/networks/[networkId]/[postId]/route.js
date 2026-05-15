@@ -9,13 +9,15 @@ export const runtime = 'nodejs'
 
 export async function GET(request, { params }) {
   try {
-    const { id } = await params
+    const { networkId, postId } = await params
     const { searchParams } = new URL(request.url)
     const viewerAddress = searchParams.get('viewer_address')
 
-    let queryParams = [id]
+    let queryParams = [postId, networkId]
     if (viewerAddress) queryParams.unshift(viewerAddress) // Add to front for the has_liked subquery
-
+console.log(
+  networkId, postId
+)
     /* SQL Logic:
        - p.id: Internal database ID
        - n.chain_id: The blockchain identifier
@@ -35,7 +37,7 @@ export async function GET(request, { params }) {
       FROM posts p
       JOIN networks n ON p.network_id = n.id
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
-      WHERE p.id = ?
+      WHERE p.id = ? AND n.chain_id = ?
       LIMIT 1
     `
 
