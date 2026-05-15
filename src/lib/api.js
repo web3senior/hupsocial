@@ -58,7 +58,7 @@ export const recordPostView = async (networkId, postId, walletAddress = null) =>
     const viewerId = getViewerId(walletAddress)
 
     /* Construct the dynamic URL using the database primary key */
-    const url = `/api/v1/${networkId}/${postId}/view`
+    const url = `/api/v1/networks/${networkId}/${postId}/view`
 
     const response = await fetch(url, {
       method: 'POST',
