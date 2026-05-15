@@ -18,7 +18,7 @@ export async function POST(request, { params }) {
     const userAgent = request.headers.get('user-agent');
 
     /* Validate that both the post and viewer identities are present */
-    if (!id || !viewer_id) {
+    if (!networkId || !postId || !viewer_id) {
       return NextResponse.json(
         { success: false, error: 'Missing post ID or viewer identity' },
         { status: 400 }
