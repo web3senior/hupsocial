@@ -243,6 +243,7 @@
       place-items: center;
       border-radius: 1000px;
       color: var(--black-600);
+      isolation: isolate;
 
       @media (max-width: 600px) {
         padding: 8px;
