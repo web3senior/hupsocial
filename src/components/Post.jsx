@@ -16,7 +16,6 @@ import { getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import commentAbi from '@/abi/post-comment.json'
@@ -25,15 +24,12 @@ import Profile from '@/components/Profile'
 import {
   CommentIcon,
   ShareIcon,
-  RepostIcon,
   TipIcon,
   BlueCheckMarkIcon,
-  ThreeDotIcon,
   ViewIcon,
 } from '@/components/Icons'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import { getIPFS } from '@/lib/ipfs'
 import MediaGallery from './Gallery'
 import { Ellipsis } from 'lucide-react'
 import { Repeat2 } from 'lucide-react'
@@ -41,9 +37,8 @@ import { MessageCircle } from 'lucide-react'
 import { Heart } from 'lucide-react'
 import { Box } from 'lucide-react'
 import { SendHorizonal } from 'lucide-react'
-import { useTicker } from '@/hooks/useTicker'
 import styles from './Post.module.scss'
-import Ticker from './Ticker'
+
 
 /**
  * Converts Markdown to sanitized HTML with ticker support.
@@ -54,35 +49,35 @@ function renderMarkdown(markdown) {
 
   const renderer = new marked.Renderer()
 
-  // In Marked v12, 'text' can be an object or a string
+  // In modern Marked, renderer methods receive a single token object
   renderer.text = (token) => {
-    // 1. Extract the actual text content from the token/string
-    const rawText = typeof token === 'string' ? token : token.text
+    // Handle both old versions (string) and new versions (object)
+    const rawText = typeof token === 'string' ? token : (token.text || '')
 
-    if (!rawText) return ''
-
-    // 2. Perform the regex replacement
+    // Perform the regex replacement for tickers
     return rawText.replace(/\$([A-Z0-9]{1,10})\b/g, (match, symbol) => {
       return `<span class="ticker-trigger" style="cursor:help; border-bottom:1px dotted;" data-symbol="${symbol}">${match}</span>`
     })
   }
 
-  renderer.link = (href, title, text) => {
-    // Basic link override for target="_blank"
-    return `<a href="${href}" title="${title || ''}" rel="noopener noreferrer" target="_blank">${text}</a>`
+  // Updated signature: link(token) instead of link(href, title, text)
+  renderer.link = (token) => {
+    // Extract properties from the token object
+    const { href, title, text } = token
+    const titleAttr = title ? ` title="${title}"` : ''
+    
+    return `<a href="${href}"${titleAttr} rel="noopener noreferrer" target="_blank">${text}</a>`
   }
 
-  // 3. Configure and parse
-  // Use marked.parse with a custom renderer passed in the options
+  // Configure and parse
   const dirtyHtml = marked.parse(content, {
     renderer,
     gfm: true,
     breaks: true,
   })
 
-  // 4. Sanitize
+  // Sanitize the output
   return DOMPurify.sanitize(dirtyHtml, {
-    // Add data-chain and data-address to allowed attributes
     ADD_ATTR: ['target', 'rel', 'data-symbol', 'data-chain', 'data-address'],
     ADD_TAGS: ['span'],
   })
