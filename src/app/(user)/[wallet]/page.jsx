@@ -161,8 +161,7 @@ export default function Page() {
     //   setTotalPosts(totalPosts)
 
     // })
-    getPosts(1, 10, null, params.wallet).then((res) => {
-      console.log(res)
+    getPosts(1, 40, null, params.wallet).then((res) => {
       setTotalPosts(res.meta.count)
       setPosts({ list: res.data })
       if (postsLoaded === 0 && !isLoadedPoll) {
