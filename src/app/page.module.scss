@@ -15,7 +15,6 @@
     border: 1px solid var(--gray-300);
     border-radius: 24px;
     overflow: hidden;
-    isolation: isolate;
 
     @media (max-width: 600px) {
       border: none;

@@ -1,26 +1,33 @@
 .stickyHeader {
-  position: sticky;
-  top: 0;
-  // Blur effect
-  -webkit-backdrop-filter: blur(28.5px);
-  backdrop-filter: blur(28.5px);
-  z-index: 1;
+position: sticky;
+top:0;
+  width: fit-content;
+margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--white); // Add a background to prevent transparency while scrolling
+  border-bottom: 1px solid var(--gray-200); 
 }
 
 .pageTitle {
   margin: 0;
   height: 3rem;
+  line-height: 3rem; // Vertically center text if not using flex
 
   color: var(--black-900);
   font-weight: 500;
   font-size: var(--font-size-15);
   text-transform: capitalize;
   user-select: none;
+  width: 100%; // Ensure it takes full width for text alignment
+  max-width: 1200px; // Optional: constrain width for large screens
+  padding: 0 1rem;
 
   span {
+    display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: block;
   }
 }

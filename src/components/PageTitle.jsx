@@ -3,25 +3,35 @@
 import { useEffect, memo } from 'react'
 import styles from './PageTitle.module.scss'
 
-const PageTitle = ({ name }) => {
+/**
+ * PageTitle Component
+ * Sets the document title and renders a sticky header.
+ */
+const PageTitle = ({ name = '' }) => {
   useEffect(() => {
-    if (name) {
-      document.title = `${name} | ${process.env.NEXT_PUBLIC_NAME}`
+    // Avoid running logic if name is empty
+    if (!name) return
+
+    const siteName = process.env.NEXT_PUBLIC_NAME || 'Default Site'
+    document.title = `${name} | ${siteName}`
+    
+    // Optional: Cleanup function to reset title when component unmounts
+    return () => {
+      document.title = siteName
     }
   }, [name])
 
+  // Early return pattern: keeps the main return block clean
   if (!name) return null
 
   return (
     <header className={styles.stickyHeader}>
-        <div className={`__container`} data-width={`small`}>
-            <h1 className={`${styles.pageTitle} d-f-c`}>
+      <h1 className={styles.pageTitle}>
         <span>{name}</span>
-      </h1> 
-        </div>
-   
+      </h1>
     </header>
   )
 }
 
+// Exporting with memo to prevent re-renders unless 'name' changes
 export default memo(PageTitle)

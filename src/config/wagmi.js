@@ -22,11 +22,6 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 // }
 
 export const CONTRACTS = {
-  // chain11155111: {
-  //   post: '',
-  //   comment: '',
-  //   status: '',
-  // },
   chain4201: {
     // LUKSO
     post: '0xCb885C28D1b005701249F92E43089b44204a7313',

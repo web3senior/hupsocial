@@ -4,24 +4,8 @@
   border-radius: 999px;
 }
 
-.profileShimmer {
-  &__pfp {
-  }
-}
-
-.badge {
-  width: 14px;
-  height: 14px;
-
-  svg {
-    width: inherit;
-    height: inherit;
-    border: 1px solid var(--gray-200);
-  }
-}
 
 figure.profile {
-  column-gap: 0.5rem;
   cursor: pointer;
   width: fit-content;
 
@@ -51,12 +35,25 @@ figure.profile {
 
 .name {
   font-weight: 600;
-  color: var(--gray-900);
+  line-height: 1;
+}
+
+
+.badge {
+  width: 14px;
+  height: 14px;
+
+  svg {
+    width: inherit;
+    height: inherit;
+    border: 1px solid var(--gray-200);
+  }
 }
 
 .createdAt {
   margin-left: 5px;
   font-weight: 400;
+   line-height: 1; 
   color: var(--gray-400);
 }
 

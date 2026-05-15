@@ -1,121 +1,158 @@
 .galleryWrapper {
-  position: relative;
+
 }
 
 .mediaItem {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  background-color: var(--gray-100); // Fallback for loading
-  will-change: transform;
-  transition: all 0.2s ease;
+  background-color: #1a1a1a;
+  transition: transform 0.2s ease;
 
-  &:active {
-    transform: scale(0.99);
-  }
-
-  &:hover {
-    .spolier {
-      background: rgba(0, 0, 0, 0.4);
-    }
+  &:hover .controls {
+    opacity: 1;
   }
 }
 
-.spolier {
-  position: absolute;
-  bottom: 1rem;
-  left: 1rem;
-  z-index: 10;
-  padding: 4px 12px;
-  border-radius: 1000px;
-  border: none;
-  background: rgba(0, 0, 0, 0.3);
-  color: white;
-  cursor: pointer;
-}
-
-/* CAROUSEL STATE */
-.embla {
-  overflow: hidden;
-  cursor: grab;
-
-  .mediaItem {
-    width: auto;
-    height: 340px; // Fixed height for carousel items
-
-    img,
-    video {
-      display: block;
-      width: auto;
-      height: 100%;
-      object-fit: cover; // Ensures media fills the area without distortion
-      aspect-ratio: 0.75; // 4:3 aspect ratio
-    }
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
-.embla__container {
+.mediaContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
   display: flex;
-  backface-visibility: hidden;
-  touch-action: pan-y pinch-zoom;
-  margin-left: -12px;
+  align-items: center;
+  justify-content: center;
 }
 
-.embla__slide {
-  flex: 0 0 auto;
-  min-width: 0;
-  padding-left: 12px;
-}
-
-/* SINGLE VIEW STATE */
-.singleView {
-  width: fit-content;
-
-  .mediaItem {
-    video,
-    img {
-      width: auto;
-      height: auto;
-      max-height: 450px; // Sync with parent max-height
-      max-width: 100%;
-      object-fit: contain; // Ensures no cropping
-    }
-
-    @media (max-width: 639px) {
-      video,
-      img {
-        width: 100%;
-        max-height: 350px; // Smaller height for mobile
-      }
-    }
-  }
-}
-
-.muteButton {
+.controls {
   position: absolute;
-  right: 1rem;
-  bottom: 1rem;
-  z-index: 10;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 5;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   border: none;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: transform 0.2s ease, background 0.2s;
-  will-change: transform;
+  backdrop-filter: blur(4px);
+  &:hover { background: rgba(0, 0, 0, 0.8); }
+}
 
-  &:hover {
-    background: rgba(0, 0, 0, 0.7);
-    transform: scale(1.1);
+.spoilerOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(20px);
+  cursor: pointer;
+  z-index: 2;
+  span {
+    padding: 6px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    color: white;
+    font-weight: 500;
   }
+}
+
+/* Base Media Styles */
+.videoPlayer, .displayImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Main Gallery Carousel */
+.embla {
+  overflow: hidden;
+  .mediaItem {
+    height: 340px;
+    width: auto;
+    img, video { aspect-ratio: 3/4; }
+  }
+}
+.embla__container { display: flex; margin-left: -12px; }
+.embla__slide { flex: 0 0 auto; padding-left: 12px; }
+
+/* Lightbox Styles */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightboxEmbla {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.lightboxContainer {
+  display: flex;
+  height: 100%;
+}
+
+.lightboxSlide {
+  flex: 0 0 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.fullscreenImage, .fullscreenVideo {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  box-shadow: 0 0 30px rgba(0,0,0,0.5);
+}
+
+.closeBtn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  z-index: 10001;
+  opacity: 0.7;
+  &:hover { opacity: 1; }
+}
+
+.navBtn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  z-index: 10001;
+  padding: 20px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  &:hover { opacity: 1; }
+  &.prev { left: 10px; }
+  &.next { right: 10px; }
 }

@@ -1,44 +1,56 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { Volume2, VolumeX } from 'lucide-react'
+import { Volume2, VolumeX, Maximize2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import styles from './Gallery.module.scss'
 
 export default function MediaGallery({ data = [] }) {
+  // State for gallery behavior
   const [isMuted, setIsMuted] = useState(true)
   const [revealedItems, setRevealedItems] = useState({})
-  // New state to store resolved Blob URLs for 0G storage
   const [resolvedUrls, setResolvedUrls] = useState({})
+  
+  // State for Lightbox (Maximize)
+  const [selectedIndex, setSelectedIndex] = useState(null)
   
   const videoRefs = useRef([])
   const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
   const isCarousel = data.length > 1
 
-  const [emblaRef] = useEmblaCarousel({
+  // Main Gallery Carousel
+  const [emblaRef, emblaApi] = useEmblaCarousel({
     active: isCarousel,
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
   })
 
+  // Lightbox Carousel
+  const [lightboxRef, lightboxApi] = useEmblaCarousel({
+    startIndex: selectedIndex || 0,
+    loop: true
+  })
+
+  // Synchronize lightbox index
+  useEffect(() => {
+    if (lightboxApi && selectedIndex !== null) {
+      lightboxApi.scrollTo(selectedIndex, true)
+    }
+  }, [lightboxApi, selectedIndex])
+
   // Resolve 0G Hashes
   useEffect(() => {
     const urlsToRevoke = []
-
     const load0GAssets = async () => {
       const newResolved = { ...resolvedUrls }
-      
       for (const item of data) {
-        // Only fetch if it's 0G, has a CID, and hasn't been resolved yet
         if (item?.storage === '0G' && item.cid && !resolvedUrls[item.cid]) {
           try {
             const res = await fetch(`/api/0g/download?hash=${item.cid}`)
             if (!res.ok) throw new Error('Download failed')
-            
             const blob = await res.blob()
             const activeUrl = URL.createObjectURL(blob)
-            
             newResolved[item.cid] = activeUrl
             urlsToRevoke.push(activeUrl)
           } catch (err) {
@@ -48,16 +60,13 @@ export default function MediaGallery({ data = [] }) {
       }
       setResolvedUrls(newResolved)
     }
-
     load0GAssets()
-
-    // Cleanup: Revoke object URLs to prevent memory leaks
     return () => {
       urlsToRevoke.forEach(url => URL.revokeObjectURL(url))
     }
   }, [data])
 
-  // Intersection Observer for video autoplay
+  // Video Autoplay Observer
   useEffect(() => {
     const observerOptions = { threshold: 0.6 }
     const handleIntersection = (entries) => {
@@ -70,19 +79,75 @@ export default function MediaGallery({ data = [] }) {
         }
       })
     }
-
     const observer = new IntersectionObserver(handleIntersection, observerOptions)
     videoRefs.current.forEach((video) => {
       if (video) observer.observe(video)
     })
-
     return () => observer.disconnect()
-  }, [data, resolvedUrls]) // Re-run when URLs resolve so observer attaches to new src
+  }, [data, resolvedUrls])
+
+  const handleReveal = (index, e) => {
+    e.stopPropagation()
+    setRevealedItems((prev) => ({ ...prev, [index]: true }))
+  }
+
+  const openLightbox = (index) => {
+    setSelectedIndex(index)
+    document.body.style.overflow = 'hidden' // Prevent scroll
+  }
+
+  const closeLightbox = () => {
+    setSelectedIndex(null)
+    document.body.style.overflow = ''
+  }
 
   if (!data.length) return null
 
-  const handleReveal = (index) => {
-    setRevealedItems((prev) => ({ ...prev, [index]: true }))
+  // Helper to render media content
+  const renderMedia = (item, i, isFullscreen = false) => {
+    const isVideo = item.type === 'video'
+    let url = ''
+    if (item?.storage === '0G') {
+      url = resolvedUrls[item.cid] || ''
+    } else if (item.cid) {
+      url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+    }
+
+    const isBlurred = item.spoiler && !revealedItems[i] && !isFullscreen
+
+    if (item?.storage === '0G' && !url) {
+      return <div className={styles.loadingPlaceholder} />
+    }
+
+    return (
+      <div className={styles.mediaContainer}>
+        {isVideo ? (
+          <video
+            ref={isFullscreen ? null : (el) => (videoRefs.current[i] = el)}
+            src={url}
+            loop
+            muted={isMuted}
+            autoPlay={isFullscreen}
+            controls={isFullscreen}
+            playsInline
+            className={isFullscreen ? styles.fullscreenVideo : styles.videoPlayer}
+            style={{ filter: isBlurred ? 'blur(40px)' : 'none' }}
+          />
+        ) : (
+          <img
+            src={url}
+            alt={item.alt || `Gallery item ${i}`}
+            className={isFullscreen ? styles.fullscreenImage : styles.displayImage}
+            style={{ filter: isBlurred ? 'blur(40px)' : 'none' }}
+          />
+        )}
+        {isBlurred && (
+          <div className={styles.spoilerOverlay} onClick={(e) => handleReveal(i, e)}>
+            <span>Spoiler</span>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -92,73 +157,68 @@ export default function MediaGallery({ data = [] }) {
         ref={isCarousel ? emblaRef : null}
       >
         <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
-          {data.map((item, i) => {
-            const isVideo = item.type === 'video'
-            let url = ''
-
-            // Logic to determine source URL
-            if (item?.storage === '0G') {
-              url = resolvedUrls[item.cid] || '' // Use the blob URL from state
-            } else if (item.cid) {
-              url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
-            }
-
-            const isBlurred = item.spoiler && !revealedItems[i]
-
-            // Don't render until we have a URL for 0G items to prevent broken src
-            if (item?.storage === '0G' && !url) {
-                return <div key={i} className={styles.loadingPlaceholder} /> 
-            }
-
-            return (
-              <div
-                key={`${item.cid}-${i}`}
-                className={isCarousel ? styles.embla__slide : styles.singleSlide}
-              >
-                <div
-                  className={styles.mediaItem}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (isBlurred) handleReveal(i)
-                  }}
-                >
-                  {isVideo ? (
-                    <>
-                      <video
-                        ref={(el) => (videoRefs.current[i] = el)}
-                        src={url}
-                        loop
-                        muted={isMuted}
-                        playsInline
-                        className={styles.videoPlayer}
-                        style={{ filter: isBlurred ? 'blur(20px)' : 'none' }}
-                      />
-                      <button
-                        className={styles.muteButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setIsMuted(!isMuted)
-                        }}
-                      >
-                        {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                      </button>
-                    </>
-                  ) : (
-                    <img
-                      src={url}
-                      alt={item.alt || `Gallery item ${i}`}
-                      className={styles.displayImage}
-                      loading="lazy"
-                      style={{ filter: isBlurred ? 'blur(20px)' : 'none' }}
-                    />
+          {data.map((item, i) => (
+            <div
+              key={`${item.cid}-${i}`}
+              className={isCarousel ? styles.embla__slide : styles.singleSlide}
+            >
+              <div className={styles.mediaItem}>
+                {renderMedia(item, i)}
+                
+                <div className={styles.controls}>
+                  {item.type === 'video' && (
+                    <button
+                      className={styles.iconButton}
+                      onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
+                    >
+                      {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                    </button>
                   )}
-                  {isBlurred && <span className={styles.spolier}>Spoiler</span>}
+                  <button 
+                    className={styles.iconButton} 
+                    onClick={() => openLightbox(i)}
+                  >
+                    <Maximize2 size={16} />
+                  </button>
                 </div>
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Lightbox Overlay */}
+      {selectedIndex !== null && (
+        <div className={styles.lightbox} onClick={closeLightbox}>
+          <button className={styles.closeBtn} onClick={closeLightbox}>
+            <X size={32} />
+          </button>
+          
+          <button 
+            className={`${styles.navBtn} ${styles.prev}`} 
+            onClick={(e) => { e.stopPropagation(); lightboxApi?.scrollPrev(); }}
+          >
+            <ChevronLeft size={40} />
+          </button>
+
+          <div className={styles.lightboxEmbla} ref={lightboxRef} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.lightboxContainer}>
+              {data.map((item, i) => (
+                <div className={styles.lightboxSlide} key={`full-${i}`}>
+                  {renderMedia(item, i, true)}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button 
+            className={`${styles.navBtn} ${styles.next}`} 
+            onClick={(e) => { e.stopPropagation(); lightboxApi?.scrollNext(); }}
+          >
+            <ChevronRight size={40} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { useMemo } from 'react'
+import Image from 'next/image'
 import useSWR from 'swr'
 import { useRouter } from 'next/navigation'
 import { getProfile, getUniversalProfile } from '@/lib/api'
@@ -11,87 +13,102 @@ import styles from './Profile.module.scss'
 const DEFAULT_USERNAME = 'new-user'
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
-/*
- * Fetcher logic that mimics your fallback chain:
- * Universal Profile -> Local DB -> Fallback Default
- */
+// Fetcher logic extracted for better testability and SWR compatibility
 const profileFetcher = async (address) => {
+  if (!address) return null
+
   try {
-    // 1. Try Universal Profile (LUKSO Standards)
-    const res = await getUniversalProfile(address);
+    // Attempt Universal Profile (LUKSO) first
+    const res = await getUniversalProfile(address)
     if (res?.data?.Profile?.[0]?.isContract) {
-      const p = res.data.Profile[0];
+      const p = res.data.Profile[0]
       return {
         wallet: res.data.id,
-        // Only use the name if it isn't null/empty
         name: p.name || DEFAULT_USERNAME,
         profileImage: p.profileImages?.[0]?.src || DEFAULT_PFP,
-      };
+      }
     }
-    
-    // 2. Try Local Database
-    const localRes = await getProfile(address);
+
+    // Fallback to local database
+    const localRes = await getProfile(address)
     if (localRes?.wallet_address) {
       return {
         ...localRes,
-        // Check if name is null from the API response you just shared
         name: localRes.name || DEFAULT_USERNAME,
-        profileImage: localRes.profileImage 
-          ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${localRes.profileImage}`
-          : DEFAULT_PFP
-      };
+        profileImage: localRes.profileImage
+          ? DEFAULT_PFP//`${process.env.NEXT_PUBLIC_UPLOAD_URL}${localRes.profileImage}`
+          : DEFAULT_PFP,
+      }
     }
   } catch (e) {
-    console.error("Profile fetch error", e);
+    console.error("Profile fetch error:", e)
   }
 
-  // 3. Absolute Fallback
-  return { wallet: address, name: DEFAULT_USERNAME, profileImage: DEFAULT_PFP };
-};
+  return { wallet: address, name: DEFAULT_USERNAME, profileImage: DEFAULT_PFP }
+}
 
 export default function Profile({
   creator,
   createdAt,
   chainId,
-  variant = 'full', // options: 'imageOnly', 'compact', 'full'
+  variant = 'full',
 }) {
   const router = useRouter()
 
-  // SWR handles caching and loading state
-  const { data: profile, isLoading } = useSWR(creator ? `profile-${creator}` : null, () =>
-    profileFetcher(creator),
+  const { data: profile, isLoading } = useSWR(
+    creator ? `profile-${creator}` : null,
+    () => profileFetcher(creator),
+    { revalidateOnFocus: false } // Prevents flickering when switching tabs
   )
+
+  const chainInfo = useMemo(() => {
+    return chainId ? config.chains.find((c) => c.id === chainId) : null
+  }, [chainId])
+
+  const handleNavigation = (e) => {
+    e.stopPropagation()
+    if (creator) router.push(`/${creator}`)
+  }
 
   if (isLoading || !profile) {
     return (
       <div className={`${styles.profileShimmer} flex align-items-center gap-050`}>
-        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
+        <div className="shimmer rounded-full" style={{ width: 36, height: 36 }} />
         {variant !== 'imageOnly' && (
           <div className="flex flex-column gap-025">
-            <div className="shimmer rounded" style={{ width: `60px`, height: `10px` }} />
+            <div className="shimmer rounded" style={{ width: 80, height: 14 }} />
+            {variant === 'full' && <div className="shimmer rounded" style={{ width: 120, height: 10 }} />}
           </div>
         )}
       </div>
     )
   }
 
-  const chainInfo = chainId ? config.chains.find((c) => c.id === chainId) : null
+  const truncatedAddress = creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
 
   return (
     <figure
-      className={`${styles.profile} flex align-items-center`}
-      onClick={(e) => {
-        e.stopPropagation()
-        router.push(`/${creator}`)
-      }}
+      className={`${styles.profile} flex align-items-center gap-050`}
+      onClick={handleNavigation}
+      role="button"
+      tabIndex={0}
     >
-      <img alt={profile.name} src={profile.profileImage} className="rounded" />
+      <div className={styles.imageWrapper}>
+        <Image
+          alt={profile.name}
+          src={profile.profileImage}
+          width={36}
+          height={36}
+          className="rounded-full"
+          unoptimized={profile.profileImage.includes('ipfs')} // IPFS images often need raw gateway access
+        />
+      </div>
 
       {variant !== 'imageOnly' && (
-        <figcaption className="flex flex-column">
+        <figcaption className="flex flex-column justify-center gap-025">
           <div className="flex align-items-center gap-025">
             <span className={styles.name}>{profile.name}</span>
-            <img alt="verified" src={blueCheckMarkIcon.src} width={14} />
+            <Image alt="verified" src={blueCheckMarkIcon} width={14} height={14} />
 
             {chainInfo && (
               <div
@@ -106,7 +123,9 @@ export default function Profile({
             )}
           </div>
 
-          {variant === 'full' && <code>{`${creator.slice(0, 6)}…${creator.slice(38)}`}</code>}
+          {variant === 'full' && creator && (
+            <code className={styles.address}>{truncatedAddress}</code>
+          )}
         </figcaption>
       )}
     </figure>
