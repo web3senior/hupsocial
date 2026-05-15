@@ -8,6 +8,8 @@ import { getIPFS } from '@/lib/ipfs'
 import styles from './AISummary.module.scss'
 import { Sparkles } from 'lucide-react'
 import clsx from 'clsx'
+const DEFAULT_USERNAME = 'new-user'
+const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
 export default function AISummary({ addr, posts, poaps }) {
   // Initialize state hooks for managing component UI data
@@ -15,6 +17,7 @@ export default function AISummary({ addr, posts, poaps }) {
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+
 
   // Fetcher logic extracted for better testability and SWR compatibility
   const profileFetcher = async (address) => {

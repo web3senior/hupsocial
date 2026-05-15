@@ -20,10 +20,11 @@ const profileFetcher = async (address) => {
   try {
     // Attempt Universal Profile (LUKSO) first
     const res = await getUniversalProfile(address)
-    if (res?.data?.Profile?.[0]?.isContract) {
-      const p = res.data.Profile[0]
+    console.log(res)
+    if (res?.Profile?.[0]?.isContract) {
+      const p = res.Profile[0]
       return {
-        wallet: res.data.id,
+        wallet: res.id,
         name: p.name || DEFAULT_USERNAME,
         profileImage: p.profileImages?.[0]?.src || DEFAULT_PFP,
       }

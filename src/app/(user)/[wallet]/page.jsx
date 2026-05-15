@@ -181,7 +181,7 @@ export default function Page() {
 
             {/* Ensure posts, the list, and POAPs exist before mounting */}
             {posts?.list?.length > 0 && POAPs && (
-              <AISummary addr={address} posts={posts} poaps={POAPs} />
+              <AISummary addr={params.wallet} posts={posts} poaps={POAPs} />
             )}
 
             <details className="mt-10">
@@ -414,27 +414,28 @@ const Profile = ({ addr }) => {
 
   useEffect(() => {
     getUniversalProfile(addr).then((res) => {
+      console.log(res)
       if (
-        res.data &&
-        Array.isArray(res.data.Profile) &&
-        res.data.Profile.length > 0 &&
-        res.data.Profile[0].isContract
+        res.Profile &&
+        Array.isArray(res.Profile) &&
+        res.Profile.length > 0 &&
+        res.Profile[0].isContract
       ) {
         setIsItUp(true)
         setData({
-          wallet: res.data.Profile[0].id,
-          name: res.data.Profile[0].name,
-          description: res.data.Profile[0].description,
+          wallet: res.Profile[0].id,
+          name: res.Profile[0].name,
+          description: res.Profile[0].description,
           profileImage:
-            res.data.Profile[0].profileImages.length > 0
-              ? res.data.Profile[0].profileImages[0].src
+            res.Profile[0].profileImages.length > 0
+              ? res.Profile[0].profileImages[0].src
               : '',
           profileHeader: '',
-          tags: JSON.stringify(res.data.Profile[0].tags),
-          links: JSON.stringify(res.data.Profile[0].links_),
+          tags: JSON.stringify(res.Profile[0].tags),
+          links: JSON.stringify(res.Profile[0].links_),
           lastUpdate: '',
         })
-        setSelfView(addr.toString().toLowerCase() === res.data.Profile[0].id.toLowerCase())
+        setSelfView(addr.toString().toLowerCase() === res.Profile[0].id.toLowerCase())
       } else {
         getProfile(addr).then((res) => {
           if (res.wallet_address) {
@@ -475,10 +476,10 @@ const Profile = ({ addr }) => {
 
             <code className={`${styles.profile__wallet}`}>
               <Link
-                href={`${activeChain[0].blockExplorers.default.url}/address/${data.wallet_address}`}
+                href={`${activeChain[0].blockExplorers.default.url}/address/${params.wallet}`}
                 target={`_blank`}
               >
-                {`${data.wallet_address.slice(0, 4)}…${data.wallet_address.slice(38)}`}
+                {`${params.wallet.slice(0, 4)}…${params.wallet.slice(38)}`}
               </Link>
             </code>
 
