@@ -33,14 +33,11 @@
   &__main {
     &__media {
       overflow: hidden;
-      // background-color: var(--gray-100);
       border-radius: var(--global-border-radius);
     }
 
     &__content {
       height: auto;
-      //width: fit-content;
-      // max-height: 150px;
       overflow: hidden;
       line-height: 1.4;
 
@@ -215,9 +212,6 @@
         color: var(--gray-400);
       }
     }
-  }
-
-  &__footer {
   }
 
   &__actions {
