@@ -605,7 +605,6 @@ const ShareModal = ({ item, setShowShareModal }) => {
  * @returns
  */
 const Like = ({ id, likeCount, hasLiked }) => {
-  console.log(id, likeCount, hasLiked)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
