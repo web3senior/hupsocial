@@ -1,26 +1,30 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Image from 'next/image'
 import useSWR from 'swr'
 import { useRouter } from 'next/navigation'
 import { getProfile, getUniversalProfile } from '@/lib/api'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { config } from '@/config/wagmi'
+import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import styles from './Profile.module.scss'
 
 const DEFAULT_USERNAME = 'new-user'
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
-// Fetcher logic extracted for better testability and SWR compatibility
+/**
+ * Clean data fetcher that queries LUKSO Universal Profiles first, 
+ * falling back to the local database configuration.
+ * Adheres to rule: No side-effect logic here.
+ */
 const profileFetcher = async (address) => {
   if (!address) return null
 
   try {
-    // Attempt Universal Profile (LUKSO) first
+    // Attempt Universal Profile (LUKSO) mapping first
     const res = await getUniversalProfile(address)
-    console.log(res)
     if (res?.Profile?.[0]?.isContract) {
       const p = res.Profile[0]
       return {
@@ -30,19 +34,17 @@ const profileFetcher = async (address) => {
       }
     }
 
-    // Fallback to local database
+    // Fallback to local database mapping
     const localRes = await getProfile(address)
     if (localRes?.wallet_address) {
       return {
         ...localRes,
         name: localRes.name || DEFAULT_USERNAME,
-        profileImage: localRes.profileImage
-          ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${localRes.profileImage}`
-          : DEFAULT_PFP,
+        profileImage: localRes.profileImage || DEFAULT_PFP,
       }
     }
   } catch (e) {
-    console.error("Profile fetch error:", e)
+    console.error('Profile fetch pipeline error:', e)
   }
 
   return { wallet: address, name: DEFAULT_USERNAME, profileImage: DEFAULT_PFP }
@@ -55,12 +57,38 @@ export default function Profile({
   variant = 'full',
 }) {
   const router = useRouter()
+  const [resolvedUrl, setResolvedUrl] = useState(null)
 
+  // SWR handles client-side caching gracefully
   const { data: profile, isLoading } = useSWR(
     creator ? `profile-${creator}` : null,
     () => profileFetcher(creator),
-    { revalidateOnFocus: false } // Prevents flickering when switching tabs
+    { revalidateOnFocus: false }
   )
+
+  // Asynchronously resolve 0G hashes using our storageHelper script
+  useEffect(() => {
+    // If there's no profile image asset or it's a standard web URL/IPFS CID, exit
+    if (!profile?.profileImage || !is0GHash(profile.profileImage)) {
+      setResolvedUrl(null)
+      return
+    }
+
+    let isMounted = true
+
+    const getAssetBlob = async () => {
+      const blobUrl = await resolve0GUrl(profile.profileImage)
+      if (blobUrl && isMounted) {
+        setResolvedUrl(blobUrl)
+      }
+    }
+
+    getAssetBlob()
+
+    return () => {
+      isMounted = false
+    }
+  }, [profile?.profileImage])
 
   const chainInfo = useMemo(() => {
     return chainId ? config.chains.find((c) => c.id === chainId) : null
@@ -87,21 +115,29 @@ export default function Profile({
 
   const truncatedAddress = creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
 
+  // Determine the final rendering image target string
+  const finalImageSrc = is0GHash(profile.profileImage)
+    ? (resolvedUrl || '/placeholder-loading-spinner.gif')
+    : profile.profileImage
+
   return (
     <figure
       className={`${styles.profile} flex align-items-center gap-050`}
       onClick={handleNavigation}
       role="button"
       tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') handleNavigation(e)
+      }}
     >
       <div className={styles.imageWrapper}>
         <img
           alt={profile.name}
-          src={profile.profileImage}
+          src={finalImageSrc}
           width={36}
           height={36}
           className="rounded-full"
-          unoptimized={profile.profileImage.includes('ipfs')} // IPFS images often need raw gateway access
+          style={{ objectFit: 'cover' }}
         />
       </div>
 

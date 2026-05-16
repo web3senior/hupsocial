@@ -43,7 +43,7 @@ import PageTitle from '@/components/PageTitle'
 import PostForm from '@/components/PostForm'
 import styles from './page.module.scss'
 import AISummary from '@/components/AISummary'
-
+import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
@@ -348,15 +348,16 @@ const Nav = ({ item }) => {
   )
 }
 /**
- * Profile
- * @param {String} addr
- * @returns
+ * Detailed Profile View Layer
+ * Handles data mapping for local profiles and native LUKSO Universal Profiles.
  */
 const Profile = ({ addr }) => {
-  const [data, setData] = useState()
-  const [selfView, setSelfView] = useState()
+  const [data, setData] = useState(null)
+  const [selfView, setSelfView] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [isItUp, setIsItUp] = useState(false)
+  const [resolved0gUrl, setResolved0gUrl] = useState(null)
+
   const params = useParams()
   const { address, isConnected } = useConnection()
   const { disconnect } = useDisconnect()
@@ -373,19 +374,103 @@ const Profile = ({ addr }) => {
     hash,
   })
 
-  const follow = async () => toast(`Coming soon `, `warning`)
+  const follow = async () => toast(`Coming soon`, `warning`)
 
   const handleDisconnect = async () => {
     disconnect()
-
-    // setTimeout(() => {
-    //   window.location.reload()
-    // }, 2000)
   }
 
-  const Tags = ({ tags }) => {
-    tags = JSON.parse(tags)
-    if (tags === null) {
+  const editProfile = () => {
+    if (isItUp) {
+      toast(`Please update your profile through Universal Profile`, `error`)
+      return
+    }
+    setShowProfileModal(true)
+  }
+
+  // Effect layer to load structural user details from chain vs database collections
+  useEffect(() => {
+    if (!addr) return
+
+    let isMounted = true
+
+    getUniversalProfile(addr).then((res) => {
+      if (!isMounted) return
+
+      if (
+        res?.Profile &&
+        Array.isArray(res.Profile) &&
+        res.Profile.length > 0 &&
+        res.Profile[0].isContract
+      ) {
+        const upRecord = res.Profile[0]
+        setIsItUp(true)
+        setData({
+          wallet: upRecord.id,
+          name: upRecord.name || '',
+          description: upRecord.description || '',
+          profileImage: upRecord.profileImages?.length > 0 ? upRecord.profileImages[0].src : '',
+          profileHeader: '',
+          tags: JSON.stringify(upRecord.tags || []),
+          links: JSON.stringify(upRecord.links_ || []),
+          lastUpdate: '',
+        })
+        setSelfView(addr.toString().toLowerCase() === upRecord.id.toLowerCase())
+      } else {
+        getProfile(addr).then((localRes) => {
+          if (!isMounted) return
+          if (localRes?.wallet_address) {
+            localRes.profileImageName = localRes.profileImage
+            setData(localRes)
+            setSelfView(addr.toString().toLowerCase() === localRes.wallet_address.toLowerCase())
+          }
+        })
+      }
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [addr])
+
+  // Effect layer to resolve 0G Storage assets dynamically when data variations hit the state tracking
+  useEffect(() => {
+    if (!data?.profileImage || !is0GHash(data.profileImage)) {
+      setResolved0gUrl(null)
+      return
+    }
+
+    let isMounted = true
+
+    const fetchStorageAsset = async () => {
+      const assetBlobUrl = await resolve0GUrl(data.profileImage)
+      if (assetBlobUrl && isMounted) {
+        setResolved0gUrl(assetBlobUrl)
+      }
+    }
+
+    fetchStorageAsset()
+
+    return () => {
+      isMounted = false
+    }
+  }, [data?.profileImage])
+
+  // Isolated sub-rendering wrapper to manage variable text arrays cleanly
+  const TagsElement = ({ rawTags }) => {
+    let listItems = []
+    try {
+      if (rawTags) {
+        const parsed = typeof rawTags === 'string' ? JSON.parse(rawTags) : rawTags
+        if (Array.isArray(parsed)) {
+          listItems = parsed
+        }
+      }
+    } catch (err) {
+      console.error('Failed parsing tag list matrix string:', err)
+    }
+
+    if (listItems.length === 0) {
       return (
         <>
           <small>#profile</small>
@@ -395,130 +480,98 @@ const Profile = ({ addr }) => {
       )
     }
 
-    let tagList = []
-    tags.forEach((element) => {
-      tagList.push(<small>#{element}</small>)
-    })
-
-    return <>{...tagList}</>
+    return (
+      <>
+        {listItems.map((tag, idx) => (
+          <small key={`profile-tag-${idx}`}>#{tag}</small>
+        ))}
+      </>
+    )
   }
-
-  const editProfile = () => {
-    console.log(isItUp)
-    if (isItUp) {
-      toast(`Please update your profile through Universal Profile`, `error`)
-      return
-    }
-    setShowProfileModal(true)
-  }
-
-  useEffect(() => {
-    getUniversalProfile(addr).then((res) => {
-      console.log(res)
-      if (
-        res.Profile &&
-        Array.isArray(res.Profile) &&
-        res.Profile.length > 0 &&
-        res.Profile[0].isContract // means: is it a UP? yes/no?
-      ) {
-        setIsItUp(true)
-        setData({
-          wallet: res.Profile[0].id,
-          name: res.Profile[0].name,
-          description: res.Profile[0].description,
-          profileImage:
-            res.Profile[0].profileImages.length > 0
-              ? res.Profile[0].profileImages[0].src
-              : '',
-          profileHeader: '',
-          tags: JSON.stringify(res.Profile[0].tags),
-          links: JSON.stringify(res.Profile[0].links_),
-          lastUpdate: '',
-        })
-       setSelfView(addr.toString().toLowerCase() === res.Profile[0].id.toLowerCase())
-      } else {
-        getProfile(addr).then((res) => {
-          if (res.wallet_address) {
-            res.profileImageName = res.profileImage
-            const profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-            res.profileImage = profileImage
-            setData(res)
-            setSelfView(addr.toString().toLowerCase() === res.wallet_address.toLowerCase())
-          }
-        })
-      }
-    })
-  }, [])
 
   if (!data) return <div className={`shimmer ${styles.shimmer}`} />
+
+  const targetWallet = params?.wallet || addr || ''
+  const displayWalletString = targetWallet.length >= 42
+    ? `${targetWallet.slice(0, 4)}…${targetWallet.slice(-4)}`
+    : targetWallet
+
+  // Image source fallbacks: 0G download cache -> raw database value -> default text path string
+  const finalAvatarImageSource = is0GHash(data.profileImage)
+    ? (resolved0gUrl || '/placeholder-loading-spinner.gif')
+    : (data.profileImage || '/placeholder-avatar.png')
+
+  const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
 
   return (
     <>
       {showProfileModal && data && (
-        <ProfileModal profile={data} setShowProfileModal={setShowProfileModal} />
+        <ProfileModal 
+          profile={data} 
+          setShowProfileModal={setShowProfileModal} 
+          updateProfile={updateProfile}
+        />
       )}
 
-      <section
-        className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}
-      >
-        <header className={`flex flex-row align-items-center justify-content-between gap-050`}>
-          <div
-            className={`flex-1 flex flex-column align-items-start justify-content-center gap-025`}
-          >
-            <div className={`${styles.profile__header}`}>
-              <b className={styles.profile__name}>{data.name !== '' ? data.name : `hup-user`}</b>
+      <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
+        <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
+          <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
+            <div className={styles.profile__header}>
+              <b className={styles.profile__name}>{data.name ? data.name : 'hup-user'}</b>
               <img
                 className={styles.profile__checkmark}
                 alt="Checkmark"
-                src={blueCheckMarkIcon.src}
+                src={blueCheckMarkIcon.src || blueCheckMarkIcon}
               />
             </div>
 
-            <code className={`${styles.profile__wallet}`}>
+            <code className={styles.profile__wallet}>
               <Link
-                href={`${activeChain[0].blockExplorers.default.url}/address/${params.wallet}`}
-                target={`_blank`}
+                href={`${explorerBaseUrl}/address/${targetWallet}`}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                {`${params.wallet.slice(0, 4)}…${params.wallet.slice(38)}`}
+                {displayWalletString}
               </Link>
             </code>
 
             <p className={`${styles.profile__description} mt-20`}>
-              {data.description || `This user has not set up a bio yet.`}
+              {data.description || 'This user has not set up a bio yet.'}
             </p>
 
-            <div
-              className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}
-            >
-              <Tags tags={data.tags} />
+            <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
+              <TagsElement rawTags={data.tags} />
             </div>
           </div>
 
           <div className={`${styles.profile__pfp} rounded relative`}>
-            <figure className={``}>
-              <img alt={`PFP`} src={`${data.profileImage}`} />
+            <figure>
+              <img 
+                alt="PFP" 
+                src={finalAvatarImageSource} 
+                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} 
+              />
             </figure>
 
             <Status addr={addr} profile={data} selfView={selfView} />
           </div>
         </header>
 
-        <footer className={`w-100`}>
-          <ul className={`flex flex-column align-items-center justify-content-between gap-1`}>
-            <li className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}>
-              <div
-                className={`flex flex-row align-items-start justify-content-start gap-025 w-100`}
-              >
-                <button className={`${styles.btnFollowers}`}>
-                  <span className={`mt-20 text-secondary`}>{100} followers</span>
+        <footer className="w-100">
+          <ul className="flex flex-column align-items-center justify-content-between gap-1 padding-left-0">
+            <li className="flex flex-row align-items-center justify-content-between gap-025 w-100">
+              <div className="flex flex-row align-items-center justify-content-start gap-025">
+                <button className={styles.btnFollowers} type="button">
+                  <span className="text-secondary">100 followers</span>
                 </button>
                 <span>•</span>
                 <Link
-                  className={`${styles.link}`}
-                  target={`_blank`}
-                  href={`https://hup.social/${addr}`}
+                  className={styles.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  href={`https://hup.social/${targetWallet}`}
                 >
-                  hup.social/{`${addr.slice(0, 4)}…${addr.slice(38)}`}
+                  hup.social/{displayWalletString}
                 </Link>
               </div>
 
@@ -528,29 +581,31 @@ const Profile = ({ addr }) => {
             </li>
 
             {isConnected && selfView && (
-              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-                {address.toString().toLowerCase() === params.wallet.toString().toLowerCase() && (
-                  <>
+              <li className="w-100 grid grid--fit gap-1" style={{ '--data-width': '200px' }}>
+                {address.toString().toLowerCase() === targetWallet.toString().toLowerCase() && (
+                  <div className="flex gap-1 w-100">
                     <button
-                      className={`${styles.profile__btnFollow}`}
-                      onClick={() => editProfile()}
+                      className={`${styles.profile__btnFollow} flex-1`}
+                      type="button"
+                      onClick={editProfile}
                     >
                       Edit profile
                     </button>
                     <button
-                      className={`${styles.profile__btnDisconnect}`}
-                      onClick={() => handleDisconnect()}
+                      className={`${styles.profile__btnDisconnect} flex-1`}
+                      type="button"
+                      onClick={handleDisconnect}
                     >
                       Disconnect
                     </button>
-                  </>
+                  </div>
                 )}
               </li>
             )}
 
             {!selfView && (
-              <li className={`w-100 grid grid--fit gap-1`} style={{ '--data-width': `200px` }}>
-                <button className={`${styles.profile__btnFollow}`} onClick={() => follow()}>
+              <li className="w-100 grid grid--fit gap-1" style={{ '--data-width': '200px' }}>
+                <button className={`${styles.profile__btnFollow} w-100`} type="button" onClick={follow}>
                   Follow
                 </button>
               </li>
@@ -1099,7 +1154,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     hash,
   })
     const uploadFileToIPFS = async (file) => {
-    setIsUploading(true)
 
     try {
       if (!file) {
@@ -1115,11 +1169,10 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
         body: data,
       })
       const signedUrl = await uploadRequest.json()
-      setIsUploading(false)
+      
       console.log(`rootHash: ${signedUrl.rootHash}`)
       return signedUrl.rootHash
     } catch (e) {
-      setIsUploading(false)
       console.log(e)
       console.error('Trouble uploading file')
     }
