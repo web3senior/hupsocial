@@ -419,7 +419,7 @@ const Profile = ({ addr }) => {
         res.Profile &&
         Array.isArray(res.Profile) &&
         res.Profile.length > 0 &&
-        res.Profile[0].isContract
+        res.Profile[0].isContract // means: is it a UP? yes/no?
       ) {
         setIsItUp(true)
         setData({
@@ -435,7 +435,7 @@ const Profile = ({ addr }) => {
           links: JSON.stringify(res.Profile[0].links_),
           lastUpdate: '',
         })
-        setSelfView(addr.toString().toLowerCase() === res.Profile[0].id.toLowerCase())
+       setSelfView(addr.toString().toLowerCase() === res.Profile[0].id.toLowerCase())
       } else {
         getProfile(addr).then((res) => {
           if (res.wallet_address) {
@@ -443,7 +443,7 @@ const Profile = ({ addr }) => {
             const profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
             res.profileImage = profileImage
             setData(res)
-            setSelfView(addr.toString().toLowerCase() === res.wallet.toLowerCase())
+            setSelfView(addr.toString().toLowerCase() === res.wallet_address.toLowerCase())
           }
         })
       }
@@ -1068,16 +1068,17 @@ const Status = ({ addr, profile, selfView }) => {
   )
 }
 
+
 /**
  * Profile Modal
  * @param {*} param0
  * @returns
  */
-const ProfileModal = ({ profile, setShowProfileModal }) => {
+const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
   const [error, setError] = useState(null)
   const [isPending, setIsPending] = useState(false)
-  const [tags, setTags] = useState({ list: JSON.parse(profile.tags) || [] })
-  const [links, setLinks] = useState({ list: JSON.parse(profile.links) || [] })
+  const [tags, setTags] = useState({ list: JSON.parse(profile.tags || '[]') })
+  const [links, setLinks] = useState({ list: JSON.parse(profile.links || '[]') })
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
 
@@ -1097,36 +1098,121 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
+    const uploadFileToIPFS = async (file) => {
+    setIsUploading(true)
 
-  const handleSubmit = async (e) => {
+    try {
+      if (!file) {
+        console.error('No file selected.')
+        return
+      }
+
+      const data = new FormData()
+      data.set('file', file)
+
+      const uploadRequest = await fetch(`/api/0g/file`, {//`/api/ipfs/file`
+        method: 'POST',
+        body: data,
+      })
+      const signedUrl = await uploadRequest.json()
+      setIsUploading(false)
+      console.log(`rootHash: ${signedUrl.rootHash}`)
+      return signedUrl.rootHash
+    } catch (e) {
+      setIsUploading(false)
+      console.log(e)
+      console.error('Trouble uploading file')
+    }
+  }
+
+const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isConnected) return
 
     setIsPending(true)
+    setError(null)
 
     const formData = new FormData(e.target)
-    const name = formData.get('name')
-    const description = formData.get('description')
+    const fileInput = formData.get('profileImage')
+
+    let profileImageHash = formData.get('profileImage_hidden') // Fallback to existing image name/hash
+
+    // Check if the user actually picked a new file
+    if (fileInput && fileInput.size > 0) {
+      try {
+        toast('Uploading image to 0G Storage...', 'info')
+        // Call your 0G upload helper function
+        const rootHash = await uploadFileToIPFS(fileInput)
+        
+        if (!rootHash) {
+          throw new Error('Failed to retrieve root hash from 0G')
+        }
+        
+        profileImageHash = rootHash
+      } catch (uploadErr) {
+        console.error('0G Storage Error:', uploadErr)
+        setError('Failed to upload image to decentralized storage.')
+        setIsPending(false)
+        return // Stop the profile update if the image upload fails
+      }
+    }
+
+    // Explicitly overwrite or append the finalized values to the FormData instance
+    formData.set('profileImage', profileImageHash) // Storing the 0G rootHash string instead of the file object
     formData.set('tags', JSON.stringify(tags.list))
     formData.set('links', JSON.stringify(links.list))
-    const errors = {}
 
-    updateProfile(formData, address).then((res) => {
+    try {
+      const res = await updateProfile(formData, address)
       if (res.success) {
-        setIsPending(false)
         toast(`Your profile has been updated.`, 'success')
+        setShowProfileModal(false)
+      } else {
+        setError(res.error || 'Failed to update profile')
       }
-    })
+    } catch (err) {
+      console.error(err)
+      setError('An unexpected error occurred')
+    } finally {
+      setIsPending(false)
+    }
   }
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault()
+  //   if (!isConnected) return
+
+  //   setIsPending(true)
+  //   setError(null)
+
+  //   const formData = new FormData(e.target)
+    
+  //   // Explicitly overwrite or append the reactive state arrays as JSON strings
+  //   formData.set('tags', JSON.stringify(tags.list))
+  //   formData.set('links', JSON.stringify(links.list))
+
+  //   try {
+  //     const res = await updateProfile(formData, address)
+  //     if (res.success) {
+  //       toast(`Your profile has been updated.`, 'success')
+  //       setShowProfileModal(false)
+  //     } else {
+  //       setError(res.error || 'Failed to update profile')
+  //     }
+  //   } catch (err) {
+  //     console.error(err)
+  //     setError('An unexpected error occurred')
+  //   } finally {
+  //     setIsPending(false)
+  //   }
+  // }
 
   const showPFP = (e) => {
     const preview = pfpRef.current
-
     const file = e.target.files[0]
     const reader = new FileReader()
 
     reader.addEventListener('load', () => {
-      // convert image file to base64 string
+      // convert image file to base64 string for instant local preview
       preview.src = reader.result
     })
 
@@ -1136,208 +1222,199 @@ const ProfileModal = ({ profile, setShowProfileModal }) => {
   }
 
   const addTag = (e) => {
-    const newTag = tagRef.current.value
+    const newTag = tagRef.current.value.trim()
     if (newTag === '') return
 
-    const isReduntant = tags.list.filter((filterItem) => filterItem === newTag)
-    if (isReduntant.length === 0) setTags({ list: tags.list.concat(newTag) })
-    tagRef.current.value = null
+    const isRedundant = tags.list.some((tag) => tag.toLowerCase() === newTag.toLowerCase())
+    if (!isRedundant) {
+      setTags({ list: [...tags.list, newTag] })
+    }
+    tagRef.current.value = ''
   }
 
-  const removeTag = (e, tag) => {
-    setTags({ list: tags.list.filter((filterItem) => filterItem !== tag) })
+  const removeTag = (e, tagToRemove) => {
+    setTags({ list: tags.list.filter((tag) => tag !== tagToRemove) })
   }
 
   const addLink = (e) => {
-    const newLinkName = linkNameRef.current.value
-    const newLinkURL = linkURLRef.current.value
+    const newLinkName = linkNameRef.current.value.trim()
+    const newLinkURL = linkURLRef.current.value.trim()
     if (newLinkName === '' || newLinkURL === '') return
 
-    const isReduntant = links.list.filter((filterItem) => filterItem.name === newLinkName)
-    if (isReduntant.length === 0)
-      setLinks({ list: links.list.concat({ name: newLinkName, url: newLinkURL }) })
-    linkNameRef.current.value = null
-    linkURLRef.current.value = null
+    const isRedundant = links.list.some((link) => link.name.toLowerCase() === newLinkName.toLowerCase())
+    if (!isRedundant) {
+      setLinks({ list: [...links.list, { name: newLinkName, url: newLinkURL }] })
+    }
+    linkNameRef.current.value = ''
+    linkURLRef.current.value = ''
   }
 
-  const removeLink = (e, link) => {
-    setLinks({ list: links.list.filter((filterItem) => filterItem !== link) })
+  const removeLink = (e, linkToRemove) => {
+    // FIXED: Using name matching instead of reference matching for deep objects
+    setLinks({ list: links.list.filter((link) => link.name !== linkToRemove.name) })
   }
 
   useEffect(() => {
-    setActiveChain(getActiveChain())
-    // getStatus(addr).then((res) => {
-    //   console.log(res)
-    //   setStatus(res)
-    // })
-  }, [])
+    if (typeof getActiveChain === 'function') {
+      setActiveChain(getActiveChain())
+    }
+  }, [getActiveChain])
+
   return (
-    <>
-      <div
-        className={`${styles.profileModal} animate fade`}
-        onMouseDown={() => setShowProfileModal(false)}
-      >
-        <div className={`${styles.profileModal__card}`} onMouseDown={(e) => e.stopPropagation()}>
-          <header className={``}>
-            <div className={``} aria-label="Close" onClick={() => setShowProfileModal(false)}>
-              <svg
-                class="x1lliihq x1n2onr6 x5n08af"
-                fill="currentColor"
-                height="16"
-                role="img"
-                viewBox="0 0 24 24"
-                width="16"
-              >
-                <title>Close</title>
-                <line
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  x1="21"
-                  x2="3"
-                  y1="3"
-                  y2="21"
-                ></line>
-                <line
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  x1="21"
-                  x2="3"
-                  y1="21"
-                  y2="3"
-                ></line>
-              </svg>
-            </div>
-            <div className={`flex-1`}>
-              <h3>Update profile</h3>
-            </div>
-            <div className={`pointer`}></div>
-          </header>
-
-          <main className={`flex flex-column align-items-center gap-1 `}>
-            {isConfirmed && <p className="text-center badge badge-success">Done</p>}
-            <form
-              className={`form`}
-              action=""
-              onSubmit={(e) => handleSubmit(e)}
-              encType={`multipart/form-data`}
+    <div
+      className={`${styles.profileModal} animate fade`}
+      onMouseDown={() => setShowProfileModal(false)}
+    >
+      <div className={`${styles.profileModal__card}`} onMouseDown={(e) => e.stopPropagation()}>
+        <header className="flex align-items-center">
+          <div className="pointer" aria-label="Close" onClick={() => setShowProfileModal(false)}>
+            <svg
+              className="x1lliihq x1n2onr6 x5n08af"
+              fill="currentColor"
+              height="16"
+              role="img"
+              viewBox="0 0 24 24"
+              width="16"
             >
-              <div className={`form-group`}>
-                <figure className={`rounded`}>
-                  <img ref={pfpRef} src={`${profile.profileImage}`} />
-                </figure>
-              </div>
-              <div className={`form-group`}>
-                <label htmlFor="">Profile picture</label>
-                <input type="file" name="profileImage" id="" onChange={(e) => showPFP(e)} />
-                <input
-                  type="hidden"
-                  name="profileImage_hidden"
-                  defaultValue={profile.profileImageName}
-                />
-              </div>
-              <div className={`form-group`}>
-                <label htmlFor="">Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  id=""
-                  defaultValue={profile.name}
-                  placeholder={`Name`}
-                />
-              </div>
-              <div className={`form-group`}>
-                <label htmlFor="">Bio</label>
-                <textarea
-                  name="description"
-                  id=""
-                  defaultValue={profile.description}
-                  placeholder="Profile bio"
-                ></textarea>
-              </div>
+              <title>Close</title>
+              <line
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                x1="21"
+                x2="3"
+                y1="3"
+                y2="21"
+              ></line>
+              <line
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                x1="21"
+                x2="3"
+                y1="21"
+                y2="3"
+              ></line>
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3>Update profile</h3>
+          </div>
+        </header>
 
-              <details open>
-                <summary>Advanced</summary>
-                <div>
-                  <div>
-                    <div className={`flex flex-wrap`}>
-                      {tags.list.length > 0 &&
-                        tags.list.map((tag, i) => (
-                          <>
-                            <span key={i} className={`${styles['form-tag']}`}>
-                              {tag}
-                              <button type="button" onClick={(e) => removeTag(e, tag)}>
-                                X
-                              </button>
-                            </span>
-                          </>
-                        ))}
-                    </div>
+        <main className="flex flex-column align-items-center gap-1">
+          {isConfirmed && <p className="text-center badge badge-success">Done</p>}
+          <form
+            className="form"
+            onSubmit={handleSubmit}
+            encType="multipart/form-data"
+          >
+            <div className="form-group">
+              <figure className="rounded">
+                <img ref={pfpRef} src={profile.profileImage || '/placeholder-avatar.png'} alt="Profile preview" />
+              </figure>
+            </div>
+            
+            <div className="form-group">
+              <label>Profile picture</label>
+              <input type="file" name="profileImage" accept="image/*" onChange={showPFP} />
+              <input
+                type="hidden"
+                name="profileImage_hidden"
+                defaultValue={profile.profileImageName}
+              />
+            </div>
 
-                    <div className={`form-group flex`}>
-                      <input ref={tagRef} type="text" name="tags" id="" placeholder={`Tag`} />
-                      <button type="button" onClick={(e) => addTag(e)}>
-                        Add
-                      </button>
-                    </div>
+            <div className="form-group">
+              <label>Name</label>
+              <input
+                type="text"
+                name="name"
+                defaultValue={profile.name}
+                placeholder="Name"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Bio</label>
+              <textarea
+                name="description"
+                defaultValue={profile.description}
+                placeholder="Profile bio"
+              ></textarea>
+            </div>
+
+            <details open>
+              <summary>Advanced</summary>
+              <div className="advanced-content">
+                <div className="tag-section">
+                  <div className="flex flex-wrap gap-0-5 margin-bottom-0-5">
+                    {tags.list.map((tag, i) => (
+                      <span key={`tag-${i}`} className={styles['form-tag']}>
+                        {tag}
+                        <button type="button" onClick={(e) => removeTag(e, tag)}>
+                          X
+                        </button>
+                      </span>
+                    ))}
                   </div>
 
-                  <div>
-                    <div className={`flex flex-wrap`}>
-                      {links.list.length > 0 &&
-                        links.list.map((link, i) => (
-                          <>
-                            <span key={i} className={`${styles['form-link']}`}>
-                              {link.name}
-                              <button type="button" onClick={(e) => removeLink(e, link)}>
-                                X
-                              </button>
-                            </span>
-                          </>
-                        ))}
-                    </div>
-
-                    <div className={`form-group flex`}>
-                      <input
-                        ref={linkNameRef}
-                        type="text"
-                        name="links"
-                        id=""
-                        placeholder={`Link Name`}
-                      />
-                      <input
-                        ref={linkURLRef}
-                        type="text"
-                        name="links"
-                        id=""
-                        placeholder={`Link URL`}
-                      />
-                      <button type="button" onClick={(e) => addLink(e)}>
-                        Add
-                      </button>
-                    </div>
+                  <div className="form-group flex">
+                    <input ref={tagRef} type="text" placeholder="Tag" />
+                    <button type="button" onClick={addTag}>
+                      Add
+                    </button>
                   </div>
                 </div>
-              </details>
 
-              <div className={`form-group`}>
-                <button type="submit" className="btn" disabled={isPending}>
-                  Update
-                </button>
-                {error && <p>{error}</p>}
+                <div className="link-section">
+                  <div className="flex flex-wrap gap-0-5 margin-bottom-0-5">
+                    {links.list.map((link, i) => (
+                      <span key={`link-${i}`} className={styles['form-link']}>
+                        {link.name}
+                        <button type="button" onClick={(e) => removeLink(e, link)}>
+                          X
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="form-group flex gap-0-5">
+                    <input
+                      ref={linkNameRef}
+                      type="text"
+                      placeholder="Link Name"
+                    />
+                    <input
+                      ref={linkURLRef}
+                      type="text"
+                      placeholder="Link URL"
+                    />
+                    <button type="button" onClick={addLink}>
+                      Add
+                    </button>
+                  </div>
+                </div>
               </div>
-            </form>
-          </main>
-        </div>
+            </details>
+
+            <div className="form-group margin-top-1">
+              <button type="submit" className="btn" disabled={isPending}>
+                {isPending ? 'Updating...' : 'Update'}
+              </button>
+              {error && <p className="error-text">{error}</p>}
+            </div>
+          </form>
+        </main>
       </div>
-    </>
+    </div>
   )
 }
+
 
 const CommentModal = ({ item, setShowCommentModal }) => {
   const [hasLiked, setHasLiked] = useState(false)

@@ -96,23 +96,30 @@ export async function getProfile(addr) {
 }
 
 /**
- * Update profile
- * @param {string} addr
- * @returns
+ * Sends updated profile details to the server backend.
+ * @param {FormData} formData - The multi-part form data payload containing profile fields.
+ * @param {string} address - The wallet address identifying the account to update.
+ * @returns {Promise<{success: boolean, message?: string, error?: string}>}
  */
-export async function updateProfile(formData, addr) {
-  var requestOptions = {
-    method: 'POST',
-    body: formData,
-    redirect: 'follow',
+export const updateProfile = async (formData, address) => {
+  try {
+    // Hits the Next.js API route you just created
+    const response = await fetch(`/api/v1/users/profile/${address}`, {
+      method: 'PUT',
+      body: formData, // Passes the FormData object directly; content headers are set automatically
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to update profile' }
+    }
+
+    return { success: true, message: data.message }
+  } catch (error) {
+    console.error('API Client Error:', error)
+    return { success: false, error: 'Network communication error' }
   }
-  const params = new URLSearchParams({ wallet: addr }).toString()
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}profile/update?${params}`,
-    requestOptions,
-  )
-  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
-  return response.json()
 }
 
 export async function getViewPost(chainId, postId) {
