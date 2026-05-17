@@ -10,28 +10,25 @@ export async function GET(req) {
   }
 
   try {
-    // 1. Initialize Indexer (Turbo mode recommended per docs)
+    // Initialize Indexer using the Turbo mode testnet endpoint
     const INDEXER_RPC = process.env.INDEXER_RPC || 'https://indexer-storage-testnet-turbo.0g.ai'
     const indexer = new Indexer(INDEXER_RPC)
 
-    // 2. Use downloadToBlob (The recommended way for in-memory/web handling)
-    // Returns [Blob, Error | null]
-    const [blob, dlErr] = await indexer.downloadToBlob(rootHash, {
-      //proof: true, // Enables Merkle proof verification
-    })
+    // Execute download from the 0G network into an in-memory blob structure
+    const [blob, dlErr] = await indexer.downloadToBlob(rootHash)
 
     if (dlErr !== null) {
       throw new Error(`0G Indexer Download Error: ${dlErr}`)
     }
 
-    // 3. Convert SDK Blob to Node.js Buffer for the Response
+    // Extract array buffer from the returned blob payload
     const arrayBuffer = await blob.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // 4. Return the file with appropriate headers
+    // Stream the binary asset payload back with aggressive edge caching headers
     return new Response(buffer, {
       headers: {
-        'Content-Type': 'image/png', // You can dynamically detect this if needed
+        'Content-Type': 'image/png',
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     })
