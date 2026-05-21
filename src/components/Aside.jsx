@@ -1,62 +1,80 @@
 'use client'
 
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import {
-  House,
-  Plus,
-  Search,
-  Users,
-  Trophy,
-  Calendar,
-  Briefcase,
-  LayoutGrid,
-  Heart,
-  Bookmark,
-  UserRound,
-  Equal,
-} from 'lucide-react'
-import logo from '@/../public/hup.svg'
+import { useTheme } from 'next-themes'
 import clsx from 'clsx'
+import { 
+  Circle, 
+  Equal, 
+  LayoutGridIcon, 
+  UserRound, 
+  PanelRightOpen, 
+  PanelRightClose, 
+  Code, 
+  Palette, 
+  Book, 
+  MessageSquareWarning, 
+  HelpCircle, 
+  Settings, 
+  Heart, 
+  Sun, 
+  Moon, 
+  Monitor, 
+  SquareTerminal, 
+  Bug 
+} from 'lucide-react'
+
+import logo from '@/../public/logo.svg'
+import { useClientMounted } from '@/hooks/useClientMount'
+import { useSidebarStore } from '@/stores/useSidebarStore'
+import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
-import { LayoutGridIcon } from 'lucide-react'
 
-const NAV_ITEMS = [
-  { name: 'Onchain', path: '/', icon: House },
-  { name: 'New post', path: '/new', icon: Plus },
-  { name: 'Search', path: '/search', icon: Search },
-  { name: 'br' },
-  { name: 'Communities', path: '/community', icon: Users },
-  { name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
-  { name: 'Events', path: '/events', icon: Calendar },
-  { name: 'Jobs', path: '/jobs', icon: Briefcase },
-  { name: 'Apps', path: '/apps', icon: LayoutGrid },
-  { name: 'br' },
-  { name: 'Activity', path: '/activity', icon: Heart },
-  { name: 'Saved', path: '/saved', icon: Bookmark },
-]
+const isActivePath = (pathname, path) => {
+  if (!path) return false
+  if (path === '/') return pathname === '/'
+  return pathname === path || pathname.startsWith(`${path}/`)
+}
 
-const NavLink = ({ item, isActive, isCompact }) => {
-  const { name, path, icon: Icon } = item
-  if (name === 'br') return <hr className={styles.divider} />
+const normalizeNavItem = (item) => {
+  if (item.name === 'br' || item.type === 'divider') {
+    return {
+      id: item.id ?? 'divider',
+      type: 'divider',
+    }
+  }
+
+  return {
+    id: item.id ?? item.path ?? item.href ?? item.name ?? item.label,
+    name: item.name ?? item.label,
+    path: item.path ?? item.href,
+    icon: item.icon,
+  }
+}
+
+const NavLink = ({ item, isActive, isExpanded, onNavigate }) => {
+  if (item.type === 'divider') {
+    return <hr className={styles.divider} />
+  }
+
+  const Icon = item.icon ?? Circle
 
   return (
     <Link
-      href={path}
+      href={item.path}
       className={clsx(styles.link, isActive && styles.linkActive)}
-      title={isCompact ? name : undefined}
+      title={isExpanded ? item.name : undefined}
+      onClick={onNavigate}
     >
       <div className={styles.iconWrapper}>
-        <Icon
-          size={20}
-          fill={isActive ? 'currentColor' : 'none'}
-          strokeWidth={isActive ? 2 : 1.7}
-        />
+        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.5} />
       </div>
-      {!isCompact && <span className={styles.linkText}>{name}</span>}
+
+      {!isExpanded && <span className={styles.linkText}>{item.name}</span>}
     </Link>
   )
 }
@@ -64,24 +82,26 @@ const NavLink = ({ item, isActive, isCompact }) => {
 export default function Aside() {
   const pathname = usePathname()
   const { address, isConnected } = useConnection()
+  const mounted = useClientMounted()
+   const { theme, setTheme } = useTheme()
 
-  // State for media query and hover
+  const navItems = useSidebarStore((state) => state.navItems)
+  const isMenuOpen = useSidebarStore((state) => state.isMenuOpen)
+  const toggleMenu = useSidebarStore((state) => state.toggleMenu)
+  const toggleMobileMenu = useSidebarStore((state) => state.toggleMobileMenu)
+  const closeMenu = useSidebarStore((state) => state.closeMenu)
+  const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
+  const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
+
   const [isWideScreen, setIsWideScreen] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  // Ref to hold the timer ID
-  const hoverTimeoutRef = useRef(null)
+  const [showMenu, setShowMenu] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    const mql = window.matchMedia('(min-width: 1150px)')
+    const mql = window.matchMedia('(min-width: 768px)') //1150px
 
-    // Set initial state
     setIsWideScreen(mql.matches)
 
-    // Listener for resize events
-    const handleChange = (e) => setIsWideScreen(e.matches)
+    const handleChange = (event) => setIsWideScreen(event.matches)
     mql.addEventListener('change', handleChange)
 
     return () => mql.removeEventListener('change', handleChange)
@@ -89,76 +109,216 @@ export default function Aside() {
 
   const navLinks = useMemo(() => {
     const profilePath = isConnected && address ? `/${address}` : '/connect'
-    return [...NAV_ITEMS, { name: 'Profile', path: profilePath, icon: UserRound }]
-  }, [address, isConnected])
 
-  // Handle Mouse Enter with Delay
-  const handleMouseEnter = () => {
-    // 200ms delay is usually the "sweet spot" for intent
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(true)
-    }, 200)
-  }
+    return [
+      ...navItems.map(normalizeNavItem).filter((item) => item.type === 'divider' || item.path),
+      {
+        id: 'profile',
+        name: 'Profile',
+        path: profilePath,
+        icon: UserRound,
+      },
+    ]
+  }, [address, isConnected, navItems])
 
-  // Handle Mouse Leave (Cancel the timer)
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current)
+  const isMobileLayout = !isWideScreen
+  const isExpanded = isMobileLayout ? isMobileMenuOpen : isMenuOpen
+  const shouldShowMobileMenu = isMobileLayout && isMobileMenuOpen
+
+  const handleToggleMenu = () => {
+    if (isMobileLayout) {
+      toggleMobileMenu()
+    } else {
+      toggleMenu()
     }
-    setIsHovered(false)
   }
 
-  // Determine if we should show the full labels
-  // Show full if: (Screen > 1150px) OR (Hovered)
-  const isExpanded = isWideScreen || isHovered
-
-  // Prevent hydration mismatch by not rendering dynamic parts until mounted
-  if (!mounted) return <aside className={styles.aside} style={{ width: '68px' }} />
+  if (!mounted) {
+    return <aside className={styles.aside} style={{ width: '68px' }} />
+  }
 
   return (
     <aside
-      className={clsx(styles.aside, isExpanded ? styles.expanded : styles.compact)}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      className={clsx(
+        styles.aside,
+
+        !isMobileLayout && (isExpanded ? styles.expanded : styles.compact),
+        shouldShowMobileMenu && styles.show,
+        shouldShowMobileMenu && styles.expanded,
+      )}
     >
       <div className={styles.navContainer}>
-        <div className={styles.logoWrapper}>
-          <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
+        <header className={styles.header}>
+          <div className={styles.logoWrapper}>
+            <Link href="/" className="flex align-items-center gap-025">
+               <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
+             
+             
+              {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
+            </Link>
+          </div>
+
           {isExpanded && (
-            <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>
+            <button className={styles.menuButton} onClick={handleToggleMenu}>
+              {isExpanded ? <PanelRightOpen size={18} strokeWidth={1.5} /> : <PanelRightClose size={18} strokeWidth={1.5} />}
+            </button>
           )}
-        </div>
+
+          <button className={clsx(styles.menuButton, styles.menuButtonFloat)} onClick={handleToggleMenu}>
+            {isExpanded ? <PanelRightOpen size={18} strokeWidth={1.5} /> : <PanelRightClose size={18} strokeWidth={1.5} />}
+          </button>
+        </header>
 
         <ul className={styles.navList}>
-          {navLinks.map((item, i) => (
-            <li key={i}>
-              <NavLink item={item} isActive={pathname === item.path} isCompact={!isExpanded} />
+          {navLinks.map((item, id) => (
+            <li key={id}>
+              <NavLink
+                item={item}
+                isActive={isActivePath(pathname, item.path)}
+                isExpanded={!isExpanded}
+                onNavigate={isMobileLayout ? closeMobileMenu : closeMenu}
+              />
             </li>
           ))}
         </ul>
 
         <div className={styles.footerNav}>
-          <div className={styles.more}>
-            <div className={styles.link}>
-              <div className={styles.iconWrapper}>
-                <Equal size={24} />
+          <NativePopover
+            trigger={
+              <button className={clsx(styles.link, styles.moreButton)}>
+                <div className={styles.iconWrapper}>
+                  <Equal size={24} />
+                </div>
+                {isExpanded && <span className={styles.linkText}>More</span>}
+              </button>
+            }
+            placement="top-end"
+            type="auto"
+          >
+            {({ close }) => (
+              <div className={styles.popoverContent}>
+                <ul className="flex flex-column gap-050">
+                  <li>
+                    <Link
+                      href="/settings"
+                      onClick={close}
+                      className="flex align-items-center gap-050"
+                    >
+                      <Settings size={16} />
+                      <span>Settings</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/liked"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={close}
+                      className="flex align-items-center gap-050"
+                    >
+                      <Heart size={16} />
+                      <span>Liked</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <a href="#" rel="noopener noreferrer" onClick={void 0} className="flex align-items-center gap-050">
+                      <Palette size={16} />
+                      <span>Theme</span>
+                    </a>
+                    <div className={clsx(styles.themeWrapper, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '60px' }}>
+                      <button
+                        onClick={()=>setTheme('light')}
+                      >
+                        <Sun size={16} />
+                        <span>Light</span>
+                      </button>
+                      <button onClick={()=>setTheme('dark')}>
+                        <Moon size={16} />
+                        <span>Dark</span>
+                      </button>
+                      <button onClick={()=>setTheme('terminal')}>
+                        <SquareTerminal size={16} />
+                        <span>Terminal</span>
+                      </button>
+                      <button onClick={()=>setTheme('system')}>
+                        <Monitor size={16} />
+                        <span>System</span>
+                      </button>
+                    </div>
+                  </li>
+                  <li>
+                    <a
+                      href="https://docs.hup.social"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={close}
+                      className="flex align-items-center gap-050"
+                    >
+                      <Book size={16} />
+                      <span>Documentation</span>
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://y7imctkw83d.typeform.com/to/kRWVNq6u"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={close}
+                      className="flex align-items-center gap-050"
+                    >
+                      <MessageSquareWarning size={16} />
+                      <span>Send feedback</span>
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://docs.google.com/forms/d/e/1FAIpQLSc-o--ue7vCnL54kg5H_M_-PbtFfIazip2UkN4VjCtGyonVGw/viewform?usp=publish-editor"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={close}
+                      className="flex align-items-center gap-050"
+                    >
+                      <Bug size={16} />
+                      <span>Report a problem</span>
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://github.com/web3senior/hupsocial"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={close}
+                      className="flex align-items-center gap-050"
+                    >
+                      <Code size={16} />
+                      <span>GitHub</span>
+                    </a>
+                  </li>
+                  <li>
+                    <a href="/help" target="_blank" rel="noopener noreferrer" onClick={close} className="flex align-items-center gap-050">
+                      <HelpCircle size={16} />
+                      <span>Help</span>
+                    </a>
+                  </li>
+                </ul>
               </div>
-              {isExpanded && <span className={styles.linkText}>More</span>}
-            </div>
-          </div>
+            )}
+          </NativePopover>
 
           <Link
-            href={`/chains`}
-            className={clsx(styles.link, pathname === `/chains` && styles.linkActive)}
-            title={`Chains`}
+            href="/chains"
+            className={clsx(styles.link, isActivePath(pathname, '/chains') && styles.linkActive)}
+            title="Networks"
+            onClick={isMobileLayout ? closeMobileMenu : closeMenu}
           >
             <div className={styles.iconWrapper}>
               <LayoutGridIcon
                 size={20}
-                fill={pathname === `/networks` ? 'currentColor' : 'none'}
-                strokeWidth={pathname === `/networks` ? 2 : 1.7}
+                fill={isActivePath(pathname, '/chains') ? 'currentColor' : 'none'}
+                strokeWidth={isActivePath(pathname, '/chains') ? 2 : 1.7}
               />
             </div>
+
             {isExpanded && <span className={styles.linkText}>Networks</span>}
           </Link>
         </div>

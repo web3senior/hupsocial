@@ -8,8 +8,11 @@ import { config } from '@/config/wagmi'
 import { useConnection, useDisconnect, useConnect, useChains, useSwitchChain } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { getProfile, getUniversalProfile } from '@/lib/api'
+import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import Shimmer from '@/components/ui/Shimmer'
 import styles from './ConnectWallet.module.scss'
+
+const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
@@ -91,7 +94,7 @@ export function WalletOptions() {
 }
 
 /**
- * Profile
+ * Profile identity component handling decentralized profile discovery profiles
  * @param {String} addr
  * @returns
  */
@@ -103,7 +106,7 @@ export function Profile({ addr }) {
     const fallbackProfile = {
       wallet: addr,
       name: 'Unknown',
-      profileImage: '',
+      profileImage: DEFAULT_PFP,
     }
 
     getUniversalProfile(addr)
@@ -123,7 +126,7 @@ export function Profile({ addr }) {
               if (localRes && localRes.wallet_address) {
                 const profileImage =
                   localRes.profileImage && localRes.profileImage !== ''
-                    ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${localRes.profileImage}`
+                    ? localRes.profileImage
                     : DEFAULT_PFP
                 setProfile({ ...localRes, profileImage })
               } else {
@@ -143,13 +146,18 @@ export function Profile({ addr }) {
       </div>
     )
 
+  // Determine standard URL structures vs 0G Root Hash streaming proxy endpoints dynamically on render
+  const finalImageSrc = is0GHash(profile.profileImage)
+    ? `${resolve0GUrl(profile.profileImage)}&w=72&q=75` 
+    : profile.profileImage
+
   return (
     <Link href={`/${addr}`}>
       <figure
         className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`}
         title={profile.name}
       >
-        <img alt={profile.name || `PFP`} src={`${profile.profileImage}`} className={`rounded`} />
+        <img alt={profile.name || `PFP`} src={finalImageSrc || DEFAULT_PFP} className={`rounded`} />
       </figure>
     </Link>
   )
@@ -193,14 +201,12 @@ export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
   }
 
   useEffect(() => {
-    // networkDialog.current.showModal()
     networkDialog.current.addEventListener('close', (e) => {
       const returnValue = networkDialog.current.returnValue
       if (returnValue === `close`) {
         return
       }
       handleSwitchChain(returnValue)
-      // networkDialog.current.close()
     })
   }, [isConnected])
 

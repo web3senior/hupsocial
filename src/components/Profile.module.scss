@@ -4,7 +4,6 @@
   border-radius: 999px;
 }
 
-
 figure.profile {
   cursor: pointer;
   width: fit-content;
@@ -20,11 +19,11 @@ figure.profile {
   > img {
     width: 36px;
     height: 36px;
-    border-radius: 1000px;
     margin-right: 0.5rem;
     border: 1px solid var(--gray-200);
     background: var(--gray-100);
     aspect-ratio: 1/1;
+    border-radius: 14px;
   }
 
   code {
@@ -34,14 +33,22 @@ figure.profile {
 }
 
 .name {
+  position: relative;
   font-weight: 600;
+  /* Removed height restriction to prevent bounding box clipping */
   line-height: 1;
-}
 
+  span {
+    /* Slight optical adjustment to balance descenders (like 'y') */
+    padding-bottom: 1px; 
+    display: inline-block;
+  }
+}
 
 .badge {
   width: 14px;
   height: 14px;
+
 
   svg {
     width: inherit;
@@ -53,27 +60,28 @@ figure.profile {
 .createdAt {
   margin-left: 5px;
   font-weight: 400;
-   line-height: 1; 
+  line-height: 1; 
   color: var(--gray-400);
 }
 
-@media (prefers-color-scheme: dark) {
+.imageWrapper {
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
 }
 
-/* Enable hover only on non-touch devices */
-@media (hover: hover) and (pointer: fine) {
-}
 
-@media (max-width: 600px) {
-  // .page {
-  //   padding: 32px;
-  //   padding-bottom: 80px;
-  // }
+.nameRow {
+  display: flex;
+  flex-direction: row;
+  // align-items: center;
+  align-items: first baseline;
+  gap: 0.25rem;
 
-  // .main {
-  //   align-items: center;
-  // }
-}
-
-@media (prefers-color-scheme: dark) {
+  b {
+    font-weight: 600;
+    line-height: 1;
+    position: relative;
+    top: -3px;
+  }
 }

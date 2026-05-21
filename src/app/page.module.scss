@@ -11,8 +11,8 @@
     position: relative;
     top: 0rem;
     min-height: 100svh;
-    background-color: var(--white, #fff);
-    border: 1px solid var(--gray-300);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 24px;
     overflow: hidden;
 
@@ -25,7 +25,7 @@
 
   hr {
     border: none;
-    border-top: 0.5px solid var(--gray-300);
+    border-top: 0.5px solid var(--border);
     opacity: 0.6; // Softens it further to look thinner
   }
 }

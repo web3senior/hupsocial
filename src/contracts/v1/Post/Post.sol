@@ -13,7 +13,7 @@ import "./IPostCommentManager.sol";
 /// @title Post
 /// @author Aratta Labs
 /// @notice Core contract for Status/Post creation, liking, and unliking, supporting gasless Meta Transactions and batch operations.
-/// @custom:version 1.4
+/// @custom:version 1
 /// @custom:emoji 📝
 contract Post is Ownable, Pausable, ReentrancyGuard, ERC2771Context {
     using Counters for Counters.Counter;

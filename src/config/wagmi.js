@@ -24,51 +24,52 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 export const CONTRACTS = {
   chain4201: {
     // LUKSO
-    post: '0xCb885C28D1b005701249F92E43089b44204a7313',
-    comment: '0x2a357c53cf617eb23a99A3E7fb0Be363e9dE8f04',
+    forwarder: '0x71A6392019f476eC75D19c0f7B5Ccb60162347CD',
+    hup: '0x28cF4C91FBbCFc877BF19060FAEfD5a3f6731215',
     status: '0x6B10B966C3369332De8c976da62249F38D6898ca',
   },
   chain11142220: {
-    post: '0x83f954b754538e1302C69F4b8BCC0eE847302a2C',
-    comment: '0x07F1BCE9585Fea0d72da07428A98293116634E4E',
+    // CELO
+    forwarder: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
+    hup: '0x8634130FF8D3De06121BEF04a25B78557883fe97',
     status: '0x13A71b258b685dFAC3bCe8b1530aAFD8daa180E1',
   },
   chain10143: {
     // Monad
-    post: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
-    comment: '0xc407722d150c8a65e890096869f8015D90a89EfD',
-    status: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
+    forwarder: '',
+    hup: '',
+    status: '',
   },
   chain59141: {
-    post: '0x1DdDEF888817A7ae49dcFf10Ac65e86427A37236',
-    comment: '0x927826f56603aD465504fe2Adb516EDCD16911ED',
-    status: '0x9aE36e2aF99c918e679c2A92f216EdA3b2d895dA',
+    forwarder: '',
+    hup: '',
+    status: '',
   },
   chain84532: {
     // Base
-    post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
-    comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
-    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    forwarder: '',
+    hup: '',
+    status: '',
   },
   chain11155420: {
-    post: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
-    comment: '0xc407722d150c8a65e890096869f8015D90a89EfD',
-    status: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
+    forwarder: '',
+    hup: '',
+    status: '',
   },
   chain1301: {
-    post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
-    comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
-    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    forwarder: '',
+    hup: '',
+    status: '',
   },
   chain8408: {
-    post: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
-    comment: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
-    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    forwarder: '',
+    hup: '',
+    status: '',
   },
   chain421614: {
-    post: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
-    comment: '0xA724524E11c971B8a98165DEc9065eBa563d424a',
-    status: '0x167486b8d7879351345378e1302EaD995CA9c505',
+    forwarder: '',
+    hup: '',
+    status: '',
   },
 }
 

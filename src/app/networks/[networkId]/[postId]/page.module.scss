@@ -11,11 +11,11 @@
   &__container {
     position: relative;
     top: 0rem;
-    background-color: var(--white, #fff);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
     box-shadow: var(--shadow-md);
     border-radius: var(--global-border-radius);
     overflow: hidden;
-    border: 1px solid var(--gray-300);
     isolation: isolate;
 
     @media (max-width: 640px) {

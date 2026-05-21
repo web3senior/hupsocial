@@ -1,0 +1,71 @@
+.panel {
+  padding: 1rem;
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  position: fixed;
+  inset: auto;
+  margin: 0;
+
+  opacity: 0;
+  transform: scale(0.96);
+  transform-origin: top left;
+
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    overlay 0.18s ease allow-discrete,
+    display 0.18s ease allow-discrete;
+
+  &:global(:popover-open) {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  &[data-placement='bottom-start'] {
+    position-area: bottom left;
+    margin-top: 6px;
+  }
+
+  &[data-placement='bottom-end'] {
+    position-area: bottom right;
+    margin-top: 6px;
+  }
+
+  &[data-placement='top-start'] {
+    position-area: top left;
+    margin-bottom: 6px;
+    transform-origin: bottom left;
+  }
+
+  &[data-placement='top-end'] {
+    position-area: top right;
+    margin-bottom: 6px;
+    transform-origin: bottom right;
+  }
+
+  &[data-placement='right-start'] {
+    position-area: right top;
+    margin-left: 6px;
+  }
+
+  &[data-placement='left-start'] {
+    position-area: left top;
+    margin-right: 6px;
+  }
+}
+
+.trigger {
+  all: unset;
+  cursor: pointer;
+}
+
+@starting-style {
+  .panel:global(:popover-open) {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}

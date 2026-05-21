@@ -37,6 +37,7 @@ import Comment from '@/components/Comment'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
+import Comments from '@/components/Comments'
 
 moment.defineLocale('en-short', {
   relativeTime: {
@@ -147,22 +148,22 @@ export default function Page() {
 
   // Effect 2: Initial Comments Load
   useEffect(() => {
-    // const initComments = async () => {
-    //   try {
-    //     const count = await getPostCommentCount(params.postId)
-    //     const total = web3.utils.toNumber(count)
-    //     setCommentCount(total)
+  //   const initComments = async () => {
+  //     try {
+  //       const count = await getPostCommentCount(params.postId)
+  //       const total = web3.utils.toNumber(count)
+  //       setCommentCount(total)
 
-    //     // Only auto-load if nothing has been loaded yet
-    //     if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
-    //       await loadMoreComment(total)
-    //     }
-    //   } catch (err) {
-    //     console.error('Failed to initialize comments', err)
-    //   }
-    // }
+  //       // Only auto-load if nothing has been loaded yet
+  //       if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
+  //         await loadMoreComment(total)
+  //       }
+  //     } catch (err) {
+  //       console.error('Failed to initialize comments', err)
+  //     }
+  //   }
 
-   // initComments()
+  //  initComments()
   }, [params.postId, showCommentModal]) // Trigger when modal opens or post changes
 
   return (
@@ -194,7 +195,13 @@ export default function Page() {
             )}
           </div>
 
-          {comments &&
+          <Comments
+            networkId={params.networkId}
+            postId={params.postId}
+            viewerAddress={address}
+          />
+
+          {/* {comments &&
             comments.list.length > 0 &&
             comments.list.map((item, i) => {
               return (
@@ -212,7 +219,7 @@ export default function Page() {
                   <hr />
                 </section>
               )
-            })}
+            })} */}
 
           {mounted && isConnected && (
             <div

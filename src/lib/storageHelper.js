@@ -1,9 +1,6 @@
 /**
- * Utility helper to handle 0G Storage asset resolution and cache tracking.
+ * Utility helper to handle 0G Storage asset routing.
  */
-
-// Simple local cache to keep track of already resolved 0G blob URLs across components
-const ogCache = new Map();
 
 /**
  * Checks if a given string is a 0G Storage root hash.
@@ -15,45 +12,13 @@ export const is0GHash = (src) => {
 };
 
 /**
- * Safely downloads a 0G asset via the backend proxy and returns a browser Object URL.
+ * Resolves a 0G root hash to a direct backend streaming proxy endpoint.
  * @param {string} hash - The 0G root hash.
- * @returns {Promise<string|null>} Resolves to a blob URL, or null if it fails.
+ * @returns {string|null} The API proxy endpoint URL, or null if invalid.
  */
-export const resolve0GUrl = async (hash) => {
+export const resolve0GUrl = (hash) => {
   if (!hash || !is0GHash(hash)) return null;
 
-  // Return from local memory if we've already fetched this asset in the current session
-  if (ogCache.has(hash)) {
-    return ogCache.get(hash);
-  }
-
-  try {
-    const res = await fetch(`/api/0g/download?hash=${hash}`);
-    if (!res.ok) throw new Error(`Failed to download 0G asset: ${res.statusText}`);
-
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-
-    // Save to cache so other components displaying this user's avatar don't re-download it
-    ogCache.set(hash, objectUrl);
-    return objectUrl;
-  } catch (error) {
-    console.error('Error resolving 0G asset URL:', error);
-    return null;
-  }
-};
-
-/**
- * Manages the explicit lifecycle clean-up of generated 0G object URLs.
- * Use this to completely wipe the active cache and clear memory instances if needed.
- */
-export const clear0GCache = () => {
-  ogCache.forEach((objectUrl) => {
-    try {
-      URL.revokeObjectURL(objectUrl);
-    } catch (e) {
-      console.error('Error revoking object URL:', e);
-    }
-  });
-  ogCache.clear();
+  // Point directly to the API endpoint to leverage native browser streaming and caching
+  return `/api/0g/download?hash=${hash}`;
 };

@@ -15,8 +15,8 @@
   &__container {
     position: relative;
     top: 0rem;
-    border: 1px solid var(--gray-300);
-    background-color: var(--white, #fff);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 24px;
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
     overflow: hidden;
@@ -35,7 +35,7 @@
 }
 
 .network {
-  background-color: var(--white);
+  background-color: var(--background);
   border: 1px solid transparent;
   border-radius: 20px;
   // box-shadow: var(--shadow-xs);
@@ -96,7 +96,7 @@
 @media (hover: hover) and (pointer: fine) {
   .network {
     &:hover {
-     background-color: var(--gray-100);
+     background-color: var(--surface);
       -webkit-transform: translateY(-2px);
       transform: translateY(-2px);
     }

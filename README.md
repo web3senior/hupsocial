@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hup
 
-## Getting Started
 
-First, run the development server:
+# Hup Unified Protocol Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+By treating all social interactions as a single `Content` primitive, Hup operates through a single, highly efficient smart contract.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### The Unified Primitive
+Every interaction on Hup is a "Content" object:
+- **Type 0 (Post):** The root of a conversation.
+- **Type 1 (Comment):** Content linked to a parent.
+- **Type 2 (Repost):** A reference to existing content.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Technical Advantages
+1. **Reduced Overhead:** No cross-contract state synchronization.
+2. **Indexer Optimization:** One contract to track; events are unified by Content ID.
+3. **Recursive Threading:** Because comments are posts, a comment can have its own comments indefinitely using the same `postChildren` logic.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Scalability with 0G
+By moving the actual text and media to **0G Storage** and only keeping the `Content` struct on-chain, this single contract can handle millions of interactions across any EVM chain without hitting state bloat limits.
 
-## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+### One potential risk: The 24KB Limit
+The only reason to keep them split would be if your code exceeds the **24KB limit**. However, since you are now using **one** struct and **one** set of logic to handle all three types, your code will actually be *shorter* than when you had two separate systems. You should have plenty of room.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Verdict:** Merge them. It makes the Hup protocol much more "elegant" and easier to deploy across multiple chains. One contract, one protocol, any EVM.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Shall we draft the final unified contract structure?
 
-## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Contract
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Extensions
+I can create another contract later for storage if i need right? it will act like attach data to posts but by the creator not owner of the contract
+
+Yes, absolutely. You can 100% decouple additional data layers and build them as standalone contracts later. This is actually a highly recommended Web3 architectural pattern called Pluggable Storage or an Extension Registry.
+
+## Interfaces
+How it works architecturally
+Your new contract will simply use an interface to talk to your deployed Hup contract. When someone tries to attach data to Post #42, the extension contract performs an external call to Hup.allContent(42) to verify who the actual creator is. If the msg.sender matches the creator address returned by Hup, it allows the write operation.
+
+# Metadata
+
+- IPFS://
+- 0G://
+- or plain text
+
+if (metadata.startsWith('0G://')) trigger the 0G Storage proxy downloader.
+
+if (metadata.startsWith('IPFS://')) route through your public IPFS gateway provider.
+
+else render as a plain text string instantly.

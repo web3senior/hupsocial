@@ -10,7 +10,8 @@ import { getActiveChain } from '@/lib/communication'
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
-import { usePostStore } from '@/store/usePostStore'
+import { usePostStore } from '@/stores/usePostStore'
+import NativePopover from '@/components/ui/NativePopover'
 
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/EventsTab'))
@@ -112,7 +113,7 @@ export default function Page() {
 
       try {
         const appsRes = await getApps(activeChain[0].id)
-        const postsRes = await getPosts(1, 10)//, activeChain[0].id
+        const postsRes = await getPosts(1, 10, null, null, address)
         setInitialData(appsRes, postsRes)
       } catch (error) {
         console.error('Initialization error:', error)
@@ -141,12 +142,12 @@ export default function Page() {
                     <section
                       key={item.id} 
                       className={`${styles.post} animate fade`}
-                      onClick={() => handlePostClick(item.id, item.chain_id)}
+                      onClick={() => handlePostClick(item.id, item.network_id)}
                     >
                       <Post 
                         item={item} 
                         networkName={item.network_name}
-                        actions={['like', 'comment', 'share', 'repost', 'hash', 'tip']} 
+                        actions={['like', 'comment', 'share', 'repost','quote', 'hash', 'tip']} 
                       />
                       {i < posts.list.length - 1 && <hr />}
                     </section>

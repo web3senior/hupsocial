@@ -1,14 +1,16 @@
 .wrapper {
   position: fixed;
   inset: 0;
+  z-index: 9999;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between; // Pushes content to top/bottom
+  justify-content: space-between;
   padding: 2rem 1rem;
-  background-color: var(--gray-50, #f9f9f9);
-  z-index: 9999;
   overflow: hidden;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 .mainContent {
@@ -19,49 +21,60 @@
 }
 
 .logoWrapper {
-  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  justify-content: center;
+}
 
-  .mainLogo {
-    width: auto;
-    height: 60px;
-    object-fit: contain;
-  }
+.mainLogo {
+  width: auto;
+  height: 60px;
+  object-fit: contain;
+  transition: filter 0.2s ease, opacity 0.2s ease;
 }
 
 .attribution {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.72;
+}
+
+.brand {
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  opacity: 0.7;
+  color: var(--foreground);
+  font-weight: 600;
+}
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 600;
-    color: var(--black-900);
+.brandLogo {
+  flex: 0 0 auto;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
 
-    &__name {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+.brandName {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 
-      small {
-        font-weight: 500;
-        font-size: var(--font-size-9);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--gray-500);
-      }
-
-      span {
-        font-size: var(--font-size-14);
-      }
-    }
+  small {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: var(--font-size-9);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
+
+  span {
+    color: var(--foreground);
+    font-size: var(--font-size-14);
+  }
+}
+
+:global([data-theme='dark']) .mainLogo,
+:global([data-theme='dark']) .brandLogo,
+:global([data-theme='terminal']) .mainLogo,
+:global([data-theme='terminal']) .brandLogo {
+  filter: brightness(0) invert(1);
 }

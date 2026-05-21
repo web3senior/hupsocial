@@ -26,6 +26,20 @@
     }
   }
 
+  &__repostLabel {
+    font-size: 12px;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    padding-left: 0.4rem;
+
+    svg {
+      opacity: 0.6;
+    }
+  }
+
   &__header {
     user-select: none;
   }
@@ -279,6 +293,17 @@
         transform: scale(0.88);
       }
     }
+  }
+}
+
+.post__navTrigger {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: none;
+  z-index: 1;
+  padding: .25rem;
+
+  &:hover {
+    background-color: var(--background);
   }
 }
 
@@ -1116,7 +1141,6 @@
       overflow-y: auto;
       resize: none;
       width: 100%;
-      padding-left: 2.8rem;
       background-color: var(--white);
       margin-top: 1rem;
       &:focus {
@@ -1272,17 +1296,16 @@
 }
 
 .postDropdown {
-  position: absolute;
-  right: 0;
+
   left: auto;
   top: 100%;
-  background-color: var(--white, #fff);
+  background-color: var(--background);
   border: none;
-  border: 1px solid var(--gray-300);
+  border: 1px solid var(--border);
   border-radius: 18px;
   padding: 1rem;
   cursor: pointer;
-  transition: transform 0.15s ease-in-out;
+  // transition: transform 0.15s ease-in-out;
   box-shadow: 0 2px 8px 0 var(--box-shadow-15);
   z-index: 1000;
 
@@ -1291,11 +1314,9 @@
 
     li {
       width: 100%;
-      padding: 0.9em;
-      border-radius: 8px;
 
       &:hover {
-        background-color: var(--gray-50);
+        background-color: var(--surface);
       }
 
       &:not(:first-child) {

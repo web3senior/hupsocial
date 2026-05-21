@@ -1,6 +1,6 @@
 .card {
   position: relative;
-  background: var(--white);
+  background: var(--background);
   border-radius: var(--global-border-radius);
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -55,7 +55,7 @@
     border-radius: inherit;
     padding: 2rem 2.5rem;
     
-    background-color: var(--white);
+    background-color: var(--background);
   }
 
   &__footer {
@@ -84,7 +84,7 @@
     flex: 1 1 auto;
     border-radius: inherit;
     padding: 2rem 2.5rem;
-    background-color: var(--black-025);
+    background-color: var(--background);
   }
 
   &__footer {

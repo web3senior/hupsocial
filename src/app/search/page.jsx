@@ -16,8 +16,8 @@ export default function SearchPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   /* Handle clicking a post to navigate to its details */
-  const handlePostClick = (id, chainId) => {
-    router.push(`/networks/${chainId}/${id}`);
+  const handlePostClick = (networkId, id) => {
+    router.push(`/networks/${networkId}/${id}`);
   };
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function SearchPage() {
               <section
                 key={item.id} 
                 className={`${styles.postWrapper} animate fade`}
-                onClick={() => handlePostClick(item.id, item.chain_id)}
+                onClick={() => handlePostClick(item.network_id, item.id)}
               >
                 <Post
                   item={item} 

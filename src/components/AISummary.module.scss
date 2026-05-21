@@ -1,11 +1,11 @@
 .ai {
   position: relative;
   background: rgba(var(--network-color-primary-rgb), 0.05);
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--border);
   border-radius: var(--global-border-radius);
   margin: 1rem 0;
   position: relative;
-  background: var(--white);
+  background: var(--background  );
   border-radius: var(--global-border-radius);
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke,
     opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter;
@@ -18,7 +18,7 @@
     border-radius: inherit;
     padding: 1rem 1.5rem;
 
-    background-color: var(--white);
+    background-color: var(--background);
   }
 
   header {
@@ -44,7 +44,7 @@
       display: block;
       font-size: var(--system-12-font-size);
       font-weight: 500;
-      color: var(--gray-500);
+      color: var(--text);
       text-wrap: balance;
       line-height: 1.3;
       max-width: 400px;
@@ -55,7 +55,7 @@
 .summaryText {
   font-size: 0.95rem;
   line-height: 1.5;
-  color: var(--gray-800);
+  color: var(--text);
   margin: 0.5rem 0;
   font-style: italic;
 }
@@ -103,7 +103,7 @@
 
 .summary {
   font-size: 0.9rem;
-  color: var(--gray-800);
+  color: var(--text);
   margin: 0.5rem 0;
 
   p {
@@ -113,10 +113,10 @@
   ul {
     li {
       box-shadow: var(--shadow-xs, 0 0 #0000);
-      border: 1px solid var(--gray-200);
+      border: 1px solid var(--border);
       border-radius: var(--global-border-radius);
       margin-bottom: 0.5rem;
-      background-color: var(--white);
+      background-color: var(--background);
       padding: .5em;
       
       > div {

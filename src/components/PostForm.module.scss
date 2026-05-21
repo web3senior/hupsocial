@@ -1,6 +1,8 @@
 .postForm {
   padding: 0.5em 1em;
-  textarea {
+  textarea,select {
+    background: var(--background);
+
   }
 
   &__postContent {
@@ -19,7 +21,7 @@ place-items: center;
 padding: .5em 1em;
 gap: 5px;
 
-background-color: var(--gray-100);
+background-color: var(--background);
 border-radius: var(--global-border-radius);
 
 span {

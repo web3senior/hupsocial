@@ -12,9 +12,9 @@
     position: relative;
     top: 0rem;
     min-height: 100svh;
-    background-color: var(--white, #fff);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
     box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-300);
     border-radius: 24px;
     overflow: hidden;
     isolation: isolate;
@@ -186,12 +186,12 @@
 
   &:after {
     right: 0;
-    background: linear-gradient(to right, transparent 10%, var(--gray-50));
+    background: linear-gradient(to right, transparent 10%, var(--background));
   }
 
   &:before {
     left: 0;
-    background: linear-gradient(to left, transparent 10%, var(--gray-50));
+    background: linear-gradient(to left, transparent 10%, var(--background));
   }
 
   &:before,
@@ -236,7 +236,7 @@
 
 .activeTab {
   border-color: var(--network-color-primary) !important;
-  color: var(--black) !important;
+  color: var(--text) !important;
 }
 
 .tabContent {
@@ -314,7 +314,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--gray-50);
+    background-color: var(--background);
     --r: min(8rem, 28vw);
     width: var(--r);
     height: var(--r);
@@ -340,7 +340,7 @@
       max-width: 80%;
       padding: 0.7rem 0.4rem;
       border-radius: 11px;
-      background-color: var(--white, #fff);
+      background-color: var(--background);
       box-shadow: var(--shadow-md);
       text-overflow: ellipsis;
       font-size: 11px;
@@ -378,7 +378,7 @@
         bottom: -0.2rem;
         left: 30%;
         transform: translateX(-30%);
-        background-color: var(--white, #fff);
+        background-color: var(--background);
         z-index: -1;
       }
 
@@ -389,7 +389,7 @@
         bottom: -0.45rem;
         left: 37%;
         transform: translateX(-30%);
-        background-color: var(--white, #fff);
+        background-color: var(--background);
       }
     }
   }
@@ -433,7 +433,7 @@
 
   &__tags {
     small {
-      background-color: var(--gray-100);
+      background-color:var(--tag);
       padding: 0 8px;
       height: 20px;
       display: flex;
@@ -469,7 +469,7 @@
     width: 100%;
     padding: 0.5rem 1rem;
     border-radius: var(--global-border-radius);
-    background-color: var(--gray-100);
+    background-color: var(--background);
     color: var(--gray-600);
     will-change: transform;
     transition: transform 0.2s ease;
@@ -635,6 +635,7 @@
             border: none;
             font-size: 11px;
             font-weight: 400;
+           
             color: var(--gray-500);
             line-height: 1.2;
             overflow-y: auto;
@@ -857,6 +858,7 @@
   textarea {
     height: 80px;
     max-height: 270px;
+    
     resize: vertical;
     &:focus {
       outline: none;

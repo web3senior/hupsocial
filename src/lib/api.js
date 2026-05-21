@@ -24,7 +24,7 @@ export async function getUniversalProfile(addr) {
   return result.data
 }
 
-export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null) => {
+export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null) => {
   /* Construct the URL with query parameters */
   let url = `/api/v1/networks/posts?page=${page}&limit=${limit}`
 
@@ -34,6 +34,10 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
 
   if (walletAddress) {
     url += `&wallet_address=${walletAddress}`
+  }
+
+  if (viewerAddress) {
+    url += `&viewer_address=${viewerAddress}`
   }
 
   const response = await fetch(url)

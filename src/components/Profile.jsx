@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import Image from 'next/image'
 import useSWR from 'swr'
 import { useRouter } from 'next/navigation'
@@ -15,7 +15,7 @@ const DEFAULT_USERNAME = 'new-user'
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
 /**
- * Clean data fetcher that queries LUKSO Universal Profiles first, 
+ * Clean data fetcher that queries LUKSO Universal Profiles first,
  * falling back to the local database configuration.
  * Adheres to rule: No side-effect logic here.
  */
@@ -50,49 +50,17 @@ const profileFetcher = async (address) => {
   return { wallet: address, name: DEFAULT_USERNAME, profileImage: DEFAULT_PFP }
 }
 
-export default function Profile({
-  creator,
-  createdAt,
-  chainId,
-  variant = 'full',
-}) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full' }) {
   const router = useRouter()
-  const [resolvedUrl, setResolvedUrl] = useState(null)
 
   // SWR handles client-side caching gracefully
-  const { data: profile, isLoading } = useSWR(
-    creator ? `profile-${creator}` : null,
-    () => profileFetcher(creator),
-    { revalidateOnFocus: false }
-  )
-
-  // Asynchronously resolve 0G hashes using our storageHelper script
-  useEffect(() => {
-    // If there's no profile image asset or it's a standard web URL/IPFS CID, exit
-    if (!profile?.profileImage || !is0GHash(profile.profileImage)) {
-      setResolvedUrl(null)
-      return
-    }
-
-    let isMounted = true
-
-    const getAssetBlob = async () => {
-      const blobUrl = await resolve0GUrl(profile.profileImage)
-      if (blobUrl && isMounted) {
-        setResolvedUrl(blobUrl)
-      }
-    }
-
-    getAssetBlob()
-
-    return () => {
-      isMounted = false
-    }
-  }, [profile?.profileImage])
+  const { data: profile, isLoading } = useSWR(creator ? `profile-${creator}` : null, () => profileFetcher(creator), {
+    revalidateOnFocus: false,
+  })
 
   const chainInfo = useMemo(() => {
-    return chainId ? config.chains.find((c) => c.id === chainId) : null
-  }, [chainId])
+    return networkId ? config.chains.find((c) => c.id === networkId) : null
+  }, [networkId])
 
   const handleNavigation = (e) => {
     e.stopPropagation()
@@ -102,7 +70,7 @@ export default function Profile({
   if (isLoading || !profile) {
     return (
       <div className={`${styles.profileShimmer} flex align-items-center gap-050`}>
-        <div className="shimmer rounded-full" style={{ width: 36, height: 36 }} />
+        <div className="shimmer" style={{ width: 36, height: 36 }} />
         {variant !== 'imageOnly' && (
           <div className="flex flex-column gap-025">
             <div className="shimmer rounded" style={{ width: 80, height: 14 }} />
@@ -115,10 +83,8 @@ export default function Profile({
 
   const truncatedAddress = creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
 
-  // Determine the final rendering image target string
-  const finalImageSrc = is0GHash(profile.profileImage)
-    ? (resolvedUrl || '/placeholder-loading-spinner.gif')
-    : profile.profileImage
+  // Compute final image source synchronously on render
+  const finalImageSrc = is0GHash(profile.profileImage) ? `${resolve0GUrl(profile.profileImage)}&w=72&q=75` : profile.profileImage
 
   return (
     <figure
@@ -131,38 +97,23 @@ export default function Profile({
       }}
     >
       <div className={styles.imageWrapper}>
-        <img
-          alt={profile.name}
-          src={finalImageSrc}
-          width={36}
-          height={36}
-          className="rounded-full"
-          style={{ objectFit: 'cover' }}
-        />
+        <img alt={profile.name} src={finalImageSrc || DEFAULT_PFP} width={36} height={36} className="" />
       </div>
 
       {variant !== 'imageOnly' && (
-        <figcaption className="flex flex-column justify-center gap-025">
-          <div className="flex align-items-center gap-025">
-            <span className={styles.name}>{profile.name}</span>
+        <figcaption className="flex flex-column align-items-start justify-content-center gap-025">
+          {/* Changed align-items-end to align-items-center */}
+          <div className={`${styles.nameRow}`}>
+            <b>{profile.name}</b>
+
             <Image alt="verified" src={blueCheckMarkIcon} width={14} height={14} />
 
-            {chainInfo && (
-              <div
-                className={styles.badge}
-                title={chainInfo.name}
-                dangerouslySetInnerHTML={{ __html: chainInfo.icon }}
-              />
-            )}
+            {chainInfo && <div className={styles.badge} title={chainInfo.name} dangerouslySetInnerHTML={{ __html: chainInfo.icon }} />}
 
-            {variant === 'full' && createdAt && (
-              <span className={styles.createdAt}>{toRelativeTime(createdAt)}</span>
-            )}
+            {variant === 'full' && createdAt && <span className={styles.createdAt}>{toRelativeTime(createdAt)}</span>}
           </div>
 
-          {variant === 'full' && creator && (
-            <code className={styles.address}>{truncatedAddress}</code>
-          )}
+          {variant === 'full' && creator && <code className={styles.address}>{truncatedAddress}</code>}
         </figcaption>
       )}
     </figure>

@@ -16,7 +16,6 @@ import {
   initPostContract,
   initStatusContract,
   getStatus,
-  getCreatorPostCount,
   getMaxLength,
   getPostsByCreator,
 } from '@/lib/communication'
@@ -294,7 +293,7 @@ export default function Page() {
           {activeTab === 'settings' && (
             <div
               className={`${styles.tabContent} ${styles.settings} relative`}
-              style={{ display: `none` }}
+              
             >
               <Settings />
             </div>
@@ -748,6 +747,10 @@ const Settings = () => {
         <PushNotificationManager />
         <hr />
         <InstallPrompt />
+           <hr />
+       <h4>Set session key</h4>
+        <p>status: {false ? 'Set' : 'Not Set'}</p>
+        <button onClick={() => toast(`Coming soon`, `warning`)}>Set session key</button>
       </div>
     </div>
   )

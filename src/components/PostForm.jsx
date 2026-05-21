@@ -219,13 +219,12 @@ export default function PostForm() {
       console.error(`CID not found`)
     }
     const metadata = resultIPFS.cid
-    const content = `─`
 
     writeContract({
       abi,
-      address: activeChain[1].post,
-      functionName: 'createPost',
-      args: [metadata, content, formData.get(`allowComments`) === 'true' ? true : false],
+      address: activeChain[1].hup,
+      functionName: 'create',
+      args: [address,0,metadata, 0,formData.get(`allowComments`) === 'true' ? true : false],
     })
   }
 

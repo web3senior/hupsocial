@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react'
 import SplashScreen from '@/components/SplashScreen'
 import NextToast from './NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
-import Header from './Header'
-import Footer from './Footer'
 import TickerTooltip from './TickerTooltip'
 import NewPostButton from './ui/NewPostButton'
-import styles from './ClientLayout.module.scss'
+import Header from './Header'
 import Aside from './Aside'
+import Footer from './Footer'
+import { Providers } from '@/app/providers'
+import styles from './ClientLayout.module.scss'
 
 export default function ClientLayout({ children }) {
   const [isLoading, setIsLoading] = useState(true)
@@ -21,20 +22,25 @@ export default function ClientLayout({ children }) {
     return () => clearTimeout(timer)
   }, [])
 
-  if (isLoading) return <SplashScreen />
+  if (isLoading)
+    return (
+      <Providers>
+        <SplashScreen />
+      </Providers>
+    )
 
   return (
-    <>
+    <Providers>
       <NextToast />
       <TickerTooltip />
-      
+
       <WagmiContext>
         <Header />
         <Aside />
         <NewPostButton />
         <main className={styles.main}>{children}</main>
-        <Footer />
+        {/* <Footer /> */}
       </WagmiContext>
-    </>
+    </Providers>
   )
 }
