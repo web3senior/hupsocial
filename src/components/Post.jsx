@@ -394,7 +394,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
         </main>
 
         <footer className={`${styles.modal__footer}  flex flex-column align-items-start`}>
-          <div className="flex flex-row align-items-center gap-050">
+          <div className="flex flex-row align-items-center gap-050 w-100">
             <Profile variant="imageOnly" creator={item.wallet_address} createdAt={item.created_at} networkId={item.network_id} />
             <textarea
               autoFocus
