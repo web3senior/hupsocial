@@ -102,7 +102,7 @@ export default function Post({ item, showContent, actions, chainId }) {
           </div>
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
-          <Profile creator={displayItem.wallet_address} createdAt={displayItem.created_at} networkId={displayItem.network_id} />
+          <Profile creator={displayItem?.wallet_address} createdAt={displayItem?.created_at} networkId={displayItem?.network_id} />
           <div onclick={(e) => e.stopPropagation()}>
             <Nav item={item} />
           </div>
