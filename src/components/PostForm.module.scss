@@ -2,9 +2,10 @@
   padding: 0.5em 1em;
   textarea,select {
     background: var(--background);
-
+&:first-child {
+    background: var(--background);
   }
-
+  }
   &__postContent {
     position: relative;
   }
