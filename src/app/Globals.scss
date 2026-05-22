@@ -32,17 +32,17 @@
 }
 
 [data-theme='terminal'] {
-  --background: #050807;
-  --foreground: #8cff9a;
+  --background: #07110b;
+  --foreground: #a3ffad;
 
-  --surface: #050807;
-  --surface-muted: #08120c;
-  --text: #8cff9a;
-  --text-muted: #4ade80;
-  --border: var(--green-500, #14532d);
-  --hover: #0d1a12;
+  --surface: #07110b;
+  --surface-muted: #0d1c12;
+  --text: #a3ffad;
+  --text-muted: #6ee77d;
+  --border: var(--green-500, #1f7a3a);
+  --hover: #12301c;
 
-  accent-color: #8cff9a;
+  accent-color: #a3ffad;
   color-scheme: dark;
 }
 

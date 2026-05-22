@@ -103,8 +103,8 @@ figure.pfp {
   place-content: center;
   place-items: center;
   row-gap: 1rem;
-  background-color: var(--gray-50);
-  z-index: 1000;
+  background-color: var(--background);
+  z-index: 10009;
 
   .wallet {
     font-size: 14px;
