@@ -5,13 +5,7 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract } from 'wagmi'
-import {
-  initPostContract,
-  initPostCommentContract,
-  getHasLikedPost,
-  getVoteCountsForPoll,
-  getVoterChoices,
-} from '@/lib/communication'
+import { initPostContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getPostById, getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { isPollActive } from '@/lib/utils'
@@ -87,11 +81,7 @@ export default function Post({ item, showContent, actions, chainId }) {
   return (
     <>
       {showCommentModal && item && (
-        <CommentModal
-          item={showCommentModal}
-          postContent={item.content.elements[0].data.text}
-          setShowCommentModal={setShowCommentModal}
-        />
+        <CommentModal item={showCommentModal} postContent={item.content.elements[0].data.text} setShowCommentModal={setShowCommentModal} />
       )}
 
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
@@ -105,14 +95,14 @@ export default function Post({ item, showContent, actions, chainId }) {
         {isRepost && (
           <div className={styles.post__repostLabel}>
             <Repeat2 strokeWidth={1.3} width={20} height={20} />
-            {displayItem?.wallet_address
-              ? `${displayItem.wallet_address.slice(0, 4)}...${displayItem.wallet_address.slice(-4)}`
-              : 'Unknown user'}{' '}
-            Reposted
+            {isRepost
+              ? `${item.wallet_address.slice(0, 4)}...${item.wallet_address.slice(-4)}`
+              : `${repostedPost?.wallet_address?.slice(0, 4)}...${repostedPost?.wallet_address?.slice(-4)}`}
+            {` Reposted`}
           </div>
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
-          <Profile creator={item.wallet_address} createdAt={item.created_at} networkId={item.network_id} />
+          <Profile creator={displayItem.wallet_address} createdAt={displayItem.created_at} networkId={displayItem.network_id} />
           <div onclick={(e) => e.stopPropagation()}>
             <Nav item={item} />
           </div>
@@ -153,9 +143,7 @@ export default function Post({ item, showContent, actions, chainId }) {
             onClick={(e) => e.stopPropagation()}
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
           >
-            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && (
-              <Like item={displayItem || item} />
-            )}
+            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like item={displayItem || item} />}
 
             {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
               <>
@@ -172,11 +160,9 @@ export default function Post({ item, showContent, actions, chainId }) {
               </>
             )}
 
-            {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && (
-              <Repost item={displayItem || item} />
-            )}
+            {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && <Repost item={displayItem || item} />}
 
-             {/* {actions.find((action) => action.toLowerCase() === 'quote') !== undefined && (
+            {/* {actions.find((action) => action.toLowerCase() === 'quote') !== undefined && (
               <Quote item={displayItem || item} />
             )} */}
 
@@ -239,9 +225,7 @@ const Nav = ({ item }) => {
         }
         placement="bottom-start"
       >
-        <div
-          className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}
-        >
+        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
           <ul>
             <li>
               <Link href={`/${activeChain[0].id}/${item.postId}`}>View post</Link>
@@ -379,13 +363,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
             <h3>Post your reply</h3>
           </div>
           <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning
-              ? `Signing...`
-              : isConfirming
-                ? 'Confirming...'
-                : status && status.content !== ''
-                  ? `Update`
-                  : `Share`}
+            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
           </div>
         </header>
 
@@ -406,9 +384,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
                           __html: renderMarkdown(item?.content?.elements?.[0]?.data?.text || item?.content || ''),
                         }}
                       />
-                      {item?.content?.elements?.[1]?.type === 'media' && (
-                        <MediaGallery data={item.content.elements[1].data.items} />
-                      )}
+                      {item?.content?.elements?.[1]?.type === 'media' && <MediaGallery data={item.content.elements[1].data.items} />}
                     </>
                   )}
                 </div>
@@ -419,12 +395,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
 
         <footer className={`${styles.modal__footer}  flex flex-column align-items-start`}>
           <div className="flex flex-row align-items-center gap-050">
-            <Profile
-              variant="imageOnly"
-              creator={item.wallet_address}
-              createdAt={item.created_at}
-              networkId={item.network_id}
-            />
+            <Profile variant="imageOnly" creator={item.wallet_address} createdAt={item.created_at} networkId={item.network_id} />
             <textarea
               autoFocus
               defaultValue={commentContent}
@@ -521,13 +492,7 @@ const TipModal = ({ item, setShowTipModal }) => {
             <h3>Support creator</h3>
           </div>
           <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning
-              ? `Signing...`
-              : isConfirming
-                ? 'Confirming...'
-                : status && status.content !== ''
-                  ? `Update`
-                  : ``}
+            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : ``}
           </div>
         </header>
 
@@ -557,18 +522,8 @@ const TipModal = ({ item, setShowTipModal }) => {
           <div className={`flex flex-column align-items-start justify-content-between`}>
             <label htmlFor="">Amount</label>
 
-            <div
-              className={`${styles.tipAmount} w-100 flex flex-row align-items-start justify-content-between gap-025`}
-            >
-              <input
-                type="number"
-                name=""
-                id=""
-                value={amount}
-                min={1}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={`0`}
-              />
+            <div className={`${styles.tipAmount} w-100 flex flex-row align-items-start justify-content-between gap-025`}>
+              <input type="number" name="" id="" value={amount} min={1} onChange={(e) => setAmount(e.target.value)} placeholder={`0`} />
               <button onClick={() => setAmount(2)}>2</button>
               <button onClick={() => setAmount(5)}>5</button>
               <button onClick={() => setAmount(10)}>10</button>
@@ -597,10 +552,7 @@ const ShareModal = ({ item, setShowShareModal }) => {
   const postContent = `${postTitle}\n\n Creator: ${item.wallet_address} \n\n`
   // --- Constructing the Share Link ---
   const shareLink =
-    `https://x.com/intent/tweet?` +
-    `text=${encodeURIComponent(postContent)}` +
-    `&url=${encodeURIComponent(postUrl)}` +
-    `&via=${hupHandle}` // <-- The recommended parameter for the handle
+    `https://x.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
 
   useEffect(() => {}, [item])
 
@@ -1063,8 +1015,7 @@ const Options = ({ item }) => {
     <>
       <ul className={`${styles.poll__options} flex flex-column gap-050 w-100`}>
         {item.options.map((option, i) => {
-          const votePercentage =
-            totalVotes > 0 ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed() : 0
+          const votePercentage = totalVotes > 0 ? ((web3.utils.toNumber(optionsVoteCount[i]) / totalVotes) * 100).toFixed() : 0
           return (
             <li
               key={i}
