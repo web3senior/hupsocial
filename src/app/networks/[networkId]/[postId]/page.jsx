@@ -170,14 +170,14 @@ export default function Page() {
     <>
       <PageTitle name={`post`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        {showCommentModal && (
+        {/* {showCommentModal && (
           <CommentModal
             item={showCommentModal.data}
             parentId={showCommentModal.parentId}
             type={showCommentModal.type}
             setShowCommentModal={setShowCommentModal}
           />
-        )}
+        )} */}
 
         <div className={`__container ${styles.page__container}`} data-width={`medium`}>
           {!post && <div className={`shimmer ${styles.pollShimmer}`} />}

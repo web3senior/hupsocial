@@ -127,7 +127,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   return (
     <>
       {showCommentModal && item && (
-        <CommentModal item={showCommentModal} postContent={item.content.elements[0].data.text} setShowCommentModal={setShowCommentModal} />
+        <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />
       )}
 
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
@@ -199,7 +199,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
                 {item.allow_comment && (
                   <button
                     onClick={() => {
-                      isConnected ? setShowCommentModal(item) : toast(`Please connect wallet`, `error`)
+                      isConnected ? setShowCommentModal(displayItem) : toast(`Please connect wallet`, `error`)
                     }}
                   >
                     <MessageCircle strokeWidth={1.5} width={17} height={17} />
@@ -462,7 +462,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
                 <div className={`${styles.post__main__media}`}>
-                  {postContent && (
+                  
                     <>
                       <div
                         className={`${styles.post__main__content} `}
@@ -473,7 +473,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
                       />
                       {item?.content?.elements?.[1]?.type === 'media' && <MediaGallery data={item.content.elements[1].data.items} />}
                     </>
-                  )}
+               
                 </div>
               </main>
             </section>
