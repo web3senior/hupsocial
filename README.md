@@ -167,3 +167,122 @@ function resolveContractPost(deployments, networkId, publicPostId) {
 - The backend should store the final `endPublicId` when replacing a contract.
 - The latest active deployment can use `endPublicId: null`.
 - URLs remain stable even if the core contract is redeployed.
+
+
+## Off-Chain Features
+
+Hup keeps the core social protocol on-chain while leaving some user-experience and indexing features off-chain. This keeps gas costs lower, avoids unnecessary public storage, and gives the app more flexibility.
+
+### Stored On-Chain
+
+The core contract stores protocol-level actions that should be publicly verifiable:
+
+- posts
+- comments
+- reposts
+- likes
+- content ownership
+- content timestamps
+- edit/delete state
+- session authorization
+- protocol fees and admin configuration
+
+These actions are emitted as events and indexed by the backend.
+
+### Stored Off-Chain
+
+The following features are intentionally handled by the backend/indexer instead of the core contract:
+
+- bookmarks/saved posts
+- post views
+- public/global post IDs
+- contract version routing
+- feed ranking
+- search
+- notifications
+- hydrated metadata from IPFS
+- full liker lists
+- full follower/following lists, when using an external follower system
+- community feed grouping, when `communityId` is stored in metadata
+
+### Why Bookmarks Are Off-Chain
+
+Bookmarks are treated as a private user preference, not protocol state.
+
+Keeping bookmarks off-chain avoids:
+
+- gas costs for saving/unsaving
+- public exposure of a user’s saved posts
+- extra contract storage
+- unnecessary contract complexity
+
+Example table:
+
+```txt
+bookmarks
+- id
+- user_address
+- network_id
+- public_post_id
+- created_at
+```
+
+### Why Views Are Off-Chain
+
+Post views are high-frequency and easy to manipulate, so storing them on-chain would be expensive and not very meaningful as trustless protocol state.
+
+Views are counted by the backend/API and can be rate-limited, filtered, or deduplicated off-chain.
+
+Example table:
+
+```txt
+post_views
+- id
+- user_address nullable
+- ip_hash nullable
+- network_id
+- public_post_id
+- created_at
+```
+
+### Why Public Post IDs Are Off-Chain
+
+Each Hup contract deployment has its own local `contentCount`. If a contract is upgraded or redeployed, IDs may restart from `1`.
+
+To keep URLs stable, the backend owns public/global post IDs and maps them to the correct contract deployment.
+
+Example:
+
+```txt
+/networks/4201/45
+```
+
+The `45` is a public post ID. The backend resolves it to:
+
+```txt
+network_id + contract_address + contract_post_id
+```
+
+### Why Lists Are Indexed Off-Chain
+
+The contract stores mappings for cheap checks like:
+
+```txt
+has this user liked this post?
+```
+
+But mappings are not enumerable, so full lists are built from events by the indexer.
+
+Examples:
+
+- all users who liked a post
+- all reposts of a post
+- user activity history
+- feed timelines
+- follower/following lists
+
+### Design Rule
+
+If a feature must be publicly verifiable and affects protocol state, it belongs on-chain.
+
+If a feature is private, high-frequency, expensive to store, or mainly needed for UI/querying, it belongs off-chain.
