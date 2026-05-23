@@ -722,6 +722,9 @@ const Like = ({ item }) => {
       args: [address, [id]], // Using the 'id' parameter passed to the function
     })
   }
+
+
+  
   const unlikePost = (e, id) => {
     e.stopPropagation()
 
@@ -738,23 +741,6 @@ const Like = ({ item }) => {
     })
   }
 
-  useEffect(() => {
-    // getHasLiked()
-    //   .then((result) => {
-    //     setHasLiked(result)
-    //     setLoading(false)
-    //   })
-    //   .catch((err) => {
-    //     console.log(err)
-    //     setError(`⚠️`)
-    //     setLoading(false)
-    //   })
-  }, [])
-
-  // if (loading) {
-  //   return <InlineLoading />
-  // }
-
   if (error) {
     return <span>{error}</span>
   }
@@ -767,7 +753,7 @@ const Like = ({ item }) => {
         } else toast(`Please connect wallet`, `error`)
       }}
     >
-      <Heart strokeWidth={1.5} width={18} height={18} fill={item.is_liked === 1 ? 'red' : 'none'} />
+      <Heart strokeWidth={1.5} width={18} height={18} color={item.is_liked ? 'var(--liked-color)' : 'currentColor'} fill={item.is_liked ? 'var(--liked-color)' : 'none'} />
       {item.total_likes === 0 ? '' : <span>{item.total_likes}</span>}
     </button>
   )
