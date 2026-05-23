@@ -32,7 +32,7 @@ import { QuoteIcon } from 'lucide-react'
 import { MessageSquareQuote } from 'lucide-react'
 import clsx from 'clsx'
 
-export default function Post({ item, showContent, actions, chainId }) {
+export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showShareModal, setShowShareModal] = useState()
@@ -122,7 +122,7 @@ export default function Post({ item, showContent, actions, chainId }) {
   }, [commentTarget?.id, commentTarget?.network_id, commentTarget?.total_comments, address])
 
   const lastCommentText = getCommentPreviewText(lastComment?.content)
-  const hasLastCommentPreview = Boolean(lastCommentText)
+  const hasLastCommentPreview = Boolean(lastCommentText) && showLastComment
 
   return (
     <>

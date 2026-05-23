@@ -148,6 +148,7 @@ export default function Page() {
                         item={item} 
                         networkName={item.network_name}
                         actions={['like', 'comment', 'share', 'repost','quote', 'hash', 'tip']} 
+                        showLastComment={true}
                       />
                       {i < posts.list.length - 1 && <hr />}
                     </section>
