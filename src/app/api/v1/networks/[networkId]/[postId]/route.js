@@ -25,7 +25,7 @@ export async function GET(request, { params }) {
       SELECT 
         p.*,
         n.name as network_name,
-        n.id,
+        n.id as network_id,
         u.name as display_name,
         u.profileImage as profile_image,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,

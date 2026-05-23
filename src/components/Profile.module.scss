@@ -7,6 +7,7 @@
 figure.profile {
   cursor: pointer;
   width: fit-content;
+  z-index: 1;
 
   figcaption {
     height: 100%;
@@ -40,7 +41,7 @@ figure.profile {
 
   span {
     /* Slight optical adjustment to balance descenders (like 'y') */
-    padding-bottom: 1px; 
+    padding-bottom: 1px;
     display: inline-block;
   }
 }
@@ -48,7 +49,6 @@ figure.profile {
 .badge {
   width: 14px;
   height: 14px;
-
 
   svg {
     width: inherit;
@@ -60,7 +60,7 @@ figure.profile {
 .createdAt {
   margin-left: 5px;
   font-weight: 400;
-  line-height: 1; 
+  line-height: 1;
   color: var(--gray-400);
 }
 
@@ -69,7 +69,6 @@ figure.profile {
   overflow: hidden;
   display: flex;
 }
-
 
 .nameRow {
   display: flex;

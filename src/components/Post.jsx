@@ -45,6 +45,7 @@ export default function Post({ item, showContent, actions, chainId }) {
   })
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
+  const [lastComment, setLastComment] = useState(null)
 
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   const repostedPostId = isRepost ? Number(item.is_repost) : null
@@ -77,7 +78,52 @@ export default function Post({ item, showContent, actions, chainId }) {
       cancelled = true
     }
   }, [isRepost, repostedPostId, item.network_id, address])
+
   const displayItem = isRepost ? repostedPost : item
+  const commentTarget = displayItem || item
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!commentTarget?.id || !commentTarget?.network_id || Number(commentTarget?.total_comments || 0) < 1) {
+      setLastComment(null)
+      return
+    }
+
+    const params = new URLSearchParams({ last: 'true' })
+    if (address) params.set('viewer_address', address)
+
+    fetch(`/api/v1/networks/${commentTarget.network_id}/${commentTarget.id}/comments?${params.toString()}`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => null)
+
+        if (!res.ok || body?.success === false) {
+          throw new Error(body?.error || 'Failed to fetch last comment')
+        }
+
+        return body
+      })
+      .then((res) => {
+        if (cancelled) return
+
+        const comment = Array.isArray(res?.data) ? res.data[0] : res?.data
+        setLastComment(comment || null)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('[LAST_COMMENT_ERROR]:', error.message)
+          setLastComment(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [commentTarget?.id, commentTarget?.network_id, commentTarget?.total_comments, address])
+
+  const lastCommentText = getCommentPreviewText(lastComment?.content)
+  const hasLastCommentPreview = Boolean(lastCommentText)
+
   return (
     <>
       {showCommentModal && item && (
@@ -91,6 +137,9 @@ export default function Post({ item, showContent, actions, chainId }) {
       <section
         className={`${styles.post} flex flex-column align-items-start justify-content-between`}
         data-content={showContent ? true : false}
+        data-commentable={item.allow_comment ? true : false}
+        data-has-comments={hasLastCommentPreview ? true : false}
+        data-has-last-comment={hasLastCommentPreview ? true : false}
       >
         {isRepost && (
           <div className={styles.post__repostLabel}>
@@ -103,7 +152,7 @@ export default function Post({ item, showContent, actions, chainId }) {
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile creator={displayItem?.wallet_address} createdAt={displayItem?.created_at} networkId={displayItem?.network_id} />
-          <div onclick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()}>
             <Nav item={item} />
           </div>
         </header>
@@ -207,6 +256,8 @@ export default function Post({ item, showContent, actions, chainId }) {
             )}
           </div>
         </footer>
+
+        {hasLastCommentPreview && <LastCommentPreview comment={lastComment} text={lastCommentText} />}
       </section>
     </>
   )
@@ -219,7 +270,7 @@ const Nav = ({ item }) => {
     <>
       <NativePopover
         trigger={
-          <button onclick={(e) => e.stopPropagation()} className={clsx(styles.post__navTrigger, 'pointer rounded-full')}>
+          <button onClick={(e) => e.stopPropagation()} className={clsx(styles.post__navTrigger, 'pointer rounded-full')}>
             <Ellipsis fill="currentColor" strokeWidth={1} width={18} height={18} />
           </button>
         }
@@ -235,6 +286,42 @@ const Nav = ({ item }) => {
       </NativePopover>
     </>
   )
+}
+
+const LastCommentPreview = ({ comment, text }) => {
+  const commenterLabel =
+    comment?.display_name || (comment?.wallet_address ? `${comment.wallet_address.slice(0, 4)}...${comment.wallet_address.slice(-4)}` : 'Last comment')
+
+  return (
+    <aside className={styles.post__lastComment} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.post__lastComment__avatar}>
+        <Profile variant="full" creator={comment.wallet_address} createdAt={comment.created_at} networkId={comment.network_id} />
+      </div>
+
+      <div className={styles.post__lastComment__body}>
+        <div
+          className={styles.post__lastComment__content}
+          dangerouslySetInnerHTML={{
+            __html: renderMarkdown(text),
+          }}
+        />
+      </div>
+    </aside>
+  )
+}
+
+function getCommentPreviewText(content) {
+  if (!content) return ''
+
+  if (typeof content === 'string') {
+    try {
+      return getCommentPreviewText(JSON.parse(content))
+    } catch {
+      return content
+    }
+  }
+
+  return content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
 }
 
 const CommentModal = ({ item, postContent, setShowCommentModal }) => {
@@ -286,7 +373,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
     return isConnected ? await getHasLikedPost(id, address) : false
   }
 
-  const postComment = async (e, id) => {
+  const postComment = async (e) => {
     e.stopPropagation()
 
     if (!isConnected) {
@@ -316,12 +403,12 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
       console.error(`CID not found`)
     }
     const metadata = resultIPFS.cid
-
+    console.log(address, 1, metadata, item.id, true)
     writeContract({
       abi,
       address: activeChain[1].hup,
       functionName: 'create',
-      args: [address, 1, metadata, id, true], //formData.get(`allowComments`) === 'true' ? true : false
+      args: [address, 1, metadata, item.id, true], //formData.get(`allowComments`) === 'true' ? true : false
     })
   }
 
@@ -403,7 +490,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
               placeholder={`Reply to ${item?.wallet_address?.slice(0, 4)}…${item?.wallet_address?.slice(-4)}`}
             />
           </div>
-          <button className="btn" onClick={(e) => postComment(e, item.id)}>
+          <button className="btn" onClick={(e) => postComment(e)}>
             Post comment
           </button>
         </footer>
