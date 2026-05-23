@@ -1,6 +1,6 @@
 .page {
+  --tag-bg: var(--gray-200);
   height: 100%;
-
   &__title {
     font-weight: 600;
     color: var(--black-900);
@@ -36,6 +36,15 @@
     opacity: 0.6; // Softens it further to look thinner
   }
 }
+
+:global([data-theme='dark']) .page {
+  --tag-bg: #20232a;
+}
+
+:global([data-theme='terminal']) .page {
+ --tag-bg: #20232a;
+}
+
 // Shimmer
 .shimmer {
   height: 200px;
@@ -433,7 +442,7 @@
 
   &__tags {
     small {
-      background-color:var(--tag);
+      background-color: var(--tag-bg);
       padding: 0 8px;
       height: 20px;
       display: flex;
