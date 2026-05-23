@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
 import {
   useWaitForTransactionReceipt,
@@ -12,13 +11,7 @@ import {
 } from 'wagmi'
 import {
   initPostContract,
-  initPostCommentContract,
-  getPosts,
-  getPostByIndex,
-  getPostCommentCount,
   getCommentsByPostId,
-  getHasLikedPost,
-  getHasLikedComment,
   getActiveChain,
 } from '@/lib/communication'
 import { getPostById, getProfile, getUniversalProfile, recordPostView } from '@/lib/api'
@@ -39,24 +32,6 @@ import styles from './page.module.scss'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import Comments from '@/components/Comments'
 
-moment.defineLocale('en-short', {
-  relativeTime: {
-    future: 'in %s',
-    past: '%s', //'%s ago'
-    s: '1s',
-    ss: '%ds',
-    m: '1m',
-    mm: '%dm',
-    h: '1h',
-    hh: '%dh',
-    d: '1d',
-    dd: '%dd',
-    M: '1mo',
-    MM: '%dmo',
-    y: '1y',
-    yy: '%dy',
-  },
-})
 
 // export async function generateMetadata({ params, searchParams }, parent) {
 //   const slug = (await params).slug
