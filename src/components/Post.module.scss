@@ -1,4 +1,11 @@
 .post {
+   --post-text-muted: var(--text-muted);
+  --post-option-bg: var(--surface);
+  --post-option-border: var(--border);
+  --post-option-hover: var(--hover);
+  --post-button-color: var(--text-muted);
+  --post-button-bg: var(--surface-muted);
+
   -webkit-tap-highlight-color: transparent;
   position: relative;
   transition: background-color 0.1s ease-out;
@@ -238,7 +245,8 @@
     width: fit-content;
     user-select: none;
 
-    button,a {
+    button,
+    a {
       all: unset;
       position: relative;
       padding: 10px;
@@ -261,12 +269,18 @@
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        background-color: var(--gray-150);
+        background-color: var(--post-button-bg);
         border-radius: 999px;
         transition: all 0.15s ease;
         will-change: width, height;
         opacity: 0;
         z-index: -1;
+      }
+
+      [data-theme='dark'] {
+        &:before {
+          background-color: var(--background);
+        }
       }
 
       &:hover {
@@ -296,11 +310,20 @@
   }
 }
 
+:global([data-theme='dark']) .post {
+  --post-button-bg: #20232a;
+}
+
+:global([data-theme='terminal']) .post {
+  --post-button-bg: #12301c;
+  --post-option-hover: #12301c;
+}
+
 .post__navTrigger {
   background-color: rgba(255, 255, 255, 0.1);
   border: none;
   z-index: 1;
-  padding: .25rem;
+  padding: 0.25rem;
 
   &:hover {
     background-color: var(--background);
@@ -1295,7 +1318,6 @@
 }
 
 .postDropdown {
-
   left: auto;
   top: 100%;
   background-color: var(--background);

@@ -1,10 +1,11 @@
 .postForm {
   padding: 0.5em 1em;
-  textarea,select {
+  textarea,
+  select {
     background: var(--background);
-&:first-child {
-    background: var(--background);
-  }
+    &:first-child {
+      background: var(--background);
+    }
   }
   &__postContent {
     position: relative;
@@ -15,23 +16,22 @@
   border: none;
   background: none;
   color: var(--gray-400);
-      will-change: transform;
-    transition: transform 0.2s ease;
-display: flex;
-place-items: center;
-padding: .5em 1em;
-gap: 5px;
+  will-change: transform;
+  transition: transform 0.2s ease;
+  display: flex;
+  place-items: center;
+  padding: 0.5em 1em;
+  gap: 5px;
+  background-color: var(--background);
+  border-radius: var(--global-border-radius);
 
-background-color: var(--background);
-border-radius: var(--global-border-radius);
+  span {
+    font-size: var(--system-12-font-size);
+  }
 
-span {
-  font-size: var(--system-12-font-size);
-}
-
-    &:active {
-      transform: scale(0.9);
-    }
+  &:active {
+    transform: scale(0.9);
+  }
 }
 
 .addImageButton {
