@@ -767,7 +767,7 @@ const Like = ({ item }) => {
         } else toast(`Please connect wallet`, `error`)
       }}
     >
-      <Heart strokeWidth={1.5} width={18} height={18} />
+      <Heart strokeWidth={1.5} width={18} height={18} fill={item.is_liked === 1 ? 'red' : 'none'} />
       {item.total_likes === 0 ? '' : <span>{item.total_likes}</span>}
     </button>
   )

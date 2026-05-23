@@ -1,5 +1,4 @@
 'use client'
-import Link from 'next/link'
 import { useEffect, useState, useRef } from 'react'
 
 import { initPostContract } from '@/lib/communication'
@@ -13,15 +12,26 @@ import { ContentSpinner } from '@/components/Loading'
 import styles from '@/components/PostForm.module.scss'
 import { Image, SquarePlay } from 'lucide-react'
 
-export default function PostForm({ text, url }) {
+const normalizePrefillValue = (value) => {
+  if (Array.isArray(value)) return value.find((item) => typeof item === 'string' && item.length > 0) || ''
+
+  return typeof value === 'string' ? value : ''
+}
+
+const getInitialPostText = (text, url) => {
+  return [normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n')
+}
+
+export default function PostForm({ text = '', url = '' }) {
+  const initialPostText = getInitialPostText(text, url)
   const [isUploading, setIsUploading] = useState(false)
-  const [content, setContent] = useState('Question?')
+  const [content, setContent] = useState(initialPostText || 'Question?')
   const [showForm, setShowForm] = useState(`post`)
   const [votingLimit, setVotingLimit] = useState(1)
   const [postContent, setPostContent] = useState({
     version: '1',
     elements: [
-      { type: 'text', data: { text: `${text.length > 0 && text} ${url.length > 0 && `\n ${url}`}` } },
+      { type: 'text', data: { text: initialPostText } },
       {
         type: 'media',
         data: {
@@ -413,15 +423,19 @@ export default function PostForm({ text, url }) {
   }
 
   const addOption = () => {
-    let optionList = options.list
-    if (optionList.length === 8) return
-    optionList.push(``)
-    setOptions({ list: optionList })
+    setOptions((prevOptions) => {
+      if (prevOptions.list.length === 8) return prevOptions
+
+      return { list: [...prevOptions.list, ``] }
+    })
   }
 
   const updateOption = (e, index) => {
-    options.list[index] = e.target.value
-    setOptions(options)
+    const value = e.target.value
+
+    setOptions((prevOptions) => ({
+      list: prevOptions.list.map((item, i) => (i === index ? value : item)),
+    }))
   }
 
   const delOption = (e, index) => {
