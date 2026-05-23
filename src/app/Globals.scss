@@ -9,7 +9,8 @@
   --text-muted: #666666;
   --border: var(--gray-300, #e5e7eb);
   --hover: #f3f4f6;
-  --tag: var(--gray-100, #f3f4f6);
+  --tag: var(--gray-50, #f3f4f6);
+--shimmer-glint: rgba(255, 255, 255, 0.55);
 
   accent-color: var(--network-color-text);
   color-scheme: light;
@@ -26,6 +27,7 @@
   --border: var(--black-800, #2a2d34);
   --hover: #20232a;
   --tag: var(--black-800);
+  --shimmer-glint: rgba(255, 255, 255, 0.12);
 
   accent-color: var(--network-color-text);
   color-scheme: dark;
@@ -41,6 +43,8 @@
   --text-muted: #6ee77d;
   --border: var(--green-500, #1f7a3a);
   --hover: #12301c;
+  --tag: var(--black-800);
+   --shimmer-glint: rgba(163, 255, 173, 0.16);
 
   accent-color: #a3ffad;
   color-scheme: dark;
@@ -139,23 +143,23 @@ html {
   min-height: 100%;
 
   // Scrollbar
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-  background-color: var(--gray-200);
-}
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background-color: var(--gray-200);
+  }
 
-::-webkit-scrollbar-thumb {
-  background: var(--network-color-primary); //var(--black-200);
-  background-clip: padding-box;
-  border: 2px solid #0000;
-  border-radius: 100vh;
-}
+  ::-webkit-scrollbar-thumb {
+    background: var(--network-color-primary); //var(--black-200);
+    background-clip: padding-box;
+    border: 2px solid #0000;
+    border-radius: 100vh;
+  }
 
-::-webkit-scrollbar-track {
-  background: 0 0;
-  border-radius: 100vh;
-}
+  ::-webkit-scrollbar-track {
+    background: 0 0;
+    border-radius: 100vh;
+  }
 }
 
 // html,
