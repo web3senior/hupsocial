@@ -3,20 +3,11 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWRInfinite from 'swr/infinite'
-import {
-  ArrowDown,
-  Eye,
-  Flame,
-  Heart,
-  Medal,
-  MessageCircle,
-  Repeat2,
-  Trophy,
-  Users,
-} from 'lucide-react'
+import { ArrowDown, Eye, Flame, Heart, Medal, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
 import PageTitle from '@/components/PageTitle'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
+import Profile from '@/components/Profile'
 
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
@@ -178,7 +169,7 @@ export default function LeaderboardPage() {
                     onClick={() => openProfile(leader.wallet_address)}
                   >
                     <RankBadge rank={leader.rank} />
-                    <Avatar leader={leader} size="large" />
+                    <Profile creator={leader.wallet_address} variant="imageOnly" />
                     <div className={styles.podiumIdentity}>
                       <strong>{leader.display_name}</strong>
                       <code>{formatWallet(leader.wallet_address)}</code>
@@ -200,7 +191,7 @@ export default function LeaderboardPage() {
                     onClick={() => openProfile(leader.wallet_address)}
                   >
                     <span className={styles.rankNumber}>{leader.rank}</span>
-                    <Avatar leader={leader} />
+                    <Profile creator={leader.wallet_address} variant="imageOnly" />
                     <span className={styles.identity}>
                       <strong>{leader.display_name}</strong>
                       <code>{formatWallet(leader.wallet_address)}</code>
@@ -217,12 +208,7 @@ export default function LeaderboardPage() {
 
               {hasMore && (
                 <div className={styles.loadMoreWrap}>
-                  <button
-                    type="button"
-                    className={styles.loadMore}
-                    onClick={() => setSize(size + 1)}
-                    disabled={isLoadingMore}
-                  >
+                  <button type="button" className={styles.loadMore} onClick={() => setSize(size + 1)} disabled={isLoadingMore}>
                     <ArrowDown size={16} />
                     <span>{isLoadingMore ? 'Loading' : 'Load more'}</span>
                   </button>
@@ -255,21 +241,6 @@ function Metric({ icon: Icon, label, value }) {
   )
 }
 
-function Avatar({ leader, size = 'default' }) {
-  const src = resolveAvatar(leader.profile_image)
-
-  return (
-    <img
-      className={`${styles.avatar} ${size === 'large' ? styles.avatarLarge : ''}`}
-      src={src}
-      alt={leader.display_name}
-      onError={(event) => {
-        event.currentTarget.src = DEFAULT_AVATAR
-      }}
-    />
-  )
-}
-
 function RankBadge({ rank }) {
   return (
     <span className={styles.rankBadge}>
@@ -291,12 +262,6 @@ function LeaderboardSkeleton() {
       ))}
     </div>
   )
-}
-
-function resolveAvatar(image) {
-  if (!image) return DEFAULT_AVATAR
-  if (is0GHash(image)) return `${resolve0GUrl(image)}&w=96&q=80`
-  return image
 }
 
 function getRankClass(rank) {
