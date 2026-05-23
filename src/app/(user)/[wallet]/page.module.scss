@@ -57,7 +57,7 @@
   display: block;
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
-  background-color: var(--gray-200);
+  background-color: var(--background);
   border: 2px solid var(--white);
   button {
     width: 15px;
@@ -69,7 +69,7 @@
   display: block;
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
-  background-color: var(--gray-200);
+  background-color: var(--background);
   border: 2px solid var(--white);
   button {
     width: 15px;
@@ -714,13 +714,17 @@
   user-select: none;
   isolation: isolate;
 
+  input[type='text'],  input[type='file'],textarea {
+    border-radius: var(--global-border-radius);
+    background-color: var(--background);
+  }
   &__card {
     font-size: 14px;
     font-weight: 600;
     column-gap: 0.5rem;
     width: 100%;
     max-width: 400px;
-    background-color: var(--white, #fff);
+    background-color: var(--background);
     border-radius: var(--global-border-radius);
     box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
     padding: 0.5rem 1.5rem;
