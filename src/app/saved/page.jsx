@@ -93,7 +93,7 @@ export default function LeaderboardPage() {
 
   return (
     <>
-      <PageTitle name="Communities" />
+      <PageTitle name="Saved" />
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="medium">
           Coming soon - we're working hard to bring you an exciting new experience! Stay tuned for updates.
