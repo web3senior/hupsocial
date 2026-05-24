@@ -263,7 +263,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
 const Nav = ({ item }) => {
   const activeChain = getActiveChain()
-
+console.log({ item })
   return (
     <>
       <NativePopover
@@ -274,10 +274,10 @@ const Nav = ({ item }) => {
         }
         placement="bottom-start"
       >
-        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
+        <div className={`${styles.postDropdown} flex flex-column align-items-center justify-content-start gap-050`}>
           <ul>
             <li>
-              <Link href={`/${activeChain[0].id}/${item.postId}`}>View post</Link>
+              <Link href={`/networks/${item.network_id}/${item.id}`}>View post</Link>
             </li>
           </ul>
         </div>
