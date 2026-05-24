@@ -3,8 +3,15 @@ pragma solidity ^0.8.35;
 
 /**
  * @title IHup
- * @author Amir Rahimi
- * @notice Public architectural blueprint for the Hup social protocol.
+ * @author Hup Labs
+ * @notice Shared interface for the Hup core social protocol.
+ * @dev Defines the protocol's public enums, structs, events, custom errors, and read interface used
+ *      by Hup-compatible contracts and off-chain indexers.
+ * @custom:version 1.0.0
+ * @custom:chain multi-chain
+ * @custom:website https://hup.social
+ * @custom:security-contact security@hup.social
+ * @custom:emoji 📜
  */
 interface IHup {
     // --- SHARED ENUMS & STRUCTS ---

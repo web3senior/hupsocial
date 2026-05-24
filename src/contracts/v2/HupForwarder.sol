@@ -5,8 +5,15 @@ import "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
 
 /**
  * @title HupForwarder
- * @author Amir Rahimi
- * @notice Secure v5 meta-transaction forwarder featuring target-isolated nonces and deadlines.
+ * @author Hup Labs
+ * @notice Meta-transaction forwarder for Hup contracts with target-scoped nonces and expiring requests.
+ * @dev Verifies typed forward requests, tracks nonces per signer and target contract, and forwards
+ *      calls to trusted recipient contracts that read the original sender through ERC2771Context.
+ * @custom:version 1.0.0
+ * @custom:chain multi-chain
+ * @custom:website https://hup.social
+ * @custom:security-contact security@hup.social
+ * @custom:emoji 📨
  */
 contract HupForwarder is ERC2771Forwarder {
     /**

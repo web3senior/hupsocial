@@ -9,9 +9,17 @@ import "./IHup.sol";
 
 /**
  * @title Hup Core Protocol
- * @author Amir Rahimi
- * @notice Core social protocol engine utilizing unified interface definitions for events and errors.
- * @dev Inherits structural components from IHup. Custom errors and events are called natively.
+ * @author Hup Labs
+ * @notice Minimal on-chain social protocol for posts, comments, reposts, likes, and session-based actions.
+ * @dev Uses IHup for shared events, errors, enums, and view structs. Supports ERC2771 trusted
+ *      forwarders for meta-transactions, AccessControl for admin permissions, Pausable for emergency
+ *      controls, and ReentrancyGuard for protected payable flows. Rich discovery, search, feeds,
+ *      bookmarks, views, and global post routing are expected to be handled off-chain by indexers.
+ * @custom:version 1.0.0
+ * @custom:chain multi-chain
+ * @custom:website https://hup.social
+ * @custom:security-contact security@hup.social
+ * @custom:emoji 💬
  */
 contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     // --- INTERNAL STORAGE STRUCTS ---
