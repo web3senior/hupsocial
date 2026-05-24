@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState,lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   getUniversalProfile,
@@ -40,9 +40,14 @@ import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import PageTitle from '@/components/PageTitle'
 import PostForm from '@/components/PostForm'
-import styles from './page.module.scss'
 import AISummary from '@/components/AISummary'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
+import styles from './page.module.scss'
+
+
+const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
+
+
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
@@ -71,6 +76,7 @@ export default function Page() {
     //  jobs: JobsTab,
     apps: <></>,
     // feed: FeedTab,
+    settings: SettingsTab,
   }
   const ActiveComponent = TabContentMap[activeTab]
   // Assumes:
