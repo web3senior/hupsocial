@@ -595,7 +595,11 @@ export default function PostForm({ text = '', url = '' }) {
 
   return (
     <div className={`${styles.postForm} flex flex-row align-items-start justify-content-between gap-1`}>
+      
       <div className={`flex-1`}>
+        <small className={`alert`}>
+            Once submitted, your post will appear in the feed as soon as the network block confirms.
+          </small>
         {showForm === `poll` && (
           <form ref={createFormRef} className={`form flex flex-column gap-050`} onSubmit={(e) => handleCreatePoll(e)}>
             <div>
