@@ -17,7 +17,6 @@
     box-shadow: var(--shadow-md);
     border-radius: 24px;
     overflow: hidden;
-    isolation: isolate;
 
     @media (max-width: 600px) {
       border: none;
