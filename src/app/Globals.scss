@@ -213,25 +213,25 @@ button {
 .debug {
   border: 1px solid red;
 }
-.motion-slideDownIn{
-animation: .1s cubic-bezier(.1, .9, .2, 1) both ms-motion-slideDownIn, .1s cubic-bezier(0, 0, 1, 1) both ms-motion-fadeIn;
-}
-@keyframes ms-motion-slideDownIn{
-  0% {
-    transform: translate3d(0, -48px, 0);
-}
-100% {
-    transform: translate3d(0, 0, 0);
-}
-}
-@keyframes ms-motion-fadeIn{
-0% {
-    opacity: 0;
-}
-100% {
-    opacity: 1;
-}
-}
+// .motion-slideDownIn{
+// animation: .1s cubic-bezier(.1, .9, .2, 1) both ms-motion-slideDownIn, .1s cubic-bezier(0, 0, 1, 1) both ms-motion-fadeIn;
+// }
+// @keyframes ms-motion-slideDownIn{
+//   0% {
+//     transform: translate3d(0, -48px, 0);
+// }
+// 100% {
+//     transform: translate3d(0, 0, 0);
+// }
+// }
+// @keyframes ms-motion-fadeIn{
+// 0% {
+//     opacity: 0;
+// }
+// 100% {
+//     opacity: 1;
+// }
+// }
 
 
 // .ms-motion-slideDownIn {

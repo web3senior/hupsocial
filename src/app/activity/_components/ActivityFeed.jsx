@@ -1,122 +1,123 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { Activity, LucideLoader2, LucideRefreshCcw, Clock, User } from 'lucide-react'
-import { getLikesPaginated, initPostContract } from '@/lib/communication'
+import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Activity,
+  Bell,
+  Clock,
+  ExternalLink,
+  Heart,
+  LucideLoader2,
+  LucideRefreshCcw,
+  MessageCircle,
+  Send,
+  User,
+} from 'lucide-react'
+import { useConnection } from 'wagmi'
 import Profile from '@/components/Profile'
-import { useConnection } from 'wagmi' // Adjust path as needed
+import { toRelativeTime } from '@/lib/dateHelper'
 import styles from './ActivityFeed.module.scss'
 
-const DEPLOY_BLOCK = 0 
+const PAGE_SIZE = 20
 
-const formatEvent = (event) => ({
-  id: `${event.transactionHash}-${event.logIndex}`,
-  transactionHash: event.transactionHash,
-  blockNumber: Number(event.blockNumber),
-  returnValues: {
-    postId: event.returnValues.postId.toString(),
-    liker: event.returnValues.liker,
+const ACTION_META = {
+  post_created: {
+    icon: Send,
+    label: 'Post created',
   },
-})
+  comment_created: {
+    icon: MessageCircle,
+    label: 'Comment created',
+  },
+  post_received_comment: {
+    icon: MessageCircle,
+    label: 'New comment',
+  },
+  post_liked: {
+    icon: Heart,
+    label: 'New like',
+  },
+  content_liked: {
+    icon: Heart,
+    label: 'New like',
+  },
+}
 
 export default function ActivityFeed() {
   const { address, isConnected } = useConnection()
-  
-  const [likes, setLikes] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [nextPage, setNextPage] = useState(null)
+  const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  const [lastScannedBlock, setLastScannedBlock] = useState(null)
-  const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState(null)
-  const [userPostIds, setUserPostIds] = useState(new Set())
 
-  const CHUNK_SIZE = 25000
-  const PAGE_SIZE = 15
+  const loadNotifications = useCallback(
+    async ({ page = 1, append = false, signal } = {}) => {
+      if (!address) return
 
-  // Unique cache key per user
-  const cacheKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}likes_cache_${address}`
+      setIsLoading(true)
+      setError(null)
 
-  // 1. Fetch User's Post IDs
-  useEffect(() => {
-    const fetchUserPosts = async () => {
-      if (!isConnected || !address) return
       try {
-        const { contract } = initPostContract()
-        // Replace with your actual contract method name
-        const ids = await contract.methods.getPostIdsByAddress(address).call()
-        setUserPostIds(new Set(ids.map(id => id.toString())))
-      } catch (e) {
-        console.error("Could not fetch user posts for filtering", e)
-      }
-    }
-    fetchUserPosts()
-  }, [address, isConnected])
+        const params = new URLSearchParams({
+          wallet_address: address,
+          page: String(page),
+          limit: String(PAGE_SIZE),
+        })
 
-  const fetchLikes = useCallback(async (isInitial = false) => {
-    if (isLoading || (!hasMore && !isInitial) || !isConnected) return
-    
-    setIsLoading(true)
-    setError(null)
+        const response = await fetch(`/api/v1/notifications?${params}`, { signal })
+        const payload = await response.json()
 
-    try {
-      const { web3 } = initPostContract()
-      const currentBlock = Number(await web3.eth.getBlockNumber())
-      const safeTip = currentBlock - 10
-
-      // Load specific cache for this wallet
-      const saved = localStorage.getItem(cacheKey)
-      const cachedEvents = saved ? JSON.parse(saved) : []
-
-      if (isInitial) {
-        if (cachedEvents.length > 0) setLikes(cachedEvents)
-
-        const newestCachedBlock = cachedEvents.length > 0
-          ? Math.max(...cachedEvents.map((e) => e.blockNumber))
-          : DEPLOY_BLOCK
-
-        if (safeTip > newestCachedBlock) {
-          const result = await getLikesPaginated(newestCachedBlock + 1, safeTip, CHUNK_SIZE, PAGE_SIZE)
-          
-          const filteredNew = result.events
-            .map(formatEvent)
-            .filter(event => userPostIds.has(event.returnValues.postId))
-
-          const updatedFeed = [...filteredNew, ...cachedEvents].slice(0, 100)
-          setLikes(updatedFeed)
-          localStorage.setItem(cacheKey, JSON.stringify(updatedFeed))
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error || 'Failed to fetch notifications')
         }
 
-        const oldestBlockInView = cachedEvents.length > 0 
-          ? Math.min(...cachedEvents.map((e) => e.blockNumber)) 
-          : safeTip
-        setLastScannedBlock(oldestBlockInView - 1)
-      } else {
-        const result = await getLikesPaginated(DEPLOY_BLOCK, lastScannedBlock, CHUNK_SIZE, PAGE_SIZE)
-        
-        const filteredOlder = result.events
-          .map(formatEvent)
-          .filter(event => userPostIds.has(event.returnValues.postId))
-
-        setLikes((prev) => [...prev, ...filteredOlder])
-        setLastScannedBlock(result.lastScannedBlock)
-        
-        if (result.lastScannedBlock <= DEPLOY_BLOCK) setHasMore(false)
+        setNotifications((current) => (append ? [...current, ...payload.data] : payload.data))
+        setNextPage(payload.nextPage)
+        setUnreadCount(payload.meta?.unread_count || 0)
+      } catch (err) {
+        if (err.name === 'AbortError') return
+        console.error('Notifications fetch error:', err)
+        setError('Could not load notifications.')
+      } finally {
+        if (!signal?.aborted) setIsLoading(false)
       }
-    } catch (err) {
-      console.error('Fetch Error:', err)
-      setError('Sync delayed.')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [isLoading, hasMore, lastScannedBlock, isConnected, address, userPostIds, cacheKey])
+    },
+    [address],
+  )
 
-  // Initial load once we have the user's post IDs
   useEffect(() => {
-    if (userPostIds.size > 0) {
-      fetchLikes(true)
-    }
-  }, [userPostIds])
+    if (!isConnected || !address) return
 
-  // Handle Disconnected State
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      loadNotifications({ signal: controller.signal })
+    }, 0)
+
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [address, isConnected, loadNotifications])
+
+  const visibleNotifications = useMemo(
+    () =>
+      isConnected && address
+        ? notifications.filter(
+            (notification) =>
+              notification.recipient_wallet_address?.toLowerCase() === address.toLowerCase(),
+          )
+        : [],
+    [address, isConnected, notifications],
+  )
+  const hasNotifications = visibleNotifications.length > 0
+  const activeNextPage = hasNotifications ? nextPage : null
+  const headerLabel = useMemo(() => {
+    if (!hasNotifications || unreadCount === 0) return 'Notifications'
+    return `${unreadCount} unread`
+  }, [hasNotifications, unreadCount])
+
   if (!isConnected) {
     return (
       <div className={styles.container}>
@@ -131,51 +132,141 @@ export default function ActivityFeed() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h4><Activity size={18} /> Notifications</h4>
-        <button onClick={() => fetchLikes(true)} className={styles.refreshButton} disabled={isLoading}>
-          <LucideRefreshCcw className={isLoading ? 'animate-spin' : ''} size={16} />
+        <h4>
+          <Activity size={18} />
+          {headerLabel}
+        </h4>
+        <button
+          type="button"
+          onClick={() => loadNotifications()}
+          className={styles.refreshButton}
+          disabled={isLoading}
+          aria-label="Refresh notifications"
+          title="Refresh notifications"
+        >
+          <LucideRefreshCcw className={isLoading ? styles.spin : undefined} size={16} />
         </button>
       </div>
 
       <div className={styles.feed}>
-        {likes.length === 0 && !isLoading ? (
-          <div className={styles.status}>No likes on your posts yet.</div>
-        ) : (
-          likes.map((like) => (
-            <div key={like.id} className={styles.activityRow}>
-              <div className={styles.profileWrapper}>
-                <Profile creator={like.returnValues.liker} createdAt={like.blockNumber} />
-              </div>
-              <div className={styles.actionLabel}>
-                Liked your post <span className={styles.postId}>#{like.returnValues.postId}</span>
-              </div>
-            </div>
-          ))
-        )}
+        {!hasNotifications && isLoading ? (
+          <div className={styles.status}>
+            <LucideLoader2 className={styles.spin} size={16} />
+            Loading notifications...
+          </div>
+        ) : null}
+
+        {!hasNotifications && !isLoading ? (
+          <div className={styles.status}>
+            <Bell size={18} />
+            No notifications yet.
+          </div>
+        ) : null}
+
+        {visibleNotifications.map((notification) => (
+          <NotificationRow key={notification.id} notification={notification} />
+        ))}
       </div>
 
       <div className={styles.footer}>
-        {hasMore ? (
-          <button 
-            onClick={() => fetchLikes(false)} 
-            disabled={isLoading} 
+        {activeNextPage ? (
+          <button
+            type="button"
+            onClick={() => loadNotifications({ page: activeNextPage, append: true })}
+            disabled={isLoading}
             className={styles.loadMore}
           >
             {isLoading ? (
-              <><LucideLoader2 className="animate-spin" size={16} /> Searching...</>
+              <>
+                <LucideLoader2 className={styles.spin} size={16} />
+                Loading...
+              </>
             ) : (
-              'Load More'
+              'Load more'
             )}
           </button>
         ) : (
-          likes.length > 0 && (
+          hasNotifications && (
             <div className={styles.status}>
-              <Clock size={14} /> Reached the beginning of history
+              <Clock size={14} />
+              You are all caught up
             </div>
           )
         )}
       </div>
+
       {error && <p className={styles.error}>{error}</p>}
     </div>
   )
+}
+
+function NotificationRow({ notification }) {
+  const actor = notification.actor_wallet_address || notification.recipient_wallet_address
+  const href = getNotificationHref(notification)
+  const { icon: Icon, label } = ACTION_META[notification.action_type] || {
+    icon: Bell,
+    label: formatActionType(notification.action_type),
+  }
+
+  return (
+    <article className={`${styles.activityRow} ${notification.is_read ? '' : styles.unread}`}>
+      <div className={styles.iconBox}>
+        <Icon size={18} />
+      </div>
+
+      <div className={styles.rowBody}>
+        <div className={styles.profileWrapper}>
+          <Profile creator={actor} networkId={notification.network_id} />
+        </div>
+
+        <div className={styles.messageGroup}>
+          <strong>{notification.title || label}</strong>
+          {notification.message && <p>{notification.message}</p>}
+          <div className={styles.meta}>
+            <span>{label}</span>
+            {notification.entity_id && <span>Post #{notification.entity_id}</span>}
+            {notification.created_at && <time>{toRelativeTime(notification.created_at)}</time>}
+          </div>
+        </div>
+      </div>
+
+      {href && (
+        <Link href={href} className={styles.openLink} aria-label="Open notification">
+          <ExternalLink size={16} />
+        </Link>
+      )}
+    </article>
+  )
+}
+
+function getNotificationHref(notification) {
+  const networkId = notification.network_id || notification.data?.network_id
+  const entityId = notification.entity_id || notification.data?.parent_post_id || notification.data?.post_id
+
+  if (networkId && notification.entity_type === 'post' && entityId) {
+    return `/networks/${networkId}/${entityId}`
+  }
+
+  if (!notification.action_url) return null
+
+  if (notification.action_url.startsWith('/posts/')) {
+    const [path, queryString] = notification.action_url.split('?')
+    const postId = path.replace('/posts/', '')
+    const params = new URLSearchParams(queryString || '')
+    const legacyNetworkId = params.get('network_id') || networkId
+
+    if (legacyNetworkId && postId) {
+      return `/networks/${legacyNetworkId}/${postId}`
+    }
+  }
+
+  return notification.action_url
+}
+
+function formatActionType(actionType = 'notification') {
+  return actionType
+    .split('_')
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(' ')
 }

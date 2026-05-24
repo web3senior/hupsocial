@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
-import { useMemo } from 'react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract } from 'wagmi'
 import { initPostContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getPostById, getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
@@ -23,14 +21,14 @@ import { MessageCircle } from 'lucide-react'
 import { Heart } from 'lucide-react'
 import { Box } from 'lucide-react'
 import { SendHorizonal } from 'lucide-react'
-import styles from './Post.module.scss'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import NativePopover from './ui/NativePopover'
-import { QuoteIcon } from 'lucide-react'
 import { MessageSquareQuote } from 'lucide-react'
 import clsx from 'clsx'
+import styles from './Post.module.scss'
+
 
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
@@ -722,8 +720,6 @@ const Like = ({ item }) => {
       args: [address, [id]], // Using the 'id' parameter passed to the function
     })
   }
-
-
   
   const unlikePost = (e, id) => {
     e.stopPropagation()

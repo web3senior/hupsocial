@@ -13,7 +13,7 @@
   cursor: pointer;
   padding: 20px 20px 0 20px;
   place-items: stretch;
-  z-index: 44;
+
   @media (max-width: 640px) {
     padding: 10px;
   }
@@ -154,7 +154,7 @@
       background-color: var(--gray-100);
       user-select: none;
       cursor: help;
-      isolation: isolate;
+   
 
       @media (max-width: 600px) {
         padding: 8px 0.7rem;

@@ -1,7 +1,7 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
   width: 100%;
 }
 
@@ -9,32 +9,42 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding-bottom: 0.5rem;
 
   h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 1.1rem;
     font-weight: 700;
-    color: #1e293b;
+    color: var(--text-color);
     margin: 0;
   }
 }
 
 .refreshButton {
-  padding: 0.5rem;
+  --size: 2.25rem;
+  width: var(--size);
+  height: var(--size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 9999px;
-  border: none;
-  background: transparent;
+  border: 1px solid var(--border);
+  background: var(--surface);
   cursor: pointer;
-  color: #64748b;
-  transition: all 0.2s ease;
+  color: var(--text-color-pale);
+  transition: background-color 0.2s var(--transition-soft), color 0.2s var(--transition-soft);
 
   &:hover:not(:disabled) {
-    background-color: #f1f5f9;
-    color: #ec4899;
+    background-color: var(--gray-100);
+    color: var(--liked-color);
   }
 
   &:disabled {
-    opacity: 0.5;
+    cursor: wait;
+    opacity: 0.6;
   }
 }
 
@@ -44,70 +54,115 @@
   gap: 0.75rem;
 }
 
-.card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.activityRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 0.875rem;
   padding: 1rem;
-  background: #ffffff;
-  border: 1px solid #f1f5f9;
-  border-radius: 1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  transition: transform 0.2s ease, border-color 0.2s ease;
-  animation: fadeIn 0.4s ease-out forwards;
-
-  &:hover {
-    transform: translateY(-2px);
-    border-color: #fbcfe8;
-  }
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  animation: fadeIn 0.28s ease-out both;
 }
 
-.infoGroup {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.unread {
+  border-color: color-mix(in srgb, var(--liked-color) 32%, var(--border));
+  box-shadow: inset 3px 0 0 var(--liked-color);
 }
 
 .iconBox {
-  background-color: #fdf2f8;
-  padding: 0.5rem;
-  border-radius: 0.75rem;
-  display: flex;
+  --size: 2.25rem;
+  width: var(--size);
+  height: var(--size);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-
-  svg {
-    color: #ec4899;
-  }
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--liked-color) 12%, var(--surface));
+  color: var(--liked-color);
 }
 
-.textGroup {
-  .liker {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #0f172a;
-    margin: 0;
+.rowBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.profileWrapper {
+  min-width: 0;
+}
+
+.messageGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+
+  strong {
+    color: var(--text-color);
+    font-size: 0.95rem;
+    line-height: 1.35;
   }
 
-  .subText {
-    font-size: 0.75rem;
-    color: #64748b;
+  p {
     margin: 0;
+    color: var(--text-color-pale);
+    font-size: 0.9rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
   }
 }
 
 .meta {
-  text-align: right;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-color-pale);
+  font-size: 0.75rem;
 
-  .block {
-    font-family: ui-monospace, monospace;
-    font-size: 10px;
-    color: #94a3b8;
+  span,
+  time {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  span:not(:last-child)::after,
+  time:not(:last-child)::after {
+    content: "";
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-left: 0.45rem;
+    opacity: 0.55;
+  }
+}
+
+.openLink {
+  --size: 2.25rem;
+  width: var(--size);
+  height: var(--size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: var(--text-color-pale);
+  text-decoration: none;
+  transition: background-color 0.2s var(--transition-soft), color 0.2s var(--transition-soft);
+
+  &:hover {
+    background: var(--gray-100);
+    color: var(--text-color);
   }
 }
 
 .footer {
-  margin-top: 1.5rem;
+  margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -115,31 +170,28 @@
 }
 
 .loadMore {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  padding: 0.6rem 1.5rem;
-  background-color: #0f172a;
-  color: #ffffff;
+  min-height: 2.45rem;
+  padding: 0.6rem 1.35rem;
+  background-color: var(--black-900);
+  color: var(--white);
   border-radius: 9999px;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover:not(:disabled) {
-    background-color: #1e293b;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
-  }
+  transition: transform 0.2s var(--transition-soft), opacity 0.2s var(--transition-soft);
 
   &:active {
-    transform: scale(0.96);
+    transform: scale(0.97);
   }
 
   &:disabled {
-    opacity: 0.6;
     cursor: wait;
+    opacity: 0.65;
   }
 }
 
@@ -147,19 +199,53 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #94a3b8;
+  color: var(--text-color-pale);
   font-size: 0.875rem;
-  font-style: italic;
   padding: 1rem 0;
 }
 
 .error {
-  color: #ef4444;
-  font-size: 0.75rem;
-  margin-top: 0.5rem;
+  color: var(--red-400);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    gap: 1rem;
+  }
+
+  .activityRow {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 0.875rem;
+  }
+
+  .openLink {
+    grid-column: 2;
+    justify-self: flex-start;
+    width: auto;
+    min-width: 2.25rem;
+  }
 }

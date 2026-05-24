@@ -4,7 +4,7 @@
   display: flex;
   place-content: center;
   place-items: center;
-  background-color: var(--white, #FFF);
+  background-color: var(--background);
   z-index: 9999;
   isolation: isolate;
 }
