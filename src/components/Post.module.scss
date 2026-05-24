@@ -13,29 +13,9 @@
   cursor: pointer;
   padding: 20px 20px 0 20px;
   place-items: stretch;
-z-index: 44;
+  z-index: 44;
   @media (max-width: 640px) {
     padding: 10px;
-  }
-
-  &[data-has-comments='true'] {
-    &:before {
-      content: '';
-      position: absolute;
-      left: 6%;
-      top: 60px;
-      width: 2px;
-      height: calc(100% - 150px);
-      background-color: var(--border);
-      z-index: 1;
-    }
-
-    // @include md-down() {
-    //   height: calc(100% - 155px);
-    //   &:before {
-    //     left: 25px;
-    //   }
-    // }
   }
 
   &[data-content='false'] {
@@ -72,7 +52,26 @@ z-index: 44;
     user-select: none;
   }
 
+  &[data-has-comments='true'] {
+    .post {
+      &__main {
+        &:before {
+          content: '';
+          position: absolute;
+          left: 1rem;
+          top: 1rem;
+          bottom: -2rem;
+          width: 2px;
+          background-color: var(--border);
+          z-index: 1;
+        }
+      }
+    }
+  }
+
   &__main {
+    position: relative;
+
     &__media {
       overflow: hidden;
       border-radius: var(--global-border-radius);
