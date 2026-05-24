@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
  * @dev Verifies typed forward requests, tracks nonces per signer and target contract, and forwards
  *      calls to trusted recipient contracts that read the original sender through ERC2771Context.
  * @custom:version 1.0.0
- * @custom:chain multi-chain
+ * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
  * @custom:emoji 📨

@@ -8,7 +8,7 @@ pragma solidity ^0.8.35;
  * @dev Defines the protocol's public enums, structs, events, custom errors, and read interface used
  *      by Hup-compatible contracts and off-chain indexers.
  * @custom:version 1.0.0
- * @custom:chain multi-chain
+ * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
  * @custom:emoji 📜

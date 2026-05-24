@@ -16,7 +16,7 @@ import "./IHup.sol";
  *      controls, and ReentrancyGuard for protected payable flows. Rich discovery, search, feeds,
  *      bookmarks, views, and global post routing are expected to be handled off-chain by indexers.
  * @custom:version 1.0.0
- * @custom:chain multi-chain
+ * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
  * @custom:emoji 💬
