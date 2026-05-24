@@ -2,62 +2,73 @@ import { Indexer } from "@0gfoundation/0g-ts-sdk"
 import { NextResponse } from "next/server"
 import sharp from "sharp"
 
+export const runtime = "nodejs"
+
+function intParam(value, fallback, min, max) {
+  const parsed = Number.parseInt(value ?? "", 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(Math.max(parsed, min), max)
+}
+
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
-  const rootHash = searchParams.get('hash')
-  
-  // Extract custom optimization parameters from the query string
-  const width = searchParams.get('w')
-  const quality = searchParams.get('q') || '80'
+  const rootHash = searchParams.get("hash")
+
+  const width = intParam(searchParams.get("w"), null, 1, 4096)
+  const quality = intParam(searchParams.get("q"), 80, 1, 100)
 
   if (!rootHash) {
-    return NextResponse.json({ error: 'Root Hash is required' }, { status: 400 })
+    return NextResponse.json({ error: "Root Hash is required" }, { status: 400 })
   }
 
   try {
-    // Initialize Indexer using the Turbo mode testnet endpoint
-    const INDEXER_RPC = process.env.INDEXER_RPC || 'https://indexer-storage-testnet-turbo.0g.ai'
-    const indexer = new Indexer(INDEXER_RPC)
+    const INDEXER_RPC =
+      process.env.INDEXER_RPC || "https://indexer-storage-testnet-turbo.0g.ai"
 
-    // Execute download from the 0G network into an in-memory blob structure
+    const indexer = new Indexer(INDEXER_RPC)
     const [blob, dlErr] = await indexer.downloadToBlob(rootHash)
 
     if (dlErr !== null) {
       throw new Error(`0G Indexer Download Error: ${dlErr}`)
     }
 
-    // Extract array buffer from the returned blob payload
     const arrayBuffer = await blob.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Instantiate the Sharp transformation pipeline with the raw asset bytes
-    let pipeline = sharp(buffer)
+    const metadata = await sharp(buffer, { animated: true }).metadata()
+    const isAnimated = (metadata.pages ?? 1) > 1
 
-    // Execute conditional resizing if a target width parameter is supplied
+    let pipeline = sharp(buffer, { animated: true })
+
     if (width) {
       pipeline = pipeline.resize({
-        width: parseInt(width, 10),
-        withoutEnlargement: true, // Prevents upscaling small avatars layout shifts
+        width,
+        withoutEnlargement: true,
       })
     }
 
-    // Force transform format to WebP and apply variable quality compression structural layouts
     const optimizedBuffer = await pipeline
-      .webp({ quality: parseInt(quality, 10) })
+      .webp({
+        quality,
+        ...(isAnimated
+          ? {
+              loop: metadata.loop ?? 0,
+              ...(metadata.delay ? { delay: metadata.delay } : {}),
+            }
+          : {}),
+      })
       .toBuffer()
 
-    // Stream the highly optimized binary layout back to the client browser engine
     return new Response(optimizedBuffer, {
       headers: {
-        'Content-Type': 'image/webp', // Explicitly declare updated format type
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        "Content-Type": "image/webp",
+        "Cache-Control": "public, max-age=31536000, immutable",
       },
     })
-
   } catch (error) {
-    console.error('0G_API_ROUTE_ERROR:', error)
+    console.error("0G_API_ROUTE_ERROR:", error)
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' }, 
+      { error: error.message || "Internal Server Error" },
       { status: 500 }
     )
   }
