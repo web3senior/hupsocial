@@ -21,7 +21,7 @@ export const useSidebarStore = create(
         { name: 'New post', path: '/new', icon: Plus },
         { name: 'Search', path: '/search', icon: Search },
         { name: 'br' },
-        { name: 'Communities', path: '/community', icon: Users },
+        { name: 'Communities', path: '/communities', icon: Users },
         { name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
         { name: 'Events', path: '/events', icon: Calendar },
         { name: 'Jobs', path: '/jobs', icon: Briefcase },
