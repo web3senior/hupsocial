@@ -112,9 +112,9 @@ export default function Page() {
       if (hasInitialized || isFetchingRef.current) return
 
       try {
-        const appsRes = await getApps(activeChain[0].id)
+        //const appsRes = await getApps(activeChain[0].id)
         const postsRes = await getPosts(1, 10, null, null, address)
-        setInitialData(appsRes, postsRes)
+        setInitialData([], postsRes)
       } catch (error) {
         console.error('Initialization error:', error)
       }

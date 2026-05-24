@@ -205,20 +205,7 @@ export async function sendNotification(message, address) {
   return response.json()
 }
 
-export async function getApps(chainId) {
-  let requestOptions = {
-    method: 'GET',
-    redirect: 'follow',
-  }
 
-  const params = new URLSearchParams({ chain_id: chainId }).toString()
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}app/list?${params}`,
-    requestOptions,
-  )
-  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
-  return response.json()
-}
 export async function getClaim() {
   let requestOptions = {
     method: 'GET',
