@@ -66,10 +66,7 @@
   animation: fadeIn 0.28s ease-out both;
 }
 
-.unread {
-  border-color: color-mix(in srgb, var(--liked-color) 32%, var(--border));
-  box-shadow: inset 3px 0 0 var(--liked-color);
-}
+
 
 .iconBox {
   --size: 2.25rem;
@@ -79,9 +76,9 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--liked-color) 12%, var(--surface));
-  color: var(--liked-color);
+  border-radius: 1000px;
+  background: var(--background);
+  color: var(--color);
 }
 
 .rowBody {
