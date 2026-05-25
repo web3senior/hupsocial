@@ -29,7 +29,6 @@ import { MessageSquareQuote } from 'lucide-react'
 import clsx from 'clsx'
 import styles from './Post.module.scss'
 
-
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
@@ -44,12 +43,12 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const [lastComment, setLastComment] = useState(null)
-const [showMore, setShowMore] = useState(false);
+  const [showMore, setShowMore] = useState(false)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   const repostedPostId = isRepost ? Number(item.is_repost) : null
-const contentRef = useRef(null);
-const [isExpanded, setIsExpanded] = useState(false);
-const [canShowMore, setCanShowMore] = useState(false);
+  const contentRef = useRef(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [canShowMore, setCanShowMore] = useState(false)
   useEffect(() => {
     let cancelled = false
 
@@ -120,20 +119,18 @@ const [canShowMore, setCanShowMore] = useState(false);
       cancelled = true
     }
   }, [commentTarget?.id, commentTarget?.network_id, commentTarget?.total_comments, address])
-useEffect(() => {
-  const el = contentRef.current;
-  if (!el) return;
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
 
-  setCanShowMore(el.scrollHeight > el.clientHeight);
-}, [displayItem?.content?.elements?.[0]?.data?.text]);
+    setCanShowMore(el.scrollHeight > el.clientHeight)
+  }, [displayItem?.content?.elements?.[0]?.data?.text])
   const lastCommentText = getCommentPreviewText(lastComment?.content)
   const hasLastCommentPreview = Boolean(lastCommentText) && showLastComment
 
   return (
     <>
-      {showCommentModal && item && (
-        <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />
-      )}
+      {showCommentModal && item && <CommentModal item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
 
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
 
@@ -169,31 +166,28 @@ useEffect(() => {
             <div className={styles.post__content}>Original post unavailable</div>
           ) : displayItem?.content?.elements?.length > 1 ? (
             <>
-<div
-  ref={contentRef}
-  className={`${styles.post__main__content} ${
-    isExpanded
-      ? styles.post__main__content_expanded
-      : styles.post__main__content_collapsed
-  }`}
-  id={`post${displayItem.id}`}
-  dangerouslySetInnerHTML={{
-    __html: renderMarkdown(displayItem?.content?.elements?.[0]?.data?.text || ''),
-  }}
-/>
-{canShowMore && (
-  <button
-    type="button"
-    className={styles.post__showMore}
-    onClick={(e) => {
-      e.stopPropagation();
-      setIsExpanded((prev) => !prev);
-    }}
-  >
-    {isExpanded ? 'Show less' : 'Show more'}
-  </button>
-)}
-
+              <div
+                ref={contentRef}
+                className={`${styles.post__main__content} ${
+                  isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed
+                }`}
+                id={`post${displayItem.id}`}
+                dangerouslySetInnerHTML={{
+                  __html: renderMarkdown(displayItem?.content?.elements?.[0]?.data?.text || ''),
+                }}
+              />
+              {canShowMore && (
+                <button
+                  type="button"
+                  className={styles.post__showMore}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsExpanded((prev) => !prev)
+                  }}
+                >
+                  {isExpanded ? 'Show less' : 'Show more'}
+                </button>
+              )}
 
               <div className={`${styles.post__main__media}`}>
                 <MediaGallery data={displayItem.content.elements[1].data.items} />
@@ -288,7 +282,7 @@ useEffect(() => {
 
 const Nav = ({ item }) => {
   const activeChain = getActiveChain()
-console.log({ item })
+  console.log({ item })
   return (
     <>
       <NativePopover
@@ -313,7 +307,8 @@ console.log({ item })
 
 const LastCommentPreview = ({ comment, text }) => {
   const commenterLabel =
-    comment?.display_name || (comment?.wallet_address ? `${comment.wallet_address.slice(0, 4)}...${comment.wallet_address.slice(-4)}` : 'Last comment')
+    comment?.display_name ||
+    (comment?.wallet_address ? `${comment.wallet_address.slice(0, 4)}...${comment.wallet_address.slice(-4)}` : 'Last comment')
 
   return (
     <aside className={styles.post__lastComment} onClick={(e) => e.stopPropagation()}>
@@ -485,18 +480,17 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
               </header>
               <main className={`${styles.modal__post__main} w-100 flex flex-column grid--gap-050`}>
                 <div className={`${styles.post__main__media}`}>
-                  
-                    <>
-                      <div
-                        className={`${styles.post__main__content} `}
-                        id={`post${item.postId}`}
-                        dangerouslySetInnerHTML={{
-                          __html: renderMarkdown(item?.content?.elements?.[0]?.data?.text || item?.content || ''),
-                        }}
-                      />
-                      {item?.content?.elements?.[1]?.type === 'media' && <MediaGallery data={item.content.elements[1].data.items} />}
-                    </>
-               
+                  <>
+                    <div
+                      className={`${styles.post__main__content} `}
+                      style={{ maxHeight: '400px', overflowY: 'auto' }}
+                      id={`post${item.postId}`}
+                      dangerouslySetInnerHTML={{
+                        __html: renderMarkdown(item?.content?.elements?.[0]?.data?.text || item?.content || ''),
+                      }}
+                    />
+                    {item?.content?.elements?.[1]?.type === 'media' && <MediaGallery data={item.content.elements[1].data.items} />}
+                  </>
                 </div>
               </main>
             </section>
@@ -745,7 +739,7 @@ const Like = ({ item }) => {
       args: [address, [id]], // Using the 'id' parameter passed to the function
     })
   }
-  
+
   const unlikePost = (e, id) => {
     e.stopPropagation()
 
@@ -774,7 +768,13 @@ const Like = ({ item }) => {
         } else toast(`Please connect wallet`, `error`)
       }}
     >
-      <Heart strokeWidth={1.5} width={18} height={18} color={item.is_liked ? 'var(--liked-color)' : 'currentColor'} fill={item.is_liked ? 'var(--liked-color)' : 'none'} />
+      <Heart
+        strokeWidth={1.5}
+        width={18}
+        height={18}
+        color={item.is_liked ? 'var(--liked-color)' : 'currentColor'}
+        fill={item.is_liked ? 'var(--liked-color)' : 'none'}
+      />
       {item.total_likes === 0 ? '' : <span>{item.total_likes}</span>}
     </button>
   )
