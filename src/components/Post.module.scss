@@ -69,6 +69,19 @@
     }
   }
 
+&__showMore {
+  margin-top: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--blue-500);
+  cursor: pointer;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  height: 40px;
+  padding-right: 1rem;
+}
+
   &__main {
     position: relative;
 
@@ -78,14 +91,20 @@
     }
 
     &__content {
-      height: auto;
       overflow: hidden;
       line-height: 1.4;
-
+      position: relative;
       padding: 0.2rem 0 0.2rem 0.3rem;
-
       white-space: pre-wrap;
       word-wrap: break-word;
+
+      &_collapsed {
+        max-height: 180px;
+      }
+
+      &_expanded {
+        max-height: none;
+      }
 
       a {
         color: var(--blue-500) !important;
@@ -154,7 +173,6 @@
       background-color: var(--gray-100);
       user-select: none;
       cursor: help;
-   
 
       @media (max-width: 600px) {
         padding: 8px 0.7rem;

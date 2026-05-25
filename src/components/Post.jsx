@@ -44,10 +44,12 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const [lastComment, setLastComment] = useState(null)
-
+const [showMore, setShowMore] = useState(false);
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   const repostedPostId = isRepost ? Number(item.is_repost) : null
-
+const contentRef = useRef(null);
+const [isExpanded, setIsExpanded] = useState(false);
+const [canShowMore, setCanShowMore] = useState(false);
   useEffect(() => {
     let cancelled = false
 
@@ -118,7 +120,12 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
       cancelled = true
     }
   }, [commentTarget?.id, commentTarget?.network_id, commentTarget?.total_comments, address])
+useEffect(() => {
+  const el = contentRef.current;
+  if (!el) return;
 
+  setCanShowMore(el.scrollHeight > el.clientHeight);
+}, [displayItem?.content?.elements?.[0]?.data?.text]);
   const lastCommentText = getCommentPreviewText(lastComment?.content)
   const hasLastCommentPreview = Boolean(lastCommentText) && showLastComment
 
@@ -162,13 +169,31 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
             <div className={styles.post__content}>Original post unavailable</div>
           ) : displayItem?.content?.elements?.length > 1 ? (
             <>
-              <div
-                className={styles.post__main__content}
-                id={`post${displayItem.id}`}
-                dangerouslySetInnerHTML={{
-                  __html: renderMarkdown(displayItem?.content?.elements?.[0]?.data?.text || ''),
-                }}
-              />
+<div
+  ref={contentRef}
+  className={`${styles.post__main__content} ${
+    isExpanded
+      ? styles.post__main__content_expanded
+      : styles.post__main__content_collapsed
+  }`}
+  id={`post${displayItem.id}`}
+  dangerouslySetInnerHTML={{
+    __html: renderMarkdown(displayItem?.content?.elements?.[0]?.data?.text || ''),
+  }}
+/>
+{canShowMore && (
+  <button
+    type="button"
+    className={styles.post__showMore}
+    onClick={(e) => {
+      e.stopPropagation();
+      setIsExpanded((prev) => !prev);
+    }}
+  >
+    {isExpanded ? 'Show less' : 'Show more'}
+  </button>
+)}
+
 
               <div className={`${styles.post__main__media}`}>
                 <MediaGallery data={displayItem.content.elements[1].data.items} />
