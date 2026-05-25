@@ -249,8 +249,6 @@ export default function Page() {
 
           {activeTab === 'posts' && (
             <div className={`${styles.tabContent} ${styles.postTab} relative`}>
-              <NewPost addr={params.wallet} />
-
               <div className={`${styles.grid} flex flex-column`}>
                 {posts.list.length > 0 &&
                   posts.list.map((item, i) => {
