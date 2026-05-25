@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { useAccount } from 'wagmi'
+import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import {
   Book,
@@ -122,7 +122,7 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
 
 export default function Aside() {
   const pathname = usePathname()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected } = useConnection()
   const mounted = useClientMounted()
   const { theme, setTheme } = useTheme()
 
