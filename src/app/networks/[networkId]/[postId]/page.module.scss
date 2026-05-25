@@ -23,7 +23,6 @@
     box-shadow: var(--page-shadow);
     border-radius: var(--global-border-radius);
     overflow: hidden;
-    isolation: isolate;
 
     @media (max-width: 640px) {
       border: none;
