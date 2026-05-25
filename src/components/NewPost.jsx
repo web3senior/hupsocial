@@ -407,10 +407,10 @@ export default function NewPost({
               <button type="button" onClick={() => triggerFileInput('video')} aria-label="Add video">
                 <SquarePlay size={22} strokeWidth={1.8} />
               </button>
-              <button type="button" aria-label="Add emoji">
+              <button type="button" aria-label="Add emoji" style={{display: 'none'}}>
                 <Smile size={22} strokeWidth={1.8} />
               </button>
-              <button type="button" aria-label="Add poll" hidden>
+              <button type="button" aria-label="Add poll"  style={{display: 'none'}}>
                 <List size={22} strokeWidth={1.8} />
               </button>
               <button type="button" onClick={() => wrapSelection('**')} aria-label="Bold">
