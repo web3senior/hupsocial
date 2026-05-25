@@ -1,24 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState,lazy, useRef } from 'react'
+import { useEffect, useState, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import {
-  getUniversalProfile,
-  getProfile,
-  updateProfile,
-  subscribeUser,
-  unsubscribeUser,
-  sendNotification,
-  getPosts,
-} from '@/lib/api'
-import {
-  initPostContract,
-  initStatusContract,
-  getStatus,
-  getMaxLength,
-  getPostsByCreator,
-} from '@/lib/communication'
+import { getUniversalProfile, getProfile, updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts } from '@/lib/api'
+import { initPostContract, initStatusContract, getStatus, getMaxLength, getPostsByCreator } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Web3 from 'web3'
 import abi from '@/abi/post.json'
@@ -28,13 +14,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import Balance from './_components/balance'
 import { getActiveChain } from '@/lib/communication'
-import {
-  useBalance,
-  useWaitForTransactionReceipt,
-  useConnection,
-  useDisconnect,
-  useWriteContract,
-} from 'wagmi'
+import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
@@ -44,9 +24,7 @@ import AISummary from '@/components/AISummary'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 
-
 const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
-
 
 export default function Page() {
   const [posts, setPosts] = useState({ list: [] })
@@ -185,27 +163,17 @@ export default function Page() {
             <Profile addr={params.wallet} />
 
             {/* Ensure posts, the list, and POAPs exist before mounting */}
-            {posts?.list?.length > 0 && POAPs && (
-              <AISummary addr={params.wallet} posts={posts} poaps={POAPs} />
-            )}
+            {posts?.list?.length > 0 && POAPs && <AISummary addr={params.wallet} posts={posts} poaps={POAPs} />}
 
             <details className="mt-10">
               <summary>View POAPs</summary>
-              <div
-                className={`grid grid--fill gap-1 mt-10`}
-                style={{ '--data-width': `64px` }}
-                role="list"
-              >
+              <div className={`grid grid--fill gap-1 mt-10`} style={{ '--data-width': `64px` }} role="list">
                 {POAPs &&
                   POAPs.length > 0 &&
                   POAPs.map((POAP, i) => {
                     return (
                       <figure key={i} className={``}>
-                        <img
-                          src={POAP.event.image_url}
-                          style={{ width: `64px` }}
-                          className={`rounded-full`}
-                        />
+                        <img src={POAP.event.image_url} style={{ width: `64px` }} className={`rounded-full`} />
                         <figcaption style={{ color: `black` }}>{POAP.event.name}</figcaption>
                         <small className={`lable lable-dark`}>{POAP.event.year}</small>
                       </figure>
@@ -215,12 +183,8 @@ export default function Page() {
             </details>
           </div>
 
-          <section
-            className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}
-          >
-            <div
-              className={`${styles.tab__container} flex align-items-center justify-content-around`}
-            >
+          <section className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
+            <div className={`${styles.tab__container} flex align-items-center justify-content-around`}>
               {TABS_DATA.map((tab) => (
                 <button
                   key={tab.id}
@@ -258,10 +222,7 @@ export default function Page() {
                         className={`${styles.post} animate fade`}
                         onClick={() => router.push(`/networks/${activeChain[0].id}/${item.id}`)}
                       >
-                        <Post
-                          item={item}
-                          actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]}
-                        />
+                        <Post item={item} actions={[`like`, `comment`, `repost`, `view`, `share`]} />
                         {i < posts.list.length - 1 && <hr />}
                       </section>
                     )
@@ -295,10 +256,7 @@ export default function Page() {
           )}
 
           {activeTab === 'settings' && (
-            <div
-              className={`${styles.tabContent} ${styles.settings} relative`}
-              
-            >
+            <div className={`${styles.tabContent} ${styles.settings} relative`}>
               <Settings />
             </div>
           )}
@@ -337,9 +295,7 @@ const Nav = ({ item }) => {
       </button>
 
       {showPostDropdown && (
-        <div
-          className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}
-        >
+        <div className={`${styles.postDropdown} animate fade flex flex-column align-items-center justify-content-start gap-050`}>
           <ul>
             <li>
               <Link href={`p/${item.postId}`}>View post</Link>
@@ -400,12 +356,7 @@ const Profile = ({ addr }) => {
     getUniversalProfile(addr).then((res) => {
       if (!isMounted) return
 
-      if (
-        res?.Profile &&
-        Array.isArray(res.Profile) &&
-        res.Profile.length > 0 &&
-        res.Profile[0].isContract
-      ) {
+      if (res?.Profile && Array.isArray(res.Profile) && res.Profile.length > 0 && res.Profile[0].isContract) {
         const upRecord = res.Profile[0]
         setIsItUp(true)
         setData({
@@ -495,52 +446,34 @@ const Profile = ({ addr }) => {
   if (!data) return <div className={`shimmer ${styles.shimmer}`} />
 
   const targetWallet = params?.wallet || addr || ''
-  const displayWalletString = targetWallet.length >= 42
-    ? `${targetWallet.slice(0, 4)}…${targetWallet.slice(-4)}`
-    : targetWallet
+  const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 4)}…${targetWallet.slice(-4)}` : targetWallet
 
   // Image source fallbacks: 0G download cache -> raw database value -> default text path string
   const finalAvatarImageSource = is0GHash(data.profileImage)
-    ? (resolved0gUrl || '/placeholder-loading-spinner.gif')
-    : (data.profileImage || '/placeholder-avatar.png')
+    ? resolved0gUrl || '/placeholder-loading-spinner.gif'
+    : data.profileImage || '/placeholder-avatar.png'
 
   const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
 
   return (
     <>
-      {showProfileModal && data && (
-        <ProfileModal 
-          profile={data} 
-          setShowProfileModal={setShowProfileModal} 
-          updateProfile={updateProfile}
-        />
-      )}
+      {showProfileModal && data && <ProfileModal profile={data} setShowProfileModal={setShowProfileModal} updateProfile={updateProfile} />}
 
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
         <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
             <div className={styles.profile__header}>
               <b className={styles.profile__name}>{data.name ? data.name : 'hup-user'}</b>
-              <img
-                className={styles.profile__checkmark}
-                alt="Checkmark"
-                src={blueCheckMarkIcon.src || blueCheckMarkIcon}
-              />
+              <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
             </div>
 
             <code className={styles.profile__wallet}>
-              <Link
-                href={`${explorerBaseUrl}/address/${targetWallet}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <Link href={`${explorerBaseUrl}/address/${targetWallet}`} target="_blank" rel="noopener noreferrer">
                 {displayWalletString}
               </Link>
             </code>
 
-            <p className={`${styles.profile__description} mt-20`}>
-              {data.description || 'This user has not set up a bio yet.'}
-            </p>
+            <p className={`${styles.profile__description} mt-20`}>{data.description || 'This user has not set up a bio yet.'}</p>
 
             <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
               <TagsElement rawTags={data.tags} />
@@ -549,10 +482,10 @@ const Profile = ({ addr }) => {
 
           <div className={`${styles.profile__pfp} rounded relative`}>
             <figure>
-              <img 
-                alt="PFP" 
-                src={finalAvatarImageSource} 
-                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} 
+              <img
+                alt="PFP"
+                src={finalAvatarImageSource}
+                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
               />
             </figure>
 
@@ -568,12 +501,7 @@ const Profile = ({ addr }) => {
                   <span className="text-secondary">100 followers</span>
                 </button>
                 <span>•</span>
-                <Link
-                  className={styles.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  href={`https://hup.social/${targetWallet}`}
-                >
+                <Link className={styles.link} target="_blank" rel="noopener noreferrer" href={`https://hup.social/${targetWallet}`}>
                   hup.social/{displayWalletString}
                 </Link>
               </div>
@@ -587,18 +515,10 @@ const Profile = ({ addr }) => {
               <li className="w-100 grid grid--fit gap-1" style={{ '--data-width': '200px' }}>
                 {address.toString().toLowerCase() === targetWallet.toString().toLowerCase() && (
                   <div className="flex gap-1 w-100">
-                    <button
-                      className={`${styles.profile__btnFollow} flex-1`}
-                      type="button"
-                      onClick={editProfile}
-                    >
+                    <button className={`${styles.profile__btnFollow} flex-1`} type="button" onClick={editProfile}>
                       Edit profile
                     </button>
-                    <button
-                      className={`${styles.profile__btnDisconnect} flex-1`}
-                      type="button"
-                      onClick={handleDisconnect}
-                    >
+                    <button className={`${styles.profile__btnDisconnect} flex-1`} type="button" onClick={handleDisconnect}>
                       Disconnect
                     </button>
                   </div>
@@ -632,21 +552,13 @@ const Links = () => {
   useEffect(() => {
     getUniversalProfile(params.wallet).then((res) => {
       console.log(res)
-      if (
-        res.data &&
-        Array.isArray(res.data.Profile) &&
-        res.data.Profile.length > 0 &&
-        res.data.Profile[0].isContract
-      ) {
+      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0 && res.data.Profile[0].isContract) {
         setIsItUp(true)
         setData({
           wallet: res.data.Profile[0].id,
           name: res.data.Profile[0].name,
           description: res.data.Profile[0].description,
-          profileImage:
-            res.data.Profile[0].profileImages.length > 0
-              ? res.data.Profile[0].profileImages[0].src
-              : '',
+          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
           profileHeader: '',
           tags: JSON.stringify(res.data.Profile[0].tags),
           links: JSON.stringify(res.data.Profile[0].links),
@@ -693,17 +605,8 @@ const Links = () => {
                 <p>{link.title || link.name}</p>
                 <code>{link.url}</code>
               </div>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 18 18"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M4.16531 14.625L3.375 13.8347L11.9597 5.25H6.75V4.125H13.875V11.25H12.75V6.04031L4.16531 14.625Z"
-                  fill="#424242"
-                />
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.16531 14.625L3.375 13.8347L11.9597 5.25H6.75V4.125H13.875V11.25H12.75V6.04031L4.16531 14.625Z" fill="#424242" />
               </svg>
             </a>
           )
@@ -751,8 +654,8 @@ const Settings = () => {
         <PushNotificationManager />
         <hr />
         <InstallPrompt />
-           <hr />
-       <h4>Set session key</h4>
+        <hr />
+        <h4>Set session key</h4>
         <p>status: {false ? 'Set' : 'Not Set'}</p>
         <button onClick={() => toast(`Coming soon`, `warning`)}>Set session key</button>
       </div>
@@ -829,12 +732,7 @@ function PushNotificationManager() {
         <>
           <p>You are subscribed to push notifications.</p>
           <button onClick={unsubscribeFromPush}>Unsubscribe</button>
-          <input
-            type="text"
-            placeholder="Enter notification message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
+          <input type="text" placeholder="Enter notification message" value={message} onChange={(e) => setMessage(e.target.value)} />
           <button onClick={sendTestNotification}>Send Test</button>
         </>
       ) : (
@@ -1001,14 +899,7 @@ const Status = ({ addr, profile, selfView }) => {
           <div className={`${styles.statusModal__card}`} onClick={(e) => e.stopPropagation()}>
             <header className={``}>
               <div className={``} aria-label="Close" onClick={() => setShowModal(false)}>
-                <svg
-                  class="x1lliihq x1n2onr6 x5n08af"
-                  fill="currentColor"
-                  height="16"
-                  role="img"
-                  viewBox="0 0 24 24"
-                  width="16"
-                >
+                <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
                   <title>Close</title>
                   <line
                     fill="none"
@@ -1038,13 +929,7 @@ const Status = ({ addr, profile, selfView }) => {
                 <h3>Set your status</h3>
               </div>
               <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-                {isSigning
-                  ? `Signing...`
-                  : isConfirming
-                    ? 'Confirming...'
-                    : status && status.content !== ''
-                      ? `Update`
-                      : `Share`}
+                {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
               </div>
             </header>
 
@@ -1056,11 +941,7 @@ const Status = ({ addr, profile, selfView }) => {
 
                 <div
                   className={`d-f-c`}
-                  title={
-                    status &&
-                    status.content !== '' &&
-                    moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()
-                  }
+                  title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}
                 >
                   <textarea
                     autoFocus
@@ -1086,15 +967,8 @@ const Status = ({ addr, profile, selfView }) => {
 
               {isConfirmed && <p className="text-center badge badge-success">Done</p>}
 
-              <div
-                title={`Expire: ${
-                  status &&
-                  moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()
-                }`}
-              >
-                {status && status.content !== '' && selfView && (
-                  <button onClick={(e) => clearStatus(e)}>Delete status</button>
-                )}
+              <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
+                {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}
               </div>
 
               <div className={`flex flex-row align-items-center gap-025`}>
@@ -1114,10 +988,7 @@ const Status = ({ addr, profile, selfView }) => {
       >
         {status && (
           <p
-            title={`Updated at ${moment
-              .unix(web3.utils.toNumber(status.timestamp))
-              .utc()
-              .fromNow()} - Expiration ${moment
+            title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment
               .unix(web3.utils.toNumber(status.expirationTimestamp))
               .utc()
               .fromNow()}`}
@@ -1129,7 +1000,6 @@ const Status = ({ addr, profile, selfView }) => {
     </>
   )
 }
-
 
 /**
  * Profile Modal
@@ -1160,8 +1030,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
-    const uploadFileToIPFS = async (file) => {
-
+  const uploadFileToIPFS = async (file) => {
     try {
       if (!file) {
         console.error('No file selected.')
@@ -1171,12 +1040,13 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
       const data = new FormData()
       data.set('file', file)
 
-      const uploadRequest = await fetch(`/api/0g/file`, {//`/api/ipfs/file`
+      const uploadRequest = await fetch(`/api/0g/file`, {
+        //`/api/ipfs/file`
         method: 'POST',
         body: data,
       })
       const signedUrl = await uploadRequest.json()
-      
+
       console.log(`rootHash: ${signedUrl.rootHash}`)
       return signedUrl.rootHash
     } catch (e) {
@@ -1185,7 +1055,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     }
   }
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isConnected) return
 
@@ -1203,11 +1073,11 @@ const handleSubmit = async (e) => {
         toast('Uploading image to 0G Storage...', 'info')
         // Call your 0G upload helper function
         const rootHash = await uploadFileToIPFS(fileInput)
-        
+
         if (!rootHash) {
           throw new Error('Failed to retrieve root hash from 0G')
         }
-        
+
         profileImageHash = rootHash
       } catch (uploadErr) {
         console.error('0G Storage Error:', uploadErr)
@@ -1245,7 +1115,7 @@ const handleSubmit = async (e) => {
   //   setError(null)
 
   //   const formData = new FormData(e.target)
-    
+
   //   // Explicitly overwrite or append the reactive state arrays as JSON strings
   //   formData.set('tags', JSON.stringify(tags.list))
   //   formData.set('links', JSON.stringify(links.list))
@@ -1321,21 +1191,11 @@ const handleSubmit = async (e) => {
   }, [getActiveChain])
 
   return (
-    <div
-      className={`${styles.profileModal} animate fade`}
-      onMouseDown={() => setShowProfileModal(false)}
-    >
+    <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
       <div className={`${styles.profileModal__card}`} onMouseDown={(e) => e.stopPropagation()}>
         <header className="flex align-items-center">
           <div className="pointer" aria-label="Close" onClick={() => setShowProfileModal(false)}>
-            <svg
-              className="x1lliihq x1n2onr6 x5n08af"
-              fill="currentColor"
-              height="16"
-              role="img"
-              viewBox="0 0 24 24"
-              width="16"
-            >
+            <svg className="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
               <title>Close</title>
               <line
                 fill="none"
@@ -1368,44 +1228,27 @@ const handleSubmit = async (e) => {
 
         <main className="flex flex-column align-items-center gap-1">
           {isConfirmed && <p className="text-center badge badge-success">Done</p>}
-          <form
-            className="form"
-            onSubmit={handleSubmit}
-            encType="multipart/form-data"
-          >
+          <form className="form" onSubmit={handleSubmit} encType="multipart/form-data">
             <div className="form-group">
               <figure className="rounded">
                 <img ref={pfpRef} src={profile.profileImage || '/placeholder-avatar.png'} alt="Profile preview" />
               </figure>
             </div>
-            
+
             <div className="form-group">
               <label>Profile picture</label>
               <input type="file" name="profileImage" accept="image/*" onChange={showPFP} />
-              <input
-                type="hidden"
-                name="profileImage_hidden"
-                defaultValue={profile.profileImageName}
-              />
+              <input type="hidden" name="profileImage_hidden" defaultValue={profile.profileImageName} />
             </div>
 
             <div className="form-group">
               <label>Name</label>
-              <input
-                type="text"
-                name="name"
-                defaultValue={profile.name}
-                placeholder="Name"
-              />
+              <input type="text" name="name" defaultValue={profile.name} placeholder="Name" />
             </div>
 
             <div className="form-group">
               <label>Bio</label>
-              <textarea
-                name="description"
-                defaultValue={profile.description}
-                placeholder="Profile bio"
-              ></textarea>
+              <textarea name="description" defaultValue={profile.description} placeholder="Profile bio"></textarea>
             </div>
 
             <details open>
@@ -1444,16 +1287,8 @@ const handleSubmit = async (e) => {
                   </div>
 
                   <div className="form-group flex gap-0-5">
-                    <input
-                      ref={linkNameRef}
-                      type="text"
-                      placeholder="Link Name"
-                    />
-                    <input
-                      ref={linkURLRef}
-                      type="text"
-                      placeholder="Link URL"
-                    />
+                    <input ref={linkNameRef} type="text" placeholder="Link Name" />
+                    <input ref={linkURLRef} type="text" placeholder="Link URL" />
                     <button type="button" onClick={addLink}>
                       Add
                     </button>
@@ -1474,7 +1309,6 @@ const handleSubmit = async (e) => {
     </div>
   )
 }
-
 
 const CommentModal = ({ item, setShowCommentModal }) => {
   const [hasLiked, setHasLiked] = useState(false)
@@ -1562,13 +1396,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
             <h3>Post your reply</h3>
           </div>
           <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning
-              ? `Signing...`
-              : isConfirming
-                ? 'Confirming...'
-                : status && status.content !== ''
-                  ? `Update`
-                  : `Share`}
+            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
           </div>
         </header>
 
@@ -1578,9 +1406,7 @@ const CommentModal = ({ item, setShowCommentModal }) => {
               <header className={`${styles.commentModal__post__header}`}>
                 <Profile creator={item.creator} createdAt={item.createdAt} />
               </header>
-              <main
-                className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}
-              >
+              <main className={`${styles.commentModal__post__main} w-100 flex flex-column grid--gap-050`}>
                 <div
                   className={`${styles.post__content} `}
                   // onClick={(e) => e.stopPropagation()}
@@ -1685,13 +1511,7 @@ const Like = ({ id, likeCount, hasLiked }) => {
 
   return (
     <button onClick={(e) => (hasLiked ? unlikePost(e, id) : likePost(e, id))}>
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 18 18"
-        fill={hasLiked ? `#EC3838` : `none`}
-        xmlns="http://www.w3.org/2000/svg"
-      >
+      <svg width="18" height="18" viewBox="0 0 18 18" fill={hasLiked ? `#EC3838` : `none`} xmlns="http://www.w3.org/2000/svg">
         <path
           d="M12.6562 3.75C14.7552 3.75003 16.1562 5.45397 16.1562 7.53125V7.54102C16.1563 8.03245 16.1552 8.68082 15.8682 9.48828C15.5795 10.3003 15.0051 11.2653 13.8701 12.4004C12.0842 14.1864 10.1231 15.619 9.37988 16.1406C9.15102 16.3012 8.85009 16.3012 8.62109 16.1406C7.87775 15.6191 5.91688 14.1865 4.13086 12.4004H4.12988C2.99487 11.2653 2.42047 10.3003 2.13184 9.48828C1.84477 8.68054 1.84374 8.03163 1.84375 7.54004V7.53125C1.84375 5.45396 3.24485 3.75 5.34375 3.75C6.30585 3.75 7.06202 4.19711 7.64844 4.80273C8.01245 5.17867 8.31475 5.61978 8.56445 6.06152L9 6.83105L9.43555 6.06152C9.68527 5.61978 9.98756 5.17867 10.3516 4.80273C10.938 4.1971 11.6942 3.75 12.6562 3.75Z"
           stroke={hasLiked ? `#EC3838` : `#424242`}
