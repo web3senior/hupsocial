@@ -163,7 +163,7 @@ export default function Page() {
                   item={post}
                   showContent={true}
                   chainId={params.networkId}
-                  actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`]}
+                  actions={[`like`, `comment`, `repost`, `view`, `share`]}
                 />
                 <hr />
               </article>
