@@ -1,8 +1,8 @@
 .newPost {
   width: min(900px, calc(100vw - 28px));
   overflow: hidden;
-  color: var(--black);
-  background: var(--white);
+  color: var(--text);
+  background: var(--background);
   border-radius: 22px;
 
   button,
