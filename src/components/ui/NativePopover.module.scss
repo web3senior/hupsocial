@@ -1,8 +1,12 @@
 .panel {
+  --popover-x: 0;
+  --popover-y: 0;
+  --popover-scale: 0.96;
+
   padding: 1rem;
   min-width: 220px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--global-border-radius);
   background: var(--surface);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
 
@@ -11,7 +15,7 @@
   margin: 0;
 
   opacity: 0;
-  transform: scale(0.96);
+  transform: translate(var(--popover-x), var(--popover-y)) scale(var(--popover-scale));
   transform-origin: top left;
 
   transition:
@@ -21,8 +25,8 @@
     display 0.18s ease allow-discrete;
 
   &:global(:popover-open) {
+    --popover-scale: 1;
     opacity: 1;
-    transform: scale(1);
   }
 
   &[data-placement='bottom-start'] {
@@ -56,6 +60,30 @@
     position-area: left top;
     margin-right: 6px;
   }
+
+  &[data-placement='center'] {
+    position-area: none;
+    left: 50%;
+    top: 50%;
+    --popover-x: -50%;
+    --popover-y: -50%;
+    transform-origin: center;
+  }
+
+  &[data-placement='center']::backdrop {
+    background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0);
+    transition:
+      background 0.18s ease,
+      backdrop-filter 0.18s ease,
+      overlay 0.18s ease allow-discrete,
+      display 0.18s ease allow-discrete;
+  }
+
+  &[data-placement='center']:global(:popover-open)::backdrop {
+    background: rgba(0, 0, 0, 0.36);
+    backdrop-filter: blur(2px);
+  }
 }
 
 .trigger {
@@ -65,7 +93,14 @@
 
 @starting-style {
   .panel:global(:popover-open) {
+    --popover-scale: 0.96;
     opacity: 0;
-    transform: scale(0.96);
+  }
+}
+
+@starting-style {
+  .panel[data-placement='center']:global(:popover-open)::backdrop {
+    background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0);
   }
 }

@@ -39,7 +39,7 @@ import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import PageTitle from '@/components/PageTitle'
-import PostForm from '@/components/PostForm'
+import NewPost from '@/components/NewPost'
 import AISummary from '@/components/AISummary'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
@@ -249,7 +249,7 @@ export default function Page() {
 
           {activeTab === 'posts' && (
             <div className={`${styles.tabContent} ${styles.postTab} relative`}>
-              <PostForm addr={params.wallet} />
+              <NewPost addr={params.wallet} />
 
               <div className={`${styles.grid} flex flex-column`}>
                 {posts.list.length > 0 &&

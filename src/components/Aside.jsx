@@ -1,41 +1,46 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useConnection } from 'wagmi'
 import { useTheme } from 'next-themes'
+import { useAccount } from 'wagmi'
 import clsx from 'clsx'
-import { 
-  Circle, 
-  Equal, 
-  LayoutGridIcon, 
-  UserRound, 
-  PanelRightOpen, 
-  PanelRightClose, 
-  Code, 
-  Palette, 
-  Book, 
-  MessageSquareWarning, 
-  HelpCircle, 
-  Settings, 
-  Heart, 
-  Sun, 
-  Moon, 
-  Monitor, 
-  SquareTerminal, 
-  Bug 
+import {
+  Book,
+  Bug,
+  Circle,
+  Code,
+  Equal,
+  Heart,
+  HelpCircle,
+  LayoutGridIcon,
+  MessageSquareWarning,
+  Monitor,
+  Moon,
+  Palette,
+  PanelRightClose,
+  PanelRightOpen,
+  Settings,
+  SquareTerminal,
+  Sun,
+  UserRound,
 } from 'lucide-react'
 
 import logo from '@/../public/logo.svg'
+import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
 
+const NAV_COMPONENTS = {
+  'new-post': NewPost,
+}
+
 const isActivePath = (pathname, path) => {
-  if (!path) return false
+  if (!pathname || !path) return false
   if (path === '/') return pathname === '/'
   return pathname === path || pathname.startsWith(`${path}/`)
 }
@@ -43,47 +48,83 @@ const isActivePath = (pathname, path) => {
 const normalizeNavItem = (item) => {
   if (item.name === 'br' || item.type === 'divider') {
     return {
-      id: item.id ?? 'divider',
+      id: item.id,
       type: 'divider',
     }
   }
 
   return {
-    id: item.id ?? item.path ?? item.href ?? item.name ?? item.label,
+    id: item.id ?? item.path ?? item.href ?? item.component ?? item.name ?? item.label,
     name: item.name ?? item.label,
     path: item.path ?? item.href,
     icon: item.icon,
+    component: item.component,
   }
 }
 
-const NavLink = ({ item, isActive, isExpanded, onNavigate }) => {
+const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
   if (item.type === 'divider') {
-    return <hr className={styles.divider} />
+    return <hr className={styles.divider} aria-hidden="true" />
   }
 
   const Icon = item.icon ?? Circle
+  const Component = typeof item.component === 'string' ? NAV_COMPONENTS[item.component] : item.component
+
+  const content = (
+    <>
+      <div className={styles.iconWrapper}>
+        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.5} />
+      </div>
+      {!isCompact && <span className={styles.linkText}>{item.name}</span>}
+    </>
+  )
+
+  if (Component) {
+    return (
+      <NativePopover
+        trigger={
+          <button
+            type="button"
+            className={clsx(styles.link, styles.moreButton)}
+            title={isCompact ? item.name : undefined}
+            aria-label={item.name}
+          >
+            {content}
+          </button>
+        }
+        placement="center"
+        type="auto"
+      >
+        {({ close }) => {
+          const closeAll = () => {
+            close()
+            onNavigate?.()
+          }
+
+          return <Component close={closeAll} onClose={closeAll} />
+        }}
+      </NativePopover>
+    )
+  }
 
   return (
     <Link
       href={item.path}
       className={clsx(styles.link, isActive && styles.linkActive)}
-      title={isExpanded ? item.name : undefined}
+      title={isCompact ? item.name : undefined}
+      aria-current={isActive ? 'page' : undefined}
       onClick={onNavigate}
     >
-      <div className={styles.iconWrapper}>
-        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.5} />
-      </div>
-
-      {!isExpanded && <span className={styles.linkText}>{item.name}</span>}
+      {content}
     </Link>
   )
 }
 
 export default function Aside() {
   const pathname = usePathname()
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const mounted = useClientMounted()
-   const { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
 
   const navItems = useSidebarStore((state) => state.navItems)
   const isMenuOpen = useSidebarStore((state) => state.isMenuOpen)
@@ -94,10 +135,9 @@ export default function Aside() {
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
 
   const [isWideScreen, setIsWideScreen] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
 
   useEffect(() => {
-    const mql = window.matchMedia('(min-width: 768px)') //1150px
+    const mql = window.matchMedia('(min-width: 768px)')
 
     setIsWideScreen(mql.matches)
 
@@ -111,7 +151,7 @@ export default function Aside() {
     const profilePath = isConnected && address ? `/${address}` : '/connect'
 
     return [
-      ...navItems.map(normalizeNavItem).filter((item) => item.type === 'divider' || item.path),
+      ...navItems.map(normalizeNavItem).filter((item) => item.type === 'divider' || item.path || item.component),
       {
         id: 'profile',
         name: 'Profile',
@@ -123,7 +163,9 @@ export default function Aside() {
 
   const isMobileLayout = !isWideScreen
   const isExpanded = isMobileLayout ? isMobileMenuOpen : isMenuOpen
+  const isCompact = !isExpanded
   const shouldShowMobileMenu = isMobileLayout && isMobileMenuOpen
+  const closeSidebar = isMobileLayout ? closeMobileMenu : closeMenu
 
   const handleToggleMenu = () => {
     if (isMobileLayout) {
@@ -141,7 +183,6 @@ export default function Aside() {
     <aside
       className={clsx(
         styles.aside,
-
         !isMobileLayout && (isExpanded ? styles.expanded : styles.compact),
         shouldShowMobileMenu && styles.show,
         shouldShowMobileMenu && styles.expanded,
@@ -150,34 +191,39 @@ export default function Aside() {
       <div className={styles.navContainer}>
         <header className={styles.header}>
           <div className={styles.logoWrapper}>
-            <Link href="/" className="flex align-items-center gap-025">
-               <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
-             
-             
+            <Link href="/" className="flex align-items-center gap-025" aria-label="Home">
+              <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
               {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
             </Link>
           </div>
 
           {isExpanded && (
-            <button className={styles.menuButton} onClick={handleToggleMenu}>
-              {isExpanded ? <PanelRightOpen size={18} strokeWidth={1.5} /> : <PanelRightClose size={18} strokeWidth={1.5} />}
+            <button
+              type="button"
+              className={styles.menuButton}
+              onClick={handleToggleMenu}
+              aria-label="Collapse sidebar"
+              aria-expanded={isExpanded}
+            >
+              <PanelRightOpen size={18} strokeWidth={1.5} />
             </button>
           )}
 
-          <button className={clsx(styles.menuButton, styles.menuButtonFloat)} onClick={handleToggleMenu}>
+          <button
+            type="button"
+            className={clsx(styles.menuButton, styles.menuButtonFloat)}
+            onClick={handleToggleMenu}
+            aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-expanded={isExpanded}
+          >
             {isExpanded ? <PanelRightOpen size={18} strokeWidth={1.5} /> : <PanelRightClose size={18} strokeWidth={1.5} />}
           </button>
         </header>
 
         <ul className={styles.navList}>
-          {navLinks.map((item, id) => (
-            <li key={id}>
-              <NavLink
-                item={item}
-                isActive={isActivePath(pathname, item.path)}
-                isExpanded={!isExpanded}
-                onNavigate={isMobileLayout ? closeMobileMenu : closeMenu}
-              />
+          {navLinks.map((item, index) => (
+            <li key={item.id ?? `${item.type}-${index}`}>
+              <NavLink item={item} isActive={isActivePath(pathname, item.path)} isCompact={isCompact} onNavigate={closeSidebar} />
             </li>
           ))}
         </ul>
@@ -185,11 +231,16 @@ export default function Aside() {
         <div className={styles.footerNav}>
           <NativePopover
             trigger={
-              <button className={clsx(styles.link, styles.moreButton)}>
+              <button
+                type="button"
+                className={clsx(styles.link, styles.moreButton)}
+                title={isCompact ? 'More' : undefined}
+                aria-label="More"
+              >
                 <div className={styles.iconWrapper}>
                   <Equal size={24} />
                 </div>
-                {isExpanded && <span className={styles.linkText}>More</span>}
+                {!isCompact && <span className={styles.linkText}>More</span>}
               </button>
             }
             placement="top-end"
@@ -199,48 +250,36 @@ export default function Aside() {
               <div className={styles.popoverContent}>
                 <ul className="flex flex-column gap-050">
                   <li>
-                    <Link
-                      href="/settings"
-                      onClick={close}
-                      className="flex align-items-center gap-050"
-                    >
+                    <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
                       <Settings size={16} />
                       <span>Settings</span>
                     </Link>
                   </li>
                   <li>
-                    <Link
-                      href="/liked"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={close}
-                      className="flex align-items-center gap-050"
-                    >
+                    <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
                       <Heart size={16} />
                       <span>Liked</span>
                     </Link>
                   </li>
                   <li>
-                    <a href="#" rel="noopener noreferrer" onClick={void 0} className="flex align-items-center gap-050">
+                    <div className="flex align-items-center gap-050">
                       <Palette size={16} />
                       <span>Theme</span>
-                    </a>
+                    </div>
                     <div className={clsx(styles.themeWrapper, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '60px' }}>
-                      <button
-                        onClick={()=>setTheme('light')}
-                      >
+                      <button type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
                         <Sun size={16} />
                         <span>Light</span>
                       </button>
-                      <button onClick={()=>setTheme('dark')}>
+                      <button type="button" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>
                         <Moon size={16} />
                         <span>Dark</span>
                       </button>
-                      <button onClick={()=>setTheme('terminal')}>
+                      <button type="button" aria-pressed={theme === 'terminal'} onClick={() => setTheme('terminal')}>
                         <SquareTerminal size={16} />
                         <span>Terminal</span>
                       </button>
-                      <button onClick={()=>setTheme('system')}>
+                      <button type="button" aria-pressed={theme === 'system'} onClick={() => setTheme('system')}>
                         <Monitor size={16} />
                         <span>System</span>
                       </button>
@@ -308,8 +347,9 @@ export default function Aside() {
           <Link
             href="/chains"
             className={clsx(styles.link, isActivePath(pathname, '/chains') && styles.linkActive)}
-            title="Networks"
-            onClick={isMobileLayout ? closeMobileMenu : closeMenu}
+            title={isCompact ? 'Networks' : undefined}
+            aria-current={isActivePath(pathname, '/chains') ? 'page' : undefined}
+            onClick={closeSidebar}
           >
             <div className={styles.iconWrapper}>
               <LayoutGridIcon
@@ -318,8 +358,7 @@ export default function Aside() {
                 strokeWidth={isActivePath(pathname, '/chains') ? 2 : 1.7}
               />
             </div>
-
-            {isExpanded && <span className={styles.linkText}>Networks</span>}
+            {!isCompact && <span className={styles.linkText}>Networks</span>}
           </Link>
         </div>
       </div>

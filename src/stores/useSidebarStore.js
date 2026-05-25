@@ -1,35 +1,28 @@
+'use client'
+
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import {
-  House,
-  Plus,
-  Search,
-  Users,
-  Trophy,
-  Calendar,
-  Briefcase,
-  LayoutGrid,
-  Heart,
-  Bookmark,
-} from 'lucide-react'
+import { Bookmark, Briefcase, Calendar, Heart, House, LayoutGrid, Plus, Search, Trophy, Users } from 'lucide-react'
+
+const DEFAULT_NAV_ITEMS = [
+  { id: 'onchain', name: 'Onchain', path: '/', icon: House },
+  { id: 'new-post', name: 'New post', component: 'new-post', icon: Plus },
+  { id: 'search', name: 'Search', path: '/search', icon: Search },
+  { id: 'divider-primary', type: 'divider' },
+  { id: 'communities', name: 'Communities', path: '/communities', icon: Users },
+  { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
+  { id: 'events', name: 'Events', path: '/events', icon: Calendar },
+  { id: 'jobs', name: 'Jobs', path: '/jobs', icon: Briefcase },
+  { id: 'apps', name: 'Apps', path: '/apps', icon: LayoutGrid },
+  { id: 'divider-secondary', type: 'divider' },
+  { id: 'activity', name: 'Activity', path: '/activity', icon: Heart },
+  { id: 'saved', name: 'Saved', path: '/saved', icon: Bookmark },
+]
 
 export const useSidebarStore = create(
   persist(
     (set) => ({
-      navItems: [
-        { name: 'Onchain', path: '/', icon: House },
-        { name: 'New post', path: '/new', icon: Plus },
-        { name: 'Search', path: '/search', icon: Search },
-        { name: 'br' },
-        { name: 'Communities', path: '/communities', icon: Users },
-        { name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
-        { name: 'Events', path: '/events', icon: Calendar },
-        { name: 'Jobs', path: '/jobs', icon: Briefcase },
-        { name: 'Apps', path: '/apps', icon: LayoutGrid },
-        { name: 'br' },
-        { name: 'Activity', path: '/activity', icon: Heart },
-        { name: 'Saved', path: '/saved', icon: Bookmark },
-      ],
+      navItems: DEFAULT_NAV_ITEMS,
 
       isMenuOpen: false,
       isMobileMenuOpen: false,
@@ -38,10 +31,7 @@ export const useSidebarStore = create(
 
       openMenu: () => set({ isMenuOpen: true }),
       closeMenu: () => set({ isMenuOpen: false }),
-      toggleMenu: () =>
-        set((state) => ({
-          isMenuOpen: !state.isMenuOpen,
-        })),
+      toggleMenu: () => set((state) => ({ isMenuOpen: !state.isMenuOpen })),
 
       openMobileMenu: () => set({ isMobileMenuOpen: true }),
       closeMobileMenu: () => set({ isMobileMenuOpen: false }),
@@ -53,11 +43,9 @@ export const useSidebarStore = create(
     {
       name: 'sidebar-menu',
       storage: createJSONStorage(() => localStorage),
-
-      // only save desktop expanded/collapsed state
       partialize: (state) => ({
         isMenuOpen: state.isMenuOpen,
       }),
-    }
-  )
+    },
+  ),
 )
