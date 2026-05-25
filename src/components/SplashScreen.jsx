@@ -3,7 +3,7 @@ import logo from '@/../public/logo.svg'
 import styles from './SplashScreen.module.scss'
 
 const FALLBACK_APP_NAME = 'Hup'
-const TAGLINE = 'web3 • open source • multichain'
+const TAGLINE = 'decentralized social • open source • multi-chain'
 
 export default function SplashScreen() {
   const appName = process.env.NEXT_PUBLIC_NAME?.trim() || FALLBACK_APP_NAME
