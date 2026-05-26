@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { useWaitForTransactionReceipt, useConnection, useWriteContract } from 'wagmi'
-import { initPostContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
+import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
+import { initHupContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getPostById, getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { isPollActive } from '@/lib/utils'
@@ -28,12 +28,13 @@ import NativePopover from './ui/NativePopover'
 import { MessageSquareQuote } from 'lucide-react'
 import clsx from 'clsx'
 import styles from './Post.module.scss'
+import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showShareModal, setShowShareModal] = useState()
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
@@ -282,7 +283,6 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
 const Nav = ({ item }) => {
   const activeChain = getActiveChain()
-  console.log({ item })
   return (
     <>
       <NativePopover
@@ -713,8 +713,53 @@ const Like = ({ item }) => {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
+  const publicClient = usePublicClient()
+const likePost = async (e, id) => {
+  e.stopPropagation()
 
-  const likePost = (e, id) => {
+  if (!isConnected || !address) {
+    console.log('Please connect your wallet first', 'error')
+    return
+  }
+
+  const targetChain = CONTRACTS[`chain${item.network_id}`]
+
+  if (!targetChain?.hup) {
+    console.log('Contract configuration missing for network', 'error')
+    return
+  }
+
+  try {
+const session = await isSessionActive({
+  userAddress: address,
+  publicClient,
+})
+
+if (session.active) {
+  await writeWithBurnerSession({
+    chain: activeChain[0],
+    contractAddress: targetChain.hup,
+    abi,
+    functionName: 'batchLike',
+    args: [address, [id]],
+  })
+
+  return
+}
+
+    writeContract({
+      abi,
+      address: targetChain.hup,
+      functionName: 'batchLike',
+      args: [address, [id]],
+    })
+  } catch (err) {
+    console.error('Like failed:', err)
+  }
+}
+
+
+  /*const likePost = (e, id) => {
     // Prevent event bubbling to parent elements
     e.stopPropagation()
 
@@ -738,7 +783,7 @@ const Like = ({ item }) => {
       functionName: 'batchLike',
       args: [address, [id]], // Using the 'id' parameter passed to the function
     })
-  }
+  }*/
 
   const unlikePost = (e, id) => {
     e.stopPropagation()
@@ -781,7 +826,7 @@ const Like = ({ item }) => {
 }
 
 function Repost({ item }) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const [isReposted, setIsReposted] = useState(false)
   const [error, setError] = useState(false)
@@ -866,7 +911,7 @@ function Repost({ item }) {
 }
 
 function Quote({ item }) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const [isReposted, setIsReposted] = useState(false)
   const [error, setError] = useState(false)
@@ -1035,7 +1080,7 @@ const Options = ({ item }) => {
   const [voted, setVoted] = useState()
   const [topOption, setTopOption] = useState()
   const [totalVotes, setTotalVotes] = useState(0)
-  const { web3, contract: readOnlyContract } = initPostContract()
+  const { web3, contract: readOnlyContract } = initHupContract()
   const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({

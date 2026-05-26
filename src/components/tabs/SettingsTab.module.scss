@@ -1,1 +1,12 @@
 
+.tabContent {
+    button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        display: block;
+        background: var(--background);
+        border:1px solid var(--border);
+        padding:0.5em 1em;
+    }
+}

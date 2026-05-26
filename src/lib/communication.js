@@ -39,7 +39,7 @@ export const getActiveChain = () => {
 /**
  * Initialize post contract
  */
-export function initPostContract() {
+export function initHupContract() {
   const activeChain = getActiveChain()
   const rpcUrl = activeChain[0].rpcUrls.default.http[0]
 
@@ -49,7 +49,7 @@ export function initPostContract() {
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
 
   // Create a Contract instance
-  const contract = new web3.eth.Contract(postAbi, activeChain[1].post)
+  const contract = new web3.eth.Contract(postAbi, activeChain[1].hup)
   return { web3, contract }
 }
 
@@ -110,8 +110,20 @@ export async function getMaxLength() {
   }
 }
 
+export async function getUserSessions(address) {
+  const { web3, contract } = initHupContract()
+
+  try {
+    const result = await contract.methods.userSessions(address).call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
+
 export async function getPosts(index, count, address = `0x0000000000000000000000000000000000000000`) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.getPosts(index, count, address).call()
@@ -123,7 +135,7 @@ export async function getPosts(index, count, address = `0x0000000000000000000000
 }
 
 export async function getPostByIndex(index, address = `0x0000000000000000000000000000000000000000`) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.getPostByIndex(index, address).call()
@@ -182,7 +194,7 @@ export async function getRepliesByCommentId(commentId, startIndex, count, addres
 }
 
 export async function getPostCount() {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.postCount().call()
@@ -194,7 +206,7 @@ export async function getPostCount() {
 }
 
 export async function getVoteCountsForPoll(id) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.getVoteCountsForPoll(id).call()
@@ -206,7 +218,7 @@ export async function getVoteCountsForPoll(id) {
 }
 
 export async function getVoteCount(id, optionIndex) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.getVoteCount(id, optionIndex).call()
@@ -217,7 +229,7 @@ export async function getVoteCount(id, optionIndex) {
   }
 }
 export async function getVoterChoices(id, address) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.getVoterChoice(id, address).call()
@@ -229,7 +241,7 @@ export async function getVoterChoices(id, address) {
 }
 
 export async function getHasLikedPost(postId, addr) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.hasLiked(postId, addr).call()
@@ -265,7 +277,7 @@ export async function getComment(commentId, address = `0x00000000000000000000000
 }
 
 export async function getPostsByCreator(creator, startIndex, count, viewer = `0x0000000000000000000000000000000000000000`) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.getPostsByCreator(creator, startIndex, count, viewer).call()
@@ -277,7 +289,7 @@ export async function getPostsByCreator(creator, startIndex, count, viewer = `0x
 }
 
 export async function getCreatorPostCount(creator) {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.getCreatorPostCount(creator).call()
@@ -289,7 +301,7 @@ export async function getCreatorPostCount(creator) {
 }
 
 export async function getAllEvents() {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     // Get the latest block number (optional, but good for defining a range)
@@ -317,7 +329,7 @@ export async function getAllEvents() {
 }
 
 export async function getPostLikedEvents() {
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
 
   try {
     // Get the latest block number (optional, but good for defining a range)
@@ -351,7 +363,7 @@ export async function getPostLikedEvents() {
  * @returns {Promise<Array>} - Array of Web3.js event objects.
  */
 export async function getLikesPaginated(startBlock, endBlock, chunkSize = 10000, targetCount = 20) {
-  const { web3, contract } = initPostContract();
+  const { web3, contract } = initHupContract();
   let allEvents = [];
   let currentTo = endBlock;
 

@@ -6,7 +6,7 @@ import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract } from 'wagmi'
 import {
-  initPostContract,
+  initHupContract,
   initPostCommentContract,
   getHasLikedPost,
   getVoteCountsForPoll,
@@ -94,7 +94,7 @@ export default function Comment({ item, showContent, actions, chainId }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showShareModal, setShowShareModal] = useState()
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
   const router = useRouter()

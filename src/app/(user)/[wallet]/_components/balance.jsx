@@ -1,11 +1,11 @@
 'use client'
 
-import { getActiveChain, initPostContract } from '@/lib/communication'
+import { getActiveChain, initHupContract } from '@/lib/communication'
 import { useConnection, useBalance } from 'wagmi'
 import styles from './balance.module.scss'
 
-export default function Balance({ addr }) {
-  const { web3, contract } = initPostContract()
+export default function Balance({ addr, chainId = null }) {
+  const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
 
@@ -15,7 +15,7 @@ export default function Balance({ addr }) {
     isError: isBalanceError,
   } = useBalance({
     address: addr,
-    chainId: activeChain[0].id,
+    chainId: chainId || activeChain[0].id,
   })
 
   const getNativeTokenPrice = async (symbol) => {

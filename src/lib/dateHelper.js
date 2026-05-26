@@ -33,13 +33,13 @@ export const toRelativeTimestamp = (timestampInSeconds) => {
  * Supports: "2025-12-07 17:37:36" or 1733593056
  */
 export const toRelativeTime = (input) => {
-  if (!input) return ''
+  if (input === null || input === undefined || input === '') return ''
 
-  let timestampInSeconds;
+  let timestampInSeconds
 
-  // 1. Convert SQL String to Timestamp if necessary
-  if (typeof input === 'string') {
-    // Replace space with 'T' to make it ISO compliant for all browsers
+  if (typeof input === 'bigint') {
+    timestampInSeconds = Number(input)
+  } else if (typeof input === 'string') {
     const isoStr = input.replace(' ', 'T')
     timestampInSeconds = Math.floor(new Date(isoStr).getTime() / 1000)
   } else {

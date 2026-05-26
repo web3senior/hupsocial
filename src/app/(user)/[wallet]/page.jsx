@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getUniversalProfile, getProfile, updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts } from '@/lib/api'
-import { initPostContract, initStatusContract, getStatus, getMaxLength, getPostsByCreator } from '@/lib/communication'
+import { initHupContract, initStatusContract, getStatus, getMaxLength, getPostsByCreator } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Web3 from 'web3'
 import abi from '@/abi/post.json'
@@ -37,7 +37,7 @@ export default function Page() {
   const params = useParams()
   const router = useRouter()
   const { address, isConnected } = useConnection()
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
   const activeChain = getActiveChain()
   const balance = useBalance({
     address: address,
@@ -257,7 +257,7 @@ export default function Page() {
 
           {activeTab === 'settings' && (
             <div className={`${styles.tabContent} ${styles.settings} relative`}>
-              <Settings />
+              <SettingsTab />
             </div>
           )}
         </div>
@@ -614,173 +614,6 @@ const Links = () => {
     </div>
   )
 }
-/**
- * Profile
- * @param {String} addr
- * @returns
- */
-const Settings = () => {
-  const handleSubscribe = async () => {
-    const sw = await navigator.serviceWorker.ready
-    const push = await sw.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: '',
-    })
-    console.log(JSON.stringify(push))
-    return push
-  }
-
-  const readUserNotificationPermition = async () => {
-    try {
-      Notification.requestPermission().then((result) => {
-        console.log(result)
-        if (result === 'granted') {
-          handleSubscribe().then((res) => {
-            subscription(res, params.id).then((res) => {
-              console.log(res)
-              toast(`Notification has been enabled.`)
-            })
-          })
-        }
-      })
-    } catch (error) {
-      console.error(error)
-    }
-  }
-
-  return (
-    <div className={`${styles.settings}`}>
-      <div>
-        <PushNotificationManager />
-        <hr />
-        <InstallPrompt />
-        <hr />
-        <h4>Set session key</h4>
-        <p>status: {false ? 'Set' : 'Not Set'}</p>
-        <button onClick={() => toast(`Coming soon`, `warning`)}>Set session key</button>
-      </div>
-    </div>
-  )
-}
-
-function PushNotificationManager() {
-  const [isSupported, setIsSupported] = useState(false)
-  const [subscription, setSubscription] = useState(null)
-  const [message, setMessage] = useState('')
-  const { address, isConnected } = useConnection()
-
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-    const base64 = (base64String + padding).replace(/\\-/g, '+').replace(/_/g, '/')
-
-    const rawData = window.atob(base64)
-    const outputArray = new Uint8Array(rawData.length)
-
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i)
-    }
-    return outputArray
-  }
-
-  async function registerServiceWorker() {
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/',
-      updateViaCache: 'none',
-    })
-    const sub = await registration.pushManager.getSubscription()
-    setSubscription(sub)
-  }
-
-  async function subscribeToPush() {
-    const registration = await navigator.serviceWorker.ready
-    const sub = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
-    })
-    setSubscription(sub)
-    await subscribeUser(sub, address)
-  }
-
-  async function unsubscribeFromPush() {
-    await subscription?.unsubscribe()
-    setSubscription(null)
-    await unsubscribeUser()
-  }
-
-  async function sendTestNotification() {
-    if (subscription) {
-      await sendNotification(message, address)
-      setMessage('')
-    }
-  }
-
-  useEffect(() => {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      setIsSupported(true)
-      registerServiceWorker()
-    }
-  }, [])
-
-  if (!isSupported) {
-    return <p>Push notifications are not supported in this browser.</p>
-  }
-
-  return (
-    <div>
-      <h3>Push Notifications</h3>
-      {subscription ? (
-        <>
-          <p>You are subscribed to push notifications.</p>
-          <button onClick={unsubscribeFromPush}>Unsubscribe</button>
-          <input type="text" placeholder="Enter notification message" value={message} onChange={(e) => setMessage(e.target.value)} />
-          <button onClick={sendTestNotification}>Send Test</button>
-        </>
-      ) : (
-        <>
-          <p>You are not subscribed to push notifications.</p>
-          <button onClick={subscribeToPush}>Subscribe</button>
-        </>
-      )}
-    </div>
-  )
-}
-
-function InstallPrompt() {
-  const [isIOS, setIsIOS] = useState(false)
-  const [isStandalone, setIsStandalone] = useState(false)
-
-  useEffect(() => {
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
-
-    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
-  }, [])
-
-  if (isStandalone) {
-    return null // Don't show install button if already installed
-  }
-
-  return (
-    <div>
-      <h3>Install App</h3>
-      <button>Add to Home Screen</button>
-      {isIOS && (
-        <p>
-          To install this app on your iOS device, tap the share button
-          <span role="img" aria-label="share icon">
-            {' '}
-            ⎋{' '}
-          </span>
-          and then "Add to Home Screen"
-          <span role="img" aria-label="plus icon">
-            {' '}
-            ➕{' '}
-          </span>
-          .
-        </p>
-      )}
-    </div>
-  )
-}
 
 /**
  * Status
@@ -817,7 +650,7 @@ const Status = ({ addr, profile, selfView }) => {
   const [statusContent, setStatusContent] = useState('')
   const [expirationTimestamp, setExpirationTimestamp] = useState(24)
   const [maxLength, setMaxLength] = useState()
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const { contract: statusContract } = initStatusContract()
   const statusRef = useRef(``)

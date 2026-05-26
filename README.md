@@ -286,3 +286,12 @@ Examples:
 If a feature must be publicly verifiable and affects protocol state, it belongs on-chain.
 
 If a feature is private, high-frequency, expensive to store, or mainly needed for UI/querying, it belongs off-chain.
+
+
+# Insider wallet
+If the burner is later exfiltrated from the browser, the attacker has an indefinite write window over that wallet's posts/likes/reposts (though not over funds — sessions cannot move ETH).
+
+# Fabian's BOT report
+
+https://gist.github.com/emmet-bot/77f06e48e7c2aaf92aac20c73d61f299
+https://gist.github.com/emmet-bot/a40ac3fc6a5f0f5b44c73ac6720581f2
