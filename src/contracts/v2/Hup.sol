@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.35;
 
+import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -11,7 +12,7 @@ import "./IHup.sol";
  * @title Hup Core Protocol
  * @author Hup Labs
  * @notice Minimal on-chain social protocol for posts, comments, reposts, likes, and session-based actions.
- * @dev Uses IHup for shared events, errors, enums, and view structs. Supports ERC2771 trusted
+ * @dev Uses IHup for shared events, errors, enums, and view structs. Supports rotatable ERC2771 trusted
  *      forwarders for meta-transactions, AccessControl for admin permissions, Pausable for emergency
  *      controls, and ReentrancyGuard for protected payable flows. Rich discovery, search, feeds,
  *      bookmarks, views, and global post routing are expected to be handled off-chain by indexers.
@@ -22,8 +23,6 @@ import "./IHup.sol";
  * @custom:emoji 💬
  */
 contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
-    // --- INTERNAL STORAGE STRUCTS ---
-
     struct ContentData {
         ContentType cType;
         string metadata;
@@ -38,16 +37,14 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         bool allowedComments;
     }
 
-    // --- ROLES & CONSTANTS ---
-
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public constant ABSOLUTE_MAX_METADATA_BYTES = 2048;
-
-    // --- STATE VARIABLES ---
 
     uint256 public contentCount;
     uint256 public fee = 0 ether;
     uint256 public maxMetadataBytes = 256;
+
+    mapping(address => bool) public trustedForwarders;
 
     mapping(uint256 => ContentData) private allContent;
     mapping(uint256 => mapping(address => bool)) public contentLikedBy;
@@ -57,28 +54,29 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     mapping(uint256 => uint256[]) private _comments;
     mapping(uint256 => uint256[]) private _reposts;
 
-    // --- MODIFIERS ---
+    event TrustedForwarderUpdated(address indexed forwarder, bool trusted);
 
     modifier onlyContentCreator(address _owner, uint256 _id) {
         if (allContent[_id].creator != _resolveActor(_owner)) revert Unauthorized();
         _;
     }
 
-    modifier onlyAdmin() {
-        if (!hasRole(ADMIN_ROLE, _msgSender())) revert Unauthorized();
+    modifier onlyDirectAdmin() {
+        if (!hasRole(ADMIN_ROLE, msg.sender)) revert Unauthorized();
         _;
     }
-
-    // --- CONSTRUCTOR ---
 
     constructor(address _trustedForwarder, address _admin) ERC2771Context(_trustedForwarder) {
         if (_admin == address(0)) revert InvalidAddress();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(ADMIN_ROLE, _admin);
-    }
 
-    // --- SESSION MANAGEMENT ---
+        if (_trustedForwarder != address(0)) {
+            trustedForwarders[_trustedForwarder] = true;
+            emit TrustedForwarderUpdated(_trustedForwarder, true);
+        }
+    }
 
     function authorizeSession(address _burnerKey, uint256 _duration) external whenNotPaused {
         if (_burnerKey == address(0)) revert InvalidAddress();
@@ -95,8 +93,6 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         delete userSessions[_msgSender()];
         emit SessionRevoked(_msgSender(), currentBurner);
     }
-
-    // --- CORE MUTATIVE LOGIC ---
 
     function create(
         address _owner,
@@ -134,7 +130,12 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         return _createInternal(actor, _type, _metadata, _parentId, _allowedComments);
     }
 
-    function update(address _owner, uint256 _id, string calldata _metadata, bool _allowedComments) external onlyContentCreator(_owner, _id) whenNotPaused returns (bool) {
+    function update(
+        address _owner,
+        uint256 _id,
+        string calldata _metadata,
+        bool _allowedComments
+    ) external onlyContentCreator(_owner, _id) whenNotPaused returns (bool) {
         address actor = _resolveActor(_owner);
         ContentData storage item = allContent[_id];
         uint256 metadataLength = bytes(_metadata).length;
@@ -179,8 +180,6 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         emit ContentDeleted(_id, actor);
     }
 
-    // --- BATCH LIKING INTERACTIONS ---
-
     function like(address _owner, uint256 _id) external whenNotPaused {
         address actor = _resolveActor(_owner);
         _like(actor, _id);
@@ -197,6 +196,208 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         }
     }
 
+    function unlike(address _owner, uint256 _id) external whenNotPaused {
+        address actor = _resolveActor(_owner);
+        _unlike(actor, _id);
+    }
+
+    function getContent(
+        uint256 _id
+    )
+        external
+        view
+        override
+        returns (
+            uint8 cType,
+            string memory metadata,
+            uint256 parentId,
+            uint256 createdAt,
+            address creator,
+            uint256 likeCount,
+            uint256 commentCount,
+            uint256 repostCount,
+            bool isDeleted,
+            bool isUpdated,
+            bool allowedComments
+        )
+    {
+        if (_id == 0 || _id > contentCount) revert InvalidIndex();
+
+        ContentData storage c = allContent[_id];
+        if (c.isDeleted) revert ContentDeletedError();
+
+        return (
+            uint8(c.cType),
+            c.metadata,
+            c.parentId,
+            c.createdAt,
+            c.creator,
+            c.likeCount,
+            c.commentCount,
+            c.repostCount,
+            c.isDeleted,
+            c.isUpdated,
+            c.allowedComments
+        );
+    }
+
+    function getFeed(
+        uint256 _startIndex,
+        uint256 _count,
+        address _viewer
+    ) external view override returns (ContentView[] memory) {
+        uint256 total = contentCount;
+        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
+
+        uint256 remaining = total - _startIndex;
+        uint256 returnCount = _count > remaining ? remaining : _count;
+        ContentView[] memory batch = new ContentView[](returnCount);
+
+        for (uint256 i = 0; i < returnCount; i++) {
+            uint256 currentId = total - (_startIndex + i);
+            batch[i] = _formatView(currentId, _viewer);
+        }
+
+        return batch;
+    }
+
+    function getCreatorContentCount(address _creator) external view override returns (uint256) {
+        return creatorContent[_creator].length;
+    }
+
+    function getContentsByCreator(
+        address _creator,
+        uint256 _startIndex,
+        uint256 _count,
+        address _viewer
+    ) external view override returns (ContentView[] memory) {
+        uint256[] storage ids = creatorContent[_creator];
+        uint256 total = ids.length;
+
+        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
+
+        uint256 remaining = total - _startIndex;
+        uint256 returnCount = _count > remaining ? remaining : _count;
+        ContentView[] memory result = new ContentView[](returnCount);
+
+        for (uint256 i = 0; i < returnCount; i++) {
+            uint256 id = ids[total - 1 - (_startIndex + i)];
+            result[i] = _formatView(id, _viewer);
+        }
+
+        return result;
+    }
+
+    function getComments(
+        uint256 _parentId,
+        uint256 _startIndex,
+        uint256 _count,
+        address _viewer
+    ) external view override returns (ContentView[] memory) {
+        uint256[] storage commentIds = _comments[_parentId];
+        uint256 total = commentIds.length;
+
+        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
+
+        uint256 remaining = total - _startIndex;
+        uint256 returnCount = _count > remaining ? remaining : _count;
+        ContentView[] memory result = new ContentView[](returnCount);
+
+        for (uint256 i = 0; i < returnCount; i++) {
+            uint256 commentId = commentIds[_startIndex + i];
+            result[i] = _formatView(commentId, _viewer);
+        }
+
+        return result;
+    }
+
+    function getReposts(
+        uint256 _parentId,
+        uint256 _startIndex,
+        uint256 _count,
+        address _viewer
+    ) external view override returns (ContentView[] memory) {
+        uint256[] storage repostIds = _reposts[_parentId];
+        uint256 total = repostIds.length;
+
+        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
+
+        uint256 remaining = total - _startIndex;
+        uint256 returnCount = _count > remaining ? remaining : _count;
+        ContentView[] memory result = new ContentView[](returnCount);
+
+        for (uint256 i = 0; i < returnCount; i++) {
+            uint256 repostId = repostIds[_startIndex + i];
+            result[i] = _formatView(repostId, _viewer);
+        }
+
+        return result;
+    }
+
+    function pause() external onlyDirectAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyDirectAdmin {
+        _unpause();
+    }
+
+    function setFee(uint256 _fee) external onlyDirectAdmin {
+        uint256 oldValue = fee;
+        fee = _fee;
+        emit FeeUpdated(oldValue, _fee);
+    }
+
+    function setMaxMetadataBytes(uint256 _maxMetadataBytes) external onlyDirectAdmin {
+        if (_maxMetadataBytes == 0 || _maxMetadataBytes > ABSOLUTE_MAX_METADATA_BYTES) {
+            revert InvalidMetadataLimit();
+        }
+
+        uint256 oldValue = maxMetadataBytes;
+        maxMetadataBytes = _maxMetadataBytes;
+
+        emit MaxMetadataBytesUpdated(oldValue, _maxMetadataBytes);
+    }
+
+    function setTrustedForwarder(address _forwarder, bool _trusted) external onlyDirectAdmin {
+        if (_forwarder == address(0)) revert InvalidAddress();
+
+        trustedForwarders[_forwarder] = _trusted;
+
+        emit TrustedForwarderUpdated(_forwarder, _trusted);
+    }
+
+    function withdrawAll(address payable _receiver) external onlyDirectAdmin nonReentrant {
+        if (_receiver == address(0)) revert InvalidAddress();
+
+        uint256 balance = address(this).balance;
+        if (balance == 0) revert TransferFailed();
+
+        (bool success, ) = _receiver.call{value: balance}("");
+        if (!success) revert TransferFailed();
+
+        emit Withdrawal(_receiver, balance);
+    }
+
+    function grantRole(bytes32 role, address account) public override {
+        if (!hasRole(getRoleAdmin(role), msg.sender)) revert Unauthorized();
+        _grantRole(role, account);
+    }
+
+    function revokeRole(bytes32 role, address account) public override {
+        if (!hasRole(getRoleAdmin(role), msg.sender)) revert Unauthorized();
+        _revokeRole(role, account);
+    }
+
+    function renounceRole(bytes32 role, address callerConfirmation) public override {
+        if (callerConfirmation != msg.sender) revert Unauthorized();
+        _revokeRole(role, callerConfirmation);
+    }
+
+    function isTrustedForwarder(address forwarder) public view override returns (bool) {
+        return trustedForwarders[forwarder];
+    }
+
     function _like(address actor, uint256 id) internal {
         if (id == 0 || id > contentCount) revert InvalidIndex();
 
@@ -209,11 +410,6 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         contentLikedBy[id][actor] = true;
 
         emit ContentLiked(id, actor, item.creator);
-    }
-
-    function unlike(address _owner, uint256 _id) external whenNotPaused {
-        address actor = _resolveActor(_owner);
-        _unlike(actor, _id);
     }
 
     function _unlike(address actor, uint256 id) internal {
@@ -230,8 +426,6 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         emit ContentUnliked(id, actor, item.creator);
     }
 
-    // --- INTERNAL HELPERS ---
-
     function _resolveActor(address _owner) internal view returns (address) {
         if (_owner == address(0) || _owner == _msgSender()) return _msgSender();
 
@@ -242,7 +436,13 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         return _owner;
     }
 
-    function _createInternal(address _author, ContentType _type, string memory _metadata, uint256 _parentId, bool _allowedComments) internal returns (uint256) {
+    function _createInternal(
+        address _author,
+        ContentType _type,
+        string memory _metadata,
+        uint256 _parentId,
+        bool _allowedComments
+    ) internal returns (uint256) {
         contentCount++;
         uint256 id = contentCount;
 
@@ -279,118 +479,6 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         return id;
     }
 
-    // --- INTERFACE & VIEW IMPLEMENTATIONS ---
-
-    function getContent(
-        uint256 _id
-    )
-        external
-        view
-        override
-        returns (
-            uint8 cType,
-            string memory metadata,
-            uint256 parentId,
-            uint256 createdAt,
-            address creator,
-            uint256 likeCount,
-            uint256 commentCount,
-            uint256 repostCount,
-            bool isDeleted,
-            bool isUpdated,
-            bool allowedComments
-        )
-    {
-        if (_id == 0 || _id > contentCount) revert InvalidIndex();
-
-        ContentData storage c = allContent[_id];
-        if (c.isDeleted) revert ContentDeletedError();
-
-        return (uint8(c.cType), c.metadata, c.parentId, c.createdAt, c.creator, c.likeCount, c.commentCount, c.repostCount, c.isDeleted, c.isUpdated, c.allowedComments);
-    }
-
-    function getFeed(uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
-        uint256 total = contentCount;
-        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
-
-        uint256 endIndex = _startIndex + _count;
-        if (endIndex > total) endIndex = total;
-
-        uint256 returnCount = endIndex - _startIndex;
-        ContentView[] memory batch = new ContentView[](returnCount);
-
-        for (uint256 i = 0; i < returnCount; i++) {
-            uint256 currentId = total - (_startIndex + i);
-            batch[i] = _formatView(currentId, _viewer);
-        }
-
-        return batch;
-    }
-
-    function getCreatorContentCount(address _creator) external view override returns (uint256) {
-        return creatorContent[_creator].length;
-    }
-
-    function getContentsByCreator(address _creator, uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
-        uint256[] storage ids = creatorContent[_creator];
-        uint256 total = ids.length;
-
-        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
-
-        uint256 endIndex = _startIndex + _count;
-        if (endIndex > total) endIndex = total;
-
-        uint256 returnCount = endIndex - _startIndex;
-        ContentView[] memory result = new ContentView[](returnCount);
-
-        for (uint256 i = 0; i < returnCount; i++) {
-            uint256 id = ids[total - 1 - (_startIndex + i)];
-            result[i] = _formatView(id, _viewer);
-        }
-
-        return result;
-    }
-
-    function getComments(uint256 _parentId, uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
-        uint256[] storage commentIds = _comments[_parentId];
-        uint256 total = commentIds.length;
-
-        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
-
-        uint256 endIndex = _startIndex + _count;
-        if (endIndex > total) endIndex = total;
-
-        uint256 returnCount = endIndex - _startIndex;
-        ContentView[] memory result = new ContentView[](returnCount);
-
-        for (uint256 i = 0; i < returnCount; i++) {
-            uint256 commentId = commentIds[_startIndex + i];
-            result[i] = _formatView(commentId, _viewer);
-        }
-
-        return result;
-    }
-
-    function getReposts(uint256 _parentId, uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
-        uint256[] storage repostIds = _reposts[_parentId];
-        uint256 total = repostIds.length;
-
-        if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
-
-        uint256 endIndex = _startIndex + _count;
-        if (endIndex > total) endIndex = total;
-
-        uint256 returnCount = endIndex - _startIndex;
-        ContentView[] memory result = new ContentView[](returnCount);
-
-        for (uint256 i = 0; i < returnCount; i++) {
-            uint256 repostId = repostIds[_startIndex + i];
-            result[i] = _formatView(repostId, _viewer);
-        }
-
-        return result;
-    }
-
     function _formatView(uint256 _id, address _viewer) internal view returns (ContentView memory) {
         ContentData storage c = allContent[_id];
 
@@ -411,47 +499,6 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
                 hasLiked: _viewer != address(0) ? contentLikedBy[_id][_viewer] : false
             });
     }
-
-    // --- SYSTEM & ADMIN CONFIGURATION ---
-
-    function pause() external onlyAdmin {
-        _pause();
-    }
-
-    function unpause() external onlyAdmin {
-        _unpause();
-    }
-
-    function setFee(uint256 _fee) external onlyAdmin {
-        uint256 oldValue = fee;
-        fee = _fee;
-        emit FeeUpdated(oldValue, _fee);
-    }
-
-    function setMaxMetadataBytes(uint256 _maxMetadataBytes) external onlyAdmin {
-        if (_maxMetadataBytes == 0 || _maxMetadataBytes > ABSOLUTE_MAX_METADATA_BYTES) {
-            revert InvalidMetadataLimit();
-        }
-
-        uint256 oldValue = maxMetadataBytes;
-        maxMetadataBytes = _maxMetadataBytes;
-
-        emit MaxMetadataBytesUpdated(oldValue, _maxMetadataBytes);
-    }
-
-    function withdrawAll(address payable _receiver) external onlyAdmin nonReentrant {
-        if (_receiver == address(0)) revert InvalidAddress();
-
-        uint256 balance = address(this).balance;
-        if (balance == 0) revert TransferFailed();
-
-        (bool success, ) = _receiver.call{value: balance}("");
-        if (!success) revert TransferFailed();
-
-        emit Withdrawal(_receiver, balance);
-    }
-
-    // --- OVERRIDES FOR ERC2771CONTEXT & ACCESSCONTROL ---
 
     function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
         return ERC2771Context._msgSender();
