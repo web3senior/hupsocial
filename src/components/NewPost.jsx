@@ -373,7 +373,14 @@ export default function NewPost({
         </button>
 
         <h2>New post</h2>
+
       </header>
+
+      <main className={clsx(styles.main, 'text-center')}>
+        <small>
+          Once submitted, your post will appear in the feed as soon as the network block confirms.
+        </small>
+      </main>
 
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input
