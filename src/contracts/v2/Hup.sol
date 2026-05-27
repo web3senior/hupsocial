@@ -73,6 +73,10 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         }
     }
 
+    function version() external pure override returns (string memory) {
+        return "1.0.0";
+    }
+
     function authorizeSession(address _burnerKey, uint256 _duration) external whenNotPaused {
         if (_burnerKey == address(0)) revert InvalidAddress();
         if (_duration == 0) revert InvalidDuration();

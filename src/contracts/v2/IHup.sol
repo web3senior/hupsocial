@@ -76,6 +76,7 @@ interface IHup {
 
     // --- STATE GETTERS ---
 
+    function version() external pure returns (string memory);
     function ADMIN_ROLE() external view returns (bytes32);
     function ABSOLUTE_MAX_METADATA_BYTES() external view returns (uint256);
     function MAX_BATCH_LIKE_COUNT() external view returns (uint256);
