@@ -2,9 +2,9 @@
 
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
-
 // --- Configuration ---
 
+// Initialize Pinata SDK using the JWT stored in environment variables
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
 })
@@ -39,7 +39,7 @@ export async function POST(request) {
     console.log(`Attempting to upload JSON object...`)
 
     // Use the Pinata 'json' upload method.
-    const { cid : rawCID } = await pinata.upload.public.json(json, {
+    const { cid: rawCID } = await pinata.upload.public.json(json, {
       pinataMetadata: { name: `hup-metadata` },
     })
 

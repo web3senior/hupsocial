@@ -18,8 +18,8 @@ const pinata = new PinataSDK({
 //   }
 // }
 // For App Router, you would typically use this:
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 // Note: When handling FormData/file uploads, Next.js handles the request body parsing automatically.
 // The issue here is likely an old config structure being used.
 // ---------------------
@@ -41,9 +41,11 @@ export async function POST(request) {
     // 2. Pin the file to IPFS using the Pinata SDK
     console.log(`Attempting to upload file: ${file.name}`)
 
-    const { cid } = await pinata.upload.public.file(file, {
+    const { cid: rawCID } = await pinata.upload.public.file(file, {
       pinataMetadata: { name: `${file.name}` },
     })
+
+    const cid = `ipfs://${rawCID}`
 
     const url = `${process.env.NEXT_PUBLIC_GATEWAY_URL}${cid}`
     console.log(`File uploaded successfully. CID: ${cid}`)
