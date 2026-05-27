@@ -132,9 +132,10 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         if (item.creator == address(0)) revert ContentNotFound();
         if (item.creator != actor) revert Unauthorized();
         if (item.isDeleted) revert ContentDeletedError();
+        if (item.cType == ContentType.Repost) revert InteractionNotAllowed();
 
         uint256 metadataLength = bytes(_metadata).length;
-        if (item.cType != ContentType.Repost && metadataLength == 0) revert InputEmpty();
+        if (metadataLength == 0) revert InputEmpty();
         if (metadataLength > maxMetadataBytes) {
             revert MetadataTooLarge(metadataLength, maxMetadataBytes);
         }
@@ -206,7 +207,7 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         return _formatView(_id, _viewer);
     }
 
-    function getContents(uint256[] calldata _ids, address _viewer) external view returns (ContentView[] memory result) {
+    function getContents(uint256[] calldata _ids, address _viewer) external view override returns (ContentView[] memory result) {
         uint256 length = _ids.length;
 
         if (length == 0 || length > MAX_BATCH_READ_COUNT) revert InvalidIndex();

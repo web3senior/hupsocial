@@ -29,6 +29,7 @@ import { MessageSquareQuote } from 'lucide-react'
 import clsx from 'clsx'
 import styles from './Post.module.scss'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
+import NewPost from './NewPost'
 
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
@@ -50,6 +51,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const contentRef = useRef(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [canShowMore, setCanShowMore] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   useEffect(() => {
     let cancelled = false
 
@@ -137,6 +139,13 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
       {showShareModal && <ShareModal item={showShareModal} setShowShareModal={setShowShareModal} />}
 
+      {showEditModal && (
+        <>
+          <NewPost actionType="edit"
+           onClose={() => setShowEditModal(false)} existingPost={displayItem} setShowEditModal={setShowEditModal} />
+        </>
+      )}
+
       <section
         className={`${styles.post} flex flex-column align-items-start justify-content-between`}
         data-content={showContent ? true : false}
@@ -156,7 +165,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile creator={displayItem?.wallet_address} createdAt={displayItem?.created_at} networkId={displayItem?.network_id} />
           <div onClick={(e) => e.stopPropagation()}>
-            <Nav item={item} />
+            <Nav item={item} setShowEditModal={setShowEditModal} />
           </div>
         </header>
 
@@ -281,7 +290,61 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   )
 }
 
-const Nav = ({ item }) => {
+const Nav = ({ item, setShowEditModal }) => {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const isMounted = useClientMounted()
+  const { address, isConnected } = useConnection()
+  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
+  const publicClient = usePublicClient()
+
+  const deletePost = async (e, id) => {
+    e.stopPropagation()
+
+    if (!isConnected || !address) {
+      console.log('Please connect your wallet first', 'error')
+      return
+    }
+
+    const targetChain = CONTRACTS[`chain${item.network_id}`]
+
+    if (!targetChain?.hup) {
+      console.log('Contract configuration missing for network', 'error')
+      return
+    }
+
+    try {
+      // const session = await isSessionActive({
+      //   userAddress: address,
+      //   publicClient,
+      // })
+
+      // if (session.active) {
+      //   await writeWithBurnerSession({
+      //     chain: activeChain[0],
+      //     contractAddress: targetChain.hup,
+      //     abi,
+      //     functionName: 'batchLike',
+      //     args: [address, [id]],
+      //   })
+
+      //   return
+      // }
+
+      writeContract({
+        abi,
+        address: targetChain.hup,
+        functionName: 'deleteContent',
+        args: [address, id],
+      })
+    } catch (err) {
+      console.error('Delete failed:', err)
+    }
+  }
+
   const activeChain = getActiveChain()
   return (
     <>
@@ -297,6 +360,12 @@ const Nav = ({ item }) => {
           <ul>
             <li>
               <Link href={`/networks/${item.network_id}/${item.id}`}>View post</Link>
+            </li>
+            {item.is_repost < 1&& <li>
+              <button onClick={(e) => { e.stopPropagation();setShowEditModal(true) }}>Edit post</button>
+            </li> }
+            <li>
+              <button onClick={(e) => deletePost(e, item.id)}>Delete post</button>
             </li>
           </ul>
         </div>
@@ -714,50 +783,49 @@ const Like = ({ item }) => {
     hash,
   })
   const publicClient = usePublicClient()
-const likePost = async (e, id) => {
-  e.stopPropagation()
+  const likePost = async (e, id) => {
+    e.stopPropagation()
 
-  if (!isConnected || !address) {
-    console.log('Please connect your wallet first', 'error')
-    return
+    if (!isConnected || !address) {
+      console.log('Please connect your wallet first', 'error')
+      return
+    }
+
+    const targetChain = CONTRACTS[`chain${item.network_id}`]
+
+    if (!targetChain?.hup) {
+      console.log('Contract configuration missing for network', 'error')
+      return
+    }
+
+    try {
+      const session = await isSessionActive({
+        userAddress: address,
+        publicClient,
+      })
+
+      if (session.active) {
+        await writeWithBurnerSession({
+          chain: activeChain[0],
+          contractAddress: targetChain.hup,
+          abi,
+          functionName: 'batchLike',
+          args: [address, [id]],
+        })
+
+        return
+      }
+
+      writeContract({
+        abi,
+        address: targetChain.hup,
+        functionName: 'batchLike',
+        args: [address, [id]],
+      })
+    } catch (err) {
+      console.error('Like failed:', err)
+    }
   }
-
-  const targetChain = CONTRACTS[`chain${item.network_id}`]
-
-  if (!targetChain?.hup) {
-    console.log('Contract configuration missing for network', 'error')
-    return
-  }
-
-  try {
-const session = await isSessionActive({
-  userAddress: address,
-  publicClient,
-})
-
-if (session.active) {
-  await writeWithBurnerSession({
-    chain: activeChain[0],
-    contractAddress: targetChain.hup,
-    abi,
-    functionName: 'batchLike',
-    args: [address, [id]],
-  })
-
-  return
-}
-
-    writeContract({
-      abi,
-      address: targetChain.hup,
-      functionName: 'batchLike',
-      args: [address, [id]],
-    })
-  } catch (err) {
-    console.error('Like failed:', err)
-  }
-}
-
 
   /*const likePost = (e, id) => {
     // Prevent event bubbling to parent elements

@@ -122,12 +122,7 @@ interface IHup {
      * @dev Deleted content is returned as a tombstone with empty metadata and `isDeleted == true`.
      */
     function getContent(uint256 _id, address _viewer) external view returns (ContentView memory);
-    
-    /**
-     * @notice Returns multiple content items by ID using the same struct shape as feed responses.
-     * @dev Reverts if `_ids.length` is zero or greater than `MAX_BATCH_READ_COUNT`.
-     *      Deleted content is returned as a tombstone with empty metadata and `isDeleted == true`.
-     */
+
     function getContents(uint256[] calldata _ids, address _viewer) external view returns (ContentView[] memory result);
 
     /**

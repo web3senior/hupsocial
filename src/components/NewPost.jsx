@@ -37,23 +37,88 @@ const normalizePrefillValue = (value) => {
   return typeof value === 'string' ? value : ''
 }
 
-const getInitialPostText = (text, url) => {
+const getInitialPostText = (text, url, actionType, existingPost) => {
+  if (actionType === 'edit' && existingPost) {
+    console.log('Prefilling edit post with existing content:', existingPost)
+    return existingPost.content?.elements?.[0]?.data?.text || ''
+  }
   return [normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n')
 }
 
-const createPostContent = (text = '') => ({
+const createPostContent = (text = '', mediaItems = []) => ({
   version: '1',
   elements: [
     { type: 'text', data: { text } },
     {
       type: 'media',
       data: {
-        items: [],
+        items: mediaItems,
       },
     },
   ],
 })
 
+const getContentPayload = (existingPost) => {
+  const content = existingPost?.content
+  if (!content) return null
+
+  if (typeof content === 'string') {
+    try {
+      return JSON.parse(content)
+    } catch {
+      return null
+    }
+  }
+
+  return content
+}
+
+const getContentElement = (content, type) => {
+  return content?.elements?.find((element) => element?.type === type)
+}
+
+const getInitialPostContent = (text, url, actionType, existingPost) => {
+  if (actionType === 'edit' && existingPost) {
+    const content = getContentPayload(existingPost)
+    const existingText = getContentElement(content, 'text')?.data?.text || ''
+    const existingMedia = getContentElement(content, 'media')?.data?.items || []
+
+    return createPostContent(existingText, existingMedia)
+  }
+
+  return createPostContent(
+    [normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n')
+  )
+}
+
+const getMediaPreviewSrc = (item) => {
+  if (item.localUrl) return item.localUrl
+  if (item.url) return item.url
+  if (item.src) return item.src
+  if (item.gatewayUrl) return item.gatewayUrl
+
+  const gateway = process.env.NEXT_PUBLIC_0G_GATEWAY_URL
+  if (gateway && item.cid) {
+    return `${gateway.replace(/\/$/, '')}/${item.cid}`
+  }
+
+  return ''
+}
+
+const getSerializablePostContent = (content) => ({
+  ...content,
+  elements: content.elements.map((element) => {
+    if (element.type !== 'media') return element
+
+    return {
+      ...element,
+      data: {
+        ...element.data,
+        items: element.data.items.map(({ localUrl, ...item }) => item),
+      },
+    }
+  }),
+})
 const getShortAddress = (address) => {
   if (!address) return ''
   return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -67,10 +132,19 @@ export default function NewPost({
   displayName,
   avatarSrc,
   communityLabel = 'Community or topic',
+  existingPost = null, // for edit mode
+  actionType = 'post', // or 'thread'
 }) {
   const mounted = useClientMounted()
-  const initialPostText = useMemo(() => getInitialPostText(text, url), [text, url])
-  const [postContent, setPostContent] = useState(() => createPostContent(initialPostText))
+ 
+ 
+const initialPostContent = useMemo(
+  () => getInitialPostContent(text, url, actionType, existingPost),
+  [text, url, actionType, existingPost]
+)
+
+const [postContent, setPostContent] = useState(() => initialPostContent)
+ 
   const [allowComments, setAllowComments] = useState(true)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -88,8 +162,8 @@ export default function NewPost({
   const resolvedDisplayName = displayName || getShortAddress(address) || 'Guest'
   const avatarInitial = resolvedDisplayName.slice(0, 1).toUpperCase()
 
-  const handleClose = () => {
-    close?.()
+  const handleClose = (e) => {
+    if (e) e.stopPropagation()
     onClose?.()
   }
 
@@ -126,9 +200,7 @@ export default function NewPost({
     requestAnimationFrame(() => {
       textarea.focus()
       const cursorOffset = selectedText ? mark.length : mark.length
-      const cursorPosition = selectedText
-        ? selectionEnd + mark.length * 2
-        : selectionStart + cursorOffset
+      const cursorPosition = selectedText ? selectionEnd + mark.length * 2 : selectionStart + cursorOffset
       textarea.setSelectionRange(cursorPosition, cursorPosition)
     })
   }
@@ -217,8 +289,7 @@ export default function NewPost({
 
     const isImage = file.type.startsWith('image/')
     const isVideo = file.type.startsWith('video/')
-    const isExpectedType =
-      (isImage && selectedMediaType === 'image') || (isVideo && selectedMediaType === 'video')
+    const isExpectedType = (isImage && selectedMediaType === 'image') || (isVideo && selectedMediaType === 'video')
 
     if (!isExpectedType) {
       toast(`Please select a ${selectedMediaType} file`, 'error')
@@ -291,9 +362,7 @@ export default function NewPost({
           ...element,
           data: {
             ...element.data,
-            items: element.data.items.map((item, index) =>
-              index === itemIndex ? { ...item, spoiler: !item.spoiler } : item
-            ),
+            items: element.data.items.map((item, index) => (index === itemIndex ? { ...item, spoiler: !item.spoiler } : item)),
           },
         }
       })
@@ -319,7 +388,7 @@ export default function NewPost({
     }
 
     try {
-      const resultIPFS = await uploadObjectToIPFS(postContent)
+  const resultIPFS = await uploadObjectToIPFS(getSerializablePostContent(postContent))
       const metadata = resultIPFS.cid || resultIPFS.IpfsHash || resultIPFS.rootHash
 
       if (!metadata) {
@@ -328,13 +397,21 @@ export default function NewPost({
 
       const activeChain = getActiveChain()
       const postContractAddress = activeChain?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
-
-      writeContract({
-        abi,
-        address: postContractAddress,
-        functionName: 'create',
-        args: [address, 0, metadata, 0, allowComments],
-      })
+      if (actionType === 'edit') {
+        writeContract({
+          abi,
+          address: postContractAddress,
+          functionName: 'update',
+          args: [address, actionType === 'edit' ? existingPost.id : 0, metadata, allowComments],
+        })
+      } else {
+        writeContract({
+          abi,
+          address: postContractAddress,
+          functionName: 'create',
+          args: [address, 0, metadata, 0, allowComments],
+        })
+      }
     } catch (error) {
       console.error(error)
       toast(error.message || 'Unable to create post', 'error')
@@ -366,37 +443,26 @@ export default function NewPost({
   if (!mounted) return null
 
   return (
-    <section className={styles.newPost} aria-label="New thread composer">
+    <section className={styles.newPost} aria-label="New thread composer" onClick={(e) => e.stopPropagation()}>
       <header className={styles.header}>
-        <button type="button" className={styles.cancelButton} onClick={handleClose}>
+        <button type="button" className={styles.cancelButton} onClick={(e) => handleClose(e)}>
           Cancel
         </button>
 
         <h2>New post</h2>
-
       </header>
 
       <main className={clsx(styles.main, 'text-center')}>
-        <small>
-          Once submitted, your post will appear in the feed as soon as the network block confirms.
-        </small>
+        <small>Once submitted, your post will appear in the feed as soon as the network block confirms.</small>
       </main>
 
       <form className={styles.form} onSubmit={handleCreatePost}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleFileSelect}
-          className={styles.fileInput}
-          multiple={false}
-        />
+        <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} multiple={false} />
 
         <div className={clsx(styles.composer, 'flex flex-column align-items-start', 'gap-1')}>
-         <Profile variant="full" creator={address}  />
+          <Profile variant="full" creator={address} />
 
           <div className={styles.composerBody}>
-           
-
             <textarea
               ref={textareaRef}
               name="q"
@@ -414,10 +480,10 @@ export default function NewPost({
               <button type="button" onClick={() => triggerFileInput('video')} aria-label="Add video">
                 <SquarePlay size={22} strokeWidth={1.8} />
               </button>
-              <button type="button" aria-label="Add emoji" style={{display: 'none'}}>
+              <button type="button" aria-label="Add emoji" style={{ display: 'none' }}>
                 <Smile size={22} strokeWidth={1.8} />
               </button>
-              <button type="button" aria-label="Add poll"  style={{display: 'none'}}>
+              <button type="button" aria-label="Add poll" style={{ display: 'none' }}>
                 <List size={22} strokeWidth={1.8} />
               </button>
               <button type="button" onClick={() => wrapSelection('**')} aria-label="Bold">
@@ -433,34 +499,30 @@ export default function NewPost({
 
             {mediaItems.length > 0 && (
               <div className={styles.mediaGrid}>
-                {mediaItems.map((item, index) => (
-                  <figure key={`${item.localUrl}-${index}`} className={styles.mediaItem}>
-                    {item.type === 'image' ? (
-                      <img
-                        src={item.localUrl}
-                        alt={item.alt || ''}
-                        className={item.spoiler ? styles.spoiler : undefined}
-                      />
-                    ) : (
-                      <video
-                        src={item.localUrl}
-                        controls
-                        className={item.spoiler ? styles.spoiler : undefined}
-                      />
-                    )}
+{mediaItems.map((item, index) => {
+  const mediaSrc = getMediaPreviewSrc(item)
 
-                    <figcaption>
-                      <button type="button" onClick={() => toggleSpoiler(index)}>
-                        <X size={14} />
-                        <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
-                      </button>
-                      <button type="button" onClick={() => handleRemoveMedia(index)}>
-                        <Trash2 size={14} />
-                        <span>Remove</span>
-                      </button>
-                    </figcaption>
-                  </figure>
-                ))}
+  return (
+    <figure key={`${item.cid || item.localUrl || index}`} className={styles.mediaItem}>
+      {item.type === 'image' ? (
+        <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
+      ) : (
+        <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
+      )}
+
+      <figcaption>
+        <button type="button" onClick={() => toggleSpoiler(index)}>
+          <X size={14} />
+          <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
+        </button>
+        <button type="button" onClick={() => handleRemoveMedia(index)}>
+          <Trash2 size={14} />
+          <span>Remove</span>
+        </button>
+      </figcaption>
+    </figure>
+  )
+})}
               </div>
             )}
 
@@ -501,12 +563,17 @@ export default function NewPost({
             )}
           </div>
 
-          <button
-            type="submit"
-            className={styles.postButton}
-            disabled={isBusy || postText.trim().length < 1}
-          >
-            {isConfirming ? 'Posting...' : isSigning ? 'Signing...' : 'Post'}
+          <button type="submit" className={styles.postButton} disabled={isBusy || postText.trim().length < 1}>
+            {}
+            {isConfirming
+              ? actionType === 'edit'
+                ? 'Updating...'
+                : 'Posting...'
+              : isSigning
+                ? 'Signing...'
+                : actionType === 'edit'
+                  ? 'Update'
+                  : 'Post'}
           </button>
         </footer>
       </form>

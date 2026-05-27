@@ -63,6 +63,8 @@ const normalizeNavItem = (item) => {
 }
 
 const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
+  const [isComponentOpen, setIsComponentOpen] = useState(false)
+
   if (item.type === 'divider') {
     return <hr className={styles.divider} aria-hidden="true" />
   }
@@ -73,7 +75,11 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
   const content = (
     <>
       <div className={styles.iconWrapper}>
-        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.5} />
+        <Icon
+          size={20}
+          fill={isActive ? 'currentColor' : 'none'}
+          strokeWidth={isActive ? 2 : 1.5}
+        />
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
     </>
@@ -81,29 +87,27 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
 
   if (Component) {
     return (
-      <NativePopover
-        trigger={
-          <button
-            type="button"
-            className={clsx(styles.link, styles.moreButton)}
-            title={isCompact ? item.name : undefined}
-            aria-label={item.name}
-          >
-            {content}
-          </button>
-        }
-        placement="center"
-        type="auto"
-      >
-        {({ close }) => {
-          const closeAll = () => {
-            close()
+      <>
+        <button
+          type="button"
+          className={clsx(styles.link, styles.moreButton)}
+          title={isCompact ? item.name : undefined}
+          aria-label={item.name}
+          onClick={() => {
+            setIsComponentOpen(true)
             onNavigate?.()
-          }
+          }}
+        >
+          {content}
+        </button>
 
-          return <Component close={closeAll} onClose={closeAll} />
-        }}
-      </NativePopover>
+        {isComponentOpen && (
+          <Component
+            item={item}
+            onClose={() => setIsComponentOpen(false)}
+          />
+        )}
+      </>
     )
   }
 
@@ -119,7 +123,6 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
     </Link>
   )
 }
-
 export default function Aside() {
   const pathname = usePathname()
   const { address, isConnected } = useConnection()
