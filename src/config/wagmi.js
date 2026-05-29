@@ -34,7 +34,7 @@ export const CONTRACTS = {
     // CELO
     forwarder: '0x46a3dfcb1f4ec29db7f96c0d3962df20e6edb259',
     hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
-    status: '',
+    status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
   },
   // chain10143: {
   //   // Monad
