@@ -1064,7 +1064,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
           <form className="form" onSubmit={handleSubmit} encType="multipart/form-data">
             <div className="form-group">
               <figure className="rounded">
-                <img ref={pfpRef} src={profile.profileImage || '/placeholder-avatar.png'} alt="Profile preview" />
+                <img ref={pfpRef} src={resolveIPFSUrl(profile.profileImage) || '/placeholder-avatar.png'} alt="Profile preview" />
               </figure>
             </div>
 
