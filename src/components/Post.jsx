@@ -450,7 +450,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
   const uploadObjectToIPFS = async (json) => {
     //setIsUploading(true)
     try {
-      const uploadRequest = await fetch(`/api/0g/object`, {
+      const uploadRequest = await fetch(`/api/ipfs/object`, {
         method: 'POST',
         // Set the Content-Type header
         headers: {
