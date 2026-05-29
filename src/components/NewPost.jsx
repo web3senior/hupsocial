@@ -25,6 +25,7 @@ import { getActiveChain } from '@/lib/communication'
 import styles from '@/components/NewPost.module.scss'
 import Profile from './Profile'
 import clsx from 'clsx'
+import { resolveIPFSUrl } from '@/lib/storageHelper'
 
 const MAX_MEDIA_ITEMS = 4
 const MAX_MEDIA_SIZE_MB = 5
@@ -95,8 +96,8 @@ const getMediaPreviewSrc = (item) => {
   // if (item.url) return item.url
   // if (item.src) return item.src
   // if (item.gatewayUrl) return item.gatewayUrl
-
-  return `/api/ipfs/file?hash=${item.cid}`
+return resolveIPFSUrl(item.cid)
+ // return `/api/ipfs/file?hash=${item.cid}`
 }
 
 const getSerializablePostContent = (content) => ({
@@ -217,7 +218,7 @@ export default function NewPost({
       }
 
       const result = await uploadRequest.json()
-      return result.rootHash
+      return result.cid
     } catch (error) {
       console.error('Trouble uploading file:', error)
       toast('Error uploading file', 'error')
@@ -290,6 +291,7 @@ export default function NewPost({
     }
 
     const cid = await uploadFileToIPFS(file)
+    console.log(cid)
     if (!cid) return
 
     const localUrl = URL.createObjectURL(file)
@@ -297,7 +299,7 @@ export default function NewPost({
       type: selectedMediaType,
       cid,
       alt: `Hup asset ${selectedMediaType}`,
-      storage: '0G',
+      storage: 'IPFS',
       mimeType: file.type,
       localUrl,
       duration: selectedMediaType === 'video' ? 0 : undefined,

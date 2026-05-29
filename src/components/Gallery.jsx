@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { Volume2, VolumeX, Maximize2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import styles from './Gallery.module.scss'
+import { resolveIPFSUrl } from '@/lib/storageHelper'
 
 export default function MediaGallery({ data = [] }) {
   // State for gallery behavior
@@ -82,7 +83,10 @@ export default function MediaGallery({ data = [] }) {
     let url = ''
     if (item?.storage === '0G') {
       url =`/api/0g/file?hash=${item.cid}`
-    } else if (item.cid) {
+    } else if (item?.storage === 'IPFS'){
+      url = resolveIPFSUrl(item.cid)
+  }
+    else if (item.cid) {
       url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
     }
 
