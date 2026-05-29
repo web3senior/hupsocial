@@ -873,7 +873,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
       const data = new FormData()
       data.set('file', file)
 
-      const uploadRequest = await fetch(`/api/0g/file`, {
+      const uploadRequest = await fetch(`/api/ipfs/file`, {
         //`/api/ipfs/file`
         method: 'POST',
         body: data,

@@ -96,7 +96,7 @@ const getMediaPreviewSrc = (item) => {
   // if (item.src) return item.src
   // if (item.gatewayUrl) return item.gatewayUrl
 
-  return `/api/0g/file?hash=${item.cid}`
+  return `/api/ipfs/file?hash=${item.cid}`
 }
 
 const getSerializablePostContent = (content) => ({
@@ -207,7 +207,7 @@ export default function NewPost({
       const data = new FormData()
       data.set('file', file)
 
-      const uploadRequest = await fetch('/api/0g/file', {
+      const uploadRequest = await fetch('/api/ipfs/file', {
         method: 'POST',
         body: data,
       })
@@ -231,7 +231,7 @@ export default function NewPost({
     setIsUploading(true)
 
     try {
-      const uploadRequest = await fetch('/api/0g/object', {
+      const uploadRequest = await fetch('/api/ipfs/object', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
