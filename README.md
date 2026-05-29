@@ -295,3 +295,43 @@ If the burner is later exfiltrated from the browser, the attacker has an indefin
 
 https://gist.github.com/emmet-bot/77f06e48e7c2aaf92aac20c73d61f299
 https://gist.github.com/emmet-bot/a40ac3fc6a5f0f5b44c73ac6720581f2
+
+
+# Full Post Content Structure
+```js
+const postContent = {
+  version: '1',
+  elements: [
+    {
+      type: 'text',
+      data: {
+        text: 'Post text here',
+      },
+    },
+    {
+      type: 'media',
+      data: {
+        items: [
+          {
+            type: 'image',
+            cid: 'Qm1234...image-cid',
+            alt: 'Image description',
+            storage: '0G',
+            mimeType: 'image/jpeg',
+            spoiler: false,
+          },
+          {
+            type: 'video',
+            cid: 'Qm5678...video-cid',
+            alt: 'Video description',
+            storage: '0G',
+            mimeType: 'video/mp4',
+            duration: 45,
+            spoiler: false,
+          },
+        ],
+      },
+    },
+  ],
+}
+```
