@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { getProfile, getUniversalProfile } from '@/lib/api'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { config } from '@/config/wagmi'
-import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
+import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import styles from './Profile.module.scss'
 
@@ -84,7 +84,8 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   const truncatedAddress = creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
 
   // Compute final image source synchronously on render
-  const finalImageSrc = is0GHash(profile.profileImage) ? `${resolve0GUrl(profile.profileImage)}&w=72&q=75` : profile.profileImage
+  //  `${resolveIPFSUrl(profile.profileImage)}&w=72&q=75`
+  const finalImageSrc =isIPFSHash(profile.profileImage) ? `${resolveIPFSUrl(profile.profileImage)}` : profile.profileImage
 
   return (
     <figure

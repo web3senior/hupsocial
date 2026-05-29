@@ -880,8 +880,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
       })
       const signedUrl = await uploadRequest.json()
 
-      console.log(`rootHash: ${signedUrl.rootHash}`)
-      return signedUrl.rootHash
+      console.log(`cid: ${signedUrl.cid}`)
+      return signedUrl.cid
     } catch (e) {
       console.log(e)
       console.error('Trouble uploading file')
@@ -903,12 +903,12 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     // Check if the user actually picked a new file
     if (fileInput && fileInput.size > 0) {
       try {
-        toast('Uploading image to 0G Storage...', 'info')
+        toast('Uploading image ...', 'info')
         // Call your 0G upload helper function
         const rootHash = await uploadFileToIPFS(fileInput)
 
         if (!rootHash) {
-          throw new Error('Failed to retrieve root hash from 0G')
+          throw new Error('Failed to upload')
         }
 
         profileImageHash = rootHash

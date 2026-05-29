@@ -8,7 +8,7 @@ import { config } from '@/config/wagmi'
 import { useConnection, useDisconnect, useConnect, useChains, useSwitchChain } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { ensureProfile, getProfile, getUniversalProfile } from '@/lib/api'
-import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
+import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import Shimmer from '@/components/ui/Shimmer'
 import styles from './ConnectWallet.module.scss'
 
@@ -164,9 +164,7 @@ export function Profile({ addr }) {
     )
 
   // Determine standard URL structures vs 0G Root Hash streaming proxy endpoints dynamically on render
-  const finalImageSrc = is0GHash(profile.profileImage)
-    ? `${resolve0GUrl(profile.profileImage)}&w=72&q=75` 
-    : profile.profileImage
+  const finalImageSrc =isIPFSHash(profile.profileImage) ? `${resolveIPFSUrl(profile.profileImage)}` : profile.profileImage
 
   return (
     <Link href={`/${addr}`}>
