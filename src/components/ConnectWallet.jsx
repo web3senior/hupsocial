@@ -7,7 +7,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
 import { useConnection, useDisconnect, useConnect, useChains, useSwitchChain } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
-import { getProfile, getUniversalProfile } from '@/lib/api'
+import { ensureProfile, getProfile, getUniversalProfile } from '@/lib/api'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import Shimmer from '@/components/ui/Shimmer'
 import styles from './ConnectWallet.module.scss'
@@ -21,6 +21,23 @@ export const ConnectWallet = () => {
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
+  
+const ensuredProfileRef = useRef(null)
+
+useEffect(() => {
+  if (!isConnected || !address) return
+
+  const walletAddress = address.toLowerCase()
+
+  if (ensuredProfileRef.current === walletAddress) return
+  ensuredProfileRef.current = walletAddress
+
+  ensureProfile(walletAddress).catch((error) => {
+    console.error('Failed to create user profile:', error.message)
+    ensuredProfileRef.current = null
+  })
+}, [isConnected, address])
+
 
   return !mounted ? null : (
     <>

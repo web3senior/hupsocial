@@ -39,33 +39,6 @@ export default function MediaGallery({ data = [] }) {
     }
   }, [lightboxApi, selectedIndex])
 
-  // Resolve 0G Hashes
-  useEffect(() => {
-    const urlsToRevoke = []
-    const load0GAssets = async () => {
-      const newResolved = { ...resolvedUrls }
-      for (const item of data) {
-        if (item?.storage === '0G' && item.cid && !resolvedUrls[item.cid]) {
-          try {
-            const res = await fetch(`/api/0g/download?hash=${item.cid}`)
-            if (!res.ok) throw new Error('Download failed')
-            const blob = await res.blob()
-            const activeUrl = URL.createObjectURL(blob)
-            newResolved[item.cid] = activeUrl
-            urlsToRevoke.push(activeUrl)
-          } catch (err) {
-            console.error('0G_RESOLVE_ERROR:', err)
-          }
-        }
-      }
-      setResolvedUrls(newResolved)
-    }
-    load0GAssets()
-    return () => {
-      urlsToRevoke.forEach(url => URL.revokeObjectURL(url))
-    }
-  }, [data])
-
   // Video Autoplay Observer
   useEffect(() => {
     const observerOptions = { threshold: 0.6 }
@@ -108,7 +81,7 @@ export default function MediaGallery({ data = [] }) {
     const isVideo = item.type === 'video'
     let url = ''
     if (item?.storage === '0G') {
-      url = resolvedUrls[item.cid] || ''
+      url =`/api/0g/file?hash=${item.cid}`
     } else if (item.cid) {
       url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
     }

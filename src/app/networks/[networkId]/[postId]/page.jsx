@@ -3,35 +3,17 @@
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import {
-  useWaitForTransactionReceipt,
-  useConnection,
-  useWriteContract,
-  useReadContract,
-} from 'wagmi'
-import {
-  initHupContract,
-  getCommentsByPostId,
-  getActiveChain,
-} from '@/lib/communication'
+import { useWaitForTransactionReceipt, useConnection, useWriteContract, useReadContract } from 'wagmi'
+import { initHupContract, getCommentsByPostId, getActiveChain } from '@/lib/communication'
 import { getPostById, getProfile, getUniversalProfile, recordPostView } from '@/lib/api'
-import PollTimer from '@/components/PollTimer'
-import { useAuth } from '@/contexts/AuthContext'
-import Web3 from 'web3'
-import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { config } from '@/config/wagmi'
-import abi from '@/abi/post.json'
-import commentAbi from '@/abi/post-comment.json'
 import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon, BlueCheckMarkIcon, RepostIcon } from '@/components/Icons'
 import Post from '@/components/Post'
-import Comment from '@/components/Comment'
 import PageTitle from '@/components/PageTitle'
-import styles from './page.module.scss'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import Comments from '@/components/Comments'
-
+import styles from './page.module.scss'
 
 // export async function generateMetadata({ params, searchParams }, parent) {
 //   const slug = (await params).slug
@@ -104,11 +86,11 @@ export default function Page() {
     //   `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`,
     //   params.networkId,
     // )
-   // setChains(config.chains)
+    // setChains(config.chains)
 
-    recordPostView(params.networkId,params.postId, address)
+    recordPostView(params.networkId, params.postId, address)
 
-    getPostById(params.networkId,params.postId, address).then((res) => {
+    getPostById(params.networkId, params.postId, address).then((res) => {
       if (res) {
         setPost(res.data)
       }
@@ -123,22 +105,20 @@ export default function Page() {
 
   // Effect 2: Initial Comments Load
   useEffect(() => {
-  //   const initComments = async () => {
-  //     try {
-  //       const count = await getPostCommentCount(params.postId)
-  //       const total = web3.utils.toNumber(count)
-  //       setCommentCount(total)
-
-  //       // Only auto-load if nothing has been loaded yet
-  //       if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
-  //         await loadMoreComment(total)
-  //       }
-  //     } catch (err) {
-  //       console.error('Failed to initialize comments', err)
-  //     }
-  //   }
-
-  //  initComments()
+    //   const initComments = async () => {
+    //     try {
+    //       const count = await getPostCommentCount(params.postId)
+    //       const total = web3.utils.toNumber(count)
+    //       setCommentCount(total)
+    //       // Only auto-load if nothing has been loaded yet
+    //       if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
+    //         await loadMoreComment(total)
+    //       }
+    //     } catch (err) {
+    //       console.error('Failed to initialize comments', err)
+    //     }
+    //   }
+    //  initComments()
   }, [params.postId, showCommentModal]) // Trigger when modal opens or post changes
 
   return (
@@ -159,22 +139,15 @@ export default function Page() {
           <div className={`${styles.grid} flex flex-column`}>
             {post && (
               <article className={`${styles.post} animate fade`}>
-                <Post
-                  item={post}
-                  showContent={true}
-                  chainId={params.networkId}
-                  actions={[`like`, `comment`, `repost`, `view`, `share`]}
-                />
+                <Post item={post} showContent={true} chainId={params.networkId} actions={[`like`, `comment`, `repost`, `view`, `share`]} />
                 <hr />
               </article>
             )}
           </div>
 
-          <Comments
-            networkId={params.networkId}
-            postId={params.postId}
-            viewerAddress={address}
-          />
+          {post && (
+            <Comments networkId={params.networkId} postId={post.is_repost > 0 ? post.is_repost : params.postId} viewerAddress={address} />
+          )}
 
           {/* {comments &&
             comments.list.length > 0 &&
@@ -196,12 +169,12 @@ export default function Page() {
               )
             })} */}
 
-          {mounted && isConnected && (
+          {mounted && isConnected &&  false&& (
             <div
               className={`${styles.reply} flex align-items-center gap-025`}
               onClick={() => setShowCommentModal({ data: post, type: `post` })}
             >
-              <Profile addr={address} variant='imageOnly' />
+              <Profile addr={address} variant="imageOnly" />
               Reply
               <p>{/* Reply to {post.creator.slice(0, 4)}…{post.creator.slice(38)} */}</p>
             </div>
@@ -281,11 +254,7 @@ const ConnectedProfile = ({ addr }) => {
         router.push(`/u/${addr}`)
       }}
     >
-      <img
-        alt={profile.name || `Default PFP`}
-        src={`${profile.profileImage}`}
-        className={`rounded`}
-      />
+      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
 
       <figcaption className={`flex flex-column`}>
         <div className={`flex align-items-center gap-025`}>

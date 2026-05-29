@@ -8,7 +8,7 @@
   overflow: hidden;
 width: fit-content;
   transition: transform 0.2s ease;
-
+z-index:1;
   &:hover .controls {
     opacity: 1;
   }

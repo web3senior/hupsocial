@@ -38,18 +38,15 @@ export async function PUT(request, { params }) {
     }
 
     const formData = await request.formData()
-    
+
     const name = formData.get('name')
     const description = formData.get('description')
-    const profileImage = formData.get('profileImage') 
-    const tags = formData.get('tags') 
-    const links = formData.get('links') 
+    const profileImage = formData.get('profileImage')
+    const tags = formData.get('tags')
+    const links = formData.get('links')
 
     // Verify profile exists before executing update
-    const [existing] = await pool.execute(
-      'SELECT wallet_address FROM users WHERE wallet_address = ?',
-      [address]
-    )
+    const [existing] = await pool.execute('SELECT wallet_address FROM users WHERE wallet_address = ?', [address])
 
     if (existing.length === 0) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -67,7 +64,7 @@ export async function PUT(request, { params }) {
       updateFields.push('`description` = ?')
       queryValues.push(description)
     }
-    
+
     // FIXED: Better string validation for the 0G root hash.
     // If it's an empty file object from the form submit, typeof won't be a string.
     // We also make sure it's not an empty string string.
@@ -100,6 +97,53 @@ export async function PUT(request, { params }) {
     await pool.execute(updateQuery, queryValues)
 
     return NextResponse.json({ success: true, message: 'Profile updated successfully' })
+  } catch (error) {
+    console.error('Database Error:', error.message)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+export async function POST(request, { params }) {
+  try {
+    const { address } = await params
+
+    if (!address) {
+      return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 })
+    }
+
+    const walletAddress = address.toLowerCase()
+
+    await pool.execute(
+      `
+      INSERT INTO users (
+        wallet_address,
+        created_at,
+        last_seen_at,
+        lastUpdate
+      )
+      VALUES (?, NOW(), NOW(), CURRENT_TIMESTAMP)
+      ON DUPLICATE KEY UPDATE
+        last_seen_at = NOW()
+      `,
+      [walletAddress],
+    )
+
+    const [rows] = await pool.execute(
+      `
+      SELECT 
+        u.*, 
+        (SELECT COUNT(*) FROM posts p WHERE p.wallet_address = u.wallet_address) as total_posts
+      FROM users u
+      WHERE u.wallet_address = ?
+      `,
+      [walletAddress],
+    )
+
+    return NextResponse.json(rows[0])
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

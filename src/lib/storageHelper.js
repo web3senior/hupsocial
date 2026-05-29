@@ -20,5 +20,5 @@ export const resolve0GUrl = (hash) => {
   if (!hash || !is0GHash(hash)) return null;
 
   // Point directly to the API endpoint to leverage native browser streaming and caching
-  return `/api/0g/download?hash=${hash}`;
+  return `/api/0g/file?hash=${hash}`;
 };

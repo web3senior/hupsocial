@@ -23,7 +23,18 @@ export async function getUniversalProfile(addr) {
   const result = await response.json()
   return result.data
 }
+export async function ensureProfile(address) {
+  const res = await fetch(`/api/users/${address.toLowerCase()}`, {
+    method: 'POST',
+    cache: 'no-store',
+  })
 
+  if (!res.ok) {
+    throw new Error('Failed to ensure profile')
+  }
+
+  return res.json()
+}
 export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null) => {
   /* Construct the URL with query parameters */
   let url = `/api/v1/networks/posts?page=${page}&limit=${limit}`

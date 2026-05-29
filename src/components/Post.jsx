@@ -52,6 +52,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const [isExpanded, setIsExpanded] = useState(false)
   const [canShowMore, setCanShowMore] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+
   useEffect(() => {
     let cancelled = false
 
@@ -67,6 +68,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         if (cancelled) return
 
         const post = Array.isArray(res?.data) ? res.data[0] : res?.data
+
         setRepostedPost(post || null)
       })
       .catch(() => {
@@ -141,8 +143,12 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
       {showEditModal && (
         <>
-          <NewPost actionType="edit"
-           onClose={() => setShowEditModal(false)} existingPost={displayItem} setShowEditModal={setShowEditModal} />
+          <NewPost
+            actionType="edit"
+            onClose={() => setShowEditModal(false)}
+            existingPost={displayItem}
+            setShowEditModal={setShowEditModal}
+          />
         </>
       )}
 
@@ -223,14 +229,14 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
             {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
               <>
-                {item.allow_comment && (
+                {commentTarget.allow_comment && (
                   <button
                     onClick={() => {
-                      isConnected ? setShowCommentModal(displayItem) : toast(`Please connect wallet`, `error`)
+                      isConnected ? setShowCommentModal(commentTarget) : toast(`Please connect wallet`, `error`)
                     }}
                   >
                     <MessageCircle strokeWidth={1.5} width={17} height={17} />
-                    {item.total_comments === 0 ? '' : <span>{item.total_comments}</span>}
+                    {commentTarget.total_comments === 0 ? '' : <span>{commentTarget.total_comments}</span>}
                   </button>
                 )}
               </>
@@ -356,19 +362,31 @@ const Nav = ({ item, setShowEditModal }) => {
         }
         placement="bottom-start"
       >
-        <div className={`${styles.postDropdown} flex flex-column align-items-center justify-content-start gap-050`}>
-          <ul>
-            <li>
-              <Link href={`/networks/${item.network_id}/${item.id}`}>View post</Link>
-            </li>
-            {item.is_repost < 1&& <li>
-              <button onClick={(e) => { e.stopPropagation();setShowEditModal(true) }}>Edit post</button>
-            </li> }
-            <li>
-              <button onClick={(e) => deletePost(e, item.id)}>Delete post</button>
-            </li>
-          </ul>
-        </div>
+        {({ close }) => (
+          <div className={`${styles.postDropdown} flex flex-column align-items-center justify-content-start gap-050`}>
+            <ul>
+              <li>
+                <Link href={`/networks/${item.network_id}/${item.id}`}>View post</Link>
+              </li>
+              {item.is_repost < 1 && (
+                <li>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowEditModal(true)
+                      close()
+                    }}
+                  >
+                    Edit post
+                  </button>
+                </li>
+              )}
+              <li>
+                <button onClick={(e) => deletePost(e, item.id)}>Delete post</button>
+              </li>
+            </ul>
+          </div>
+        )}
       </NativePopover>
     </>
   )
@@ -419,7 +437,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
   const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const { data: hash, isPending: isSigning, error: submitError, writeContractAsync } = useWriteContract()
   const {
     isLoading: isConfirming,
     isSuccess: isConfirmed,
@@ -427,10 +445,12 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
+  const [isUploadingComment, setIsUploadingComment] = useState(false)
+  const isPostingComment = isUploadingComment || isSigning || isConfirming
   const uploadObjectToIPFS = async (json) => {
     //setIsUploading(true)
     try {
-      const uploadRequest = await fetch(`/api/ipfs/object`, {
+      const uploadRequest = await fetch(`/api/0g/object`, {
         method: 'POST',
         // Set the Content-Type header
         headers: {
@@ -463,6 +483,10 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
   const postComment = async (e) => {
     e.stopPropagation()
 
+    if (isPostingComment) {
+      return
+    }
+
     if (!isConnected) {
       console.log(`Please connect your wallet first`, 'error')
       return
@@ -470,33 +494,42 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
 
     //const formData = new FormData(e.target)
 
-    const resultIPFS = await uploadObjectToIPFS({
-      version: '1',
-      elements: [
-        { type: 'text', data: { text: commentContent } },
-        {
-          type: 'media',
-          data: {
-            items: [
-              // { type: 'image', cid: 'Qm1234...image-cid-1', alt: 'Photo of the launch party.', mimeType: 'image/jpeg' },
-              // { type: 'image', cid: 'Qm5678...image-cid-2', alt: 'Screenshot of the new interface.', mimeType: 'image/jpeg' },
-              // { type: 'video', cid: 'Qm9012...video-cid-3', format: 'mp4', duration: 45 },
-            ],
+    try {
+      setIsUploadingComment(true)
+
+      const resultIPFS = await uploadObjectToIPFS({
+        version: '1',
+        elements: [
+          { type: 'text', data: { text: commentContent } },
+          {
+            type: 'media',
+            data: {
+              items: [
+                // { type: 'image', cid: 'Qm1234...image-cid-1', alt: 'Photo of the launch party.', mimeType: 'image/jpeg' },
+                // { type: 'image', cid: 'Qm5678...image-cid-2', alt: 'Screenshot of the new interface.', mimeType: 'image/jpeg' },
+                // { type: 'video', cid: 'Qm9012...video-cid-3', format: 'mp4', duration: 45 },
+              ],
+            },
           },
-        },
-      ],
-    })
-    if (!resultIPFS.cid) {
-      console.error(`CID not found`)
+        ],
+      })
+      if (!resultIPFS.cid) {
+        console.error(`CID not found`)
+        return
+      }
+      const metadata = resultIPFS.cid
+      console.log(address, 1, metadata, item.id, true)
+      await writeContractAsync({
+        abi,
+        address: activeChain[1].hup,
+        functionName: 'create',
+        args: [address, 1, metadata, item.id, true], //formData.get(`allowComments`) === 'true' ? true : false
+      })
+    } catch (err) {
+      console.error('Trouble posting comment:', err)
+    } finally {
+      setIsUploadingComment(false)
     }
-    const metadata = resultIPFS.cid
-    console.log(address, 1, metadata, item.id, true)
-    writeContract({
-      abi,
-      address: activeChain[1].hup,
-      functionName: 'create',
-      args: [address, 1, metadata, item.id, true], //formData.get(`allowComments`) === 'true' ? true : false
-    })
   }
 
   useEffect(() => {
@@ -576,8 +609,8 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
               placeholder={`Reply to ${item?.wallet_address?.slice(0, 4)}…${item?.wallet_address?.slice(-4)}`}
             />
           </div>
-          <button className="btn" onClick={(e) => postComment(e)}>
-            Post comment
+          <button className="btn" onClick={(e) => postComment(e)} disabled={isPostingComment} aria-busy={isPostingComment}>
+            {isUploadingComment ? 'Posting...' : isSigning ? 'Signing...' : isConfirming ? 'Confirming...' : 'Post comment'}
           </button>
         </footer>
       </div>
@@ -768,43 +801,58 @@ const ShareModal = ({ item, setShowShareModal }) => {
 }
 
 /**
- * Like
- * @param {*} param0
- * @returns
+ * Like Interaction Component
+ * @param {Object} props
+ * @param {Object} props.item Core content model with network metadata and like metrics.
  */
 const Like = ({ item }) => {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  // Local state to handle async executions cleanly
+  const [isProcessing, setIsProcessing] = useState(false)
+
   const isMounted = useClientMounted()
   const activeChain = getActiveChain()
   const { address, isConnected } = useConnection()
-  const { data: hash, isPending, writeContract } = useWriteContract()
+
+  // Wagmi hooks for primary wallet transactions
+  const { data: hash, isPending: isWalletPending, writeContractAsync } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
+
   const publicClient = usePublicClient()
+
+  // Track primary wallet transaction completion status
+  useEffect(() => {
+    if (isConfirmed) {
+      setIsProcessing(false)
+      toast('Interaction saved on-chain!', 'success')
+    }
+  }, [isConfirmed])
+
   const likePost = async (e, id) => {
     e.stopPropagation()
 
     if (!isConnected || !address) {
-      console.log('Please connect your wallet first', 'error')
+      toast('Please connect your wallet first', 'error')
       return
     }
 
     const targetChain = CONTRACTS[`chain${item.network_id}`]
-
     if (!targetChain?.hup) {
-      console.log('Contract configuration missing for network', 'error')
+      toast('Contract configuration missing for network', 'error')
       return
     }
 
     try {
+      setIsProcessing(true)
+
       const session = await isSessionActive({
         userAddress: address,
         publicClient,
       })
 
       if (session.active) {
+        // Burner session pipeline (Immediate transaction submission)
         await writeWithBurnerSession({
           chain: activeChain[0],
           contractAddress: targetChain.hup,
@@ -813,86 +861,93 @@ const Like = ({ item }) => {
           args: [address, [id]],
         })
 
+        toast('Liked via active session key!', 'success')
+        setIsProcessing(false)
         return
       }
 
-      writeContract({
+      // Primary wallet fallback pipeline using the async variant for cleaner catching
+      await writeContractAsync({
         abi,
         address: targetChain.hup,
         functionName: 'batchLike',
         args: [address, [id]],
       })
+
+      toast('Confirming block execution...', 'success')
     } catch (err) {
       console.error('Like failed:', err)
+      toast(err.message || 'Transaction rejected or encountered an error.', 'error')
+      setIsProcessing(false)
     }
   }
 
-  /*const likePost = (e, id) => {
-    // Prevent event bubbling to parent elements
+  const unlikePost = async (e, id) => {
     e.stopPropagation()
 
-    // Guard clause for disconnected wallets
     if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
+      toast('Please connect your wallet first', 'error')
       return
     }
 
-    // Ensure the target network configuration exists
     const targetChain = CONTRACTS[`chain${item.network_id}`]
-    if (!targetChain || !targetChain.hup) {
-      console.log(`Contract configuration missing for network`, 'error')
-      return
-    }
-    console.log([address, [id]])
-    // Execute the contract write using the passed id variable
-    writeContract({
-      abi,
-      address: targetChain.hup,
-      functionName: 'batchLike',
-      args: [address, [id]], // Using the 'id' parameter passed to the function
-    })
-  }*/
-
-  const unlikePost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
+    if (!targetChain?.hup) {
+      toast('Contract configuration missing for network', 'error')
       return
     }
 
-    writeContract({
-      abi,
-      address: activeChain[1].post,
-      functionName: 'unlikePost',
-      args: [id],
-    })
+    try {
+      setIsProcessing(true)
+
+      await writeContractAsync({
+        abi,
+        address: targetChain.hup,
+        functionName: 'unlikePost',
+        args: [id],
+      })
+
+      toast('Removing like on-chain...', 'success')
+    } catch (err) {
+      console.error('Unlike failed:', err)
+      toast(err.message || 'Failed to remove transaction.', 'error')
+      setIsProcessing(false)
+    }
   }
 
-  if (error) {
-    return <span>{error}</span>
-  }
+  // Determine aggregate loading footprint
+  const isLoading = isProcessing || isWalletPending || isConfirming
+
+  if (!isMounted) return null
 
   return (
     <button
+      disabled={isLoading}
+      className={`like-button ${isLoading ? 'processing' : ''}`}
       onClick={(e) => {
         if (isConnected) {
           item.is_liked === 1 ? unlikePost(e, item.id) : likePost(e, item.id)
-        } else toast(`Please connect wallet`, `error`)
+        } else {
+          toast('Please connect wallet', 'error')
+        }
       }}
     >
-      <Heart
-        strokeWidth={1.5}
-        width={18}
-        height={18}
-        color={item.is_liked ? 'var(--liked-color)' : 'currentColor'}
-        fill={item.is_liked ? 'var(--liked-color)' : 'none'}
-      />
-      {item.total_likes === 0 ? '' : <span>{item.total_likes}</span>}
+      {isLoading ? (
+        // Standard loading animation replacement frame
+        <span className="spinner-icon animate-spin">⏳</span>
+      ) : (
+        <Heart
+          strokeWidth={1.5}
+          width={18}
+          height={18}
+          color={item.is_liked ? 'var(--liked-color)' : 'currentColor'}
+          fill={item.is_liked ? 'var(--liked-color)' : 'none'}
+        />
+      )}
+
+      {item.total_likes > 0 && !isLoading && <span>{item.total_likes}</span>}
     </button>
   )
 }
-
 function Repost({ item }) {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
@@ -941,7 +996,7 @@ function Repost({ item }) {
         ContentType.Repost,
         '', // repost metadata can be empty
         BigInt(id), // parent post id
-        true, // allowedComments, mostly irrelevant for reposts
+        false, //false for all reposts
       ],
     })
   }

@@ -498,7 +498,7 @@ const Profile = ({ addr }) => {
             <li className="flex flex-row align-items-center justify-content-between gap-025 w-100">
               <div className="flex flex-row align-items-center justify-content-start gap-025">
                 <button className={styles.btnFollowers} type="button">
-                  <span className="text-secondary">100 followers</span>
+                  <span className="text-secondary">0 followers</span>
                 </button>
                 <span>•</span>
                 <Link className={styles.link} target="_blank" rel="noopener noreferrer" href={`https://hup.social/${targetWallet}`}>

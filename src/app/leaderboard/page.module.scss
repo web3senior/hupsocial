@@ -187,9 +187,10 @@
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(32, 201, 151, 0.12), transparent 48%),
-    var(--surface);
+  background: var(--background);
+  // background:
+  //   linear-gradient(135deg, rgba(32, 201, 151, 0.12), transparent 48%),
+  //   var(--surface);
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -202,21 +203,21 @@
 }
 
 .rankFirst {
-  background:
-    linear-gradient(135deg, rgba(221, 182, 36, 0.22), transparent 48%),
-    var(--surface);
+  // background:
+  //   linear-gradient(135deg, rgba(221, 182, 36, 0.22), transparent 48%),
+  //   var(--surface);
 }
 
 .rankSecond {
-  background:
-    linear-gradient(135deg, rgba(122, 167, 199, 0.2), transparent 48%),
-    var(--surface);
+  // background:
+  //   linear-gradient(135deg, rgba(122, 167, 199, 0.2), transparent 48%),
+  //   var(--surface);
 }
 
 .rankThird {
-  background:
-    linear-gradient(135deg, rgba(244, 128, 36, 0.16), transparent 48%),
-    var(--surface);
+  // background:
+  //   linear-gradient(135deg, rgba(244, 128, 36, 0.16), transparent 48%),
+  //   var(--surface);
 }
 
 .rankBadge {

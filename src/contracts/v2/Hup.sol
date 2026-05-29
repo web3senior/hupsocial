@@ -11,11 +11,11 @@ import "./IHup.sol";
 /**
  * @title Hup Core Protocol
  * @author Hup Labs
- * @notice Minimal on-chain social protocol for posts, comments, reposts, likes, and session-based actions.
+ * @notice Minimal onchain social protocol for posts, comments, reposts, likes, and session-based actions.
  * @dev Uses IHup for shared events, errors, enums, and view structs. Supports rotatable ERC2771 trusted
  *      forwarders for meta-transactions, AccessControl for admin permissions, Pausable for emergency
  *      controls, and ReentrancyGuard for protected payable flows. Rich discovery, search, feeds,
- *      bookmarks, views, and global post routing are expected to be handled off-chain by indexers.
+ *      bookmarks, views, and global post routing are expected to be handled offchain by indexers.
  * @custom:version 1.0.0
  * @custom:chain multichain
  * @custom:website https://hup.social
@@ -100,12 +100,17 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         string calldata _metadata,
         uint256 _parentId,
         bool _allowedComments
-    ) external payable whenNotPaused nonReentrant returns (uint256) {
+    ) external payable whenNotPaused returns (uint256) {
         address actor = _resolveActor(_owner);
         uint256 metadataLength = bytes(_metadata).length;
 
-        if (fee > 0 && msg.value < fee) revert InsufficientFee();
+        if (fee > 0 && msg.value != fee) revert InsufficientFee();
         if (_type != ContentType.Repost && metadataLength == 0) revert InputEmpty();
+
+        if (_type == ContentType.Repost && metadataLength != 0) {
+            revert RepostMetadataNotAllowed();
+        }
+
         if (metadataLength > maxMetadataBytes) {
             revert MetadataTooLarge(metadataLength, maxMetadataBytes);
         }
@@ -117,12 +122,17 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
             if (parent.creator == address(0)) revert ContentNotFound();
             if (parent.isDeleted) revert ContentDeletedError();
 
+            if (parent.cType == ContentType.Repost) {
+                revert InteractionNotAllowed();
+            }
+
             if (_type == ContentType.Comment && !parent.allowedComments) {
                 revert InteractionNotAllowed();
             }
 
-            if (_type == ContentType.Repost && contentRepostedBy[_parentId][actor]) {
-                revert InteractionNotAllowed();
+            if (_type == ContentType.Repost) {
+                if (_allowedComments) revert InteractionNotAllowed();
+                if (contentRepostedBy[_parentId][actor]) revert InteractionNotAllowed();
             }
         }
 
@@ -148,7 +158,7 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         item.allowedComments = _allowedComments;
         item.isUpdated = true;
 
-        emit ContentUpdated(_id, actor, _metadata);
+        emit ContentUpdated(_id, actor, _metadata, _allowedComments);
         return true;
     }
 
@@ -177,7 +187,7 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
             }
         }
 
-        emit ContentDeleted(_id, actor);
+        emit ContentDeleted(_id, actor, cType, parentId);
     }
 
     function like(address _owner, uint256 _id) external whenNotPaused {
@@ -214,20 +224,24 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     function getContents(uint256[] calldata _ids, address _viewer) external view override returns (ContentView[] memory result) {
         uint256 length = _ids.length;
 
-        if (length == 0 || length > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+        if (length > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+        if (length == 0) return new ContentView[](0);
 
+        uint256 total = contentCount;
         result = new ContentView[](length);
 
         for (uint256 i = 0; i < length; i++) {
             uint256 id = _ids[i];
 
-            if (id == 0 || id > contentCount) revert InvalidIndex();
+            if (id == 0 || id > total) revert InvalidIndex();
 
             result[i] = _formatView(id, _viewer);
         }
     }
 
     function getFeed(uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
+        if (_count > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+
         uint256 total = contentCount;
         if (total == 0 || _startIndex >= total || _count == 0) return new ContentView[](0);
 
@@ -244,6 +258,8 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     }
 
     function getFeedBefore(uint256 _cursorId, uint256 _count, address _viewer) external view override returns (ContentView[] memory batch, uint256 nextCursor) {
+        if (_count > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+
         uint256 total = contentCount;
 
         if (total == 0 || _count == 0) {
@@ -268,6 +284,8 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     }
 
     function getPostsFeedBefore(uint256 _cursorId, uint256 _count, address _viewer) external view override returns (ContentView[] memory batch, uint256 nextCursor) {
+        if (_count > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+
         uint256 cursor = _cursorId == 0 ? _postIds.length : _lowerBound(_postIds, _cursorId);
 
         if (cursor == 0 || _count == 0) {
@@ -290,6 +308,8 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     }
 
     function getContentsByCreator(address _creator, uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
+        if (_count > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+
         uint256[] storage ids = creatorContent[_creator];
         uint256 total = ids.length;
 
@@ -313,6 +333,8 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         uint256 _count,
         address _viewer
     ) external view override returns (ContentView[] memory result, uint256 nextCursor) {
+        if (_count > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+
         uint256[] storage ids = creatorContent[_creator];
         uint256 cursor = _cursorId == 0 ? ids.length : _lowerBound(ids, _cursorId);
 
@@ -332,6 +354,8 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     }
 
     function getComments(uint256 _parentId, uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
+        if (_count > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+
         uint256[] storage commentIds = _comments[_parentId];
         uint256 total = commentIds.length;
 
@@ -350,6 +374,8 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     }
 
     function getReposts(uint256 _parentId, uint256 _startIndex, uint256 _count, address _viewer) external view override returns (ContentView[] memory) {
+        if (_count > MAX_BATCH_READ_COUNT) revert InvalidIndex();
+
         uint256[] storage repostIds = _reposts[_parentId];
         uint256 total = repostIds.length;
 
@@ -441,6 +467,7 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
         ContentData storage item = allContent[id];
 
         if (item.isDeleted) revert ContentDeletedError();
+        if (item.cType == ContentType.Repost) revert InteractionNotAllowed();
         if (contentLikedBy[id][actor]) revert InteractionNotAllowed();
 
         item.likeCount++;
@@ -464,10 +491,16 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     }
 
     function _resolveActor(address _owner) internal view returns (address) {
-        if (_owner == address(0) || _owner == _msgSender()) return _msgSender();
+        address sender = _msgSender();
+
+        if (sender == address(0)) revert InvalidAddress();
+
+        if (_owner == address(0) || _owner == sender) {
+            return sender;
+        }
 
         Session memory session = userSessions[_owner];
-        if (session.burnerKey != _msgSender()) revert Unauthorized();
+        if (session.burnerKey != sender) revert Unauthorized();
         if (block.timestamp >= session.expiresAt) revert SessionExpired();
 
         return _owner;
@@ -476,11 +509,13 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     function _createInternal(address _author, ContentType _type, string memory _metadata, uint256 _parentId, bool _allowedComments) internal returns (uint256) {
         contentCount++;
         uint256 id = contentCount;
+        uint256 createdAt = block.timestamp;
+        bool allowedComments = _type == ContentType.Repost ? false : _allowedComments;
 
         allContent[id] = ContentData({
             metadata: _metadata,
             parentId: _parentId,
-            createdAt: block.timestamp,
+            createdAt: createdAt,
             likeCount: 0,
             commentCount: 0,
             repostCount: 0,
@@ -488,7 +523,7 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
             cType: _type,
             isDeleted: false,
             isUpdated: false,
-            allowedComments: _allowedComments
+            allowedComments: allowedComments
         });
 
         creatorContent[_author].push(id);
@@ -510,7 +545,7 @@ contract Hup is IHup, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
             }
         }
 
-        emit ContentCreated(id, _author, _type, _parentId);
+        emit ContentCreated(id, _author, _type, _parentId, _metadata, allowedComments, createdAt);
         return id;
     }
 

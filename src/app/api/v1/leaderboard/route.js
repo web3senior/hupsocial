@@ -58,7 +58,7 @@ export async function GET(request) {
       timeColumn: 'created_at',
       networkId,
       since,
-      baseConditions: ['pl.liker IS NOT NULL'],
+      baseConditions: ['pl.liker_address IS NOT NULL'],
     })
 
     const viewsFilter = buildWhere({
@@ -89,16 +89,16 @@ export async function GET(request) {
           COALESCE(views.views_received, 0) AS views_received,
           ${SCORE_SQL} AS score
         FROM (
-          SELECT wallet_address COLLATE utf8mb4_general_ci AS wallet_address FROM users
+          SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM users
           UNION
-          SELECT wallet_address COLLATE utf8mb4_general_ci AS wallet_address FROM posts WHERE wallet_address IS NOT NULL
+          SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM posts WHERE wallet_address IS NOT NULL
           UNION
-          SELECT liker COLLATE utf8mb4_general_ci AS wallet_address FROM post_likes WHERE liker IS NOT NULL
+          SELECT CONVERT(liker_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM post_likes WHERE liker_address IS NOT NULL
         ) wallets
         LEFT JOIN users u ON u.wallet_address = wallets.wallet_address
         LEFT JOIN (
           SELECT
-            p.wallet_address,
+            CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
             COUNT(*) AS total_posts,
             SUM(CASE WHEN p.is_comment IS NULL AND p.is_repost IS NULL THEN 1 ELSE 0 END) AS root_posts,
             SUM(CASE WHEN p.is_comment IS NOT NULL THEN 1 ELSE 0 END) AS comments_made,
@@ -106,33 +106,33 @@ export async function GET(request) {
             MAX(p.created_at) AS latest_post_at
           FROM posts p
           ${activityFilter.where}
-          GROUP BY p.wallet_address
+          GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
         ) activity ON activity.wallet_address = wallets.wallet_address
         LEFT JOIN (
           SELECT
-            p.wallet_address,
+            CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
             COUNT(pl.id) AS likes_received
           FROM post_likes pl
           JOIN posts p ON pl.post_id = p.id AND pl.network_id = p.network_id
           ${receivedFilter.where}
-          GROUP BY p.wallet_address
+          GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
         ) received ON received.wallet_address = wallets.wallet_address
         LEFT JOIN (
           SELECT
-            pl.liker COLLATE utf8mb4_general_ci AS wallet_address,
+            CONVERT(pl.liker_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
             COUNT(*) AS likes_given
           FROM post_likes pl
           ${givenFilter.where}
-          GROUP BY pl.liker
+          GROUP BY CONVERT(pl.liker_address USING utf8mb4) COLLATE utf8mb4_general_ci
         ) given ON given.wallet_address = wallets.wallet_address
         LEFT JOIN (
           SELECT
-            p.wallet_address,
+            CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
             COUNT(pv.id) AS views_received
           FROM post_views pv
           JOIN posts p ON pv.post_id = p.id AND pv.network_id = p.network_id
           ${viewsFilter.where}
-          GROUP BY p.wallet_address
+          GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
         ) views ON views.wallet_address = wallets.wallet_address
       ) ranked
       WHERE ranked.score > 0

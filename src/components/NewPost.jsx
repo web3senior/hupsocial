@@ -86,23 +86,17 @@ const getInitialPostContent = (text, url, actionType, existingPost) => {
     return createPostContent(existingText, existingMedia)
   }
 
-  return createPostContent(
-    [normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n')
-  )
+  return createPostContent([normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n'))
 }
 
 const getMediaPreviewSrc = (item) => {
-  if (item.localUrl) return item.localUrl
-  if (item.url) return item.url
-  if (item.src) return item.src
-  if (item.gatewayUrl) return item.gatewayUrl
+  console.log(item)
+  // if (item.localUrl) return item.localUrl
+  // if (item.url) return item.url
+  // if (item.src) return item.src
+  // if (item.gatewayUrl) return item.gatewayUrl
 
-  const gateway = process.env.NEXT_PUBLIC_0G_GATEWAY_URL
-  if (gateway && item.cid) {
-    return `${gateway.replace(/\/$/, '')}/${item.cid}`
-  }
-
-  return ''
+  return `/api/0g/file?hash=${item.cid}`
 }
 
 const getSerializablePostContent = (content) => ({
@@ -136,15 +130,14 @@ export default function NewPost({
   actionType = 'post', // or 'thread'
 }) {
   const mounted = useClientMounted()
- 
- 
-const initialPostContent = useMemo(
-  () => getInitialPostContent(text, url, actionType, existingPost),
-  [text, url, actionType, existingPost]
-)
 
-const [postContent, setPostContent] = useState(() => initialPostContent)
- 
+  const initialPostContent = useMemo(
+    () => getInitialPostContent(text, url, actionType, existingPost),
+    [text, url, actionType, existingPost],
+  )
+
+  const [postContent, setPostContent] = useState(() => initialPostContent)
+
   const [allowComments, setAllowComments] = useState(true)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -238,7 +231,7 @@ const [postContent, setPostContent] = useState(() => initialPostContent)
     setIsUploading(true)
 
     try {
-      const uploadRequest = await fetch('/api/ipfs/object', {
+      const uploadRequest = await fetch('/api/0g/object', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -388,9 +381,9 @@ const [postContent, setPostContent] = useState(() => initialPostContent)
     }
 
     try {
-  const resultIPFS = await uploadObjectToIPFS(getSerializablePostContent(postContent))
-      const metadata = resultIPFS.cid || resultIPFS.IpfsHash || resultIPFS.rootHash
-
+      const resultIPFS = await uploadObjectToIPFS(getSerializablePostContent(postContent))
+      const metadata = resultIPFS.cid // || resultIPFS.IpfsHash || resultIPFS.rootHash
+      console.log(metadata)
       if (!metadata) {
         throw new Error('CID not found')
       }
@@ -499,30 +492,30 @@ const [postContent, setPostContent] = useState(() => initialPostContent)
 
             {mediaItems.length > 0 && (
               <div className={styles.mediaGrid}>
-{mediaItems.map((item, index) => {
-  const mediaSrc = getMediaPreviewSrc(item)
+                {mediaItems.map((item, index) => {
+                  const mediaSrc = getMediaPreviewSrc(item)
 
-  return (
-    <figure key={`${item.cid || item.localUrl || index}`} className={styles.mediaItem}>
-      {item.type === 'image' ? (
-        <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
-      ) : (
-        <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
-      )}
+                  return (
+                    <figure key={`${item.cid || item.localUrl || index}`} className={styles.mediaItem}>
+                      {item.type === 'image' ? (
+                        <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
+                      ) : (
+                        <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
+                      )}
 
-      <figcaption>
-        <button type="button" onClick={() => toggleSpoiler(index)}>
-          <X size={14} />
-          <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
-        </button>
-        <button type="button" onClick={() => handleRemoveMedia(index)}>
-          <Trash2 size={14} />
-          <span>Remove</span>
-        </button>
-      </figcaption>
-    </figure>
-  )
-})}
+                      <figcaption>
+                        <button type="button" onClick={() => toggleSpoiler(index)}>
+                          <X size={14} />
+                          <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
+                        </button>
+                        <button type="button" onClick={() => handleRemoveMedia(index)}>
+                          <Trash2 size={14} />
+                          <span>Remove</span>
+                        </button>
+                      </figcaption>
+                    </figure>
+                  )
+                })}
               </div>
             )}
 

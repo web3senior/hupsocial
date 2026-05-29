@@ -45,9 +45,9 @@ interface IHup {
 
     // --- SHARED EVENTS ---
 
-    event ContentCreated(uint256 indexed id, address indexed creator, ContentType indexed cType, uint256 parentId);
-    event ContentUpdated(uint256 indexed id, address indexed creator, string metadata);
-    event ContentDeleted(uint256 indexed id, address indexed deleter);
+    event ContentCreated(uint256 indexed id, address indexed creator, ContentType indexed cType, uint256 parentId, string metadata, bool allowedComments, uint256 createdAt);
+    event ContentUpdated(uint256 indexed id, address indexed creator, string metadata, bool allowedComments);
+    event ContentDeleted(uint256 indexed id, address indexed deleter, ContentType indexed cType, uint256 parentId);
     event ContentLiked(uint256 indexed id, address indexed liker, address indexed creator);
     event ContentUnliked(uint256 indexed id, address indexed unliker, address indexed creator);
     event SessionAuthorized(address indexed primaryWallet, address indexed burnerKey, uint256 expiresAt);
@@ -73,6 +73,7 @@ interface IHup {
     error InvalidAddress();
     error InvalidDuration();
     error InvalidMetadataLimit();
+    error RepostMetadataNotAllowed();
 
     // --- STATE GETTERS ---
 

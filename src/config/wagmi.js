@@ -24,8 +24,8 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 export const CONTRACTS = {
   chain4201: {
     // LUKSO
-    forwarder: '0x4Ae9880579cd9145B34f7e62E689C33E8Ce590a5',
-    hup: '0x73b9d1799309Bcbe423Ae0EDDdd19709B8fd8a89',
+    forwarder: '0x4f8cEe13D83c5415c8aaC9153621B9fAD2f29403',
+    hup: '0xe8c98DEF425668f18fD3F41DDd3f43998bA032a3',
     status: '0x6B10B966C3369332De8c976da62249F38D6898ca',
   },
   chain11142220: {
@@ -39,38 +39,7 @@ export const CONTRACTS = {
     forwarder: '',
     hup: '',
     status: '',
-  },
-  chain59141: {
-    forwarder: '',
-    hup: '',
-    status: '',
-  },
-  chain84532: {
-    // Base
-    forwarder: '',
-    hup: '',
-    status: '',
-  },
-  chain11155420: {
-    forwarder: '',
-    hup: '',
-    status: '',
-  },
-  chain1301: {
-    forwarder: '',
-    hup: '',
-    status: '',
-  },
-  chain8408: {
-    forwarder: '',
-    hup: '',
-    status: '',
-  },
-  chain421614: {
-    forwarder: '',
-    hup: '',
-    status: '',
-  },
+  }
 }
 
 // Customize chains object
