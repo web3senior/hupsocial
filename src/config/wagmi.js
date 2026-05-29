@@ -1,6 +1,7 @@
 import { createConfig, http, webSocket } from 'wagmi'
 import {
   lukso,
+  celo,
   sepolia,
   baseSepoliaPreconf,
   celoSepolia,
@@ -29,12 +30,12 @@ export const CONTRACTS = {
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
   },
-  // chain11142220: {
-  //   // CELO
-  //   forwarder: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
-  //   hup: '0x8634130FF8D3De06121BEF04a25B78557883fe97',
-  //   status: '0x13A71b258b685dFAC3bCe8b1530aAFD8daa180E1',
-  // },
+  chain42220: {
+    // CELO
+    forwarder: '0x46a3dfcb1f4ec29db7f96c0d3962df20e6edb259',
+    hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
+    status: '',
+  },
   // chain10143: {
   //   // Monad
   //   forwarder: '',
@@ -54,10 +55,10 @@ lukso.primaryColor = `#FD1669`
 lukso.textColor = `#fff`
 
 // CELO
-celoSepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10733_2648)"> <path d="M0 0H18V18H0V0Z" fill="#FCFE52"/> <path d="M5 5H13V8H11.83C11.5941 7.33279 11.1299 6.77045 10.5195 6.41237C9.90911 6.05429 9.19176 5.92353 8.49427 6.0432C7.79677 6.16288 7.16404 6.52527 6.70789 7.06634C6.25175 7.60741 6.00157 8.29231 6.00157 9C6.00157 9.70769 6.25175 10.3926 6.70789 10.9337C7.16404 11.4747 7.79677 11.8371 8.49427 11.9568C9.19176 12.0765 9.90911 11.9457 10.5195 11.5876C11.1299 11.2296 11.5941 10.6672 11.83 10H13V13H5V5Z" fill="black"/> </g> <defs> <clipPath id="clip0_10733_2648"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
-celoSepolia.faucetUrl = `https://faucet.celo.org/celo-sepolia/`
-celoSepolia.primaryColor = `#fcff52`
-celoSepolia.textColor = `#333`
+celo.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10733_2648)"> <path d="M0 0H18V18H0V0Z" fill="#FCFE52"/> <path d="M5 5H13V8H11.83C11.5941 7.33279 11.1299 6.77045 10.5195 6.41237C9.90911 6.05429 9.19176 5.92353 8.49427 6.0432C7.79677 6.16288 7.16404 6.52527 6.70789 7.06634C6.25175 7.60741 6.00157 8.29231 6.00157 9C6.00157 9.70769 6.25175 10.3926 6.70789 10.9337C7.16404 11.4747 7.79677 11.8371 8.49427 11.9568C9.19176 12.0765 9.90911 11.9457 10.5195 11.5876C11.1299 11.2296 11.5941 10.6672 11.83 10H13V13H5V5Z" fill="black"/> </g> <defs> <clipPath id="clip0_10733_2648"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
+celo.faucetUrl = `https://faucet.celo.org/celo-sepolia/`
+celo.primaryColor = `#fcff52`
+celo.textColor = `#333`
 
 // Base
 baseSepoliaPreconf.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_11007_5115)"><path d="M18 0H0V18H18V0Z" fill="#0052FF"/><path d="M8.94604 14.1103C11.7979 14.1103 14.1098 11.8024 14.1098 8.95553C14.1098 6.10863 11.7979 3.80078 8.94604 3.80078C6.24039 3.80078 4.02074 5.87808 3.80029 8.52223H10.6256V9.38883H3.80029C4.02074 12.0329 6.24039 14.1103 8.94604 14.1103Z" fill="white"/></g><defs><clipPath id="clip0_11007_5115"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
@@ -109,10 +110,11 @@ sepolia.textColor = `#fff`
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [lukso], //somniaTestnet, opBNBTestnet
+  chains: [lukso, celo], //somniaTestnet, opBNBTestnet
   connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
   transports: {
     [lukso.id]: http(),
+    [celo.id]: http(),
   },
   ssr: true,
   // storage: createStorage({
