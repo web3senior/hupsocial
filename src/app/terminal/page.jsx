@@ -8,7 +8,7 @@ import { useConnectorClient, useConnections, useClient, networks,
    useWaitForTransactionReceipt, useAccount, useDisconnect, Connector,
     useConnect, useWriteContract, useReadContract } from 'wagmi'
 import {
-  initPostContract,
+  initHupContract,
   initPostCommentContract,
   getPosts,
   getPostByIndex,
@@ -62,7 +62,7 @@ export default function Page() {
   const [commentCount, setCommentCount] = useState(0)
   const [isLoadedComment, setIsLoadedPoll] = useState(false)
   const [showCommentModal, setShowCommentModal] = useState()
-  const { web3, contract } = initPostContract()
+  const { web3, contract } = initHupContract()
   const giftModal = useRef()
   const giftModalMessage = useRef()
   const mounted = useClientMounted()
