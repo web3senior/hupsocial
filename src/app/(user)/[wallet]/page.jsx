@@ -21,7 +21,7 @@ import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import PageTitle from '@/components/PageTitle'
 import NewPost from '@/components/NewPost'
 import AISummary from '@/components/AISummary'
-import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
+import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 
 const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
@@ -389,7 +389,7 @@ const Profile = ({ addr }) => {
 
   // Effect layer to resolve 0G Storage assets dynamically when data variations hit the state tracking
   useEffect(() => {
-    if (!data?.profileImage || !is0GHash(data.profileImage)) {
+    if (!data?.profileImage || !isIPFSHash(data.profileImage)) {
       setResolved0gUrl(null)
       return
     }
@@ -397,7 +397,7 @@ const Profile = ({ addr }) => {
     let isMounted = true
 
     const fetchStorageAsset = async () => {
-      const assetBlobUrl = await resolve0GUrl(data.profileImage)
+      const assetBlobUrl = await resolveIPFSUrl(data.profileImage)
       if (assetBlobUrl && isMounted) {
         setResolved0gUrl(assetBlobUrl)
       }
@@ -449,7 +449,7 @@ const Profile = ({ addr }) => {
   const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 4)}…${targetWallet.slice(-4)}` : targetWallet
 
   // Image source fallbacks: 0G download cache -> raw database value -> default text path string
-  const finalAvatarImageSource = is0GHash(data.profileImage)
+  const finalAvatarImageSource = isIPFSHash(data.profileImage)
     ? resolved0gUrl || '/placeholder-loading-spinner.gif'
     : data.profileImage || '/placeholder-avatar.png'
 
