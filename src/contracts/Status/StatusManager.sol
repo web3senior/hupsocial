@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity ^0.8.35;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-// NEW IMPORT: ERC2771Context for Gasless Transactions
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
 /// @title StatusManager

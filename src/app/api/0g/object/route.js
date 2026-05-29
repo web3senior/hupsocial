@@ -12,20 +12,14 @@ export async function POST(req) {
     const contentType = req.headers.get('content-type') || ''
 
     if (!contentType.includes('application/json')) {
-      return NextResponse.json(
-        { error: 'Content-Type must be application/json' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 400 })
     }
 
     // Extract JSON body
     const jsonData = await req.json()
 
     if (!jsonData || typeof jsonData !== 'object') {
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
     // Convert JSON to Buffer for the SDK
@@ -74,10 +68,7 @@ export async function POST(req) {
   } catch (error) {
     console.error('JSON upload failed:', error)
 
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
@@ -86,15 +77,11 @@ export async function GET(req) {
   const rootHash = searchParams.get('hash')
 
   if (!rootHash) {
-    return NextResponse.json(
-      { error: 'Root Hash is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Root Hash is required' }, { status: 400 })
   }
 
   try {
-    const INDEXER_RPC =
-      process.env.INDEXER_RPC || 'https://indexer-storage-testnet-turbo.0g.ai'
+    const INDEXER_RPC = process.env.INDEXER_RPC
 
     const indexer = new Indexer(INDEXER_RPC)
 
@@ -115,10 +102,7 @@ export async function GET(req) {
     try {
       data = JSON.parse(jsonString)
     } catch {
-      return NextResponse.json(
-        { error: 'Downloaded file is not valid JSON' },
-        { status: 422 }
-      )
+      return NextResponse.json({ error: 'Downloaded file is not valid JSON' }, { status: 422 })
     }
 
     return NextResponse.json(data, {
@@ -129,9 +113,6 @@ export async function GET(req) {
   } catch (error) {
     console.error('0G_JSON_DOWNLOAD_ERROR:', error)
 
-    return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

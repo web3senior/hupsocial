@@ -9,7 +9,7 @@ import commentAbi from '@/abi/post-comment.json'
  * @returns Array [chainObject, contractAddress]
  */
 export const getActiveChain = () => {
-  const DEFAULT_CHAIN_ID = 4201
+  const DEFAULT_CHAIN_ID = 42
 
   if (typeof window !== 'undefined') {
     // Client-side execution: Read from localStorage

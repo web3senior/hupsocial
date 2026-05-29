@@ -1,10 +1,10 @@
 import { Indexer, MemData } from '@0gfoundation/0g-ts-sdk'
 import { ethers } from 'ethers'
 import { NextResponse } from 'next/server'
-import sharp from "sharp"
+import sharp from 'sharp'
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function POST(req) {
   try {
@@ -64,25 +64,24 @@ export async function POST(req) {
 }
 
 function intParam(value, fallback, min, max) {
-  const parsed = Number.parseInt(value ?? "", 10)
+  const parsed = Number.parseInt(value ?? '', 10)
   if (!Number.isFinite(parsed)) return fallback
   return Math.min(Math.max(parsed, min), max)
 }
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
-  const rootHash = searchParams.get("hash")
+  const rootHash = searchParams.get('hash')
 
-  const width = intParam(searchParams.get("w"), null, 1, 4096)
-  const quality = intParam(searchParams.get("q"), 80, 1, 100)
+  const width = intParam(searchParams.get('w'), null, 1, 4096)
+  const quality = intParam(searchParams.get('q'), 80, 1, 100)
 
   if (!rootHash) {
-    return NextResponse.json({ error: "Root Hash is required" }, { status: 400 })
+    return NextResponse.json({ error: 'Root Hash is required' }, { status: 400 })
   }
 
   try {
-    const INDEXER_RPC =
-      process.env.INDEXER_RPC || "https://indexer-storage-testnet-turbo.0g.ai"
+    const INDEXER_RPC = process.env.INDEXER_RPC
 
     const indexer = new Indexer(INDEXER_RPC)
     const [blob, dlErr] = await indexer.downloadToBlob(rootHash)
@@ -120,15 +119,12 @@ export async function GET(req) {
 
     return new Response(optimizedBuffer, {
       headers: {
-        "Content-Type": "image/webp",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        'Content-Type': 'image/webp',
+        'Cache-Control': 'public, max-age=31536000, immutable',
       },
     })
   } catch (error) {
-    console.error("0G_API_ROUTE_ERROR:", error)
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 }
-    )
+    console.error('0G_API_ROUTE_ERROR:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

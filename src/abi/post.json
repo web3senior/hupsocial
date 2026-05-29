@@ -3,6 +3,24 @@
     "inputs": [
       {
         "internalType": "address",
+        "name": "_owner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "_ids",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "batchLike",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "_trustedForwarder",
         "type": "address"
       },
@@ -50,42 +68,6 @@
       }
     ],
     "name": "authorizeSession",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_owner",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256[]",
-        "name": "_ids",
-        "type": "uint256[]"
-      }
-    ],
-    "name": "batchLike",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_owner",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256[]",
-        "name": "_ids",
-        "type": "uint256[]"
-      }
-    ],
-    "name": "batchUnlike",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -168,6 +150,11 @@
   },
   {
     "inputs": [],
+    "name": "RepostMetadataNotAllowed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "SessionExpired",
     "type": "error"
   },
@@ -207,6 +194,24 @@
         "internalType": "uint256",
         "name": "parentId",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "metadata",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "allowedComments",
+        "type": "bool"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "createdAt",
+        "type": "uint256"
       }
     ],
     "name": "ContentCreated",
@@ -226,6 +231,18 @@
         "internalType": "address",
         "name": "deleter",
         "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum IHup.ContentType",
+        "name": "cType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "parentId",
+        "type": "uint256"
       }
     ],
     "name": "ContentDeleted",
@@ -301,6 +318,12 @@
         "internalType": "string",
         "name": "metadata",
         "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "allowedComments",
+        "type": "bool"
       }
     ],
     "name": "ContentUpdated",
@@ -396,6 +419,24 @@
       }
     ],
     "name": "grantRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_owner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_id",
+        "type": "uint256"
+      }
+    ],
+    "name": "like",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -623,6 +664,80 @@
       }
     ],
     "name": "setMaxMetadataBytes",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_forwarder",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "_trusted",
+        "type": "bool"
+      }
+    ],
+    "name": "setTrustedForwarder",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "forwarder",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "trusted",
+        "type": "bool"
+      }
+    ],
+    "name": "TrustedForwarderUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "UnattributedDeposit",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_owner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_id",
+        "type": "uint256"
+      }
+    ],
+    "name": "unlike",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -961,64 +1076,177 @@
         "internalType": "uint256",
         "name": "_id",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_viewer",
+        "type": "address"
       }
     ],
     "name": "getContent",
     "outputs": [
       {
-        "internalType": "uint8",
-        "name": "cType",
-        "type": "uint8"
-      },
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum IHup.ContentType",
+            "name": "cType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "metadata",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "likeCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "commentCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "repostCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isDeleted",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "isUpdated",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "allowedComments",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "hasLiked",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct IHup.ContentView",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
-        "internalType": "string",
-        "name": "metadata",
-        "type": "string"
-      },
-      {
-        "internalType": "uint256",
-        "name": "parentId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "createdAt",
-        "type": "uint256"
+        "internalType": "uint256[]",
+        "name": "_ids",
+        "type": "uint256[]"
       },
       {
         "internalType": "address",
-        "name": "creator",
+        "name": "_viewer",
         "type": "address"
-      },
+      }
+    ],
+    "name": "getContents",
+    "outputs": [
       {
-        "internalType": "uint256",
-        "name": "likeCount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "commentCount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "repostCount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isDeleted",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "isUpdated",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "allowedComments",
-        "type": "bool"
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum IHup.ContentType",
+            "name": "cType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "metadata",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "likeCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "commentCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "repostCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isDeleted",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "isUpdated",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "allowedComments",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "hasLiked",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct IHup.ContentView[]",
+        "name": "result",
+        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
@@ -1120,6 +1348,112 @@
         "internalType": "struct IHup.ContentView[]",
         "name": "",
         "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_creator",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_cursorId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_count",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_viewer",
+        "type": "address"
+      }
+    ],
+    "name": "getContentsByCreatorBefore",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum IHup.ContentType",
+            "name": "cType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "metadata",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "likeCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "commentCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "repostCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isDeleted",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "isUpdated",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "allowedComments",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "hasLiked",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct IHup.ContentView[]",
+        "name": "result",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nextCursor",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1235,6 +1569,208 @@
         "internalType": "struct IHup.ContentView[]",
         "name": "",
         "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cursorId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_count",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_viewer",
+        "type": "address"
+      }
+    ],
+    "name": "getFeedBefore",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum IHup.ContentType",
+            "name": "cType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "metadata",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "likeCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "commentCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "repostCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isDeleted",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "isUpdated",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "allowedComments",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "hasLiked",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct IHup.ContentView[]",
+        "name": "batch",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nextCursor",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_cursorId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_count",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_viewer",
+        "type": "address"
+      }
+    ],
+    "name": "getPostsFeedBefore",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum IHup.ContentType",
+            "name": "cType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "metadata",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "likeCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "commentCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "repostCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isDeleted",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "isUpdated",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "allowedComments",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "hasLiked",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct IHup.ContentView[]",
+        "name": "batch",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nextCursor",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1405,6 +1941,32 @@
   },
   {
     "inputs": [],
+    "name": "MAX_BATCH_LIKE_COUNT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_BATCH_READ_COUNT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "maxMetadataBytes",
     "outputs": [
       {
@@ -1469,6 +2031,25 @@
         "type": "address"
       }
     ],
+    "name": "trustedForwarders",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "name": "userSessions",
     "outputs": [
       {
@@ -1483,6 +2064,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   }
 ]

@@ -1,5 +1,6 @@
 import { createConfig, http, webSocket } from 'wagmi'
 import {
+  lukso,
   sepolia,
   baseSepoliaPreconf,
   celoSepolia,
@@ -22,35 +23,35 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 // }
 
 export const CONTRACTS = {
-  chain4201: {
+  chain42: {
     // LUKSO
-    forwarder: '0x4f8cEe13D83c5415c8aaC9153621B9fAD2f29403',
-    hup: '0xe8c98DEF425668f18fD3F41DDd3f43998bA032a3',
-    status: '0x6B10B966C3369332De8c976da62249F38D6898ca',
+    forwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
+    hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
+    status: '0xeCF2c230df65F50482c687040b272A808F753849',
   },
-  chain11142220: {
-    // CELO
-    forwarder: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
-    hup: '0x8634130FF8D3De06121BEF04a25B78557883fe97',
-    status: '0x13A71b258b685dFAC3bCe8b1530aAFD8daa180E1',
-  },
-  chain10143: {
-    // Monad
-    forwarder: '',
-    hup: '',
-    status: '',
-  }
+  // chain11142220: {
+  //   // CELO
+  //   forwarder: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
+  //   hup: '0x8634130FF8D3De06121BEF04a25B78557883fe97',
+  //   status: '0x13A71b258b685dFAC3bCe8b1530aAFD8daa180E1',
+  // },
+  // chain10143: {
+  //   // Monad
+  //   forwarder: '',
+  //   hup: '',
+  //   status: '',
+  // }
 }
 
 // Customize chains object
 // LUKSO
-luksoTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10950_4143)"><mask id="mask0_10950_4143" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18"><path d="M18 0H0V18H18V0Z" fill="white"/></mask><g mask="url(#mask0_10950_4143)"><path d="M0 0H18V18H0V0Z" fill="#F0F3FA"/><path d="M10.0922 3.26602L13.908 5.2667C14.58 5.62682 15 6.27704 15 6.98729V10.9986C15 11.7089 14.58 12.3691 13.908 12.7293L10.0922 14.7299C9.4202 15.09 8.58023 15.09 7.90826 14.7299L4.09237 12.7293C3.75034 12.5407 3.47094 12.2832 3.28006 11.9807C3.08917 11.6782 2.99298 11.3404 3.0004 10.9986V6.99729C3.0004 6.27704 3.42039 5.62682 4.09237 5.2667L7.90826 3.26602C8.23434 3.0923 8.61323 3 9.00022 3C9.3872 3 9.7661 3.0923 10.0922 3.26602ZM10.4521 10.6885L11.3161 9.30808C11.4361 9.10802 11.4361 8.87794 11.3161 8.68787L10.4401 7.3074C10.3875 7.21668 10.3059 7.13978 10.2042 7.0851C10.1027 7.0304 9.98506 7.00003 9.86419 6.99729H8.13624C7.89626 6.99729 7.66825 7.11733 7.56027 7.29739L6.68429 8.69787C6.56429 8.87794 6.56429 9.11801 6.68429 9.29807L7.56027 10.6985C7.68025 10.8786 7.89626 10.9986 8.13624 10.9986H9.86419C10.1042 10.9986 10.3321 10.8786 10.4401 10.6985L10.4521 10.6885Z" fill="#FE005B"/></g></g><defs><clipPath id="clip0_10950_4143"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
-luksoTestnet.faucetUrl = `https://faucet.testnet.lukso.network/`
+lukso.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10950_4143)"><mask id="mask0_10950_4143" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18"><path d="M18 0H0V18H18V0Z" fill="white"/></mask><g mask="url(#mask0_10950_4143)"><path d="M0 0H18V18H0V0Z" fill="#F0F3FA"/><path d="M10.0922 3.26602L13.908 5.2667C14.58 5.62682 15 6.27704 15 6.98729V10.9986C15 11.7089 14.58 12.3691 13.908 12.7293L10.0922 14.7299C9.4202 15.09 8.58023 15.09 7.90826 14.7299L4.09237 12.7293C3.75034 12.5407 3.47094 12.2832 3.28006 11.9807C3.08917 11.6782 2.99298 11.3404 3.0004 10.9986V6.99729C3.0004 6.27704 3.42039 5.62682 4.09237 5.2667L7.90826 3.26602C8.23434 3.0923 8.61323 3 9.00022 3C9.3872 3 9.7661 3.0923 10.0922 3.26602ZM10.4521 10.6885L11.3161 9.30808C11.4361 9.10802 11.4361 8.87794 11.3161 8.68787L10.4401 7.3074C10.3875 7.21668 10.3059 7.13978 10.2042 7.0851C10.1027 7.0304 9.98506 7.00003 9.86419 6.99729H8.13624C7.89626 6.99729 7.66825 7.11733 7.56027 7.29739L6.68429 8.69787C6.56429 8.87794 6.56429 9.11801 6.68429 9.29807L7.56027 10.6985C7.68025 10.8786 7.89626 10.9986 8.13624 10.9986H9.86419C10.1042 10.9986 10.3321 10.8786 10.4401 10.6985L10.4521 10.6885Z" fill="#FE005B"/></g></g><defs><clipPath id="clip0_10950_4143"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+lukso.faucetUrl = `https://faucet.testnet.lukso.network/`
 // luksoTestnet.rpcUrls.default.http = [
 //   `https://4201.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID}`,
 // ]
-luksoTestnet.primaryColor = `#FD1669`
-luksoTestnet.textColor = `#fff`
+lukso.primaryColor = `#FD1669`
+lukso.textColor = `#fff`
 
 // CELO
 celoSepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10733_2648)"> <path d="M0 0H18V18H0V0Z" fill="#FCFE52"/> <path d="M5 5H13V8H11.83C11.5941 7.33279 11.1299 6.77045 10.5195 6.41237C9.90911 6.05429 9.19176 5.92353 8.49427 6.0432C7.79677 6.16288 7.16404 6.52527 6.70789 7.06634C6.25175 7.60741 6.00157 8.29231 6.00157 9C6.00157 9.70769 6.25175 10.3926 6.70789 10.9337C7.16404 11.4747 7.79677 11.8371 8.49427 11.9568C9.19176 12.0765 9.90911 11.9457 10.5195 11.5876C11.1299 11.2296 11.5941 10.6672 11.83 10H13V13H5V5Z" fill="black"/> </g> <defs> <clipPath id="clip0_10733_2648"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
@@ -108,26 +109,10 @@ sepolia.textColor = `#fff`
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [
-    baseSepoliaPreconf,
-    luksoTestnet,
-    arbitrumSepolia,
-    celoSepolia,
-    monadTestnet,
-    lineaSepolia,
-    optimismSepolia,
-    unichainSepolia,
-  ], //somniaTestnet, opBNBTestnet
+  chains: [lukso], //somniaTestnet, opBNBTestnet
   connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
   transports: {
-    [luksoTestnet.id]: http(),
-    [celoSepolia.id]: http(),
-    [monadTestnet.id]: http(),
-    [lineaSepolia.id]: http(),
-    [baseSepoliaPreconf.id]: http(),
-    [optimismSepolia.id]: http(),
-    [unichainSepolia.id]: http(),
-    [arbitrumSepolia.id]: http(),
+    [lukso.id]: http(),
   },
   ssr: true,
   // storage: createStorage({
@@ -156,4 +141,4 @@ export const getNetworkColor = () => {
   return { primaryColor, secondaryColor }
 }
 
- console.log(config)
+console.log(config)
