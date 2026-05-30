@@ -23,6 +23,7 @@ import NewPost from '@/components/NewPost'
 import AISummary from '@/components/AISummary'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
+import LinksTab from '@/components/tabs/LinksTab'
 
 const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 
@@ -33,7 +34,7 @@ export default function Page() {
   const [totalPosts, setTotalPosts] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [POAPs, setPOAPs] = useState()
-  const [activeTab, setActiveTab] = useState('posts') // New state for active tab
+  const [activeTab, setActiveTab] = useState('links') // New state for active tab
   const params = useParams()
   const router = useRouter()
   const { address, isConnected } = useConnection()
@@ -251,7 +252,7 @@ export default function Page() {
 
           {activeTab === 'links' && (
             <div className={`${styles.tabContent} ${styles.links} relative`}>
-              <Links />
+              <LinksTab />
             </div>
           )}
 
@@ -539,81 +540,7 @@ const Profile = ({ addr }) => {
     </>
   )
 }
-/**
- * Profile
- * @param {String} addr
- * @returns
- */
-const Links = () => {
-  const [data, setData] = useState()
-  const [isItUp, setIsItUp] = useState()
-  const params = useParams()
 
-  useEffect(() => {
-    getUniversalProfile(params.wallet).then((res) => {
-      console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0 && res.data.Profile[0].isContract) {
-        setIsItUp(true)
-        setData({
-          wallet: res.data.Profile[0].id,
-          name: res.data.Profile[0].name,
-          description: res.data.Profile[0].description,
-          profileImage: res.data.Profile[0].profileImages.length > 0 ? res.data.Profile[0].profileImages[0].src : '',
-          profileHeader: '',
-          tags: JSON.stringify(res.data.Profile[0].tags),
-          links: JSON.stringify(res.data.Profile[0].links),
-          lastUpdate: '',
-        })
-      } else {
-        getProfile(params.wallet).then((res) => {
-          console.log(res, `==`)
-          if (res.wallet) {
-            res.profileImageName = res.profileImage
-            const profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-            res.profileImage = profileImage
-            setData(res)
-          }
-        })
-      }
-    })
-  }, [])
-
-  if (!data)
-    return (
-      <div className={`flex flex-column gap-1`}>
-        <div className={`shimmer ${styles.linkShimmer}`} />
-        <div className={`shimmer ${styles.linkShimmer}`} />
-        <div className={`shimmer ${styles.linkShimmer}`} />
-      </div>
-    )
-
-  if (JSON.parse(data.links).length < 1) return <NoData name={`links`} />
-
-  return (
-    <div className={`${styles.links}`}>
-      {JSON.parse(data.links).length > 0 &&
-        JSON.parse(data.links).map((link, i) => {
-          return (
-            <a
-              key={i}
-              href={`${!link.url.includes(`http`) ? `//${link.url}` : link.url}`}
-              target={`_blank`}
-              rel="noopener noreferrer"
-              className={`flex flex-row align-items-center justify-content-between`}
-            >
-              <div className={`flex flex-column`}>
-                <p>{link.title || link.name}</p>
-                <code>{link.url}</code>
-              </div>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4.16531 14.625L3.375 13.8347L11.9597 5.25H6.75V4.125H13.875V11.25H12.75V6.04031L4.16531 14.625Z" fill="#424242" />
-              </svg>
-            </a>
-          )
-        })}
-    </div>
-  )
-}
 
 /**
  * Status
