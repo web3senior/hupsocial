@@ -35,7 +35,8 @@ const getBurnerSigner = async (chain, password = null) => {
     } else {
       // 3. Encrypted key requires password to decrypt
       if (!password) {
-        throw new Error('PASSWORD_REQUIRED')
+       // throw new Error('PASSWORD_REQUIRED')
+       password = prompt(`Please enter your password`)
       }
       privateKey = await decryptData(storedKey, password)
       
