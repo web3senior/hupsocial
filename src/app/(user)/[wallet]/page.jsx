@@ -34,7 +34,7 @@ export default function Page() {
   const [totalPosts, setTotalPosts] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [POAPs, setPOAPs] = useState()
-  const [activeTab, setActiveTab] = useState('links') // New state for active tab
+  const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const router = useRouter()
   const { address, isConnected } = useConnection()
@@ -458,7 +458,7 @@ const Profile = ({ addr }) => {
 
   return (
     <>
-      {showProfileModal && data && <ProfileModal profile={data} setShowProfileModal={setShowProfileModal} updateProfile={updateProfile} />}
+      {showProfileModal && data && <ProfileModal getActiveChain={getActiveChain} profile={data} setShowProfileModal={setShowProfileModal} updateProfile={updateProfile} />}
 
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
         <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
@@ -761,16 +761,43 @@ const Status = ({ addr, profile, selfView }) => {
   )
 }
 
+
 /**
- * Profile Modal
- * @param {*} param0
- * @returns
+ * Profile Modal Component
+ * @param {Object} props
+ * @param {Object} props.profile - The profile data object.
+ * @param {Function} props.setShowProfileModal - State setter to control modal visibility.
+ * @param {Function} props.getActiveChain - Helper to get the current active blockchain network.
+ * @returns {JSX.Element}
  */
 const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
+  // Safe helper to parse structural lists from DB and strip away malformed or empty data structures
+  const parseSafeList = (data, isLinkList = false) => {
+    try {
+      if (!data || data === '[]') return []
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data
+      if (!Array.isArray(parsed)) return []
+
+      // Clean out corrupt or empty structural entries like [{""}] or empty keys
+      return parsed.filter((item) => {
+        if (!item) return false
+        if (isLinkList) {
+          return typeof item === 'object' && item.name && item.name.trim() !== ''
+        }
+        return typeof item === 'string' && item.trim() !== ''
+      })
+    } catch (e) {
+      // Handles completely malformed JSON syntax safely without crashing
+      console.error('Failed to parse list from database profile data:', e)
+      return []
+    }
+  }
+
+  // State
   const [error, setError] = useState(null)
   const [isPending, setIsPending] = useState(false)
-  const [tags, setTags] = useState({ list: JSON.parse(profile.tags || '[]') })
-  const [links, setLinks] = useState({ list: JSON.parse(profile.links || '[]') })
+  const [tags, setTags] = useState({ list: parseSafeList(profile?.tags, false) })
+  const [links, setLinks] = useState({ list: parseSafeList(profile?.links, true) })
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
 
@@ -780,9 +807,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
   const linkNameRef = useRef()
   const linkURLRef = useRef()
 
-  /* Error during submission (e.g., user rejected)  */
+  // Contract Hooks
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
-  /* Error after mining (e.g., transaction reverted) */
   const {
     isLoading: isConfirming,
     isSuccess: isConfirmed,
@@ -790,6 +816,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
+
+  // Handlers
   const uploadFileToIPFS = async (file) => {
     try {
       if (!file) {
@@ -801,7 +829,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
       data.set('file', file)
 
       const uploadRequest = await fetch(`/api/ipfs/file`, {
-        //`/api/ipfs/file`
         method: 'POST',
         body: data,
       })
@@ -810,8 +837,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
       console.log(`cid: ${signedUrl.cid}`)
       return signedUrl.cid
     } catch (e) {
-      console.log(e)
-      console.error('Trouble uploading file')
+      console.error('Trouble uploading file:', e)
     }
   }
 
@@ -825,13 +851,13 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     const formData = new FormData(e.target)
     const fileInput = formData.get('profileImage')
 
-    let profileImageHash = formData.get('profileImage_hidden') // Fallback to existing image name/hash
+    // Fallback to existing image name/hash
+    let profileImageHash = formData.get('profileImage_hidden')
 
     // Check if the user actually picked a new file
     if (fileInput && fileInput.size > 0) {
       try {
         toast('Uploading image ...', 'info')
-        // Call your 0G upload helper function
         const rootHash = await uploadFileToIPFS(fileInput)
 
         if (!rootHash) {
@@ -843,12 +869,12 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
         console.error('0G Storage Error:', uploadErr)
         setError('Failed to upload image to decentralized storage.')
         setIsPending(false)
-        return // Stop the profile update if the image upload fails
+        return
       }
     }
 
     // Explicitly overwrite or append the finalized values to the FormData instance
-    formData.set('profileImage', profileImageHash) // Storing the 0G rootHash string instead of the file object
+    formData.set('profileImage', profileImageHash)
     formData.set('tags', JSON.stringify(tags.list))
     formData.set('links', JSON.stringify(links.list))
 
@@ -867,34 +893,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
       setIsPending(false)
     }
   }
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault()
-  //   if (!isConnected) return
-
-  //   setIsPending(true)
-  //   setError(null)
-
-  //   const formData = new FormData(e.target)
-
-  //   // Explicitly overwrite or append the reactive state arrays as JSON strings
-  //   formData.set('tags', JSON.stringify(tags.list))
-  //   formData.set('links', JSON.stringify(links.list))
-
-  //   try {
-  //     const res = await updateProfile(formData, address)
-  //     if (res.success) {
-  //       toast(`Your profile has been updated.`, 'success')
-  //       setShowProfileModal(false)
-  //     } else {
-  //       setError(res.error || 'Failed to update profile')
-  //     }
-  //   } catch (err) {
-  //     console.error(err)
-  //     setError('An unexpected error occurred')
-  //   } finally {
-  //     setIsPending(false)
-  //   }
-  // }
 
   const showPFP = (e) => {
     const preview = pfpRef.current
@@ -902,7 +900,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     const reader = new FileReader()
 
     reader.addEventListener('load', () => {
-      // convert image file to base64 string for instant local preview
       preview.src = reader.result
     })
 
@@ -940,15 +937,15 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
   }
 
   const removeLink = (e, linkToRemove) => {
-    // FIXED: Using name matching instead of reference matching for deep objects
     setLinks({ list: links.list.filter((link) => link.name !== linkToRemove.name) })
   }
 
+  // Effects
   useEffect(() => {
     if (typeof getActiveChain === 'function') {
       setActiveChain(getActiveChain())
     }
-  }, [getActiveChain])
+  } ,[getActiveChain])
 
   return (
     <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
@@ -991,24 +988,24 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
           <form className="form" onSubmit={handleSubmit} encType="multipart/form-data">
             <div className="form-group">
               <figure className="rounded">
-                <img ref={pfpRef} src={resolveIPFSUrl(profile.profileImage) || '/placeholder-avatar.png'} alt="Profile preview" />
+                <img ref={pfpRef} src={resolveIPFSUrl(profile?.profileImage) || '/placeholder-avatar.png'} alt="Profile preview" />
               </figure>
             </div>
 
             <div className="form-group">
               <label>Profile picture</label>
               <input type="file" name="profileImage" accept="image/*" onChange={showPFP} />
-              <input type="hidden" name="profileImage_hidden" defaultValue={profile.profileImageName} />
+              <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
             </div>
 
             <div className="form-group">
               <label>Name</label>
-              <input type="text" name="name" defaultValue={profile.name} placeholder="Name" />
+              <input type="text" name="name" defaultValue={profile?.name} placeholder="Name" />
             </div>
 
             <div className="form-group">
               <label>Bio</label>
-              <textarea name="description" defaultValue={profile.description} placeholder="Profile bio"></textarea>
+              <textarea name="description" defaultValue={profile?.description} placeholder="Profile bio"></textarea>
             </div>
 
             <details open>
@@ -1069,6 +1066,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     </div>
   )
 }
+
+
 
 const CommentModal = ({ item, setShowCommentModal }) => {
   const [hasLiked, setHasLiked] = useState(false)
