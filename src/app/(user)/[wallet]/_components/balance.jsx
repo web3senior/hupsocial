@@ -8,7 +8,12 @@ export default function Balance({ addr, chainId = null }) {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
-
+console.log(
+  {
+    address: addr,
+    chainId: chainId ,
+  }
+)
   const {
     data: balanceData,
     isLoading: isBalanceLoading,

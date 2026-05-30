@@ -235,7 +235,7 @@ const handleImportSessionKey = async () => {
                     <code>{burnerAddress}</code>
                   </p>
                   <p className="m-0 mb-5">
-                    <strong>Balance:</strong> <Balance addr={burnerAddress} chainId={4201} />
+                    <strong>Balance:</strong> <Balance addr={burnerAddress} />
                   </p>
                   {expiresAt && (
                     <p className="m-0">
