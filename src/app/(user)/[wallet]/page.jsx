@@ -769,7 +769,7 @@ const Status = ({ addr, profile, selfView }) => {
             <main className={`flex flex-column align-items-center gap-1 `}>
               <div className={`${styles.statusModal__pfp} rounded relative`}>
                 <figure className={`rounded`}>
-                  <img src={`${profile.profileImage}`} />
+                  <img src={`${resolveIPFSUrl(profile.profileImage)}`} />
                 </figure>
 
                 <div
