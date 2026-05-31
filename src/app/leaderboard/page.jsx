@@ -8,7 +8,7 @@ import PageTitle from '@/components/PageTitle'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
-
+import { useProfile } from '@/hooks/useProfile'
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
 
@@ -171,8 +171,7 @@ export default function LeaderboardPage() {
                     <RankBadge rank={leader.rank} />
                     <Profile creator={leader.wallet_address} variant="imageOnly" />
                     <div className={styles.podiumIdentity}>
-                      <strong>{leader.display_name}</strong>
-                      <code>{formatWallet(leader.wallet_address)}</code>
+                      <WalletCard address={leader.wallet_address} />
                     </div>
                     <div className={styles.scoreBlock}>
                       <span>{numberFormatter.format(leader.score)}</span>
@@ -192,10 +191,7 @@ export default function LeaderboardPage() {
                   >
                     <span className={styles.rankNumber}>{leader.rank}</span>
                     <Profile creator={leader.wallet_address} variant="imageOnly" />
-                    <span className={styles.identity}>
-                      <strong>{leader.display_name}</strong>
-                      <code>{formatWallet(leader.wallet_address)}</code>
-                    </span>
+                    <WalletCard address={leader.wallet_address} />
                     <Metric icon={Flame} label="Posts" value={leader.root_posts} />
                     <Metric icon={MessageCircle} label="Comments" value={leader.comments_made} />
                     <Metric icon={Heart} label="Likes" value={leader.likes_received} />
@@ -274,4 +270,18 @@ function getRankClass(rank) {
 function formatWallet(wallet = '') {
   if (wallet.length <= 12) return wallet
   return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
+}
+
+function WalletCard({ address }) {
+  const { profile, isLoading, isError } = useProfile(address)
+
+  if (isLoading) return <div>Loading account data...</div>
+  if (isError || !profile) return <div>Error loading profile</div>
+{console.log(profile)}
+  return (
+    <div className="wallet-card">
+      <h3>{profile.name}</h3>
+      <small>{formatWallet(profile.wallet)}</small>
+    </div>
+  )
 }

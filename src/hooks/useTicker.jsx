@@ -1,9 +1,10 @@
 import useSWR from 'swr'
 
-const fetcher = (url) => fetch(url).then((res) => {
-  if (!res.ok) throw new Error('Fetch failed')
-  return res.json()
-})
+const fetcher = (url) =>
+  fetch(url).then((res) => {
+    if (!res.ok) throw new Error('Fetch failed')
+    return res.json()
+  })
 
 const STATIC_MAP = {
   ETH: { chain: 'Ethereum', address: '0x0000000000000000000000000000000000000000' },
@@ -19,10 +20,8 @@ export function useTicker(blockchain, address, symbol) {
   // Step 1: Search for metadata if address is missing
   // This allows us to support tickers not in our static list
   const { data: searchData, error: searchError } = useSWR(
-    symbol && !initialAddress 
-      ? `https://api.diadata.org/v1/search?q=${symbol}` 
-      : null,
-    fetcher
+    symbol && !initialAddress ? `https://api.diadata.org/v1/search?q=${symbol}` : null,
+    fetcher,
   )
 
   // Determine final lookup params
@@ -32,14 +31,12 @@ export function useTicker(blockchain, address, symbol) {
 
   // Step 2: Fetch actual price data using the resolved address
   const { data, error, isLoading } = useSWR(
-    finalChain && finalAddress
-      ? `https://api.diadata.org/v1/assetQuotation/${finalChain}/${finalAddress}`
-      : null,
+    finalChain && finalAddress ? `https://api.diadata.org/v1/assetQuotation/${finalChain}/${finalAddress}` : null,
     fetcher,
     {
       refreshInterval: 30000,
       dedupingInterval: 5000,
-    }
+    },
   )
 
   return {
