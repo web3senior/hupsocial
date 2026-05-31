@@ -115,10 +115,28 @@
 }
 
 .iconWrapper {
+  position: relative;
+  min-height: 24px;
   min-width: 24px;
   display: flex;
   justify-content: center;
   color: var(--black);
+
+  &[data-icon='Activity'] {
+    &:after {
+      content: '●';
+      color: var(--liked-color);
+      position: absolute;
+      top: -8px;
+      right: -1px;
+      // Use text-shadow to create a clean 1px outline around the text character
+      text-shadow: 
+        -1px -1px 0 var(--white),  
+         1px -1px 0 var(--white),
+        -1px  1px 0 var(--white),
+         1px  1px 0 var(--white);
+    }
+  }
 }
 
 .linkText {
@@ -234,11 +252,11 @@
 
 .themeWrapper {
   margin-top: 0.5rem;
-  
+
   button {
     all: unset;
     cursor: pointer;
-    padding: .25rem 0;
+    padding: 0.25rem 0;
     border-radius: var(--global-border-radius);
     background-color: var(--gray-50);
     font-size: var(--font-size-12);
@@ -251,13 +269,6 @@
     }
   }
 }
-
-
-
-
-
-
-
 
 .link,
 .iconWrapper,

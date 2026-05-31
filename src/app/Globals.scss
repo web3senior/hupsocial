@@ -10,8 +10,8 @@
   --border: var(--gray-300, #e5e7eb);
   --hover: #f3f4f6;
   --tag: var(--gray-50, #f3f4f6);
---shimmer-glint: rgba(255, 255, 255, 0.55);
---liked-color: #FF007A;
+  --shimmer-glint: rgba(255, 255, 255, 0.55);
+  --liked-color: #ff007a;
 
   accent-color: var(--network-color-text);
   color-scheme: light;
@@ -45,7 +45,7 @@
   --border: var(--green-500, #1f7a3a);
   --hover: #12301c;
   --tag: var(--black-800);
-   --shimmer-glint: rgba(163, 255, 173, 0.16);
+  --shimmer-glint: rgba(163, 255, 173, 0.16);
 
   accent-color: #a3ffad;
   color-scheme: dark;
@@ -232,7 +232,6 @@ button {
 //     opacity: 1;
 // }
 // }
-
 
 // .ms-motion-slideDownIn {
 //   animation-name: slideDownIn;

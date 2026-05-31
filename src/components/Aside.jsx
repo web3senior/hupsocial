@@ -74,7 +74,7 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
 
   const content = (
     <>
-      <div className={styles.iconWrapper}>
+      <div className={styles.iconWrapper} data-icon={item.name}>
         <Icon
           size={20}
           fill={isActive ? 'currentColor' : 'none'}
