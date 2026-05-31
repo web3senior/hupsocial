@@ -258,12 +258,6 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
               </button>
             )}
 
-            {actions.find((action) => action.toLowerCase() === 'hash') !== undefined && (
-              <a href={`${item.explorer_url}/tx/${item.tx_hash}`} target="_blank" rel="noopener noreferrer">
-                <Box strokeWidth={1.5} width={17} height={17} />
-              </a>
-            )}
-
             {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
               <button>
                 <ViewIcon />
@@ -276,6 +270,12 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
                   </span>
                 )}
               </button>
+            )}
+
+            {actions.find((action) => action.toLowerCase() === 'hash') !== undefined && (
+              <a href={`${item.explorer_url}/tx/${item.tx_hash}`} target="_blank" rel="noopener noreferrer">
+                <Box strokeWidth={1.5} width={17} height={17} />
+              </a>
             )}
 
             {actions.find((action) => action.toLowerCase() === 'share') !== undefined && (
