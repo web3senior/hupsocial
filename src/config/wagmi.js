@@ -3,7 +3,7 @@ import {
   lukso,
   celo,
   sepolia,
-  baseSepoliaPreconf,
+  base,
   celoSepolia,
   opBNBTestnet,
   arbitrumSepolia,
@@ -36,12 +36,12 @@ export const CONTRACTS = {
     hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
     status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
   },
-  // chain10143: {
-  //   // Monad
-  //   forwarder: '',
-  //   hup: '',
-  //   status: '',
-  // }
+  chain8453: {
+    // Base
+    forwarder: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
+    hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
+    status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
+  },
 }
 
 // Customize chains object
@@ -61,9 +61,9 @@ celo.primaryColor = `#fcff52`
 celo.textColor = `#333`
 
 // Base
-baseSepoliaPreconf.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_11007_5115)"><path d="M18 0H0V18H18V0Z" fill="#0052FF"/><path d="M8.94604 14.1103C11.7979 14.1103 14.1098 11.8024 14.1098 8.95553C14.1098 6.10863 11.7979 3.80078 8.94604 3.80078C6.24039 3.80078 4.02074 5.87808 3.80029 8.52223H10.6256V9.38883H3.80029C4.02074 12.0329 6.24039 14.1103 8.94604 14.1103Z" fill="white"/></g><defs><clipPath id="clip0_11007_5115"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
-baseSepoliaPreconf.primaryColor = `#0052FF`
-baseSepoliaPreconf.textColor = `#fff`
+base.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_11007_5115)"><path d="M18 0H0V18H18V0Z" fill="#0052FF"/><path d="M8.94604 14.1103C11.7979 14.1103 14.1098 11.8024 14.1098 8.95553C14.1098 6.10863 11.7979 3.80078 8.94604 3.80078C6.24039 3.80078 4.02074 5.87808 3.80029 8.52223H10.6256V9.38883H3.80029C4.02074 12.0329 6.24039 14.1103 8.94604 14.1103Z" fill="white"/></g><defs><clipPath id="clip0_11007_5115"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+base.primaryColor = `#0052FF`
+base.textColor = `#fff`
 
 // Monad
 monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" fill="white"/><path d="M8.99996 3C7.26731 3 3 7.2672 3 8.99996C3 10.7327 7.26731 15 8.99996 15C10.7326 15 15 10.7326 15 8.99996C15 7.26727 10.7327 3 8.99996 3ZM8.06498 12.431C7.33433 12.2319 5.36993 8.79563 5.56906 8.06498C5.76819 7.33429 9.20437 5.36992 9.93499 5.56905C10.6657 5.76815 12.6301 9.20434 12.431 9.93503C12.2318 10.6657 8.79563 12.6301 8.06498 12.431Z" fill="#836EF9"/></svg>`
@@ -110,11 +110,12 @@ sepolia.textColor = `#fff`
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [lukso, celo], //somniaTestnet, opBNBTestnet
+  chains: [lukso, celo, base], //somniaTestnet, opBNBTestnet
   connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
   transports: {
     [lukso.id]: http(),
     [celo.id]: http(),
+    [base.id]: http(),
   },
   ssr: true,
   // storage: createStorage({
