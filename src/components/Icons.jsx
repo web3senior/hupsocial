@@ -90,6 +90,73 @@ export const POAPIcon = () => (
   </svg>
 )
 
+export const AnimatedHeart = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="transparent">
+  <defs>
+    <linearGradient id="heartGrad" x1="0%" y1="1%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#f43f5e" />
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <clipPath id="heartClip">
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    </clipPath>
+  </defs>
+
+  <g>
+    <path
+      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+      fill="none"
+      opacity="0.6"
+      stroke="#475569"
+      stroke-width="0.7"
+    />
+
+    <g clip-path="url(#heartClip)">
+      <g>
+        <animateTransform
+          attributeName="transform"
+          type="translate"
+          from="0, 24"
+          to="0, 0"
+          dur="2.4s"
+          keyTimes="0; 1"
+          keySplines="0.42, 0, 0.58, 1"
+          calcMode="spline"
+          repeatCount="indefinite"
+        />
+
+        <rect x="0" y="0" width="24" height="24" fill="url(#heartGrad)" filter="url(#glow)" />
+
+        <path d="M 0,0 Q 6,-1.5 12,0 T 24,0 L 24,5 L 0,5 Z" fill="#fda4af">
+          <animate attributeName="d"
+            values="M 0,0 Q 6,-1.5 12,0 T 24,0 L 24,5 L 0,5 Z;
+                    M 0,0 Q 6,1.5 12,0 T 24,0 L 24,5 L 0,5 Z;
+                    M 0,0 Q 6,-1.5 12,0 T 24,0 L 24,5 L 0,5 Z"
+            dur="0.8s"
+            repeatCount="indefinite"
+          />
+        </path>
+      </g>
+    </g>
+
+    <path
+      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+      fill="none"
+      stroke="#f43f5e"
+      stroke-width="0.8"
+      opacity="0.9"
+    />
+  </g>
+</svg>
+
+)
+
 export const ThreeDotIcon = () => (
   <svg aria-label="More" role="img" viewBox="0 0 24 24" fill="#999999">
     <title>More</title>

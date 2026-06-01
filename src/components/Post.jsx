@@ -13,7 +13,7 @@ import { getActiveChain } from '@/lib/communication'
 import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, TipIcon, BlueCheckMarkIcon, ViewIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon, TipIcon, BlueCheckMarkIcon, ViewIcon, AnimatedHeart } from '@/components/Icons'
 import MediaGallery from './Gallery'
 import { Ellipsis } from 'lucide-react'
 import { Repeat2 } from 'lucide-react'
@@ -933,7 +933,9 @@ const Like = ({ item }) => {
     >
       {isLoading ? (
         // Standard loading animation replacement frame
-        <span className="spinner-icon animate-spin">⏳</span>
+        <div className={styles.animatedHeader}>
+        <AnimatedHeart/>
+        </div>
       ) : (
         <Heart
           strokeWidth={1.5}

@@ -69,18 +69,18 @@
     }
   }
 
-&__showMore {
-  margin-top: 0.25rem;
-  border: 0;
-  background: transparent;
-  color: var(--blue-500);
-  cursor: pointer;
-  font-weight: 600;
-  border: none;
-  background: transparent;
-  height: 40px;
-  padding-right: 1rem;
-}
+  &__showMore {
+    margin-top: 0.25rem;
+    border: 0;
+    background: transparent;
+    color: var(--blue-500);
+    cursor: pointer;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    height: 40px;
+    padding-right: 1rem;
+  }
 
   &__main {
     position: relative;
@@ -514,6 +514,13 @@
     }
     &:not(:first-child) {
     }
+  }
+}
+
+.animatedHeader {
+  svg {
+    width: 19px;
+    height: 19px;
   }
 }
 
