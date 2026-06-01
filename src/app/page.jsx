@@ -125,7 +125,7 @@ export default function Page() {
 
   return (
     <>
-      <PageTitle name={`Onchain Feed`} />
+      <PageTitle name={`Onchain`} />
       <div className={`__container`} data-width={`medium`}>
 
         {/* <Suspense fallback={<div>Loading Tab Content...</div>}>

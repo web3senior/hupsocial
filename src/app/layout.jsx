@@ -19,7 +19,7 @@ export const metadata = {
 
   // Title (SEO best practice for better click-through)
   title: {
-    template: ` %s | ${process.env.NEXT_PUBLIC_NAME}`,
+    template: `${process.env.NEXT_PUBLIC_TITLE || process.env.NEXT_PUBLIC_NAME} | %s`, // Use ENV var, fallback to name if title is not set
     default: process.env.NEXT_PUBLIC_NAME,
   },
 
