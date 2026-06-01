@@ -28,6 +28,7 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.4.2",
     "embla-carousel-react": "^8.6.0",
+    "ethereum-blockies-base64": "^1.0.2",
     "ethers": "^6.16.0",
     "jdenticon": "^3.3.0",
     "lucide-react": "^1.14.0",
