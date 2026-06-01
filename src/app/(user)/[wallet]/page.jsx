@@ -24,7 +24,7 @@ import AISummary from '@/components/AISummary'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 import LinksTab from '@/components/tabs/LinksTab'
-import UniversalIdentity from '@/components/UI/UniversalIdentity/UniversalIdentity'
+import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 
 const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 

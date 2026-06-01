@@ -32,7 +32,7 @@ import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import NativePopover from './UI/NativePopover'
+import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
 
 const NAV_COMPONENTS = {
