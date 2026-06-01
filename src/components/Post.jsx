@@ -804,120 +804,143 @@ const ShareModal = ({ item, setShowShareModal }) => {
  * Like Interaction Component
  * @param {Object} props
  * @param {Object} props.item Core content model with network metadata and like metrics.
+ * @param {Function} [props.onUpdate] Optional parent update callback to sync list states.
  */
-const Like = ({ item }) => {
-  // Local state to handle async executions cleanly
-  const [isProcessing, setIsProcessing] = useState(false)
+const Like = ({ item, onUpdate }) => {
+  // Local state initialized straight from the source prop
+  const [isLiked, setIsLiked] = useState(item.is_liked === 1 || item.is_liked === true);
+  const [likeCount, setLikeCount] = useState(Number(item.total_likes) || 0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const isMounted = useClientMounted()
-  const activeChain = getActiveChain()
-  const { address, isConnected } = useConnection()
+  const isMounted = useClientMounted();
+  const activeChain = getActiveChain();
+  const { address, isConnected } = useConnection();
 
   // Wagmi hooks for primary wallet transactions
-  const { data: hash, isPending: isWalletPending, writeContractAsync } = useWriteContract()
+  const { data: hash, isPending: isWalletPending, writeContractAsync } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
-  })
+  });
 
-  const publicClient = usePublicClient()
+  const publicClient = usePublicClient();
 
-  // Track primary wallet transaction completion status
+  // Watch for primary wallet transaction confirmations
   useEffect(() => {
     if (isConfirmed) {
-      setIsProcessing(false)
-      toast('Interaction saved on-chain!', 'success')
+      setIsProcessing(false);
+      setIsLiked(true);
+      setLikeCount((prev) => prev + 1);
+      
+      // Notify parent component or state managers if callback provided
+      if (typeof onUpdate === 'function') {
+        onUpdate(item.id, { is_liked: 1, total_likes: likeCount + 1 });
+      }
+      toast('Interaction saved on-chain!', 'success');
     }
-  }, [isConfirmed])
+  }, [isConfirmed]);
 
   const likePost = async (e, id) => {
-    e.stopPropagation()
+    e.stopPropagation();
 
     if (!isConnected || !address) {
-      toast('Please connect your wallet first', 'error')
-      return
+      toast('Please connect your wallet first', 'error');
+      return;
     }
 
-    const targetChain = CONTRACTS[`chain${item.network_id}`]
+    const targetChain = CONTRACTS[`chain${item.network_id}`];
     if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error')
-      return
+      toast('Contract configuration missing for network', 'error');
+      return;
     }
 
     try {
-      setIsProcessing(true)
+      setIsProcessing(true);
 
       const session = await isSessionActive({
         userAddress: address,
         publicClient,
-      })
+      });
 
       if (session.active) {
-        // Burner session pipeline (Immediate transaction submission)
+        // Burner session pipeline (Immediate execution)
         await writeWithBurnerSession({
           chain: activeChain[0],
           contractAddress: targetChain.hup,
           abi,
           functionName: 'batchLike',
           args: [address, [id]],
-        })
+        });
 
-        toast('Liked via active session key!', 'success')
-        setIsProcessing(false)
-        return
+        // Optimistic / Immediate UI adjustment for burner sessions
+        setIsLiked(true);
+        setLikeCount((prev) => prev + 1);
+        if (typeof onUpdate === 'function') {
+          onUpdate(id, { is_liked: 1, total_likes: likeCount + 1 });
+        }
+
+        toast('Liked via active session key!', 'success');
+        setIsProcessing(false);
+        return;
       }
 
-      // Primary wallet fallback pipeline using the async variant for cleaner catching
+      // Primary wallet fallback pipeline
       await writeContractAsync({
         abi,
         address: targetChain.hup,
         functionName: 'batchLike',
         args: [address, [id]],
-      })
+      });
 
-      toast('Confirming block execution...', 'success')
+      toast('Confirming block execution...', 'success');
     } catch (err) {
-      console.error('Like failed:', err)
-      toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      setIsProcessing(false)
+      console.error('Like failed:', err);
+      toast(err.message || 'Transaction rejected or encountered an error.', 'error');
+      setIsProcessing(false);
     }
-  }
+  };
 
   const unlikePost = async (e, id) => {
-    e.stopPropagation()
+    e.stopPropagation();
 
     if (!isConnected) {
-      toast('Please connect your wallet first', 'error')
-      return
+      toast('Please connect your wallet first', 'error');
+      return;
     }
 
-    const targetChain = CONTRACTS[`chain${item.network_id}`]
+    const targetChain = CONTRACTS[`chain${item.network_id}`];
     if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error')
-      return
+      toast('Contract configuration missing for network', 'error');
+      return;
     }
 
     try {
-      setIsProcessing(true)
+      setIsProcessing(true);
 
       await writeContractAsync({
         abi,
         address: targetChain.hup,
         functionName: 'unlikePost',
         args: [id],
-      })
+      });
 
-      toast('Removing like on-chain...', 'success')
+      // For primary wallet unlikes, you can either optimistically remove it here
+      // or set up an effect watching a separate un-liking transaction receipt.
+      setIsLiked(false);
+      setLikeCount((prev) => Math.max(0, prev - 1));
+      setIsProcessing(false);
+
+      toast('Removing like on-chain...', 'success');
     } catch (err) {
-      console.error('Unlike failed:', err)
-      toast(err.message || 'Failed to remove transaction.', 'error')
-      setIsProcessing(false)
+      console.error('Unlike failed:', err);
+      toast(err.message || 'Failed to remove transaction.', 'error');
+      setIsProcessing(false);
     }
-  }
+  };
 
   // Determine aggregate loading footprint
-  const isLoading = isProcessing || isWalletPending || isConfirming
+  const isLoading = isProcessing || isWalletPending || isConfirming;
 
-  if (!isMounted) return null
+  if (!isMounted) return null;
 
   return (
     <button
@@ -925,31 +948,31 @@ const Like = ({ item }) => {
       className={`like-button ${isLoading ? 'processing' : ''}`}
       onClick={(e) => {
         if (isConnected) {
-          item.is_liked === 1 ? unlikePost(e, item.id) : likePost(e, item.id)
+          isLiked ? unlikePost(e, item.id) : likePost(e, item.id);
         } else {
-          toast('Please connect wallet', 'error')
+          toast('Please connect wallet', 'error');
         }
       }}
     >
       {isLoading ? (
-        // Standard loading animation replacement frame
         <div className={styles.animatedHeader}>
-        <AnimatedHeart/>
+          <AnimatedHeart />
         </div>
       ) : (
         <Heart
           strokeWidth={1.5}
           width={18}
           height={18}
-          color={item.is_liked ? 'var(--liked-color)' : 'currentColor'}
-          fill={item.is_liked ? 'var(--liked-color)' : 'none'}
+          color={isLiked ? 'var(--liked-color)' : 'currentColor'}
+          fill={isLiked ? 'var(--liked-color)' : 'none'}
         />
       )}
 
-      {item.total_likes > 0 && !isLoading && <span>{item.total_likes}</span>}
+      {likeCount > 0 && !isLoading && <span>{likeCount}</span>}
     </button>
-  )
-}
+  );
+};
+
 function Repost({ item }) {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
