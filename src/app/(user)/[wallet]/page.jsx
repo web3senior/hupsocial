@@ -24,6 +24,7 @@ import AISummary from '@/components/AISummary'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 import LinksTab from '@/components/tabs/LinksTab'
+import UniversalIdentity from '@/components/UI/UniversalIdentity/UniversalIdentity'
 
 const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 
@@ -458,7 +459,14 @@ const Profile = ({ addr }) => {
 
   return (
     <>
-      {showProfileModal && data && <ProfileModal getActiveChain={getActiveChain} profile={data} setShowProfileModal={setShowProfileModal} updateProfile={updateProfile} />}
+      {showProfileModal && data && (
+        <ProfileModal
+          getActiveChain={getActiveChain}
+          profile={data}
+          setShowProfileModal={setShowProfileModal}
+          updateProfile={updateProfile}
+        />
+      )}
 
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
         <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
@@ -482,13 +490,13 @@ const Profile = ({ addr }) => {
           </div>
 
           <div className={`${styles.profile__pfp} rounded relative`}>
-            <figure>
-              <img
-                alt="PFP"
-                src={finalAvatarImageSource}
-                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
-              />
-            </figure>
+            <UniversalIdentity
+              displayName={data.name}
+              profileImageUrl={finalAvatarImageSource}
+              smartContractAddress={addr}
+              profile={data}
+              selfView={selfView}
+            />
 
             <Status addr={addr} profile={data} selfView={selfView} />
           </div>
@@ -540,7 +548,6 @@ const Profile = ({ addr }) => {
     </>
   )
 }
-
 
 /**
  * Status
@@ -761,7 +768,6 @@ const Status = ({ addr, profile, selfView }) => {
   )
 }
 
-
 /**
  * Profile Modal Component
  * @param {Object} props
@@ -945,7 +951,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     if (typeof getActiveChain === 'function') {
       setActiveChain(getActiveChain())
     }
-  } ,[getActiveChain])
+  }, [getActiveChain])
 
   return (
     <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
@@ -1066,8 +1072,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
     </div>
   )
 }
-
-
 
 const CommentModal = ({ item, setShowCommentModal }) => {
   const [hasLiked, setHasLiked] = useState(false)

@@ -9,7 +9,7 @@ import { useConnection, useDisconnect, useConnect, useChains, useSwitchChain } f
 import { getActiveChain } from '@/lib/communication'
 import { ensureProfile, getProfile, getUniversalProfile } from '@/lib/api'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
-import Shimmer from '@/components/ui/Shimmer'
+import Shimmer from '@/components/UI/Shimmer'
 import styles from './ConnectWallet.module.scss'
 
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`

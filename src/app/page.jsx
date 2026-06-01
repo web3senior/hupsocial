@@ -11,7 +11,7 @@ import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import { usePostStore } from '@/stores/usePostStore'
-import NativePopover from '@/components/ui/NativePopover'
+import NativePopover from '@/components/UI/NativePopover'
 
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const EventsTab = lazy(() => import('@/components/tabs/SettingsTab'))
