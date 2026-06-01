@@ -119,7 +119,7 @@ export default function AISummary({ addr, posts, poaps }) {
             </figure>
             <h4 className={styles.title}>AI Profile Insights</h4>
             <p className={`text-center ${styles.subtitle}`}>
-              AI analysis of on-chain activity and bio. Tap analyze to reveal this user's Web3
+              AI analysis of onchain activity and bio. Tap analyze to reveal this user's Web3
               personality.
             </p>
           </header>
