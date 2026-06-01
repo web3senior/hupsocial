@@ -12,6 +12,7 @@ const DEFAULT_USERNAME = 'new-user'
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
 export default function AISummary({ addr, posts, poaps }) {
+  console.log((posts))
   // Initialize state hooks for managing component UI data
   const [profileData, setProfileData] = useState(null)
   const [data, setData] = useState(null)
@@ -67,18 +68,6 @@ export default function AISummary({ addr, posts, poaps }) {
       // Resolve content hashes from storage asynchronously
       const resolvedPosts = await Promise.all(
         postsList.map(async (post) => {
-          if (post.metadata) {
-            try {
-              const ipfsContent = await getIPFS(post.metadata)
-
-              // Handle instances where IPFS yields string variants vs object keys
-              return typeof ipfsContent === 'object'
-                ? ipfsContent?.elements?.[0]?.data?.text
-                : JSON.stringify(ipfsContent)
-            } catch (e) {
-              return post.content
-            }
-          }
           return post.content
         }),
       )
