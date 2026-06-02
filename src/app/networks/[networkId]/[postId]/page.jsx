@@ -7,7 +7,7 @@ import styles from './page.module.scss'
 // Generate dynamic metadata for SEO optimization
 export async function generateMetadata({ params }, parent) {
   const parentMetadata = await parent
-  console.log('Generating metadata for post with params:', parentMetadata)
+  // console.log('Generating metadata for post with params:', parentMetadata)
 
   // optionally access and extend (rather than replace) parent metadata
   const previousImages = (await parent).openGraph?.images || []
@@ -45,7 +45,7 @@ export async function generateMetadata({ params }, parent) {
         images: images.length > 0 ? images : parentMetadata.openGraph?.images || [],
       },
     }
-    console.log('Generated metadata for post:', metadata)
+    // console.log('Generated metadata for post:', metadata)
     return metadata
   } catch (error) {
     // Return fallback metadata if the initial fetch fails

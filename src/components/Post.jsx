@@ -823,7 +823,6 @@ const ShareModal = ({ item, setShowShareModal }) => {
  * @param {Function} [props.onUpdate] Optional parent update callback to sync list states.
  */
 const Like = ({ item, onUpdate }) => {
-  console.log({ item })
   // Local state initialized straight from the source prop
   const [isLiked, setIsLiked] = useState(item.is_liked === 1 || item.is_liked === true)
   const [likeCount, setLikeCount] = useState(Number(item.total_likes) || 0)
@@ -991,7 +990,6 @@ const Like = ({ item, onUpdate }) => {
 }
 
 function Repost({ item }) {
-  console.log({ item })
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const [isReposted, setIsReposted] = useState(false)
