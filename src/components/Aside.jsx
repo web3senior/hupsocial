@@ -75,11 +75,7 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
   const content = (
     <>
       <div className={styles.iconWrapper} data-icon={item.name}>
-        <Icon
-          size={20}
-          fill={isActive ? 'currentColor' : 'none'}
-          strokeWidth={isActive ? 2 : 1.5}
-        />
+        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.5} />
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
     </>
@@ -101,12 +97,7 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
           {content}
         </button>
 
-        {isComponentOpen && (
-          <Component
-            item={item}
-            onClose={() => setIsComponentOpen(false)}
-          />
-        )}
+        {isComponentOpen && <Component item={item} onClose={() => setIsComponentOpen(false)} />}
       </>
     )
   }
@@ -246,7 +237,7 @@ export default function Aside() {
                 {!isCompact && <span className={styles.linkText}>More</span>}
               </button>
             }
-            placement="top-end"//top-end
+            placement="top-end" //top-end
             type="auto"
           >
             {({ close }) => (

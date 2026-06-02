@@ -8,7 +8,6 @@ figure.profile {
   cursor: pointer;
   width: fit-content;
 
-
   figcaption {
     height: 100%;
 
@@ -24,7 +23,6 @@ figure.profile {
     border: 1px solid var(--gray-200);
     background: var(--gray-100);
     aspect-ratio: 1/1;
-    border-radius: 14px;
   }
 
   code {
@@ -66,8 +64,17 @@ figure.profile {
 
 .imageWrapper {
   border-radius: 4px;
-  overflow: hidden;
+
   display: flex;
+  position: relative;
+
+  &__fingerprint {
+    border: 2px solid var(--white);
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    border-radius: 999px;
+  }
 }
 
 .nameRow {

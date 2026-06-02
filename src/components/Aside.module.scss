@@ -120,6 +120,7 @@
   min-width: 24px;
   display: flex;
   justify-content: center;
+  align-items: center;
   color: var(--black);
 
   &[data-icon='Activity'] {
@@ -127,13 +128,13 @@
       content: '●';
       color: var(--liked-color);
       position: absolute;
-      top: -8px;
-      right: -1px;
-      text-shadow: 
-        -1px -1px 0 var(--white),  
-         1px -1px 0 var(--white),
-        -1px  1px 0 var(--white),
-         1px  1px 0 var(--white);
+      top: -6px;
+      right: -0.5px;
+      text-shadow:
+        -1px -1px 0 var(--white),
+        1px -1px 0 var(--white),
+        -1px 1px 0 var(--white),
+        1px 1px 0 var(--white);
     }
   }
 }
@@ -143,6 +144,7 @@
   white-space: nowrap;
   opacity: 1;
   transition: opacity 0.2s;
+  line-height: 1;
 }
 
 .linkActive {

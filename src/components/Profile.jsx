@@ -8,11 +8,13 @@ import { toRelativeTime } from '@/lib/dateHelper'
 import { config } from '@/config/wagmi'
 import { isIPFSHash, resolveIPFSUrl } from '@/lib/storageHelper'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
+import { Identicon } from './ui/UniversalIdentity/Identicon'
+import clsx from 'clsx'
 import styles from './Profile.module.scss'
 
 export default function Profile({ creator, createdAt, networkId, variant = 'full' }) {
   const router = useRouter()
-  
+
   // Utilize the shared hook here
   const { profile, isLoading } = useProfile(creator)
 
@@ -53,7 +55,14 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       }}
     >
       <div className={styles.imageWrapper}>
-        <img alt={profile.name} src={finalImageSrc} width={36} height={36} className="" />
+        <img alt={profile.name} src={finalImageSrc} width={36} height={36} className={'rounded-full'} />
+        <Identicon
+          name={profile.name}
+          profileImage={finalImageSrc}
+          address={creator}
+          size={20}
+          className={clsx(styles.imageWrapper__fingerprint, 'rounded-full')}
+        />
       </div>
 
       {variant !== 'imageOnly' && (

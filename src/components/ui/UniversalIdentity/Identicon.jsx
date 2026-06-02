@@ -36,9 +36,7 @@ export const Identicon = ({ address, name = '', profileImage = '', size = 16, cl
     //   style={{ width: size, height: size }}
     //   title={name ? `${name} (${address})` : address}
     // />
-    <>
     <img src={makeBlockie(`${address.toLowerCase()}_${name.trim()}_${profileImage.trim()}`)} 
     alt={name} className={clsx(styles['identicon-container'], className)} style={{ width: size, height: size }} />
-    </>
   )
 }
