@@ -3,6 +3,7 @@ import PageTitle from '@/components/PageTitle'
 import PostDetails from './_components/PostDetails'
 import { notFound } from 'next/navigation'
 import styles from './page.module.scss'
+import { resolveIPFSUrl } from '@/lib/storageHelper'
 
 // Generate dynamic metadata for SEO optimization
 export async function generateMetadata({ params }, parent) {
@@ -25,7 +26,7 @@ export async function generateMetadata({ params }, parent) {
         console.log(`Processing media item for metadata:`, mediaItem)
         if (mediaItem.type === 'image') {
           images.push({
-            url: mediaItem.cid.startsWith('http') ? mediaItem.cid : `${process.env.NEXT_PUBLIC_GATEWAY_URL}${mediaItem.cid}`,
+            url: mediaItem.cid.startsWith('http') ? mediaItem.cid : `${resolveIPFSUrl(mediaItem.cid)}`,
             width: mediaItem.width || 1200, // Default width if not provided
             height: mediaItem.height || 630, // Default height if not provided
             alt: mediaItem.alt || 'Post Image',
