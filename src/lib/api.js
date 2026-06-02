@@ -60,7 +60,7 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
 export const getPostById = async (networkId, postId, viewerAddress = null) => {
   // Determine the base URL based on the environment
   const isServer = typeof window === 'undefined'
-  const baseUrl = isServer ? process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' : ''
+  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' : ''
 
   const path = viewerAddress
     ? `/api/v1/networks/${networkId}/${postId}?viewer_address=${viewerAddress}`
