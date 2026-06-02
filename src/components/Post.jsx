@@ -541,6 +541,9 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
         functionName: 'create',
         args: [address, 1, metadata, item.id, true], //formData.get(`allowComments`) === 'true' ? true : false
       })
+      setShowCommentModal(false)
+      setCommentContent('')
+      toast('Your post will appear once the transaction is confirmed.', 'success')
     } catch (err) {
       console.error('Trouble posting comment:', err)
     } finally {
@@ -989,7 +992,7 @@ const Like = ({ item, onUpdate }) => {
   )
 }
 
-function Repost({ item }) {
+const Repost = ({ item }) => {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const [isReposted, setIsReposted] = useState(false)
@@ -1074,7 +1077,7 @@ function Repost({ item }) {
   )
 }
 
-function Quote({ item }) {
+const Quote = ({ item }) => {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const [isReposted, setIsReposted] = useState(false)
@@ -1158,6 +1161,7 @@ function Quote({ item }) {
     </button>
   )
 }
+
 const Poll = ({ polls }) => {
   return (
     <>
@@ -1348,86 +1352,5 @@ const Options = ({ item }) => {
         <PollTimer startTime={item.startTime} endTime={item.endTime} pollId={item.pollId} />
       </p>
     </>
-  )
-}
-
-/**
- * Profile
- * @param {String} addr
- * @returns
- */
-const ConnectedProfile = ({ addr }) => {
-  const [profile, setProfile] = useState()
-  const activeChain = getActiveChain()
-  const defaultUsername = `hup-user`
-  const [isItUp, setIsItUp] = useState()
-  useEffect(() => {
-    getUniversalProfile(addr).then((res) => {
-      // console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setIsItUp(true)
-        setProfile({
-          wallet: res.data.id,
-          name: res.data.Profile[0].name,
-          description: res.data.description,
-          profileImage:
-            res.data.Profile[0].profileImages.length > 0
-              ? res.data.Profile[0].profileImages[0].src
-              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
-          profileHeader: '',
-          tags: JSON.stringify(res.data.tags),
-          links: JSON.stringify(res.data.links_),
-          lastUpdate: '',
-        })
-      } else {
-        getProfile(addr).then((res) => {
-          //  console.log(res)
-          if (res.wallet) {
-            const profileImage =
-              res.profileImage !== ''
-                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
-            res.profileImage = profileImage
-            setProfile(res)
-          }
-        })
-      }
-    })
-  }, [])
-
-  if (!profile)
-    return (
-      <div className={`${styles.profileShimmer} flex align-items-center gap-050`}>
-        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
-        <div className={`flex flex-column justify-content-between gap-025`}>
-          <span className={`shimmer rounded`} style={{ width: `60px`, height: `10px` }} />
-          <span className={`shimmer rounded`} style={{ width: `40px`, height: `10px` }} />
-        </div>
-      </div>
-    )
-
-  return (
-    <figure
-      className={`${styles.profile} flex align-items-center`}
-      onClick={(e) => {
-        e.stopPropagation()
-        router.push(`/u/${addr}`)
-      }}
-    >
-      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
-
-      <figcaption className={`flex flex-column`}>
-        <div className={`flex align-items-center gap-025`}>
-          <b>{profile.name ?? defaultUsername}</b>
-          <BlueCheckMarkIcon />
-          <div
-            className={`${styles.badge}`}
-            title={activeChain && activeChain[0].name}
-            dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}
-          ></div>
-        </div>
-        <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
-      </figcaption>
-    </figure>
   )
 }

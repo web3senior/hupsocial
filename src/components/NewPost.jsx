@@ -461,7 +461,7 @@ export default function NewPost({
 
     localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, '')
     setPostContent(createPostContent(''))
-    toast('Post sent.', 'success')
+    toast('Your post will appear once the transaction is confirmed.', 'success')
     handleClose()
   }, [isConfirmed])
 
