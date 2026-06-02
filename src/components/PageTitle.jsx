@@ -7,10 +7,10 @@ import styles from './PageTitle.module.scss'
  * PageTitle Component
  * Sets the document title and renders a sticky header.
  */
-const PageTitle = ({ name = '' }) => {
+const PageTitle = ({ name = '', changeDocumentTitle = true }) => {
   useEffect(() => {
     // Avoid running logic if name is empty
-    if (!name) return
+    if (!name || !changeDocumentTitle) return
 
     const siteName = process.env.NEXT_PUBLIC_NAME
     document.title = `${siteName} | ${name}`
@@ -19,7 +19,7 @@ const PageTitle = ({ name = '' }) => {
     return () => {
       document.title = siteName
     }
-  }, [name])
+  }, [name, changeDocumentTitle])
 
   // Early return pattern: keeps the main return block clean
   if (!name) return null

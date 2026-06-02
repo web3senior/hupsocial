@@ -1,273 +1,87 @@
-'use client'
-
-import { useState, useEffect, useId, useRef, useCallback } from 'react'
-import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
-import { useWaitForTransactionReceipt, useConnection, useWriteContract, useReadContract } from 'wagmi'
-import { initHupContract, getCommentsByPostId, getActiveChain } from '@/lib/communication'
-import { getPostById, getProfile, getUniversalProfile, recordPostView } from '@/lib/api'
-import { useClientMounted } from '@/hooks/useClientMount'
-import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, BlueCheckMarkIcon, RepostIcon } from '@/components/Icons'
-import Post from '@/components/Post'
+import { getPostById } from '@/lib/api'
 import PageTitle from '@/components/PageTitle'
-import GlobalLoader, { ContentSpinner } from '@/components/Loading'
-import Comments from '@/components/Comments'
+import PostDetails from './_components/PostDetails'
+import { notFound } from 'next/navigation'
 import styles from './page.module.scss'
 
-// export async function generateMetadata({ params, searchParams }, parent) {
-//   const slug = (await params).slug
+// Generate dynamic metadata for SEO optimization
+export async function generateMetadata({ params }, parent) {
+  const parentMetadata = await parent
+  console.log('Generating metadata for post with params:', parentMetadata)
 
-//   // fetch post information
-//   const post = await fetch(`https://api.vercel.app/blog/${slug}`).then((res) =>
-//     res.json()
-//   )
+  // optionally access and extend (rather than replace) parent metadata
+  const previousImages = (await parent).openGraph?.images || []
 
-//   return {
-//     title: post.title,
-//     description: post.description,
-//   }
-// }
+  const { networkId, postId } = await params
 
-export default function Page() {
-  const [post, setPost] = useState()
-  const [comments, setComments] = useState({ list: [] })
-  const [commentsLoaded, setcommentsLoaded] = useState(0)
-  const [viewCount, setViewCount] = useState(0)
-  const [commentCount, setCommentCount] = useState(0)
-  const [isLoadedComment, setIsLoadedPoll] = useState(false)
-  const [showCommentModal, setShowCommentModal] = useState()
-  const { web3, contract } = initHupContract()
-  const giftModal = useRef()
-  const mounted = useClientMounted()
-  const [chains, setChains] = useState()
-  const params = useParams()
-  const activeChain = getActiveChain()
-  const { address, isConnected } = useConnection()
-  const router = useRouter()
-  const { data: hash, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  })
+  try {
+    const post = await getPostById(networkId, postId, null)
+    const item = post?.data
 
-  const loadMoreComment = async (totalCount) => {
-    if (isLoadedComment || commentsLoaded >= totalCount) return
+    let images = []
 
-    setIsLoadedPoll(true)
+    if (item?.content?.elements?.[1]?.type === 'media' && item?.content?.elements?.[1]?.data?.items.length > 0) {
+      item.content.elements[1].data.items.forEach((mediaItem) => {
+        if (mediaItem.type === 'image') {
+          images.push({
+            url: mediaItem.data.cid.startsWith('http') ? mediaItem.data.cid : `${process.env.NEXT_PUBLIC_GATEWAY_URL}${mediaItem.data.cid}`,
+            width: mediaItem.data.width || 1200, // Default width if not provided
+            height: mediaItem.data.height || 630, // Default height if not provided
+            alt: mediaItem.data.alt || 'Post Image',
+          })
+        }
+      })
+    }
 
-    try {
-      const PAGE_SIZE = 40
-      const remaining = totalCount - commentsLoaded
-      const countToFetch = Math.min(PAGE_SIZE, remaining)
-      const startIndex = Math.max(0, totalCount - commentsLoaded - countToFetch)
+    images.push(...previousImages)
 
-      console.log(`Fetching from index ${startIndex}, count: ${countToFetch}`)
-
-      const newComments = await getCommentsByPostId(params.postId, startIndex, countToFetch, address)
-
-      if (Array.isArray(newComments) && newComments.length > 0) {
-        // Assuming you want the newest comments at the top or bottom?
-        // Reverse if the contract returns them in descending index order.
-        setComments((prev) => ({
-          list: [...prev.list, ...newComments],
-        }))
-        setcommentsLoaded((prev) => prev + newComments.length)
-      }
-    } catch (error) {
-      console.error('Error loading more comments:', error)
-    } finally {
-      setIsLoadedPoll(false)
+    const metadata = {
+      title: post?.data?.content?.elements?.[0]?.data?.text.slice(0, 60) || 'Post Details',
+      description:
+        post?.data?.content?.elements?.[0]?.data?.text.slice(0, 160) ||
+        parentMetadata.description ||
+        'View the details of this post on our platform.',
+      openGraph: {
+        images: images.length > 0 ? images : parentMetadata.openGraph?.images || [],
+      },
+    }
+    console.log('Generated metadata for post:', metadata)
+    return metadata
+  } catch (error) {
+    // Return fallback metadata if the initial fetch fails
+    return {
+      title: 'Post Not Found',
+      description: parentMetadata.description || 'The requested post was not found.',
     }
   }
+}
 
-  // Effect 1: Basic Post Data & Analytics
-  useEffect(() => {
-    // localStorage.setItem(
-    //   `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`,
-    //   params.networkId,
-    // )
-    // setChains(config.chains)
+export default async function Page({ params, searchParams }) {
+  // Resolve params and searchParams in parallel to avoid waterfalls
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
 
-    recordPostView(params.networkId, params.postId, address)
+  const { networkId, postId } = resolvedParams
+  const advancedView = resolvedSearchParams?.advancedView === 'true'
 
-    getPostById(params.networkId, params.postId, address).then((res) => {
-      if (res) {
-        setPost(res.data)
-      }
-    })
-    // getPostByIndex(params.postId, address).then((res) => {
-    //   if (res) {
-    //     res.postId = params.postId
-    //     setPost(res)
-    //   }
-    // })
-  }, [params.postId, params.networkId, address]) // Re-run if post or user changes
+  // Fetch target post data directly on the server
+  let post = null
+  try {
+    post = await getPostById(networkId, postId, null)
+  } catch (error) {
+    console.error(`Failed to fetch post ${postId}:`, error)
+  }
 
-  // Effect 2: Initial Comments Load
-  useEffect(() => {
-    //   const initComments = async () => {
-    //     try {
-    //       const count = await getPostCommentCount(params.postId)
-    //       const total = web3.utils.toNumber(count)
-    //       setCommentCount(total)
-    //       // Only auto-load if nothing has been loaded yet
-    //       if (commentsLoaded === 0 && !isLoadedComment && total > 0) {
-    //         await loadMoreComment(total)
-    //       }
-    //     } catch (err) {
-    //       console.error('Failed to initialize comments', err)
-    //     }
-    //   }
-    //  initComments()
-  }, [params.postId, showCommentModal]) // Trigger when modal opens or post changes
+  // Trigger Next.js native 404 page if the post explicitly doesn't exist
+  if (!post || !post.data) {
+    notFound()
+  }
 
   return (
     <>
-      <PageTitle name={`post`} />
+      <PageTitle name={`Post`} changeDocumentTitle={false} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        {/* {showCommentModal && (
-          <CommentModal
-            item={showCommentModal.data}
-            parentId={showCommentModal.parentId}
-            type={showCommentModal.type}
-            setShowCommentModal={setShowCommentModal}
-          />
-        )} */}
-
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-          {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
-          <div className={`${styles.grid} flex flex-column`}>
-            {post && (
-              <article className={`${styles.post} animate fade`}>
-                <Post item={post} showContent={true} chainId={params.networkId} actions={[`like`, `comment`, `repost`, `view`, `share`]} />
-                <hr />
-              </article>
-            )}
-          </div>
-
-          {post && (
-            <Comments networkId={params.networkId} postId={post.is_repost > 0 ? post.is_repost : params.postId} viewerAddress={address} />
-          )}
-
-          {/* {comments &&
-            comments.list.length > 0 &&
-            comments.list.map((item, i) => {
-              return (
-                <section
-                  key={i}
-                  className={`${styles.post} animate fade`}
-                  onClick={() => router.push(`/${activeChain[0].id}/comment/${item.commentId}`)}
-                >
-                  <Comment
-                    item={item}
-                    showContent={true}
-                    chainId={params.networkId}
-                    actions={[`like`, `comment`, `repost`, `share`]}
-                  />
-                  <hr />
-                </section>
-              )
-            })} */}
-
-          {mounted && isConnected &&  false&& (
-            <div
-              className={`${styles.reply} flex align-items-center gap-025`}
-              onClick={() => setShowCommentModal({ data: post, type: `post` })}
-            >
-              <Profile addr={address} variant="imageOnly" />
-              Reply
-              <p>{/* Reply to {post.creator.slice(0, 4)}…{post.creator.slice(38)} */}</p>
-            </div>
-          )}
-        </div>
-        {/* 
-        {commentsLoaded !== commentCount && (
-          <button className={`${styles.loadMore}`} onClick={() => loadMoreComment(commentCount)}>
-            Load More
-          </button>
-        )} */}
+        <PostDetails post={post.data} advancedMode={advancedView} />
       </div>
     </>
-  )
-}
-
-/**
- * Profile
- * @param {String} addr
- * @returns
- */
-const ConnectedProfile = ({ addr }) => {
-  const [profile, setProfile] = useState()
-  const activeChain = getActiveChain()
-  const defaultUsername = `hup-user`
-  const [isItUp, setIsItUp] = useState()
-  useEffect(() => {
-    getUniversalProfile(addr).then((res) => {
-      // console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setIsItUp(true)
-        setProfile({
-          wallet: res.data.id,
-          name: res.data.Profile[0].name,
-          description: res.data.description,
-          profileImage:
-            res.data.Profile[0].profileImages.length > 0
-              ? res.data.Profile[0].profileImages[0].src
-              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
-          profileHeader: '',
-          tags: JSON.stringify(res.data.tags),
-          links: JSON.stringify(res.data.links_),
-          lastUpdate: '',
-        })
-      } else {
-        getProfile(addr).then((res) => {
-          //  console.log(res)
-          if (res.wallet) {
-            const profileImage =
-              res.profileImage !== ''
-                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
-            res.profileImage = profileImage
-            setProfile(res)
-          }
-        })
-      }
-    })
-  }, [])
-
-  if (!profile)
-    return (
-      <div className={`${styles.profileShimmer} flex align-items-center gap-050`}>
-        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
-        <div className={`flex flex-column justify-content-between gap-025`}>
-          <span className={`shimmer rounded`} style={{ width: `60px`, height: `10px` }} />
-          <span className={`shimmer rounded`} style={{ width: `40px`, height: `10px` }} />
-        </div>
-      </div>
-    )
-
-  return (
-    <figure
-      className={`${styles.profile} flex align-items-center`}
-      onClick={(e) => {
-        e.stopPropagation()
-        router.push(`/u/${addr}`)
-      }}
-    >
-      <img alt={profile.name || `Default PFP`} src={`${profile.profileImage}`} className={`rounded`} />
-
-      <figcaption className={`flex flex-column`}>
-        <div className={`flex align-items-center gap-025`}>
-          <b>{profile.name ?? defaultUsername}</b>
-          <BlueCheckMarkIcon />
-          <div
-            className={`${styles.badge}`}
-            title={activeChain && activeChain[0].name}
-            dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}
-          ></div>
-        </div>
-        <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
-      </figcaption>
-    </figure>
   )
 }
