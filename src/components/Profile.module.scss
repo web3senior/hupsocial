@@ -4,26 +4,10 @@
   border-radius: 999px;
 }
 
-figure.profile {
+.profile {
   cursor: pointer;
   width: fit-content;
-
-  figcaption {
-    height: 100%;
-
-    svg {
-      aspect-ratio: 1/1;
-    }
-  }
-
-  > img {
-    width: 36px;
-    height: 36px;
-    margin-right: 0.5rem;
-    border: 1px solid var(--gray-200);
-    background: var(--gray-100);
-    aspect-ratio: 1/1;
-  }
+  gap: 0.7rem;
 
   code {
     color: var(--gray-400);
@@ -31,17 +15,50 @@ figure.profile {
   }
 }
 
+.imageWrapper {
+  position: relative;
+  will-change: transform;
+  cursor: pointer;
+
+  &:hover {
+    .imageWrapper__fingerprint {
+      transform: scale(1.1);
+      transition: transform 0.2s ease;
+    }
+  }
+
+  img {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    background: var(--gray-100);
+    aspect-ratio: 1/1;
+  }
+
+  &__fingerprint {
+    border: 2px solid var(--white) !important;
+    background: var(--gray-400) !important;
+    width: 12px;
+    height: 12px;
+    position: absolute;
+    bottom: -1px;
+    right: -4px;
+    border-radius: 999px;
+  }
+}
+
+.nameRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .name {
   position: relative;
   font-weight: 600;
-  /* Removed height restriction to prevent bounding box clipping */
   line-height: 1;
-
-  span {
-    /* Slight optical adjustment to balance descenders (like 'y') */
-    padding-bottom: 1px;
-    display: inline-block;
-  }
+  font-family: var(--font-family-monospace) !important;
 }
 
 .badge {
@@ -51,43 +68,14 @@ figure.profile {
   svg {
     width: inherit;
     height: inherit;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border);
   }
 }
 
 .createdAt {
-  margin-left: 5px;
+  padding-left: 0.25rem;
   font-weight: 400;
   line-height: 1;
+  font-size: var(--system-12-font-size);
   color: var(--gray-400);
-}
-
-.imageWrapper {
-  border-radius: 4px;
-
-  display: flex;
-  position: relative;
-
-  &__fingerprint {
-    border: 2px solid var(--white);
-    position: absolute;
-    bottom: -5px;
-    right: -5px;
-    border-radius: 999px;
-  }
-}
-
-.nameRow {
-  display: flex;
-  flex-direction: row;
-  // align-items: center;
-  align-items: first baseline;
-  gap: 0.25rem;
-
-  b {
-    font-weight: 600;
-    line-height: 1;
-    position: relative;
-    top: -3px;
-  }
 }
