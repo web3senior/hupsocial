@@ -8,12 +8,10 @@ export default function Balance({ addr, chainId = null }) {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
-console.log(
-  {
+  console.log({
     address: addr,
-    chainId: chainId ,
-  }
-)
+    chainId: chainId,
+  })
   const {
     data: balanceData,
     isLoading: isBalanceLoading,
@@ -65,7 +63,7 @@ console.log(
 
       {balanceData !== undefined && (
         <span className={`flex gap-025`}>
-          <span> {Number(web3.utils.fromWei(balanceData?.value, `ether`)).toFixed(2)}</span>
+          <span> {Number(web3.utils.fromWei(balanceData?.value, `ether`)).toFixed(4)}</span>
           <span>{balanceData?.symbol}</span>
         </span>
       )}
