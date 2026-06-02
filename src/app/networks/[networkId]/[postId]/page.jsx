@@ -5,7 +5,6 @@ import { notFound } from 'next/navigation'
 import styles from './page.module.scss'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
 
-// Generate dynamic metadata for SEO optimization
 export async function generateMetadata({ params }, parent) {
   const parentMetadata = await parent
   // console.log('Generating metadata for post with params:', parentMetadata)
@@ -37,17 +36,20 @@ export async function generateMetadata({ params }, parent) {
 
     images.push(...previousImages)
 
+    const bodyText = post?.data?.content?.elements?.[0]?.data?.text || ''
+
     const metadata = {
-      title: post?.data?.content?.elements?.[0]?.data?.text.slice(0, 60) || 'Post Details',
-      description:
-        post?.data?.content?.elements?.[0]?.data?.text.slice(0, 160) ||
-        parentMetadata.description ||
-        'View the details of this post on our platform.',
+      // Slice the first 60 characters for the SEO title
+      title: bodyText.slice(0, 60).trim() || 'Post Details',
+
+      // Slice the first 160 characters for the description, then fall back if empty
+      description: bodyText.slice(0, 160).trim() || parentMetadata.description || 'View the details of this post on our platform.',
+
       openGraph: {
         images: images.length > 0 ? images : parentMetadata.openGraph?.images || [],
       },
     }
-    // console.log('Generated metadata for post:', metadata)
+
     return metadata
   } catch (error) {
     // Return fallback metadata if the initial fetch fails
