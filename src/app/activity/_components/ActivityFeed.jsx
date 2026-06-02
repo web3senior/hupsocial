@@ -11,19 +11,20 @@ import {
   LucideLoader2,
   LucideRefreshCcw,
   MessageCircle,
-  Send,
+  CirclePlus,
   User,
 } from 'lucide-react'
 import { useConnection } from 'wagmi'
 import Profile from '@/components/Profile'
 import { toRelativeTime } from '@/lib/dateHelper'
+import { getPostById, getViewPost } from '@/lib/api'
 import styles from './ActivityFeed.module.scss'
 
 const PAGE_SIZE = 20
 
 const ACTION_META = {
   post_created: {
-    icon: Send,
+    icon: CirclePlus,
     label: 'Post created',
   },
   comment_created: {
@@ -164,7 +165,11 @@ export default function ActivityFeed() {
         ) : null}
 
         {visibleNotifications.map((notification) => (
-          <NotificationRow key={notification.id} notification={notification} />
+          <NotificationRow 
+            key={notification.id} 
+            notification={notification} 
+            currentAddress={address} 
+          />
         ))}
       </div>
 
@@ -199,14 +204,58 @@ export default function ActivityFeed() {
     </div>
   )
 }
-
-function NotificationRow({ notification }) {
+function NotificationRow({ notification, currentAddress }) {
   const actor = notification.actor_wallet_address || notification.recipient_wallet_address
   const href = getNotificationHref(notification)
   const { icon: Icon, label } = ACTION_META[notification.action_type] || {
     icon: Bell,
     label: formatActionType(notification.action_type),
   }
+
+  const [post, setPost] = useState(null)
+  const [isLoadingPost, setIsLoadingPost] = useState(false)
+
+  // Extract variables safely using top level parameters or data attributes
+  const entityId = notification.data?.parent_post_id || notification.entity_id || notification.data?.post_id
+  const networkId = notification.network_id || notification.data?.network_id
+
+  useEffect(() => {
+    if (!networkId || !entityId) return
+
+    let cancelled = false
+    setIsLoadingPost(true)
+
+    // Using getPostById exactly like your working Post component
+    getPostById(networkId, entityId, currentAddress)
+      .then((res) => {
+        if (cancelled) return
+
+        const fetchedPost = Array.isArray(res?.data) ? res.data[0] : res?.data
+        setPost(fetchedPost || null)
+      })
+      .catch((err) => {
+        console.error('Error fetching notification content:', err)
+        if (!cancelled) setPost(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingPost(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [networkId, entityId, currentAddress])
+
+  // Mirror the text resolution structure from your Post component
+  const postTextPreview = useMemo(() => {
+    if (!post) return null
+
+    if (post.content?.elements?.length > 0) {
+      return post.content.elements[0]?.data?.text || ''
+    }
+
+    return typeof post.content === 'string' ? post.content : null
+  }, [post])
 
   return (
     <article className={`${styles.activityRow} ${notification.is_read ? '' : styles.unread}`}>
@@ -222,6 +271,20 @@ function NotificationRow({ notification }) {
         <div className={styles.messageGroup}>
           <strong>{notification.title || label}</strong>
           {notification.message && <p>{notification.message}</p>}
+          
+          {isLoadingPost && (
+            <div className={styles.postPreviewLoader}>
+              <LucideLoader2 className={styles.spin} size={12} />
+              <span>Loading post content...</span>
+            </div>
+          )}
+
+          {postTextPreview && (
+            <div className={styles.postPreview}>
+             {postTextPreview}
+            </div>
+          )}
+
           <div className={styles.meta}>
             <span>{label}</span>
             {notification.entity_id && <span>Post #{notification.entity_id}</span>}
@@ -238,7 +301,6 @@ function NotificationRow({ notification }) {
     </article>
   )
 }
-
 function getNotificationHref(notification) {
   const networkId = notification.network_id || notification.data?.network_id
   const entityId = notification.entity_id || notification.data?.parent_post_id || notification.data?.post_id
