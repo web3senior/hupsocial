@@ -298,7 +298,7 @@ export default function NewPost({
     const nextItem = {
       type: selectedMediaType,
       cid,
-      alt: `Hup asset ${selectedMediaType}`,
+      alt: `Hup asset ${selectedMediaType} | ${postText.slice(0, 30)}...`,
       storage: 'IPFS',
       mimeType: file.type,
       localUrl,
