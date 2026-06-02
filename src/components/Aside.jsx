@@ -34,6 +34,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
+import { Network } from 'lucide-react'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
@@ -346,7 +347,7 @@ export default function Aside() {
             onClick={closeSidebar}
           >
             <div className={styles.iconWrapper}>
-              <LayoutGridIcon
+              <Network
                 size={20}
                 fill={isActivePath(pathname, '/chains') ? 'currentColor' : 'none'}
                 strokeWidth={isActivePath(pathname, '/chains') ? 2 : 1.7}
