@@ -22,12 +22,13 @@ export async function generateMetadata({ params }, parent) {
 
     if (item?.content?.elements?.[1]?.type === 'media' && item?.content?.elements?.[1]?.data?.items.length > 0) {
       item.content.elements[1].data.items.forEach((mediaItem) => {
+        console.log(`Processing media item for metadata:`, mediaItem)
         if (mediaItem.type === 'image') {
           images.push({
-            url: mediaItem.data.cid.startsWith('http') ? mediaItem.data.cid : `${process.env.NEXT_PUBLIC_GATEWAY_URL}${mediaItem.data.cid}`,
-            width: mediaItem.data.width || 1200, // Default width if not provided
-            height: mediaItem.data.height || 630, // Default height if not provided
-            alt: mediaItem.data.alt || 'Post Image',
+            url: mediaItem.cid.startsWith('http') ? mediaItem.cid : `${process.env.NEXT_PUBLIC_GATEWAY_URL}${mediaItem.cid}`,
+            width: mediaItem.width || 1200, // Default width if not provided
+            height: mediaItem.height || 630, // Default height if not provided
+            alt: mediaItem.alt || 'Post Image',
           })
         }
       })

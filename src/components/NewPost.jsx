@@ -96,8 +96,8 @@ const getMediaPreviewSrc = (item) => {
   // if (item.url) return item.url
   // if (item.src) return item.src
   // if (item.gatewayUrl) return item.gatewayUrl
-return resolveIPFSUrl(item.cid)
- // return `/api/ipfs/file?hash=${item.cid}`
+  return resolveIPFSUrl(item.cid)
+  // return `/api/ipfs/file?hash=${item.cid}`
 }
 
 const getSerializablePostContent = (content) => ({
@@ -268,6 +268,39 @@ export default function NewPost({
       fileInputRef.current.click()
     }
   }
+  const getMediaDimensions = (file, type) => {
+    return new Promise((resolve) => {
+      const localUrl = URL.createObjectURL(file)
+
+      if (type === 'image') {
+        const img = new Image()
+        img.onload = () => {
+          // Clean up the object URL to avoid memory leaks
+          URL.revokeObjectURL(localUrl)
+          resolve({ width: img.naturalWidth, height: img.naturalHeight })
+        }
+        img.onerror = () => {
+          URL.revokeObjectURL(localUrl)
+          resolve({ width: undefined, height: undefined })
+        }
+        img.src = localUrl
+      } else if (type === 'video') {
+        const video = document.createElement('video')
+        video.preload = 'metadata'
+        video.onloadedmetadata = () => {
+          URL.revokeObjectURL(localUrl)
+          resolve({ width: video.videoWidth, height: video.videoHeight, duration: video.duration })
+        }
+        video.onerror = () => {
+          URL.revokeObjectURL(localUrl)
+          resolve({ width: undefined, height: undefined, duration: 0 })
+        }
+        video.src = localUrl
+      } else {
+        resolve({ width: undefined, height: undefined })
+      }
+    })
+  }
 
   const handleFileSelect = async (event) => {
     const file = event.target.files?.[0]
@@ -290,6 +323,9 @@ export default function NewPost({
       return
     }
 
+    // Extract dimensions and video duration before uploading to IPFS to save time
+    const dimensions = await getMediaDimensions(file, selectedMediaType)
+
     const cid = await uploadFileToIPFS(file)
     console.log(cid)
     if (!cid) return
@@ -302,7 +338,9 @@ export default function NewPost({
       storage: 'IPFS',
       mimeType: file.type,
       localUrl,
-      duration: selectedMediaType === 'video' ? 0 : undefined,
+      width: dimensions.width,
+      height: dimensions.height,
+      duration: selectedMediaType === 'video' ? dimensions.duration || 0 : undefined,
       spoiler: false,
     }
 
