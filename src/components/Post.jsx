@@ -21,7 +21,7 @@ import { MessageCircle } from 'lucide-react'
 import { Heart } from 'lucide-react'
 import { Box } from 'lucide-react'
 import { SendHorizonal } from 'lucide-react'
-import { config, CONTRACTS } from '@/config/wagmi'
+import { CONTRACTS } from '@/config/wagmi'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import NativePopover from './ui/NativePopover'
@@ -53,6 +53,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const [canShowMore, setCanShowMore] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
+  // Fetch the original post data if this item is a repost
   useEffect(() => {
     let cancelled = false
 
@@ -70,6 +71,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         const post = Array.isArray(res?.data) ? res.data[0] : res?.data
 
         setRepostedPost(post || null)
+        setIsLoadingRepost(false)
       })
       .catch(() => {
         if (!cancelled) setRepostedPost(null)
@@ -86,6 +88,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const displayItem = isRepost ? repostedPost : item
   const commentTarget = displayItem || item
 
+  // Retrieve the latest comment metadata for the active post context
   useEffect(() => {
     let cancelled = false
 
@@ -124,14 +127,35 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
       cancelled = true
     }
   }, [commentTarget?.id, commentTarget?.network_id, commentTarget?.total_comments, address])
+
+  // Track layout heights to evaluate if the content body needs a show-more interface
   useEffect(() => {
     const el = contentRef.current
     if (!el) return
 
     setCanShowMore(el.scrollHeight > el.clientHeight)
   }, [displayItem?.content?.elements?.[0]?.data?.text])
+
   const lastCommentText = getCommentPreviewText(lastComment?.content)
   const hasLastCommentPreview = Boolean(lastCommentText) && showLastComment
+
+  // Guard clause: Render global loading state until repost data is completely ready
+  if (isRepost && isLoadingRepost) {
+    return (
+      <div className={`${styles.post} flex align-items-center justify-content-center p-4`}>
+        <div className={styles.post__content}>Loading repost...</div>
+      </div>
+    )
+  }
+
+  // Guard clause: Handle instances where fallback records for repost data cannot be found
+  if (isRepost && !displayItem) {
+    return (
+      <div className={`${styles.post} flex align-items-center justify-content-center p-4`}>
+        <div className={styles.post__content}>Original post unavailable</div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -176,11 +200,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         </header>
 
         <main className={`${styles.post__main}`}>
-          {isRepost && isLoadingRepost ? (
-            <div className={styles.post__content}>Loading repost...</div>
-          ) : isRepost && !displayItem ? (
-            <div className={styles.post__content}>Original post unavailable</div>
-          ) : displayItem?.content?.elements?.length > 1 ? (
+          {displayItem?.content?.elements?.length > 1 ? (
             <>
               <div
                 ref={contentRef}
@@ -243,10 +263,6 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
             )}
 
             {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && <Repost item={displayItem || item} />}
-
-            {/* {actions.find((action) => action.toLowerCase() === 'quote') !== undefined && (
-              <Quote item={displayItem || item} />
-            )} */}
 
             {actions.find((action) => action.toLowerCase() === 'tip') !== undefined && (
               <button
@@ -807,59 +823,60 @@ const ShareModal = ({ item, setShowShareModal }) => {
  * @param {Function} [props.onUpdate] Optional parent update callback to sync list states.
  */
 const Like = ({ item, onUpdate }) => {
+  console.log({ item })
   // Local state initialized straight from the source prop
-  const [isLiked, setIsLiked] = useState(item.is_liked === 1 || item.is_liked === true);
-  const [likeCount, setLikeCount] = useState(Number(item.total_likes) || 0);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isLiked, setIsLiked] = useState(item.is_liked === 1 || item.is_liked === true)
+  const [likeCount, setLikeCount] = useState(Number(item.total_likes) || 0)
+  const [isProcessing, setIsProcessing] = useState(false)
 
-  const isMounted = useClientMounted();
-  const activeChain = getActiveChain();
-  const { address, isConnected } = useConnection();
+  const isMounted = useClientMounted()
+  const activeChain = getActiveChain()
+  const { address, isConnected } = useConnection()
 
   // Wagmi hooks for primary wallet transactions
-  const { data: hash, isPending: isWalletPending, writeContractAsync } = useWriteContract();
+  const { data: hash, isPending: isWalletPending, writeContractAsync } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
-  });
+  })
 
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient()
 
   // Watch for primary wallet transaction confirmations
   useEffect(() => {
     if (isConfirmed) {
-      setIsProcessing(false);
-      setIsLiked(true);
-      setLikeCount((prev) => prev + 1);
-      
+      setIsProcessing(false)
+      setIsLiked(true)
+      setLikeCount((prev) => prev + 1)
+
       // Notify parent component or state managers if callback provided
       if (typeof onUpdate === 'function') {
-        onUpdate(item.id, { is_liked: 1, total_likes: likeCount + 1 });
+        onUpdate(item.id, { is_liked: 1, total_likes: likeCount + 1 })
       }
-      toast('Interaction saved on-chain!', 'success');
+      toast('Interaction saved on-chain!', 'success')
     }
-  }, [isConfirmed]);
+  }, [isConfirmed])
 
   const likePost = async (e, id) => {
-    e.stopPropagation();
+    e.stopPropagation()
 
     if (!isConnected || !address) {
-      toast('Please connect your wallet first', 'error');
-      return;
+      toast('Please connect your wallet first', 'error')
+      return
     }
 
-    const targetChain = CONTRACTS[`chain${item.network_id}`];
+    const targetChain = CONTRACTS[`chain${item.network_id}`]
     if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error');
-      return;
+      toast('Contract configuration missing for network', 'error')
+      return
     }
 
     try {
-      setIsProcessing(true);
+      setIsProcessing(true)
 
       const session = await isSessionActive({
         userAddress: address,
         publicClient,
-      });
+      })
 
       if (session.active) {
         // Burner session pipeline (Immediate execution)
@@ -869,18 +886,18 @@ const Like = ({ item, onUpdate }) => {
           abi,
           functionName: 'batchLike',
           args: [address, [id]],
-        });
+        })
 
         // Optimistic / Immediate UI adjustment for burner sessions
-        setIsLiked(true);
-        setLikeCount((prev) => prev + 1);
+        setIsLiked(true)
+        setLikeCount((prev) => prev + 1)
         if (typeof onUpdate === 'function') {
-          onUpdate(id, { is_liked: 1, total_likes: likeCount + 1 });
+          onUpdate(id, { is_liked: 1, total_likes: likeCount + 1 })
         }
 
-        toast('Liked via active session key!', 'success');
-        setIsProcessing(false);
-        return;
+        toast('Liked via active session key!', 'success')
+        setIsProcessing(false)
+        return
       }
 
       // Primary wallet fallback pipeline
@@ -889,58 +906,58 @@ const Like = ({ item, onUpdate }) => {
         address: targetChain.hup,
         functionName: 'batchLike',
         args: [address, [id]],
-      });
+      })
 
-      toast('Confirming block execution...', 'success');
+      toast('Confirming block execution...', 'success')
     } catch (err) {
-      console.error('Like failed:', err);
-      toast(err.message || 'Transaction rejected or encountered an error.', 'error');
-      setIsProcessing(false);
+      console.error('Like failed:', err)
+      toast(err.message || 'Transaction rejected or encountered an error.', 'error')
+      setIsProcessing(false)
     }
-  };
+  }
 
   const unlikePost = async (e, id) => {
-    e.stopPropagation();
+    e.stopPropagation()
 
     if (!isConnected) {
-      toast('Please connect your wallet first', 'error');
-      return;
+      toast('Please connect your wallet first', 'error')
+      return
     }
 
-    const targetChain = CONTRACTS[`chain${item.network_id}`];
+    const targetChain = CONTRACTS[`chain${item.network_id}`]
     if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error');
-      return;
+      toast('Contract configuration missing for network', 'error')
+      return
     }
 
     try {
-      setIsProcessing(true);
+      setIsProcessing(true)
 
       await writeContractAsync({
         abi,
         address: targetChain.hup,
         functionName: 'unlikePost',
         args: [id],
-      });
+      })
 
       // For primary wallet unlikes, you can either optimistically remove it here
       // or set up an effect watching a separate un-liking transaction receipt.
-      setIsLiked(false);
-      setLikeCount((prev) => Math.max(0, prev - 1));
-      setIsProcessing(false);
+      setIsLiked(false)
+      setLikeCount((prev) => Math.max(0, prev - 1))
+      setIsProcessing(false)
 
-      toast('Removing like on-chain...', 'success');
+      toast('Removing like on-chain...', 'success')
     } catch (err) {
-      console.error('Unlike failed:', err);
-      toast(err.message || 'Failed to remove transaction.', 'error');
-      setIsProcessing(false);
+      console.error('Unlike failed:', err)
+      toast(err.message || 'Failed to remove transaction.', 'error')
+      setIsProcessing(false)
     }
-  };
+  }
 
   // Determine aggregate loading footprint
-  const isLoading = isProcessing || isWalletPending || isConfirming;
+  const isLoading = isProcessing || isWalletPending || isConfirming
 
-  if (!isMounted) return null;
+  if (!isMounted) return null
 
   return (
     <button
@@ -948,9 +965,9 @@ const Like = ({ item, onUpdate }) => {
       className={`like-button ${isLoading ? 'processing' : ''}`}
       onClick={(e) => {
         if (isConnected) {
-          isLiked ? unlikePost(e, item.id) : likePost(e, item.id);
+          isLiked ? unlikePost(e, item.id) : likePost(e, item.id)
         } else {
-          toast('Please connect wallet', 'error');
+          toast('Please connect wallet', 'error')
         }
       }}
     >
@@ -970,10 +987,11 @@ const Like = ({ item, onUpdate }) => {
 
       {likeCount > 0 && !isLoading && <span>{likeCount}</span>}
     </button>
-  );
-};
+  )
+}
 
 function Repost({ item }) {
+  console.log({ item })
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const [isReposted, setIsReposted] = useState(false)

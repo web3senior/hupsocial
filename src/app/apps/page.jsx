@@ -6,8 +6,9 @@ import useSWRInfinite from 'swr/infinite'
 import { ArrowDown, Eye, Flame, Heart, Medal, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
 import PageTitle from '@/components/PageTitle'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
-import styles from './page.module.scss'
 import Profile from '@/components/Profile'
+import clsx from 'clsx'
+import styles from './page.module.scss'
 
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
@@ -94,9 +95,18 @@ export default function LeaderboardPage() {
   return (
     <>
       <PageTitle name="Apps" />
-      <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
-          Coming soon - we're working hard to bring you an exciting new experience! Stay tuned for updates.
+      <div className={clsx(styles.page, 'animate', 'fade')}>
+        <div className={`__container ${styles.page__container} ${styles['animated-soft-background']}`} data-width="medium">
+          <div className={styles.gradientBgContainer}>
+            <div className={styles.blurWrapper}>
+              <div className={styles.blobBlue} />
+              <div className={styles.blobPink} />
+              <div className={styles.blobPurple} />
+              <div className={styles.blobYellow} />
+            </div>
+
+            <>Coming soon - we're working hard to bring you an exciting new experience! Stay tuned for updates.</>
+          </div>
         </div>
       </div>
     </>

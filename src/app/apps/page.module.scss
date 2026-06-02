@@ -18,3 +18,108 @@
     }
   }
 }
+// Color and animation configurations
+$base-bg: #fafaff;
+$blur-intensity: 80px;
+$transition-speed-fast: 22s;
+$transition-speed-med: 25s;
+$transition-speed-slow: 30s;
+$transition-speed-vlow: 35s;
+
+// Container that holds the background and clips the shapes at the edges
+.gradientBgContainer {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: $base-bg;
+}
+
+// Wrapper for the blurred blobs to isolate the backdrop filter
+.blurWrapper {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  // The magic blur that fuses the rotating shapes together
+  filter: blur($blur-intensity); 
+}
+
+// Common properties for all four colored shapes
+.blob {
+  position: absolute;
+  mix-blend-mode: multiply; // Helps the colors blend softly where they overlap
+  opacity: 0.65;
+}
+
+// Individual shape configurations with unique colors, sizes, and positions
+.blobBlue {
+  @extend .blob;
+  top: -10%;
+  left: -10%;
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle, rgba(200, 230, 255, 1) 0%, rgba(200, 230, 255, 0) 70%);
+  animation: rotateShape $transition-speed-med infinite linear;
+}
+
+.blobPink {
+  @extend .blob;
+  bottom: -10%;
+  right: -10%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, rgba(255, 215, 235, 1) 0%, rgba(255, 215, 235, 0) 70%);
+  animation: rotateShapeReverse $transition-speed-slow infinite linear;
+}
+
+.blobPurple {
+  @extend .blob;
+  top: 20%;
+  right: -20%;
+  width: 55vw;
+  height: 55vw;
+  background: radial-gradient(circle, rgba(235, 215, 255, 1) 0%, rgba(235, 215, 255, 0) 70%);
+  animation: rotateShape $transition-speed-vlow infinite linear;
+}
+
+.blobYellow {
+  @extend .blob;
+  bottom: -20%;
+  left: 10%;
+  width: 45vw;
+  height: 45vw;
+  background: radial-gradient(circle, rgba(255, 250, 210, 1) 0%, rgba(255, 250, 210, 0) 70%);
+  animation: rotateShapeReverse $transition-speed-fast infinite linear;
+}
+
+// Animation keyframes for the rotation and fluid morphing
+@keyframes rotateShape {
+  0% {
+    transform: rotate(0deg) scale(1);
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+    // Morphs the circle edge slightly during rotation
+    border-radius: 70% 30% 50% 50% / 30% 60% 40% 70%; 
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  }
+}
+
+@keyframes rotateShapeReverse {
+  0% {
+    transform: rotate(360deg) scale(1.1);
+    border-radius: 50% 50% 30% 70% / 50% 60% 40% 60%;
+  }
+  50% {
+    transform: rotate(180deg) scale(0.9);
+    border-radius: 30% 70% 70% 30% / 60% 40% 60% 40%;
+  }
+  100% {
+    transform: rotate(0deg) scale(1.1);
+    border-radius: 50% 50% 30% 70% / 50% 60% 40% 60%;
+  }
+}
