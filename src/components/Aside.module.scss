@@ -135,6 +135,12 @@
         1px -1px 0 var(--white),
         -1px 1px 0 var(--white),
         1px 1px 0 var(--white);
+
+      @include md-down() {
+        font-size: var(--font-size-12);
+        top: -3px;
+        right: 0.5px;
+      }
     }
   }
 }
