@@ -297,7 +297,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
             {actions.find((action) => action.toLowerCase() === 'share') !== undefined && (
               <button
                 onClick={() => {
-                  isConnected ? setShowShareModal(item) : toast(`Please connect wallet`, `error`)
+                  isConnected ? setShowShareModal(displayItem) : toast(`Please connect wallet`, `error`)
                 }}
               >
                 <SendHorizonal strokeWidth={1.5} width={17} height={17} />
