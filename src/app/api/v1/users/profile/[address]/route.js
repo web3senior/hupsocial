@@ -12,30 +12,41 @@ export async function GET(request, { params }) {
 
     /* Construct the internal URL for your proxy route */
     const origin = new URL(request.url).origin
-    const upProxyUrl = `${origin}/api/v1/universal-profile`
+    const upProxyUrl = `${origin}/api/universal-profile`
 
     try {
       /* Hit your internal Universal Profile endpoint */
-      const upResponse = await fetch(upProxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ addr: address.toLowerCase() }),
+      const myHeaders = new Headers()
+      myHeaders.append('Content-Type', 'application/json')
+
+      const raw = JSON.stringify({
+        addr: address.toLowerCase(), // Preserve original casing in payload to match working query state
       })
+
+      const requestOptions = {
+        method: 'POST',
+        headers: myHeaders,
+        body: raw,
+        redirect: 'follow',
+      }
+
+      const upResponse = await fetch(upProxyUrl, requestOptions)
 
       if (upResponse.ok) {
         const upData = await upResponse.json()
 
         /* Check if the profile data exists and has valid metadata */
         const profile = upData?.data?.Profile?.[0]
+  
         if (profile && (profile.name || profile.fullName)) {
-          /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
-          profile.profileImage = resolveStorageUrl(profile.profileImage)
+          /* Fallback to profileImages array elements if they exist as per incoming payload */
+          profile.profileImage = profile.profileImages && profile.profileImages.length > 0 
+            ? profile.profileImages[0].url 
+            : null
 
           return NextResponse.json({
             source: 'universal_profile',
-            data: profile
+            data: profile,
           })
         }
       }
@@ -65,14 +76,13 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({
       source: 'database',
-      data: dbProfile
+      data: dbProfile,
     })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
-
 
 export async function PUT(request, { params }) {
   try {
