@@ -87,8 +87,8 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
         <button
           type="button"
           className={clsx(styles.link, styles.moreButton)}
-          title={isCompact ? item.name : undefined}
           aria-label={item.name}
+          data-tooltip={isCompact ? item.name : undefined}
           onClick={() => {
             setIsComponentOpen(true)
             onNavigate?.()
@@ -106,7 +106,8 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
     <Link
       href={item.path}
       className={clsx(styles.link, isActive && styles.linkActive)}
-      title={isCompact ? item.name : undefined}
+      aria-label={item.name}
+      data-tooltip={isCompact ? item.name : undefined}
       aria-current={isActive ? 'page' : undefined}
       onClick={onNavigate}
     >
@@ -229,8 +230,8 @@ export default function Aside() {
               <button
                 type="button"
                 className={clsx(styles.link, styles.moreButton)}
-                title={isCompact ? 'More' : undefined}
                 aria-label="More"
+                data-tooltip={isCompact ? 'More' : undefined}
               >
                 <div className={styles.iconWrapper}>
                   <Equal size={24} />
@@ -238,7 +239,7 @@ export default function Aside() {
                 {!isCompact && <span className={styles.linkText}>More</span>}
               </button>
             }
-            placement="top-end" //top-end
+            placement="top-end"
             type="auto"
           >
             {({ close }) => (
@@ -342,7 +343,8 @@ export default function Aside() {
           <Link
             href="/chains"
             className={clsx(styles.link, isActivePath(pathname, '/chains') && styles.linkActive)}
-            title={isCompact ? 'Networks' : undefined}
+            aria-label="Networks"
+            data-tooltip={isCompact ? 'Networks' : undefined}
             aria-current={isActivePath(pathname, '/chains') ? 'page' : undefined}
             onClick={closeSidebar}
           >

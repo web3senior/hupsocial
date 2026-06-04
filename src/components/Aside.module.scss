@@ -12,10 +12,9 @@
   border-right: 1px solid transparent;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-  overflow: hidden;
   padding: 1rem 0.5rem;
   user-select: none;
-  overflow: hidden;
+  // overflow: hidden;
   width: 200px;
 
   @include md-down() {
@@ -83,7 +82,7 @@
   flex-direction: column;
   gap: 0.1rem;
   list-style: none;
-  overflow-y: auto;
+  //overflow-y: auto;
   padding-right: 0.1rem; // Add some padding to prevent scrollbar from overlapping content
 }
 
@@ -112,6 +111,36 @@
   &:active {
     transform: scale(0.95);
   }
+
+  &[data-tooltip] {
+    position: relative;
+    &::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: calc(100% + 10px);
+      top: 50%;
+      transform: translateY(-50%) scale(0.95);
+      background-color: var(--black);
+      color: var(--white);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      font-size: var(--font-size-12);
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      white-space: nowrap;
+      transition:
+        opacity 0.15s ease,
+        transform 0.15s ease;
+      z-index: 10;
+      box-shadow: var(--shadow-sm);
+    }
+
+    &:hover::after {
+      opacity: 1;
+      transform: translateY(-50%) scale(1);
+    }
+  }
 }
 
 .iconWrapper {
@@ -125,22 +154,16 @@
 
   &[data-icon='Activity'] {
     &:after {
-      content: '●';
+      content: '';
       color: var(--liked-color);
       position: absolute;
-      top: -6px;
-      right: -0.5px;
-      text-shadow:
-        -1px -1px 0 var(--white),
-        1px -1px 0 var(--white),
-        -1px 1px 0 var(--white),
-        1px 1px 0 var(--white);
-
-      @include md-down() {
-        font-size: var(--font-size-12);
-        top: -3px;
-        right: 0.5px;
-      }
+      top: 2px;
+      right: 1px;
+      outline: 1px solid var(--background);
+      width: 7px;
+      height: 7px;
+      border-radius: 1000px;
+      background-color: var(--liked-color);
     }
   }
 }
