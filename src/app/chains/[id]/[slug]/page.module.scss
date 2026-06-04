@@ -29,6 +29,8 @@
       th,
       td {
         text-align: left;
+        overflow-wrap: break-word;
+        word-break: break-word;
       }
     }
   }

@@ -1,5 +1,17 @@
 import { getViewerId } from './viewer'
 
+export const getProfile= async (address) => {
+  // Determine the base URL based on the environment
+  const isServer = typeof window === 'undefined'
+  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' : ''
+  const url = `${baseUrl}/api/v1/users/profile/${address.toLowerCase()}`
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Post fetch failed')
+  const data = await response.json()
+  return data
+}
+
 /**
  * Get Universal Profile via internal API proxy
  * @param {string} addr
@@ -23,8 +35,9 @@ export async function getUniversalProfile(addr) {
   const result = await response.json()
   return result.data
 }
+
 export async function ensureProfile(address) {
-  const res = await fetch(`/api/users/${address.toLowerCase()}`, {
+  const res = await fetch(`/api/v1/users/profile/${address.toLowerCase()}`, {
     method: 'POST',
     cache: 'no-store',
   })
@@ -103,17 +116,6 @@ export const recordPostView = async (networkId, postId, walletAddress = null) =>
 const getLocalToken = () => {
   if (localStorage.getItem('token') === null) return
   return localStorage.getItem('token').slice(1, localStorage.getItem('token').length - 1)
-}
-
-export async function getProfile(addr) {
-  let requestOptions = {
-    method: 'GET',
-    redirect: 'follow',
-  }
-
-  const response = await fetch(`/api/v1/users/profile/${addr}`, requestOptions)
-  if (!response.ok) throw new Response('Failed to get data', { status: 500 })
-  return response.json()
 }
 
 /**

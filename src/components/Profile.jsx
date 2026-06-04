@@ -21,12 +21,6 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
     return networkId ? config.chains.find((c) => c.id === networkId) : null
   }, [networkId])
 
-  // Compute alternative fallback image source from IPFS or remote origins
-  const finalImageSrc = useMemo(() => {
-    if (!profile?.profileImage) return ''
-    return isIPFSHash(profile.profileImage) ? resolveIPFSUrl(profile.profileImage) : profile.profileImage
-  }, [profile?.profileImage])
-
   // Truncate public wallet keys into compact readable hashes
   const truncatedAddress = useMemo(() => {
     return creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
@@ -67,14 +61,14 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       <div className={styles.imageWrapper}>
         <img 
           alt={profile.name} 
-          src={finalImageSrc} 
+          src={profile.profileImage} 
           width={36} 
           height={36} 
           className="rounded-full"
         />
         <Identicon
           name={profile.name}
-          profileImage={finalImageSrc}
+          profileImage={profile.profileImage}
           address={creator}
           size={20}
           className={clsx(styles.imageWrapper__fingerprint, 'rounded-full')}

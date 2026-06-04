@@ -11,6 +11,7 @@ import { ensureProfile, getProfile, getUniversalProfile } from '@/lib/api'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import Shimmer from '@/components/ui/Shimmer'
 import styles from './ConnectWallet.module.scss'
+import { useProfile } from '@/hooks/useProfile'
 
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
@@ -116,45 +117,15 @@ export function WalletOptions() {
  * @returns
  */
 export function Profile({ addr }) {
-  const [profile, setProfile] = useState(null)
   const router = useRouter()
+  const { profile, isLoading } = useProfile(addr)
 
-  useEffect(() => {
-    const fallbackProfile = {
-      wallet: addr,
-      name: 'Unknown',
-      profileImage: DEFAULT_PFP,
-    }
-
-    getUniversalProfile(addr)
-      .then((res) => {
-        if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-          setProfile({
-            wallet: res.data.id,
-            name: res.data.Profile[0].name,
-            profileImage:
-              res.data.Profile[0].profileImages.length > 0
-                ? res.data.Profile[0].profileImages[0].src
-                : DEFAULT_PFP,
-          })
-        } else {
-          getProfile(addr)
-            .then((localRes) => {
-              if (localRes && localRes.wallet_address) {
-                const profileImage =
-                  localRes.profileImage && localRes.profileImage !== ''
-                    ? localRes.profileImage
-                    : DEFAULT_PFP
-                setProfile({ ...localRes, profileImage })
-              } else {
-                setProfile(fallbackProfile)
-              }
-            })
-            .catch(() => setProfile(fallbackProfile))
-        }
-      })
-      .catch(() => setProfile(fallbackProfile))
-  }, [addr])
+  if (isLoading)
+    return (
+      <div className={`${styles.profileShimmer} flex align-items-center`}>
+        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
+      </div>
+    )
 
   if (!profile)
     return (
@@ -163,16 +134,13 @@ export function Profile({ addr }) {
       </div>
     )
 
-  // Determine standard URL structures vs 0G Root Hash streaming proxy endpoints dynamically on render
-  const finalImageSrc =isIPFSHash(profile.profileImage) ? `${resolveIPFSUrl(profile.profileImage)}` : profile.profileImage
-
   return (
     <Link href={`/${addr}`}>
       <figure
         className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`}
         title={profile.name}
       >
-        <img alt={profile.name || `PFP`} src={finalImageSrc || DEFAULT_PFP} className={`rounded`} />
+        <img alt={profile.name || `PFP`} src={profile.profileImage} className={`rounded`} />
       </figure>
     </Link>
   )

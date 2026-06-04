@@ -15,9 +15,9 @@ import {
   Equal,
   Heart,
   HelpCircle,
-  LayoutGridIcon,
   MessageSquareWarning,
   Monitor,
+  Boxes,
   Moon,
   Palette,
   PanelRightClose,
@@ -34,7 +34,6 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
-import { Network } from 'lucide-react'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
@@ -115,6 +114,7 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
     </Link>
   )
 }
+
 export default function Aside() {
   const pathname = usePathname()
   const { address, isConnected } = useConnection()
@@ -347,7 +347,7 @@ export default function Aside() {
             onClick={closeSidebar}
           >
             <div className={styles.iconWrapper}>
-              <Network
+              <Boxes
                 size={20}
                 fill={isActivePath(pathname, '/chains') ? 'currentColor' : 'none'}
                 strokeWidth={isActivePath(pathname, '/chains') ? 2 : 1.7}

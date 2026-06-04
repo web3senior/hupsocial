@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { Bookmark, Briefcase, Calendar, Heart, House, LayoutGrid, Plus, Search, Trophy, Users } from 'lucide-react'
+import { Bookmark, Briefcase, Calendar, MessageCircle, Heart, House, LayoutGrid, Plus, Search, Trophy, Users } from 'lucide-react'
 
 const DEFAULT_NAV_ITEMS = [
   { id: 'onchain', name: 'Onchain', path: '/', icon: House },
@@ -15,6 +15,7 @@ const DEFAULT_NAV_ITEMS = [
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: Briefcase },
   { id: 'apps', name: 'Apps', path: '/apps', icon: LayoutGrid },
   { id: 'divider-secondary', type: 'divider' },
+  { id: 'chat', name: 'Chat', path: '/chat', icon: MessageCircle },
   { id: 'activity', name: 'Activity', path: '/activity', icon: Heart },
   { id: 'saved', name: 'Saved', path: '/saved', icon: Bookmark },
 ]

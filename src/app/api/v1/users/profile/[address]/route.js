@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { resolveStorageUrl } from '@/lib/storageHelper' /* Adjust this import path to match your helper file location */
 
 export async function GET(request, { params }) {
   try {
@@ -9,6 +10,41 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
 
+    /* Construct the internal URL for your proxy route */
+    const origin = new URL(request.url).origin
+    const upProxyUrl = `${origin}/api/v1/universal-profile`
+
+    try {
+      /* Hit your internal Universal Profile endpoint */
+      const upResponse = await fetch(upProxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ addr: address.toLowerCase() }),
+      })
+
+      if (upResponse.ok) {
+        const upData = await upResponse.json()
+
+        /* Check if the profile data exists and has valid metadata */
+        const profile = upData?.data?.Profile?.[0]
+        if (profile && (profile.name || profile.fullName)) {
+          /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
+          profile.profileImage = resolveStorageUrl(profile.profileImage)
+
+          return NextResponse.json({
+            source: 'universal_profile',
+            data: profile
+          })
+        }
+      }
+    } catch (upError) {
+      /* Quietly catch internal fetch errors to ensure fallback execution succeeds */
+      console.error('Internal Universal Profile lookup failed:', upError.message)
+    }
+
+    /* Fallback to Database if the UP endpoint fails or returns no profile */
     const [rows] = await pool.execute(
       `SELECT 
         u.*, 
@@ -22,12 +58,21 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    return NextResponse.json(rows[0])
+    const dbProfile = rows[0]
+
+    /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
+    dbProfile.profileImage = resolveStorageUrl(dbProfile.profileImage)
+
+    return NextResponse.json({
+      source: 'database',
+      data: dbProfile
+    })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+
 
 export async function PUT(request, { params }) {
   try {
