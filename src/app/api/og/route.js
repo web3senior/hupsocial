@@ -73,6 +73,7 @@ const styles = {
     alignItems: 'center',
     marginTop: '40px',
     listStyle: 'none',
+    fontSize: '24px',
   },
   qrContainer: {
     position: 'absolute',
