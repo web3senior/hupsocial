@@ -7,7 +7,6 @@ import { getUniversalProfile, getProfile, updateProfile, subscribeUser, unsubscr
 import { initHupContract, initStatusContract, getStatus, getMaxLength, getPostsByCreator } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Web3 from 'web3'
-import abi from '@/abi/post.json'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -19,12 +18,12 @@ import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import PageTitle from '@/components/PageTitle'
-import NewPost from '@/components/NewPost'
 import AISummary from '@/components/AISummary'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import LinksTab from '@/components/tabs/LinksTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import styles from './UserProfile.module.scss'
+import { useProfile } from '@/hooks/useProfile'
 
 const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 
@@ -321,7 +320,7 @@ const Profile = ({ addr }) => {
   const { address, isConnected } = useConnection()
   const { disconnect } = useDisconnect()
   const activeChain = getActiveChain()
-
+  const { profile, isLoading } = useProfile(addr)
   /* Error during submission (e.g., user rejected)  */
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
   /* Error after mining (e.g., transaction reverted) */
@@ -347,68 +346,8 @@ const Profile = ({ addr }) => {
     setShowProfileModal(true)
   }
 
-  // Effect layer to load structural user details from chain vs database collections
-  useEffect(() => {
-    if (!addr) return
 
-    let isMounted = true
 
-    getUniversalProfile(addr).then((res) => {
-      if (!isMounted) return
-
-      if (res?.Profile && Array.isArray(res.Profile) && res.Profile.length > 0 && res.Profile[0].isContract) {
-        const upRecord = res.Profile[0]
-        setIsItUp(true)
-        setData({
-          wallet: upRecord.id,
-          name: upRecord.name || '',
-          description: upRecord.description || '',
-          profileImage: upRecord.profileImages?.length > 0 ? upRecord.profileImages[0].src : '',
-          profileHeader: '',
-          tags: JSON.stringify(upRecord.tags || []),
-          links: JSON.stringify(upRecord.links_ || []),
-          lastUpdate: '',
-        })
-        setSelfView(addr.toString().toLowerCase() === upRecord.id.toLowerCase())
-      } else {
-        getProfile(addr).then((localRes) => {
-          if (!isMounted) return
-          if (localRes?.wallet_address) {
-            localRes.profileImageName = localRes.profileImage
-            setData(localRes)
-            setSelfView(addr.toString().toLowerCase() === localRes.wallet_address.toLowerCase())
-          }
-        })
-      }
-    })
-
-    return () => {
-      isMounted = false
-    }
-  }, [addr])
-
-  // Effect layer to resolve 0G Storage assets dynamically when data variations hit the state tracking
-  useEffect(() => {
-    if (!data?.profileImage || !isIPFSHash(data.profileImage)) {
-      setResolved0gUrl(null)
-      return
-    }
-
-    let isMounted = true
-
-    const fetchStorageAsset = async () => {
-      const assetBlobUrl = await resolveIPFSUrl(data.profileImage)
-      if (assetBlobUrl && isMounted) {
-        setResolved0gUrl(assetBlobUrl)
-      }
-    }
-
-    fetchStorageAsset()
-
-    return () => {
-      isMounted = false
-    }
-  }, [data?.profileImage])
 
   // Isolated sub-rendering wrapper to manage variable text arrays cleanly
   const TagsElement = ({ rawTags }) => {
@@ -443,15 +382,11 @@ const Profile = ({ addr }) => {
     )
   }
 
-  if (!data) return <div className={`shimmer ${styles.shimmer}`} />
+  if (isLoading) return <div className={`shimmer ${styles.shimmer}`} />
 
   const targetWallet = params?.wallet || addr || ''
   const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 4)}…${targetWallet.slice(-4)}` : targetWallet
 
-  // Image source fallbacks: 0G download cache -> raw database value -> default text path string
-  const finalAvatarImageSource = isIPFSHash(data.profileImage)
-    ? resolved0gUrl || '/placeholder-loading-spinner.gif'
-    : data.profileImage || '/placeholder-avatar.png'
 
   const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
 
@@ -470,7 +405,7 @@ const Profile = ({ addr }) => {
         <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
             <div className={styles.profile__header}>
-              <b className={styles.profile__name}>{data.name ? data.name : 'hup-user'}</b>
+              <b className={styles.profile__name}>{profile.name ? profile.name : 'hup-user'}</b>
               <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
             </div>
 
@@ -480,23 +415,23 @@ const Profile = ({ addr }) => {
               </Link>
             </code>
 
-            <p className={`${styles.profile__description} mt-20`}>{data.description || 'This user has not set up a bio yet.'}</p>
+            <p className={`${styles.profile__description} mt-20`}>{profile.description || 'This user has not set up a bio yet.'}</p>
 
             <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
-              <TagsElement rawTags={data.tags} />
+              <TagsElement rawTags={profile.tags} />
             </div>
           </div>
 
           <div className={`${styles.profile__pfp} rounded relative`}>
             <UniversalIdentity
-              displayName={data.name}
-              profileImageUrl={finalAvatarImageSource}
+              displayName={profile.name}
+              profileImageUrl={profile.profileImage}
               smartContractAddress={addr}
-              profile={data}
+              profile={profile}
               selfView={selfView}
             />
 
-            <Status addr={addr} profile={data} selfView={selfView} />
+            <Status addr={addr} profile={profile} selfView={selfView} />
           </div>
         </header>
 
@@ -701,7 +636,7 @@ const Status = ({ addr, profile, selfView }) => {
             <main className={`flex flex-column align-items-center gap-1 `}>
               <div className={`${styles.statusModal__pfp} rounded relative`}>
                 <figure className={`rounded`}>
-                  <img src={`${resolveIPFSUrl(profile.profileImage)}`} />
+                  <img src={`${profile.profileImage}`} />
                 </figure>
 
                 <div

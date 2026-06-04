@@ -1,6 +1,7 @@
 import { getProfile } from '@/lib/api'
 import UserProfile from './_components/UserProfile'
 import styles from './page.module.scss'
+import PageTitle from '@/components/PageTitle'
 
 /**
  * Dynamically generates SEO and Open Graph metadata for the user profile.
@@ -72,6 +73,7 @@ export async function generateMetadata({ params }, parent) {
 export default function Page() {
   return (
     <>
+    <PageTitle name="Profile" changeDocumentTitle={false} />
       <UserProfile />
     </>
   )
