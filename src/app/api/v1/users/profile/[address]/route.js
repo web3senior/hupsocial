@@ -41,7 +41,7 @@ export async function GET(request, { params }) {
         if (profile && (profile.name || profile.fullName)) {
           /* Fallback to profileImages array elements if they exist as per incoming payload */
           profile.profileImage = profile.profileImages && profile.profileImages.length > 0 
-            ? profile.profileImages[0].url 
+            ? profile.profileImages[0].src 
             : null
 
           return NextResponse.json({
