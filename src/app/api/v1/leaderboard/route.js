@@ -104,7 +104,7 @@ export async function GET(request) {
         LEFT JOIN (
           SELECT
             CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
-            COUNT(*) AS total_posts,
+            SUM(CASE WHEN p.content_type = 0 THEN 1 ELSE 0 END) AS total_posts,
             SUM(CASE WHEN p.is_comment IS NULL AND p.is_repost IS NULL THEN 1 ELSE 0 END) AS root_posts,
             SUM(CASE WHEN p.is_comment IS NOT NULL THEN 1 ELSE 0 END) AS comments_made,
             SUM(CASE WHEN p.is_repost IS NOT NULL THEN 1 ELSE 0 END) AS reposts_made,
