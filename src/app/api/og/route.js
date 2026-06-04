@@ -10,7 +10,6 @@ export const size = {
   height: 630,
 }
 
-/* Emulated style module dictionary mapping styles cleanly */
 const styles = {
   container: {
     height: '100%',

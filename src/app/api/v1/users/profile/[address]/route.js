@@ -17,6 +17,7 @@ export async function GET(request, { params }) {
 
     let leaderboardRank = null
     let leaderboardScore = 0
+    let leaderboardTotalPosts = 0
 
     /* Fetch the user's leaderboard ranking metadata from your updated leaderboard endpoint */
     try {
@@ -26,6 +27,7 @@ export async function GET(request, { params }) {
         if (lbData.success && lbData.data) {
           leaderboardRank = lbData.data.rank || null
           leaderboardScore = lbData.data.score || 0
+          leaderboardTotalPosts = lbData.data.total_posts || 0
         }
       }
     } catch (lbError) {
@@ -56,25 +58,17 @@ export async function GET(request, { params }) {
 
         /* Check if the profile data exists and has valid metadata */
         const profile = upData?.data?.Profile?.[0]
-  
+
         if (profile && (profile.name || profile.fullName)) {
           /* Fallback to profileImages array elements if they exist as per incoming payload */
-          profile.profileImage = profile.profileImages && profile.profileImages.length > 0 
-            ? profile.profileImages[0].src 
-            : null
+          profile.profileImage = profile.profileImages && profile.profileImages.length > 0 ? profile.profileImages[0].src : null
 
           profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
-
-          /* Retrieve total post counts for this user to append to the UP profile response */
-          const [countRows] = await pool.execute(
-            'SELECT COUNT(*) as total_posts FROM posts WHERE wallet_address = ?',
-            [address]
-          )
-          profile.total_posts = countRows[0]?.total_posts || 0
 
           /* Append leaderboard tracking data fields */
           profile.leaderboard_rank = leaderboardRank
           profile.leaderboard_score = leaderboardScore
+          profile.total_posts = leaderboardTotalPosts
 
           return NextResponse.json({
             source: 'universal_profile',
@@ -109,6 +103,7 @@ export async function GET(request, { params }) {
     /* Append leaderboard tracking data fields to database fallback too */
     dbProfile.leaderboard_rank = leaderboardRank
     dbProfile.leaderboard_score = leaderboardScore
+    dbProfile.total_posts = leaderboardTotalPosts
 
     return NextResponse.json({
       source: 'database',
