@@ -10,9 +10,28 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
 
-    /* Construct the internal URL for your proxy route */
+    /* Construct the internal URL for your proxy route and leaderboard endpoint */
     const origin = new URL(request.url).origin
     const upProxyUrl = `${origin}/api/universal-profile`
+    const leaderboardUrl = `${origin}/api/v1/leaderboard?wallet_address=${encodeURIComponent(address)}`
+
+    let leaderboardRank = null
+    let leaderboardScore = 0
+
+    /* Fetch the user's leaderboard ranking metadata from your updated leaderboard endpoint */
+    try {
+      const lbResponse = await fetch(leaderboardUrl)
+      if (lbResponse.ok) {
+        const lbData = await lbResponse.json()
+        if (lbData.success && lbData.data) {
+          leaderboardRank = lbData.data.rank || null
+          leaderboardScore = lbData.data.score || 0
+        }
+      }
+    } catch (lbError) {
+      /* Log internally but continue so the endpoint remains resilient */
+      console.error('Internal Leaderboard look up failed:', lbError.message)
+    }
 
     try {
       /* Hit your internal Universal Profile endpoint */
@@ -44,6 +63,19 @@ export async function GET(request, { params }) {
             ? profile.profileImages[0].src 
             : null
 
+          profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
+
+          /* Retrieve total post counts for this user to append to the UP profile response */
+          const [countRows] = await pool.execute(
+            'SELECT COUNT(*) as total_posts FROM posts WHERE wallet_address = ?',
+            [address]
+          )
+          profile.total_posts = countRows[0]?.total_posts || 0
+
+          /* Append leaderboard tracking data fields */
+          profile.leaderboard_rank = leaderboardRank
+          profile.leaderboard_score = leaderboardScore
+
           return NextResponse.json({
             source: 'universal_profile',
             data: profile,
@@ -73,6 +105,10 @@ export async function GET(request, { params }) {
 
     /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
     dbProfile.profileImage = resolveStorageUrl(dbProfile.profileImage)
+
+    /* Append leaderboard tracking data fields to database fallback too */
+    dbProfile.leaderboard_rank = leaderboardRank
+    dbProfile.leaderboard_score = leaderboardScore
 
     return NextResponse.json({
       source: 'database',

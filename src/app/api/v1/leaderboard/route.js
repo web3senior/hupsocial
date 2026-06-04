@@ -9,9 +9,10 @@ const PERIODS = {
   '7d': 7,
 }
 
+/* Updated to sort by total_posts instead of root_posts when posts sort type is active */
 const SORTS = {
   score: 'ranked.score DESC, ranked.likes_received DESC, ranked.root_posts DESC, ranked.latest_post_at DESC',
-  posts: 'ranked.root_posts DESC, ranked.score DESC, ranked.latest_post_at DESC',
+  posts: 'ranked.total_posts DESC, ranked.score DESC, ranked.latest_post_at DESC',
   engagement: 'ranked.likes_received DESC, ranked.reposts_made DESC, ranked.score DESC',
   views: 'ranked.views_received DESC, ranked.score DESC, ranked.latest_post_at DESC',
 }
@@ -29,6 +30,7 @@ const SCORE_SQL = `
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
+    const walletAddressParam = searchParams.get('wallet_address')
 
     const page = clampNumber(parseInt(searchParams.get('page'), 10), 1, 1000, 1)
     const limit = clampNumber(parseInt(searchParams.get('limit'), 10), 1, 100, 20)
@@ -68,8 +70,11 @@ export async function GET(request) {
       since,
     })
 
-    const query = `
-      SELECT ranked.*
+    /* Construct base query fields to execute dynamic window rank sequencing */
+    const queryBase = `
+      SELECT 
+        ranked.*,
+        ROW_NUMBER() OVER (ORDER BY ${SORTS[sort]}) AS global_rank
       FROM (
         SELECT
           wallets.wallet_address,
@@ -136,33 +141,70 @@ export async function GET(request) {
         ) views ON views.wallet_address = wallets.wallet_address
       ) ranked
       WHERE ranked.score > 0
-      ORDER BY ${SORTS[sort]}
-      LIMIT ? OFFSET ?
     `
 
-    const params = [
-      ...activityFilter.params,
-      ...receivedFilter.params,
-      ...givenFilter.params,
-      ...viewsFilter.params,
-      limit + 1,
-      offset,
-    ]
+    let rows = []
+    let hasMore = false
+    let leaders = []
+    let nextPage = null
 
-    const [rows] = await pool.execute(query, params)
-    const hasMore = rows.length > limit
-    const leaders = hasMore ? rows.slice(0, limit) : rows
-    const nextPage = hasMore ? page + 1 : null
+    /* Handle execution branch when requesting single user leaderboard state vs paginated records list */
+    if (walletAddressParam) {
+      const singleUserQuery = `
+        SELECT wrapper.* FROM (
+          ${queryBase}
+        ) wrapper 
+        WHERE wrapper.wallet_address = ?
+      `
+      const params = [
+        ...activityFilter.params,
+        ...receivedFilter.params,
+        ...givenFilter.params,
+        ...viewsFilter.params,
+        walletAddressParam,
+      ]
+
+      const [queryRows] = await pool.execute(singleUserQuery, params)
+      rows = queryRows
+
+      if (rows.length === 0) {
+        return NextResponse.json({ error: 'Wallet address profile score record not found on leaderboard' }, { status: 404 })
+      }
+
+      leaders = rows
+    } else {
+      const genericLeaderboardQuery = `
+        ${queryBase}
+        ORDER BY global_rank ASC
+        LIMIT ? OFFSET ?
+      `
+      const params = [
+        ...activityFilter.params,
+        ...receivedFilter.params,
+        ...givenFilter.params,
+        ...viewsFilter.params,
+        limit + 1,
+        offset,
+      ]
+
+      const [queryRows] = await pool.execute(genericLeaderboardQuery, params)
+      rows = queryRows
+      hasMore = rows.length > limit
+      leaders = hasMore ? rows.slice(0, limit) : rows
+      nextPage = hasMore ? page + 1 : null
+    }
 
     const [statsRows] = await pool.execute(buildStatsQuery(networkId, since), buildStatsParams(networkId, since))
     const [networks] = await pool.execute('SELECT id, name FROM networks ORDER BY name ASC')
 
     return NextResponse.json({
       success: true,
-      data: leaders.map((row, index) => serializeLeader(row, offset + index + 1)),
+      data: walletAddressParam 
+        ? serializeLeader(leaders[0], leaders[0].global_rank)
+        : leaders.map((row) => serializeLeader(row, row.global_rank)),
       nextPage,
       meta: {
-        page,
+        page: walletAddressParam ? 1 : page,
         count: leaders.length,
         hasMore,
         period,
@@ -177,7 +219,7 @@ export async function GET(request) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch leaderboard',
+        error: 'Failed to fetch leaderboard query state',
         details: process.env.NODE_ENV === 'production' ? undefined : error.message,
       },
       { status: 500 },
