@@ -4,14 +4,13 @@ import {
   celo,
   sepolia,
   base,
+  monad,
   celoSepolia,
   opBNBTestnet,
   arbitrumSepolia,
-  monadTestnet,
   somniaTestnet,
   unichainSepolia,
   optimismSepolia,
-  luksoTestnet,
   lineaSepolia,
 } from 'wagmi/chains'
 import { injected, metaMask, safe, walletConnect } from 'wagmi/connectors'
@@ -42,6 +41,12 @@ export const CONTRACTS = {
     hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
   },
+    chain143: {
+    // Monad
+    forwarder: '0x8466799e31a86a4d51B76154e57B14DcAF9A8756',
+    hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
+    status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
+  },
 }
 
 // Customize chains object
@@ -66,10 +71,10 @@ base.primaryColor = `#0052FF`
 base.textColor = `#fff`
 
 // Monad
-monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" fill="white"/><path d="M8.99996 3C7.26731 3 3 7.2672 3 8.99996C3 10.7327 7.26731 15 8.99996 15C10.7326 15 15 10.7326 15 8.99996C15 7.26727 10.7327 3 8.99996 3ZM8.06498 12.431C7.33433 12.2319 5.36993 8.79563 5.56906 8.06498C5.76819 7.33429 9.20437 5.36992 9.93499 5.56905C10.6657 5.76815 12.6301 9.20434 12.431 9.93503C12.2318 10.6657 8.79563 12.6301 8.06498 12.431Z" fill="#836EF9"/></svg>`
-monadTestnet.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
-monadTestnet.primaryColor = `#836EF9`
-monadTestnet.textColor = `#fff`
+monad.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" fill="white"/><path d="M8.99996 3C7.26731 3 3 7.2672 3 8.99996C3 10.7327 7.26731 15 8.99996 15C10.7326 15 15 10.7326 15 8.99996C15 7.26727 10.7327 3 8.99996 3ZM8.06498 12.431C7.33433 12.2319 5.36993 8.79563 5.56906 8.06498C5.76819 7.33429 9.20437 5.36992 9.93499 5.56905C10.6657 5.76815 12.6301 9.20434 12.431 9.93503C12.2318 10.6657 8.79563 12.6301 8.06498 12.431Z" fill="#836EF9"/></svg>`
+monad.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
+monad.primaryColor = `#836EF9`
+monad.textColor = `#fff`
 
 // Linea
 lineaSepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10733_2645)"> <path d="M0 0H18V18H0V0Z" fill="#190066"/> <path d="M6.4 11.67H12V13H5V6H6.4V11.67ZM11.75 4.5C12.0815 4.5 12.3995 4.6317 12.6339 4.86612C12.8683 5.10054 13 5.41848 13 5.75C13 6.08152 12.8683 6.39946 12.6339 6.63388C12.3995 6.8683 12.0815 7 11.75 7C11.4185 7 11.1005 6.8683 10.8661 6.63388C10.6317 6.39946 10.5 6.08152 10.5 5.75C10.5 5.41848 10.6317 5.10054 10.8661 4.86612C11.1005 4.6317 11.4185 4.5 11.75 4.5Z" fill="#61DFFF"/> </g> <defs> <clipPath id="clip0_10733_2645"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
@@ -110,12 +115,13 @@ sepolia.textColor = `#fff`
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [lukso, celo, base], //somniaTestnet, opBNBTestnet
+  chains: [lukso, celo, base, monad], //somniaTestnet, opBNBTestnet
   connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
   transports: {
     [lukso.id]: http(),
     [celo.id]: http(),
     [base.id]: http(),
+    [monad.id]: http(),
   },
   ssr: true,
   // storage: createStorage({
