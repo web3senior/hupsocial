@@ -10,7 +10,7 @@ export async function generateMetadata({ params }, parent) {
   const parentMetadata = await parent
 
   // Extract previously resolved images from parent Open Graph properties
-  const previousImages = (await parent).openGraph?.images || []
+  const previousImages = parentMetadata.openGraph?.images || []
 
   // Extract required parameters for fetching the dynamic post
   const { networkId, postId } = await params
