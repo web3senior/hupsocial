@@ -5,7 +5,6 @@ import SplashScreen from '@/components/SplashScreen'
 import NextToast from './NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
 import TickerTooltip from './TickerTooltip'
-import NewPostButton from './ui/NewPostButton'
 import Header from './Header'
 import Aside from './Aside'
 import Footer from './Footer'
@@ -37,7 +36,7 @@ export default function ClientLayout({ children }) {
       <WagmiContext>
         <Header />
         <Aside />
-        <NewPostButton />
+
         <main className={styles.main}>{children}</main>
         {/* <Footer /> */}
       </WagmiContext>

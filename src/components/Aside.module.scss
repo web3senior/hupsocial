@@ -326,3 +326,49 @@
 .expanded {
   border-color: var(--border);
 }
+
+.newButton {
+  // Define a CSS variable for the icon size that SCSS and lucide-react can both leverage
+  --icon-size: 32px;
+
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.2s ease, bottom 0.2s ease, right 0.2s ease;
+  z-index: 100;
+
+  // Target the SVG directly using our CSS variable
+  svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  // Mobile layout adjustments
+  @include md-down {
+    // Bring it closer to the screen edges on mobile devices
+    bottom: 1.25rem;
+    right: 1.25rem;
+    width: 56px;
+    height: 56px;
+    --icon-size: 24px; 
+  }
+}

@@ -34,6 +34,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
+import { Plus } from 'lucide-react'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
@@ -63,7 +64,8 @@ const normalizeNavItem = (item) => {
 }
 
 const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
-  const [isComponentOpen, setIsComponentOpen] = useState(false)
+  const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
+  const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
 
   if (item.type === 'divider') {
     return <hr className={styles.divider} aria-hidden="true" />
@@ -129,6 +131,7 @@ export default function Aside() {
   const closeMenu = useSidebarStore((state) => state.closeMenu)
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
+  const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
 
   const [isWideScreen, setIsWideScreen] = useState(false)
 
@@ -258,30 +261,30 @@ export default function Aside() {
                     </Link>
                   </li>
                   <li>
-<div className={styles.themeWrapper}>
+                    <div className={styles.themeWrapper}>
                       <div className="flex align-items-center gap-050">
-                      <Palette size={16} />
-                      <span>Theme</span>
+                        <Palette size={16} />
+                        <span>Theme</span>
+                      </div>
+                      <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '60px' }}>
+                        <button type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
+                          <Sun size={16} />
+                          <span>Light</span>
+                        </button>
+                        <button type="button" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>
+                          <Moon size={16} />
+                          <span>Dark</span>
+                        </button>
+                        <button type="button" aria-pressed={theme === 'terminal'} onClick={() => setTheme('terminal')}>
+                          <SquareTerminal size={16} />
+                          <span>Terminal</span>
+                        </button>
+                        <button type="button" aria-pressed={theme === 'system'} onClick={() => setTheme('system')}>
+                          <Monitor size={16} />
+                          <span>System</span>
+                        </button>
+                      </div>
                     </div>
-                    <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '60px' }}>
-                      <button type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
-                        <Sun size={16} />
-                        <span>Light</span>
-                      </button>
-                      <button type="button" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>
-                        <Moon size={16} />
-                        <span>Dark</span>
-                      </button>
-                      <button type="button" aria-pressed={theme === 'terminal'} onClick={() => setTheme('terminal')}>
-                        <SquareTerminal size={16} />
-                        <span>Terminal</span>
-                      </button>
-                      <button type="button" aria-pressed={theme === 'system'} onClick={() => setTheme('system')}>
-                        <Monitor size={16} />
-                        <span>System</span>
-                      </button>
-                    </div>
-</div>
                   </li>
                   <li>
                     <a
@@ -361,6 +364,10 @@ export default function Aside() {
           </Link>
         </div>
       </div>
+
+      <button  className={`${styles.newButton}`} onClick={setIsComponentOpen} aria-label="Create new post">
+        <Plus />
+      </button>
     </aside>
   )
 }

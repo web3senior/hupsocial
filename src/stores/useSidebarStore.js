@@ -27,8 +27,11 @@ export const useSidebarStore = create(
 
       isMenuOpen: false,
       isMobileMenuOpen: false,
+      isComponentOpen: false,
 
       setNavItems: (navItems) => set({ navItems }),
+      setIsComponentOpen: () => set((state) => ({ isComponentOpen: !state.isComponentOpen })),
+      openComponent: () => set({ isComponentOpen: true }),
 
       openMenu: () => set({ isMenuOpen: true }),
       closeMenu: () => set({ isMenuOpen: false }),
