@@ -258,11 +258,12 @@ export default function Aside() {
                     </Link>
                   </li>
                   <li>
-                    <div className="flex align-items-center gap-050">
+<div className={styles.themeWrapper}>
+                      <div className="flex align-items-center gap-050">
                       <Palette size={16} />
                       <span>Theme</span>
                     </div>
-                    <div className={clsx(styles.themeWrapper, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '60px' }}>
+                    <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '60px' }}>
                       <button type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
                         <Sun size={16} />
                         <span>Light</span>
@@ -280,6 +281,7 @@ export default function Aside() {
                         <span>System</span>
                       </button>
                     </div>
+</div>
                   </li>
                   <li>
                     <a
