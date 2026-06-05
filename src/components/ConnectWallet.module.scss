@@ -147,10 +147,11 @@ figure.pfp {
   }
 }
 
-// Default Network
-.networkDialog {
+// Layout style wrapper inside your popover anchor target
+.networkDialogInner {
   max-width: 460px;
-  // max-height: 450px;
+  padding: 1.5rem;
+  background: var(--background);
 
   .link {
     color: var(--blue-400);
@@ -160,15 +161,18 @@ figure.pfp {
   }
 
   h2 {
-    color: var(--black);
+    color: var(--color);
+    margin-bottom: 0.5rem;
     @media (max-width: 300px) {
       font-size: 12px;
     }
   }
 
   p {
-    color: var(--black-500);
+    color: var(--color);
     text-wrap: balance;
+    margin-bottom: 1rem;
+  
     @media (max-width: 300px) {
       font-size: 9px;
       line-height: 1.2;
@@ -180,7 +184,8 @@ figure.pfp {
 
     button {
       all: unset;
-      background-color: var(--gray-50);
+      background-color: var(--background);
+      color: var(--color);
       border: 1px solid transparent;
       padding: 1.1rem 1rem;
       border-radius: 1rem;
@@ -193,15 +198,18 @@ figure.pfp {
       gap: 0.2rem;
       cursor: pointer;
       will-change: transform;
-      transition: transform 0.2s ease;
-      transition: background-color 1s step-end, border 0.3s allow-discrete, transform 0.1s allow-discrete;
+      position: relative; // Retained position rule for alignment marks
+      transition:
+        background-color 1s step-end,
+        border 0.3s allow-discrete,
+        transform 0.1s allow-discrete;
 
       @media (max-width: 300px) {
         padding: 0.5rem 0.2rem;
       }
 
       &:hover {
-        border: 1px solid var(--gray-300);
+        border: 1px solid var(--border);
         transform: scale(1.04);
       }
 
@@ -210,12 +218,11 @@ figure.pfp {
       }
 
       &[data-current='true'] {
-        border: 1px solid var(--black-900);
+        border: 1px solid var(--border);
 
         &:after {
           content: '✓ Current';
           font-size: 9px;
-          background-color: var(--gray-200);
           padding: 0.05rem 0.3rem;
           border-radius: 1000px;
           position: absolute;
@@ -237,7 +244,7 @@ figure.pfp {
       }
 
       span {
-        color: var(--black);
+        color: var(--color);
         font-size: 0.9em;
         text-align: center;
         @media (max-width: 300px) {

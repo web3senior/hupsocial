@@ -218,7 +218,7 @@ const handleImportSessionKey = async () => {
         <div className={`card ${styles.section}`}>
           <div className={`card__body ${styles.sectionBody}`}>
             <div className="flex justify-between align-items-center">
-              <h4>Set session key on LUKSO</h4>
+              <h4>In app wallet</h4>
               <button onClick={checkStatus} className={styles.btnIcon}>
                 <RefreshCwIcon size={18} />
               </button>

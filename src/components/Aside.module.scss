@@ -16,6 +16,8 @@
   user-select: none;
   // overflow: hidden;
   width: 200px;
+  border-top-right-radius: var(--global-border-radius);
+  border-bottom-right-radius: var(--global-border-radius);
 
   @include md-down() {
     //width: 0 !important;
@@ -95,7 +97,7 @@
   gap: 6px;
   min-width: 32px;
   height: 32px;
-  padding-left: 0.25rem;
+  padding: 0 0.25rem;
   border-radius: 1000px;
   text-decoration: none;
   color: var(--black);
@@ -155,14 +157,14 @@
   align-items: center;
   color: var(--black);
 
-  &[data-icon='Activity'] {
+  &[data-icon='Notifications'] {
     &:after {
       content: '';
       color: var(--liked-color);
       position: absolute;
       top: 2px;
-      right: 1px;
-      outline: 1px solid var(--background);
+      right: 3px;
+      outline: 2px solid var(--background);
       width: 7px;
       height: 7px;
       border-radius: 1000px;
@@ -246,7 +248,6 @@
   right: 50%;
   transform: translateX(50%);
   z-index: 2;
-  
 }
 
 .divider {
@@ -285,7 +286,7 @@
 }
 
 .themeWrapper {
-      padding: 4px;
+  padding: 4px;
 }
 
 .themeItems {
@@ -296,8 +297,8 @@
     cursor: pointer;
     padding: 0.25rem 0;
     border-radius: var(--global-border-radius);
-  background-color: var(--surface-muted);
-  color: var(--text);
+    background-color: var(--surface-muted);
+    color: var(--text);
     font-size: var(--font-size-12);
     display: flex;
     flex-direction: column;
@@ -343,7 +344,10 @@
   border: 1px solid var(--border);
   border-radius: var(--global-border-radius);
   box-shadow: var(--shadow-md);
-  transition: transform 0.2s ease, bottom 0.2s ease, right 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    bottom 0.2s ease,
+    right 0.2s ease;
   z-index: 100;
 
   // Target the SVG directly using our CSS variable
@@ -369,6 +373,42 @@
     right: 1.25rem;
     width: 56px;
     height: 56px;
-    --icon-size: 24px; 
+    --icon-size: 24px;
   }
+}
+// Container wrapper layout rules inside nav link structure
+.iconWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  // Tiny red alert indicator badge overlay for the collapsed view state
+  .compactBadgeDot {
+      color: var(--liked-color);
+      position: absolute;
+      top: 3px;
+      right: 1px;
+      outline: 2px solid var(--background);
+      width: 6px;
+      height: 6px;
+      border-radius: 1000px;
+      background-color: var(--batch-like-color);
+
+  }
+}
+
+// Crisp numeric overlay counter badge for the expanded sidebar view state
+.badgeCounter {
+  margin-left: auto;
+  background-color: var(--batch-like-color); 
+  color: #000000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

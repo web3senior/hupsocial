@@ -43,9 +43,10 @@ export default function NativePopover({
     }
   }
 
+  {/* Fixed: Converted target attributes to camelCase properties for React */}
   const triggerProps = {
-    popovertarget: popoverId,
-    popovertargetaction: action,
+    popoverTarget: popoverId,
+    popoverTargetAction: action,
     'aria-controls': popoverId,
   }
 

@@ -346,9 +346,6 @@ const Profile = ({ addr }) => {
     setShowProfileModal(true)
   }
 
-
-
-
   // Isolated sub-rendering wrapper to manage variable text arrays cleanly
   const TagsElement = ({ rawTags }) => {
     let listItems = []
@@ -386,7 +383,6 @@ const Profile = ({ addr }) => {
 
   const targetWallet = params?.wallet || addr || ''
   const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 4)}…${targetWallet.slice(-4)}` : targetWallet
-
 
   const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
 
@@ -453,7 +449,7 @@ const Profile = ({ addr }) => {
               </div>
             </li>
 
-            {isConnected && selfView && (
+            {isConnected && (
               <li className="w-100 grid grid--fit gap-1" style={{ '--data-width': '200px' }}>
                 {address.toString().toLowerCase() === targetWallet.toString().toLowerCase() && (
                   <div className="flex gap-1 w-100">
@@ -468,7 +464,7 @@ const Profile = ({ addr }) => {
               </li>
             )}
 
-            {!selfView && (
+            {isConnected && address.toString().toLowerCase() !== targetWallet.toString().toLowerCase() && (
               <li className="w-100 grid grid--fit gap-1" style={{ '--data-width': '200px' }}>
                 <button className={`${styles.profile__btnFollow} w-100`} type="button" onClick={follow}>
                   Follow

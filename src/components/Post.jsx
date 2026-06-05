@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useId, useRef, useCallback } from 'react'
+import { useState, useEffect, useId, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
 import { initHupContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
@@ -30,6 +30,7 @@ import clsx from 'clsx'
 import styles from './Post.module.scss'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 import NewPost from './NewPost'
+import { useSidebarStore } from '@/stores/useSidebarStore'
 
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
@@ -245,7 +246,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
             onClick={(e) => e.stopPropagation()}
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
           >
-            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like item={displayItem || item} />}
+            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like post={displayItem || item} />}
 
             {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
               <>
@@ -822,13 +823,27 @@ const ShareModal = ({ item, setShowShareModal }) => {
 /**
  * Like Interaction Component
  * @param {Object} props
- * @param {Object} props.item Core content model with network metadata and like metrics.
+ * @param {Object} props.post Core content model with network metadata and like metrics.
  * @param {Function} [props.onUpdate] Optional parent update callback to sync list states.
  */
-const Like = ({ item, onUpdate }) => {
-  // Local state initialized straight from the source prop
-  const [isLiked, setIsLiked] = useState(item.is_liked === 1 || item.is_liked === true)
-  const [likeCount, setLikeCount] = useState(Number(item.total_likes) || 0)
+const Like = ({ post, onUpdate }) => {
+  // Extract batch actions and the network-separated queue map from the store
+  const addToBatch = useSidebarStore((state) => state.addToBatch)
+  const removeFromBatch = useSidebarStore((state) => state.removeFromBatch)
+  const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
+
+  // Resolve the current sub-queue for this network to evaluate queue state safely
+  const currentNetworkQueue = useMemo(() => {
+    if (Array.isArray(likedPostIdsMap)) return likedPostIdsMap
+    return likedPostIdsMap[post.network_id] ?? []
+  }, [likedPostIdsMap, post.network_id])
+
+  // Check if this specific post is sitting in the matching network queue
+  const isQueued = currentNetworkQueue.includes(post.id)
+
+  // Local state initialized straight from the source prop object
+  const [isLiked, setIsLiked] = useState(post.is_liked === 1 || post.is_liked === true)
+  const [likeCount, setLikeCount] = useState(Number(post.total_likes) || 0)
   const [isProcessing, setIsProcessing] = useState(false)
 
   const isMounted = useClientMounted()
@@ -852,21 +867,20 @@ const Like = ({ item, onUpdate }) => {
 
       // Notify parent component or state managers if callback provided
       if (typeof onUpdate === 'function') {
-        onUpdate(item.id, { is_liked: 1, total_likes: likeCount + 1 })
+        onUpdate(post.id, { is_liked: 1, total_likes: likeCount + 1 })
       }
       toast('Interaction saved on-chain!', 'success')
     }
   }, [isConfirmed])
 
-  const likePost = async (e, id) => {
-    e.stopPropagation()
-
+  // Execute on-chain direct post liking workflow logic
+  const likePost = async (id) => {
     if (!isConnected || !address) {
       toast('Please connect your wallet first', 'error')
       return
     }
 
-    const targetChain = CONTRACTS[`chain${item.network_id}`]
+    const targetChain = CONTRACTS[`chain${post.network_id}`]
     if (!targetChain?.hup) {
       toast('Contract configuration missing for network', 'error')
       return
@@ -881,7 +895,7 @@ const Like = ({ item, onUpdate }) => {
       })
 
       if (session.active) {
-        // Burner session pipeline (Immediate execution)
+        // Burner session pipeline handles immediate execution blocks
         await writeWithBurnerSession({
           chain: activeChain[0],
           contractAddress: targetChain.hup,
@@ -890,7 +904,7 @@ const Like = ({ item, onUpdate }) => {
           args: [address, [id]],
         })
 
-        // Optimistic / Immediate UI adjustment for burner sessions
+        // Optimistic UI adjustments for burner action channels
         setIsLiked(true)
         setLikeCount((prev) => prev + 1)
         if (typeof onUpdate === 'function') {
@@ -902,7 +916,7 @@ const Like = ({ item, onUpdate }) => {
         return
       }
 
-      // Primary wallet fallback pipeline
+      // Primary connected user wallet fallback pipeline execution
       await writeContractAsync({
         abi,
         address: targetChain.hup,
@@ -917,16 +931,15 @@ const Like = ({ item, onUpdate }) => {
       setIsProcessing(false)
     }
   }
-
-  const unlikePost = async (e, id) => {
-    e.stopPropagation()
-
+  
+  // Execute on-chain direct post unliking workflow logic
+  const unlikePost = async (id) => {
     if (!isConnected) {
       toast('Please connect your wallet first', 'error')
       return
     }
 
-    const targetChain = CONTRACTS[`chain${item.network_id}`]
+    const targetChain = CONTRACTS[`chain${post.network_id}`]
     if (!targetChain?.hup) {
       toast('Contract configuration missing for network', 'error')
       return
@@ -938,12 +951,11 @@ const Like = ({ item, onUpdate }) => {
       await writeContractAsync({
         abi,
         address: targetChain.hup,
-        functionName: 'unlikePost',
+        functionName: 'batchUnLike',
         args: [id],
       })
 
-      // For primary wallet unlikes, you can either optimistically remove it here
-      // or set up an effect watching a separate un-liking transaction receipt.
+      // Adjust states optimistically while awaiting blockchain finalization block
       setIsLiked(false)
       setLikeCount((prev) => Math.max(0, prev - 1))
       setIsProcessing(false)
@@ -956,42 +968,73 @@ const Like = ({ item, onUpdate }) => {
     }
   }
 
-  // Determine aggregate loading footprint
+  // Handle local click router deciding between unliking or toggling batch membership
+  const handleLikeInteraction = (e) => {
+    e.stopPropagation()
+    
+    if (!isConnected) {
+      toast('Please connect wallet', 'error')
+      return
+    }
+
+    if (isLiked) {
+      unlikePost(post.id)
+    } else if (isQueued) {
+      // Toggle off: remove from batch queue if already queued
+      removeFromBatch(post.network_id, post.id)
+      toast('Removed from batch queue', 'info')
+    } else {
+      // Toggle on: add to batch queue if not queued yet
+      addToBatch(post.network_id, post.id)
+      toast('Added to batch queue!', 'success')
+    }
+  }
+
+  // Determine cumulative operations footprint size across standard states
   const isLoading = isProcessing || isWalletPending || isConfirming
+
+  // Derive dynamic color tokens directly from state checks
+  const heartColor = isLiked 
+    ? 'var(--liked-color, red)' 
+    : isQueued 
+    ? 'var(--batch-like-color, #facc15)' 
+    : 'currentColor'
+
+  const heartFill = isLiked 
+    ? 'var(--liked-color, red)' 
+    : isQueued 
+    ? 'var(--batch-like-color, #facc15)' 
+    : 'none'
 
   if (!isMounted) return null
 
   return (
-    <button
-      disabled={isLoading}
-      className={`like-button ${isLoading ? 'processing' : ''}`}
-      onClick={(e) => {
-        if (isConnected) {
-          isLiked ? unlikePost(e, item.id) : likePost(e, item.id)
-        } else {
-          toast('Please connect wallet', 'error')
-        }
-      }}
-    >
-      {isLoading ? (
-        <div className={styles.animatedHeader}>
-          <AnimatedHeart />
-        </div>
-      ) : (
-        <Heart
-          strokeWidth={1.5}
-          width={18}
-          height={18}
-          color={isLiked ? 'var(--liked-color)' : 'currentColor'}
-          fill={isLiked ? 'var(--liked-color)' : 'none'}
-        />
-      )}
+    <div className="flex align-items-center gap-050">
+      <button
+        disabled={isLoading}
+        className={`like-button ${isLoading ? 'processing' : ''} ${isQueued ? 'queued' : ''}`}
+        onClick={handleLikeInteraction}
+        aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
+      >
+        {isLoading ? (
+          <div className={styles.animatedHeader}>
+            <AnimatedHeart />
+          </div>
+        ) : (
+          <Heart
+            strokeWidth={1.5}
+            width={18}
+            height={18}
+            color={heartColor}
+            fill={heartFill}
+          />
+        )}
 
-      {likeCount > 0 && !isLoading && <span>{likeCount}</span>}
-    </button>
+        {likeCount > 0 && !isLoading && <span>{likeCount}</span>}
+      </button>
+    </div>
   )
 }
-
 const Repost = ({ item }) => {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()

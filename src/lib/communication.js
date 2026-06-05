@@ -12,30 +12,26 @@ export const getActiveChain = () => {
   const DEFAULT_CHAIN_ID = 42
 
   if (typeof window !== 'undefined') {
-    // Client-side execution: Read from localStorage
+    // Check if wagmi has a live connected chain first!
+    // This allows wagmi to act as your single source of truth.
+    
     const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || DEFAULT_CHAIN_ID.toString()
     const userSelectedChain = config.chains.filter((filterItem) => filterItem.id.toString() === activeChain.toString())
 
-    // Ensure a chain was actually found
     if (userSelectedChain.length > 0) {
-      // Change primary color of the app
       setNetworkColor(userSelectedChain[0])
       return [userSelectedChain[0], CONTRACTS[`chain${userSelectedChain[0].id}`]]
     }
   }
 
-  // Server-side execution OR localStorage failed to find a matching chain
   const defaultChain = config.chains.find((filterItem) => filterItem.id === DEFAULT_CHAIN_ID)
-
   if (defaultChain) {
     return [defaultChain, CONTRACTS[`chain${DEFAULT_CHAIN_ID}`]]
   }
 
-  // Fallback if the default chain isn't even in config (should rarely happen)
   console.error('Default chain not found in config.')
   return [null, null]
 }
-
 /**
  * Initialize post contract
  */

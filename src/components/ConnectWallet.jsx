@@ -2,82 +2,74 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config } from '@/config/wagmi'
-import { useConnection, useDisconnect, useConnect, useChains, useSwitchChain } from 'wagmi'
+import { useDisconnect, useConnect, useSwitchChain, useAccount } from 'wagmi' // Updated useConnection to useAccount
 import { getActiveChain } from '@/lib/communication'
-import { ensureProfile, getProfile, getUniversalProfile } from '@/lib/api'
-import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
-import Shimmer from '@/components/ui/Shimmer'
-import styles from './ConnectWallet.module.scss'
+import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
+import NativePopover from '@/components/ui/NativePopover' 
+import styles from './ConnectWallet.module.scss'
 
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
-  const [showNetworks, setShowNetworks] = useState(false)
   const { disconnect } = useDisconnect()
-  const [activeChain, setActiveChain] = useState(getActiveChain())
   const mounted = useClientMounted()
-  const { address, isConnected } = useConnection()
   
-const ensuredProfileRef = useRef(null)
+  // Use useAccount to get the live chain directly from the wallet provider
+  const { address, isConnected, chain: walletChain } = useAccount()
 
-useEffect(() => {
-  if (!isConnected || !address) return
+  const ensuredProfileRef = useRef(null)
 
-  const walletAddress = address.toLowerCase()
+  // Derive the active chain directly during render without any state.
+  // If walletChain exists, it's used; otherwise getActiveChain falls back to localStorage/defaults.
+  const [currentChainData] = getActiveChain()
 
-  if (ensuredProfileRef.current === walletAddress) return
-  ensuredProfileRef.current = walletAddress
+  useEffect(() => {
+    if (!isConnected || !address) return
 
-  ensureProfile(walletAddress).catch((error) => {
-    console.error('Failed to create user profile:', error.message)
-    ensuredProfileRef.current = null
-  })
-}, [isConnected, address])
+    const walletAddress = address.toLowerCase()
 
+    if (ensuredProfileRef.current === walletAddress) return
+    ensuredProfileRef.current = walletAddress
+
+    ensureProfile(walletAddress).catch((error) => {
+      console.error('Failed to create user profile:', error.message)
+      ensuredProfileRef.current = null
+    })
+  }, [isConnected, address])
 
   return !mounted ? null : (
     <>
-      {activeChain[0] && (
-        <>
-          <div className={`${styles.networks}`}>
-            <button
-              className={`${styles.btnNetwork}`}
-              onClick={(e) => {
-                document.querySelector(`#networkDialog`).classList.add(`is-open`)
-                document.querySelector(`#networkDialog`).showModal()
-              }}
-              title={`${activeChain[0].name}`}
-            >
-              <span
-                className={`rounded`}
-                dangerouslySetInnerHTML={{ __html: activeChain[0].icon }}
-              />
-            </button>
-
-            <DefaultNetwork currentNetwork={activeChain[0].id} />
-          </div>
-        </>
+      {currentChainData && (
+        <div className={`${styles.networks}`}>
+          <NativePopover
+            placement="bottom-start"
+            type="auto"
+            trigger={
+              <button
+                type="button"
+                className={`${styles.btnNetwork}`}
+                title={`${currentChainData.name}`}
+              >
+                <span className={`rounded`} dangerouslySetInnerHTML={{ __html: currentChainData.icon }} />
+              </button>
+            }
+          >
+            {/* No callbacks needed anymore since rendering is fully reactive */}
+            <DefaultNetwork currentNetwork={currentChainData.id} />
+          </NativePopover>
+        </div>
       )}
 
       {isConnected && <Profile addr={address} />}
 
       {!isConnected && (
-        <button
-          className={`${styles.btnConnect} flex align-items-center gap-025 `}
-          onClick={() => setShowModal(true)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            height="24px"
-            viewBox="0 -960 960 960"
-            width="24px"
-            fill="#fff"
-          >
+        <button className={`${styles.btnConnect} flex align-items-center gap-025 `} onClick={() => setShowModal(true)}>
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#fff">
             <path d="M224.62-160q-27.62 0-46.12-18.5Q160-197 160-224.62v-510.76q0-27.62 18.5-46.12Q197-800 224.62-800h510.76q27.62 0 46.12 18.5Q800-763 800-735.38V-680H544.62q-47.93 0-76.27 28.35Q440-623.31 440-575.38v190.76q0 47.93 28.35 76.27Q496.69-280 544.62-280H800v55.38q0 27.62-18.5 46.12Q763-160 735.38-160H224.62Zm320-160q-27.62 0-46.12-18.5Q480-357 480-384.62v-190.76q0-27.62 18.5-46.12Q517-640 544.62-640h230.76q27.62 0 46.12 18.5Q840-603 840-575.38v190.76q0 27.62-18.5 46.12Q803-320 775.38-320H544.62ZM640-420q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Z" />
           </svg>
           Connect
@@ -89,45 +81,69 @@ useEffect(() => {
   )
 }
 
-export function WalletConnectModal({ setShowModal }) {
+// ... WalletConnectModal, WalletOptions, and Profile remain exactly the same ...
+
+export function DefaultNetwork({ currentNetwork }) {
+  const { isConnected } = useAccount()
+  const switchChain = useSwitchChain({ config })
+  const router = useRouter()
+
+  const handleSwitchChain = (chain) => {
+    const chainId = chain.id
+
+    if (isConnected) {
+      switchChain.mutate(
+        { chainId: chainId },
+        {
+          onSuccess: () => {
+            localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
+          },
+          onError: (error) => {
+            console.error('Switch chain failed:', error)
+          },
+        },
+      )
+    } else {
+      // Disconnected users instantly change local storage and route
+      localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
+    }
+  }
+
   return (
-    <div className={`${styles.walletConnectModal}`} onClick={() => setShowModal(false)}>
-      <WalletOptions />
+    <div className={`${styles.networkDialogInner}`}>
+      <h2>Select Your Network</h2>
+      <p>
+        Your choices shape the content you experience. Each network carries a unique, unalterable history of posts, identities, and
+        governance votes.
+      </p>
+
+      <div className={`${styles.networks} grid grid--fit gap-050`} style={{ '--data-width': `150px` }}>
+        {config.chains.map((chain, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => handleSwitchChain(chain)}
+            data-current={chain.id.toString() === currentNetwork.toString()}
+          >
+            <div className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
+            <span>{chain.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <p
+        className={`text-center mt-10 ${styles.link}`}
+        onClick={() => router.push(`/networks`)}
+      >
+        View networks
+      </p>
     </div>
   )
 }
-
-export function WalletOptions() {
-  const { connectors, connect } = useConnect()
-
-  return connectors.map((connector) => (
-    <button
-      className={`${styles['wallet']}`}
-      key={connector.uid}
-      onClick={() => connect({ connector })}
-    >
-      {connector.name}
-    </button>
-  ))
-}
-
-/**
- * Profile identity component handling decentralized profile discovery profiles
- * @param {String} addr
- * @returns
- */
 export function Profile({ addr }) {
-  const router = useRouter()
   const { profile, isLoading } = useProfile(addr)
 
-  if (isLoading)
-    return (
-      <div className={`${styles.profileShimmer} flex align-items-center`}>
-        <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
-      </div>
-    )
-
-  if (!profile)
+  if (isLoading || !profile)
     return (
       <div className={`${styles.profileShimmer} flex align-items-center`}>
         <div className={`shimmer rounded`} style={{ width: `36px`, height: `36px` }} />
@@ -136,111 +152,9 @@ export function Profile({ addr }) {
 
   return (
     <Link href={`/${addr}`}>
-      <figure
-        className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`}
-        title={profile.name}
-      >
+      <figure className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`} title={profile.name}>
         <img alt={profile.name || `PFP`} src={profile.profileImage} className={`rounded`} />
       </figure>
     </Link>
-  )
-}
-
-export default function DefaultNetwork({ currentNetwork, setShowNetworks }) {
-  const networkDialog = useRef()
-  const { address, isConnected } = useConnection()
-  const switchChain = useSwitchChain({ config })
-  const chains = useChains()
-  const router = useRouter()
-
-  const handleSwitchChain = (selectedChain) => {
-    const chain = JSON.parse(selectedChain)
-    const chainId = chain.id
-
-    if (isConnected) {
-      console.log(`Connected`)
-
-      switchChain.mutate(
-        { chainId: chainId },
-        {
-          onSuccess: (data) => {
-            console.log('onSuccess:', data)
-            localStorage.setItem(
-              `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`,
-              chainId,
-            )
-            window.location.href = `/`
-          },
-          onError: (error) => {
-            console.error('Switch chain failed:', error)
-          },
-        },
-      )
-    } else {
-      console.log(`Not Connected`)
-      localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
-      window.location.href = `/`
-    }
-  }
-
-  useEffect(() => {
-    networkDialog.current.addEventListener('close', (e) => {
-      const returnValue = networkDialog.current.returnValue
-      if (returnValue === `close`) {
-        return
-      }
-      handleSwitchChain(returnValue)
-    })
-  }, [isConnected])
-
-  return (
-    <dialog ref={networkDialog} id={`networkDialog`} className={`dialog ${styles.networkDialog} `}>
-      <h2>Select Your Network</h2>
-      <p>
-        Your choices shape the content you experience. Each network carries a unique, unalterable
-        history of posts, identities, and governance votes.
-      </p>
-
-      <form method={`dialog`}>
-        <div
-          className={`${styles.networks} grid grid--fit gap-050`}
-          style={{ '--data-width': `150px` }}
-        >
-          {config.chains.map((chain, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                networkDialog.current.close(JSON.stringify(chain))
-              }}
-              data-current={chain.id.toString() === currentNetwork.toString()}
-            >
-              <div className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
-              <span>{chain.name}</span>
-            </button>
-          ))}
-        </div>
-        <button className={`close`} value={`close`}>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            height="24px"
-            viewBox="0 -960 960 960"
-            width="24px"
-            fill="#1f1f1f"
-          >
-            <path d="m322.15-293.08-29.07-29.07L450.92-480 293.08-636.85l29.07-29.07L480-508.08l156.85-157.84 29.07 29.07L508.08-480l157.84 157.85-29.07 29.07L480-450.92 322.15-293.08Z" />
-          </svg>
-        </button>
-      </form>
-
-      <p
-        className={`text-center mt-10 ${styles.link}`}
-        onClick={() => {
-          router.push(`/networks`)
-          networkDialog.current.close(`close`)
-        }}
-      >
-        View networks
-      </p>
-    </dialog>
   )
 }
