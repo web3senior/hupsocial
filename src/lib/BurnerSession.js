@@ -63,6 +63,9 @@ const getBurnerSigner = async (chain, password = null) => {
  * Bubbles up 'PASSWORD_REQUIRED' if the key needs to be unlocked.
  */
 export const writeWithBurnerSession = async ({ chain, contractAddress, abi, functionName, args, password = null }) => {
+  console.log(
+    { chain, contractAddress, abi, functionName, args}
+  )
   // Retrieve signer (decrypts key asynchronously if needed)
   const burnerSigner = await getBurnerSigner(chain, password)
 

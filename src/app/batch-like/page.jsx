@@ -10,7 +10,7 @@ import { useSidebarStore } from '@/stores/useSidebarStore'
 import PageTitle from '@/components/PageTitle'
 import { getNetworkDisplayName } from '@/lib/chains'
 import { CONTRACTS } from '@/config/wagmi'
-import { postAbi } from '@/abi/post'
+import abi from '@/abi/post.json'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 import { toast } from '@/components/NextToast'
 import styles from './page.module.scss'
@@ -97,7 +97,7 @@ export default function Page() {
         await writeWithBurnerSession({
           chain: activeChain || { id: numericChainId },
           contractAddress: targetChain.hup,
-          abi: postAbi,
+          abi: abi,
           functionName: 'batchLike',
           args: [address, currentNetworkPosts],
         })
@@ -110,7 +110,6 @@ export default function Page() {
 
       // Base ledger wallet fallback pathway requiring local user confirmation
       await writeContractAsync({
-        abi: postAbi,
         address: targetChain.hup,
         functionName: 'batchLike',
         args: [address, currentNetworkPosts],
