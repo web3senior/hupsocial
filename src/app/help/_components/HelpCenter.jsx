@@ -165,6 +165,7 @@ export default function HelpCenter() {
               <option value="indexing">Profile Sync / Indexing Issue</option>
               <option value="transaction">On-Chain Transaction Problem</option>
               <option value="bug">Bug Report / App Error</option>
+              <option value="feedback">Feedback / Suggestion</option>
             </select>
           </div>
 
