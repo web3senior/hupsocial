@@ -7,15 +7,11 @@ const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX
 const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
 const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
 
-const getRpcUrl = (chain) => 
-  chain?.rpcUrls?.default?.http?.[0] || 
-  chain?.rpcUrl || 
-  chain?.rpc || 
-  process.env.NEXT_PUBLIC_LUKSO_RPC_URL
+const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl || chain?.rpc || process.env.NEXT_PUBLIC_LUKSO_RPC_URL
 
 /**
  * Retrieves the burner signer. Asynchronously decrypts the key if locked.
- * 
+ *
  * @param {object} chain - The chain object containing RPC configurations.
  * @param {string|null} password - Optional password to decrypt the key if locked.
  */
@@ -35,11 +31,11 @@ const getBurnerSigner = async (chain, password = null) => {
     } else {
       // 3. Encrypted key requires password to decrypt
       if (!password) {
-       // throw new Error('PASSWORD_REQUIRED')
-       password = prompt(`Please enter your password`)
+        // throw new Error('PASSWORD_REQUIRED')
+        password = prompt(`Please enter your password`)
       }
       privateKey = await decryptData(storedKey, password)
-      
+
       // Cache decrypted key in sessionStorage for this tab session
       sessionStorage.setItem(sessionStorageUnlockedKey, privateKey)
     }
@@ -86,7 +82,7 @@ const getStoredBurner = () => {
 
   const address = localStorage.getItem(localStorageBurnerAddress)
   const privateKey = localStorage.getItem(localStorageBurnerKey)
-  
+
   if (!privateKey || !address) return null
 
   try {
@@ -97,7 +93,7 @@ const getStoredBurner = () => {
         return null
       }
     }
-    
+
     // For encrypted keys, we trust the stored address (validated during setup/import)
     return {
       address,
@@ -114,8 +110,11 @@ const getStoredBurner = () => {
  * Runs completely in the background without needing to decrypt the private key.
  */
 export const isSessionActive = async ({ userAddress, publicClient }) => {
+  const session = await getUserSessions(userAddress)
+
   if (!userAddress) {
     return {
+      session,
       active: false,
       burnerAddress: null,
       expiresAt: null,
@@ -126,13 +125,13 @@ export const isSessionActive = async ({ userAddress, publicClient }) => {
 
   if (!storedBurner) {
     return {
+      session,
       active: false,
       burnerAddress: null,
       expiresAt: null,
     }
   }
 
-  const session = await getUserSessions(userAddress)
   const latestBlock = await publicClient?.getBlock()
   const networkTime = latestBlock?.timestamp ?? BigInt(Math.floor(Date.now() / 1000))
 
@@ -146,6 +145,7 @@ export const isSessionActive = async ({ userAddress, publicClient }) => {
     expiresAt > networkTime
 
   return {
+    session,
     active,
     burnerAddress: sessionBurner,
     expiresAt,

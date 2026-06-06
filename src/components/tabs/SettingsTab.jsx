@@ -55,6 +55,8 @@ export default function SettingsTab() {
         userAddress: address,
         publicClient,
       })
+      console.log(session)
+
       setSessionActive(session.active)
       setBurnerAddress(session.burnerAddress)
       setExpiresAt(session.expiresAt)

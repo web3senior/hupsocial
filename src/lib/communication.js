@@ -107,10 +107,12 @@ export async function getMaxLength() {
 }
 
 export async function getUserSessions(address) {
+    console.log(`============================================`)
   const { web3, contract } = initHupContract()
 
   try {
     const result = await contract.methods.userSessions(address).call()
+  
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
