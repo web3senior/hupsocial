@@ -339,7 +339,7 @@ const Profile = ({ addr }) => {
   }
 
   const editProfile = () => {
-    if (isItUp) {
+    if (profile.source === `universal_profile`) {
       toast(`Please update your profile through Universal Profile`, `error`)
       return
     }
@@ -388,10 +388,10 @@ const Profile = ({ addr }) => {
 
   return (
     <>
-      {showProfileModal && data && (
+      {showProfileModal && profile && (
         <ProfileModal
           getActiveChain={getActiveChain}
-          profile={data}
+          profile={profile}
           setShowProfileModal={setShowProfileModal}
           updateProfile={updateProfile}
         />
@@ -402,7 +402,8 @@ const Profile = ({ addr }) => {
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
             <div className={styles.profile__header}>
               <b className={styles.profile__name}>{profile.name ? profile.name : 'hup-user'}</b>
-              <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
+              <img className={styles.profile__checkmark} alt="Checkmark" 
+              src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
             </div>
 
             <code className={styles.profile__wallet}>
@@ -706,6 +707,7 @@ const Status = ({ addr, profile, selfView }) => {
  * @returns {JSX.Element}
  */
 const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
+  console.log(`withing profile modal`,profile)
   // Safe helper to parse structural lists from DB and strip away malformed or empty data structures
   const parseSafeList = (data, isLinkList = false) => {
     try {
@@ -923,7 +925,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
           <form className="form" onSubmit={handleSubmit} encType="multipart/form-data">
             <div className="form-group">
               <figure className="rounded">
-                <img ref={pfpRef} src={resolveIPFSUrl(profile?.profileImage) || '/placeholder-avatar.png'} alt="Profile preview" />
+                <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" />
               </figure>
             </div>
 

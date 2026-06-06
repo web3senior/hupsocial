@@ -22,6 +22,7 @@ export const profileFetcher = async (address) => {
     if (profile) {
       return {
         ...profile,
+        source: rawProfile.source,
         name: profile.name || DEFAULT_USERNAME,
         profileImage: profile.profileImage || DEFAULT_PFP,
       }
