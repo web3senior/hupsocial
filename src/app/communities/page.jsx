@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount, usePublicClient } from 'wagmi'
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount, usePublicClient, useConnection } from 'wagmi'
 import { parseEther } from 'viem'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
@@ -14,6 +14,7 @@ const CORE_CONTRACT_ADDRESS = '0x77F884698945883841384bCA8bE6df17fCB7c04D'
 
 // Helper component to fetch, render, update, and post within individual community cards
 function CommunityCard({ id }) {
+    const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
   const publicClient = usePublicClient()
   
@@ -68,23 +69,32 @@ function CommunityCard({ id }) {
     isSuccess: isPostConfirmed
   } = useWaitForTransactionReceipt({ hash: postHash })
 
-  // Query and filter ContentCreated event logs for this specific community context
+
+// Query and filter feed arrays using a direct contract view function call
   useEffect(() => {
     const fetchCommunityFeed = async () => {
       if (!publicClient) return
       setIsFeedLoading(true)
       try {
-        // Query ContentCreated logs emitted by the Core engine
-        const logs = await publicClient.getContractEvents({
+        // Read directly from the core contract state instead of relying on RPC log intervals
+        const feedData = await publicClient.readContract({
           address: CORE_CONTRACT_ADDRESS,
           abi: HupCoreABI,
-          eventName: 'ContentCreated',
-          fromBlock: 'earliest',
+          functionName: 'getFeed',
+          args: [
+            0n,   // Offset/Start index for pagination (adjust based on contract requirements)
+            10n,  // Limit/Count of total items to return in the array pass
+            address
+          ],
         })
 
-        const filteredAndParsedPosts = logs
-          .map((log) => {
-            const { id: postId, owner, metadata: rawMetadata } = log.args
+        // Ensure we have a valid array to map over
+        const rawPosts = Array.isArray(feedData) ? feedData : []
+
+        const filteredAndParsedPosts = rawPosts
+          .map((post) => {
+            // Adjust property keys based on the exact struct returned by your getFeed function
+            const { id: postId, owner, metadata: rawMetadata } = post
             
             let parsedMeta = {}
             try {
@@ -93,7 +103,7 @@ function CommunityCard({ id }) {
               return null
             }
 
-            // Verify if the indexed metadata belongs to this specific community scope
+            // Verify if the metadata object matches this community context
             if (Number(parsedMeta.communityId) !== Number(id)) {
               return null
             }
@@ -107,11 +117,12 @@ function CommunityCard({ id }) {
             }
           })
           .filter(Boolean)
+          // Sort to ensure the latest community items appear at the head of the list
           .sort((a, b) => b.timestamp - a.timestamp)
 
         setCommunityPosts(filteredAndParsedPosts)
       } catch (err) {
-        console.error('Failed to parse logs from core engine:', err)
+        console.error('Failed to parse feed data from core contract view:', err)
       } finally {
         setIsFeedLoading(false)
       }
@@ -119,6 +130,7 @@ function CommunityCard({ id }) {
 
     fetchCommunityFeed()
   }, [id, publicClient, isPostConfirmed])
+
 
   if (isLoading || !data) {
     return <div className={clsx(styles.card, styles['card--loading'])}>Loading space #{id}...</div>
@@ -252,16 +264,16 @@ function CommunityCard({ id }) {
             ) : (
               <div className={styles.feed__list}>
                 {communityPosts.map((post) => (
-                  <div key={post.postId} className={styles.feed__item}>
-                    <div className={styles.feed__itemHeader}>
+                  <div key={post.postId} className={`${styles.feed__item} card`}>
+                    <div className={`${styles.feed__itemHeader} card__body`}>
                       <span className={styles.feed__itemAuthor}>
-                        {post.author.slice(0, 6)}...{post.author.slice(-4)}
+                        {post?.author && post.author.slice(0, 6)}...{post?.author && post.author.slice(-4)}
                       </span>
                       <span className={styles.feed__itemTime}>
                         {new Date(post.timestamp).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className={styles.feed__itemContent}>{post.content}</p>
+                    <p className={styles.feed__itemContent} style={{padding:`1rem`}}>{post.content}</p>
                     {post.attachment && (
                       <div className={styles.feed__itemMedia}>
                         <img src={post.attachment} alt="Attachment payload" />
