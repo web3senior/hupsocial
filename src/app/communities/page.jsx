@@ -14,7 +14,7 @@ const CORE_CONTRACT_ADDRESS = '0x77F884698945883841384bCA8bE6df17fCB7c04D'
 
 // Helper component to fetch, render, update, and post within individual community cards
 function CommunityCard({ id }) {
-    const { address, isConnected } = useConnection()
+  const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
   const publicClient = usePublicClient()
   
@@ -30,6 +30,10 @@ function CommunityCard({ id }) {
   const [editLogoUrl, setEditLogoUrl] = useState('')
   const [editMembershipType, setEditMembershipType] = useState(0)
   const [editCommunityType, setEditCommunityType] = useState(0)
+
+  // NFT Requirement Input States
+  const [nftContractAddress, setNftContractAddress] = useState('')
+  const [minNftBalance, setMinNftBalance] = useState('1')
 
   // New post content inputs
   const [postContent, setPostContent] = useState('')
@@ -56,6 +60,19 @@ function CommunityCard({ id }) {
     isSuccess: isUpdateConfirmed 
   } = useWaitForTransactionReceipt({ hash: updateHash })
 
+  // Contract modification hook for setting NFT configuration requirements
+  const {
+    writeContract: updateNftRequirement,
+    data: nftHash,
+    isPending: isNftPending,
+    error: nftError
+  } = useWriteContract()
+
+  const {
+    isLoading: isNftConfirming,
+    isSuccess: isNftConfirmed
+  } = useWaitForTransactionReceipt({ hash: nftHash })
+
   // Contract modification hook targeting Hup Core directly via background session authorization
   const {
     writeContract: publishPostContract,
@@ -69,8 +86,7 @@ function CommunityCard({ id }) {
     isSuccess: isPostConfirmed
   } = useWaitForTransactionReceipt({ hash: postHash })
 
-
-// Query and filter feed arrays using a direct contract view function call
+  // Query and filter feed arrays using a direct contract view function call
   useEffect(() => {
     const fetchCommunityFeed = async () => {
       if (!publicClient) return
@@ -131,7 +147,6 @@ function CommunityCard({ id }) {
     fetchCommunityFeed()
   }, [id, publicClient, isPostConfirmed])
 
-
   if (isLoading || !data) {
     return <div className={clsx(styles.card, styles['card--loading'])}>Loading space #{id}...</div>
   }
@@ -157,6 +172,8 @@ function CommunityCard({ id }) {
     setEditLogoUrl(metadata['logo url'] || '')
     setEditMembershipType(membershipType)
     setEditCommunityType(cType)
+    setNftContractAddress('')
+    setMinNftBalance('1')
     setIsEditing(true)
     setIsPosting(false)
   }
@@ -179,12 +196,23 @@ function CommunityCard({ id }) {
     }
     const updatedMetadataString = JSON.stringify(updatedMetadataObj)
 
+    // Execute standard community info update rule
     updateContract({
       address: CONTRACT_ADDRESS,
       abi: HupCommunityABI,
       functionName: 'updateCommunity',
       args: [id, editMembershipType, updatedMetadataString], 
     })
+
+    // If configuration transitions to or maintains NFT-gated rule, trigger requirements update rules
+    if (editMembershipType === 3 && nftContractAddress) {
+      updateNftRequirement({
+        address: CONTRACT_ADDRESS,
+        abi: HupCommunityABI,
+        functionName: 'setNftRequirement',
+        args: [id, nftContractAddress, BigInt(minNftBalance)],
+      })
+    }
   }
 
   const handlePostSubmit = (e) => {
@@ -325,6 +353,35 @@ function CommunityCard({ id }) {
             </div>
           </div>
 
+          {/* Conditional Input UI layer for handling smart NFT registration gating configuration properties */}
+          {editMembershipType === 3 && (
+            <div className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')} style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+              <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>NFT Gating Configuration</h5>
+              <div className={styles.card__field}>
+                <label className={styles.card__label}>NFT Collection Address</label>
+                <input 
+                  className={styles.card__input} 
+                  placeholder="0x..." 
+                  value={nftContractAddress}
+                  onChange={(e) => setNftContractAddress(e.target.value)}
+                  required={editMembershipType === 3}
+                />
+              </div>
+              <div className={styles.card__field} style={{ marginTop: '0.5rem' }}>
+                <label className={styles.card__label}>Minimum NFT Balance Threshold</label>
+                <input 
+                  type="number"
+                  className={styles.card__input} 
+                  placeholder="1" 
+                  min="1"
+                  value={minNftBalance}
+                  onChange={(e) => setMinNftBalance(e.target.value)}
+                  required={editMembershipType === 3}
+                />
+              </div>
+            </div>
+          )}
+
           <div className={styles.card__field}>
             <label className={styles.card__label}>Name</label>
             <input className={styles.card__input} value={editName} onChange={(e) => setEditName(e.target.value)} required />
@@ -345,21 +402,22 @@ function CommunityCard({ id }) {
             <input className={styles.card__input} value={editLogoUrl} onChange={(e) => setEditLogoUrl(e.target.value)} />
           </div>
 
-          <button type="submit" className={styles.card__submit} disabled={isUpdatePending || isUpdateConfirming}>
-            {isUpdatePending ? 'Confirm Wallet...' : isUpdateConfirming ? 'Updating Block...' : 'Save Configuration'}
+          <button type="submit" className={styles.card__submit} disabled={isUpdatePending || isUpdateConfirming || isNftPending || isNftConfirming}>
+            {isUpdatePending || isNftPending ? 'Confirm Wallet...' : isUpdateConfirming || isNftConfirming ? 'Updating Block...' : 'Save Configuration'}
           </button>
 
-          {updateHash && (
+          {(updateHash || nftHash) && (
             <div className={styles.card__monitor}>
-              <p className={styles.card__tx}>Tx: <span>{updateHash}</span></p>
-              {isUpdateConfirming && <p className={styles.card__status}>Waiting for confirmation...</p>}
-              {isUpdateConfirmed && <p className={clsx(styles.card__status, styles['card__status--success'])}>Changes committed on-chain!</p>}
+              {updateHash && <p className={styles.card__tx}>Metadata Tx: <span>{updateHash}</span></p>}
+              {nftHash && <p className={styles.card__tx}>NFT Requirement Tx: <span>{nftHash}</span></p>}
+              {(isUpdateConfirming || isNftConfirming) && <p className={styles.card__status}>Waiting for confirmation...</p>}
+              {(isUpdateConfirmed && (editMembershipType !== 3 || isNftConfirmed)) && <p className={clsx(styles.card__status, styles['card__status--success'])}>Changes committed on-chain!</p>}
             </div>
           )}
           
-          {updateError && (
+          {(updateError || nftError) && (
             <div className={styles.card__error}>
-              Error: {updateError.shortMessage || updateError.message}
+              Error: {updateError?.shortMessage || updateError?.message || nftError?.shortMessage || nftError?.message}
             </div>
           )}
         </form>
