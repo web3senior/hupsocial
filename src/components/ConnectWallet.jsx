@@ -9,7 +9,7 @@ import { useDisconnect, useConnect, useSwitchChain, useAccount } from 'wagmi' //
 import { getActiveChain } from '@/lib/communication'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
-import NativePopover from '@/components/ui/NativePopover' 
+import NativePopover from '@/components/ui/NativePopover'
 import styles from './ConnectWallet.module.scss'
 
 const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
@@ -18,7 +18,7 @@ export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
   const { disconnect } = useDisconnect()
   const mounted = useClientMounted()
-  
+
   // Use useAccount to get the live chain directly from the wallet provider
   const { address, isConnected, chain: walletChain } = useAccount()
 
@@ -50,11 +50,7 @@ export const ConnectWallet = () => {
             placement="bottom-start"
             type="auto"
             trigger={
-              <button
-                type="button"
-                className={`${styles.btnNetwork}`}
-                title={`${currentChainData.name}`}
-              >
+              <button type="button" className={`${styles.btnNetwork}`} title={`${currentChainData.name}`}>
                 <span className={`rounded`} dangerouslySetInnerHTML={{ __html: currentChainData.icon }} />
               </button>
             }
@@ -81,7 +77,24 @@ export const ConnectWallet = () => {
   )
 }
 
-// ... WalletConnectModal, WalletOptions, and Profile remain exactly the same ...
+export function WalletConnectModal({ setShowModal }) {
+  return (
+    <div className={`${styles.walletConnectModal}`} onClick={() => setShowModal(false)}>
+      <WalletOptions />
+    </div>
+  )
+}
+
+export function WalletOptions() {
+  const { connectors, connect } = useConnect()
+
+  return connectors.map((connector) => (
+    <button className={`${styles['wallet']}`} key={connector.uid} onClick={() => connect({ connector })}>
+      {connector.name}
+    </button>
+  ))
+}
+
 
 export function DefaultNetwork({ currentNetwork }) {
   const { isConnected } = useAccount()
@@ -131,15 +144,13 @@ export function DefaultNetwork({ currentNetwork }) {
         ))}
       </div>
 
-      <p
-        className={`text-center mt-10 ${styles.link}`}
-        onClick={() => router.push(`/networks`)}
-      >
+      <p className={`text-center mt-10 ${styles.link}`} onClick={() => router.push(`/networks`)}>
         View networks
       </p>
     </div>
   )
 }
+
 export function Profile({ addr }) {
   const { profile, isLoading } = useProfile(addr)
 
