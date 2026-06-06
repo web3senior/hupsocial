@@ -324,16 +324,10 @@ export default function Aside() {
                     </a>
                   </li>
                   <li>
-                    <a
-                      href="https://y7imctkw83d.typeform.com/to/kRWVNq6u"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={close}
-                      className="flex align-items-center gap-050"
-                    >
+                    <Link href="/help" onClick={close} className="flex align-items-center gap-050">
                       <MessageSquareWarning size={16} />
                       <span>Send feedback</span>
-                    </a>
+                    </Link>
                   </li>
                   <li>
                     <Link href="/help" onClick={close} className="flex align-items-center gap-050">
