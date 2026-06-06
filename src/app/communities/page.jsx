@@ -1,27 +1,38 @@
 'use client'
 
-import { useState } from 'react'
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi'
+import { useState, useEffect } from 'react'
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount, usePublicClient } from 'wagmi'
 import { parseEther } from 'viem'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import HupCommunityABI from '@/abis/HupCommunity'
+import HupCoreABI from '@/abis/HupCore'
 
 const CONTRACT_ADDRESS = '0x021Ee55BaA5058A38A4BF3AAbd90f5c1b31068CD'
+const CORE_CONTRACT_ADDRESS = '0x77F884698945883841384bCA8bE6df17fCB7c04D'
 
-// Helper component to fetch, render, and update individual community data cards
+// Helper component to fetch, render, update, and post within individual community cards
 function CommunityCard({ id }) {
   const { address: activeAccountAddress } = useAccount()
+  const publicClient = usePublicClient()
+  
   const [isEditing, setIsEditing] = useState(false)
+  const [isPosting, setIsPosting] = useState(false)
+  const [communityPosts, setCommunityPosts] = useState([])
+  const [isFeedLoading, setIsFeedLoading] = useState(false)
 
-  // Update states for inline form
+  // Update states for inline modifications
   const [editName, setEditName] = useState('')
   const [editSummary, setEditSummary] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editLogoUrl, setEditLogoUrl] = useState('')
   const [editMembershipType, setEditMembershipType] = useState(0)
   const [editCommunityType, setEditCommunityType] = useState(0)
+
+  // New post content inputs
+  const [postContent, setPostContent] = useState('')
+  const [postAttachmentUrl, setPostAttachmentUrl] = useState('')
 
   // Contract data query hook
   const { data, isLoading } = useReadContract({
@@ -31,7 +42,7 @@ function CommunityCard({ id }) {
     args: [id],
   })
 
-  // Contract modification hook for updating state
+  // Contract modification hook for updating space metadata
   const { 
     writeContract: updateContract, 
     data: updateHash, 
@@ -43,6 +54,71 @@ function CommunityCard({ id }) {
     isLoading: isUpdateConfirming, 
     isSuccess: isUpdateConfirmed 
   } = useWaitForTransactionReceipt({ hash: updateHash })
+
+  // Contract modification hook targeting Hup Core directly via background session authorization
+  const {
+    writeContract: publishPostContract,
+    data: postHash,
+    isPending: isPostPending,
+    error: postError
+  } = useWriteContract()
+
+  const {
+    isLoading: isPostConfirming,
+    isSuccess: isPostConfirmed
+  } = useWaitForTransactionReceipt({ hash: postHash })
+
+  // Query and filter ContentCreated event logs for this specific community context
+  useEffect(() => {
+    const fetchCommunityFeed = async () => {
+      if (!publicClient) return
+      setIsFeedLoading(true)
+      try {
+        // Query ContentCreated logs emitted by the Core engine
+        const logs = await publicClient.getContractEvents({
+          address: CORE_CONTRACT_ADDRESS,
+          abi: HupCoreABI,
+          eventName: 'ContentCreated',
+          fromBlock: 'earliest',
+        })
+
+        const filteredAndParsedPosts = logs
+          .map((log) => {
+            const { id: postId, owner, metadata: rawMetadata } = log.args
+            
+            let parsedMeta = {}
+            try {
+              parsedMeta = JSON.parse(rawMetadata)
+            } catch (err) {
+              return null
+            }
+
+            // Verify if the indexed metadata belongs to this specific community scope
+            if (Number(parsedMeta.communityId) !== Number(id)) {
+              return null
+            }
+
+            return {
+              postId: postId ? postId.toString() : '0',
+              author: owner,
+              content: parsedMeta.content || '',
+              attachment: parsedMeta.attachment || '',
+              timestamp: parsedMeta.timestamp || Date.now()
+            }
+          })
+          .filter(Boolean)
+          .sort((a, b) => b.timestamp - a.timestamp)
+
+        setCommunityPosts(filteredAndParsedPosts)
+      } catch (err) {
+        console.error('Failed to parse logs from core engine:', err)
+      } finally {
+        setIsFeedLoading(false)
+      }
+    }
+
+    fetchCommunityFeed()
+  }, [id, publicClient, isPostConfirmed])
 
   if (isLoading || !data) {
     return <div className={clsx(styles.card, styles['card--loading'])}>Loading space #{id}...</div>
@@ -60,7 +136,6 @@ function CommunityCard({ id }) {
   const membershipLabels = ['Public', 'Request-Based', 'Private', 'NFT-Gated', 'Token-Gated']
   const typeLabels = ['Discussion', 'Broadcast']
 
-  // Validate ownership block
   const isOwner = activeAccountAddress?.toLowerCase() === creator?.toLowerCase()
 
   const handleStartEditing = () => {
@@ -71,6 +146,14 @@ function CommunityCard({ id }) {
     setEditMembershipType(membershipType)
     setEditCommunityType(cType)
     setIsEditing(true)
+    setIsPosting(false)
+  }
+
+  const handleStartPosting = () => {
+    setPostContent('')
+    setPostAttachmentUrl('')
+    setIsPosting(true)
+    setIsEditing(false)
   }
 
   const handleUpdateSubmit = (e) => {
@@ -88,13 +171,41 @@ function CommunityCard({ id }) {
       address: CONTRACT_ADDRESS,
       abi: HupCommunityABI,
       functionName: 'updateCommunity',
-      args: [id, editMembershipType, updatedMetadataString],//TODO: need to redeploy the community   editCommunityType, 
+      args: [id, editMembershipType, updatedMetadataString], 
+    })
+  }
+
+  const handlePostSubmit = (e) => {
+    e.preventDefault()
+
+    if (!activeAccountAddress) return
+
+    const postMetadataObj = {
+      content: postContent,
+      attachment: postAttachmentUrl,
+      communityId: id,
+      timestamp: Date.now()
+    }
+    
+    const postMetadataString = JSON.stringify(postMetadataObj)
+
+    publishPostContract({
+      address: CORE_CONTRACT_ADDRESS,
+      abi: HupCoreABI,
+      functionName: 'create',
+      args: [
+        activeAccountAddress, 
+        0,                     
+        postMetadataString,   
+        0,                     
+        true                   
+      ],
     })
   }
 
   return (
     <div className={styles.card}>
-      {!isEditing ? (
+      {!isEditing && !isPosting && (
         <>
           <div className={styles.card__header}>
             {metadata['logo url'] && (
@@ -104,15 +215,24 @@ function CommunityCard({ id }) {
               <h3 className={styles.card__title}>{metadata.name || `Community #${id}`}</h3>
               <span className={styles.card__creator}>By {creator.slice(0, 6)}...{creator.slice(-4)}</span>
             </div>
-            {isOwner && (
+            <div className={styles.card__actionRow}>
               <button 
                 type="button" 
-                className={styles.card__editBtn}
-                onClick={handleStartEditing}
+                className={styles.card__postTriggerBtn}
+                onClick={handleStartPosting}
               >
-                Modify
+                Write Post
               </button>
-            )}
+              {isOwner && (
+                <button 
+                  type="button" 
+                  className={styles.card__editBtn}
+                  onClick={handleStartEditing}
+                >
+                  Modify
+                </button>
+              )}
+            </div>
           </div>
           
           <p className={styles.card__summary}>{metadata.summary || metadata.description}</p>
@@ -121,16 +241,45 @@ function CommunityCard({ id }) {
             <span className={styles.card__tag}>{membershipLabels[membershipType]}</span>
             <span className={styles.card__tag}>{typeLabels[cType]}</span>
           </div>
+
+          {/* Sub-Feed Component Layer */}
+          <div className={styles.feed}>
+            <h4 className={styles.feed__title}>Recent Updates</h4>
+            {isFeedLoading ? (
+              <div className={styles.feed__loading}>Syncing feed events...</div>
+            ) : communityPosts.length === 0 ? (
+              <div className={styles.feed__empty}>No posts published in this space yet.</div>
+            ) : (
+              <div className={styles.feed__list}>
+                {communityPosts.map((post) => (
+                  <div key={post.postId} className={styles.feed__item}>
+                    <div className={styles.feed__itemHeader}>
+                      <span className={styles.feed__itemAuthor}>
+                        {post.author.slice(0, 6)}...{post.author.slice(-4)}
+                      </span>
+                      <span className={styles.feed__itemTime}>
+                        {new Date(post.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className={styles.feed__itemContent}>{post.content}</p>
+                    {post.attachment && (
+                      <div className={styles.feed__itemMedia}>
+                        <img src={post.attachment} alt="Attachment payload" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </>
-      ) : (
+      )}
+
+      {isEditing && (
         <form className={styles.card__form} onSubmit={handleUpdateSubmit}>
           <div className={styles.card__formHeader}>
             <h4 className={styles.card__formTitle}>Modify Space #{id}</h4>
-            <button 
-              type="button" 
-              className={styles.card__cancelBtn}
-              onClick={() => setIsEditing(false)}
-            >
+            <button type="button" className={styles.card__cancelBtn} onClick={() => setIsEditing(false)}>
               Cancel
             </button>
           </div>
@@ -166,48 +315,25 @@ function CommunityCard({ id }) {
 
           <div className={styles.card__field}>
             <label className={styles.card__label}>Name</label>
-            <input 
-              className={styles.card__input} 
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              required
-            />
+            <input className={styles.card__input} value={editName} onChange={(e) => setEditName(e.target.value)} required />
           </div>
 
           <div className={styles.card__field}>
             <label className={styles.card__label}>Short Summary</label>
-            <input 
-              className={styles.card__input} 
-              value={editSummary}
-              onChange={(e) => setEditSummary(e.target.value)}
-              required
-            />
+            <input className={styles.card__input} value={editSummary} onChange={(e) => setEditSummary(e.target.value)} required />
           </div>
 
           <div className={styles.card__field}>
             <label className={styles.card__label}>Description</label>
-            <textarea 
-              className={styles.card__textarea} 
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-              required
-            />
+            <textarea className={styles.card__textarea} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} required />
           </div>
 
           <div className={styles.card__field}>
             <label className={styles.card__label}>Logo URL</label>
-            <input 
-              className={styles.card__input} 
-              value={editLogoUrl}
-              onChange={(e) => setEditLogoUrl(e.target.value)}
-            />
+            <input className={styles.card__input} value={editLogoUrl} onChange={(e) => setEditLogoUrl(e.target.value)} />
           </div>
 
-          <button 
-            type="submit" 
-            className={clsx(styles.card__submit, { [styles['card__submit--loading']]: isUpdatePending || isUpdateConfirming })}
-            disabled={isUpdatePending || isUpdateConfirming}
-          >
+          <button type="submit" className={styles.card__submit} disabled={isUpdatePending || isUpdateConfirming}>
             {isUpdatePending ? 'Confirm Wallet...' : isUpdateConfirming ? 'Updating Block...' : 'Save Configuration'}
           </button>
 
@@ -226,45 +352,84 @@ function CommunityCard({ id }) {
           )}
         </form>
       )}
+
+      {isPosting && (
+        <form className={styles.card__form} onSubmit={handlePostSubmit}>
+          <div className={styles.card__formHeader}>
+            <h4 className={styles.card__formTitle}>New Post inside {metadata.name || `Space #${id}`}</h4>
+            <button type="button" className={styles.card__cancelBtn} onClick={() => setIsPosting(false)}>
+              Cancel
+            </button>
+          </div>
+
+          <div className={styles.card__field}>
+            <label className={styles.card__label}>Message Content</label>
+            <textarea 
+              className={styles.card__textarea} 
+              placeholder="What is happening on-chain?"
+              value={postContent}
+              onChange={(e) => setPostContent(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className={styles.card__field}>
+            <label className={styles.card__label}>Media Attachment Link (Optional)</label>
+            <input 
+              className={styles.card__input} 
+              placeholder="ipfs://... or image address URL"
+              value={postAttachmentUrl}
+              onChange={(e) => setPostAttachmentUrl(e.target.value)}
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            className={clsx(styles.card__submit, { [styles['card__submit--loading']]: isPostPending || isPostConfirming })}
+            disabled={isPostPending || isPostConfirming}
+          >
+            {isPostPending ? 'Confirm Wallet...' : isPostConfirming ? 'Publishing Transact...' : 'Broadcast Message'}
+          </button>
+
+          {postHash && (
+            <div className={styles.card__monitor}>
+              <p className={styles.card__tx}>Tx: <span>{postHash}</span></p>
+              {isPostConfirming && <p className={styles.card__status}>Transmitting to core engine layer...</p>}
+              {isPostConfirmed && <p className={clsx(styles.card__status, styles['card__status--success'])}>Message published successfully!</p>}
+            </div>
+          )}
+
+          {postError && (
+            <div className={styles.card__error}>
+              Gating Failure: {postError.shortMessage || postError.message}
+            </div>
+          )}
+        </form>
+      )}
     </div>
   )
 }
 
+// Top-level layout entry default page export module
 export default function CommunitiesPage() {
-  // Metadata string construction form fields
   const [name, setName] = useState('')
   const [summary, setSummary] = useState('')
   const [description, setDescription] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
 
-  // Contract parameter enums selection handlers
   const [membershipType, setMembershipType] = useState(0) 
   const [communityType, setCommunityType] = useState(0)   
 
-  // Write contract states with distinct namespace mapping
-  const { 
-    writeContract, 
-    data: hash, 
-    isPending, 
-    error: createError 
-  } = useWriteContract()
-  
+  const { writeContract, data: hash, isPending, error: createError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
-  // Read contract data variables utilizing clear aliases to bypass scope collisions
-  const { 
-    data: countData, 
-    isLoading: isCountLoading, 
-    error: readError 
-  } = useReadContract({
+  const { data: countData, isLoading: isCountLoading, error: readError } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: HupCommunityABI,
     functionName: 'communityCount',
   })
 
   const totalCommunities = countData ? Number(countData) : 0
-  
-  // Arrange array parameters to list recently launched spaces first
   const communityIds = Array.from({ length: totalCommunities }, (_, i) => i + 1).reverse()
 
   const handleCreate = (e) => {
@@ -293,7 +458,7 @@ export default function CommunitiesPage() {
       <div className={clsx(styles.page, 'animate', 'fade')}>
         <div className={clsx('__container', styles.page__container)} data-width="medium">
           <p className='alert alert--warning'>Live on Monad Testnet</p>
-          {/* Form handling component for protocol-level actions */}
+          
           <div className={styles.manager}>
             <div className={styles.manager__header}>
               <h2 className={styles.manager__title}>Launch a New Community</h2>
@@ -382,7 +547,6 @@ export default function CommunitiesPage() {
               </button>
             </form>
 
-            {/* Network event feedback output window */}
             {hash && (
               <div className={styles.manager__monitor}>
                 <p className={styles.manager__tx}>Tx: <span>{hash}</span></p>
@@ -398,7 +562,6 @@ export default function CommunitiesPage() {
             )}
           </div>
 
-          {/* Directory view to display returned data models */}
           <div className={styles.directory}>
             <div className={styles.directory__header}>
               <h2 className={styles.directory__title}>Explore Communities</h2>

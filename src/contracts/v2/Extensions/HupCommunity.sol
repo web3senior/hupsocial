@@ -11,7 +11,7 @@ import "./IHupCommunity.sol";
 
 /**
  * @title Hup Community Protocol
- * @author Hup Labs
+ * @author MCH01 Labs
  * @notice Manages decentralized community spaces, membership tiers, and moderation roles.
  */
 contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
@@ -96,6 +96,7 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         Community storage c = communities[_id];
         if (c.membershipType == MembershipType.Public) {
             status.isMember = true;
+            status.canPost = true;
             emit MemberStatusUpdated(_id, _msgSender(), true);
         } else if (c.membershipType == MembershipType.RequestBased) {
             status.isPending = true;
@@ -106,12 +107,14 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     function addMember(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
         registry[_id][_actor].isMember = true;
+        registry[_id][_actor].canPost = true;
         registry[_id][_actor].isPending = false;
         emit MemberStatusUpdated(_id, _actor, true);
     }
 
     function approveRequest(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
         registry[_id][_actor].isMember = true;
+        registry[_id][_actor].canPost = true;
         registry[_id][_actor].isPending = false;
         emit MemberStatusUpdated(_id, _actor, true);
     }
@@ -126,16 +129,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit MemberStatusUpdated(_id, _actor, !_banned);
     }
 
-    /**
-     * @notice Updates NFT gating requirements for a community.
-     */
     function setNftRequirement(uint256 _id, address _nftAddress, uint256 _tokenId) external communityExists(_id) onlyModerator(_id) {
         nftRequirements[_id] = NftRequirement(_nftAddress, _tokenId);
     }
 
-    /**
-     * @notice Updates Token gating requirements for a community.
-     */
     function setTokenRequirement(uint256 _id, address _tokenAddress, uint256 _minBalance) external communityExists(_id) onlyModerator(_id) {
         tokenRequirements[_id] = TokenRequirement(_tokenAddress, _minBalance);
     }
@@ -145,54 +142,35 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit MemberStatusUpdated(_id, _actor, registry[_id][_actor].isMember);
     }
 
-    /**
-     * @notice Validates balance for native or ERC20 tokens.
-     */
+    // --- Guard & Permissions Gate ---
+
     function isEligibleViaToken(address _actor, uint256 _id) public view returns (bool) {
         TokenRequirement memory req = tokenRequirements[_id];
         if (req.minBalance == 0) return true;
 
         if (req.tokenAddress == address(0)) {
-            // Native token check
             return _actor.balance >= req.minBalance;
         } else {
-            // ERC20 token check
             return IERC20(req.tokenAddress).balanceOf(_actor) >= req.minBalance;
         }
     }
 
-    /**
-     * @notice Checks if a user holds the required NFT to qualify as a member.
-     */
     function isEligibleViaNft(address _actor, uint256 _id) public view returns (bool) {
         NftRequirement memory req = nftRequirements[_id];
         if (req.nftAddress == address(0)) return false;
 
-        // Check if user owns at least one token from the collection
         return IERC721(req.nftAddress).balanceOf(_actor) > 0;
     }
 
-    /**
-     * @notice Validates posting permissions.
-     * @dev Integrates MembershipType gating, manual registry, and granular 'canPost' permissions.
-     */
     function canPost(address actor, uint256 communityId) external view override returns (bool) {
         if (communityId == 0) return true;
 
         Community storage c = communities[communityId];
         MemberStatus storage status = registry[communityId][actor];
 
-        // 1. Hard Security: Banned users never post
         if (status.isBanned) return false;
-
-        // 2. Privilege: Creator/Moderators always have full posting rights
         if (c.creator == actor || status.isModerator) return true;
-
-        // 3. Permission Flag: Enforce the 'canPost' flag for all members/eligible users
-        // If the channel is read-only, this flag will be false, blocking the post
         if (!status.canPost) return false;
-
-        // 4. Membership Logic: Check eligibility based on Community Type
         if (c.membershipType == MembershipType.Public) return true;
 
         if (c.membershipType == MembershipType.NftGated) {
@@ -203,7 +181,6 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
             return isEligibleViaToken(actor, communityId);
         }
 
-        // Fallback: Check if they are in the manual registry
         return status.isMember;
     }
 
@@ -212,9 +189,11 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     function pause() external onlyDirectAdmin {
         _pause();
     }
+
     function unpause() external onlyDirectAdmin {
         _unpause();
     }
+
     function setFee(uint256 _fee) external onlyDirectAdmin {
         uint256 oldValue = fee;
         fee = _fee;
@@ -224,9 +203,11 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
         return ERC2771Context._msgSender();
     }
+
     function _msgData() internal view override(Context, ERC2771Context) returns (bytes calldata) {
         return ERC2771Context._msgData();
     }
+
     function _contextSuffixLength() internal view override(Context, ERC2771Context) returns (uint256) {
         return ERC2771Context._contextSuffixLength();
     }

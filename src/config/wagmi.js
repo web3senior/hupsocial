@@ -48,11 +48,12 @@ export const CONTRACTS = {
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
   },
   chain10143: {
-    // Monad
+    // Monad Testnet
     forwarder: '0x7C71e48C3916EdBBeFB84918A48e0b26FecC5D9c',
-    hup: '',
+    hup: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
     status: '',
-    community: '0x021Ee55BaA5058A38A4BF3AAbd90f5c1b31068CD'
+    community: '0x021Ee55BaA5058A38A4BF3AAbd90f5c1b31068CD',
+    nft: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F'// GenesisHup
   },
 }
 
