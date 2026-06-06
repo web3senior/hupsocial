@@ -12,6 +12,25 @@ import HupCoreABI from '@/abis/HupCore'
 const CONTRACT_ADDRESS = '0x021Ee55BaA5058A38A4BF3AAbd90f5c1b31068CD'
 const CORE_CONTRACT_ADDRESS = '0x77F884698945883841384bCA8bE6df17fCB7c04D'
 
+// Dedicated presentation sub-component to isolate ERC-721 naming hooks safely
+function NftTag({ tokenAddress, minBalance }) {
+  const { data: nftName } = useReadContract({
+    address: tokenAddress,
+    abi: [{ name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }],
+    functionName: 'name',
+  })
+
+  return (
+    <span 
+      className={styles.card__tag} 
+      style={{ background: 'var(--bg-light)', border: '1px dashed var(--border-color)', color: 'var(--text-muted)', fontSize: '0.8rem' }}
+      title={`Contract: ${tokenAddress}`}
+    >
+      NFT: {nftName || `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`} (Min: {minBalance || '1'})
+    </span>
+  )
+}
+
 // Helper component to fetch, render, update, and post within individual community cards
 function CommunityCard({ id }) {
   const { address, isConnected } = useConnection()
@@ -184,16 +203,7 @@ function CommunityCard({ id }) {
   // This layout structure maps fields as: [address tokenAddress, uint256 minimumBalance]
   const savedNftAddress = nftRequirementData ? nftRequirementData[0] : null
   const savedNftMinBalance = nftRequirementData ? nftRequirementData[1]?.toString() : null
-
-  // Optional: Read collection metadata name directly if an asset address exists
-  const { data: nftName } = useReadContract({
-    address: savedNftAddress,
-    abi: [{ name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }],
-    functionName: 'name',
-    query: {
-      enabled: !!savedNftAddress && savedNftAddress !== '0x0000000000000000000000000000000000000000'
-    }
-  })
+  const hasValidNftAddress = savedNftAddress && savedNftAddress !== '0x0000000000000000000000000000000000000000'
 
   const handleStartEditing = () => {
     setEditName(metadata.name || '')
@@ -311,15 +321,9 @@ function CommunityCard({ id }) {
             <span className={styles.card__tag}>{membershipLabels[membershipType]}</span>
             <span className={styles.card__tag}>{typeLabels[cType]}</span>
             
-            {/* Render gating requirements directly inline if the space mapping state has been initialized */}
-            {membershipType === 3 && savedNftAddress && savedNftAddress !== '0x0000000000000000000000000000000000000000' && (
-              <span 
-                className={styles.card__tag} 
-                style={{ background: 'var(--bg-light)', border: '1px dashed var(--border-color)', color: 'var(--text-muted)', fontSize: '0.8rem' }}
-                title={`Contract: ${savedNftAddress}`}
-              >
-                NFT: {nftName || `${savedNftAddress.slice(0, 6)}...${savedNftAddress.slice(-4)}`} (Min: {savedNftMinBalance || '1'})
-              </span>
+            {/* Render the extracted sub-component to eliminate the rule-of-hooks error */}
+            {membershipType === 3 && hasValidNftAddress && (
+              <NftTag tokenAddress={savedNftAddress} minBalance={savedNftMinBalance} />
             )}
           </div>
 
@@ -484,10 +488,10 @@ function CommunityCard({ id }) {
             />
           </div>
 
-          <div className={styles.card__field}>
-            <label className={styles.card__label}>Media Attachment Link (Optional)</label>
+          <div className={styles.manager__field}>
+            <label className={styles.manager__label}>Media Attachment Link (Optional)</label>
             <input 
-              className={styles.card__input} 
+              className={styles.manager__input} 
               placeholder="ipfs://... or image address URL"
               value={postAttachmentUrl}
               onChange={(e) => setPostAttachmentUrl(e.target.value)}
