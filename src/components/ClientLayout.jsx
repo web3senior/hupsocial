@@ -36,7 +36,6 @@ export default function ClientLayout({ children }) {
       <WagmiContext>
         <Header />
         <Aside />
-
         <main className={styles.main}>{children}</main>
         {/* <Footer /> */}
       </WagmiContext>

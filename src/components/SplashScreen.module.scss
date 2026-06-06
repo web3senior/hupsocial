@@ -12,19 +12,29 @@
   color: var(--foreground);
 }
 
-.logo {
-  width: auto;
-  height: 60px;
-  object-fit: contain;
-}
-
-.footer {
-  opacity: 0.72;
-  font-size: var(--font-size-14);
-  text-align: center;
-}
-
 :global([data-theme='dark']) .logo,
 :global([data-theme='terminal']) .logo {
   filter: brightness(0) invert(1);
+}
+
+.footer {
+  justify-self: center;
+  text-align: center;
+}
+
+.attribution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.label {
+  font-size: var(--font-size-14);
+  opacity: 0.7;
+}
+
+.author {
+  font-size: var(--font-size-16);
+  font-weight: 700;
 }

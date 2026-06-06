@@ -25,7 +25,10 @@ import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdenti
 import styles from './UserProfile.module.scss'
 import { useProfile } from '@/hooks/useProfile'
 
-const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
+import SettingsTab from '@/components/tabs/SettingsTab'
+//const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
+// todo: this cause to handle loading.jsx again
+
 
 export default function UserProfile() {
   const [posts, setPosts] = useState({ list: [] })

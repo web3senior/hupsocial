@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import hupABI from '@/abi/hup.json'
-import styles from './SettingsTab.module.scss'
 import { RefreshCwIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, CheckIcon, CopyIcon, UploadIcon } from 'lucide-react'
 import { ethers } from 'ethers'
 import Balance from '@/app/(user)/[wallet]/_components/balance'
@@ -12,6 +11,7 @@ import { toRelativeTime } from '@/lib/dateHelper'
 import { isSessionActive } from '@/lib/BurnerSession'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
 import { isHexString, Wallet } from 'ethers'
+import styles from './SettingsTab.module.scss'
 
 const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
 const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
@@ -21,7 +21,7 @@ export default function SettingsTab() {
   const { address } = useConnection()
   const publicClient = usePublicClient()
   const activeChain = getActiveChain()
-  
+
   // Base states
   const [sessionActive, setSessionActive] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -38,7 +38,7 @@ export default function SettingsTab() {
   const [revealKeyMode, setRevealKeyMode] = useState(false)
   const [revealedPrivateKey, setRevealedPrivateKey] = useState(null)
   const [copied, setCopied] = useState(false)
-  
+
   // Import custom key states
   const [importPrivateKeyInput, setImportPrivateKeyInput] = useState('')
   const [importPassword, setImportPassword] = useState('')
@@ -76,7 +76,7 @@ export default function SettingsTab() {
     setErrorMsg('')
     setPassword('')
     setConfirmPassword('')
-    
+
     const existingKey = localStorage.getItem(localStorageBurnerKey)
     if (existingKey && isPrivateKeyEncrypted(existingKey)) {
       handleAuthorizeSession(null)
@@ -100,11 +100,11 @@ export default function SettingsTab() {
 
         const burner = ethers.Wallet.createRandom()
         const encryptedKey = await encryptData(burner.privateKey, customPassword)
-        
+
         localStorage.setItem(localStorageBurnerKey, encryptedKey)
         localStorage.setItem(localStorageBurnerAddress, burner.address)
         sessionStorage.setItem(sessionStorageUnlockedKey, burner.privateKey)
-        
+
         targetBurnerAddress = burner.address
       } else {
         targetBurnerAddress = localStorage.getItem(localStorageBurnerAddress)
@@ -133,7 +133,7 @@ export default function SettingsTab() {
       setIsLoading(true)
       setErrorMsg('')
       const encryptedKey = localStorage.getItem(localStorageBurnerKey)
-      
+
       if (!encryptedKey) {
         throw new Error('No session key found on this device.')
       }
@@ -159,38 +159,38 @@ export default function SettingsTab() {
     }
   }
 
-const handleImportSessionKey = async () => {
-  try {
-    setIsLoading(true)
-    setErrorMsg('')
+  const handleImportSessionKey = async () => {
+    try {
+      setIsLoading(true)
+      setErrorMsg('')
 
-    // Validate the raw string format cleanly using Ethers v6 top-level utilities
-    if (!isHexString(importPrivateKeyInput, 32)) {
-      throw new Error('Invalid private key format. Must be a 66-character hex string (starting with 0x).')
+      // Validate the raw string format cleanly using Ethers v6 top-level utilities
+      if (!isHexString(importPrivateKeyInput, 32)) {
+        throw new Error('Invalid private key format. Must be a 66-character hex string (starting with 0x).')
+      }
+
+      if (importPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters.')
+      }
+
+      // Instantiation using the updated v6 class syntax
+      const importedWallet = new Wallet(importPrivateKeyInput)
+      const encryptedKey = await encryptData(importPrivateKeyInput, importPassword)
+
+      localStorage.setItem(localStorageBurnerKey, encryptedKey)
+      localStorage.setItem(localStorageBurnerAddress, importedWallet.address)
+      sessionStorage.setItem(sessionStorageUnlockedKey, importPrivateKeyInput)
+
+      await checkStatus()
+      setShowImportPrompt(false)
+      setImportPrivateKeyInput('')
+      setImportPassword('')
+    } catch (err) {
+      setErrorMsg(err.message || 'Import failed. Check private key format.')
+    } finally {
+      setIsLoading(false)
     }
-
-    if (importPassword.length < 6) {
-      throw new Error('Password must be at least 6 characters.')
-    }
-
-    // Instantiation using the updated v6 class syntax
-    const importedWallet = new Wallet(importPrivateKeyInput)
-    const encryptedKey = await encryptData(importPrivateKeyInput, importPassword)
-
-    localStorage.setItem(localStorageBurnerKey, encryptedKey)
-    localStorage.setItem(localStorageBurnerAddress, importedWallet.address)
-    sessionStorage.setItem(sessionStorageUnlockedKey, importPrivateKeyInput)
-
-    await checkStatus()
-    setShowImportPrompt(false)
-    setImportPrivateKeyInput('')
-    setImportPassword('')
-  } catch (err) {
-    setErrorMsg(err.message || 'Import failed. Check private key format.')
-  } finally {
-    setIsLoading(false)
   }
-}
 
   const handleRevokeSession = async () => {
     try {
@@ -283,23 +283,21 @@ const handleImportSessionKey = async () => {
                   />
                 </div>
                 <div className="flex gap-05 justify-between align-items-center">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowPlainPassword(!showPlainPassword)} 
-                    className={styles.btnLink}
-                  >
+                  <button type="button" onClick={() => setShowPlainPassword(!showPlainPassword)} className={styles.btnLink}>
                     {showPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPlainPassword ? 'Hide' : 'Show'}
                   </button>
                   <div className="flex gap-05">
-                    <button onClick={() => setShowPasswordSetup(false)} className={styles.btnSecondary}>Cancel</button>
-                    <button 
+                    <button onClick={() => setShowPasswordSetup(false)} className={styles.btnSecondary}>
+                      Cancel
+                    </button>
+                    <button
                       onClick={() => {
                         if (password !== confirmPassword) {
                           setErrorMsg('Passwords do not match.')
                           return
                         }
                         handleAuthorizeSession(password)
-                      }} 
+                      }}
                       className={styles.btnPrimary}
                       disabled={isLoading}
                     >
@@ -325,7 +323,9 @@ const handleImportSessionKey = async () => {
                   className={styles.formControl}
                 />
                 <div className="flex justify-end gap-050 mt-15">
-                  <button onClick={() => setShowDecryptPrompt(false)} className={styles.btnSecondary}>Cancel</button>
+                  <button onClick={() => setShowDecryptPrompt(false)} className={styles.btnSecondary}>
+                    Cancel
+                  </button>
                   <button onClick={handleDecryptAndReveal} className={styles.btnPrimary} disabled={isLoading}>
                     Unlock Key
                   </button>
@@ -357,7 +357,9 @@ const handleImportSessionKey = async () => {
                   />
                 </div>
                 <div className="flex justify-end gap-1">
-                  <button onClick={() => setShowImportPrompt(false)} className={styles.btnSecondary}>Cancel</button>
+                  <button onClick={() => setShowImportPrompt(false)} className={styles.btnSecondary}>
+                    Cancel
+                  </button>
                   <button onClick={handleImportSessionKey} className={styles.btnPrimary} disabled={isLoading}>
                     Encrypt & Import
                   </button>
@@ -369,7 +371,9 @@ const handleImportSessionKey = async () => {
             {revealKeyMode && revealedPrivateKey && (
               <div className={styles.secureSetup}>
                 <h5>Backup Session Private Key</h5>
-                <p><strong>CAUTION:</strong> Never share this key. Store it securely to recover your session on other devices.</p>
+                <p>
+                  <strong>CAUTION:</strong> Never share this key. Store it securely to recover your session on other devices.
+                </p>
                 <div className={styles.keyContainer}>
                   <code>{revealedPrivateKey}</code>
                   <button onClick={() => copyToClipboard(revealedPrivateKey)} className={styles.btnIcon} title="Copy to clipboard">
@@ -377,11 +381,11 @@ const handleImportSessionKey = async () => {
                   </button>
                 </div>
                 <div className="flex justify-end mt-15">
-                  <button 
+                  <button
                     onClick={() => {
                       setRevealKeyMode(false)
                       setRevealedPrivateKey(null)
-                    }} 
+                    }}
                     className={styles.btnSecondary}
                   >
                     Hide Key
@@ -392,30 +396,26 @@ const handleImportSessionKey = async () => {
 
             {/* ACTION BUTTONS GROUP */}
             <div className="flex flex-wrap gap-10 mt-20  gap-1">
-              <button 
-                onClick={triggerAuthorizeFlow} 
+              <button
+                onClick={triggerAuthorizeFlow}
                 disabled={sessionActive || isLoading || showPasswordSetup}
                 className={styles.btnPrimary}
               >
                 Authorize Session
               </button>
 
-              <button 
-                onClick={handleRevokeSession} 
-                disabled={!sessionActive || isLoading}
-                className={styles.btnDanger}
-              >
+              <button onClick={handleRevokeSession} disabled={!sessionActive || isLoading} className={styles.btnDanger}>
                 Revoke Session
               </button>
 
               {localStorage.getItem(localStorageBurnerKey) && !revealKeyMode && (
-                <button 
+                <button
                   onClick={() => {
                     setErrorMsg('')
                     setShowDecryptPrompt(true)
                     setShowPasswordSetup(false)
                     setShowImportPrompt(false)
-                  }} 
+                  }}
                   className={styles.btnSecondary}
                   disabled={isLoading}
                 >
@@ -423,20 +423,19 @@ const handleImportSessionKey = async () => {
                 </button>
               )}
 
-              <button 
+              <button
                 onClick={() => {
                   setErrorMsg('')
                   setShowImportPrompt(true)
                   setShowPasswordSetup(false)
                   setShowDecryptPrompt(false)
-                }} 
+                }}
                 className={styles.btnSecondary}
                 disabled={isLoading}
               >
                 Import Key
               </button>
             </div>
-
           </div>
         </div>
       </div>

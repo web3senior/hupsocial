@@ -2,7 +2,20 @@
 .tabContent {
   button {
     padding: 0.5rem;
+
+    &[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   }
+}
+
+.btnDanger {
+  border:1px solid red;
+      &[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 }
 .secureSetup {
   background: rgba(255, 255, 255, 0.03);
