@@ -28,6 +28,7 @@ contract HupDataExtension {
         
         // Enforce state validations and permission constraints
         if (isDeleted) revert("Core content has been deleted");
+        // TODO: to change msg.data to _msgData()
         if (creator != msg.sender) revert("Only the original creator can add extensions");
 
         extensionStorage[_postId][_key] = _val;

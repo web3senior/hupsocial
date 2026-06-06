@@ -3,7 +3,7 @@ import { config, CONTRACTS, setNetworkColor } from '@/config/wagmi'
 import postAbi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import commentAbi from '@/abi/post-comment.json'
-
+import  HupCommunityABI  from '@/abis/HupCommunity'
 /**
  * Get user selected chain
  * @returns Array [chainObject, contractAddress]
@@ -48,7 +48,19 @@ export function initHupContract() {
   const contract = new web3.eth.Contract(postAbi, activeChain[1].hup)
   return { web3, contract }
 }
+export function initHupCommunityContract() {
+  const activeChain = getActiveChain()
+  const rpcUrl = activeChain[0].rpcUrls.default.http[0]
 
+  if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
+
+  // Initialize Web3 with an HttpProvider for server-side connection
+  const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
+
+  // Create a Contract instance
+  const contract = new web3.eth.Contract(HupCommunityABI, activeChain[1].community)
+  return { web3, contract }
+}
 /**
  * Initialize post comment contract
  */
@@ -81,7 +93,17 @@ export function initStatusContract() {
   const contract = new web3.eth.Contract(statusAbi, activeChain[1].status)
   return { web3, contract }
 }
+export async function getCommunityCount() {
+  const { web3, contract } = initHupCommunityContract()
 
+  try {
+    const result = await contract.methods.communityCount().call()
+    return result
+  } catch (error) {
+    console.error('Error fetching contract data with Web3.js:', error)
+    return { error }
+  }
+}
 export async function getStatus(address) {
   const { web3, contract } = initStatusContract()
 
