@@ -47,6 +47,14 @@ function CommunityCard({ id }) {
     args: [id],
   })
 
+  // Read data directly from the automatically generated public mapping getter
+  const { data: nftRequirementData, refetch: refetchNftRequirements } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: HupCommunityABI,
+    functionName: 'nftRequirements',
+    args: [id],
+  })
+
   // Contract modification hook for updating space metadata
   const { 
     writeContract: updateContract, 
@@ -85,6 +93,13 @@ function CommunityCard({ id }) {
     isLoading: isPostConfirming,
     isSuccess: isPostConfirmed
   } = useWaitForTransactionReceipt({ hash: postHash })
+
+  // Refresh NFT requirement state on successful block confirmation
+  useEffect(() => {
+    if (isNftConfirmed) {
+      refetchNftRequirements()
+    }
+  }, [isNftConfirmed, refetchNftRequirements])
 
   // Query and filter feed arrays using a direct contract view function call
   useEffect(() => {
@@ -165,6 +180,21 @@ function CommunityCard({ id }) {
 
   const isOwner = activeAccountAddress?.toLowerCase() === creator?.toLowerCase()
 
+  // Auto-generated mapping getters return fields in structural definition order
+  // This layout structure maps fields as: [address tokenAddress, uint256 minimumBalance]
+  const savedNftAddress = nftRequirementData ? nftRequirementData[0] : null
+  const savedNftMinBalance = nftRequirementData ? nftRequirementData[1]?.toString() : null
+
+  // Optional: Read collection metadata name directly if an asset address exists
+  const { data: nftName } = useReadContract({
+    address: savedNftAddress,
+    abi: [{ name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }],
+    functionName: 'name',
+    query: {
+      enabled: !!savedNftAddress && savedNftAddress !== '0x0000000000000000000000000000000000000000'
+    }
+  })
+
   const handleStartEditing = () => {
     setEditName(metadata.name || '')
     setEditSummary(metadata.summary || '')
@@ -172,8 +202,8 @@ function CommunityCard({ id }) {
     setEditLogoUrl(metadata['logo url'] || '')
     setEditMembershipType(membershipType)
     setEditCommunityType(cType)
-    setNftContractAddress('')
-    setMinNftBalance('1')
+    setNftContractAddress(savedNftAddress || '')
+    setMinNftBalance(savedNftMinBalance || '1')
     setIsEditing(true)
     setIsPosting(false)
   }
@@ -204,7 +234,7 @@ function CommunityCard({ id }) {
       args: [id, editMembershipType, updatedMetadataString], 
     })
 
-    // If configuration transitions to or maintains NFT-gated rule, trigger requirements update rules
+    // Trigger update rule targeting public mapping setter when membership rule is set to NFT-Gated
     if (editMembershipType === 3 && nftContractAddress) {
       updateNftRequirement({
         address: CONTRACT_ADDRESS,
@@ -277,9 +307,20 @@ function CommunityCard({ id }) {
           
           <p className={styles.card__summary}>{metadata.summary || metadata.description}</p>
           
-          <div className={styles.card__tags}>
+          <div className={styles.card__tags} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
             <span className={styles.card__tag}>{membershipLabels[membershipType]}</span>
             <span className={styles.card__tag}>{typeLabels[cType]}</span>
+            
+            {/* Render gating requirements directly inline if the space mapping state has been initialized */}
+            {membershipType === 3 && savedNftAddress && savedNftAddress !== '0x0000000000000000000000000000000000000000' && (
+              <span 
+                className={styles.card__tag} 
+                style={{ background: 'var(--bg-light)', border: '1px dashed var(--border-color)', color: 'var(--text-muted)', fontSize: '0.8rem' }}
+                title={`Contract: ${savedNftAddress}`}
+              >
+                NFT: {nftName || `${savedNftAddress.slice(0, 6)}...${savedNftAddress.slice(-4)}`} (Min: {savedNftMinBalance || '1'})
+              </span>
+            )}
           </div>
 
           {/* Sub-Feed Component Layer */}
@@ -358,7 +399,7 @@ function CommunityCard({ id }) {
             <div className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')} style={{ marginTop: '1rem', marginBottom: '1rem' }}>
               <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>NFT Gating Configuration</h5>
               <div className={styles.card__field}>
-                <label className={styles.card__label}>NFT Collection Address</label>
+                <label className={styles.card__label}>NFT Token Address</label>
                 <input 
                   className={styles.card__input} 
                   placeholder="0x..." 
