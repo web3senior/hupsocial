@@ -66,10 +66,10 @@ const normalizeNavItem = (item) => {
 const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
-  
+
   // Extract network-mapped queue states to calculate aggregated metrics safely
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
-  
+
   // Safely accumulate the total item count across all active chain networks
   const batchCount = useMemo(() => {
     if (Array.isArray(likedPostIdsMap)) {
@@ -88,29 +88,20 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
   const Component = typeof item.component === 'string' ? NAV_COMPONENTS[item.component] : item.component
 
   // Match target item flags against common dynamic identifier properties
-  const isBatchLikeItem = 
-    item.id === 'batch-like' || 
-    item.path === '/batch-like' || 
-    item.name === 'Batch Like'
+  const isBatchLikeItem = item.id === 'batch-like' || item.path === '/batch-like' || item.name === 'Batch Like'
 
   const content = (
     <>
       <div className={styles.iconWrapper} data-icon={item.name}>
         <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.5} />
-        
+
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
-        {isBatchLikeItem && isCompact && batchCount > 0 && (
-          <span className={styles.compactBadgeDot} aria-hidden="true" />
-        )}
+        {isBatchLikeItem && isCompact && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
-      
+
       {/* Render full numeric indicator tag layout when sidebar is wide/expanded */}
-      {isBatchLikeItem && !isCompact && batchCount > 0 && (
-        <span className={styles.badgeCounter}>
-          {batchCount}
-        </span>
-      )}
+      {isBatchLikeItem && !isCompact && batchCount > 0 && <span className={styles.badgeCounter}>{batchCount}</span>}
     </>
   )
 
@@ -156,7 +147,7 @@ export default function Aside() {
   const { theme, setTheme } = useTheme()
 
   const getNavItems = useSidebarStore((state) => state.getNavItems)
-  
+
   // Safe item fallback array structure avoids runtime evaluation crash errors
   const navItems = getNavItems() ?? []
   const isMenuOpen = useSidebarStore((state) => state.isMenuOpen)
@@ -345,16 +336,10 @@ export default function Aside() {
                     </a>
                   </li>
                   <li>
-                    <a
-                      href="https://docs.google.com/forms/d/e/1FAIpQLSc-o--ue7vCnL54kg5H_M_-PbtFfIazip2UkN4VjCtGyonVGw/viewform?usp=publish-editor"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={close}
-                      className="flex align-items-center gap-050"
-                    >
+                    <Link href="/help" onClick={close} className="flex align-items-center gap-050">
                       <Bug size={16} />
                       <span>Report a problem</span>
-                    </a>
+                    </Link>
                   </li>
                   <li>
                     <a
@@ -369,10 +354,10 @@ export default function Aside() {
                     </a>
                   </li>
                   <li>
-                    <a href="/help" target="_blank" rel="noopener noreferrer" onClick={close} className="flex align-items-center gap-050">
+                    <Link href="/help" onClick={close} className="flex align-items-center gap-050">
                       <HelpCircle size={16} />
                       <span>Help</span>
-                    </a>
+                    </Link>
                   </li>
                 </ul>
               </div>
@@ -399,7 +384,7 @@ export default function Aside() {
         </div>
       </div>
 
-      <button className={`${styles.newButton}`} onClick={setIsComponentOpen} aria-label="Create new post">
+      <button className={clsx(styles.newButton, 'rounded-full')} onClick={setIsComponentOpen} aria-label="Create new post">
         <Plus />
       </button>
     </aside>
