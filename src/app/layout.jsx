@@ -89,8 +89,8 @@ export const metadata = {
 
 export const viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: process.env.NEXT_PUBLIC_THEME_COLOR },
-    { media: '(prefers-color-scheme: dark)', color: process.env.NEXT_PUBLIC_THEME_COLOR },
+    { media: '(prefers-color-scheme: light)', color: process.env.NEXT_PUBLIC_THEME_COLOR_LIGHT },
+    { media: '(prefers-color-scheme: dark)', color: process.env.NEXT_PUBLIC_THEME_COLOR_DARK },
   ],
 }
 
