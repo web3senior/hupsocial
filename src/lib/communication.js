@@ -3,17 +3,18 @@ import { config, CONTRACTS, setNetworkColor } from '@/config/wagmi'
 import postAbi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import commentAbi from '@/abi/post-comment.json'
-import HupCommunityABI from '@/abis/HupCommunity'
-
+import  HupCommunityABI  from '@/abis/HupCommunity'
 /**
  * Get user selected chain
- * @returns Array [chainObject, contractAddressMapObject]
+ * @returns Array [chainObject, contractAddress]
  */
 export const getActiveChain = () => {
   const DEFAULT_CHAIN_ID = 42
 
   if (typeof window !== 'undefined') {
-    /* Extract the multichain context from local storage cleanly */
+    // Check if wagmi has a live connected chain first!
+    // This allows wagmi to act as your single source of truth.
+    
     const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || DEFAULT_CHAIN_ID.toString()
     const userSelectedChain = config.chains.filter((filterItem) => filterItem.id.toString() === activeChain.toString())
 
@@ -31,57 +32,48 @@ export const getActiveChain = () => {
   console.error('Default chain not found in config.')
   return [null, null]
 }
-
 /**
  * Initialize post contract
  */
 export function initHupContract() {
   const activeChain = getActiveChain()
-  if (!activeChain[0] || !activeChain[1]) throw new Error('Active network deployment configuration context unresolvable.')
-
   const rpcUrl = activeChain[0].rpcUrls.default.http[0]
+
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
-  if (!activeChain[1].hup) {
-    throw new Error(`Hup core contract address is not configured for network sequence: ${activeChain[0].name}`)
-  }
-
+  // Initialize Web3 with an HttpProvider for server-side connection
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
+
+  // Create a Contract instance
   const contract = new web3.eth.Contract(postAbi, activeChain[1].hup)
   return { web3, contract }
 }
-
 export function initHupCommunityContract() {
   const activeChain = getActiveChain()
-  if (!activeChain[0] || !activeChain[1]) throw new Error('Active network deployment configuration context unresolvable.')
-
   const rpcUrl = activeChain[0].rpcUrls.default.http[0]
+
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
-  if (!activeChain[1].community) {
-    throw new Error(`Hup Community contract address is not configured for network sequence: ${activeChain[0].name}`)
-  }
-
+  // Initialize Web3 with an HttpProvider for server-side connection
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
+
+  // Create a Contract instance
   const contract = new web3.eth.Contract(HupCommunityABI, activeChain[1].community)
   return { web3, contract }
 }
-
 /**
  * Initialize post comment contract
  */
 export function initPostCommentContract() {
   const activeChain = getActiveChain()
-  if (!activeChain[0] || !activeChain[1]) throw new Error('Active network deployment configuration context unresolvable.')
-
   const rpcUrl = activeChain[0].rpcUrls.default.http[0]
+
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
-  if (!activeChain[1].comment) {
-    throw new Error(`Hup Comment contract address is not configured for network sequence: ${activeChain[0].name}`)
-  }
-
+  // Initialize Web3 with an HttpProvider for server-side connection
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
+
+  // Create a Contract instance
   const contract = new web3.eth.Contract(commentAbi, activeChain[1].comment)
   return { web3, contract }
 }
@@ -91,23 +83,20 @@ export function initPostCommentContract() {
  */
 export function initStatusContract() {
   const activeChain = getActiveChain()
-  if (!activeChain[0] || !activeChain[1]) throw new Error('Active network deployment configuration context unresolvable.')
-
   const rpcUrl = activeChain[0].rpcUrls.default.http[0]
+
   if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
 
-  if (!activeChain[1].status) {
-    throw new Error(`Hup Status contract address is not configured for network sequence: ${activeChain[0].name}`)
-  }
-
+  // Initialize Web3 with an HttpProvider for server-side connection
   const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
+  // Create a Contract instance
   const contract = new web3.eth.Contract(statusAbi, activeChain[1].status)
   return { web3, contract }
 }
-
 export async function getCommunityCount() {
+  const { web3, contract } = initHupCommunityContract()
+
   try {
-    const { contract } = initHupCommunityContract()
     const result = await contract.methods.communityCount().call()
     return result
   } catch (error) {
@@ -115,10 +104,10 @@ export async function getCommunityCount() {
     return { error }
   }
 }
-
 export async function getStatus(address) {
+  const { web3, contract } = initStatusContract()
+
   try {
-    const { contract } = initStatusContract()
     const result = await contract.methods.statuses(address).call()
     return result
   } catch (error) {
@@ -128,8 +117,9 @@ export async function getStatus(address) {
 }
 
 export async function getMaxLength() {
+  const { web3, contract } = initStatusContract()
+
   try {
-    const { contract } = initStatusContract()
     const result = await contract.methods.maxLength().call()
     return result
   } catch (error) {
@@ -139,9 +129,12 @@ export async function getMaxLength() {
 }
 
 export async function getUserSessions(address) {
+    console.log(`============================================`)
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.userSessions(address).call()
+  
     return result
   } catch (error) {
     console.error('Error fetching contract data with Web3.js:', error)
@@ -149,9 +142,10 @@ export async function getUserSessions(address) {
   }
 }
 
-export async function getPosts(index, count, address = '0x0000000000000000000000000000000000000000') {
+export async function getPosts(index, count, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.getPosts(index, count, address).call()
     return result
   } catch (error) {
@@ -160,9 +154,10 @@ export async function getPosts(index, count, address = '0x0000000000000000000000
   }
 }
 
-export async function getPostByIndex(index, address = '0x0000000000000000000000000000000000000000') {
+export async function getPostByIndex(index, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.getPostByIndex(index, address).call()
     return result
   } catch (error) {
@@ -170,10 +165,10 @@ export async function getPostByIndex(index, address = '0x00000000000000000000000
     return { error }
   }
 }
-
 export async function getPostCommentCount(parentId) {
+  const { web3, contract } = initPostCommentContract()
+
   try {
-    const { contract } = initPostCommentContract()
     const result = await contract.methods.getPostCommentCount(parentId).call()
     return result
   } catch (error) {
@@ -183,8 +178,9 @@ export async function getPostCommentCount(parentId) {
 }
 
 export async function getReplyCount(postId) {
+  const { web3, contract } = initPostCommentContract()
+
   try {
-    const { contract } = initPostCommentContract()
     const result = await contract.methods.getReplyCount(postId).call()
     return result
   } catch (error) {
@@ -193,9 +189,10 @@ export async function getReplyCount(postId) {
   }
 }
 
-export async function getCommentsByPostId(postId, startIndex, count, address = '0x0000000000000000000000000000000000000000') {
+export async function getCommentsByPostId(postId, startIndex, count, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initPostCommentContract()
+
   try {
-    const { contract } = initPostCommentContract()
     const result = await contract.methods.getCommentsByPostId(postId, startIndex, count, address).call()
     return result
   } catch (error) {
@@ -204,9 +201,10 @@ export async function getCommentsByPostId(postId, startIndex, count, address = '
   }
 }
 
-export async function getRepliesByCommentId(commentId, startIndex, count, address = '0x0000000000000000000000000000000000000000') {
+export async function getRepliesByCommentId(commentId, startIndex, count, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initPostCommentContract()
+
   try {
-    const { contract } = initPostCommentContract()
     const result = await contract.methods.getRepliesByCommentId(commentId, startIndex, count, address).call()
     return result
   } catch (error) {
@@ -216,8 +214,9 @@ export async function getRepliesByCommentId(commentId, startIndex, count, addres
 }
 
 export async function getPostCount() {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.postCount().call()
     return result
   } catch (error) {
@@ -227,8 +226,9 @@ export async function getPostCount() {
 }
 
 export async function getVoteCountsForPoll(id) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.getVoteCountsForPoll(id).call()
     return result
   } catch (error) {
@@ -238,8 +238,9 @@ export async function getVoteCountsForPoll(id) {
 }
 
 export async function getVoteCount(id, optionIndex) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.getVoteCount(id, optionIndex).call()
     return result
   } catch (error) {
@@ -247,10 +248,10 @@ export async function getVoteCount(id, optionIndex) {
     return { error }
   }
 }
-
 export async function getVoterChoices(id, address) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.getVoterChoice(id, address).call()
     return result
   } catch (error) {
@@ -260,8 +261,9 @@ export async function getVoterChoices(id, address) {
 }
 
 export async function getHasLikedPost(postId, addr) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.hasLiked(postId, addr).call()
     return result
   } catch (error) {
@@ -271,8 +273,9 @@ export async function getHasLikedPost(postId, addr) {
 }
 
 export async function getHasLikedComment(commentId, addr) {
+  const { web3, contract } = initPostCommentContract()
+
   try {
-    const { contract } = initPostCommentContract()
     const result = await contract.methods.hasLikedComment(commentId, addr).call()
     return result
   } catch (error) {
@@ -281,9 +284,10 @@ export async function getHasLikedComment(commentId, addr) {
   }
 }
 
-export async function getComment(commentId, address = '0x0000000000000000000000000000000000000000') {
+export async function getComment(commentId, address = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initPostCommentContract()
+
   try {
-    const { contract } = initPostCommentContract()
     const result = await contract.methods.getComment(commentId, address).call()
     return result
   } catch (error) {
@@ -292,9 +296,10 @@ export async function getComment(commentId, address = '0x00000000000000000000000
   }
 }
 
-export async function getPostsByCreator(creator, startIndex, count, viewer = '0x0000000000000000000000000000000000000000') {
+export async function getPostsByCreator(creator, startIndex, count, viewer = `0x0000000000000000000000000000000000000000`) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.getPostsByCreator(creator, startIndex, count, viewer).call()
     return result
   } catch (error) {
@@ -304,8 +309,9 @@ export async function getPostsByCreator(creator, startIndex, count, viewer = '0x
 }
 
 export async function getCreatorPostCount(creator) {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
     const result = await contract.methods.getCreatorPostCount(creator).call()
     return result
   } catch (error) {
@@ -315,14 +321,17 @@ export async function getCreatorPostCount(creator) {
 }
 
 export async function getAllEvents() {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { web3, contract } = initHupContract()
+    // Get the latest block number (optional, but good for defining a range)
     const latestBlock = await web3.eth.getBlockNumber()
     console.log(`Latest block: ${latestBlock}`)
 
+    // Fetch all events from the contract
     const allEvents = await contract.getPastEvents('allEvents', {
-      fromBlock: 0,
-      toBlock: 'latest',
+      fromBlock: 0, // Start from block 0 or a specific block number
+      toBlock: 'latest', // Go up to the latest block or a specific block number
     })
 
     console.log(`All historical events: count(${allEvents.length})`)
@@ -340,12 +349,25 @@ export async function getAllEvents() {
 }
 
 export async function getPostLikedEvents() {
+  const { web3, contract } = initHupContract()
+
   try {
-    const { contract } = initHupContract()
+    // Get the latest block number (optional, but good for defining a range)
+    const latestBlock = await web3.eth.getBlockNumber()
+
+    // Fetch specific events (e.g., 'Transfer' events)
     const reactEvents = await contract.getPastEvents('PostLiked', {
-      fromBlock: 0,
+      fromBlock: 0, // Example: fetch events from the last 1000 blocks
       toBlock: 'latest',
     })
+
+    // reactEvents.forEach(event => {
+    //     console.log('---');
+    //     console.log(`Block Number: ${event.blockNumber}`);
+    //     console.log(`From: ${event.returnValues.from}`);
+    //     console.log(`To: ${event.returnValues.to}`);
+    //     console.log(`Value: ${event.returnValues.value}`);
+    // });
     return reactEvents
   } catch (error) {
     console.error('Error fetching past events:', error)
@@ -355,35 +377,32 @@ export async function getPostLikedEvents() {
 
 /**
  * Fetches "PostLiked" events in chunks to prevent RPC timeouts and handle large datasets.
- * @param {number} startBlock - The block number where the contract was deployed.
+ * * @param {number} startBlock - The block number where the contract was deployed.
  * @param {number} endBlock - The block number to start scanning backwards from (usually latest).
  * @param {number} chunkSize - Number of blocks to scan per request (default 5000).
  * @returns {Promise<Array>} - Array of Web3.js event objects.
  */
 export async function getLikesPaginated(startBlock, endBlock, chunkSize = 10000, targetCount = 20) {
-  try {
-    const { contract } = initHupContract()
-    let allEvents = []
-    let currentTo = endBlock
+  const { web3, contract } = initHupContract();
+  let allEvents = [];
+  let currentTo = endBlock;
 
-    while (allEvents.length < targetCount && currentTo >= startBlock) {
-      const currentFrom = Math.max(startBlock, currentTo - chunkSize + 1)
-      
-      const events = await contract.getPastEvents('PostLiked', {
-        fromBlock: currentFrom,
-        toBlock: currentTo,
-      })
+  while (allEvents.length < targetCount && currentTo >= startBlock) {
+    const currentFrom = Math.max(startBlock, currentTo - chunkSize + 1);
+    
+    const events = await contract.getPastEvents('PostLiked', {
+      fromBlock: currentFrom,
+      toBlock: currentTo,
+    });
 
-      allEvents.push(...events.reverse())
-      currentTo = currentFrom - 1
-    }
-
-    return {
-      events: allEvents.slice(0, targetCount),
-      lastScannedBlock: currentTo
-    }
-  } catch (error) {
-    console.error('Error during chunked event parsing logs:', error)
-    return { events: [], lastScannedBlock: endBlock, error }
+    // Web3.js returns oldest first, so we reverse the chunk
+    allEvents.push(...events.reverse());
+    currentTo = currentFrom - 1;
   }
+
+  // RETURN AN OBJECT, NOT JUST THE ARRAY
+  return {
+    events: allEvents.slice(0, targetCount),
+    lastScannedBlock: currentTo
+  };
 }
