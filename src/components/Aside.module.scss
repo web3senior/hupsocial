@@ -329,13 +329,15 @@
 }
 
 .newButton {
-  --icon-size: 32px;
+  // Icon scales fluently, but stays between 24px and 32px
+  --icon-size: clamp(24px, 3vw, 32px);
 
   position: fixed;
   bottom: 2rem;
   right: 2rem;
-  width: 70px;
-  height: 70px;
+  // Button scales fluently, but stays between 56px and 70px
+  width: clamp(56px, 8vw, 70px);
+  height: clamp(56px, 8vw, 70px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -365,16 +367,10 @@
     transform: scale(0.95);
   }
 
-  // Mobile layout adjustments
-  @include md-down {
-    // Bring it closer to the screen edges on mobile devices
-    bottom: 1.25rem;
-    right: 1.25rem;
-    width: 56px;
-    height: 56px;
-    --icon-size: 24px;
-  }
+  // With clamp(), you can completely delete the @include md-down block
+  // because the mathematical limits handle mobile sizing automatically.
 }
+
 // Container wrapper layout rules inside nav link structure
 .iconWrapper {
   position: relative;

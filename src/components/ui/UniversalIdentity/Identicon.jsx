@@ -1,42 +1,21 @@
-import React, { useEffect, useRef } from 'react'
+import React from 'react'
 import clsx from 'clsx'
-import makeBlockie from 'ethereum-blockies-base64';
-import jazzy from '@metamask/jazzicon'
+import makeBlockie from 'ethereum-blockies-base64'
 import styles from './Identicon.module.scss'
 
-export const Identicon = ({ address, name = '', profileImage = '', size = 16, className }) => {
-  const iconRef = useRef(null)
+export const Identicon = ({ address, size = 16, className }) => {
+  // Ensure we have a valid address string before transforming it
+  const safeAddress = address ? address.toLowerCase() : ''
 
-  useEffect(() => {
-    if (address && iconRef.current) {
-      iconRef.current.innerHTML = ''
-
-      // Combine all profile components into a single identifier string
-      const identityString = `${address.toLowerCase()}_${name.trim()}_${profileImage.trim()}`
-
-      // Generate a deterministic hash from the identity string using a simple DJB2 algorithm
-      let hash = 5381
-      for (let i = 0; i < identityString.length; i++) {
-        hash = (hash * 33) ^ identityString.charCodeAt(i)
-      }
-
-      // Convert the signed bitwise hash into an unsigned 32-bit integer seed
-      const seed = hash >>> 0
-
-      // Render the unique canvas pattern based on the combined profile identity
-      const iconElement = jazzy(size, seed)
-      iconRef.current.appendChild(iconElement)
-    }
-  }, [address, name, profileImage, size])
+  // Generate the unique base64 image data using the sanitized address string
+  const imageSource = safeAddress ? makeBlockie(safeAddress) : ''
 
   return (
-    // <div
-    //   ref={iconRef}
-    //   className={clsx(styles['identicon-container'], className)}
-    //   style={{ width: size, height: size }}
-    //   title={name ? `${name} (${address})` : address}
-    // />
-    <img src={makeBlockie(`${address.toLowerCase()}_${name.trim()}_${profileImage.trim()}`)} 
-    alt={name} className={clsx(styles['identicon-container'], className)} style={{ width: size, height: size }} />
+    <img 
+      src={imageSource} 
+      alt={address ? `Identicon for ${address}` : 'Identicon'} 
+      className={clsx(styles['identicon-container'], className)} 
+      style={{ width: size, height: size }} 
+    />
   )
 }
