@@ -14,7 +14,6 @@ import { usePostStore } from '@/stores/usePostStore'
 import NativePopover from '@/components/ui/NativePopover'
 
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
-const EventsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 // const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
 const CommunitiesTab = lazy(() => import('@/components/tabs/CommunitiesTab'))
 
@@ -40,7 +39,6 @@ export default function Page() {
 
   const TabContentMap = {
     polls: PollsTab,
-    events: EventsTab,
     apps: <></>,
     communities: CommunitiesTab,
   }

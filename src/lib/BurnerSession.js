@@ -2,10 +2,10 @@ import { ethers } from 'ethers'
 import { getUserSessions } from './communication'
 import { decryptData, isPrivateKeyEncrypted } from './cryptoHelper'
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
-const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
-const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+export const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
+export const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
+export const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
 
 const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl || chain?.rpc || process.env.NEXT_PUBLIC_LUKSO_RPC_URL
 
@@ -15,7 +15,7 @@ const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl
  * @param {object} chain - The chain object containing RPC configurations.
  * @param {string|null} password - Optional password to decrypt the key if locked.
  */
-const getBurnerSigner = async (chain, password = null) => {
+export const getBurnerSigner = async (chain, password = null) => {
   const storedAddress = localStorage.getItem(localStorageBurnerAddress)
   const storedKey = localStorage.getItem(localStorageBurnerKey)
 
@@ -77,7 +77,7 @@ export const writeWithBurnerSession = async ({ chain, contractAddress, abi, func
  * Reads stored credentials. Designed to be fast and non-blocking for background checks.
  * Does not decrypt locked keys to avoid unnecessary password prompts.
  */
-const getStoredBurner = () => {
+export const getStoredBurner = () => {
   if (typeof window === 'undefined') return null
 
   const address = localStorage.getItem(localStorageBurnerAddress)

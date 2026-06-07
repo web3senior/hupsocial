@@ -1,244 +1,444 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { 
-  HelpCircle, 
-  ChevronDown, 
-  MessageSquare, 
-  Send, 
-  LucideLoader2, 
-  CheckCircle2, 
-  AlertCircle,
-  HelpCircle as GuestIcon
-} from 'lucide-react'
-import { useConnection } from 'wagmi'
-import { getViewerId } from '@/lib/viewer'
+import { useCallback, useEffect, useState } from 'react'
+import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { getActiveChain } from '@/lib/communication'
+import hupABI from '@/abi/hup.json'
+import { RefreshCwIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, CheckIcon, CopyIcon, UploadIcon } from 'lucide-react'
+import { ethers } from 'ethers'
+import Balance from '@/app/(user)/[wallet]/_components/balance'
+import { toRelativeTime } from '@/lib/dateHelper'
+import { isSessionActive } from '@/lib/BurnerSession'
+import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
+import { isHexString, Wallet } from 'ethers'
 import styles from './Settings.module.scss'
 
-const FAQ_DATA = [
-  {
-    id: 'faq-1',
-    question: 'What is hup.social?',
-    answer: 'hup is a fully decentralized social protocol built on top of secure smart contract primitives. It gives users complete ownership over their content, identity graphs, and profiles across multiple EVM ecosystems.',
-  },
-  {
-    id: 'faq-2',
-    question: 'How do Universal Profiles work here?',
-    answer: 'hup interfaces directly with modular smart contract identities (like LUKSO Standard Proposals). This allows your identity metadata, data keys, and contract relations to be entirely dynamic and client-agnostic.',
-  },
-  {
-    id: 'faq-3',
-    question: 'Why am I not seeing my latest actions updated instantly?',
-    answer: 'While transaction state updates on-chain with block finality, indexing nodes extract and normalize data into our application database layer. Highly congested network status can occasionally experience brief replication delays.',
-  },
-  {
-    id: 'faq-4',
-    question: 'Are there gas fees for posting or interacting?',
-    answer: 'Yes, because actions (such as posts, comments, or profile updates) live securely on-chain, transactions require network execution fees. However, ecosystem transaction relayers may subsidize execution metrics for compatible profiles.',
-  }
-]
+const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
+const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
+const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
 
-export default function HelpCenter() {
-  const { address, isConnected } = useConnection()
-  const [openFaqId, setOpenFaqId] = useState(null)
-  
-  const [category, setCategory] = useState('general')
-  const [subject, setSubject] = useState('')
-  const [message, setMessage] = useState('')
-  const [email, setEmail] = useState('')
-  
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState(null)
-  const [errorMessage, setErrorMessage] = useState('')
+export default function SettingsTab() {
+  const { address } = useConnection()
+  const publicClient = usePublicClient()
+  const activeChain = getActiveChain()
 
-  const toggleFaq = useCallback((id) => {
-    setOpenFaqId((current) => (current === id ? null : id))
-  }, [])
+  // Base states
+  const [sessionActive, setSessionActive] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [burnerAddress, setBurnerAddress] = useState(null)
+  const [expiresAt, setExpiresAt] = useState(null)
 
-  const handleSubmitTicket = async (e) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setSubmitStatus(null)
-    setErrorMessage('')
+  // Password / Security States
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false)
+  const [showDecryptPrompt, setShowDecryptPrompt] = useState(false)
+  const [showImportPrompt, setShowImportPrompt] = useState(false)
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [decryptPassword, setDecryptPassword] = useState('')
+  const [revealKeyMode, setRevealKeyMode] = useState(false)
+  const [revealedPrivateKey, setRevealedPrivateKey] = useState(null)
+  const [copied, setCopied] = useState(false)
 
+  // Import custom key states
+  const [importPrivateKeyInput, setImportPrivateKeyInput] = useState('')
+  const [importPassword, setImportPassword] = useState('')
+
+  // UI helpers
+  const [showPlainPassword, setShowPlainPassword] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  const { data: hash, writeContract } = useWriteContract()
+
+  const checkStatus = useCallback(async () => {
     try {
-      /* Resolve the user identity string using your viewer helper logic */
-      const resolvedIdentifier = getViewerId(isConnected ? address : null)
-
-      const response = await fetch('/api/v1/support/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          wallet_address: isConnected ? address : null,
-          identifier: resolvedIdentifier,
-          category,
-          subject,
-          message,
-          email: email || null,
-        }),
+      const session = await isSessionActive({
+        userAddress: address,
+        publicClient,
       })
+      console.log(session)
 
-      const payload = await response.json()
-
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.error || 'Failed to submit your support ticket.')
-      }
-
-      setSubmitStatus('success')
-      setSubject('')
-      setMessage('')
-      setEmail('')
+      setSessionActive(session.active)
+      setBurnerAddress(session.burnerAddress)
+      setExpiresAt(session.expiresAt)
     } catch (err) {
-      console.error('Support ticket handling failure:', err)
-      setSubmitStatus('error')
-      setErrorMessage(err.message || 'An unexpected error occurred.')
-    } finally {
-      setIsSubmitting(false)
+      console.error('Status check failed:', err)
+      setSessionActive(false)
+    }
+  }, [address, publicClient])
+
+  useEffect(() => {
+    checkStatus()
+    const interval = setInterval(checkStatus, 30000)
+    return () => clearInterval(interval)
+  }, [checkStatus])
+
+  const triggerAuthorizeFlow = () => {
+    setErrorMsg('')
+    setPassword('')
+    setConfirmPassword('')
+
+    const existingKey = localStorage.getItem(localStorageBurnerKey)
+    if (existingKey && isPrivateKeyEncrypted(existingKey)) {
+      handleAuthorizeSession(null)
+    } else {
+      setShowPasswordSetup(true)
     }
   }
 
+  const handleAuthorizeSession = async (customPassword = null) => {
+    try {
+      setIsLoading(true)
+      setErrorMsg('')
+
+      let targetBurnerAddress
+      let currentKey = localStorage.getItem(localStorageBurnerKey)
+
+      if (!currentKey || !localStorage.getItem(localStorageBurnerAddress)) {
+        if (!customPassword || customPassword.length < 6) {
+          throw new Error('Please enter a secure password (at least 6 characters).')
+        }
+
+        const burner = ethers.Wallet.createRandom()
+        const encryptedKey = await encryptData(burner.privateKey, customPassword)
+
+        localStorage.setItem(localStorageBurnerKey, encryptedKey)
+        localStorage.setItem(localStorageBurnerAddress, burner.address)
+        sessionStorage.setItem(sessionStorageUnlockedKey, burner.privateKey)
+
+        targetBurnerAddress = burner.address
+      } else {
+        targetBurnerAddress = localStorage.getItem(localStorageBurnerAddress)
+      }
+
+      const duration = 3600 * 24 * 30 // 30 days
+
+      writeContract({
+        address: activeChain[1].hup,
+        abi: hupABI,
+        functionName: 'authorizeSession',
+        args: [targetBurnerAddress, duration],
+      })
+
+      setShowPasswordSetup(false)
+    } catch (err) {
+      console.error('Session authorization failed:', err)
+      setErrorMsg(err.message || 'Authorization failed. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDecryptAndReveal = async () => {
+    try {
+      setIsLoading(true)
+      setErrorMsg('')
+      const encryptedKey = localStorage.getItem(localStorageBurnerKey)
+
+      if (!encryptedKey) {
+        throw new Error('No session key found on this device.')
+      }
+
+      if (!isPrivateKeyEncrypted(encryptedKey)) {
+        setRevealedPrivateKey(encryptedKey)
+        setRevealKeyMode(true)
+        setShowDecryptPrompt(false)
+        return
+      }
+
+      const decrypted = await decryptData(encryptedKey, decryptPassword)
+      setRevealedPrivateKey(decrypted)
+      sessionStorage.setItem(sessionStorageUnlockedKey, decrypted)
+
+      setRevealKeyMode(true)
+      setShowDecryptPrompt(false)
+      setDecryptPassword('')
+    } catch (err) {
+      setErrorMsg(err.message || 'Decryption failed. Incorrect password.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleImportSessionKey = async () => {
+    try {
+      setIsLoading(true)
+      setErrorMsg('')
+
+      // Validate the raw string format cleanly using Ethers v6 top-level utilities
+      if (!isHexString(importPrivateKeyInput, 32)) {
+        throw new Error('Invalid private key format. Must be a 66-character hex string (starting with 0x).')
+      }
+
+      if (importPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters.')
+      }
+
+      // Instantiation using the updated v6 class syntax
+      const importedWallet = new Wallet(importPrivateKeyInput)
+      const encryptedKey = await encryptData(importPrivateKeyInput, importPassword)
+
+      localStorage.setItem(localStorageBurnerKey, encryptedKey)
+      localStorage.setItem(localStorageBurnerAddress, importedWallet.address)
+      sessionStorage.setItem(sessionStorageUnlockedKey, importPrivateKeyInput)
+
+      await checkStatus()
+      setShowImportPrompt(false)
+      setImportPrivateKeyInput('')
+      setImportPassword('')
+    } catch (err) {
+      setErrorMsg(err.message || 'Import failed. Check private key format.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleRevokeSession = async () => {
+    try {
+      setIsLoading(true)
+      writeContract({
+        address: activeChain[1].hup,
+        abi: hupABI,
+        functionName: 'revokeSession',
+        args: [],
+      })
+    } catch (err) {
+      console.error('Session revocation failed:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <h4>Help & Support Center</h4>
-        <p>Find answers to common technical protocol questions or file a support request.</p>
-      </header>
+    <div className={`${styles.tabContent} ${styles.communitiesTab} relative`}>
+      <div className="__container" data-width="medium">
+        <div className={`card ${styles.section}`}>
+          <div className={`card__body ${styles.sectionBody}`}>
+            <div className="flex justify-between align-items-center">
+              <h4>In app wallet</h4>
+              <button onClick={checkStatus} className={styles.btnIcon}>
+                <RefreshCwIcon size={18} />
+              </button>
+            </div>
+            <small>Send a small amount of native token to the burner address to sign transactions automatically in the background.</small>
 
-      <section className={styles.section}>
-        <h2>
-          <HelpCircle size={22} />
-          Frequently Asked Questions
-        </h2>
-        <div className={styles.faqList}>
-          {FAQ_DATA.map((faq) => {
-            const isOpen = openFaqId === faq.id
-            return (
-              <div key={faq.id} className={styles.faqItem}>
-                <button
-                  type="button"
-                  className={styles.faqQuestion}
-                  onClick={() => toggleFaq(faq.id)}
-                  aria-expanded={isOpen}
-                  aria-controls={faq.id}
-                >
-                  <span>{faq.question}</span>
-                  <ChevronDown size={18} />
-                </button>
-                {isOpen && (
-                  <div id={faq.id} className={styles.faqAnswer}>
-                    {faq.answer}
-                  </div>
-                )}
+            <div className="mt-15">
+              <p>Status: {sessionActive ? '🟢 Active' : 'Not Set'}</p>
+
+              {burnerAddress && (
+                <div className={styles.bgLight}>
+                  <p className="m-0 mb-5">
+                    <strong>Burner Address:</strong> <br />
+                    <code>{burnerAddress}</code>
+                  </p>
+                  <p className="m-0 mb-5">
+                    <strong>Balance:</strong> <Balance addr={burnerAddress} />
+                  </p>
+                  {expiresAt && (
+                    <p className="m-0">
+                      <strong>Expires At:</strong> <br />
+                      <code>
+                        {sessionActive ? 'In ' : ''}
+                        {sessionActive ? toRelativeTime(expiresAt) : 'Expired'}
+                      </code>
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {errorMsg && (
+              <div className={styles.alertError}>
+                <ShieldAlertIcon size={16} />
+                <span>{errorMsg}</span>
               </div>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <h2>
-          <MessageSquare size={22} />
-          Submit a Support Ticket
-        </h2>
-        
-        <form onSubmit={handleSubmitTicket} className={styles.ticketForm}>
-          {isConnected ? (
-            <div className={styles.walletHint}>
-              Connected wallet <strong>{address.slice(0, 6)}...{address.slice(-4)}</strong> will be automatically attached to this support profile payload.
-            </div>
-          ) : (
-            <div className={styles.walletHint}>
-              <GuestIcon size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-              You are currently browsing as a guest. A secure visitor identity token will be assigned to track this ticket request.
-            </div>
-          )}
-
-          <div className={styles.formGroup}>
-            <label htmlFor="category">Inquiry Type</label>
-            <select
-              id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              disabled={isSubmitting}
-            >
-              <option value="general">General Protocol Question</option>
-              <option value="indexing">Profile Sync / Indexing Issue</option>
-              <option value="transaction">On-Chain Transaction Problem</option>
-              <option value="bug">Bug Report / App Error</option>
-              <option value="feedback">Feedback / Suggestion</option>
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label htmlFor="email">Email Address (Optional)</label>
-            <input
-              type="email"
-              id="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label htmlFor="subject">Subject</label>
-            <input
-              type="text"
-              id="subject"
-              placeholder="Brief description of the issue"
-              required
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label htmlFor="message">Message Description</label>
-            <textarea
-              id="message"
-              placeholder="Provide explicit operational details regarding your issue..."
-              required
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {submitStatus === 'success' && (
-            <div className={`${styles.statusMessage} ${styles.success}`}>
-              <CheckCircle2 size={18} />
-              <span>Ticket successfully received. The team will analyze the telemetry.</span>
-            </div>
-          )}
-
-          {submitStatus === 'error' && (
-            <div className={`${styles.statusMessage} ${styles.error}`}>
-              <AlertCircle size={18} />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className={styles.submitButton}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <LucideLoader2 className={styles.spin} size={18} />
-                Submitting Ticket...
-              </>
-            ) : (
-              <>
-                <Send size={16} />
-                Send Ticket
-              </>
             )}
-          </button>
-        </form>
-      </section>
+
+            {/* PASSWORD SETUP FORM */}
+            {showPasswordSetup && (
+              <div className={styles.secureSetup}>
+                <h5>
+                  <KeyRoundIcon size={16} /> Secure Your Session Key
+                </h5>
+                <p>Choose a PIN or Password. It will be used to encrypt the burner private key before storing it on this device.</p>
+                <div className={styles.formGroup}>
+                  <input
+                    type={showPlainPassword ? 'text' : 'password'}
+                    placeholder="Enter password (min 6 characters)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={styles.formControl}
+                  />
+                  <input
+                    type={showPlainPassword ? 'text' : 'password'}
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={styles.formControl}
+                  />
+                </div>
+                <div className="flex gap-05 justify-between align-items-center">
+                  <button type="button" onClick={() => setShowPlainPassword(!showPlainPassword)} className={styles.btnLink}>
+                    {showPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPlainPassword ? 'Hide' : 'Show'}
+                  </button>
+                  <div className="flex gap-05">
+                    <button onClick={() => setShowPasswordSetup(false)} className={styles.btnSecondary}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (password !== confirmPassword) {
+                          setErrorMsg('Passwords do not match.')
+                          return
+                        }
+                        handleAuthorizeSession(password)
+                      }}
+                      className={styles.btnPrimary}
+                      disabled={isLoading}
+                    >
+                      Encrypt & Authorize
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DECRYPT / REVEAL PASSWORD PROMPT */}
+            {showDecryptPrompt && (
+              <div className={styles.secureSetup}>
+                <h5>
+                  <KeyRoundIcon size={16} /> Enter Password to Unlock
+                </h5>
+                <p>Provide your password to securely decrypt the key from localStorage.</p>
+                <input
+                  type="password"
+                  placeholder="Enter session password"
+                  value={decryptPassword}
+                  onChange={(e) => setDecryptPassword(e.target.value)}
+                  className={styles.formControl}
+                />
+                <div className="flex justify-end gap-050 mt-15">
+                  <button onClick={() => setShowDecryptPrompt(false)} className={styles.btnSecondary}>
+                    Cancel
+                  </button>
+                  <button onClick={handleDecryptAndReveal} className={styles.btnPrimary} disabled={isLoading}>
+                    Unlock Key
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* IMPORT SESSION KEY PROMPT */}
+            {showImportPrompt && (
+              <div className={styles.secureSetup}>
+                <h5>
+                  <UploadIcon size={16} /> Import Session Key
+                </h5>
+                <p>Paste the private key from your other device and choose a new password for local encryption.</p>
+                <div className={styles.formGroup}>
+                  <input
+                    type="text"
+                    placeholder="Enter Private Key (starts with 0x)"
+                    value={importPrivateKeyInput}
+                    onChange={(e) => setImportPrivateKeyInput(e.target.value)}
+                    className={styles.formControl}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Create a Password for local encryption"
+                    value={importPassword}
+                    onChange={(e) => setImportPassword(e.target.value)}
+                    className={styles.formControl}
+                  />
+                </div>
+                <div className="flex justify-end gap-1">
+                  <button onClick={() => setShowImportPrompt(false)} className={styles.btnSecondary}>
+                    Cancel
+                  </button>
+                  <button onClick={handleImportSessionKey} className={styles.btnPrimary} disabled={isLoading}>
+                    Encrypt & Import
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* REVEALED PRIVATE KEY SECTION */}
+            {revealKeyMode && revealedPrivateKey && (
+              <div className={styles.secureSetup}>
+                <h5>Backup Session Private Key</h5>
+                <p>
+                  <strong>CAUTION:</strong> Never share this key. Store it securely to recover your session on other devices.
+                </p>
+                <div className={styles.keyContainer}>
+                  <code>{revealedPrivateKey}</code>
+                  <button onClick={() => copyToClipboard(revealedPrivateKey)} className={styles.btnIcon} title="Copy to clipboard">
+                    {copied ? <CheckIcon size={16} className="text-success" /> : <CopyIcon size={16} />}
+                  </button>
+                </div>
+                <div className="flex justify-end mt-15">
+                  <button
+                    onClick={() => {
+                      setRevealKeyMode(false)
+                      setRevealedPrivateKey(null)
+                    }}
+                    className={styles.btnSecondary}
+                  >
+                    Hide Key
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ACTION BUTTONS GROUP */}
+            <div className="flex flex-wrap gap-10 mt-20  gap-1">
+              <button
+                onClick={triggerAuthorizeFlow}
+                disabled={sessionActive || isLoading || showPasswordSetup}
+                className={styles.btnPrimary}
+              >
+                Authorize Session
+              </button>
+
+              <button onClick={handleRevokeSession} disabled={!sessionActive || isLoading} className={styles.btnDanger}>
+                Revoke Session
+              </button>
+
+              {localStorage.getItem(localStorageBurnerKey) && !revealKeyMode && (
+                <button
+                  onClick={() => {
+                    setErrorMsg('')
+                    setShowDecryptPrompt(true)
+                    setShowPasswordSetup(false)
+                    setShowImportPrompt(false)
+                  }}
+                  className={styles.btnSecondary}
+                  disabled={isLoading}
+                >
+                  Backup Key
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setErrorMsg('')
+                  setShowImportPrompt(true)
+                  setShowPasswordSetup(false)
+                  setShowDecryptPrompt(false)
+                }}
+                className={styles.btnSecondary}
+                disabled={isLoading}
+              >
+                Import Key
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -25,7 +25,7 @@ import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdenti
 import styles from './UserProfile.module.scss'
 import { useProfile } from '@/hooks/useProfile'
 
-import SettingsTab from '@/components/tabs/SettingsTab'
+//import SettingsTab from '@/components/tabs/SettingsTab'
 //const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 // todo: this cause to handle loading.jsx again
 
@@ -58,7 +58,6 @@ export default function UserProfile() {
     //  jobs: JobsTab,
     apps: <></>,
     // feed: FeedTab,
-    settings: SettingsTab,
   }
   const ActiveComponent = TabContentMap[activeTab]
   // Assumes:
@@ -254,12 +253,6 @@ export default function UserProfile() {
           {activeTab === 'links' && (
             <div className={`${styles.tabContent} ${styles.links} relative`}>
               <LinksTab />
-            </div>
-          )}
-
-          {activeTab === 'settings' && (
-            <div className={`${styles.tabContent} ${styles.settings} relative`}>
-              <SettingsTab />
             </div>
           )}
         </div>
