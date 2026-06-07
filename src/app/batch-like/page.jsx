@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useConfig, useAccount, useSwitchChain, useWriteContract, usePublicClient } from 'wagmi'
+import { useConfig, useAccount, useSwitchChain, useWriteContract, usePublicClient, useConnection } from 'wagmi'
 import { Trash2, Layers, ArrowRight, Heart, Loader2 } from 'lucide-react'
 
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -14,17 +14,18 @@ import abi from '@/abi/post.json'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 import { toast } from '@/components/NextToast'
 import styles from './page.module.scss'
+import { getActiveChain } from '@/lib/communication'
 
 export default function Page() {
   const router = useRouter()
   const config = useConfig()
   
   // Extract account authentication, chain utility, and transaction hooks
-  const { isConnected, address, chain: activeChain } = useAccount()
+  const { isConnected, address } = useConnection()
   const { switchChainAsync } = useSwitchChain()
   const { writeContractAsync } = useWriteContract()
   const publicClient = usePublicClient()
-
+  const activeChain = getActiveChain()
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
   const removeFromBatch = useSidebarStore((state) => state.removeFromBatch)
   const clearBatch = useSidebarStore((state) => state.clearBatch)
@@ -93,9 +94,18 @@ export default function Page() {
       })
 
       if (session.active) {
+        console.log(
+          {
+          chain: activeChain[0],
+          contractAddress: targetChain.hup,
+          abi: abi,
+          functionName: 'batchLike',
+          args: [address, currentNetworkPosts],
+        }
+        )
         // Burner key authorization route clears target stack instantly
         await writeWithBurnerSession({
-          chain: activeChain || { id: numericChainId },
+          chain: activeChain[0],
           contractAddress: targetChain.hup,
           abi: abi,
           functionName: 'batchLike',
