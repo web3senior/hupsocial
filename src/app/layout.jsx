@@ -1,17 +1,6 @@
-import { Geist, Geist_Mono } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import './Globals.scss'
 import './../styles/Global.scss'
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
 
 export const metadata = {
   // --- BASE & CORE METADATA ---
@@ -107,7 +96,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body>
         <ClientLayout>{children}</ClientLayout>
       </body>

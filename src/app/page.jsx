@@ -4,14 +4,12 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect, lazy, Suspense, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import { getApps, getPosts } from '@/lib/api'
-import Profile from '@/components/Profile'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { getActiveChain } from '@/lib/communication'
 import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import { usePostStore } from '@/stores/usePostStore'
-import NativePopover from '@/components/ui/NativePopover'
 
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 // const AppsTab = lazy(() => import('@/components/tabs/AppsTab'))
