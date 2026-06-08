@@ -3,9 +3,8 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useConfig, useAccount, useSwitchChain, useWriteContract, usePublicClient, useConnection } from 'wagmi'
+import { useConfig, useSwitchChain, useWriteContract, usePublicClient, useConnection } from 'wagmi'
 import { Trash2, Layers, ArrowRight, Heart, Loader2 } from 'lucide-react'
-
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import PageTitle from '@/components/PageTitle'
 import { getNetworkDisplayName } from '@/lib/chains'
@@ -25,7 +24,7 @@ export default function Page() {
   const { switchChainAsync } = useSwitchChain()
   const { writeContractAsync } = useWriteContract()
   const publicClient = usePublicClient()
-  const activeChain = getActiveChain()
+  const activeChain = getActiveChain()[0]
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
   const removeFromBatch = useSidebarStore((state) => state.removeFromBatch)
   const clearBatch = useSidebarStore((state) => state.clearBatch)
@@ -81,6 +80,8 @@ export default function Page() {
     try {
       setIsProcessing(true)
 
+      console.log(activeChain)
+
       // Verify that the connected user wallet matches the active pipeline target chain
       if (!activeChain || activeChain.id !== numericChainId) {
         toast(`Switching network connection to match pipeline parameters...`, 'info')
@@ -92,7 +93,7 @@ export default function Page() {
         userAddress: address,
         publicClient,
       })
-
+  
       if (session.active) {
         console.log(
           {
@@ -118,12 +119,21 @@ export default function Page() {
         return
       }
 
+      console.log(
+        address,
+        currentNetworkPosts,
+        targetChain.hup
+      )
+
       // Base ledger wallet fallback pathway requiring local user confirmation
       await writeContractAsync({
+         abi,
+
         address: targetChain.hup,
         functionName: 'batchLike',
         args: [address, currentNetworkPosts],
       })
+
 
       toast('Transaction sent! Clearing localized buffer parameters...', 'success')
       clearBatch(activeNetworkId)
