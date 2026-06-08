@@ -1,21 +1,22 @@
+@import '@/styles/components/responsive';
+
 .page {
   --gray-rgb: 0, 0, 0;
   --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
-  height: 100%;
-  min-height: 85svh;
+  // height: 100%;
+  // min-height: 85svh;
 
   &__container {
     position: relative;
     top: 0rem;
-    min-height: 100svh;
+    // min-height: 100svh;
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: 24px;
     overflow: hidden;
-
 
     @media (max-width: 600px) {
       border: none;
@@ -95,7 +96,6 @@
 }
 
 .tabContent {
-  padding: 0 0 0 0;
 }
 
 .tabContentEmpty {
@@ -347,9 +347,6 @@
   z-index: -1;
 }
 
-.grid {
-}
-
 .priceIcon {
   background-color: #f3f5f9;
   padding: 2px 6px;
@@ -372,4 +369,44 @@
 }
 
 @media (max-width: 600px) {
+}
+.page__header {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.new-posts {
+  position: sticky;
+  top: 3.6rem;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  border: none;
+  width: 100%;
+  flex: 1;
+  pointer-events: auto;
+  color: var(--blue-500);
+  text-align: center;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  background-color: var(--surface);
+
+@include small-up {
+  border-radius: 1000px;
+  margin-bottom: 4px;
+}
+
+  &:hover {
+    background-color: var(--surface);
+  }
+}
+
+[data-theme='light'] {
+  .new-posts {
+      background-color: var(--gray-100);
+  }
 }

@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
 
@@ -89,6 +90,9 @@ export async function GET(request, { params }) {
     const hasMore = !lastOnly && rows.length > limit
     const commentsToSend = lastOnly ? rows : hasMore ? rows.slice(0, limit) : rows
     const nextPage = hasMore ? page + 1 : null
+
+    // Fulfill any missing Universal Profile fields
+    await fulfillUniversalProfiles(commentsToSend, pool)
 
     return NextResponse.json({
       success: true,

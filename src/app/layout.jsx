@@ -82,8 +82,8 @@ export const metadata = {
 
   // --- CUSTOM META TAGS ---
   other: {
-    'base:app_id': '699cfe2d6b5b98f55322fb3a', // The meta tag you want to add
-    // Add other custom meta tags here if needed
+    'base:app_id': '699cfe2d6b5b98f55322fb3a',
+    // Other custom meta tags
   },
 }
 
