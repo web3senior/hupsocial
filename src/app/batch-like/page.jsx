@@ -18,7 +18,7 @@ import { getActiveChain } from '@/lib/communication'
 export default function Page() {
   const router = useRouter()
   const config = useConfig()
-  
+
   // Extract account authentication, chain utility, and transaction hooks
   const { isConnected, address } = useConnection()
   const { switchChainAsync } = useSwitchChain()
@@ -34,16 +34,12 @@ export default function Page() {
 
   const networkIds = useMemo(() => {
     if (Array.isArray(likedPostIdsMap)) return []
-    return Object.keys(likedPostIdsMap).filter(
-      (netId) => likedPostIdsMap[netId]?.length > 0
-    )
+    return Object.keys(likedPostIdsMap).filter((netId) => likedPostIdsMap[netId]?.length > 0)
   }, [likedPostIdsMap])
 
   const [activeNetworkId, setActiveNetworkId] = useState(() => {
     if (Array.isArray(likedPostIdsMap)) return ''
-    const keys = Object.keys(likedPostIdsMap).filter(
-      (netId) => likedPostIdsMap[netId]?.length > 0
-    )
+    const keys = Object.keys(likedPostIdsMap).filter((netId) => likedPostIdsMap[netId]?.length > 0)
     return keys[0] || ''
   })
 
@@ -93,20 +89,11 @@ export default function Page() {
         userAddress: address,
         publicClient,
       })
-  
+
       if (session.active) {
-        console.log(
-          {
-          chain: activeChain[0],
-          contractAddress: targetChain.hup,
-          abi: abi,
-          functionName: 'batchLike',
-          args: [address, currentNetworkPosts],
-        }
-        )
         // Burner key authorization route clears target stack instantly
         await writeWithBurnerSession({
-          chain: activeChain[0],
+          chain: activeChain,
           contractAddress: targetChain.hup,
           abi: abi,
           functionName: 'batchLike',
@@ -119,21 +106,16 @@ export default function Page() {
         return
       }
 
-      console.log(
-        address,
-        currentNetworkPosts,
-        targetChain.hup
-      )
+      console.log(address, currentNetworkPosts, targetChain.hup)
 
       // Base ledger wallet fallback pathway requiring local user confirmation
       await writeContractAsync({
-         abi,
+        abi,
 
         address: targetChain.hup,
         functionName: 'batchLike',
         args: [address, currentNetworkPosts],
       })
-
 
       toast('Transaction sent! Clearing localized buffer parameters...', 'success')
       clearBatch(activeNetworkId)
@@ -177,9 +159,7 @@ export default function Page() {
                         className={`${styles.tabItem} ${activeNetworkId === netId ? styles.tabItemActive : ''}`}
                         onClick={() => setActiveNetworkId(netId)}
                       >
-                        <span className={styles.networkName}>
-                          {getNetworkDisplayName(config, netId)}
-                        </span>
+                        <span className={styles.networkName}>{getNetworkDisplayName(config, netId)}</span>
                         <span className={styles.networkCountBadge}>{count}</span>
                       </button>
                     )
@@ -233,20 +213,15 @@ export default function Page() {
 
                 {currentNetworkPosts.length > 0 && (
                   <div className={styles.checkoutActionsContainer}>
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--full"
-                      disabled={isProcessing}
-                      onClick={handleExecuteBatchLike}
-                    >
+                    <button type="button" className="btn btn--primary btn--full" disabled={isProcessing} onClick={handleExecuteBatchLike}>
                       {isProcessing ? (
                         <>
                           <Loader2 size={16} className="animate spin" />
-                          <span>Processing Array Payload...</span>
+                          <span>Processing...</span>
                         </>
                       ) : (
                         <>
-                          <span>Sign Multi-Call Like Payload</span>
+                          <span>Sign Batch Like</span>
                           <ArrowRight size={16} />
                         </>
                       )}
