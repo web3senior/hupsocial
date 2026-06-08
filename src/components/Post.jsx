@@ -31,6 +31,7 @@ import styles from './Post.module.scss'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 import NewPost from './NewPost'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { Pencil } from 'lucide-react'
 
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
@@ -203,7 +204,8 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         <main className={`${styles.post__main}`}>
           {displayItem?.content?.elements?.length > 1 ? (
             <>
-              <div
+           
+                <div
                 ref={contentRef}
                 className={`${styles.post__main__content} ${
                   isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed
@@ -213,6 +215,14 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
                   __html: renderMarkdown(displayItem?.content?.elements?.[0]?.data?.text || ''),
                 }}
               />
+              {displayItem.is_edited === 1 && (
+                <div className={styles.post__edited}>
+                  <Pencil strokeWidth={1.5} size={10} />
+                  Edited
+                </div>
+              )}
+      
+
               {canShowMore && (
                 <button
                   type="button"
@@ -931,7 +941,7 @@ const Like = ({ post, onUpdate }) => {
       setIsProcessing(false)
     }
   }
-  
+
   // Execute on-chain direct post unliking workflow logic
   const unlikePost = async (id) => {
     if (!isConnected) {
@@ -971,7 +981,7 @@ const Like = ({ post, onUpdate }) => {
   // Handle local click router deciding between unliking or toggling batch membership
   const handleLikeInteraction = (e) => {
     e.stopPropagation()
-    
+
     if (!isConnected) {
       toast('Please connect wallet', 'error')
       return
@@ -994,17 +1004,9 @@ const Like = ({ post, onUpdate }) => {
   const isLoading = isProcessing || isWalletPending || isConfirming
 
   // Derive dynamic color tokens directly from state checks
-  const heartColor = isLiked 
-    ? 'var(--liked-color, red)' 
-    : isQueued 
-    ? 'var(--batch-like-color, #facc15)' 
-    : 'currentColor'
+  const heartColor = isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
 
-  const heartFill = isLiked 
-    ? 'var(--liked-color, red)' 
-    : isQueued 
-    ? 'var(--batch-like-color, #facc15)' 
-    : 'none'
+  const heartFill = isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'none'
 
   if (!isMounted) return null
 
@@ -1021,13 +1023,7 @@ const Like = ({ post, onUpdate }) => {
             <AnimatedHeart />
           </div>
         ) : (
-          <Heart
-            strokeWidth={1.5}
-            width={18}
-            height={18}
-            color={heartColor}
-            fill={heartFill}
-          />
+          <Heart strokeWidth={1.5} width={18} height={18} color={heartColor} fill={heartFill} />
         )}
 
         {likeCount > 0 && !isLoading && <span>{likeCount}</span>}

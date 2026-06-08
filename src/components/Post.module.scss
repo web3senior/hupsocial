@@ -34,6 +34,18 @@
     }
   }
 
+  &__edited {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-10);
+    gap: 4px;
+    padding: 2px 4px;
+    border-radius: 1000px;
+    background-color: var(--background);
+    border:1px solid var(--border);
+  }
+
   &__repostLabel {
     font-size: 12px;
     color: var(--gray-500);
