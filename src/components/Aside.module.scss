@@ -114,7 +114,8 @@
   &:active {
     transform: scale(0.95);
   }
-
+  
+  // ■■■ Tooltip ■■■
   &[data-tooltip] {
     position: relative;
     &::after {
@@ -132,18 +133,30 @@
       pointer-events: none;
       opacity: 0;
       white-space: nowrap;
-      transition:
-        opacity 0.15s ease,
-        transform 0.15s ease;
       z-index: 10;
       box-shadow: var(--shadow-sm);
-      display: none;
+
+      // Visibility is used instead of display to allow transition animations
+      visibility: hidden;
+
+      // Snappy exit transition when the mouse leaves
+      transition:
+        opacity 0.1s ease,
+        transform 0.1s ease,
+        visibility 0.1s ease;
     }
 
     &:hover::after {
-      display: block;
+      // Reveal tooltip on hover
+      visibility: visible;
       opacity: 1;
       transform: translateY(-50%) scale(1);
+
+      // Balanced 0.5-second hover delay before revealing
+      transition:
+        opacity 0.1s ease 0.5s,
+        transform 0.1s ease 0.5s,
+        visibility 0s linear 0.5s;
     }
   }
 }
@@ -333,8 +346,8 @@
   --icon-size: clamp(24px, 3vw, 32px);
 
   position: fixed;
-  bottom: 2rem;
-  right: 2rem;
+  bottom: 1rem;
+  right: 1rem;
   // Button scales fluently, but stays between 56px and 70px
   width: clamp(56px, 8vw, 70px);
   height: clamp(56px, 8vw, 70px);
@@ -380,23 +393,22 @@
 
   // Tiny red alert indicator badge overlay for the collapsed view state
   .compactBadgeDot {
-      color: var(--liked-color);
-      position: absolute;
-      top: 3px;
-      right: 1px;
-      outline: 2px solid var(--background);
-      width: 6px;
-      height: 6px;
-      border-radius: 1000px;
-      background-color: var(--batch-like-color);
-
+    color: var(--liked-color);
+    position: absolute;
+    top: 3px;
+    right: 1px;
+    outline: 2px solid var(--background);
+    width: 6px;
+    height: 6px;
+    border-radius: 1000px;
+    background-color: var(--batch-like-color);
   }
 }
 
 // Crisp numeric overlay counter badge for the expanded sidebar view state
 .badgeCounter {
   margin-left: auto;
-  background-color: var(--batch-like-color); 
+  background-color: var(--batch-like-color);
   color: #000000;
   font-size: 0.75rem;
   font-weight: 700;
