@@ -34,18 +34,6 @@
     }
   }
 
-  &__edited {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--font-size-10);
-    gap: 4px;
-    padding: 2px 4px;
-    border-radius: 1000px;
-    background-color: var(--background);
-    border:1px solid var(--border);
-  }
-
   &__repostLabel {
     font-size: 12px;
     color: var(--gray-500);
@@ -62,6 +50,9 @@
 
   &__header {
     user-select: none;
+
+    &__actions {
+    }
   }
 
   &[data-has-comments='true'] {
@@ -404,13 +395,34 @@
 }
 
 .post__navTrigger {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--background);
   border: none;
-  z-index: 1;
-  padding: 0.25rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
-    background-color: var(--background);
+    background-color: var(--surface-muted);
+  }
+}
+
+.post__edited {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-10);
+  gap: 4px;
+  width: 1.7rem;
+  height: 1.7rem;
+  background-color: var(--surface-muted);
+  color: var(--text-muted);
+  border-radius: 1000px;
+  background-color: var(--background);
+
+  &:hover {
+    background-color: var(--surface-muted);
   }
 }
 

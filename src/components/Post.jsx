@@ -31,7 +31,7 @@ import styles from './Post.module.scss'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 import NewPost from './NewPost'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import { Pencil } from 'lucide-react'
+import { Pen } from 'lucide-react'
 
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
@@ -196,7 +196,35 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile creator={displayItem?.wallet_address} createdAt={displayItem?.created_at} networkId={displayItem?.network_id} />
-          <div onClick={(e) => e.stopPropagation()}>
+
+          <div
+            className={clsx(styles.post__header__actions, 'flex align-items-center justify-content-start gap-050')}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {displayItem.is_edited === 1 && (
+              <div className={clsx(styles['post__edited'])}>
+                <NativePopover
+                  trigger={
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      className={clsx(styles.post__navTrigger, 'pointer', 'rounded-full')}
+                      data-tooltip="Edited"
+                    >
+                      <Pen strokeWidth={1.5} size={10} />
+                    </button>
+                  }
+                  placement="bottom-end"
+                  type="auto"
+                >
+                  {({ close }) => (
+                    <div className={clsx('flex', 'flex-column', 'align-items-center', 'justify-content-start', 'gap-050')}>
+                      <p>This post is edited.</p>
+                    </div>
+                  )}
+                </NativePopover>
+              </div>
+            )}
+
             <Nav item={item} setShowEditModal={setShowEditModal} />
           </div>
         </header>
@@ -204,8 +232,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         <main className={`${styles.post__main}`}>
           {displayItem?.content?.elements?.length > 1 ? (
             <>
-           
-                <div
+              <div
                 ref={contentRef}
                 className={`${styles.post__main__content} ${
                   isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed
@@ -215,13 +242,6 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
                   __html: renderMarkdown(displayItem?.content?.elements?.[0]?.data?.text || ''),
                 }}
               />
-              {displayItem.is_edited === 1 && (
-                <div className={styles.post__edited}>
-                  <Pencil strokeWidth={1.5} size={10} />
-                  Edited
-                </div>
-              )}
-      
 
               {canShowMore && (
                 <button
@@ -387,7 +407,7 @@ const Nav = ({ item, setShowEditModal }) => {
             <Ellipsis fill="currentColor" strokeWidth={1} width={18} height={18} />
           </button>
         }
-        placement="bottom-start"
+        placement="bottom-end"
       >
         {({ close }) => (
           <div className={`${styles.postDropdown} flex flex-column align-items-center justify-content-start gap-050`}>

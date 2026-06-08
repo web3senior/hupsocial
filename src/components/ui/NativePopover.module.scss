@@ -1,4 +1,5 @@
 .panel {
+  // ■■■ Custom Properties ■■■
   --popover-x: 0;
   --popover-y: 0;
   --popover-scale: 0.96;
@@ -29,40 +30,68 @@
     opacity: 1;
   }
 
+  // ■■■ Anchor Placements: Bottom ■■■
   &[data-placement='bottom-start'] {
-    position-area: bottom left;
+    top: anchor(bottom);
+    left: anchor(left);
     margin-top: 6px;
+    transform-origin: top left;
   }
 
   &[data-placement='bottom-end'] {
-    position-area: bottom right;
+    top: anchor(bottom);
+    right: anchor(right);
     margin-top: 6px;
+    transform-origin: top right;
   }
 
+  // ■■■ Anchor Placements: Top ■■■
   &[data-placement='top-start'] {
-    position-area: top left;
+    bottom: anchor(top);
+    left: anchor(left);
     margin-bottom: 6px;
     transform-origin: bottom left;
   }
 
   &[data-placement='top-end'] {
-    position-area: top right;
+    bottom: anchor(top);
+    right: anchor(right);
     margin-bottom: 6px;
     transform-origin: bottom right;
   }
 
+  // ■■■ Anchor Placements: Right ■■■
   &[data-placement='right-start'] {
-    position-area: right top;
+    left: anchor(right);
+    top: anchor(top);
     margin-left: 6px;
+    transform-origin: top left;
   }
 
+  &[data-placement='right-end'] {
+    left: anchor(right);
+    bottom: anchor(bottom);
+    margin-left: 6px;
+    transform-origin: bottom left;
+  }
+
+  // ■■■ Anchor Placements: Left ■■■
   &[data-placement='left-start'] {
-    position-area: left top;
+    right: anchor(left);
+    top: anchor(top);
     margin-right: 6px;
+    transform-origin: top right;
   }
 
+  &[data-placement='left-end'] {
+    right: anchor(left);
+    bottom: anchor(bottom);
+    margin-right: 6px;
+    transform-origin: bottom right;
+  }
+
+  // ■■■ Global Viewport Placements ■■■
   &[data-placement='center'] {
-    position-area: none;
     left: 50%;
     top: 50%;
     --popover-x: -50%;
@@ -70,7 +99,37 @@
     transform-origin: center;
   }
 
-  &[data-placement='center']::backdrop {
+  &[data-placement='bottom-right-corner'] {
+    right: 0;
+    bottom: 0;
+    margin: 1rem;
+    transform-origin: bottom right;
+  }
+
+  &[data-placement='bottom-left-corner'] {
+    left: 0;
+    bottom: 0;
+    margin: 1rem;
+    transform-origin: bottom left;
+  }
+
+  &[data-placement='top-right-corner'] {
+    right: 0;
+    top: 0;
+    margin: 1rem;
+    transform-origin: top right;
+  }
+
+  &[data-placement='top-left-corner'] {
+    left: 0;
+    top: 0;
+    margin: 1rem;
+    transform-origin: top left;
+  }
+
+  // ■■■ Backdrop Layer Layout ■■■
+  &[data-placement='center']::backdrop,
+  &[data-placement$='-corner']::backdrop {
     background: rgba(0, 0, 0, 0);
     backdrop-filter: blur(0);
     transition:
@@ -80,7 +139,8 @@
       display 0.18s ease allow-discrete;
   }
 
-  &[data-placement='center']:global(:popover-open)::backdrop {
+  &[data-placement='center']:global(:popover-open)::backdrop,
+  &[data-placement$='-corner']:global(:popover-open)::backdrop {
     background: rgba(0, 0, 0, 0.36);
     backdrop-filter: blur(2px);
   }
@@ -91,6 +151,7 @@
   cursor: pointer;
 }
 
+// ■■■ Entrance Animations ■■■
 @starting-style {
   .panel:global(:popover-open) {
     --popover-scale: 0.96;
@@ -99,7 +160,8 @@
 }
 
 @starting-style {
-  .panel[data-placement='center']:global(:popover-open)::backdrop {
+  .panel[data-placement='center']:global(:popover-open)::backdrop,
+  .panel[data-placement$='-corner']:global(:popover-open)::backdrop {
     background: rgba(0, 0, 0, 0);
     backdrop-filter: blur(0);
   }

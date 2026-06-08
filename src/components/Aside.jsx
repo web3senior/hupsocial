@@ -267,7 +267,7 @@ export default function Aside() {
                 {!isCompact && <span className={styles.linkText}>More</span>}
               </button>
             }
-            placement="top-end"
+            placement="right-end"
             type="auto"
           >
             {({ close }) => (
