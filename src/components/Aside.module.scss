@@ -363,6 +363,11 @@
   }
 }
 
+
+
+
+
+
 .newButton {
   // Icon scales fluently, but stays between 24px and 32px
   --icon-size: clamp(24px, 3vw, 32px);
@@ -386,7 +391,6 @@
     right 0.2s ease;
   z-index: 100;
 
-  // Target the SVG directly using our CSS variable
   svg {
     width: var(--icon-size);
     height: var(--icon-size);
@@ -402,7 +406,7 @@
     transform: scale(0.95);
   }
 }
-// Crisp numeric overlay counter badge for the expanded sidebar view state
+
 .badgeCounter {
   margin-left: auto;
   background-color: var(--batch-like-color);
@@ -417,15 +421,14 @@
   justify-content: center;
 }
 
-
 .batchButton {
   // Icon scales fluently, but stays between 24px and 32px
   --icon-size: clamp(24px, 3vw, 32px);
 
   position: fixed;
-  bottom: clamp(5rem, 10vh, 6rem);
+  // Combines newButton bottom (1rem) + height clamp + desired spacing gap (0.75rem)
+  bottom: calc(1.75rem + clamp(56px, 8vw, 70px));
   right: 1rem;
-  // Button scales fluently, but stays between 56px and 70px
   width: clamp(70px, 9vw, 100px);
   height: clamp(56px, 8vw, 70px);
   display: flex;
@@ -441,7 +444,6 @@
     right 0.2s ease;
   z-index: 100;
 
-  // Target the SVG directly using our CSS variable
   svg {
     width: var(--icon-size);
     height: var(--icon-size);
