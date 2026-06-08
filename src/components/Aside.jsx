@@ -1,5 +1,6 @@
 'use client'
 
+// ■■■ Core Imports ■■■
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -29,6 +30,7 @@ import {
   Plus,
 } from 'lucide-react'
 
+// ■■■ Local Utilities & State ■■■
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -63,22 +65,10 @@ const normalizeNavItem = (item) => {
   }
 }
 
-const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
+// ■■■ Child Component: NavLink ■■■
+const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
-
-  // Extract network-mapped queue states to calculate aggregated metrics safely
-  const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
-
-  // Safely accumulate the total item count across all active chain networks
-  const batchCount = useMemo(() => {
-    if (Array.isArray(likedPostIdsMap)) {
-      return likedPostIdsMap.length
-    }
-    return Object.values(likedPostIdsMap).reduce((acc, currentArray) => {
-      return acc + (Array.isArray(currentArray) ? currentArray.length : 0)
-    }, 0)
-  }, [likedPostIdsMap])
 
   if (item.type === 'divider') {
     return <hr className={styles.divider} aria-hidden="true" />
@@ -140,6 +130,7 @@ const NavLink = ({ item, isActive, isCompact, onNavigate }) => {
   )
 }
 
+// ■■■ Primary Component: Aside ■■■
 export default function Aside() {
   const pathname = usePathname()
   const { address, isConnected } = useConnection()
@@ -157,6 +148,19 @@ export default function Aside() {
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
+
+  // Extract network-mapped queue states to calculate aggregated metrics safely
+  const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
+
+  // Safely accumulate the total item count across all active chain networks
+  const batchCount = useMemo(() => {
+    if (Array.isArray(likedPostIdsMap)) {
+      return likedPostIdsMap.length
+    }
+    return Object.values(likedPostIdsMap).reduce((acc, currentArray) => {
+      return acc + (Array.isArray(currentArray) ? currentArray.length : 0)
+    }, 0)
+  }, [likedPostIdsMap])
 
   const [isWideScreen, setIsWideScreen] = useState(false)
 
@@ -247,7 +251,13 @@ export default function Aside() {
         <ul className={styles.navList}>
           {navLinks.map((item, index) => (
             <li key={item.id ?? `${item.type}-${index}`}>
-              <NavLink item={item} isActive={isActivePath(pathname, item.path)} isCompact={isCompact} onNavigate={closeSidebar} />
+              <NavLink 
+                item={item} 
+                isActive={isActivePath(pathname, item.path)} 
+                isCompact={isCompact} 
+                batchCount={batchCount} 
+                onNavigate={closeSidebar} 
+              />
             </li>
           ))}
         </ul>
@@ -378,7 +388,19 @@ export default function Aside() {
         </div>
       </div>
 
-      <button className={clsx(styles.newButton, 'rounded-full')} onClick={setIsComponentOpen} aria-label="Create new post">
+      {/* ■■■ Floating Global Actions Layout ■■■ */}
+      {batchCount > 0 && (
+        <Link 
+          href="/batch-like" 
+          className={clsx(styles.batchButton)} 
+          aria-label={`View batch queue with ${batchCount} operations`}
+        >
+          <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
+          <span className={styles.floatingBadgeCount}>{batchCount}</span>
+        </Link>
+      )}
+
+      <button className={clsx(styles.newButton)} onClick={() => setIsComponentOpen(true)} aria-label="Create new post">
         <Plus />
       </button>
     </aside>

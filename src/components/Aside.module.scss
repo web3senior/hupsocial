@@ -341,6 +341,28 @@
   border-color: var(--border);
 }
 
+
+// Container wrapper layout rules inside nav link structure
+.iconWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  // Tiny red alert indicator badge overlay for the collapsed view state
+  .compactBadgeDot {
+    color: var(--liked-color);
+    position: absolute;
+    top: 3px;
+    right: 1px;
+    outline: 2px solid var(--background);
+    width: 6px;
+    height: 6px;
+    border-radius: 1000px;
+    background-color: var(--batch-like-color);
+  }
+}
+
 .newButton {
   // Icon scales fluently, but stays between 24px and 32px
   --icon-size: clamp(24px, 3vw, 32px);
@@ -349,7 +371,7 @@
   bottom: 1rem;
   right: 1rem;
   // Button scales fluently, but stays between 56px and 70px
-  width: clamp(56px, 8vw, 70px);
+  width: clamp(70px, 9vw, 100px);
   height: clamp(56px, 8vw, 70px);
   display: flex;
   align-items: center;
@@ -379,32 +401,7 @@
   &:active {
     transform: scale(0.95);
   }
-
-  // With clamp(), you can completely delete the @include md-down block
-  // because the mathematical limits handle mobile sizing automatically.
 }
-
-// Container wrapper layout rules inside nav link structure
-.iconWrapper {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  // Tiny red alert indicator badge overlay for the collapsed view state
-  .compactBadgeDot {
-    color: var(--liked-color);
-    position: absolute;
-    top: 3px;
-    right: 1px;
-    outline: 2px solid var(--background);
-    width: 6px;
-    height: 6px;
-    border-radius: 1000px;
-    background-color: var(--batch-like-color);
-  }
-}
-
 // Crisp numeric overlay counter badge for the expanded sidebar view state
 .badgeCounter {
   margin-left: auto;
@@ -418,4 +415,64 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+
+.batchButton {
+  // Icon scales fluently, but stays between 24px and 32px
+  --icon-size: clamp(24px, 3vw, 32px);
+
+  position: fixed;
+  bottom: clamp(5rem, 10vh, 6rem);
+  right: 1rem;
+  // Button scales fluently, but stays between 56px and 70px
+  width: clamp(70px, 9vw, 100px);
+  height: clamp(56px, 8vw, 70px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  box-shadow: var(--shadow-md);
+  transition:
+    transform 0.2s ease,
+    bottom 0.2s ease,
+    right 0.2s ease;
+  z-index: 100;
+
+  // Target the SVG directly using our CSS variable
+  svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.floatingBadgeCount {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: var(--batch-like-color, #facc15);
+  color: #000000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--surface);
 }
