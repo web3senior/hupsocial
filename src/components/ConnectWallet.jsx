@@ -144,7 +144,7 @@ export function DefaultNetwork({ currentNetwork }) {
         ))}
       </div>
 
-      <p className={`text-center mt-10 ${styles.link}`} onClick={() => router.push(`/networks`)}>
+      <p className={`text-center mt-10 ${styles.link}`} onClick={() => router.push(`/chains`)}>
         View networks
       </p>
     </div>
