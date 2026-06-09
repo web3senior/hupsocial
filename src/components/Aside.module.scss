@@ -114,7 +114,7 @@
   &:active {
     transform: scale(0.95);
   }
-  
+
   // ■■■ Tooltip ■■■
   &[data-tooltip] {
     position: relative;
@@ -341,7 +341,6 @@
   border-color: var(--border);
 }
 
-
 // Container wrapper layout rules inside nav link structure
 .iconWrapper {
   position: relative;
@@ -356,17 +355,12 @@
     top: 3px;
     right: 1px;
     outline: 2px solid var(--background);
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 1000px;
     background-color: var(--batch-like-color);
   }
 }
-
-
-
-
-
 
 .newButton {
   // Icon scales fluently, but stays between 24px and 32px
