@@ -1,5 +1,5 @@
 .panel {
-  // ■■■ Custom Properties ■■■
+  // Custom Properties
   --popover-x: 0;
   --popover-y: 0;
   --popover-scale: 0.96;
@@ -14,6 +14,11 @@
   position: fixed;
   inset: auto;
   margin: 0;
+
+  // Screen Overflow Guardrails
+  // Automatically shifts or flips the popover when space is restricted
+  position-try-fallbacks: flip-block, flip-inline, flip-start;
+  position-visibility: always;
 
   opacity: 0;
   transform: translate(var(--popover-x), var(--popover-y)) scale(var(--popover-scale));
@@ -30,68 +35,59 @@
     opacity: 1;
   }
 
-  // ■■■ Anchor Placements: Bottom ■■■
+  // Anchor Placements: Bottom
   &[data-placement='bottom-start'] {
-    top: anchor(bottom);
-    left: anchor(left);
+    position-area: bottom left;
     margin-top: 6px;
-    transform-origin: top left;
   }
 
   &[data-placement='bottom-end'] {
-    top: anchor(bottom);
-    right: anchor(right);
+    position-area: bottom right;
     margin-top: 6px;
     transform-origin: top right;
   }
 
-  // ■■■ Anchor Placements: Top ■■■
+  // Anchor Placements: Top
   &[data-placement='top-start'] {
-    bottom: anchor(top);
-    left: anchor(left);
+    position-area: top left;
     margin-bottom: 6px;
     transform-origin: bottom left;
   }
 
   &[data-placement='top-end'] {
-    bottom: anchor(top);
-    right: anchor(right);
+    position-area: top right;
     margin-bottom: 6px;
     transform-origin: bottom right;
   }
 
-  // ■■■ Anchor Placements: Right ■■■
+  // Anchor Placements: Right
   &[data-placement='right-start'] {
-    left: anchor(right);
-    top: anchor(top);
+    position-area: right top;
     margin-left: 6px;
-    transform-origin: top left;
   }
 
   &[data-placement='right-end'] {
-    left: anchor(right);
-    bottom: anchor(bottom);
+    position-area: right bottom;
     margin-left: 6px;
     transform-origin: bottom left;
   }
 
-  // ■■■ Anchor Placements: Left ■■■
+  // Anchor Placements: Left
   &[data-placement='left-start'] {
-    right: anchor(left);
-    top: anchor(top);
+    position-area: left top;
     margin-right: 6px;
     transform-origin: top right;
   }
 
   &[data-placement='left-end'] {
-    right: anchor(left);
-    bottom: anchor(bottom);
+    position-area: left bottom;
     margin-right: 6px;
     transform-origin: bottom right;
   }
 
-  // ■■■ Global Viewport Placements ■■■
+  // Global Viewport Placements
   &[data-placement='center'] {
+    position-area: none;
     left: 50%;
     top: 50%;
     --popover-x: -50%;
@@ -100,6 +96,7 @@
   }
 
   &[data-placement='bottom-right-corner'] {
+    position-area: none;
     right: 0;
     bottom: 0;
     margin: 1rem;
@@ -107,6 +104,7 @@
   }
 
   &[data-placement='bottom-left-corner'] {
+    position-area: none;
     left: 0;
     bottom: 0;
     margin: 1rem;
@@ -114,6 +112,7 @@
   }
 
   &[data-placement='top-right-corner'] {
+    position-area: none;
     right: 0;
     top: 0;
     margin: 1rem;
@@ -121,13 +120,14 @@
   }
 
   &[data-placement='top-left-corner'] {
+    position-area: none;
     left: 0;
     top: 0;
     margin: 1rem;
     transform-origin: top left;
   }
 
-  // ■■■ Backdrop Layer Layout ■■■
+  // Backdrop Layer Layout
   &[data-placement='center']::backdrop,
   &[data-placement$='-corner']::backdrop {
     background: rgba(0, 0, 0, 0);
@@ -151,7 +151,7 @@
   cursor: pointer;
 }
 
-// ■■■ Entrance Animations ■■■
+// Entrance Animations
 @starting-style {
   .panel:global(:popover-open) {
     --popover-scale: 0.96;
