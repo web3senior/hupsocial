@@ -485,9 +485,9 @@ export default function NewPost({
         <h2>New post</h2>
       </header>
 
-      <main className={clsx(styles.main, 'text-center')}>
+      {/* <main className={clsx(styles.main, 'text-center')}>
         <small>Once submitted, your post will appear in the feed as soon as the network block confirms.</small>
-      </main>
+      </main> */}
 
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} multiple={false} />
