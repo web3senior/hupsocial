@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import clsx from 'clsx'
 import { Heart } from 'lucide-react'
+import useSWR from 'swr'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
@@ -12,6 +13,7 @@ import { useSidebarStore } from '@/stores/useSidebarStore'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import { AnimatedHeart } from '@/components/Icons'
+import { getPostById } from '@/lib/api'
 import styles from './Like.module.scss'
 
 const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
@@ -29,6 +31,50 @@ export const Like = ({ post, onUpdate }) => {
   const removeFromBatch = useSidebarStore((state) => state.removeFromBatch)
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
 
+  const isMounted = useClientMounted()
+  const activeChain = getActiveChain()
+  const { address, isConnected } = useConnection()
+  const publicClient = usePublicClient()
+
+  // ■■■ SWR Data Fetching Configuration ■■■
+  const cacheKey = post?.id ? `posts/${post.network_id}/${post.id}/${address || 'anonymous'}/likes` : null
+
+  const fetcher = async () => {
+    try {
+      const res = await getPostById(post.network_id, post.id, address)
+      const freshPost = Array.isArray(res?.data) ? res.data[0] : res?.data
+
+      if (!freshPost) return null
+
+      return {
+        isLiked: freshPost.is_liked === 1 || freshPost.is_liked === true,
+        likeCount: Number(freshPost.total_likes) || 0,
+        isProcessing: false,
+      }
+    } catch (error) {
+      console.error('Failed to sync post interaction state via API:', error)
+      return {
+        isLiked: post.is_liked === 1 || post.is_liked === true,
+        likeCount: Number(post.total_likes) || 0,
+        isProcessing: false,
+      }
+    }
+  }
+
+  const { data: interactionState, mutate } = useSWR(
+    cacheKey,
+    fetcher,
+    {
+      fallbackData: {
+        isLiked: post.is_liked === 1 || post.is_liked === true,
+        likeCount: Number(post.total_likes) || 0,
+        isProcessing: false,
+      },
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  )
+
   // ■■■ State & Memo Hooks ■■■
   const currentNetworkQueue = useMemo(() => {
     if (Array.isArray(likedPostIdsMap)) return likedPostIdsMap
@@ -37,31 +83,26 @@ export const Like = ({ post, onUpdate }) => {
 
   const isQueued = currentNetworkQueue.includes(post.id)
 
-  const [isLiked, setIsLiked] = useState(post.is_liked === 1 || post.is_liked === true)
-  const [likeCount, setLikeCount] = useState(Number(post.total_likes) || 0)
-  const [isProcessing, setIsProcessing] = useState(false)
-
-  const isMounted = useClientMounted()
-  const activeChain = getActiveChain()
-  const { address, isConnected } = useConnection()
-
   // ■■■ Web3 Hooks ■■■
   const { data: hash, isPending: isWalletPending, writeContractAsync } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
 
-  const publicClient = usePublicClient()
-
   // ■■■ Effects ■■■
   useEffect(() => {
     if (isConfirmed) {
-      setIsProcessing(false)
-      setIsLiked(true)
-      setLikeCount((prev) => prev + 1)
+      mutate(
+        (prev) => ({
+          ...prev,
+          isProcessing: false,
+          isLiked: true,
+        }),
+        { revalidate: true }
+      )
 
       if (typeof onUpdate === 'function') {
-        onUpdate(post.id, { is_liked: 1, total_likes: likeCount + 1 })
+        onUpdate(post.id, { is_liked: 1, total_likes: interactionState.likeCount })
       }
       toast('Interaction saved on-chain!', 'success')
     }
@@ -79,8 +120,17 @@ export const Like = ({ post, onUpdate }) => {
       return
     }
 
+    const previousData = interactionState
+
     try {
-      setIsProcessing(true)
+      mutate(
+        {
+          isLiked: true,
+          likeCount: previousData.likeCount + 1,
+          isProcessing: true,
+        },
+        { revalidate: false }
+      )
 
       const session = await isSessionActive({
         userAddress: address,
@@ -96,14 +146,16 @@ export const Like = ({ post, onUpdate }) => {
           args: [address, [id]],
         })
 
-        setIsLiked(true)
-        setLikeCount((prev) => prev + 1)
+        mutate(
+          (prev) => ({ ...prev, isProcessing: false }),
+          { revalidate: true }
+        )
+
         if (typeof onUpdate === 'function') {
-          onUpdate(id, { is_liked: 1, total_likes: likeCount + 1 })
+          onUpdate(id, { is_liked: 1, total_likes: previousData.likeCount + 1 })
         }
 
         toast('Liked via active session key!', 'success')
-        setIsProcessing(false)
         return
       }
 
@@ -118,7 +170,7 @@ export const Like = ({ post, onUpdate }) => {
     } catch (err) {
       console.error('Like failed:', err)
       toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      setIsProcessing(false)
+      mutate(previousData, { revalidate: false })
     }
   }
 
@@ -134,8 +186,17 @@ export const Like = ({ post, onUpdate }) => {
       return
     }
 
+    const previousData = interactionState
+
     try {
-      setIsProcessing(true)
+      mutate(
+        {
+          isLiked: false,
+          likeCount: Math.max(0, previousData.likeCount - 1),
+          isProcessing: true,
+        },
+        { revalidate: false }
+      )
 
       await writeContractAsync({
         abi,
@@ -144,15 +205,16 @@ export const Like = ({ post, onUpdate }) => {
         args: [id],
       })
 
-      setIsLiked(false)
-      setLikeCount((prev) => Math.max(0, prev - 1))
-      setIsProcessing(false)
+      mutate(
+        (prev) => ({ ...prev, isProcessing: false }),
+        { revalidate: true }
+      )
 
       toast('Removing like on-chain...', 'success')
     } catch (err) {
       console.error('Unlike failed:', err)
       toast(err.message || 'Failed to remove transaction.', 'error')
-      setIsProcessing(false)
+      mutate(previousData, { revalidate: false })
     }
   }
 
@@ -164,12 +226,11 @@ export const Like = ({ post, onUpdate }) => {
       return
     }
 
-    if (isLiked) {
+    if (interactionState.isLiked) {
       unlikePost(post.id)
     } else if (isQueued) {
       removeFromBatch(post.network_id, post.id)
     } else {
-      // Check if Batch Like toggle preference is active in localStorage
       const batchLikePref = localStorage.getItem(localStorageBatchLikeKey)
       const isBatchLikeEnabled = batchLikePref === 'true'
 
@@ -182,9 +243,9 @@ export const Like = ({ post, onUpdate }) => {
   }
 
   // ■■■ UI Style Layout Variables ■■■
-  const isLoading = isProcessing || isWalletPending || isConfirming
-  const heartColor = isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
-  const heartFill = isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'none'
+  const isLoading = interactionState.isProcessing || isWalletPending || isConfirming
+  const heartColor = interactionState.isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
+  const heartFill = interactionState.isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'none'
 
   if (!isMounted) return null
 
@@ -194,7 +255,7 @@ export const Like = ({ post, onUpdate }) => {
         disabled={isLoading}
         className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
         onClick={handleLikeInteraction}
-        aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
+        aria-label={interactionState.isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
       >
         {isLoading ? (
           <div className={clsx(styles.animatedHeader)}>
@@ -204,7 +265,13 @@ export const Like = ({ post, onUpdate }) => {
           <Heart strokeWidth={1.5} width={18} height={18} color={heartColor} fill={heartFill} />
         )}
 
-        {likeCount > 0 && !isLoading && <span>{likeCount}</span>}
+        {interactionState.likeCount > 0 && !isLoading && (
+          <div className={styles.counterWrapper}>
+            <span key={interactionState.likeCount} className={styles.counterNumber}>
+              {interactionState.likeCount}
+            </span>
+          </div>
+        )}
       </button>
     </div>
   )

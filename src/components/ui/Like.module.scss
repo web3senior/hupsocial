@@ -1,0 +1,27 @@
+.counterWrapper {
+  display: inline-flex;
+  position: relative;
+  overflow: hidden;
+  height: 20px;         /* Match text line height precisely */
+  min-width: 14px;      /* Prevent layout jumps when count shifts */
+  align-items: center;
+  justify-content: center;
+}
+
+.counterNumber {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 20px;
+  animation: slideUpFade 0.2s ease-out forwards;
+}
+
+@keyframes slideUpFade {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
