@@ -1,18 +1,25 @@
+/* Custom scrollbar styling for Firefox */
 * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--thumbBG) var(--scrollbarBG);
-  }
-  
-  ::-webkit-scrollbar {
-    visibility: hidden;
-    width: 0.4rem;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: var(--scrollbarBG);
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background-color: var(--thumbBG);
- 
-  }
+  scrollbar-width: thin;
+  scrollbar-color: var(--network-color-primary, var(--thumbBG)) var(--scrollbarBG);
+}
+
+/* Base scrollbar container for WebKit/Blink browsers */
+::-webkit-scrollbar {
+  width: 12px; /* Balanced width for modern UI; original 118px was massive */
+  background-color: var(--gray-200);
+}
+
+/* Track configuration */
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 100vh;
+}
+
+/* Draggable thumb configuration */
+::-webkit-scrollbar-thumb {
+  background-color: var(--network-color-primary, var(--thumbBG));
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 100vh;
+}

@@ -152,7 +152,8 @@ figure.pfp {
   max-width: 460px;
   padding: 1.5rem;
   background: var(--background);
-
+max-height: 100svh;
+overflow-y: auto;
   .link {
     color: var(--blue-400);
     text-decoration: underline;

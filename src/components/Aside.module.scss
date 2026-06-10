@@ -286,6 +286,9 @@
 }
 
 .popoverContent {
+  max-height: calc(100svh - 2rem);
+  overflow-y: auto;
+
   a {
     cursor: pointer;
     padding: 4px;

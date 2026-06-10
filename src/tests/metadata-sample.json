@@ -1,0 +1,34 @@
+{
+  "version": "1",
+  "elements": [
+    {
+      "type": "text",
+      "data": { "text": "Your comment text here" }
+    },
+    {
+      "type": "media",
+      "data": {
+        "items": [
+          {
+            "type": "image",
+            "cid": "Qm1234...image-cid-1",
+            "alt": "Photo of the launch party.",
+            "mimeType": "image/jpeg"
+          },
+          {
+            "type": "image",
+            "cid": "Qm5678...image-cid-2",
+            "alt": "Screenshot of the new interface.",
+            "mimeType": "image/jpeg"
+          },
+          {
+            "type": "video",
+            "cid": "Qm9012...video-cid-3",
+            "format": "mp4",
+            "duration": 45
+          }
+        ]
+      }
+    }
+  ]
+}

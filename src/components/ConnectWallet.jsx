@@ -47,7 +47,7 @@ export const ConnectWallet = () => {
       {currentChainData && (
         <div className={`${styles.networks}`}>
           <NativePopover
-            placement="bottom-start"
+            placement="center"
             type="auto"
             trigger={
               <button type="button" className={`${styles.btnNetwork}`} title={`${currentChainData.name}`}>
@@ -124,12 +124,6 @@ export function DefaultNetwork({ currentNetwork }) {
 
   return (
     <div className={`${styles.networkDialogInner}`}>
-      <h2>Select Your Network</h2>
-      <p>
-        Your choices shape the content you experience. Each network carries a unique, unalterable history of posts, identities, and
-        governance votes.
-      </p>
-
       <div className={`${styles.networks} grid grid--fit gap-050`} style={{ '--data-width': `150px` }}>
         {config.chains.map((chain, i) => (
           <button
