@@ -11,24 +11,18 @@ import { toRelativeTime } from '@/lib/dateHelper'
 import { isSessionActive } from '@/lib/BurnerSession'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
 import { isHexString, Wallet } from 'ethers'
-import styles from './Settings.module.scss'
+import styles from './InAppWallet.module.scss'
 import { ToggleLeft } from 'lucide-react'
 import clsx from 'clsx'
 
 const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
 const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
+const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
 const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
 
-export default function SettingsTab() {
+export default function InAppWallet() {
   // Establish state to track whether the switch is turned on or off
-const [isOn, setIsOn] = useState(false);
-
-  // Event handler to update state when clicked
-  const handleToggleChange = (event) => {
-    setIsToggled(event.target.checked);
-    console.log("Switch state updated to:", event.target.checked);
-  };
-
+  const [isOn, setIsOn] = useState(false)
 
   const { address } = useConnection()
   const publicClient = usePublicClient()
@@ -60,6 +54,21 @@ const [isOn, setIsOn] = useState(false);
   const [errorMsg, setErrorMsg] = useState('')
 
   const { data: hash, writeContract } = useWriteContract()
+
+  // Load the initial toggle preference from localStorage on mount
+  useEffect(() => {
+    const savedPreference = localStorage.getItem(localStorageBatchLikeKey)
+    if (savedPreference !== null) {
+      setIsOn(savedPreference === 'true')
+    }
+  }, [])
+
+  // Update localStorage whenever the toggle switch state changes
+  const handleToggleChange = (e) => {
+    const nextState = e.target.checked
+    setIsOn(nextState)
+    localStorage.setItem(localStorageBatchLikeKey, String(nextState))
+  }
 
   const checkStatus = useCallback(async () => {
     try {
@@ -453,27 +462,18 @@ const [isOn, setIsOn] = useState(false);
 
         <div className={clsx('col-desktop-4  flex align-items-center justify-content-between gap-1')}>
           <span>Batch Like</span>
-<ToggleSwitch 
-        checked={isOn} 
-        onChange={(e) => setIsOn(e.target.checked)} 
-      />
+          <ToggleSwitch checked={isOn} onChange={handleToggleChange} />
         </div>
       </div>
     </div>
   )
 }
 
-
-export  function ToggleSwitch({ checked, onChange }) {
+export function ToggleSwitch({ checked, onChange }) {
   return (
-<label className={`${styles.toggleSwitch} ${checked ? styles.checked : ''}`}>
-      <input 
-        type="checkbox" 
-        className={styles.nativeCheckbox}
-        checked={checked} 
-        onChange={onChange} 
-      />
+    <label className={`${styles.toggleSwitch} ${checked ? styles.checked : ''}`}>
+      <input type="checkbox" className={styles.nativeCheckbox} checked={checked} onChange={onChange} />
       <span className={styles.slider}></span>
     </label>
-  );
+  )
 }

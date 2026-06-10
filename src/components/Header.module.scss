@@ -3,33 +3,37 @@
 .header {
   position: fixed;
   inset: 0 0 auto;
-
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-
-  padding: 0.7rem 1rem;
+  // padding: 0.7rem 1rem;
 
   user-select: none;
   z-index: 1;
 }
 
 .menuButton {
+  position: fixed;
+  left: 0.7rem;
+  top: .9rem;
+
   display: flex;
   align-items: center;
   justify-content: center;
   border: 0;
   background: transparent;
   cursor: pointer;
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   border-radius: 1000px;
-  background-color: var(--background);
+  background-color: var(--surface-muted);
 
   &:hover {
-      background-color: var(--hover);
+    background-color: var(--hover);
   }
+}
+
+.connectWallet {
+  position: fixed;
+  right: 0.7rem;
+  top: 1.1rem;
 }
 
 .nav {
@@ -40,10 +44,6 @@
 }
 
 @include md-down() {
-  .header {
-    padding: 0.5rem;
-  }
-
   .menuButton {
     display: inline-flex;
   }

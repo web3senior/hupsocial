@@ -184,7 +184,7 @@ export default function Page() {
         <PageTitle name={`Onchain`} changeDocumentTitle={false} />
       </div>
 
-      <div className={clsx('__container')} data-width={`medium`}>
+      <div className={clsx('__container')} data-width={`small`}>
         {newPostsQueue.length > 0 && (
           <button className={clsx(styles['new-posts'])} onClick={handleMergeNewPosts}>
             Show {newPostsQueue.length} post{newPostsQueue.length > 1 ? 's' : ''}

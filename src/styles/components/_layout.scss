@@ -82,7 +82,8 @@ $breakpoints: (
 .gap-2 {
   grid-gap: 2rem;
 }
-@debug list.nth(list.nth(list.nth($breakpoints, 1), 2), 2);
+
+// @debug list.nth(list.nth(list.nth($breakpoints, 1), 2), 2);
 
 // Medias
 @for $i from 1 through list.length($breakpoints) {

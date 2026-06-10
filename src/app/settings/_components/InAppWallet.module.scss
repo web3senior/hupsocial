@@ -11,11 +11,11 @@
 }
 
 .btnDanger {
-  border:1px solid red;
-      &[disabled] {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+  border: 1px solid red;
+  &[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 .secureSetup {
   background: rgba(255, 255, 255, 0.03);
@@ -166,15 +166,14 @@
   }
 }
 
-
 // Configuration variables
-$width: 80px;
-$height: 44px;
-$padding: 4px;
-$active-color: #4cd964; 
-$inactive-color: #e5e5ea; 
+$width: 40px;
+$height: 18px; // Increased height slightly for better tap target
+$padding: 2px;
+$active-color: #4cd964;
+$inactive-color: #e5e5ea;
 
-// A perfect circle handle height and width are identical
+// Maintain perfect proportions based on height and padding
 $circle-diameter: $height - ($padding * 2);
 
 .toggleSwitch {
@@ -183,56 +182,59 @@ $circle-diameter: $height - ($padding * 2);
   width: $width;
   height: $height;
 
-  // Keep the native checkbox hidden but interactive
+  // Keep the native checkbox hidden but interactive for screen readers
   .nativeCheckbox {
     opacity: 0;
     width: 0;
     height: 0;
     position: absolute;
 
-    // Focus ring for accessibility
+    // Focus ring for keyboard accessibility
     &:focus-visible + .slider {
       box-shadow: 0 0 0 3px rgba($active-color, 0.4);
     }
+
+    // Toggle state logic using the adjacent sibling selector
+    &:checked + .slider {
+      background-color: $active-color;
+
+      &::before {
+        // Calculate exact travel distance: Total width - circle width - both paddings
+        transform: translateX($width - $circle-diameter - ($padding * 2));
+      }
+    }
   }
 
-  // Base state of the background track (OFF state)
+  // Background track (OFF state)
   .slider {
     position: absolute;
     cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0; // Modern shorthand for top/bottom/left/right: 0
     background-color: $inactive-color;
     transition: background-color 0.3s ease;
     border-radius: $height / 2;
 
-    // The inner circle handle (Starts on the LEFT)
+    // Inner circle handle
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       left: $padding;
-      bottom: $padding;
+      top: $padding; // Aligned to top padding for vertical centering
       height: $circle-diameter;
       width: $circle-diameter;
       background-color: #ffffff;
-      transform: translateX(0); 
+      border-radius: 50%;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
       transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-      border-radius: 50%; // Makes it a perfect circle
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); // Subtle pop effect
+      will-change: transform; // Hint to browser for smoother animation
     }
   }
 
-  // Active State (ON state applied via React class binding)
-  &.checked {
-    .slider {
-      background-color: $active-color;
-
-      // Moves the circle completely to the RIGHT side
-      &::before {
-        transform: translateX($width - $circle-diameter - ($padding * 2));
-      }
+  // Redundant class support for manual React state binding if needed
+  &.checked .slider {
+    background-color: $active-color;
+    &::before {
+      transform: translateX($width - $circle-diameter - ($padding * 2));
     }
   }
 }

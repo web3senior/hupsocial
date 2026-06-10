@@ -40,7 +40,7 @@ export default function SearchPage() {
     <>
       <PageTitle name="Search" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           
           <div className={styles.searchBox}>
             <input 

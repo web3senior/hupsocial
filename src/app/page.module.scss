@@ -6,21 +6,16 @@
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
-  // height: 100%;
-  // min-height: 85svh;
 
   &__container {
     position: relative;
-    top: 0rem;
-    // min-height: 100svh;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 24px;
+    border-radius: var(--page-border-radius);
     overflow: hidden;
 
-    @media (max-width: 600px) {
+    @include sm-down {
       border: none;
-      filter: none;
       border-radius: unset;
     }
   }
@@ -35,7 +30,7 @@
 .tab {
   position: relative;
   margin: 0 4em;
-  @media (max-width: 600px) {
+  @include sm-down {
     margin: 0;
   }
 
@@ -395,10 +390,10 @@
   cursor: pointer;
   background-color: var(--surface);
 
-@include small-up {
-  border-radius: 1000px;
-  margin-bottom: 4px;
-}
+  @include small-up {
+    border-radius: 1000px;
+    margin-bottom: 4px;
+  }
 
   &:hover {
     background-color: var(--surface);
@@ -407,6 +402,6 @@
 
 [data-theme='light'] {
   .new-posts {
-      background-color: var(--gray-100);
+    background-color: var(--gray-100);
   }
 }

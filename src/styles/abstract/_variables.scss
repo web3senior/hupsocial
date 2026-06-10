@@ -282,6 +282,7 @@ $secondary-color: #9e481d;
   --selection-background-color: rgba(#{$primary-color-rgb}, 0.4);
   --selection-color: inherit;
   --global-border-radius: 0.8rem;
+  --page-border-radius: 24px;
 
   // Card Specifics
   --card-padding: 16px;

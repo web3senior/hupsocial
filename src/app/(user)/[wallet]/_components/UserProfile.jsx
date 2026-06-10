@@ -51,7 +51,6 @@ export default function UserProfile() {
     { id: 'assets', label: 'Assets' },
     { id: 'reposts', label: 'Reposts' },
     { id: 'links', label: 'Links' },
-    { id: 'settings', label: 'Settings' },
   ]
   const TabContentMap = {
     events: <></>,
@@ -159,7 +158,7 @@ export default function UserProfile() {
   return (
     <>
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+        <div className={`__container ${styles.page__container}`} data-width={`small`}>
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 

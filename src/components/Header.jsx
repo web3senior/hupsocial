@@ -22,9 +22,9 @@ export default function Header() {
         <Equal size={24} />
       </button>
 
-      <li className="flex justify-content-end align-items-center gap-050">
+      <div className={clsx(styles.connectWallet, 'flex justify-content-end align-items-center gap-050')}>
         <ConnectWallet />
-      </li>
+      </div>
     </header>
   )
 }

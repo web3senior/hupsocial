@@ -14,6 +14,8 @@ import { toast } from '@/components/NextToast'
 import { AnimatedHeart } from '@/components/Icons'
 import styles from './Like.module.scss'
 
+const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
+
 /**
  * Like Interaction Component
  * @param {Object} props
@@ -167,7 +169,15 @@ export const Like = ({ post, onUpdate }) => {
     } else if (isQueued) {
       removeFromBatch(post.network_id, post.id)
     } else {
-      addToBatch(post.network_id, post.id)
+      // Check if Batch Like toggle preference is active in localStorage
+      const batchLikePref = localStorage.getItem(localStorageBatchLikeKey)
+      const isBatchLikeEnabled = batchLikePref === 'true'
+
+      if (isBatchLikeEnabled) {
+        addToBatch(post.network_id, post.id)
+      } else {
+        likePost(post.id)
+      }
     }
   }
 

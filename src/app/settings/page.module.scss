@@ -1,3 +1,5 @@
+@import '@/styles/components/responsive';
+
 .page {
   height: 100%;
   min-height: 80svh;
@@ -5,91 +7,19 @@
     border: 4px solid red;
   }
 
-  &__title {
-    font-weight: 600;
-    color: var(--black-900);
-    margin: 1rem 0;
-    z-index: 1000;
-  }
 
   &__container {
     position: relative;
-    top: 0rem;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 24px;
-    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
+    border-radius: var(--page-border-radius);
     overflow: hidden;
-    isolation: isolate;
-    padding: 2rem;
 
-    @media (max-width: 600px) {
-      padding: 0;
-      background-color: transparent;
-      box-shadow: none;
+    @include sm-down {
       border: none;
-      filter: none;
       border-radius: unset;
     }
   }
-}
-
-.network {
-  background-color: var(--white);
-  border: 1px solid transparent;
-  border-radius: 20px;
-  // box-shadow: var(--shadow-xs);
-  cursor: pointer;
-  transition: border 0.2s var(--transition-soft), transform 0.1s var(--transition-soft);
-  will-change: transform;
-  user-select: none;
-
-  // &:active {
-  //   transform: scale(0.99) !important;
-  // }
-
-  &__body {
-    padding: 1.2rem;
-  }
-
-  a {
-    color: var(--blue-400);
-  }
-
-  &__icon {
-    svg {
-      --r: 32px;
-      width: var(--r);
-      height: var(--r);
-      box-shadow: var(--shadow-10);
-    }
-  }
-
-  span {
-    font-size: 13px;
-    font-weight: 500;
-    border-radius: 1000px;
-  }
-
-  small {
-    color: var(--text-color-pale);
-  }
-
-  small {
-    background-color: var(--gray-100);
-    color: var(--black);
-    padding: 6px 12px;
-    font-size: 11px;
-    border: none;
-    border-radius: 1000px;
-  }
-}
-
-// Shimmer
-.shimmer {
-  padding: 1.2rem;
-  border-radius: 20px;
-  box-shadow: var(--shadow-xs);
 }
 
 /* Enable hover only on non-touch devices */
