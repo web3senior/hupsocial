@@ -30,6 +30,8 @@ import { resolveIPFSUrl } from '@/lib/storageHelper'
 const MAX_MEDIA_ITEMS = 4
 const MAX_MEDIA_SIZE_MB = 5
 
+// ■■■ [Utility Helpers] ■■■
+
 const normalizePrefillValue = (value) => {
   if (Array.isArray(value)) {
     return value.find((item) => typeof item === 'string' && item.length > 0) || ''
@@ -92,12 +94,7 @@ const getInitialPostContent = (text, url, actionType, existingPost) => {
 
 const getMediaPreviewSrc = (item) => {
   console.log(item)
-  // if (item.localUrl) return item.localUrl
-  // if (item.url) return item.url
-  // if (item.src) return item.src
-  // if (item.gatewayUrl) return item.gatewayUrl
   return resolveIPFSUrl(item.cid)
-  // return `/api/ipfs/file?hash=${item.cid}`
 }
 
 const getSerializablePostContent = (content) => ({
@@ -114,10 +111,13 @@ const getSerializablePostContent = (content) => ({
     }
   }),
 })
+
 const getShortAddress = (address) => {
   if (!address) return ''
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
+
+// ■■■ [Main Component] ■■■
 
 export default function NewPost({
   text = '',
@@ -127,8 +127,8 @@ export default function NewPost({
   displayName,
   avatarSrc,
   communityLabel = 'Community or topic',
-  existingPost = null, // for edit mode
-  actionType = 'post', // or 'thread'
+  existingPost = null,
+  actionType = 'post',
 }) {
   const mounted = useClientMounted()
 
@@ -138,7 +138,6 @@ export default function NewPost({
   )
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
-
   const [allowComments, setAllowComments] = useState(true)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -155,6 +154,15 @@ export default function NewPost({
   const isBusy = isSigning || isConfirming || isUploading
   const resolvedDisplayName = displayName || getShortAddress(address) || 'Guest'
   const avatarInitial = resolvedDisplayName.slice(0, 1).toUpperCase()
+
+  // ■■■ [Auto-expanding Textarea Height Calculation] ■■■
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    textarea.style.height = 'auto'
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [postText])
 
   const handleClose = (e) => {
     if (e) e.stopPropagation()
@@ -268,6 +276,7 @@ export default function NewPost({
       fileInputRef.current.click()
     }
   }
+
   const getMediaDimensions = (file, type) => {
     return new Promise((resolve) => {
       const localUrl = URL.createObjectURL(file)
@@ -275,7 +284,6 @@ export default function NewPost({
       if (type === 'image') {
         const img = new Image()
         img.onload = () => {
-          // Clean up the object URL to avoid memory leaks
           URL.revokeObjectURL(localUrl)
           resolve({ width: img.naturalWidth, height: img.naturalHeight })
         }
@@ -323,9 +331,7 @@ export default function NewPost({
       return
     }
 
-    // Extract dimensions and video duration before uploading to IPFS to save time
     const dimensions = await getMediaDimensions(file, selectedMediaType)
-
     const cid = await uploadFileToIPFS(file)
     console.log(cid)
     if (!cid) return
@@ -422,7 +428,7 @@ export default function NewPost({
 
     try {
       const resultIPFS = await uploadObjectToIPFS(getSerializablePostContent(postContent))
-      const metadata = resultIPFS.cid // || resultIPFS.IpfsHash || resultIPFS.rootHash
+      const metadata = resultIPFS.cid
       console.log(metadata)
       if (!metadata) {
         throw new Error('CID not found')
@@ -484,10 +490,6 @@ export default function NewPost({
 
         <h2>New post</h2>
       </header>
-
-      {/* <main className={clsx(styles.main, 'text-center')}>
-        <small>Once submitted, your post will appear in the feed as soon as the network block confirms.</small>
-      </main> */}
 
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} multiple={false} />
@@ -597,7 +599,6 @@ export default function NewPost({
           </div>
 
           <button type="submit" className={styles.postButton} disabled={isBusy || postText.trim().length < 1}>
-            {}
             {isConfirming
               ? actionType === 'edit'
                 ? 'Updating...'

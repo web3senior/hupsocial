@@ -1,5 +1,6 @@
 .newPost {
   width: min(900px, calc(100vw - 28px));
+  max-height: calc(100vh - 40px);
   overflow: hidden;
   color: var(--text);
   background: var(--background);
@@ -11,6 +12,8 @@
   transform: translate(-50%, -50%);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 9999;
+  display: flex;
+  flex-direction: column;
 
   button,
   textarea,
@@ -30,6 +33,7 @@
   min-height: 84px;
   padding: 0 36px;
   border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
 
   h2 {
     margin: 0;
@@ -75,14 +79,15 @@
   }
 }
 
+/* ■■■ [Form & Layout Containment] ■■■ */
+
 .form {
   display: flex;
   flex-direction: column;
-  min-height: 326px;
-}
-
-.fileInput {
-  display: none;
+  flex: 1;
+  /* Crucial: prevents the form from expanding past the flexbox container allocation */
+  min-height: 0; 
+  overflow: hidden; 
 }
 
 .composer {
@@ -90,7 +95,18 @@
   grid-template-columns: 54px minmax(0, 1fr);
   gap: 16px;
   padding: 32px 36px 0;
+  
+  /* Crucial: Allows the content area to scroll independently */
+  flex: 1;
+  overflow-y: auto; 
+  min-height: 0;
 }
+
+.fileInput {
+  display: none;
+}
+
+
 
 .avatarColumn {
   display: flex;
@@ -177,12 +193,13 @@
   padding: 0;
   margin-top: 2px;
   color: var(--black);
-  resize: vertical;
+  resize: none;
   background: transparent;
   border: 0;
   outline: none;
   font-size: 1.25rem;
   line-height: 1.45;
+  overflow-y: hidden;
 
   &::placeholder {
     color: var(--gray-400);
@@ -304,6 +321,7 @@
   gap: 18px;
   margin-top: auto;
   padding: 26px 36px 32px;
+  flex-shrink: 0;
 }
 
 .postOptions {
@@ -377,6 +395,7 @@
 @media (max-width: 640px) {
   .newPost {
     width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
     border-radius: 18px;
   }
 
