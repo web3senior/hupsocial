@@ -120,7 +120,7 @@ export default function PostDetails({post}) {
           />
         )} */}
 
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+        <div className={`__container ${styles.page__container}`} data-width={`small`}>
           {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
           <div className={`${styles.grid} flex flex-column`}>
             {post && (

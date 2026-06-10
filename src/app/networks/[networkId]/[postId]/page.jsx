@@ -99,7 +99,7 @@ export default async function Page({ params, searchParams }) {
   return (
     <>
       <PageTitle name={`Post`} changeDocumentTitle={false} />
-      <div className={`${styles.page} ms-motion-slideDownIn`}>
+      <div className={`${styles.page}`}>
         <PostDetails post={post.data} advancedMode={advancedView} />
       </div>
     </>
