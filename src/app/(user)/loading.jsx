@@ -4,7 +4,7 @@ export default function Loading() {
   return (
     <div>
       {/* Title placeholder */}
-      <p className="text-3xl font-bold mb-4">Profile</p>
+      <p className="text-3xl font-bold mb-4">Loading Profile...</p>
       
       {/* List container for skeleton items */}
       <ul className="list-disc pl-6 mt-4 space-y-2">
