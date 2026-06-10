@@ -39,15 +39,22 @@ export const Like = ({ post, onUpdate }) => {
   // ■■■ SWR Data Fetching Configuration ■■■
   const cacheKey = post?.id ? `posts/${post.network_id}/${post.id}/${address || 'anonymous'}/likes` : null
 
-  const fetcher = async () => {
+const fetcher = async () => {
     try {
       const res = await getPostById(post.network_id, post.id, address)
       const freshPost = Array.isArray(res?.data) ? res.data[0] : res?.data
 
       if (!freshPost) return null
 
+      // Reading the correct "has_liked" property returned by the Cidex indexer
+      const userHasLiked = 
+        freshPost.has_liked === 1 || 
+        freshPost.has_liked === true || 
+        freshPost.is_liked === 1 || 
+        freshPost.is_liked === true
+
       return {
-        isLiked: freshPost.is_liked === 1 || freshPost.is_liked === true,
+        isLiked: userHasLiked,
         likeCount: Number(freshPost.total_likes) || 0,
         isProcessing: false,
       }
