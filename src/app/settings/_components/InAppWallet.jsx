@@ -12,7 +12,6 @@ import { isSessionActive } from '@/lib/BurnerSession'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
 import { isHexString, Wallet } from 'ethers'
 import styles from './InAppWallet.module.scss'
-import { ToggleLeft } from 'lucide-react'
 import clsx from 'clsx'
 
 const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
@@ -236,17 +235,19 @@ export default function InAppWallet() {
   }
 
   return (
-    <div className={`${styles.page} relative`}>
+    <div className={clsx(styles.page, 'relative')}>
       <div className="__container" data-width="medium">
-        <div className={`col-desktop-8  card ${styles.section}`}>
-          <div className={`card__body ${styles.sectionBody}`}>
+        <div className={clsx('col-desktop-8', styles.section)}>
+          <div className={styles.sectionBody}>
             <div className="flex justify-between align-items-center">
               <h4>In app wallet</h4>
               <button onClick={checkStatus} className={styles.btnIcon}>
                 <RefreshCwIcon size={18} />
               </button>
             </div>
-            <small>Send a small amount of native token to the burner address to sign transactions automatically in the background.</small>
+            <small style={{ color: 'var(--text-muted)' }}>
+              Send a small amount of native token to the burner address to sign transactions automatically in the background.
+            </small>
 
             <div className="mt-15">
               <p>Status: {sessionActive ? '🟢 Active' : 'Not Set'}</p>
@@ -398,7 +399,7 @@ export default function InAppWallet() {
                 <div className={styles.keyContainer}>
                   <code>{revealedPrivateKey}</code>
                   <button onClick={() => copyToClipboard(revealedPrivateKey)} className={styles.btnIcon} title="Copy to clipboard">
-                    {copied ? <CheckIcon size={16} className="text-success" /> : <CopyIcon size={16} />}
+                    {copied ? <CheckIcon size={16} style={{ color: 'var(--toggle-active)' }} /> : <CopyIcon size={16} />}
                   </button>
                 </div>
                 <div className="flex justify-end mt-15">
@@ -416,7 +417,7 @@ export default function InAppWallet() {
             )}
 
             {/* ACTION BUTTONS GROUP */}
-            <div className="flex flex-wrap gap-10 mt-20  gap-1">
+            <div className="flex flex-wrap gap-10 mt-20 gap-1">
               <button
                 onClick={triggerAuthorizeFlow}
                 disabled={sessionActive || isLoading || showPasswordSetup}
@@ -460,7 +461,7 @@ export default function InAppWallet() {
           </div>
         </div>
 
-        <div className={clsx('col-desktop-4  flex align-items-center justify-content-between gap-1')}>
+        <div className={clsx('col-desktop-4 flex align-items-center justify-content-between gap-1')}>
           <span>Batch Like</span>
           <ToggleSwitch checked={isOn} onChange={handleToggleChange} />
         </div>
@@ -471,7 +472,7 @@ export default function InAppWallet() {
 
 export function ToggleSwitch({ checked, onChange }) {
   return (
-    <label className={`${styles.toggleSwitch} ${checked ? styles.checked : ''}`}>
+    <label className={clsx(styles.toggleSwitch, checked && styles.checked)}>
       <input type="checkbox" className={styles.nativeCheckbox} checked={checked} onChange={onChange} />
       <span className={styles.slider}></span>
     </label>
