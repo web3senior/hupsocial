@@ -12,12 +12,24 @@ import { isSessionActive } from '@/lib/BurnerSession'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
 import { isHexString, Wallet } from 'ethers'
 import styles from './Settings.module.scss'
+import { ToggleLeft } from 'lucide-react'
+import clsx from 'clsx'
 
 const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
 const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
 const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
 
 export default function SettingsTab() {
+  // Establish state to track whether the switch is turned on or off
+const [isOn, setIsOn] = useState(false);
+
+  // Event handler to update state when clicked
+  const handleToggleChange = (event) => {
+    setIsToggled(event.target.checked);
+    console.log("Switch state updated to:", event.target.checked);
+  };
+
+
   const { address } = useConnection()
   const publicClient = usePublicClient()
   const activeChain = getActiveChain()
@@ -215,9 +227,9 @@ export default function SettingsTab() {
   }
 
   return (
-    <div className={`${styles.tabContent} ${styles.communitiesTab} relative`}>
+    <div className={`${styles.page} relative`}>
       <div className="__container" data-width="medium">
-        <div className={`card ${styles.section}`}>
+        <div className={`col-desktop-8  card ${styles.section}`}>
           <div className={`card__body ${styles.sectionBody}`}>
             <div className="flex justify-between align-items-center">
               <h4>In app wallet</h4>
@@ -438,7 +450,30 @@ export default function SettingsTab() {
             </div>
           </div>
         </div>
+
+        <div className={clsx('col-desktop-4  flex align-items-center justify-content-between gap-1')}>
+          <span>Batch Like</span>
+<ToggleSwitch 
+        checked={isOn} 
+        onChange={(e) => setIsOn(e.target.checked)} 
+      />
+        </div>
       </div>
     </div>
   )
+}
+
+
+export  function ToggleSwitch({ checked, onChange }) {
+  return (
+<label className={`${styles.toggleSwitch} ${checked ? styles.checked : ''}`}>
+      <input 
+        type="checkbox" 
+        className={styles.nativeCheckbox}
+        checked={checked} 
+        onChange={onChange} 
+      />
+      <span className={styles.slider}></span>
+    </label>
+  );
 }

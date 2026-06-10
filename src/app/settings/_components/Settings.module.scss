@@ -165,3 +165,74 @@
     line-height: 1.4;
   }
 }
+
+
+// Configuration variables
+$width: 80px;
+$height: 44px;
+$padding: 4px;
+$active-color: #4cd964; 
+$inactive-color: #e5e5ea; 
+
+// A perfect circle handle height and width are identical
+$circle-diameter: $height - ($padding * 2);
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  width: $width;
+  height: $height;
+
+  // Keep the native checkbox hidden but interactive
+  .nativeCheckbox {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+
+    // Focus ring for accessibility
+    &:focus-visible + .slider {
+      box-shadow: 0 0 0 3px rgba($active-color, 0.4);
+    }
+  }
+
+  // Base state of the background track (OFF state)
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: $inactive-color;
+    transition: background-color 0.3s ease;
+    border-radius: $height / 2;
+
+    // The inner circle handle (Starts on the LEFT)
+    &::before {
+      content: "";
+      position: absolute;
+      left: $padding;
+      bottom: $padding;
+      height: $circle-diameter;
+      width: $circle-diameter;
+      background-color: #ffffff;
+      transform: translateX(0); 
+      transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+      border-radius: 50%; // Makes it a perfect circle
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); // Subtle pop effect
+    }
+  }
+
+  // Active State (ON state applied via React class binding)
+  &.checked {
+    .slider {
+      background-color: $active-color;
+
+      // Moves the circle completely to the RIGHT side
+      &::before {
+        transform: translateX($width - $circle-diameter - ($padding * 2));
+      }
+    }
+  }
+}
