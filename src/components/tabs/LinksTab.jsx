@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { getUniversalProfile, getProfile } from '@/lib/api'
+import { useProfile } from '@/hooks/useProfile' // Adjust the import path as needed for your project structure
 import styles from './LinksTab.module.scss'
 import NoData from '../NoData'
 
@@ -9,63 +9,35 @@ import NoData from '../NoData'
  * Renders a list of external links associated with a user's wallet profile.
  */
 export default function LinksTab() {
-  const [data, setData] = useState(null)
   const [links, setLinks] = useState([])
   const params = useParams()
 
+  // Extract the wallet address directly from url parameters
+  const walletAddress = params?.wallet || ''
+
+  // Fetch profile state directly using the custom hook
+  const { profile, isLoading } = useProfile(walletAddress)
+
   useEffect(() => {
-    // Return early if no wallet address is provided in the parameters
-    if (!params?.wallet) return
+    // Return early if no profile structure or links are available
+    if (!profile?.links) {
+      setLinks([])
+      return
+    }
 
-    getUniversalProfile(params.wallet).then((res) => {
-      console.log('Universal profile response:', res)
-      
-      if (res?.Profile?.length > 0 && res.Profile[0].isContract) {
+    let parsedLinks = []
+    try {
+      // Parse the links if they arrive formatted as a stringified JSON matrix
+      parsedLinks = typeof profile.links === 'string' ? JSON.parse(profile.links) : profile.links || []
+    } catch (error) {
+      console.error('Failed to parse profile links structure:', error)
+    }
 
-        const profile = res.Profile[0]
-        let parsedLinks = []
-        
-        try {
-          parsedLinks = typeof profile.links === 'string' ? JSON.parse(profile.links) : (profile.links || [])
-        } catch (error) {
-          console.error('Failed to parse universal profile links:', error)
-        }
+    setLinks(parsedLinks)
+  }, [profile?.links])
 
-        setLinks(parsedLinks)
-        setData({
-          wallet: profile.id,
-          name: profile.name,
-          description: profile.description,
-          profileImage: profile.profileImages?.length > 0 ? profile.profileImages[0].src : '',
-          profileHeader: '',
-          tags: profile.tags || [],
-          lastUpdate: '',
-        })
-      } else {
-        getProfile(params.wallet).then((fallbackRes) => {
-          console.log('Standard profile response:', fallbackRes)
-          
-          if (fallbackRes?.wallet_address) {
-            let parsedLinks = []
-            try {
-              parsedLinks = typeof fallbackRes.links === 'string' ? JSON.parse(fallbackRes.links) : (fallbackRes.links || [])
-            } catch (error) {
-              console.error('Failed to parse standard profile links:', error)
-            }
-
-            fallbackRes.profileImageName = fallbackRes.profileImage
-            fallbackRes.profileImage = `${process.env.NEXT_PUBLIC_UPLOAD_URL}${fallbackRes.profileImage}`
-            
-            setLinks(parsedLinks)
-            setData(fallbackRes)
-          }
-        })
-      }
-    })
-  }, [params?.wallet])
-
-  // Display skeleton shimmers while loading data
-  if (!data) {
+  // Display skeleton shimmers while hook loads data
+  if (isLoading) {
     return (
       <div className="flex flex-column gap-1">
         <div className={`shimmer ${styles.linkShimmer}`} />
@@ -83,8 +55,9 @@ export default function LinksTab() {
   return (
     <div className={styles.links}>
       {links.map((link, index) => {
+        // Enforce fallback structure to ensure valid routing schemas
         const targetUrl = link.url.startsWith('http') ? link.url : `//${link.url}`
-        
+
         return (
           <a
             key={index}
