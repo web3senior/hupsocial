@@ -377,7 +377,7 @@ const Profile = ({ addr }) => {
   if (isLoading) return <div className={`shimmer ${styles.shimmer}`} />
 
   const targetWallet = params?.wallet || addr || ''
-  const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 4)}…${targetWallet.slice(-4)}` : targetWallet
+  const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 6)}…${targetWallet.slice(-4)}` : targetWallet
 
   const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
 
