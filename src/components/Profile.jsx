@@ -10,6 +10,7 @@ import { isIPFSHash, resolveIPFSUrl } from '@/lib/storageHelper'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import clsx from 'clsx'
+import UPlogo from '@/../public/up.png'
 import styles from './Profile.module.scss'
 
 export default function Profile({ creator, createdAt, networkId, variant = 'full' }) {
@@ -59,13 +60,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       }}
     >
       <div className={styles.imageWrapper}>
-        <img 
-          alt={profile.name} 
-          src={profile.profileImage} 
-          width={36} 
-          height={36} 
-          className="rounded-full"
-        />
+        <img alt={profile.name} src={profile.profileImage} width={36} height={36} className="rounded-full" />
         <Identicon
           name={profile.name}
           profileImage={profile.profileImage}
@@ -80,21 +75,16 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
           <div className={styles.nameRow}>
             <b className={styles.name}>{profile.name}</b>
             <Image alt="verified" src={blueCheckMarkIcon} width={14} height={14} />
-            {chainInfo && (
-              <div 
-                className={styles.badge} 
-                title={chainInfo.name} 
-                dangerouslySetInnerHTML={{ __html: chainInfo.icon }} 
-              />
+            {chainInfo && <div className={styles.badge} title={chainInfo.name} dangerouslySetInnerHTML={{ __html: chainInfo.icon }} />}
+            {profile.source === `universal_profile` && (
+              <>
+                <img alt={`Universal Profile`} src={UPlogo.src} width={12} height={12} />
+              </>
             )}
-            {variant === 'full' && createdAt && (
-              <small className={styles.createdAt}>{toRelativeTime(createdAt)}</small>
-            )}
+            {variant === 'full' && createdAt && <small className={styles.createdAt}>{toRelativeTime(createdAt)}</small>}
           </div>
-          
-          {variant === 'full' && creator && (
-            <code className={styles.address}>{truncatedAddress}</code>
-          )}
+
+          {variant === 'full' && creator && <code className={styles.address}>{truncatedAddress}</code>}
         </div>
       )}
     </div>
