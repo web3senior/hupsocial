@@ -24,16 +24,22 @@ import { SendHorizonal } from 'lucide-react'
 import { CONTRACTS } from '@/config/wagmi'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
+import useSWR from 'swr'
 import NativePopover from './ui/NativePopover'
 import { MessageSquareQuote } from 'lucide-react'
 import clsx from 'clsx'
 import styles from './Post.module.scss'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 import NewPost from './NewPost'
-
+import { checkIsEnglish } from '@/lib/languageHelper'
 import { Pen } from 'lucide-react'
 import Like from './ui/Like'
 import Comment from './ui/Comment'
+
+// import React, { useState, useEffect } from 'react'
+// import { Repeat2, Pen, MessageCircle, Box, SendHorizonal } from 'lucide-react'
+// import clsx from 'clsx'
+// import { PostText } from './PostText'
 
 export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
@@ -49,12 +55,8 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const [lastComment, setLastComment] = useState(null)
-  const [showMore, setShowMore] = useState(false)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   const repostedPostId = isRepost ? Number(item.is_repost) : null
-  const contentRef = useRef(null)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [canShowMore, setCanShowMore] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
   // Fetch the original post data if this item is a repost
@@ -132,14 +134,15 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
     }
   }, [commentTarget?.id, commentTarget?.network_id, commentTarget?.total_comments, address])
 
-  // Track layout heights to evaluate if the content body needs a show-more interface
-  useEffect(() => {
-    const el = contentRef.current
-    if (!el) return
+  // Extract raw source content string contextually based on data schema structure
+  const getRawContentText = () => {
+    if (displayItem?.content?.elements?.length > 1) {
+      return displayItem?.content?.elements?.[0]?.data?.text || ''
+    }
+    return `${displayItem?.content || ''}`
+  }
 
-    setCanShowMore(el.scrollHeight > el.clientHeight)
-  }, [displayItem?.content?.elements?.[0]?.data?.text])
-
+  const sourceText = getRawContentText()
   const lastCommentText = getCommentPreviewText(lastComment?.content)
   const hasLastCommentPreview = Boolean(lastCommentText) && showLastComment
 
@@ -231,44 +234,30 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
           </div>
         </header>
 
-        <main className={`${styles.post__main}`}>
+        <main className={`${styles.post__main} w-100`}>
           {displayItem?.content?.elements?.length > 1 ? (
             <>
-              <div
-                ref={contentRef}
-                className={`${styles.post__main__content} ${
-                  isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed
-                }`}
-                id={`post${displayItem.id}`}
-                dangerouslySetInnerHTML={{
-                  __html: renderMarkdown(displayItem?.content?.elements?.[0]?.data?.text || ''),
-                }}
+              <PostText
+                sourceText={sourceText}
+                postId={displayItem.id}
+                styles={styles}
+                renderMarkdown={renderMarkdown}
+                isCollapsible={true}
+                baseClassName={styles.post__main__content}
               />
-
-              {canShowMore && (
-                <button
-                  type="button"
-                  className={styles.post__showMore}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setIsExpanded((prev) => !prev)
-                  }}
-                >
-                  {isExpanded ? 'Show less' : 'Show more'}
-                </button>
-              )}
 
               <div className={`${styles.post__main__media}`}>
                 <MediaGallery data={displayItem.content.elements[1].data.items} />
               </div>
             </>
           ) : (
-            <div
-              className={`${styles.post__content}`}
-              id={`post${displayItem?.id}`}
-              dangerouslySetInnerHTML={{
-                __html: renderMarkdown(`${displayItem?.content || ''}`),
-              }}
+            <PostText
+              sourceText={sourceText}
+              postId={displayItem?.id}
+              styles={styles}
+              renderMarkdown={renderMarkdown}
+              isCollapsible={false}
+              baseClassName={styles.post__content}
             />
           )}
         </main>
@@ -905,11 +894,6 @@ const Poll = ({ polls }) => {
   )
 }
 
-/**
- * Options
- * @param {Object} item
- * @returns
- */
 const Options = ({ item }) => {
   const [status, setStatus] = useState(`loading`)
   const [optionsVoteCount, setOptionsVoteCount] = useState()
@@ -1020,5 +1004,110 @@ const Options = ({ item }) => {
         <PollTimer startTime={item.startTime} endTime={item.endTime} pollId={item.pollId} />
       </p>
     </>
+  )
+}
+
+
+// ■■■ Translation Core Infrastructure ■■■
+
+const translationFetcher = async ([text, targetLang]) => {
+  if (!text) return ''
+  
+  const targetUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
+  const res = await fetch(targetUrl)
+  
+  if (!res.ok) {
+    throw new Error('Translation pipeline network response failed')
+  }
+  
+  const data = await res.json()
+  if (!data || !data[0]) return ''
+
+  return data[0]
+    .map((segment) => segment[0])
+    .filter(Boolean)
+    .join('')
+}
+
+// ■■■ Sub-Component Definition ■■■
+
+export function PostText({ sourceText, postId, styles, renderMarkdown, isCollapsible = false, baseClassName }) {
+  const [showTranslation, setShowTranslation] = useState(false)
+  const contentRef = useRef(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [canShowMore, setCanShowMore] = useState(false)
+
+  // Verify language profile to optimize translation button visibility using external helper
+  const isEnglish = useMemo(() => checkIsEnglish(sourceText), [sourceText])
+
+  // Execute external translation pipeline via cached hooks infrastructure
+  const { data: translatedText, isValidating: isTranslating } = useSWR(
+    showTranslation && sourceText ? [sourceText, 'en'] : null,
+    translationFetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 600000,
+    }
+  )
+
+  // Track layout heights to evaluate if the content body needs a show-more interface
+  useEffect(() => {
+    if (!isCollapsible) return
+    const el = contentRef.current
+    if (!el) return
+
+    setCanShowMore(el.scrollHeight > el.clientHeight)
+  }, [sourceText, showTranslation, translatedText, isCollapsible])
+
+  const handleToggleTranslation = (e) => {
+    e.stopPropagation()
+    setShowTranslation((prev) => !prev)
+  }
+
+  const renderedContentText = showTranslation && translatedText ? translatedText : sourceText
+
+  return (
+    <div className="flex flex-column w-100">
+      <div
+        ref={isCollapsible ? contentRef : null}
+        className={clsx(
+          baseClassName,
+          isCollapsible && (isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed)
+        )}
+        id={`post${postId}`}
+        dangerouslySetInnerHTML={{
+          __html: renderMarkdown(renderedContentText || ''),
+        }}
+      />
+
+      {isCollapsible && canShowMore && (
+        <button
+          type="button"
+          className={styles.post__showMore}
+          onClick={(e) => {
+            e.stopPropagation()
+            setIsExpanded((prev) => !prev)
+          }}
+        >
+          {isExpanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+
+      {/* Conditionally suppress translation controls if the original content is English */}
+      {!isEnglish && (
+        <div className="flex align-items-center mt-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className={clsx(styles.post__translateTrigger, 'pointer border-none bg-transparent p-0 text-sm font-medium text-muted')}
+            style={{ fontSize: '0.8rem', opacity: 0.8 }}
+            onClick={handleToggleTranslation}
+            disabled={isTranslating}
+          >
+            {isTranslating ? 'Translating...' : showTranslation && translatedText ? 'See original' : 'Translate'}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
