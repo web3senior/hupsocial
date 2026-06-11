@@ -85,8 +85,8 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             <Image alt="verified" src={blueCheckMarkIcon} width={14} height={14} />
             {chainInfo && <div className={styles.badge} title={chainInfo.name} dangerouslySetInnerHTML={{ __html: chainInfo.icon }} />}
             {profile.source === `universal_profile` && (
-              <div className={styles.universalProfile} onClick={handleUniversalProfile}>
-                <img alt={`Universal Profile`} src={UPlogo.src} width={12} height={12} />
+              <div className={styles.badge} onClick={handleUniversalProfile}>
+                <img alt={`Universal Profile`} src={UPlogo.src} width={14} height={14} />
               </div>
             )}
             {variant === 'full' && createdAt && <small className={styles.createdAt}>{toRelativeTime(createdAt)}</small>}

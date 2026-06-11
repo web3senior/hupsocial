@@ -19,11 +19,13 @@ import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import GlobalLoader, { ContentSpinner } from '@/components/Loading'
 import PageTitle from '@/components/PageTitle'
 import AISummary from '@/components/AISummary'
+import UPlogo from '@/../public/up.png'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import LinksTab from '@/components/tabs/LinksTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import styles from './UserProfile.module.scss'
 import { useProfile } from '@/hooks/useProfile'
+import clsx from 'clsx'
 
 //import SettingsTab from '@/components/tabs/SettingsTab'
 //const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
@@ -340,6 +342,12 @@ const Profile = ({ addr }) => {
     setShowProfileModal(true)
   }
 
+  const handleUniversalProfile = (e) => {
+    const url = `https://universaleverything.io/${addr}`
+
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+  
   // Isolated sub-rendering wrapper to manage variable text arrays cleanly
   const TagsElement = ({ rawTags }) => {
     let listItems = []
@@ -397,6 +405,12 @@ const Profile = ({ addr }) => {
             <div className={styles.profile__header}>
               <b className={styles.profile__name}>{profile.name ? profile.name : 'hup-user'}</b>
               <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
+
+              {profile.source === `universal_profile` && (
+                <div className={styles.badge} onClick={handleUniversalProfile}>
+                  <img alt={`Universal Profile`} src={UPlogo.src} width={14} height={14} />
+                </div>
+              )}
             </div>
 
             <code className={styles.profile__wallet}>
@@ -437,7 +451,12 @@ const Profile = ({ addr }) => {
               </div>
 
               <div role="list">
-                <POAPIcon />
+                   {profile.source === `universal_profile` && (
+                <div className={clsx(styles.universalProfileBadge, 'flex align-items-center justify-content-center rounded-full gap-025')} onClick={handleUniversalProfile}>
+                  <img alt={`Universal Profile`} src={UPlogo.src} width={14} height={14} />
+                  <span>Universal Profile</span>
+                </div>
+              )}
               </div>
             </li>
 

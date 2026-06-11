@@ -58,14 +58,13 @@
   position: relative;
   font-weight: 600;
   line-height: 1;
-  font-family: var(--font-family-monospace) !important;
 }
 
 .badge {
   width: 14px;
   height: 14px;
 
-  svg {
+  svg{
     width: inherit;
     height: inherit;
     border: 1px solid var(--border);

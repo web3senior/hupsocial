@@ -603,15 +603,18 @@ $secondary-color: #9e481d;
   --scrollbarBG: #f4f4f4;
   --link-color: var(--blue-40);
   --thumbBG: var(--gray);
+
   --ff-cy-grotesk: 'Cy Grotesk Grand Dark';
   --ff-sans: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Liberation Sans', sans-serif;
   --ff-serif: Georgia, Cambria, 'Times New Roman', Times, serif;
   --ff-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'Liberation Mono', Menlo, Monaco, Consolas, monospace;
   --ff-segoe:
     'Segoe UI', 'Segoe UI Web (West European)', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
-  --theme-body-font-family: var(--ff-sans);
+  
+    --theme-body-font-family: var(--ff-sans);
   --body-background-color: #f3f3f3;
   --gradient-primary: linear-gradient(180deg, #fdc5ec 34.5%, #ecf134 86.5%);
+  --universal-profile-color: 134, 143, 205;
 
   // ++++++++++++++++++++++++++++++++++++
 
