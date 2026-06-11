@@ -29,7 +29,6 @@ import { useProfile } from '@/hooks/useProfile'
 //const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 // todo: this cause to handle loading.jsx again
 
-
 export default function UserProfile() {
   const [posts, setPosts] = useState({ list: [] })
   const [postsLoaded, setPostsLoaded] = useState(0)
@@ -397,8 +396,7 @@ const Profile = ({ addr }) => {
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
             <div className={styles.profile__header}>
               <b className={styles.profile__name}>{profile.name ? profile.name : 'hup-user'}</b>
-              <img className={styles.profile__checkmark} alt="Checkmark" 
-              src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
+              <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
             </div>
 
             <code className={styles.profile__wallet}>
@@ -435,9 +433,7 @@ const Profile = ({ addr }) => {
                   <span className="text-secondary">0 followers</span>
                 </button>
                 <span>•</span>
-                <Link className={styles.link} target="_blank" rel="noopener noreferrer" href={`https://hup.social/${targetWallet}`}>
-                  hup.social/{displayWalletString}
-                </Link>
+                <ProfileLink targetWallet={targetWallet} displayWalletString={displayWalletString} />
               </div>
 
               <div role="list">
@@ -471,6 +467,56 @@ const Profile = ({ addr }) => {
         </footer>
       </section>
     </>
+  )
+}
+
+const ProfileLink = ({ targetWallet, displayWalletString }) => {
+  const [copied, setCopied] = useState(false)
+
+  // Store the timeout reference to prevent memory leaks or overlapping timers
+  const timeoutRef = useRef(null)
+
+  // Cleanup any active timeouts if the component unmounts
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
+
+  const copyToClipboard = async (text) => {
+    try {
+      // The Clipboard API is asynchronous and requires a secure context (HTTPS)
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      toast(`Profile link copied to clipboard.`, `success`)
+      // Clear any previous timeout in case the user clicks multiple times rapidly
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+
+      // Revert the copied state back to false after a short delay
+      timeoutRef.current = setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    } catch (error) {
+      // Log errors if the browser denies clipboard access or the API is unavailable
+      console.error('Failed to copy to clipboard:', error)
+    }
+  }
+
+  return (
+    // Replaced the span with a semantic button for better screen reader and keyboard support
+    <button
+      type="button"
+      className={styles.link}
+      onClick={() => copyToClipboard(`https://hup.social/${targetWallet}`)}
+      aria-label="Copy profile link to clipboard"
+      title="Copy to clipboard"
+    >
+      hup.social/{displayWalletString}
+    </button>
   )
 }
 
@@ -702,7 +748,7 @@ const Status = ({ addr, profile, selfView }) => {
  * @returns {JSX.Element}
  */
 const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
-  console.log(`withing profile modal`,profile)
+  console.log(`withing profile modal`, profile)
   // Safe helper to parse structural lists from DB and strip away malformed or empty data structures
   const parseSafeList = (data, isLinkList = false) => {
     try {

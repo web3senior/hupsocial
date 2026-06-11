@@ -1,11 +1,11 @@
 allowBuilds:
   '@google/genai': true
-  '@parcel/watcher': true
-  '@reown/appkit': true
-  bufferutil: true
-  es5-ext: true
-  protobufjs: true
-  secp256k1: true
-  sharp: true
-  unrs-resolver: true
-  utf-8-validate: true
+  '@parcel/watcher': false
+  '@reown/appkit': false
+  bufferutil: false
+  es5-ext: false
+  protobufjs: false
+  secp256k1: false
+  sharp: false
+  unrs-resolver: false
+  utf-8-validate: false

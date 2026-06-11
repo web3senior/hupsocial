@@ -1,20 +1,110 @@
 .page {
-  min-height: 85svh;
+  height: 100svh;
 
-  &__container {
-    position: relative;
-    min-height: 100svh;
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    overflow: hidden;
-    isolation: isolate;
-    padding: 1.25rem;
+  display: grid;
+  grid-template-columns: 70px min(40svw, 300px) 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas:
+    'nav aside header'
+    'nav aside main'
+    'nav aside footer';
+}
 
-    @media (max-width: 600px) {
-      border: none;
-      border-radius: 0;
-      padding: 1rem;
+.nav {
+  grid-column-start: 1;
+  grid-column-end: 2;
+  border-right: 1px solid var(--gray-100);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  place-items: stretch;
+
+  ul {
+    padding: 12px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    li {
+      &:first-child {
+        img {
+          width: 32px;
+        }
+      }
+
+      .nav-item {
+        border: unset;
+        background-color: transparent;
+        color: #282c34;
+        display: block;
+        padding: 0.5rem;
+
+        &:not(.nav-item--disabled) {
+          will-change: transform;
+          transition: transform 0.15s;
+        }
+
+        &:hover {
+          background-color: var(--light-blue);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+
+        &.nav-item--active {
+          background-color: var(--light-blue);
+        }
+
+        &.nav-item--disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
     }
+  }
+}
+
+// @media (max-width: 600px) {
+//   padding: 0.7rem 0.7rem;
+// }
+
+// No data styles
+.no-data {
+  height: 100svh;
+  grid-column-start: 2;
+  grid-column-end: 4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+    --button-primary-hover: #ccc;
+    --button-secondary-hover: #1a1a1a;
+  }
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  a.primary:hover {
+    border-color: transparent;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo {
+    filter: invert(100%);
   }
 }

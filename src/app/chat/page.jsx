@@ -1,158 +1,82 @@
 'use client'
 
-import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import useSWRInfinite from 'swr/infinite'
-import { ArrowDown, Eye, Flame, Heart, Medal, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
-import PageTitle from '@/components/PageTitle'
-import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
+import { ConnectWallet } from '@/components/ConnectWallet'
+import { MessageSquareMore, Radio, Settings, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import clsx from 'clsx'
+import Chat from '@/app/chat/_components/Chat'
 import styles from './page.module.scss'
-import Profile from '@/components/Profile'
 
-const DEFAULT_AVATAR = '/default-pfp.svg'
-const PAGE_SIZE = 20
-
-const PERIOD_OPTIONS = [
-  { value: 'all', label: 'All time' },
-  { value: '30d', label: '30D' },
-  { value: '7d', label: '7D' },
-]
-
-const SORT_OPTIONS = [
-  { value: 'score', label: 'Score' },
-  { value: 'engagement', label: 'Engagement' },
-  { value: 'posts', label: 'Posts' },
-  { value: 'views', label: 'Views' },
-]
-
-const numberFormatter = new Intl.NumberFormat('en-US')
-const compactFormatter = new Intl.NumberFormat('en-US', {
-  notation: 'compact',
-  maximumFractionDigits: 1,
-})
-
-const EMPTY_STATS = {
-  active_users: 0,
-  root_posts: 0,
-  comments: 0,
-  likes: 0,
-  views: 0,
-}
-
-const fetcher = async (url) => {
-  const response = await fetch(url)
-  const json = await response.json()
-
-  if (!response.ok || !json.success) {
-    throw new Error(json.error || 'Leaderboard failed to load')
-  }
-
-  return json
-}
-
-export default function LeaderboardPage() {
+export default function Page() {
+  const [activeTab, setActiveTab] = useState('chat')
+  // Track if we are still checking the local storage
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
-  const [period, setPeriod] = useState('all')
-  const [sort, setSort] = useState('score')
-  const [networkId, setNetworkId] = useState('all')
 
-  const getKey = (pageIndex, previousPageData) => {
-    if (previousPageData && !previousPageData.meta?.hasMore) return null
+  useEffect(() => {
+    const key = localStorage.getItem('encryptedAppKey')
 
-    const params = new URLSearchParams({
-      page: String(pageIndex + 1),
-      limit: String(PAGE_SIZE),
-      period,
-      sort,
-    })
-
-    if (networkId !== 'all') {
-      params.set('network_id', networkId)
+    if (!key) {
+      router.push('/')
+    } else {
+      setIsAuthorized(true)
     }
+  }, [router])
 
-    return `/api/v1/leaderboard?${params.toString()}`
-  }
-
-  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite(getKey, fetcher, {
-    persistSize: false,
-    revalidateFirstPage: false,
-  })
-
-  const leaders = useMemo(() => data?.flatMap((pageData) => pageData.data || []) || [], [data])
-  const meta = data?.[data.length - 1]?.meta || data?.[0]?.meta || { stats: EMPTY_STATS, networks: [] }
-  const stats = meta?.stats || EMPTY_STATS
-  const networks = meta?.networks || []
-  const topLeaders = useMemo(() => leaders.slice(0, 3), [leaders])
-  const hasMore = Boolean(meta?.hasMore)
-  const isLoadingMore = isValidating && size > 1
-
-  const openProfile = (walletAddress) => {
-    if (!walletAddress) return
-    router.push(`/${walletAddress}`)
+  // Prevent rendering the UI while redirecting or checking
+  if (!isAuthorized) {
+    return null // or a loading spinner
   }
 
   return (
-    <>
-      <PageTitle name="Chat" />
-      <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
-          You are not whitelisted for the chat yet.
-        </div>
-      </div>
-    </>
-  )
-}
+    <div className={clsx(styles.page)}>
+      <nav className={clsx(styles.nav)}>
+        <ul className={clsx(styles['nav__list'])}>
+          <li title={`Chat`}>
+            <button onClick={() => setActiveTab(`chat`)} className={clsx('rounded-full', styles['nav__item'], activeTab === 'chat' && styles['nav__item--active'])}>
+              <MessageSquareMore width={21} height={21} strokeWidth={1.75} />
+            </button>
+          </li>
+          <li title={`Communities`}>
+            <button onClick={() => setActiveTab(`communities`)} className={clsx('rounded-full', styles['nav__item'], styles['nav__item--disabled'])}>
+              <Users width={21} height={21} strokeWidth={1.75} />
+            </button>
+          </li>
+          <li title={`Channels`}>
+            <button onClick={() => setActiveTab(`channels`)} className={clsx('rounded-full', styles['nav__item'], styles['nav__item--disabled'])}>
+              <Radio width={21} height={21} strokeWidth={1.75} />
+            </button>
+          </li>
+        </ul>
 
-function StatCard({ icon: Icon, label, value }) {
-  return (
-    <div className={styles.statCard}>
-      <Icon size={16} />
-      <span>{label}</span>
-      <strong>{compactFormatter.format(value)}</strong>
+        <ul className={clsx(styles['nav__list'])}>
+          <li>
+            <button onClick={() => setActiveTab(`settings`)} className={clsx('rounded-full', styles['nav__item'], activeTab === 'settings' && styles['nav__item--active'])}>
+              <Settings width={21} height={21} strokeWidth={1.75} />
+            </button>
+          </li>
+          <li>
+            <ConnectWallet />
+          </li>
+        </ul>
+      </nav>
+
+      {activeTab === 'chat' && <Chat />}
+      {activeTab === 'communities' && <NoData name={`Communities`} />}
+      {activeTab === 'channels' && <NoData name={`Channels`} />}
+      {activeTab === 'settings' && <NoData name={`Settings`} />}
     </div>
   )
 }
 
-function Metric({ icon: Icon, label, value }) {
+//
+// NoData Component
+//
+const NoData = ({ name }) => {
   return (
-    <span className={styles.metric} title={label}>
-      <Icon size={15} />
-      <span>{compactFormatter.format(value)}</span>
-    </span>
-  )
-}
-
-function RankBadge({ rank }) {
-  return (
-    <span className={styles.rankBadge}>
-      {rank <= 3 ? <Medal size={16} /> : null}
-      <span>#{rank}</span>
-    </span>
-  )
-}
-
-function LeaderboardSkeleton() {
-  return (
-    <div className={styles.skeletonList} aria-label="Loading leaderboard">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className={styles.skeletonRow}>
-          <span />
-          <div />
-          <p />
-        </div>
-      ))}
+    <div className={clsx(styles['no-data'], 'd-f-c')}>
+      <p className={clsx(styles['no-data__message'])}>{name} coming soon.</p>
     </div>
   )
-}
-
-function getRankClass(rank) {
-  if (rank === 1) return styles.rankFirst
-  if (rank === 2) return styles.rankSecond
-  if (rank === 3) return styles.rankThird
-  return ''
-}
-
-function formatWallet(wallet = '') {
-  if (wallet.length <= 12) return wallet
-  return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
 }
