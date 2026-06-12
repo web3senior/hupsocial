@@ -1,8 +1,51 @@
 'use client'
 
-import React, { cloneElement, isValidElement, useEffect, useId, useRef } from 'react'
+import React, { cloneElement, isValidElement, useEffect, useId, useRef, useCallback } from 'react'
 import clsx from 'clsx'
 import styles from './NativePopover.module.scss'
+
+const GAP = 6
+const MARGIN = 8
+
+function computePosition(triggerRect, pw, ph, placement) {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const { left: tx, top: ty, width: tw, height: th } = triggerRect
+
+  switch (placement) {
+    case 'center':
+      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+    case 'bottom-right-corner':
+      return { top: 'auto', left: 'auto', bottom: MARGIN + 'px', right: MARGIN + 'px' }
+    case 'bottom-left-corner':
+      return { top: 'auto', right: 'auto', bottom: MARGIN + 'px', left: MARGIN + 'px' }
+    case 'top-right-corner':
+      return { bottom: 'auto', left: 'auto', top: MARGIN + 'px', right: MARGIN + 'px' }
+    case 'top-left-corner':
+      return { bottom: 'auto', right: 'auto', top: MARGIN + 'px', left: MARGIN + 'px' }
+    default: break
+  }
+
+  let top, left
+
+  switch (placement) {
+    case 'bottom-end':   top = ty + th + GAP; left = tx + tw - pw; break
+    case 'top-start':    top = ty - ph - GAP; left = tx;            break
+    case 'top-end':      top = ty - ph - GAP; left = tx + tw - pw;  break
+    case 'right-start':  top = ty;            left = tx + tw + GAP; break
+    case 'right-end':    top = ty + th - ph;  left = tx + tw + GAP; break
+    case 'left-start':   top = ty;            left = tx - pw - GAP; break
+    case 'left-end':     top = ty + th - ph;  left = tx - pw - GAP; break
+    case 'bottom-start':
+    default:             top = ty + th + GAP; left = tx;            break
+  }
+
+  // Clamp to viewport
+  left = Math.max(MARGIN, Math.min(left, vw - pw - MARGIN))
+  top  = Math.max(MARGIN, Math.min(top,  vh - ph - MARGIN))
+
+  return { top: top + 'px', left: left + 'px', bottom: 'auto', right: 'auto', transform: '' }
+}
 
 export default function NativePopover({
   trigger,
@@ -16,49 +59,79 @@ export default function NativePopover({
 }) {
   const rawId = useId()
   const popoverId = `popover-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
-  const anchorName = `--anchor-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const popoverRef = useRef(null)
+  const triggerRef = useRef(null)
+
+  const applyPosition = useCallback(() => {
+    const triggerEl = triggerRef.current
+    const popoverEl = popoverRef.current
+    if (!triggerEl || !popoverEl) return
+
+    // offsetWidth/offsetHeight are 0 while the popover is hidden.
+    // Move it off-screen, make it visible just long enough to measure, then position.
+    const wasHidden = !popoverEl.matches(':popover-open')
+    if (wasHidden) {
+      Object.assign(popoverEl.style, { position: 'fixed', top: '-9999px', left: '-9999px', visibility: 'hidden' })
+      popoverEl.showPopover()
+    }
+
+    const rect = triggerEl.getBoundingClientRect()
+    const pw = popoverEl.offsetWidth
+    const ph = popoverEl.offsetHeight
+
+    if (wasHidden) {
+      popoverEl.hidePopover()
+      popoverEl.style.visibility = ''
+    }
+
+    const pos = computePosition(rect, pw, ph, placement)
+    Object.assign(popoverEl.style, pos)
+  }, [placement])
 
   useEffect(() => {
     const node = popoverRef.current
     if (!node) return
 
-    if (onBeforeToggle) node.addEventListener('beforetoggle', onBeforeToggle)
+    const handleBeforeToggle = (e) => {
+      if (e.newState === 'open') applyPosition()
+      onBeforeToggle?.(e)
+    }
+
+    node.addEventListener('beforetoggle', handleBeforeToggle)
     if (onToggle) node.addEventListener('toggle', onToggle)
 
     return () => {
-      if (onBeforeToggle) node.removeEventListener('beforetoggle', onBeforeToggle)
+      node.removeEventListener('beforetoggle', handleBeforeToggle)
       if (onToggle) node.removeEventListener('toggle', onToggle)
     }
-  }, [onBeforeToggle, onToggle])
+  }, [applyPosition, onBeforeToggle, onToggle])
 
   const close = () => {
-    if (popoverRef.current?.matches(':popover-open')) {
-      popoverRef.current.hidePopover()
-    }
+    popoverRef.current?.hidePopover()
   }
 
   const open = () => {
-    if (popoverRef.current && !popoverRef.current.matches(':popover-open')) {
-      popoverRef.current.showPopover()
-    }
+    const el = popoverRef.current
+    if (!el || el.matches(':popover-open')) return
+    applyPosition()
+    el.showPopover()
   }
 
   const triggerProps = {
     popoverTarget: popoverId,
     popoverTargetAction: action,
     'aria-controls': popoverId,
-    style: { anchorName },
   }
 
   const triggerNode = isValidElement(trigger) ? (
     cloneElement(trigger, {
       ...triggerProps,
+      ref: triggerRef,
       type: trigger.props.type ?? 'button',
-      style: { ...trigger.props.style, ...triggerProps.style },
+      style: trigger.props.style,
     })
   ) : (
-    <button type="button" {...triggerProps} className={styles.trigger}>
+    <button type="button" {...triggerProps} ref={triggerRef} className={styles.trigger}>
       {trigger}
     </button>
   )
@@ -66,14 +139,12 @@ export default function NativePopover({
   return (
     <>
       {triggerNode}
-
       <div
         id={popoverId}
         ref={popoverRef}
         popover={type}
         data-placement={placement}
         className={clsx(styles.panel, className)}
-        style={{ positionAnchor: anchorName }}
       >
         {typeof children === 'function' ? children({ close, open }) : children}
       </div>
