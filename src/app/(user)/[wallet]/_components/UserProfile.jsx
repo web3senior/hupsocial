@@ -488,13 +488,11 @@ const Profile = ({ addr }) => {
   )
 }
 
+
 const ProfileLink = ({ targetWallet, displayWalletString }) => {
   const [copied, setCopied] = useState(false)
-
-  // Store the timeout reference to prevent memory leaks or overlapping timers
   const timeoutRef = useRef(null)
 
-  // Cleanup any active timeouts if the component unmounts
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -505,39 +503,57 @@ const ProfileLink = ({ targetWallet, displayWalletString }) => {
 
   const copyToClipboard = async (text) => {
     try {
-      // The Clipboard API is asynchronous and requires a secure context (HTTPS)
       await navigator.clipboard.writeText(text)
       setCopied(true)
       toast(`Profile link copied to clipboard.`, `success`)
-      // Clear any previous timeout in case the user clicks multiple times rapidly
+      
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
 
-      // Revert the copied state back to false after a short delay
       timeoutRef.current = setTimeout(() => {
         setCopied(false)
       }, 2000)
     } catch (error) {
-      // Log errors if the browser denies clipboard access or the API is unavailable
       console.error('Failed to copy to clipboard:', error)
     }
   }
 
   return (
-    // Replaced the span with a semantic button for better screen reader and keyboard support
-    <button
-      type="button"
-      className={styles.link}
-      onClick={() => copyToClipboard(`https://hup.social/${targetWallet}`)}
-      aria-label="Copy profile link to clipboard"
-      title="Copy to clipboard"
-    >
-      hup.social/{displayWalletString}
-    </button>
+    <div className={styles.profileLink}>
+      <span className={styles.profileLink__text}>
+        hup.social/{displayWalletString}
+      </span>
+      
+      <button
+        type="button"
+        className={styles.profileLink__copyButton}
+        onClick={() => copyToClipboard(`https://hup.social/${targetWallet}`)}
+        aria-label="Copy profile link to clipboard"
+        title="Copy to clipboard"
+      >
+        {copied ? (
+          <span className={styles.profileLink__status}>Copied!</span>
+        ) : (
+          <svg
+            className={styles.profileLink__icon}
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        )}
+      </button>
+    </div>
   )
 }
-
 /**
  * Status
  * @param {*} param0

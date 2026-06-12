@@ -203,14 +203,50 @@
   }
 }
 
-.link {
-  color: var(--blue-400);
-  text-decoration: none;
-  word-break: break-all;
-  transition: color 0.2s ease-in-out;
-  background: unset;
-}
+// ■■■ Profile Link Layout Modules ■■■
 
+.profileLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  vertical-align: middle;
+
+  &__text {
+    color: var(--blue-400);
+    text-decoration: none;
+    word-break: break-all;
+    transition: color 0.2s ease-in-out;
+  }
+
+  &__copyButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #888888);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: var(--color);
+    }
+  }
+
+  &__icon {
+    display: block;
+  }
+
+  &__status {
+    font-size: 0.75rem;
+    color: var(--green-400, #4caf50);
+    font-weight: 500;
+    line-height: 0;
+  }
+}
 .tab {
   position: relative;
 
