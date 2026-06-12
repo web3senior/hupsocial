@@ -16,10 +16,10 @@
   margin: 0;
 
   // Screen Overflow Guardrails
-  // Automatically shifts or flips the popover when space is restricted
   position-try-fallbacks: flip-block, flip-inline, flip-start;
   position-visibility: always;
 
+  // Base closed state
   opacity: 0;
   transform: translate(var(--popover-x), var(--popover-y)) scale(var(--popover-scale));
   transform-origin: top left;
@@ -95,8 +95,11 @@
     transform-origin: center;
   }
 
-  &[data-placement='bottom-right-corner'] {
+  &[data-placement$='-corner'] {
     position-area: none;
+  }
+
+  &[data-placement='bottom-right-corner'] {
     right: 0;
     bottom: 0;
     margin: 1rem;
@@ -104,7 +107,6 @@
   }
 
   &[data-placement='bottom-left-corner'] {
-    position-area: none;
     left: 0;
     bottom: 0;
     margin: 1rem;
@@ -112,7 +114,6 @@
   }
 
   &[data-placement='top-right-corner'] {
-    position-area: none;
     right: 0;
     top: 0;
     margin: 1rem;
@@ -120,7 +121,6 @@
   }
 
   &[data-placement='top-left-corner'] {
-    position-area: none;
     left: 0;
     top: 0;
     margin: 1rem;
@@ -157,9 +157,7 @@
     --popover-scale: 0.96;
     opacity: 0;
   }
-}
 
-@starting-style {
   .panel[data-placement='center']:global(:popover-open)::backdrop,
   .panel[data-placement$='-corner']:global(:popover-open)::backdrop {
     background: rgba(0, 0, 0, 0);

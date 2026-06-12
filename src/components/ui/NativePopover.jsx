@@ -16,6 +16,7 @@ export default function NativePopover({
 }) {
   const rawId = useId()
   const popoverId = `popover-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
+  const anchorName = `--anchor-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const popoverRef = useRef(null)
 
   useEffect(() => {
@@ -43,17 +44,18 @@ export default function NativePopover({
     }
   }
 
-  {/* Fixed: Converted target attributes to camelCase properties for React */}
   const triggerProps = {
     popoverTarget: popoverId,
     popoverTargetAction: action,
     'aria-controls': popoverId,
+    style: { anchorName },
   }
 
   const triggerNode = isValidElement(trigger) ? (
     cloneElement(trigger, {
       ...triggerProps,
       type: trigger.props.type ?? 'button',
+      style: { ...trigger.props.style, ...triggerProps.style },
     })
   ) : (
     <button type="button" {...triggerProps} className={styles.trigger}>
@@ -71,6 +73,7 @@ export default function NativePopover({
         popover={type}
         data-placement={placement}
         className={clsx(styles.panel, className)}
+        style={{ positionAnchor: anchorName }}
       >
         {typeof children === 'function' ? children({ close, open }) : children}
       </div>
