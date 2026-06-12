@@ -1,3 +1,5 @@
+@import '@/styles/components/responsive';
+
 .page {
   --tag-bg: var(--gray-200);
   height: 100%;
@@ -54,10 +56,20 @@
   color: rgba(var(--universal-profile-color), 1);
   text-transform: uppercase;
   line-height: 0;
-  padding: 2px 0.5rem 2px 2px;
+  padding: 2px 2px;
   border: 1px solid rgba(var(--universal-profile-color), 0.5);
   user-select: none;
   cursor: pointer;
+
+  @include md-up {
+    &:after {
+      content: 'Universal Profile';
+      padding-right: 4px;
+    }
+  }
+  @include md-down{
+
+  }
 }
 
 // Shimmer

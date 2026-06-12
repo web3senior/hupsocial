@@ -454,7 +454,6 @@ const Profile = ({ addr }) => {
                    {profile.source === `universal_profile` && (
                 <div className={clsx(styles.universalProfileBadge, 'flex align-items-center justify-content-center rounded-full gap-025')} onClick={handleUniversalProfile}>
                   <img alt={`Universal Profile`} src={UPlogo.src} width={14} height={14} />
-                  <span>Universal Profile</span>
                 </div>
               )}
               </div>
