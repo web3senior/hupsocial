@@ -158,6 +158,17 @@ export default function UserProfile() {
     })
   }, [])
 
+    const handlePostClick = (postId, chainId) => {
+    const selection = window.getSelection()
+    if (selection && selection.toString().length > 0) return
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(200)
+    }
+
+    router.push(`networks/${chainId}/${postId}`)
+  }
+
   return (
     <>
       <div className={`${styles.page} ms-motion-slideDownIn`}>
@@ -223,7 +234,7 @@ export default function UserProfile() {
                       <section
                         key={i}
                         className={`${styles.post} animate fade`}
-                        onClick={() => router.push(`/networks/${activeChain[0].id}/${item.id}`)}
+                        onClick={() => handlePostClick(item.id, item.network_id)}
                       >
                         <Post item={item} actions={[`like`, `comment`, `repost`, `view`, `share`]} />
                         {i < posts.list.length - 1 && <hr />}
