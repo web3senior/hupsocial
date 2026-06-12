@@ -26,6 +26,8 @@ import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdenti
 import styles from './UserProfile.module.scss'
 import { useProfile } from '@/hooks/useProfile'
 import clsx from 'clsx'
+import NativePopover from '@/components/ui/NativePopover'
+import { ProfileQRCode } from './ProfileQRCode'
 
 //import SettingsTab from '@/components/tabs/SettingsTab'
 //const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
@@ -347,7 +349,7 @@ const Profile = ({ addr }) => {
 
     window.open(url, '_blank', 'noopener,noreferrer')
   }
-  
+
   // Isolated sub-rendering wrapper to manage variable text arrays cleanly
   const TagsElement = ({ rawTags }) => {
     let listItems = []
@@ -450,12 +452,17 @@ const Profile = ({ addr }) => {
                 <ProfileLink targetWallet={targetWallet} displayWalletString={displayWalletString} />
               </div>
 
-              <div role="list">
-                   {profile.source === `universal_profile` && (
-                <div className={clsx(styles.universalProfileBadge, 'flex align-items-center justify-content-center rounded-full gap-025')} onClick={handleUniversalProfile}>
-                  <img alt={`Universal Profile`} src={UPlogo.src} width={14} height={14} />
-                </div>
-              )}
+              <div className={clsx(`flex gap-025`)}>
+                {profile.source === `universal_profile` && (
+                  <div
+                    className={clsx(styles.universalProfileBadge, 'flex align-items-center justify-content-center rounded-full gap-025')}
+                    onClick={handleUniversalProfile}
+                  >
+                    <img alt={`Universal Profile`} src={UPlogo.src} width={14} height={14} />
+                  </div>
+                )}
+
+                <ProfileQRCode profileUrl={`https://hup.social/${addr}`} styles={styles} />
               </div>
             </li>
 
@@ -488,7 +495,6 @@ const Profile = ({ addr }) => {
   )
 }
 
-
 const ProfileLink = ({ targetWallet, displayWalletString }) => {
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef(null)
@@ -506,7 +512,7 @@ const ProfileLink = ({ targetWallet, displayWalletString }) => {
       await navigator.clipboard.writeText(text)
       setCopied(true)
       toast(`Profile link copied to clipboard.`, `success`)
-      
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
@@ -521,10 +527,8 @@ const ProfileLink = ({ targetWallet, displayWalletString }) => {
 
   return (
     <div className={styles.profileLink}>
-      <span className={styles.profileLink__text}>
-        hup.social/{displayWalletString}
-      </span>
-      
+      <span className={styles.profileLink__text}>hup.social/{displayWalletString}</span>
+
       <button
         type="button"
         className={styles.profileLink__copyButton}
