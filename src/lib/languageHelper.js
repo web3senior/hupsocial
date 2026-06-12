@@ -14,7 +14,11 @@ export const checkIsEnglish = (text) => {
     'how', 'your', 'is', 'am', 'are', 'was', 'were', 'has', 'had', 'just', 'now',
     
     // Social media expressions, web3 phrasing, and platform context
-    'sup', 'hup', 'hups', 'gm', 'gn', 'hey', 'hi', 'hello', 'yo', 'fren', 'frens'
+    'sup', 'hup', 'hups', 'gm', 'gn', 'hey', 'hi', 'hello', 'yo', 'fren', 'frens',
+    
+    // Common interface nouns and social interactions
+    'nice', 'cool', 'great', 'awesome', 'good', 'love', 'like', 'badge', 'post', 
+    'feed', 'profile', 'wallet', 'chain', 'crypto', 'app', 'user', 'fren', 'frens'
   ])
 
   const tokens = text.toLowerCase().match(/\b[a-z]+\b/g) || []
