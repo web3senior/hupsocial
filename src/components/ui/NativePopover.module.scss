@@ -16,14 +16,16 @@
   margin: 0;
 
   // Screen Overflow Guardrails
+  // Legacy alias fallback for older iOS versions
+  inset-try-fallbacks: flip-block, flip-inline, flip-start; 
   position-try-fallbacks: flip-block, flip-inline, flip-start;
   position-visibility: always;
 
-  // Base closed state
   opacity: 0;
   transform: translate(var(--popover-x), var(--popover-y)) scale(var(--popover-scale));
   transform-origin: top left;
 
+  // Older iOS fallback: Smooth transitions when switching classes
   transition:
     opacity 0.18s ease,
     transform 0.18s ease,
@@ -33,15 +35,19 @@
   &:global(:popover-open) {
     --popover-scale: 1;
     opacity: 1;
+    // Standardizes behavior on mobile browsers ignoring discrete display paths
+    display: block !important; 
   }
 
   // Anchor Placements: Bottom
   &[data-placement='bottom-start'] {
+    inset-area: bottom left;
     position-area: bottom left;
     margin-top: 6px;
   }
 
   &[data-placement='bottom-end'] {
+    inset-area: bottom right;
     position-area: bottom right;
     margin-top: 6px;
     transform-origin: top right;
@@ -49,12 +55,14 @@
 
   // Anchor Placements: Top
   &[data-placement='top-start'] {
+    inset-area: top left;
     position-area: top left;
     margin-bottom: 6px;
     transform-origin: bottom left;
   }
 
   &[data-placement='top-end'] {
+    inset-area: top right;
     position-area: top right;
     margin-bottom: 6px;
     transform-origin: bottom right;
@@ -62,11 +70,13 @@
 
   // Anchor Placements: Right
   &[data-placement='right-start'] {
+    inset-area: right top;
     position-area: right top;
     margin-left: 6px;
   }
 
   &[data-placement='right-end'] {
+    inset-area: right bottom;
     position-area: right bottom;
     margin-left: 6px;
     transform-origin: bottom left;
@@ -74,12 +84,14 @@
 
   // Anchor Placements: Left
   &[data-placement='left-start'] {
+    inset-area: left top;
     position-area: left top;
     margin-right: 6px;
     transform-origin: top right;
   }
 
   &[data-placement='left-end'] {
+    inset-area: left bottom;
     position-area: left bottom;
     margin-right: 6px;
     transform-origin: bottom right;
@@ -87,6 +99,7 @@
 
   // Global Viewport Placements
   &[data-placement='center'] {
+    inset-area: none;
     position-area: none;
     left: 50%;
     top: 50%;
@@ -96,6 +109,7 @@
   }
 
   &[data-placement$='-corner'] {
+    inset-area: none;
     position-area: none;
   }
 
