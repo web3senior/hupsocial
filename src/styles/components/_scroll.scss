@@ -7,7 +7,7 @@
 /* Base scrollbar container for WebKit/Blink browsers */
 ::-webkit-scrollbar {
   width: 12px; /* Balanced width for modern UI; original 118px was massive */
-  background-color: var(--gray-200);
+  background-color: var(--thumbBG);
 }
 
 /* Track configuration */

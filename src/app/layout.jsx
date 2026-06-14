@@ -1,103 +1,110 @@
 import ClientLayout from '../components/ClientLayout'
+import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
 import './Globals.scss'
 import './../styles/Global.scss'
 
 export const metadata = {
-  // --- BASE & CORE METADATA ---
-  metadataBase: process.env.NEXT_PUBLIC_BASE_URL,
+  // Base URL for absolute paths
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
 
-  // Title (SEO best practice for better click-through)
   title: {
-    template: `${process.env.NEXT_PUBLIC_NAME} | %s`, // Use ENV var, fallback to name if title is not set
-    default: process.env.NEXT_PUBLIC_NAME,
+    template: `${process.env.NEXT_PUBLIC_NAME} | %s`,
+    default: process.env.NEXT_PUBLIC_NAME || 'Hup',
   },
 
   description: process.env.NEXT_PUBLIC_DESCRIPTION,
 
-  // Keywords (As an array, but ensure there are multiple keywords for impact)
+  // Keywords handling
   keywords: Array.isArray(process.env.NEXT_PUBLIC_KEYWORDS)
     ? process.env.NEXT_PUBLIC_KEYWORDS
-    : (process.env.NEXT_PUBLIC_KEYWORDS || '').split(',').map((k) => k.trim()), // Ensures keywords are an array and handles common string format
+    : (process.env.NEXT_PUBLIC_KEYWORDS || '').split(',').map((k) => k.trim()),
 
-  // Authorship
-  author: {
-    name: process.env.NEXT_PUBLIC_AUTHOR,
-    url: process.env.NEXT_PUBLIC_AUTHOR_URL,
-  },
+  authors: [{ name: process.env.NEXT_PUBLIC_AUTHOR, url: process.env.NEXT_PUBLIC_AUTHOR_URL }],
   creator: process.env.NEXT_PUBLIC_CREATOR,
-  category: process.env.NEXT_PUBLIC_CATEGORY || 'Technology', // Use ENV var, default to 'Technology' if undefined
+  category: process.env.NEXT_PUBLIC_CATEGORY || 'Technology',
 
-  // --- OPEN GRAPH (OG) - ESSENTIAL FOR SOCIAL SHARING ---
+  // Canonical link to prevent duplicate content issues
+  alternates: {
+    canonical: '/',
+  },
+
+  // Open Graph
   openGraph: {
-    title: process.env.NEXT_PUBLIC_NAME, // Explicit title for OG
-    description: process.env.NEXT_PUBLIC_DESCRIPTION, // Explicit description for OG
-    url: process.env.NEXT_PUBLIC_BASE_URL, // Canonical URL
+    title: process.env.NEXT_PUBLIC_NAME,
+    description: process.env.NEXT_PUBLIC_DESCRIPTION,
+    url: process.env.NEXT_PUBLIC_BASE_URL,
     siteName: process.env.NEXT_PUBLIC_NAME,
-    type: 'website', // Use 'article' or 'profile' if more appropriate
-    locale: 'en_US', // Specify locale
+    type: 'website',
+    locale: 'en_US',
     images: [
       {
         url: '/open-graph.png',
-        width: 1200, // Recommended width for large previews
-        height: 630, // Recommended height for large previews
-        alt: `${process.env.NEXT_PUBLIC_NAME} Open Graph Image`, // Alt text is good practice
+        width: 1200,
+        height: 630,
+        alt: `${process.env.NEXT_PUBLIC_NAME} Open Graph Image`,
       },
-      // You can add more images here (e.g., smaller ones)
     ],
   },
 
-  // --- TWITTER CARD - ESSENTIAL FOR TWITTER SHARING ---
+  // Twitter Card
   twitter: {
-    card: 'summary_large_image', // Best practice for visuals
-    site: process.env.NEXT_PUBLIC_TWITTER_SITE || '@hupsocial', // Your site's Twitter handle
-    creator: process.env.NEXT_PUBLIC_TWITTER_CREATOR || '@atenyun', // Creator's Twitter handle
-    title: process.env.NEXT_PUBLIC_NAME,
-    description: process.env.NEXT_PUBLIC_DESCRIPTION,
-    images: ['/open-graph.png'], // Re-use OG image
+    card: 'summary_large_image',
+    site: process.env.NEXT_PUBLIC_TWITTER_SITE || '@hupsocial',
+    creator: process.env.NEXT_PUBLIC_TWITTER_CREATOR || '@atenyun',
   },
 
-  // --- ROBOTS ---
-  // This is already good, but simplified for clarity as the default is usually fine
+  // Robots
   robots: {
     index: true,
     follow: true,
-    nocache: true,
     googleBot: {
       index: true,
       follow: true,
-      noimageindex: false,
       'max-video-preview': -1,
       'max-image-preview': 'large',
       'max-snippet': -1,
     },
   },
 
-  // --- ICONS & MANIFEST ---
+  // Icons and Manifest (Replaces manual <link> tags in HTML)
   icons: {
-    icon: '/favicon.ico', // Generally use .ico or .svg for main icon
-    shortcut: '/shortcut-icon.png',
-    apple: '/apple-icon.png',
+    icon: [
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
   },
-  manifest: '/manifest.json',
+  manifest: '/site.webmanifest',
 
-  // --- CUSTOM META TAGS ---
+  // Format detection
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+
+  // Custom meta tags
   other: {
-    'base:app_id': '699cfe2d6b5b98f55322fb3a',
-    // Other custom meta tags
+    'apple-mobile-web-app-title': 'Hup',
   },
 }
 
 export const viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: process.env.NEXT_PUBLIC_THEME_COLOR_LIGHT },
-    { media: '(prefers-color-scheme: dark)', color: process.env.NEXT_PUBLIC_THEME_COLOR_DARK },
+    { media: '(prefers-color-scheme: light)', color: process.env.NEXT_PUBLIC_THEME_COLOR_LIGHT || '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: process.env.NEXT_PUBLIC_THEME_COLOR_DARK || '#000000' },
   ],
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
+        <ServiceWorkerRegistry />
+        
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

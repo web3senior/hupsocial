@@ -6,8 +6,6 @@ import { QrCode } from 'lucide-react'
 import NativePopover from '@/components/ui/NativePopover'
 import styles from './ProfileQRCode.module.scss'
 
-// ■■■ QR Code Compiling Infrastructure ■■■
-
 const qrCodeFetcher = async ([_, profileUrl]) => {
   if (!profileUrl) return ''
 
@@ -20,8 +18,6 @@ const qrCodeFetcher = async ([_, profileUrl]) => {
     },
   })
 }
-
-// ■■■ Sub-Component Definition ■■■
 
 export function ProfileQRCode({ profileUrl }) {
   // Execute async QR canvas calculation inside cached hook pipeline

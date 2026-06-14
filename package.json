@@ -4,6 +4,7 @@
   "private": false,
   "scripts": {
     "dev": "next dev",
+    "dev:ssl": "next dev --experimental-https",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -53,6 +54,7 @@
     "uuid": "^14.0.0",
     "viem": "^2.48.11",
     "wagmi": "^3.6.13",
+    "web-push": "^3.6.7",
     "web3": "^4.16.0",
     "zustand": "^5.0.13"
   },

@@ -87,7 +87,7 @@ $border-radius-item: 8px;
   .label {
     font-size: 0.95rem;
     font-weight: 500;
-    color: $color-text-primary;
+    color: var(--color);
     line-height: 1.2;
   }
 

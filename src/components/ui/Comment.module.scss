@@ -1,4 +1,4 @@
-@import '../../styles/components/responsive';
+@use '@/styles/components/responsive' as r;
 
 .modal {
   position: fixed;
@@ -24,7 +24,7 @@
     overflow-y: auto;
     max-height: 100svh;
 
-    @include md-down() {
+    @include r.md-down() {
       max-width: 100svw !important;
       height: 100svh;
     }
@@ -79,21 +79,6 @@
     }
 
     main {
-      // figure {
-      //   border: 1px solid var(--gray-100);
-      //   background-color: var(--gray-50);
-      //   margin: 0 auto;
-
-      //   --r: 8rem;
-      //   width: var(--r);
-      //   height: var(--r);
-      //   img {
-      //     width: inherit;
-      //     height: inherit;
-      //     border-radius: inherit;
-      //     aspect-ratio: 1/1;
-      //   }
-      // }
     }
   }
 
@@ -166,11 +151,6 @@
       isolation: isolate;
       place-items: stretch;
     }
-
-    // background-image: url('/hup.svg');
-    // background-position: 97% 95%;
-    // background-repeat: no-repeat;
-    // background-size: 2rem;
 
     &__header {
       width: fit-content;

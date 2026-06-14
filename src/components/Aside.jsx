@@ -37,6 +37,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
+import { Download } from 'lucide-react'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
@@ -251,12 +252,12 @@ export default function Aside() {
         <ul className={styles.navList}>
           {navLinks.map((item, index) => (
             <li key={item.id ?? `${item.type}-${index}`}>
-              <NavLink 
-                item={item} 
-                isActive={isActivePath(pathname, item.path)} 
-                isCompact={isCompact} 
-                batchCount={batchCount} 
-                onNavigate={closeSidebar} 
+              <NavLink
+                item={item}
+                isActive={isActivePath(pathname, item.path)}
+                isCompact={isCompact}
+                batchCount={batchCount}
+                onNavigate={closeSidebar}
               />
             </li>
           ))}
@@ -346,6 +347,12 @@ export default function Aside() {
                     </Link>
                   </li>
                   <li>
+                    <Link href="/install" onClick={close} className="flex align-items-center gap-050">
+                      <Download size={16} />
+                      <span>Install {process.env.NEXT_PUBLIC_NAME}</span>
+                    </Link>
+                  </li>
+                  <li>
                     <a
                       href="https://github.com/web3senior/hupsocial"
                       target="_blank"
@@ -369,18 +376,18 @@ export default function Aside() {
           </NativePopover>
 
           <Link
-            href="/chains"
-            className={clsx(styles.link, isActivePath(pathname, '/chains') && styles.linkActive)}
+            href="/networks"
+            className={clsx(styles.link, isActivePath(pathname, '/networks') && styles.linkActive)}
             aria-label="Networks"
             data-tooltip={isCompact ? 'Networks' : undefined}
-            aria-current={isActivePath(pathname, '/chains') ? 'page' : undefined}
+            aria-current={isActivePath(pathname, '/networks') ? 'page' : undefined}
             onClick={closeSidebar}
           >
             <div className={styles.iconWrapper}>
               <Boxes
                 size={20}
-                fill={isActivePath(pathname, '/chains') ? 'currentColor' : 'none'}
-                strokeWidth={isActivePath(pathname, '/chains') ? 2 : 1.7}
+                fill={isActivePath(pathname, '/networks') ? 'currentColor' : 'none'}
+                strokeWidth={isActivePath(pathname, '/networks') ? 2 : 1.7}
               />
             </div>
             {!isCompact && <span className={styles.linkText}>Networks</span>}
@@ -390,11 +397,7 @@ export default function Aside() {
 
       {/* ■■■ Floating Global Actions Layout ■■■ */}
       {batchCount > 0 && (
-        <Link 
-          href="/batch-like" 
-          className={clsx(styles.batchButton)} 
-          aria-label={`View batch queue with ${batchCount} operations`}
-        >
+        <Link href="/batch-like" className={clsx(styles.batchButton)} aria-label={`View batch queue with ${batchCount} operations`}>
           <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
           <span className={styles.floatingBadgeCount}>{batchCount}</span>
         </Link>

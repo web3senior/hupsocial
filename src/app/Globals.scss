@@ -14,6 +14,9 @@
   --liked-color: #ff007a;
   --batch-like-color: #facc15;
 
+  --scrollbarBG: #f4f4f4;
+  --thumbBG: var(--gray);
+
   accent-color: var(--network-color-text);
   color-scheme: light;
 }
@@ -31,6 +34,9 @@
   --tag: var(--black-800);
   --shimmer-glint: rgba(255, 255, 255, 0.12);
 
+  --scrollbarBG: #101114;
+  --thumbBG: var(--black);
+
   accent-color: var(--network-color-text);
   color-scheme: dark;
 }
@@ -47,6 +53,9 @@
   --hover: #12301c;
   --tag: var(--black-800);
   --shimmer-glint: rgba(163, 255, 173, 0.16);
+
+    --scrollbarBG: #0d1c12;
+  --thumbBG: var(--black);
 
   accent-color: #a3ffad;
   color-scheme: dark;

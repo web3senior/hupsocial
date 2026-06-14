@@ -4,7 +4,7 @@ import { useState, useEffect, useId, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
 import { initHupContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
-import { getPostById, getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
+import { getPostById } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -13,31 +13,22 @@ import { getActiveChain } from '@/lib/communication'
 import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, TipIcon, BlueCheckMarkIcon, ViewIcon, AnimatedHeart } from '@/components/Icons'
+import { CommentIcon, ShareIcon, TipIcon, ViewIcon } from '@/components/Icons'
 import MediaGallery from './Gallery'
-import { Ellipsis } from 'lucide-react'
-import { Repeat2 } from 'lucide-react'
-import { MessageCircle } from 'lucide-react'
-import { Heart } from 'lucide-react'
-import { Box } from 'lucide-react'
-import { SendHorizonal } from 'lucide-react'
+import { Ellipsis, Pen, Repeat2, MessageCircle, Box, SendHorizonal, MessageSquareQuote } from 'lucide-react'
 import { CONTRACTS } from '@/config/wagmi'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import useSWR from 'swr'
 import NativePopover from './ui/NativePopover'
-import { MessageSquareQuote } from 'lucide-react'
 import clsx from 'clsx'
 import styles from './Post.module.scss'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
 import NewPost from './NewPost'
 import { checkIsEnglish } from '@/lib/languageHelper'
-import { Pen } from 'lucide-react'
 import Like from './ui/Like'
 import Comment from './ui/Comment'
 
 // import React, { useState, useEffect } from 'react'
-// import { Repeat2, Pen, MessageCircle, Box, SendHorizonal } from 'lucide-react'
 // import clsx from 'clsx'
 // import { PostText } from './PostText'
 
@@ -1007,19 +998,18 @@ const Options = ({ item }) => {
   )
 }
 
-
 // ■■■ Translation Core Infrastructure ■■■
 
 const translationFetcher = async ([text, targetLang]) => {
   if (!text) return ''
-  
+
   const targetUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
   const res = await fetch(targetUrl)
-  
+
   if (!res.ok) {
     throw new Error('Translation pipeline network response failed')
   }
-  
+
   const data = await res.json()
   if (!data || !data[0]) return ''
 
@@ -1048,7 +1038,7 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       dedupingInterval: 600000,
-    }
+    },
   )
 
   // Track layout heights to evaluate if the content body needs a show-more interface
@@ -1073,7 +1063,7 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
         ref={isCollapsible ? contentRef : null}
         className={clsx(
           baseClassName,
-          isCollapsible && (isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed)
+          isCollapsible && (isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed),
         )}
         id={`post${postId}`}
         dangerouslySetInnerHTML={{

@@ -5,7 +5,7 @@ import { slugify } from '@/lib/utils'
 import styles from './page.module.scss'
 
 export default async function Page({ params }) {
-  const id = (await params).id
+  const id = (await params).networkId
 
   return (
     <>

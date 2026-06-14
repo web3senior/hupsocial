@@ -73,7 +73,7 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
 export const getPostById = async (networkId, postId, viewerAddress = null) => {
   // Determine the base URL based on the environment
   const isServer = typeof window === 'undefined'
-  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' : ''
+  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000' : ''
 
   const path = viewerAddress
     ? `/api/v1/networks/${networkId}/${postId}?viewer_address=${viewerAddress}`
@@ -167,52 +167,6 @@ export async function addViewPost(chainId, postId) {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}view/add?${params}`, requestOptions)
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return await response.json()
-}
-
-export async function subscribeUser(sub, wallet) {
-  const subscription = sub
-
-  var raw = JSON.stringify({
-    subscription: subscription,
-    wallet: wallet,
-  })
-
-  var requestOptions = {
-    method: 'POST',
-    body: raw,
-    redirect: 'follow',
-  }
-  // const params = new URLSearchParams({ wallet: wallet}).toString()
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}subscription`, requestOptions)
-  if (!response.ok) throw new Response('Failed to provinces', { status: 500 })
-  return response.json()
-}
-
-export async function unsubscribeUser(wallet) {
-  const subscription = null
-  var raw = JSON.stringify(subscription)
-
-  var requestOptions = {
-    method: 'POST',
-    body: raw,
-    redirect: 'follow',
-  }
-
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}subscription/unsubscribe`, requestOptions)
-  if (!response.ok) throw new Response('Failed to provinces', { status: 500 })
-  return response.json()
-}
-
-export async function sendNotification(message, address) {
-  var requestOptions = {
-    method: 'POST',
-    body: JSON.stringify({ message: message, address: address }),
-    redirect: 'follow',
-  }
-
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}sendNotification`, requestOptions)
-  if (!response.ok) throw new Response('Failed to provinces', { status: 500 })
-  return response.json()
 }
 
 export async function getClaim() {

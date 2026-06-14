@@ -1,0 +1,84 @@
+// ■■■ [Block] ■■■
+.notification-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background-color: #0d0d0d;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  font-family: 'Courier New', Courier, monospace;
+
+  // ■■■ [Elements] ■■■
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+  }
+
+  &__status {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #888888;
+
+    // ■■■ [Modifiers] ■■■
+    &--error {
+      color: #ff4a4a;
+    }
+
+    &--warning {
+      color: #ffb84d;
+    }
+
+    &--success {
+      color: #00e676;
+    }
+  }
+
+  &__action {
+    align-self: flex-start;
+    padding: 0.6rem 1.2rem;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    // ■■■ [Modifiers] ■■■
+    &--subscribe {
+      color: #00e676;
+      border: 1px solid rgba(0, 230, 118, 0.3);
+
+      &:hover:not(:disabled) {
+        background: rgba(0, 230, 118, 0.1);
+        border-color: #00e676;
+      }
+    }
+
+    &--unsubscribe {
+      color: #ff4a4a;
+      border: 1px solid rgba(255, 74, 74, 0.3);
+
+      &:hover:not(:disabled) {
+        background: rgba(255, 74, 74, 0.1);
+        border-color: #ff4a4a;
+      }
+    }
+  }
+}

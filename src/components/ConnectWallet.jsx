@@ -132,13 +132,13 @@ export function DefaultNetwork({ currentNetwork }) {
             onClick={() => handleSwitchChain(chain)}
             data-current={chain.id.toString() === currentNetwork.toString()}
           >
-            <div className={`rounded`} dangerouslySetInnerHTML={{ __html: chain.icon }} />
+            <div dangerouslySetInnerHTML={{ __html: chain.icon }} />
             <span>{chain.name}</span>
           </button>
         ))}
       </div>
 
-      <p className={`text-center mt-10 ${styles.link}`} onClick={() => router.push(`/chains`)}>
+      <p className={`text-center mt-10 ${styles.link}`} onClick={() => router.push(`/networks`)}>
         View networks
       </p>
     </div>

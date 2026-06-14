@@ -1,0 +1,104 @@
+@use '../../styles/components/responsive' as r;
+
+.page {
+  min-height: 85svh;
+
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    isolation: isolate;
+    padding: 1.25rem;
+
+    @include r.sm-down() {
+      border: none;
+      border-radius: 0;
+      padding: 1rem;
+    }
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted, #999);
+  letter-spacing: 0.03em;
+}
+
+.textarea {
+  width: 100%;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+}
+
+.button {
+  align-self: flex-start;
+  padding: 0.75rem 1.5rem;
+  background: var(--color-primary);
+  color: var(--white, #fff);
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+
+  &:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.success {
+  font-size: 0.85rem;
+  color: var(--green-500, #4ade80);
+  margin: 0;
+}
+
+.error {
+  font-size: 0.85rem;
+  color: var(--red-500, #f87171);
+  margin: 0;
+}
+
+.gate {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0;
+}

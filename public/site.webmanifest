@@ -1,11 +1,6 @@
 {
   "name": "Hup",
   "short_name": "Hup",
-  "description": "A fully on-chain social network",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2E90FA",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
@@ -19,5 +14,8 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone"
 }

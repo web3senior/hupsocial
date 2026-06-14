@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import styles from './SettingsNav.module.scss'
 import InAppWallet from './InAppWallet'
+import PushNotificationManager from '@/components/ui/PushNotificationManager'
 
 export default function SettingsNav() {
   // Manage whether we see the menu list or the active detail pane on mobile viewports
@@ -33,6 +34,12 @@ export default function SettingsNav() {
       icon: <Wallet size={20} />,
     },
     {
+      id: 'notification',
+      desc: 'Get notifications',
+      label: 'Push Notification',
+      icon: <Lock size={20} />,
+    },
+        {
       id: 'privacy',
       desc: 'Manage your visibility and digital footprint options',
       label: 'Privacy',
@@ -54,6 +61,10 @@ export default function SettingsNav() {
   // Submenu configuration with disabled options added
   const subMenuContent = {
     'in-app-wallet': [
+      { id: 'auto-sign', label: 'Automatic signing', desc: 'Allow background transactions', icon: <Sliders size={20} /> , disabled: true},
+      { id: 'export-key', label: 'Export private key', icon: <Lock size={20} />, disabled: true},
+    ],
+        'Notification': [
       { id: 'auto-sign', label: 'Automatic signing', desc: 'Allow background transactions', icon: <Sliders size={20} /> , disabled: true},
       { id: 'export-key', label: 'Export private key', icon: <Lock size={20} />, disabled: true},
     ],
@@ -113,6 +124,8 @@ export default function SettingsNav() {
         </div>
 
         {activeTab === 'in-app-wallet' && <InAppWallet />}
+        {activeTab === 'notification' && <PushNotificationManager />}
+
         <div className={styles.subMenuList}>
           {subMenuContent[activeTab]?.map((subItem) => (
             <button

@@ -1,3 +1,5 @@
+@use 'sass:map';
+
 /* Configuration map - The single source of truth */
 $responsive-breakpoints: (
   'xs': 480px,
@@ -9,41 +11,41 @@ $responsive-breakpoints: (
 );
 
 /* Semantic variable aliases for backward compatibility */
-$small-width: map-get($responsive-breakpoints, 'xs');
-$medium-width: map-get($responsive-breakpoints, 'md');
-$large-width: map-get($responsive-breakpoints, 'lg');
+$small-width: map.get($responsive-breakpoints, 'xs');
+$medium-width: map.get($responsive-breakpoints, 'md');
+$large-width: map.get($responsive-breakpoints, 'lg');
 
 /* 
    Mixins: "Up" (Mobile-first)
    Apply styles from this width and larger
 */
 @mixin xs-up {
-  @media (min-width: map-get($responsive-breakpoints, 'xs')) {
+  @media (min-width: map.get($responsive-breakpoints, 'xs')) {
     @content;
   }
 }
 @mixin sm-up {
-  @media (min-width: map-get($responsive-breakpoints, 'sm')) {
+  @media (min-width: map.get($responsive-breakpoints, 'sm')) {
     @content;
   }
 }
 @mixin md-up {
-  @media (min-width: map-get($responsive-breakpoints, 'md')) {
+  @media (min-width: map.get($responsive-breakpoints, 'md')) {
     @content;
   }
 }
 @mixin lg-up {
-  @media (min-width: map-get($responsive-breakpoints, 'lg')) {
+  @media (min-width: map.get($responsive-breakpoints, 'lg')) {
     @content;
   }
 }
 @mixin xl-up {
-  @media (min-width: map-get($responsive-breakpoints, 'xl')) {
+  @media (min-width: map.get($responsive-breakpoints, 'xl')) {
     @content;
   }
 }
 @mixin xxl-up {
-  @media (min-width: map-get($responsive-breakpoints, 'xxl')) {
+  @media (min-width: map.get($responsive-breakpoints, 'xxl')) {
     @content;
   }
 }
@@ -53,39 +55,38 @@ $large-width: map-get($responsive-breakpoints, 'lg');
    Apply styles from this width and smaller 
 */
 @mixin xs-down {
-  @media (max-width: (map-get($responsive-breakpoints, 'xs') - 1px)) {
+  @media (max-width: (map.get($responsive-breakpoints, 'xs') - 1px)) {
     @content;
   }
 }
 @mixin sm-down {
-  @media (max-width: (map-get($responsive-breakpoints, 'sm') - 1px)) {
+  @media (max-width: (map.get($responsive-breakpoints, 'sm') - 1px)) {
     @content;
   }
 }
 @mixin md-down {
-  @media (max-width: (map-get($responsive-breakpoints, 'md') - 1px)) {
+  @media (max-width: (map.get($responsive-breakpoints, 'md') - 1px)) {
     @content;
   }
 }
 @mixin lg-down {
-  @media (max-width: (map-get($responsive-breakpoints, 'lg') - 1px)) {
+  @media (max-width: (map.get($responsive-breakpoints, 'lg') - 1px)) {
     @content;
   }
 }
 @mixin xl-down {
-  @media (max-width: (map-get($responsive-breakpoints, 'xl') - 1px)) {
+  @media (max-width: (map.get($responsive-breakpoints, 'xl') - 1px)) {
     @content;
   }
 }
 @mixin xxl-down {
-  @media (max-width: (map-get($responsive-breakpoints, 'xxl') - 1px)) {
+  @media (max-width: (map.get($responsive-breakpoints, 'xxl') - 1px)) {
     @content;
   }
 }
 
 /* 
    Legacy Aliases 
-   Fixed: These now properly pass @content to the underlying mixins
 */
 @mixin extra-small {
   @include xs-down {
