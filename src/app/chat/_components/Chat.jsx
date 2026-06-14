@@ -31,25 +31,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import styles from './Chat.module.scss'
 import { encodeFunctionData, bytesToHex } from 'viem'
 import { ContentSpinner } from '@/components/Loading'
-const moment = require('moment')
-moment.defineLocale('en-short', {
-  relativeTime: {
-    future: 'in %s',
-    past: '%s', //'%s ago'
-    s: '1s',
-    ss: '%ds',
-    m: '1m',
-    mm: '%dm',
-    h: '1h',
-    hh: '%dh',
-    d: '1d',
-    dd: '%dd',
-    M: '1mo',
-    MM: '%dmo',
-    y: '1y',
-    yy: '%dy',
-  },
-})
+import { getActiveChain } from '@/lib/communication'
 
 export default function Chat() {
   const [balance, setBalance] = useState()
@@ -140,50 +122,6 @@ export default function Chat() {
       console.log('✅ ECIES test successful: Decrypted message matches original.')
     } else {
       console.error('❌ ECIES test failed: Message mismatch.')
-    }
-  }
-
-  const handleCreatePost = async (e) => {
-    // (chatContract, senderAddress, receiverAddress, plaintext)
-    e.preventDefault()
-
-    const formData = new FormData(e.target)
-    const metadata = ''
-
-    if (!formData.get(`content`).trim()) {
-      console.warn('Message is empty.')
-      return
-    }
-
-    try {
-      console.log('1. Starting encryption and IPFS upload...')
-      //const cidHash = await mockUploadToIpfs(encryptedData)
-
-      /*
-address _receiver,
-bytes32 _cidHash,
-bytes memory _senderEncryptedKey,
-bytes memory _receiverEncryptedKey
-*/
-
-      writeContract({
-        abi: abiChat,
-        address: activeChain[1].chat,
-        functionName: 'sendMessage',
-        args: ['0x2B47dE780AC1bfFa8b121EE9C21026559499bA36', '0x0', ''],
-      })
-
-      // writeContract({
-      //       abi: abiChat,
-      //       address: activeChain[1].chat,
-      //       functionName: 'registerPublicKey',
-      //       args: [keyPair.publicKeyHex],
-      //     })
-    } catch (error) {
-      console.error('❌ Failed to send private message:', error.message || error)
-      // You might want to handle cleaning up IPFS data here if the transaction failed,
-      // though IPFS data garbage collection (GC) usually handles unpinned content.
-      throw error
     }
   }
 

@@ -6,7 +6,7 @@ import { Heart } from 'lucide-react'
 import useSWR from 'swr'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/BurnerSession'
+import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { CONTRACTS } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -96,7 +96,6 @@ const fetcher = async () => {
     hash,
   })
 
-  // ■■■ Effects ■■■
   useEffect(() => {
     if (isConfirmed) {
       mutate(

@@ -129,7 +129,6 @@ export async function getMaxLength() {
 }
 
 export async function getUserSessions(address) {
-    console.log(`============================================`)
   const { web3, contract } = initHupContract()
 
   try {

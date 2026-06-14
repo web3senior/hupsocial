@@ -8,7 +8,7 @@ import { RefreshCwIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, Chec
 import { ethers } from 'ethers'
 import Balance from '@/app/(user)/[wallet]/_components/balance'
 import { toRelativeTime } from '@/lib/dateHelper'
-import { isSessionActive } from '@/lib/BurnerSession'
+import { isSessionActive } from '@/lib/burnerSession'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
 import { isHexString, Wallet } from 'ethers'
 import styles from './SettingsTab.module.scss'

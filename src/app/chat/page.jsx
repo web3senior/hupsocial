@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { notFound, useRouter } from 'next/navigation'
 import { ConnectWallet } from '@/components/ConnectWallet'
 import { MessageSquareMore, Radio, Settings, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -10,24 +10,24 @@ import styles from './page.module.scss'
 
 export default function Page() {
   const [activeTab, setActiveTab] = useState('chat')
-  // Track if we are still checking the local storage
   const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    const key = localStorage.getItem('encryptedAppKey')
+  // useEffect(() => {
+  //   const key = localStorage.getItem('encryptedAppKey')
 
-    if (!key) {
-      router.push('/')
-    } else {
-      setIsAuthorized(true)
-    }
-  }, [router])
+  //   if (!key) {
+  //     router.push('/')
+  //   } else {
+  //     setIsAuthorized(true)
+  //   }
+  // }, [router])
 
-  // Prevent rendering the UI while redirecting or checking
-  if (!isAuthorized) {
-    return null // or a loading spinner
-  }
+  // // Prevent rendering the UI while redirecting or checking
+  // if (!isAuthorized) {
+  //   return null // or a loading spinner
+  // }
+return notFound()
 
   return (
     <div className={clsx(styles.page)}>
