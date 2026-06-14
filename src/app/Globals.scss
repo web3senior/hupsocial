@@ -17,6 +17,8 @@
   --scrollbarBG: #f4f4f4;
   --thumbBG: var(--gray);
 
+  --fingerprint-border: var(--white, #fff);
+
   accent-color: var(--network-color-text);
   color-scheme: light;
 }
@@ -37,6 +39,8 @@
   --scrollbarBG: #101114;
   --thumbBG: var(--black);
 
+  --fingerprint-border: var(--surface-muted);
+
   accent-color: var(--network-color-text);
   color-scheme: dark;
 }
@@ -54,8 +58,10 @@
   --tag: var(--black-800);
   --shimmer-glint: rgba(163, 255, 173, 0.16);
 
-    --scrollbarBG: #0d1c12;
+  --scrollbarBG: #0d1c12;
   --thumbBG: var(--black);
+
+  --fingerprint-border: var(--surface-muted);
 
   accent-color: #a3ffad;
   color-scheme: dark;
