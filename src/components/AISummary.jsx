@@ -1,96 +1,58 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { getProfile, getUniversalProfile } from '@/lib/api'
+import { useState } from 'react'
 import searchAI from '@/../public/search-ai.svg'
 import loading from '@/../public/loading.svg'
-import { getIPFS } from '@/lib/ipfs'
 import styles from './AISummary.module.scss'
 import { Sparkles } from 'lucide-react'
 import clsx from 'clsx'
-const DEFAULT_USERNAME = 'new-user'
-const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+import { useProfile } from '@/hooks/useProfile'
 
 export default function AISummary({ addr, posts, poaps }) {
-  console.log((posts))
-  // Initialize state hooks for managing component UI data
-  const [profileData, setProfileData] = useState(null)
+  const { profile, isLoading: isProfileLoading } = useProfile(addr)
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
-
-  // Fetcher logic extracted for better testability and SWR compatibility
-  const profileFetcher = async (address) => {
-    if (!address) return null
-
-    try {
-      // Attempt Universal Profile (LUKSO) first
-      const res = await getUniversalProfile(address)
-      if (res?.data?.Profile?.[0]?.isContract) {
-        const p = res.data.Profile[0]
-        return {
-          wallet: res.data.id,
-          name: p.name || DEFAULT_USERNAME,
-          profileImage: p.profileImages?.[0]?.src || DEFAULT_PFP,
-        }
-      }
-
-      // Fallback to local database
-      const localRes = await getProfile(address)
-      if (localRes?.wallet_address) {
-        return {
-          ...localRes,
-          name: localRes.name || DEFAULT_USERNAME,
-          profileImage: localRes.profileImage
-            ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${localRes.profileImage}`
-            : DEFAULT_PFP,
-        }
-      }
-    } catch (e) {
-      console.error('Profile fetch error:', e)
-    }
-
-    return { wallet: address, name: DEFAULT_USERNAME, profileImage: DEFAULT_PFP }
+  // Extract just the human-written text from a post's content, ignoring media/structure
+  const extractPostText = (content) => {
+    if (!content || !Array.isArray(content.elements)) return null
+    return content.elements
+      .filter((el) => el.type === 'text')
+      .map((el) => el.data?.text)
+      .filter(Boolean)
+      .join(' ')
   }
 
-  // Handle the text aggregation and proxy payload delivery to API
   const generateSummary = async () => {
-    if (!profileData || isLoading) return
+    if (!profile || isLoading) return
 
     setIsLoading(true)
     setError(null)
 
     try {
-      // Safely aggregate posts list arrays prior to parallel execution
       const postsList = posts?.list || []
 
-      // Resolve content hashes from storage asynchronously
-      const resolvedPosts = await Promise.all(
-        postsList.map(async (post) => {
-          return post.content
-        }),
-      )
+      const postText = postsList
+        .map((post) => extractPostText(post.content))
+        .filter(Boolean)
+        .join(' | ')
 
-      const postText = resolvedPosts.filter(Boolean).join(' | ')
-
-      // Request insights breakdown from Next endpoint
       const response = await fetch('/api/ai/openai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile: profileData,
+          profile,
           posts: postText,
-          poaps: poaps,
+          poaps,
         }),
       })
 
       const json = await response.json()
-      const responseData = json.json
 
-      if (responseData?.error) throw new Error(responseData.error)
+      if (json?.error) throw new Error(json.error)
 
-      setData(responseData)
+      setData(json)
     } catch (err) {
       console.error('AI Error:', err)
       setError('Could not generate summary.')
@@ -99,14 +61,18 @@ export default function AISummary({ addr, posts, poaps }) {
     }
   }
 
-  // Handle updates to incoming target address configurations
-  useEffect(() => {
-    profileFetcher(addr).then((profileData) => setProfileData(profileData))
-  }, [addr])
+  if (isProfileLoading) {
+    return (
+      <div className={styles.ai}>
+        <div className={`${styles.ai__container} d-f-c flex-column`}>
+          <img src={loading.src} alt="Loading" className={styles.loading} />
+        </div>
+      </div>
+    )
+  }
 
-  if (!profileData) return null
+  if (!profile) return null
 
-  // Safely extract scores to minimize repetitive template code chains
   const scores = data?.scores || {}
 
   return (
@@ -119,13 +85,12 @@ export default function AISummary({ addr, posts, poaps }) {
             </figure>
             <h4 className={styles.title}>AI Profile Insights</h4>
             <p className={`text-center ${styles.subtitle}`}>
-              AI analysis of onchain activity and bio. Tap analyze to reveal this user's Web3
-              personality.
+              AI analysis of onchain activity and bio. Tap analyze to reveal this user's Web3 personality.
             </p>
           </header>
         )}
 
-        {isLoading && <img src={loading.src} alt="Loading Indicators" className={styles.loading} />}
+        {isLoading && <img src={loading.src} alt="Loading Indicator" className={styles.loading} />}
 
         <div className={clsx(styles.content, 'w-100')}>
           {error ? (
