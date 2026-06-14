@@ -28,14 +28,15 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  const targetUrl = event.notification.data?.actionUrl || '/'
+  const appOrigin = self.location.origin
+  const targetUrl = new URL(event.notification.data?.actionUrl || '/', appOrigin).href
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       // 1. Check if the PWA is already open
       for (let client of windowClients) {
-        // Look for your PWA's URL pattern
-        if (client.url.includes(process.env.NEXT_PUBLIC_DOMAIN) && 'focus' in client) {
+        const clientOrigin = new URL(client.url).origin
+        if (clientOrigin === appOrigin && 'focus' in client) {
           // Navigate the existing PWA window to the target URL
           client.postMessage({ type: 'NAVIGATE', url: targetUrl })
           return client.focus()
