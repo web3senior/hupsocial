@@ -30,7 +30,24 @@ self.addEventListener('notificationclick', (event) => {
 
   const targetUrl = event.notification.data?.actionUrl || '/'
 
-  event.waitUntil(clients.openWindow(targetUrl))
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // 1. Check if the PWA is already open
+      for (let client of windowClients) {
+        // Look for your PWA's URL pattern
+        if (client.url.includes(process.env.NEXT_PUBLIC_DOMAIN) && 'focus' in client) {
+          // Navigate the existing PWA window to the target URL
+          client.postMessage({ type: 'NAVIGATE', url: targetUrl })
+          return client.focus()
+        }
+      }
+
+      // 2. If no window is open, open a new one (PWA windows are standalone)
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl)
+      }
+    })
+  )
 })
 
 self.addEventListener('install', (event) => {
