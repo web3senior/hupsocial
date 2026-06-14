@@ -177,7 +177,6 @@ export default function Page() {
     }
   }, [newPostsQueue, handleMergeNewPosts, address, setInitialData])
 
-  // ■■■ RENDER ■■■
   return (
     <>
       <div onClick={handleManualRefresh} className={clsx(styles.page__header)} role="button" tabIndex={0}>

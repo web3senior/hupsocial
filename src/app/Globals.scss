@@ -83,6 +83,7 @@ body {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
+
 .no-scroll {
   overflow: hidden;
 }
@@ -148,6 +149,7 @@ details[open]::details-content {
 //     }
 //   }
 // }
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -172,15 +174,6 @@ body {
   font-size: var(--system-16-font-size);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  // min-height: calc(100svh - 4rem);
-  // display: grid;
-  // grid-template-rows: 400px 1fr;
-  // grid-template-columns: 1fr;
-  // align-items: center;
-  // justify-items: stretch;
-  // gap: 1rem;
-  //background-color: var(--global-background-color);
-
   // cursor: url('./../public/awesome-face.cur') 4 12, auto;
 }
 
@@ -198,10 +191,12 @@ button {
 .pointer {
   cursor: pointer;
 }
+
 .ticker-trigger {
   cursor: help;
   border-bottom: 1px dotted currentColor;
 }
+
 .rounded,
 .rounded-full {
   border-radius: 9999px;
@@ -210,6 +205,15 @@ button {
 .debug {
   border: 1px solid red;
 }
+
+.relative {
+  position: relative;
+}
+
+.d-block {
+  display: block;
+}
+
 // .motion-slideDownIn{
 // animation: .1s cubic-bezier(.1, .9, .2, 1) both ms-motion-slideDownIn, .1s cubic-bezier(0, 0, 1, 1) both ms-motion-fadeIn;
 // }
@@ -249,17 +253,3 @@ button {
 //    // transform: translateY(0);
 //   }
 // }
-
-.relative {
-  position: relative;
-}
-
-.d-block {
-  display: block;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-}
