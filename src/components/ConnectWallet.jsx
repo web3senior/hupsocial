@@ -95,7 +95,6 @@ export function WalletOptions() {
   ))
 }
 
-
 export function DefaultNetwork({ currentNetwork }) {
   const { isConnected } = useAccount()
   const switchChain = useSwitchChain({ config })
@@ -110,6 +109,7 @@ export function DefaultNetwork({ currentNetwork }) {
         {
           onSuccess: () => {
             localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
+            window.location.reload()
           },
           onError: (error) => {
             console.error('Switch chain failed:', error)
