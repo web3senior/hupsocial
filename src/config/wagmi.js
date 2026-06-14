@@ -5,8 +5,8 @@ import {
   sepolia,
   base,
   monad,
+  bsc,
   monadTestnet,
-  opBNBTestnet,
   arbitrumSepolia,
   somniaTestnet,
   unichainSepolia,
@@ -47,13 +47,19 @@ export const CONTRACTS = {
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
   },
+  chain56: {
+    // bnb
+    forwarder: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
+    status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
+  },
   chain10143: {
     // Monad Testnet
     forwarder: '0x7C71e48C3916EdBBeFB84918A48e0b26FecC5D9c',
     hup: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
     status: '',
     community: '0x021Ee55BaA5058A38A4BF3AAbd90f5c1b31068CD',
-    nft: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F'// GenesisHup
+    nft: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F', // GenesisHup
   },
 }
 
@@ -115,9 +121,9 @@ somniaTestnet.primaryColor = `#000`
 somniaTestnet.textColor = `#F50947`
 
 // BNB
-opBNBTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10769_2638)"> <path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10769_2638)"/> <path d="M5.93 4.84L9 3L12.07 4.84L10.94 5.52L9 4.36L7.06 5.52L5.93 4.84ZM12.07 7.16L10.94 6.48L9 7.64L7.06 6.48L5.93 7.16V8.5L7.87 9.66V12L9 12.68L10.13 12V9.67L12.07 8.51V7.16ZM12.07 10.83V9.47L10.94 10.15V11.51L12.07 10.83ZM12.87 11.31L10.93 12.47V13.83L14 11.99V8.32L12.87 8.99V11.31ZM11.74 6L12.87 6.68V8.03L14 7.36V6L12.87 5.32L11.74 6ZM7.87 12.96V14.32L9 15L10.13 14.32V12.96L9 13.64L7.87 12.96ZM5.93 10.83L7.06 11.51V10.15L5.93 9.47V10.83ZM7.87 6L9 6.68L10.13 6L9 5.32L7.87 6ZM5.13 6.68L6.26 6L5.13 5.32L4 6V7.36L5.13 8.03V6.68ZM5.13 8.99L4 8.32V11.99L7.07 13.83V12.47L5.13 11.31V9V8.99Z" fill="#F0B90B"/> </g> <defs> <linearGradient id="paint0_linear_10769_2638" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"> <stop stop-color="#1A1E21"/> <stop offset="1" stop-color="#06060A"/> </linearGradient> <clipPath id="clip0_10769_2638"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
-opBNBTestnet.primaryColor = `#F0B90B`
-opBNBTestnet.textColor = `#fff`
+bsc.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10769_2638)"> <path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10769_2638)"/> <path d="M5.93 4.84L9 3L12.07 4.84L10.94 5.52L9 4.36L7.06 5.52L5.93 4.84ZM12.07 7.16L10.94 6.48L9 7.64L7.06 6.48L5.93 7.16V8.5L7.87 9.66V12L9 12.68L10.13 12V9.67L12.07 8.51V7.16ZM12.07 10.83V9.47L10.94 10.15V11.51L12.07 10.83ZM12.87 11.31L10.93 12.47V13.83L14 11.99V8.32L12.87 8.99V11.31ZM11.74 6L12.87 6.68V8.03L14 7.36V6L12.87 5.32L11.74 6ZM7.87 12.96V14.32L9 15L10.13 14.32V12.96L9 13.64L7.87 12.96ZM5.93 10.83L7.06 11.51V10.15L5.93 9.47V10.83ZM7.87 6L9 6.68L10.13 6L9 5.32L7.87 6ZM5.13 6.68L6.26 6L5.13 5.32L4 6V7.36L5.13 8.03V6.68ZM5.13 8.99L4 8.32V11.99L7.07 13.83V12.47L5.13 11.31V9V8.99Z" fill="#F0B90B"/> </g> <defs> <linearGradient id="paint0_linear_10769_2638" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"> <stop stop-color="#1A1E21"/> <stop offset="1" stop-color="#06060A"/> </linearGradient> <clipPath id="clip0_10769_2638"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
+bsc.primaryColor = `#F0B90B`
+bsc.textColor = `#fff`
 
 // Sepolia
 sepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10996_4352)"><path d="M18 0H0V18H18V0Z" fill="#627EEA"/><mask id="mask0_10996_4352" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="1" width="16" height="16"><path d="M16.5 1.5H1.5V16.5H16.5V1.5Z" fill="white"/></mask><g mask="url(#mask0_10996_4352)"><path d="M9 16.5C13.1421 16.5 16.5 13.1421 16.5 9C16.5 4.85787 13.1421 1.5 9 1.5C4.85787 1.5 1.5 4.85787 1.5 9C1.5 13.1421 4.85787 16.5 9 16.5Z" fill="#627EEA"/><path d="M9.2334 3.375V7.5328L12.7476 9.1031L9.2334 3.375Z" fill="white" fill-opacity="0.602"/><path d="M9.23345 3.375L5.71875 9.1031L9.23345 7.5328V3.375Z" fill="white"/><path d="M9.2334 11.7978V14.623L12.7499 9.75781L9.2334 11.7978Z" fill="white" fill-opacity="0.602"/><path d="M9.23345 14.623V11.7974L5.71875 9.75781L9.23345 14.623Z" fill="white"/><path d="M9.2334 11.1431L12.7476 9.10255L9.2334 7.5332V11.1431Z" fill="white" fill-opacity="0.2"/><path d="M5.71875 9.10255L9.23345 11.1431V7.5332L5.71875 9.10255Z" fill="white" fill-opacity="0.602"/></g></g><defs><clipPath id="clip0_10996_4352"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
@@ -128,15 +134,15 @@ sepolia.textColor = `#fff`
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [lukso, celo, base, monad, monadTestnet], //somniaTestnet, opBNBTestnet
+  chains: [lukso, celo, base, monad, bsc, monadTestnet], //somniaTestnet
   connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
   transports: {
     [lukso.id]: http(),
     [celo.id]: http(),
     [base.id]: http(),
     [monad.id]: http(),
+    [bsc.id]: http(),
     [monadTestnet.id]: http(),
-    // [somniaTestnet.id]: http(),
   },
   ssr: true,
   // storage: createStorage({
@@ -164,5 +170,3 @@ export const getNetworkColor = () => {
   const secondaryColor = rootElement.style.getPropertyValue(`--network-color-text`)
   return { primaryColor, secondaryColor }
 }
-
-console.log(config)
