@@ -75,7 +75,7 @@ export default function AISummary({ addr, posts, poaps }) {
       const postText = resolvedPosts.filter(Boolean).join(' | ')
 
       // Request insights breakdown from Next endpoint
-      const response = await fetch('/api/ai/token-route', {
+      const response = await fetch('/api/ai/openai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
