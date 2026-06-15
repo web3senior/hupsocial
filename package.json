@@ -11,7 +11,8 @@
     "dev:webpack": "next dev --webpack",
     "build:webpack": "next build --webpack",
     "ngrok": "ngrok http 3000",
-    "clean:cache": "rm -rf .next"
+    "clean:cache": "rm -rf .next",
+    "init:env": "copy .env.example .env"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.8",
