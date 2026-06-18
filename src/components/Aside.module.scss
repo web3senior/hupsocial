@@ -267,8 +267,8 @@
   }
 }
 
-[data-theme='dark'] .logoWrapper img,
-[data-theme='terminal'] .logoWrapper img {
+[data-theme='dark'] .logoWrapper img:first-child,
+[data-theme='terminal'] .logoWrapper img:first-child {
   filter: invert(1);
 }
 
