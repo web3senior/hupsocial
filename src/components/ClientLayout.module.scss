@@ -23,12 +23,11 @@
   // grid-column: 1/1;
   height: 100%;
   // gap: 1rem;
-  padding: 0 5rem;
+  // padding: 0 5rem;
   min-height: 100svh;
 
-
   @media (max-width: 640px) {
-      padding: 0;
+    padding: 0;
   }
 
   // --pattern-fg: color-mix(in oklab, var(--grey-90-a50) 5%, transparent);

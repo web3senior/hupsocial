@@ -1,6 +1,5 @@
 'use client'
 
-// ■■■ Core Imports ■■■
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -30,8 +29,8 @@ import {
   Plus,
 } from 'lucide-react'
 
-// ■■■ Local Utilities & State ■■■
 import logo from '@/../public/logo.svg'
+import socerBall from '@/../public/socer-ball.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -66,7 +65,6 @@ const normalizeNavItem = (item) => {
   }
 }
 
-// ■■■ Child Component: NavLink ■■■
 const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
@@ -131,7 +129,6 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
   )
 }
 
-// ■■■ Primary Component: Aside ■■■
 export default function Aside() {
   const pathname = usePathname()
   const { address, isConnected } = useConnection()
@@ -222,6 +219,7 @@ export default function Aside() {
           <div className={styles.logoWrapper}>
             <Link href="/" className="flex align-items-center gap-025" aria-label="Home">
               <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
+              <Image src={socerBall} alt="World Cup" className={styles.logoWrapper__ball} />
               {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
             </Link>
           </div>
@@ -395,7 +393,6 @@ export default function Aside() {
         </div>
       </div>
 
-      {/* ■■■ Floating Global Actions Layout ■■■ */}
       {batchCount > 0 && (
         <Link href="/batch-like" className={clsx(styles.batchButton)} aria-label={`View batch queue with ${batchCount} operations`}>
           <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
@@ -403,9 +400,11 @@ export default function Aside() {
         </Link>
       )}
 
-      <button className={clsx(styles.newButton)} onClick={() => setIsComponentOpen(true)} aria-label="Create new post">
-        <Plus />
-      </button>
+      {pathname !== '/chat' && (
+        <button className={clsx(styles.newButton)} onClick={() => setIsComponentOpen(true)} aria-label="Create new post">
+          <Plus />
+        </button>
+      )}
     </aside>
   )
 }
