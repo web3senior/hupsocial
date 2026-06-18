@@ -4,7 +4,7 @@ import { useState, useEffect, useId, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
 import { initHupContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
-import { getPostById } from '@/lib/api'
+import { getPostById, recordPostView } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -87,6 +87,10 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
   // Retrieve the latest comment metadata for the active post context
   useEffect(() => {
+
+    // View post 
+    recordPostView(item.network_id, item.id, address)
+
     let cancelled = false
 
     if (!commentTarget?.id || !commentTarget?.network_id || Number(commentTarget?.total_comments || 0) < 1) {
