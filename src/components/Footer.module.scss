@@ -83,11 +83,12 @@
 
   // Trigger the zoom expansion on hover or keyboard focus
   // &:focus-visible::before
-  &:hover::before {
-    opacity: 1;
-    transform: scale(1);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover::before {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
-
   // Soft tap shrink for mobile responsiveness
   &:active {
     transform: scale(0.95);
