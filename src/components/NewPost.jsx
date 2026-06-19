@@ -483,7 +483,7 @@ export default function NewPost({
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} multiple={false} />
 
-        <div className={clsx(styles.composer, 'flex flex-column align-items-start', 'gap-1')}>
+        <div className={styles.composer}>
           <Profile variant="full" creator={address} />
 
           <div className={styles.composerBody}>

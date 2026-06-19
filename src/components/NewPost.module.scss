@@ -91,8 +91,9 @@
 }
 
 .composer {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
+  /* Fix: Removed grid to allow full profile metadata to sit above the textarea */
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   padding: 32px 36px 0;
   
@@ -105,8 +106,6 @@
 .fileInput {
   display: none;
 }
-
-
 
 .avatarColumn {
   display: flex;
@@ -382,37 +381,6 @@
   }
 }
 
-.postButton {
-  min-width: 94px;
-  height: 54px;
-  padding: 0 24px;
-  color: var(--black);
-  background: var(--white);
-  border: 1px solid var(--gray-300);
-  border-radius: 16px;
-  cursor: pointer;
-  font-size: 1.15rem;
-  font-weight: 700;
-  transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    transform 0.18s ease;
-
-  &:hover:not(:disabled) {
-    background: var(--gray-100);
-    border-color: var(--gray-400);
-  }
-
-  &:active:not(:disabled) {
-    transform: scale(0.96);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-}
-
 @media (max-width: 640px) {
   .newPost {
     width: calc(100vw - 20px);
@@ -434,7 +402,9 @@
   }
 
   .composer {
-    grid-template-columns: 42px minmax(0, 1fr);
+    /* Fix: Keep mobile layout as a flex column too */
+    display: flex;
+    flex-direction: column;
     gap: 12px;
     padding: 22px 18px 0;
   }

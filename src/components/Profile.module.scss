@@ -6,7 +6,8 @@
 
 .profile {
   cursor: pointer;
-  width: 100%;
+  width: max-content; /* Let it size to its contents naturally */
+  flex-shrink: 0;     /* Prevent the compose input from squishing this block */
   gap: 0.7rem;
 
   code {
