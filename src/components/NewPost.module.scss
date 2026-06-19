@@ -22,7 +22,7 @@
   }
 
   textarea {
-    color: var(--color) !important;
+    color: inherit;
   }
 }
 
@@ -230,7 +230,28 @@
     &:active {
       transform: scale(0.94);
     }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+      transform: none;
+    }
   }
+}
+
+.composerMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  color: var(--gray-500);
+  font-size: 0.8rem;
+}
+
+.metaDanger {
+  color: #cb2e2e;
+  font-weight: 700;
 }
 
 .mediaGrid {
@@ -431,6 +452,11 @@
 
   .toolbar {
     gap: 8px;
+  }
+
+  .mediaItem figcaption {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .footer {

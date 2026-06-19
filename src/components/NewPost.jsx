@@ -1,16 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import {
   Bold,
-  FileText,
   Image as ImageIcon,
   Italic,
-  List,
   MapPin,
-  MoreHorizontal,
-  Smile,
   SlidersHorizontal,
   SquarePlay,
   Trash2,
@@ -29,6 +25,7 @@ import { resolveIPFSUrl } from '@/lib/storageHelper'
 
 const MAX_MEDIA_ITEMS = 4
 const MAX_MEDIA_SIZE_MB = 5
+const MAX_POST_LENGTH = 5000
 
 // ■■■ [Utility Helpers] ■■■
 
@@ -38,14 +35,6 @@ const normalizePrefillValue = (value) => {
   }
 
   return typeof value === 'string' ? value : ''
-}
-
-const getInitialPostText = (text, url, actionType, existingPost) => {
-  if (actionType === 'edit' && existingPost) {
-    console.log('Prefilling edit post with existing content:', existingPost)
-    return existingPost.content?.elements?.[0]?.data?.text || ''
-  }
-  return [normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n')
 }
 
 const createPostContent = (text = '', mediaItems = []) => ({
@@ -92,10 +81,7 @@ const getInitialPostContent = (text, url, actionType, existingPost) => {
   return createPostContent([normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n'))
 }
 
-const getMediaPreviewSrc = (item) => {
-  console.log(item)
-  return resolveIPFSUrl(item.cid)
-}
+const getMediaPreviewSrc = (item) => item.localUrl || resolveIPFSUrl(item.cid)
 
 const getSerializablePostContent = (content) => ({
   ...content,
@@ -112,11 +98,6 @@ const getSerializablePostContent = (content) => ({
   }),
 })
 
-const getShortAddress = (address) => {
-  if (!address) return ''
-  return `${address.slice(0, 6)}...${address.slice(-4)}`
-}
-
 // ■■■ [Main Component] ■■■
 
 export default function NewPost({
@@ -124,9 +105,6 @@ export default function NewPost({
   url = '',
   close,
   onClose,
-  displayName,
-  avatarSrc,
-  communityLabel = 'Community or topic',
   existingPost = null,
   actionType = 'post',
 }) {
@@ -144,6 +122,7 @@ export default function NewPost({
   const [selectedMediaType, setSelectedMediaType] = useState(null)
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
+  const mediaItemsRef = useRef([])
 
   const { address, isConnected } = useConnection()
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
@@ -152,8 +131,8 @@ export default function NewPost({
   const postText = postContent.elements[0].data.text
   const mediaItems = postContent.elements[1].data.items
   const isBusy = isSigning || isConfirming || isUploading
-  const resolvedDisplayName = displayName || getShortAddress(address) || 'Guest'
-  const avatarInitial = resolvedDisplayName.slice(0, 1).toUpperCase()
+  const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0
+  const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
   // ■■■ [Auto-expanding Textarea Height Calculation] ■■■
   useEffect(() => {
@@ -164,10 +143,14 @@ export default function NewPost({
     textarea.style.height = `${textarea.scrollHeight}px`
   }, [postText])
 
-  const handleClose = (e) => {
-    if (e) e.stopPropagation()
-    onClose?.()
-  }
+  const handleClose = useCallback(
+    (e) => {
+      if (e) e.stopPropagation()
+      close?.()
+      onClose?.()
+    },
+    [close, onClose],
+  )
 
   const updateTextContent = (nextText) => {
     setPostContent((prevContent) => {
@@ -333,7 +316,6 @@ export default function NewPost({
 
     const dimensions = await getMediaDimensions(file, selectedMediaType)
     const cid = await uploadFileToIPFS(file)
-    console.log(cid)
     if (!cid) return
 
     const localUrl = URL.createObjectURL(file)
@@ -421,15 +403,19 @@ export default function NewPost({
       return
     }
 
-    if (!postText.trim()) {
+    if (!hasPostBody) {
       textareaRef.current?.focus()
+      return
+    }
+
+    if (isTextOverLimit) {
+      toast(`Post is too long. Maximum ${MAX_POST_LENGTH} characters`, 'error')
       return
     }
 
     try {
       const resultIPFS = await uploadObjectToIPFS(getSerializablePostContent(postContent))
       const metadata = resultIPFS.cid
-      console.log(metadata)
       if (!metadata) {
         throw new Error('CID not found')
       }
@@ -463,17 +449,20 @@ export default function NewPost({
   }, [submitError])
 
   useEffect(() => {
+    mediaItemsRef.current = mediaItems
+  }, [mediaItems])
+
+  useEffect(() => {
     if (!isConfirmed) return
 
     localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, '')
-    setPostContent(createPostContent(''))
     toast('Your post will appear once the transaction is confirmed.', 'success')
     handleClose()
-  }, [isConfirmed])
+  }, [handleClose, isConfirmed])
 
   useEffect(() => {
     return () => {
-      mediaItems.forEach((item) => {
+      mediaItemsRef.current.forEach((item) => {
         if (item.localUrl) URL.revokeObjectURL(item.localUrl)
       })
     }
@@ -488,7 +477,7 @@ export default function NewPost({
           Cancel
         </button>
 
-        <h2>New post</h2>
+        <h2>{actionType === 'edit' ? 'Edit post' : 'New post'}</h2>
       </header>
 
       <form className={styles.form} onSubmit={handleCreatePost}>
@@ -509,27 +498,30 @@ export default function NewPost({
             />
 
             <div className={styles.toolbar} aria-label="Post tools">
-              <button type="button" onClick={() => triggerFileInput('image')} aria-label="Add image">
+              <button type="button" onClick={() => triggerFileInput('image')} aria-label="Add image" disabled={isBusy}>
                 <ImageIcon size={22} strokeWidth={1.8} />
               </button>
-              <button type="button" onClick={() => triggerFileInput('video')} aria-label="Add video">
+              <button type="button" onClick={() => triggerFileInput('video')} aria-label="Add video" disabled={isBusy}>
                 <SquarePlay size={22} strokeWidth={1.8} />
               </button>
-              <button type="button" aria-label="Add emoji" style={{ display: 'none' }}>
-                <Smile size={22} strokeWidth={1.8} />
-              </button>
-              <button type="button" aria-label="Add poll" style={{ display: 'none' }}>
-                <List size={22} strokeWidth={1.8} />
-              </button>
-              <button type="button" onClick={() => wrapSelection('**')} aria-label="Bold">
+              <button type="button" onClick={() => wrapSelection('**')} aria-label="Bold" disabled={isBusy}>
                 <Bold size={20} strokeWidth={1.8} />
               </button>
-              <button type="button" onClick={() => wrapSelection('*')} aria-label="Italic">
+              <button type="button" onClick={() => wrapSelection('*')} aria-label="Italic" disabled={isBusy}>
                 <Italic size={20} strokeWidth={1.8} />
               </button>
-              <button type="button" aria-label="Add location">
+              <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
                 <MapPin size={22} strokeWidth={1.8} />
               </button>
+            </div>
+
+            <div className={styles.composerMeta}>
+              <span>
+                {mediaItems.length}/{MAX_MEDIA_ITEMS} media
+              </span>
+              <span className={clsx({ [styles.metaDanger]: isTextOverLimit })}>
+                {postText.length}/{MAX_POST_LENGTH}
+              </span>
             </div>
 
             {mediaItems.length > 0 && (
@@ -577,13 +569,14 @@ export default function NewPost({
               className={styles.postOptionsButton}
               onClick={() => setIsOptionsOpen((value) => !value)}
               aria-expanded={isOptionsOpen}
+              aria-controls="new-post-options-panel"
             >
               <SlidersHorizontal size={22} strokeWidth={1.8} />
               <span>Post Options</span>
             </button>
 
             {isOptionsOpen && (
-              <div className={styles.optionsPanel}>
+              <div id="new-post-options-panel" className={styles.optionsPanel}>
                 <label htmlFor="allowComments">Allow comments</label>
                 <select
                   id="allowComments"
@@ -598,7 +591,7 @@ export default function NewPost({
             )}
           </div>
 
-          <button type="submit" className={styles.postButton} disabled={isBusy || postText.trim().length < 1}>
+          <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit}>
             {isConfirming
               ? actionType === 'edit'
                 ? 'Updating...'
