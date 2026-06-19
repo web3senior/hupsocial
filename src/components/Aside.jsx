@@ -393,18 +393,28 @@ export default function Aside() {
         </div>
       </div>
 
-      {batchCount > 0 && (
-        <Link href="/batch-like" className={clsx(styles.batchButton)} aria-label={`View batch queue with ${batchCount} operations`}>
-          <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
-          <span className={styles.floatingBadgeCount}>{batchCount}</span>
-        </Link>
-      )}
-
-      {pathname !== '/chat' && (
-        <button className={clsx(styles.newButton)} onClick={() => setIsComponentOpen(true)} aria-label="Create new post">
-          <Plus />
-        </button>
-      )}
+{pathname !== '/chat' && (
+  <div className={styles.floatingActions}>
+    {batchCount > 0 && (
+      <Link 
+        href="/batch-like" 
+        className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])} 
+        aria-label={`View batch queue with ${batchCount} operations`}
+      >
+        <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
+        <span className={styles.floatingActions__badge}>{batchCount}</span>
+      </Link>
+    )}
+    
+    <button 
+      className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])} 
+      onClick={() => setIsComponentOpen(true)} 
+      aria-label="Create new post"
+    >
+      <Plus />
+    </button>
+  </div>
+)}
     </aside>
   )
 }

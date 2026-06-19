@@ -410,48 +410,98 @@
     background-color: var(--batch-like-color);
   }
 }
-
-.newButton {
-  // Icon scales fluently, but stays between 24px and 32px
-  --icon-size: clamp(24px, 3vw, 32px);
-
+.floatingActions {
   position: fixed;
   bottom: 1rem;
   right: 1rem;
-  // Button scales fluently, but stays between 56px and 70px
-  width: clamp(70px, 9vw, 100px);
-  height: clamp(56px, 8vw, 70px);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--global-border-radius);
-  box-shadow: var(--shadow-md);
-  transition:
-    transform 0.2s ease,
-    bottom 0.2s ease,
-    right 0.2s ease;
+  flex-direction: column;
+  gap: 0.75rem;
   z-index: 100;
+  pointer-events: none; // Prevents container bounding box from blocking feed clicks
 
-  svg {
-    width: var(--icon-size);
-    height: var(--icon-size);
-  }
+  // Element: Shared layout base for all actions
+  &__button {
+    pointer-events: auto; // Re-enables pointer interactions for buttons
+    --icon-size: clamp(24px, 3vw, 32px);
 
-  @media (hover: hover) {
-    &:hover {
-      transform: scale(1.1);
+    width: clamp(70px, 9vw, 100px);
+    height: clamp(56px, 8vw, 70px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    box-shadow: var(--shadow-md);
+    transition: transform 0.2s ease;
+    position: relative;
+
+    svg {
+      width: var(--icon-size);
+      height: var(--icon-size);
+    }
+
+    @media (hover: hover) {
+      &:hover {
+        transform: scale(1.1);
+      }
+    }
+
+    &:active {
+      transform: scale(0.95);
     }
   }
 
-  &:active {
-    transform: scale(0.95);
+  // Modifier: Compose Button specific constraints
+  &__button--new {
+    @include md-down() {
+      display: none;
+    }
   }
 
-  @include md-down() {
-    display: none;
+  // Modifier: Batch Button styling variations if needed
+  &__button--batch {
+    @include md-down() {
+  margin-bottom: 3.5rem;
+    }
   }
+
+  // Element: Overlay Badge
+&__badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    
+    // Layout & Sizing
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    
+    // Branding & Typography
+    background-color: var(--batch-like-color, #facc15); // Falls back to your yellow accent
+    color: var(--background, #000); // High contrast text color
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums; // Prevents layout jitter when numbers change
+    
+    // Borders & Depth
+    border-radius: 9999px; // Smooth pill shape
+    border: 2px solid var(--surface); // Clean visual separation from the button base
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    
+    // Animation touch for when item counts increase
+    animation: badgePop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+}
+
+@keyframes badgePop {
+  0% { transform: scale(0.5); }
+  100% { transform: scale(1); }
 }
 
 .badgeCounter {
@@ -468,44 +518,6 @@
   justify-content: center;
 }
 
-.batchButton {
-  // Icon scales fluently, but stays between 24px and 32px
-  --icon-size: clamp(24px, 3vw, 32px);
-
-  position: fixed;
-  // Combines newButton bottom (1rem) + height clamp + desired spacing gap (0.75rem)
-  bottom: calc(1.75rem + clamp(56px, 8vw, 70px));
-  right: 1rem;
-  width: clamp(70px, 9vw, 100px);
-  height: clamp(56px, 8vw, 70px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--global-border-radius);
-  box-shadow: var(--shadow-md);
-  transition:
-    transform 0.2s ease,
-    bottom 0.2s ease,
-    right 0.2s ease;
-  z-index: 100;
-
-  svg {
-    width: var(--icon-size);
-    height: var(--icon-size);
-  }
-
-  @media (hover: hover) {
-    &:hover {
-      transform: scale(1.1);
-    }
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-}
 
 .floatingBadgeCount {
   position: absolute;
