@@ -19,26 +19,6 @@
   position: relative;
   will-change: transform;
   cursor: pointer;
- // border: 3px solid red;
-
-  &:hover {
-    .imageWrapper__fingerprint {
-      transform: scale(1.1);
-      transition: transform 0.2s ease;
-    }
-  }
-
-  // > img {
-  //   width: 36px;
-  //   height: 36px;
-  //   aspect-ratio: 1/1;
-
-  //   &:first-child {
-  //     border: 1px solid var(--border);
-  //     background: var(--gray-100);
-  //   }
-  // }
-  
 
   &__fingerprint {
     border: 2px solid var(--fingerprint-border);
@@ -47,6 +27,13 @@
     position: absolute;
     bottom: -1px;
     right: -4px;
+    transition: transform 0.2s ease;
+  }
+
+  &:hover {
+    .imageWrapper__fingerprint {
+      transform: scale(1.1);
+    }
   }
 }
 

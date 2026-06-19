@@ -37,9 +37,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 
   const handleUniversalProfile = (e) => {
     e.stopPropagation()
-
     const url = `https://universaleverything.io/${creator}`
-
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
@@ -85,7 +83,9 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
           <div className={styles.nameRow}>
             <b className={styles.name}>{profile.name}</b>
             <img alt="verified" src={blueCheckMarkIcon.src} width={12} height={12} />
-            {chainInfo && <div className={styles.badge} title={chainInfo.name} dangerouslySetInnerHTML={{ __html: chainInfo.icon }} />}
+            {chainInfo && (
+              <div className={styles.badge} title={chainInfo.name} dangerouslySetInnerHTML={{ __html: chainInfo.icon }} />
+            )}
             {profile.source === `universal_profile` && (
               <div className={styles.badge} onClick={handleUniversalProfile}>
                 <img alt={`Universal Profile`} src={UPlogo.src} width={14} height={14} />
