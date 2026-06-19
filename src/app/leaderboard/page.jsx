@@ -169,10 +169,7 @@ export default function LeaderboardPage() {
                     onClick={() => openProfile(leader.wallet_address)}
                   >
                     <RankBadge rank={leader.rank} />
-                    <Profile creator={leader.wallet_address} variant="imageOnly" />
-                    <div className={styles.podiumIdentity}>
-                      <WalletCard address={leader.wallet_address} />
-                    </div>
+                    <Profile creator={leader.wallet_address} variant="fullWithoutTime" />
                     <div className={styles.scoreBlock}>
                       <span>{numberFormatter.format(leader.score)}</span>
                       <small>score</small>
@@ -190,8 +187,8 @@ export default function LeaderboardPage() {
                     onClick={() => openProfile(leader.wallet_address)}
                   >
                     <span className={styles.rankNumber}>{leader.rank}</span>
-                    <Profile creator={leader.wallet_address} variant="imageOnly" />
-                    <WalletCard address={leader.wallet_address} />
+                    <Profile creator={leader.wallet_address} className={styles.avatar} variant="fullWithoutTime" />
+                  
                     <Metric icon={Flame} label="Posts" value={leader.root_posts} />
                     <Metric icon={MessageCircle} label="Comments" value={leader.comments_made} />
                     <Metric icon={Heart} label="Likes" value={leader.likes_received} />
@@ -271,17 +268,17 @@ function formatWallet(wallet = '') {
   if (wallet.length <= 12) return wallet
   return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
 }
+//   <WalletCard address={leader.wallet_address} />
+// function WalletCard({ address }) {
+//   const { profile, isLoading, isError } = useProfile(address)
 
-function WalletCard({ address }) {
-  const { profile, isLoading, isError } = useProfile(address)
-
-  if (isLoading) return <div>Loading account data...</div>
-  if (isError || !profile) return <div>Error loading profile</div>
-{console.log(profile)}
-  return (
-    <div className="wallet-card">
-      <h3>{profile.name}</h3>
-      <small>{formatWallet(profile.wallet)}</small>
-    </div>
-  )
-}
+//   if (isLoading) return <div>Loading account data...</div>
+//   if (isError || !profile) return <div>Error loading profile</div>
+// {console.log(profile)}
+//   return (
+//     <div className="wallet-card">
+//       <h3>{profile.name}</h3>
+//       <small>{formatWallet(profile.wallet)}</small>
+//     </div>
+//   )
+// }
