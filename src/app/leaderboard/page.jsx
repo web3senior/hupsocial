@@ -12,6 +12,12 @@ import { useProfile } from '@/hooks/useProfile'
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
 
+const RANK_ICONS = {
+  1: '/icons/1st.svg',
+  2: '/icons/2nd.svg', // Fixed typo: 2st -> 2nd
+  3: '/icons/3rd.svg', // Fixed typo: 3st -> 3rd
+};
+
 const PERIOD_OPTIONS = [
   { value: 'all', label: 'All time' },
   { value: '30d', label: '30D' },
@@ -234,13 +240,17 @@ function Metric({ icon: Icon, label, value }) {
   )
 }
 
+
+
 function RankBadge({ rank }) {
+  const iconSrc = RANK_ICONS[rank];
+
   return (
     <span className={styles.rankBadge}>
-      {rank <= 3 ? <Medal size={16} /> : null}
-      <span>#{rank}</span>
+      {iconSrc && <img src={iconSrc} alt={`Rank ${rank}`} />}
+      <span className={styles.rankNumber}>#{rank}</span>
     </span>
-  )
+  );
 }
 
 function LeaderboardSkeleton() {
