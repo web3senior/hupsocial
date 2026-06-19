@@ -206,7 +206,7 @@ const handleManualRefresh = useCallback(async () => {
         )}
 
         {/* 2. Skeleton fallback for initial blank state only */}
-        {postsLoaded === 0 && <PostSkeletonGrid count={10} />}
+        {postsLoaded === 0 && <PostSkeletonGrid count={14} />}
 
         {/* 3. Render feed posts */}
         {posts?.list?.map((item, i) => (
