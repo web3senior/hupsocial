@@ -19,6 +19,7 @@
   position: relative;
   will-change: transform;
   cursor: pointer;
+ // border: 3px solid red;
 
   &:hover {
     .imageWrapper__fingerprint {
@@ -27,16 +28,17 @@
     }
   }
 
-  >img {
-    width: 36px;
-    height: 36px;
-    aspect-ratio: 1/1;
+  // > img {
+  //   width: 36px;
+  //   height: 36px;
+  //   aspect-ratio: 1/1;
 
-    &:first-child {
-    border: 1px solid var(--border);
-    background: var(--gray-100);
-    }
-  }
+  //   &:first-child {
+  //     border: 1px solid var(--border);
+  //     background: var(--gray-100);
+  //   }
+  // }
+  
 
   &__fingerprint {
     border: 2px solid var(--fingerprint-border);
