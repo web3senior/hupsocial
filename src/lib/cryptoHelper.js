@@ -1,5 +1,5 @@
 /**
- * Utility for encrypting/decrypting private keys, session caching, 
+ * Utility for encrypting/decrypting private keys, session caching,
  * retrieving the authenticated wallet, and sending transactions.
  * Uses native browser Web Crypto API (AES-GCM 256-bit).
  */
@@ -7,19 +7,16 @@
 import { ethers } from 'ethers'
 
 const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''}burner_key`
-const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
+export const sessionStorageUnlockedKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}unlocked_burner_key`
 
 // Internal helper to derive a cryptographic key from a password and salt
 async function deriveKey(password, salt) {
   const enc = new TextEncoder()
-  const keyMaterial = await window.crypto.subtle.importKey(
-    'raw',
-    enc.encode(password),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits', 'deriveKey']
-  )
-  
+  const keyMaterial = await window.crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, [
+    'deriveBits',
+    'deriveKey',
+  ])
+
   return window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
@@ -30,7 +27,7 @@ async function deriveKey(password, salt) {
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   )
 }
 
@@ -51,7 +48,7 @@ export async function encryptData(plaintext, password) {
         iv: iv,
       },
       aesKey,
-      enc.encode(plaintext)
+      enc.encode(plaintext),
     )
 
     // Combine salt, iv, and ciphertext into a single Uint8Array
@@ -80,7 +77,7 @@ export async function decryptData(encryptedBase64, password) {
     const combined = new Uint8Array(
       atob(encryptedBase64)
         .split('')
-        .map((char) => char.charCodeAt(0))
+        .map((char) => char.charCodeAt(0)),
     )
 
     // Extract salt, iv, and ciphertext segments
@@ -96,7 +93,7 @@ export async function decryptData(encryptedBase64, password) {
         iv: iv,
       },
       aesKey,
-      ciphertext
+      ciphertext,
     )
 
     return dec.decode(decrypted)
@@ -132,7 +129,7 @@ export function isSessionUnlocked() {
 /**
  * Retrieves the authenticated burner wallet instance.
  * Automatically handles caching and legacy plain text formats.
- * 
+ *
  * @param {string|null} password - Optional password. If omitted and key is encrypted, throws 'PASSWORD_REQUIRED'.
  * @returns {ethers.Wallet|null} Wallet instance or null if no key is stored.
  */
@@ -155,12 +152,13 @@ export async function getSessionWallet(password = null) {
   if (!password) {
     throw new Error('PASSWORD_REQUIRED')
   }
-
+console.log(storedKey)
+return
   const decryptedKey = await decryptData(storedKey, password)
-  
+
   // Cache in sessionStorage for fast future lookup
   sessionStorage.setItem(sessionStorageUnlockedKey, decryptedKey)
-  
+
   return new ethers.Wallet(decryptedKey)
 }
 
@@ -175,7 +173,7 @@ export function lockSession() {
 /**
  * Connects the burner wallet to a provider and signs/sends a transaction.
  * Bubbles up 'PASSWORD_REQUIRED' if the wallet needs to be unlocked.
- * 
+ *
  * @param {object} txData - The transaction payload (to, value, data, gasLimit, etc.).
  * @param {ethers.providers.Provider|null} customProvider - Optional custom provider instance.
  * @param {string|null} password - Optional password if decryption is needed.
@@ -184,7 +182,7 @@ export function lockSession() {
 export async function executeBurnerTransaction(txData, customProvider = null, password = null) {
   // 1. Retrieve wallet (will throw 'PASSWORD_REQUIRED' if key is encrypted and no password/cache is available)
   const wallet = await getSessionWallet(password)
-  
+
   if (!wallet) {
     throw new Error('NO_WALLET_FOUND')
   }

@@ -1,7 +1,9 @@
+@use '@/styles/components/responsive' as r;
+
 .chat {
   height: 100svh;
-  grid-column-start: 2;
-  grid-column-end: 4;
+  grid-column-start: 1;
+  grid-column-end: 2;
 
   display: grid;
   grid-template-columns: min(40svw, 300px) 1fr;
@@ -11,12 +13,16 @@
     'aside main'
     'aside main';
 
+  @include r.md-down() {
+    height: calc(100svh - 4rem);
+  }
+
   &__container {
     position: relative;
     top: 0rem;
-    background-color: var(--white, #fff);
+    background-color: var(--background);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
-    border: 1px solid #f7f9f9;
+    border: 1px solid var(--border);
     border-radius: var(--global-border-radius);
     overflow: hidden;
     isolation: isolate;
@@ -42,7 +48,7 @@
 .aside {
   grid-area: aside;
 
-  background-color: var(--white);
+  background-color: var(--background);
 
   &__header {
     padding: 1rem 0.7rem;
@@ -151,6 +157,45 @@
   overflow-x: hidden;
   overflow-y: auto;
   height: 100%;
+}
+
+.add-contact {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem 0;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
+    background: var(--background);
+    color: var(--text-primary);
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+  }
+
+  button {
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-primary);
+    color: var(--white);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+  }
+
+  &__error {
+    color: #d12b2b;
+    font-size: 0.75rem;
+    margin: 0.35rem 0.7rem 0;
+  }
 }
 .conversation-item {
   width: 100%;
@@ -265,7 +310,7 @@
   grid-area: main;
   padding-bottom: 60px;
   position: relative;
-  background-color: var(--white);
+  background-color: var(--background);
 }
 
 .chatHistory {
@@ -274,9 +319,9 @@
   overflow-x: hidden;
   overflow-y: auto;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column; /* Changed from column-reverse */
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end; /* Keeps initial short messages pinned at the bottom */
   row-gap: 0.5rem;
   padding: 1rem;
 
@@ -359,7 +404,7 @@
 
   &__title {
     padding: 1rem;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 11px solid red;
   }
 
   &__container {
@@ -375,11 +420,11 @@
   align-items: center;
   padding: 1rem;
   border: none;
-  background: transparent;
+  background: var(--surface-muted);
   cursor: pointer;
 
   &--active {
-    background: #f0f7ff;
+    background: var(--surface-muted);
     border-left: 4px solid #0070f3;
   }
 

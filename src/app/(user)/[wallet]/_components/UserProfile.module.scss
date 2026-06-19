@@ -1,4 +1,4 @@
-@import '@/styles/components/responsive';
+@use '@/styles/components/responsive';
 
 .page {
   --tag-bg: var(--gray-200);
@@ -61,14 +61,11 @@
   user-select: none;
   cursor: pointer;
 
-  @include md-up {
+  @include responsive.md-up {
     &:after {
       content: 'Universal Profile';
       padding-right: 4px;
     }
-  }
-  @include md-down{
-
   }
 }
 

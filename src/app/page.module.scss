@@ -1,4 +1,5 @@
-@import '@/styles/components/responsive';
+// 1. Changed @import to @use
+@use '@/styles/components/responsive' as resp;
 
 .page {
   --gray-rgb: 0, 0, 0;
@@ -6,6 +7,7 @@
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
+  padding-bottom: 4rem;
 
   &__container {
     position: relative;
@@ -14,7 +16,8 @@
     border-radius: var(--page-border-radius);
     overflow: hidden;
 
-    @include sm-down {
+    // 2. Prefixed mixin with namespace
+    @include resp.sm-down {
       border: none;
       border-radius: unset;
     }
@@ -23,36 +26,18 @@
   hr {
     border: none;
     border-top: 0.5px solid var(--border);
-    opacity: 0.6; // Softens it further to look thinner
+    opacity: 0.6;
   }
 }
 
 .tab {
   position: relative;
   margin: 0 4em;
-  @include sm-down {
+
+  // 2. Prefixed mixin with namespace
+  @include resp.sm-down {
     margin: 0;
   }
-
-  // &:after {
-  //   right: 0;
-  //   background: linear-gradient(to right, transparent 10%, var(--gray-50));
-  // }
-
-  // &:before {
-  //   left: 0;
-  //   background: linear-gradient(to left, transparent 10%, var(--gray-50));
-  // }
-
-  // &:before,
-  // &:after {
-  //   content: '';
-  //   position: absolute;
-  //   top: 0;
-  //   height: 80%;
-  //   width: 20px;
-  //   z-index: 1;
-  // }
 
   &__container {
     display: flex;
@@ -160,21 +145,6 @@
     }
 
     &__main {
-      // figure {
-      //   border: 1px solid var(--gray-100);
-      //   background-color: var(--gray-50);
-      //   margin: 0 auto;
-
-      //   --r: 8rem;
-      //   width: var(--r);
-      //   height: var(--r);
-      //   img {
-      //     width: inherit;
-      //     height: inherit;
-      //     border-radius: inherit;
-      //     aspect-ratio: 1/1;
-      //   }
-      // }
     }
   }
 
@@ -205,6 +175,7 @@
       padding-left: 2.8rem;
       background-color: var(--white);
       margin-top: 1rem;
+
       &:focus {
         outline: none;
       }
@@ -250,11 +221,6 @@
       place-items: stretch;
     }
 
-    // background-image: url('/hup.svg');
-    // background-position: 97% 95%;
-    // background-repeat: no-repeat;
-    // background-size: 2rem;
-
     &__header {
       width: fit-content;
       user-select: none;
@@ -283,7 +249,6 @@
   margin: 0 auto;
   position: relative;
   top: 0.5rem;
-
   color: var(--white, #fff);
   background-color: var(--color-primary);
   font-weight: 500;
@@ -301,6 +266,7 @@
     transform: scale(0.95);
   }
 }
+
 .pageShimmer {
   padding: 1.7rem 1.7rem 0 1.7rem;
 }
@@ -324,6 +290,7 @@
   &__pfp {
   }
 }
+
 .badge {
   width: 18px;
   height: 18px;
@@ -335,7 +302,6 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-// <Sparkles className={`${styles.sparkles}`} color={`#ff00ff`}/>
 .sparkles {
   position: absolute;
   inset: 0;
@@ -365,6 +331,7 @@
 
 @media (max-width: 600px) {
 }
+
 .page__header {
   cursor: pointer;
   transition: opacity 0.2s ease;
@@ -390,7 +357,8 @@
   cursor: pointer;
   background-color: var(--surface);
 
-  @include small-up {
+  // 2. Prefixed mixin with namespace
+  @include resp.small-up {
     border-radius: 1000px;
     margin-bottom: 4px;
   }

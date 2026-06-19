@@ -14,7 +14,7 @@ const PageTitle = ({ name = '', changeDocumentTitle = true }) => {
 
     const siteName = process.env.NEXT_PUBLIC_NAME
     document.title = `${siteName} | ${name}`
-    
+
     // Optional: Cleanup function to reset title when component unmounts
     return () => {
       document.title = siteName

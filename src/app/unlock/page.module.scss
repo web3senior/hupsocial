@@ -1,0 +1,165 @@
+.page {
+  height: inherit;
+  
+  &__container {
+    position: relative;
+    padding: 4rem 0;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--global-border-radius);
+    isolation: isolate;
+
+    @media (max-width: 600px) {
+      box-shadow: unset;
+      border-radius: unset;
+      border: unset;
+      padding: unset;
+    }
+  }
+
+  button,
+  label,
+  input[type='checkbox'] {
+    cursor: pointer;
+    outline: none;
+  }
+
+  input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+  }
+
+  a {
+    color: var(--blue-light-500);
+  }
+}
+
+.languageContainer {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  color: var(--gray-600);
+  cursor: help;
+  padding: 0.4rem;
+  border-radius: 1000px;
+  will-change: transform;
+  transition: transform 0.2s ease;
+  user-select: none;
+
+  &:hover {
+    transform: scale(1.025);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.actionButton {
+  width: 100%;
+  max-width: 300px;
+  font-weight: 500;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--global-border-radius);
+  will-change: transform;
+  transition: transform 0.2s ease;
+  user-select: none;
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.createButton {
+  margin-top: 1rem;
+  color: var(--white, #fff);
+  background: var(--color-primary);
+}
+
+.importButton {
+  margin-top: 0.5rem;
+  color: var(--color-primary);
+  background: var(--white);
+  border: 1px solid var(--color-primary);
+}
+
+.tour {
+  svg {
+    width: 128px;
+    height: 128px;
+    path {
+      fill: var(--color-primary);
+    }
+  }
+
+  &__title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  &__description {
+    text-align: center;
+    max-width: 400px;
+    text-wrap: balance;
+    color: var(--gray-600);
+  }
+
+  &__category {
+    margin-top: 0.25rem;
+    text-align: center;
+    color: var(--color-primary);
+  }
+}
+
+.pagination {
+  margin-top: 20px;
+
+  span {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 1000px;
+    background-color: var(--gray-100);
+    transition: all ease-in-out 0.25s;
+
+    &.active {
+      width: 24px;
+      background-color: var(--gray-300);
+    }
+  }
+}
+
+.tourButton {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 48px;
+  width: 48px;
+  background-color: var(--gray-100);
+  border-radius: 1000px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  will-change: transform;
+  transition: transform 0.2s ease;
+
+  &:active {
+    transform: translateY(-50%) scale(0.94);
+  }
+}
+
+.nextButton {
+  right: 2rem;
+}
+
+.preveiuosButton {
+  left: 2rem;
+}

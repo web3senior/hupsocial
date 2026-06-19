@@ -19,6 +19,8 @@
 
   --fingerprint-border: var(--white, #fff);
 
+--footer-link-color: var(--gray-400);
+
   accent-color: var(--network-color-text);
   color-scheme: light;
 }
@@ -41,6 +43,8 @@
 
   --fingerprint-border: var(--surface-muted);
 
+  --footer-link-color: #a1a1aa;
+
   accent-color: var(--network-color-text);
   color-scheme: dark;
 }
@@ -62,6 +66,8 @@
   --thumbBG: var(--black);
 
   --fingerprint-border: var(--surface-muted);
+
+    --footer-link-color: #6ee77d;
 
   accent-color: #a3ffad;
   color-scheme: dark;

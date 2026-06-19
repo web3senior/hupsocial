@@ -8,16 +8,11 @@ import { RefreshCwIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, Chec
 import { ethers } from 'ethers'
 import Balance from '@/app/(user)/[wallet]/_components/balance'
 import { toRelativeTime } from '@/lib/dateHelper'
-import { isSessionActive } from '@/lib/burnerSession'
+import { isSessionActive, localStorageBurnerAddress,localStorageBurnerKey, localStorageBatchLikeKey, sessionStorageUnlockedKey} from '@/lib/burnerSession'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
 import { isHexString, Wallet } from 'ethers'
 import styles from './InAppWallet.module.scss'
 import clsx from 'clsx'
-
-const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
-const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
-const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
-const sessionStorageUnlockedKey = `hup_unlocked_burner_key`
 
 export default function InAppWallet() {
   // Establish state to track whether the switch is turned on or off

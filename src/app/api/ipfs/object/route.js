@@ -45,8 +45,9 @@ export async function POST(request) {
 
     const cid = `ipfs://${rawCID}`
 
-    const url = `${process.env.NEXT_PUBLIC_GATEWAY_URL}${cid}`
+    const url = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${cid}`
     console.log(`JSON object uploaded successfully. CID: ${cid}`)
+
     return NextResponse.json({ url, cid }, { status: 200 })
   } catch (e) {
     console.error('Pinata JSON upload error:', e)

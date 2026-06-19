@@ -238,7 +238,12 @@
     height: 22px;
 
     animation: spin-and-zoom 3s ease-in-out 1;
+
+     &:hover {
+    animation: spin-and-zoom 3s ease-in-out 1;
+    }
   }
+ 
   // &:hover {
   //   transform: scale(1.03);
   // }

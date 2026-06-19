@@ -27,40 +27,10 @@ export default function Page() {
   // if (!isAuthorized) {
   //   return null // or a loading spinner
   // }
-return notFound()
 
   return (
     <div className={clsx(styles.page)}>
-      <nav className={clsx(styles.nav)}>
-        <ul className={clsx(styles['nav__list'])}>
-          <li title={`Chat`}>
-            <button onClick={() => setActiveTab(`chat`)} className={clsx('rounded-full', styles['nav__item'], activeTab === 'chat' && styles['nav__item--active'])}>
-              <MessageSquareMore width={21} height={21} strokeWidth={1.75} />
-            </button>
-          </li>
-          <li title={`Communities`}>
-            <button onClick={() => setActiveTab(`communities`)} className={clsx('rounded-full', styles['nav__item'], styles['nav__item--disabled'])}>
-              <Users width={21} height={21} strokeWidth={1.75} />
-            </button>
-          </li>
-          <li title={`Channels`}>
-            <button onClick={() => setActiveTab(`channels`)} className={clsx('rounded-full', styles['nav__item'], styles['nav__item--disabled'])}>
-              <Radio width={21} height={21} strokeWidth={1.75} />
-            </button>
-          </li>
-        </ul>
 
-        <ul className={clsx(styles['nav__list'])}>
-          <li>
-            <button onClick={() => setActiveTab(`settings`)} className={clsx('rounded-full', styles['nav__item'], activeTab === 'settings' && styles['nav__item--active'])}>
-              <Settings width={21} height={21} strokeWidth={1.75} />
-            </button>
-          </li>
-          <li>
-            <ConnectWallet />
-          </li>
-        </ul>
-      </nav>
 
       {activeTab === 'chat' && <Chat />}
       {activeTab === 'communities' && <NoData name={`Communities`} />}
