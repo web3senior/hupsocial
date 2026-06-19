@@ -37,10 +37,22 @@ import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
 import { Download } from 'lucide-react'
+import { Settings2 } from 'lucide-react'
+import { Cpu } from 'lucide-react'
+import { CodeXml } from 'lucide-react'
+import { Terminal } from 'lucide-react'
+import { TerminalSquare } from 'lucide-react'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
 }
+
+const themeOptions = [
+  { id: 'system', icon: <Settings2 size={16} /> },
+  { id: 'dark', icon: <Moon size={16} /> },
+  { id: 'light', icon: <Sun size={16} /> },
+  { id: 'terminal', icon: <TerminalSquare size={16} /> },
+]
 
 const isActivePath = (pathname, path) => {
   if (!pathname || !path) return false
@@ -296,29 +308,27 @@ export default function Aside() {
                   </li>
                   <li>
                     <div className={styles.themeWrapper}>
-                      <div className="flex align-items-center gap-050">
-                        <Palette size={16} />
-                        <span>Theme</span>
-                      </div>
-                      <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '60px' }}>
-                        <button type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
-                          <Sun size={16} />
-                          <span>Light</span>
-                        </button>
-                        <button type="button" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>
-                          <Moon size={16} />
-                          <span>Dark</span>
-                        </button>
-                        <button type="button" aria-pressed={theme === 'terminal'} onClick={() => setTheme('terminal')}>
-                          <SquareTerminal size={16} />
-                          <span>Terminal</span>
-                        </button>
-                        <button type="button" aria-pressed={theme === 'system'} onClick={() => setTheme('system')}>
-                          <Monitor size={16} />
-                          <span>System</span>
-                        </button>
-                      </div>
+
+             
+                    <div className="flex align-items-center gap-050">
+                      <Palette size={16} />
+                      <span>Theme</span>
                     </div>
+                    <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
+                      {themeOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={theme === option.id}
+                          onClick={() => setTheme(option.id)}
+                          className={clsx(theme === option.id && styles.active)}
+                        >
+                          {console.log('Current Theme:', theme, 'Option ID:', option.id)}
+                          {option.icon}
+                        </button>
+                      ))}
+                    </div>
+                           </div>
                   </li>
                   <li>
                     <a
@@ -393,28 +403,28 @@ export default function Aside() {
         </div>
       </div>
 
-{pathname !== '/chat' && (
-  <div className={styles.floatingActions}>
-    {batchCount > 0 && (
-      <Link 
-        href="/batch-like" 
-        className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])} 
-        aria-label={`View batch queue with ${batchCount} operations`}
-      >
-        <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
-        <span className={styles.floatingActions__badge}>{batchCount}</span>
-      </Link>
-    )}
-    
-    <button 
-      className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])} 
-      onClick={() => setIsComponentOpen(true)} 
-      aria-label="Create new post"
-    >
-      <Plus />
-    </button>
-  </div>
-)}
+      {pathname !== '/chat' && (
+        <div className={styles.floatingActions}>
+          {batchCount > 0 && (
+            <Link
+              href="/batch-like"
+              className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])}
+              aria-label={`View batch queue with ${batchCount} operations`}
+            >
+              <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
+              <span className={styles.floatingActions__badge}>{batchCount}</span>
+            </Link>
+          )}
+
+          <button
+            className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
+            onClick={() => setIsComponentOpen(true)}
+            aria-label="Create new post"
+          >
+            <Plus />
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

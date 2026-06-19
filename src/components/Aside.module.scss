@@ -239,11 +239,11 @@
 
     animation: spin-and-zoom 3s ease-in-out 1;
 
-     &:hover {
-    animation: spin-and-zoom 3s ease-in-out 1;
+    &:hover {
+      animation: spin-and-zoom 3s ease-in-out 1;
     }
   }
- 
+
   // &:hover {
   //   transform: scale(1.03);
   // }
@@ -348,26 +348,43 @@
 }
 
 .themeWrapper {
-  padding: 4px;
+  padding: 0 .5rem;
 }
 
 .themeItems {
+  padding: 2px;
   margin-top: 0.5rem;
+  background-color: var(--surface-muted);
+  border-radius: var(--global-border-radius);
 
   button {
     all: unset;
     cursor: pointer;
-    padding: 0.5rem 0;
-    border-radius: var(--global-border-radius);
-    background-color: var(--surface-muted);
+    padding: 0.4rem 0;
+    border-radius: max(0px, calc(var(--global-border-radius) - 2px));
     color: var(--text);
     font-size: var(--font-size-12);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
+
+    svg {
+      color: var(--text-muted);
+    }
+
     &:hover {
-      background-color: var(--gray-100);
+      svg {
+        color: var(--text);
+      }
+    }
+
+    &.active {
+      background-color: var(--background);
+
+      svg {
+        color: var(--text);
+      }
     }
   }
 }
@@ -463,16 +480,16 @@
   // Modifier: Batch Button styling variations if needed
   &__button--batch {
     @include md-down() {
-  margin-bottom: 3.5rem;
+      margin-bottom: 3.5rem;
     }
   }
 
   // Element: Overlay Badge
-&__badge {
+  &__badge {
     position: absolute;
     top: -4px;
     right: -4px;
-    
+
     // Layout & Sizing
     display: flex;
     align-items: center;
@@ -480,7 +497,7 @@
     min-width: 20px;
     height: 20px;
     padding: 0 6px;
-    
+
     // Branding & Typography
     background-color: var(--batch-like-color, #facc15); // Falls back to your yellow accent
     color: var(--background, #000); // High contrast text color
@@ -488,20 +505,24 @@
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums; // Prevents layout jitter when numbers change
-    
+
     // Borders & Depth
     border-radius: 9999px; // Smooth pill shape
     border: 2px solid var(--surface); // Clean visual separation from the button base
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-    
+
     // Animation touch for when item counts increase
     animation: badgePop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
 }
 
 @keyframes badgePop {
-  0% { transform: scale(0.5); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0.5);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .badgeCounter {
@@ -517,7 +538,6 @@
   align-items: center;
   justify-content: center;
 }
-
 
 .floatingBadgeCount {
   position: absolute;
@@ -537,4 +557,3 @@
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--surface);
 }
-
