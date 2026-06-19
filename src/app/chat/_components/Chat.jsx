@@ -554,6 +554,7 @@ export default function Chat() {
       throw e
     }
   }
+  
   const handleAddContactSubmit = async (e) => {
     e.preventDefault()
     setContactError('')
