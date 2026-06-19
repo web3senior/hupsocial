@@ -308,27 +308,24 @@ export default function Aside() {
                   </li>
                   <li>
                     <div className={styles.themeWrapper}>
-
-             
-                    <div className="flex align-items-center gap-050">
-                      <Palette size={16} />
-                      <span>Theme</span>
+                      <div className="flex align-items-center gap-050">
+                        <Palette size={16} />
+                        <span>Theme</span>
+                      </div>
+                      <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
+                        {themeOptions.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            aria-pressed={theme === option.id}
+                            onClick={() => setTheme(option.id)}
+                            className={clsx(theme === option.id && styles.active)}
+                          >
+                            {option.icon}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
-                      {themeOptions.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          aria-pressed={theme === option.id}
-                          onClick={() => setTheme(option.id)}
-                          className={clsx(theme === option.id && styles.active)}
-                        >
-                          {console.log('Current Theme:', theme, 'Option ID:', option.id)}
-                          {option.icon}
-                        </button>
-                      ))}
-                    </div>
-                           </div>
                   </li>
                   <li>
                     <a
