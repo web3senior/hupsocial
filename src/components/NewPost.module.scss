@@ -22,7 +22,7 @@
   }
 
   textarea {
-    color: inherit;
+  color: var(--color) !important;
   }
 }
 
@@ -432,4 +432,8 @@
   .footer {
     padding: 20px 18px 22px;
   }
+}
+
+.postButton {
+  padding: .2rem .5rem;
 }
