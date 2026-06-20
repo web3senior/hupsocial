@@ -18,8 +18,9 @@
   --thumbBG: var(--gray);
 
   --fingerprint-border: var(--white, #fff);
+  --beta-badge-background: var(--gray-400);
 
---footer-link-color: var(--gray-400);
+  --footer-link-color: var(--gray-400);
 
   accent-color: var(--network-color-text);
   color-scheme: light;
@@ -42,6 +43,7 @@
   --thumbBG: var(--black);
 
   --fingerprint-border: var(--surface-muted);
+  --beta-badge-background: var(--black-400);
 
   --footer-link-color: #a1a1aa;
 
@@ -66,8 +68,9 @@
   --thumbBG: var(--black);
 
   --fingerprint-border: var(--surface-muted);
+  --beta-badge-background: var(--green-400);
 
-    --footer-link-color: #6ee77d;
+  --footer-link-color: #6ee77d;
 
   accent-color: #a3ffad;
   color-scheme: dark;

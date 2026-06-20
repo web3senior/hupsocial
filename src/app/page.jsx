@@ -159,84 +159,84 @@ export default function Page() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [newPostsQueue, posts?.list, setInitialData])
 
-const handleManualRefresh = useCallback(async () => {
-  if (newPostsQueue.length > 0) {
-    handleMergeNewPosts()
-    return
-  }
+  const handleManualRefresh = useCallback(async () => {
+    if (newPostsQueue.length > 0) {
+      handleMergeNewPosts()
+      return
+    }
 
-  setIsRefreshing(true)
-  setIsFetching(true)
-  try {
-    const postsRes = await getPosts(1, 10, null, null, address)
-    setInitialData([], postsRes)
-    setPage(1)
-    setNewPostsQueue([])
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  } catch (error) {
-    console.error('Refresh error:', error)
-  } finally {
-    setIsFetching(false)
-    setIsRefreshing(false) // Turn off refresh loading
-  }
-}, [newPostsQueue, handleMergeNewPosts, address, setInitialData])
+    setIsRefreshing(true)
+    setIsFetching(true)
+    try {
+      const postsRes = await getPosts(1, 10, null, null, address)
+      setInitialData([], postsRes)
+      setPage(1)
+      setNewPostsQueue([])
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (error) {
+      console.error('Refresh error:', error)
+    } finally {
+      setIsFetching(false)
+      setIsRefreshing(false) // Turn off refresh loading
+    }
+  }, [newPostsQueue, handleMergeNewPosts, address, setInitialData])
 
   return (
-    <>
+    <div className={styles.page}>
       <div onClick={handleManualRefresh} className={clsx(styles.page__header)} role="button" tabIndex={0}>
         <PageTitle name={`Onchain`} changeDocumentTitle={false} />
       </div>
 
-<div className={clsx('__container')} data-width={`small`}>
-  {newPostsQueue.length > 0 && (
-    <button className={clsx(styles['new-posts'])} onClick={handleMergeNewPosts}>
-      Show {newPostsQueue.length} post{newPostsQueue.length > 1 ? 's' : ''}
-    </button>
-  )}
-
-  <div className={clsx(styles.tabContent, styles.feedTab, 'relative')}>
-    <div className={clsx(styles.page, 'motion-slideDownIn')}>
-      <div className={clsx('__container', styles.page__container)} data-width={`medium`}>
-        
-        {/* 1. Inline Top Loader (Shown while preserving existing posts) */}
-        {isRefreshing && (
-          <div className="flex justify-content-center w-full p-20 animate fade">
-            <ContentSpinner /> 
-          </div>
+      <div className={clsx('__container')} data-width={`small`}>
+        {newPostsQueue.length > 0 && (
+          <button className={clsx(styles['new-posts'])} onClick={handleMergeNewPosts}>
+            Show {newPostsQueue.length} post{newPostsQueue.length > 1 ? 's' : ''}
+          </button>
         )}
 
-        {/* 2. Skeleton fallback for initial blank state only */}
-        {postsLoaded === 0 && <PostSkeletonGrid count={14} />}
+        <div className={clsx(styles.tabContent, styles.feedTab, 'relative')}>
+          <div className={clsx(styles.page, 'motion-slideDownIn')}>
+            <div className={clsx('__container', styles.page__container)} data-width={`medium`}>
 
-        {/* 3. Render feed posts */}
-        {posts?.list?.map((item, i) => (
-          <section
-            key={item.id}
-            className={clsx(styles.post, 'animate', 'fade')}
-            onClick={() => handlePostClick(item.id, item.network_id)}
-          >
-            <Post
-              item={item}
-              networkName={item.network_name}
-              actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'hash']}
-              showLastComment={true}
-            />
-            {i < posts.list.length - 1 && <hr />}
-          </section>
-        ))}
-      </div>
+              {/* 1. Inline Top Loader (Shown while preserving existing posts) */}
+              {isRefreshing && (
+                <div className="flex justify-content-center w-full p-20 animate fade">
+                  <ContentSpinner />
+                </div>
+              )}
 
-      {hasMore && (
-        <div className="flex justify-content-center p-100">
-          <button className={clsx(styles.loadMore)} onClick={loadMorePosts} disabled={isFetching}>
-            {isFetching ? 'Loading...' : 'Load More'}
-          </button>
+              {/* 2. Skeleton fallback for initial blank state only */}
+              {postsLoaded === 0 && <PostSkeletonGrid count={14} />}
+
+              {/* 3. Render feed posts */}
+              {posts?.list?.map((item, i) => (
+                <section
+                  key={item.id}
+                  className={clsx(styles.post, 'animate', 'fade')}
+                  onClick={() => handlePostClick(item.id, item.network_id)}
+                >
+                  <Post
+                    item={item}
+                    networkName={item.network_name}
+                    actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'hash']}
+                    showLastComment={true}
+                  />
+                  {i < posts.list.length - 1 && <hr />}
+                </section>
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="flex justify-content-center p-100">
+                <button className={clsx(styles.loadMore)} onClick={loadMorePosts} disabled={isFetching}>
+                  {isFetching ? 'Loading...' : 'Load More'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
-  </div>
-</div>
-    </>
   )
 }
 

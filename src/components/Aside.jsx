@@ -16,19 +16,19 @@ import {
   Heart,
   HelpCircle,
   MessageSquareWarning,
-  Monitor,
+  Download,
   Boxes,
   Moon,
+  Settings2,
   Palette,
   PanelRightClose,
   PanelRightOpen,
   Settings,
-  SquareTerminal,
+  TerminalSquare,
   Sun,
   UserRound,
   Plus,
 } from 'lucide-react'
-
 import logo from '@/../public/logo.svg'
 import socerBall from '@/../public/socer-ball.svg'
 import NewPost from '@/components/NewPost'
@@ -36,12 +36,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
-import { Download } from 'lucide-react'
-import { Settings2 } from 'lucide-react'
-import { Cpu } from 'lucide-react'
-import { CodeXml } from 'lucide-react'
-import { Terminal } from 'lucide-react'
-import { TerminalSquare } from 'lucide-react'
+
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
@@ -90,6 +85,7 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
 
   // Match target item flags against common dynamic identifier properties
   const isBatchLikeItem = item.id === 'batch-like' || item.path === '/batch-like' || item.name === 'Batch Like'
+  const isChatItem = item.id === 'chat' || item.path === '/chat' || item.name === 'Chat'
 
   const content = (
     <>
@@ -100,6 +96,8 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
         {isBatchLikeItem && isCompact && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
+
+      {isChatItem && !isCompact && <span className={styles.betaBadge}>BETA</span>}
 
       {/* Render full numeric indicator tag layout when sidebar is wide/expanded */}
       {isBatchLikeItem && !isCompact && batchCount > 0 && <span className={styles.badgeCounter}>{batchCount}</span>}

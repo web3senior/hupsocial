@@ -11,19 +11,20 @@ export const runtime = 'nodejs'
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
-    
+
     // Pagination parameters
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 20
     const offset = (page - 1) * limit
 
     // Filters
-    const chainId = searchParams.get('chain_id') // e.g., 4201 for LUKSO Testnet
+    const chainId = searchParams.get('chain_id') // e.g., 42 for LUKSO
     const walletAddress = searchParams.get('wallet_address')
+
 
     let queryParams = []
 
-    // 1. Build the Base Query with User Profile and Network Joins
+    // Build the Base Query with User Profile and Network Joins
     let query = `
       SELECT 
         p.*,
@@ -38,7 +39,7 @@ export async function GET(request) {
       WHERE 1=1
     `
 
-    // 2. Apply dynamic filters using chain_id from the networks table
+    // Apply dynamic filters using chain_id from the networks table
     if (chainId) {
       query += ` AND n.chain_id = ?`
       queryParams.push(chainId)
@@ -48,40 +49,36 @@ export async function GET(request) {
       queryParams.push(walletAddress)
     }
 
-    // 3. Sorting and Pagination
+    // Sorting and Pagination
     query += ` ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
     queryParams.push(limit + 1, offset)
 
-    /* 4. Execute using standardized pool */
+    // Execute using standardized pool
     const [rows] = await pool.execute(query, queryParams)
 
-    // 5. Handle "Has More" for infinite scroll
+    // Handle "Has More" for infinite scroll
     const hasMore = rows.length > limit
     const postsToSend = hasMore ? rows.slice(0, limit) : rows
     const nextPage = hasMore ? page + 1 : null
 
     return NextResponse.json({
       success: true,
-      data: postsToSend.map(post => ({
+      data: postsToSend.map((post) => ({
         ...post,
         // Safely handle IPFS JSON data
-        content: parseIPFSContent(post.content)
+        content: parseIPFSContent(post.content),
       })),
       nextPage,
       meta: {
         page,
         count: postsToSend.length,
         hasMore,
-        filter_chain_id: chainId || 'all'
-      }
+        filter_chain_id: chainId || 'all',
+      },
     })
-
   } catch (error) {
     console.error('[POSTS_FETCH_ERROR]:', error.message)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch posts' }, 
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Failed to fetch posts' }, { status: 500 })
   }
 }
 
@@ -92,6 +89,6 @@ function parseIPFSContent(content) {
   try {
     return JSON.parse(content)
   } catch (e) {
-    return content 
+    return content
   }
 }

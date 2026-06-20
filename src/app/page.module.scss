@@ -9,6 +9,10 @@
   --button-secondary-hover: #f2f2f2;
   padding-bottom: 4rem;
 
+  &__header {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   &__container {
     position: relative;
     background-color: var(--surface);
@@ -75,8 +79,7 @@
   color: var(--black) !important;
 }
 
-.tabContent {
-}
+.tabContent {}
 
 .tabContentEmpty {
   padding: 4rem 0;
@@ -109,7 +112,7 @@
       flex-direction: row;
       align-items: flex-start;
 
-      > div {
+      >div {
         text-align: center;
         padding: 0.5rem 0;
         align-self: stretch;
@@ -144,8 +147,7 @@
       }
     }
 
-    &__main {
-    }
+    &__main {}
   }
 
   &__footer {
@@ -213,7 +215,7 @@
   &__post {
     -webkit-tap-highlight-color: transparent;
 
-    > section {
+    >section {
       position: relative;
       background-color: var(--white, #fff);
       transition: background-color 0.1s ease-out;
@@ -280,15 +282,16 @@
 .optionShimmer {
   background: var(--gray-100);
   padding: 1.6rem 1rem;
+
   @media (max-width: 600px) {
     padding: 8px 0.7rem;
   }
+
   border-radius: 4px;
 }
 
 .profileShimmer {
-  &__pfp {
-  }
+  &__pfp {}
 }
 
 .badge {
@@ -322,15 +325,12 @@
 }
 
 /* Styles for dark color theme. */
-@media (prefers-color-scheme: dark) {
-}
+@media (prefers-color-scheme: dark) {}
 
 /* Enable hover only on non-touch devices */
-@media (hover: hover) and (pointer: fine) {
-}
+@media (hover: hover) and (pointer: fine) {}
 
-@media (max-width: 600px) {
-}
+@media (max-width: 600px) {}
 
 .page__header {
   cursor: pointer;

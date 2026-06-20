@@ -554,7 +554,7 @@ export default function Chat() {
       throw e
     }
   }
-  
+
   const handleAddContactSubmit = async (e) => {
     e.preventDefault()
     setContactError('')
@@ -575,7 +575,9 @@ export default function Chat() {
 
   useEffect(() => {
     if (!isConnected || !isMounted || contactsInitializedRef.current) return
+
     contactsInitializedRef.current = true
+
     setTimeout(() => {
       void loadMyContacts()
     }, 0)

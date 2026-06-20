@@ -13,25 +13,22 @@ export default function Page() {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
 
-  // useEffect(() => {
-  //   const key = localStorage.getItem('encryptedAppKey')
+  useEffect(() => {
+    const key = localStorage.getItem('encryptedAppKey')
 
-  //   if (!key) {
-  //     router.push('/')
-  //   } else {
-  //     setIsAuthorized(true)
-  //   }
-  // }, [router])
+    if (!key) {
+      router.push('/setup')
+    } else {
+      setIsAuthorized(true)
+    }
+  }, [router])
 
-  // // Prevent rendering the UI while redirecting or checking
-  // if (!isAuthorized) {
-  //   return null // or a loading spinner
-  // }
+  if (!isAuthorized) {
+    return null
+  }
 
   return (
     <div className={clsx(styles.page)}>
-
-
       {activeTab === 'chat' && <Chat />}
       {activeTab === 'communities' && <NoData name={`Communities`} />}
       {activeTab === 'channels' && <NoData name={`Channels`} />}

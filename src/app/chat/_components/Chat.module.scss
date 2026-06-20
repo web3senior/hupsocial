@@ -66,6 +66,7 @@
           border-radius: 1000px;
           color: #282c34;
           isolation: isolate;
+
           @media (max-width: 600px) {
             padding: 8px;
           }
@@ -92,6 +93,7 @@
               height: 100%;
               opacity: 1;
             }
+
             cursor: pointer;
           }
 
@@ -197,6 +199,7 @@
     margin: 0.35rem 0.7rem 0;
   }
 }
+
 .conversation-item {
   width: 100%;
   background: transparent;
@@ -268,6 +271,7 @@
     width: 14px;
     height: 14px;
     display: flex;
+
     svg {
       width: 100%;
       height: 100%;
@@ -306,6 +310,7 @@
     }
   }
 }
+
 .main {
   grid-area: main;
   padding-bottom: 60px;
@@ -319,9 +324,11 @@
   overflow-x: hidden;
   overflow-y: auto;
   display: flex;
-  flex-direction: column; /* Changed from column-reverse */
+  flex-direction: column;
+  /* Changed from column-reverse */
   align-items: center;
-  justify-content: flex-end; /* Keeps initial short messages pinned at the bottom */
+  justify-content: flex-end;
+  /* Keeps initial short messages pinned at the bottom */
   row-gap: 0.5rem;
   padding: 1rem;
 
@@ -395,6 +402,7 @@
     width: 100%;
   }
 }
+
 //
 .contact-list {
   display: flex;
@@ -440,6 +448,7 @@
     font-weight: 600;
   }
 }
+
 .profileShimmer {
   width: 548px;
   height: 48px;
@@ -476,6 +485,7 @@
 
   &__chain-icon {
     display: flex;
+
     svg,
     img {
       width: 14px;
@@ -514,6 +524,7 @@
     font-size: 13px;
     line-height: 1.4;
     padding: 0 0 0 1rem;
+
     &:focus {
       outline: none;
     }
@@ -546,10 +557,12 @@
 .shimmer {
   height: 200px;
 }
+
 @keyframes shimmer {
   0% {
     background-position: -468px 0;
   }
+
   100% {
     background-position: 468px 0;
   }

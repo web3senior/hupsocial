@@ -31,17 +31,17 @@ export const useSidebarStore = create(
       isMenuOpen: false,
       isMobileMenuOpen: false,
       isComponentOpen: false,
-      
+
       // Dictionary mapping network ids to array of post ids
       likedPostIds: {},
 
       // Actions for Batch Like queue management split by network id
       addToBatch: (networkId, postId) => set((state) => {
         const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
-        
+
         // Prevent duplicate queuing inside the specific network sub-array
         if (currentNetworkQueue.includes(postId)) return state
-        
+
         return {
           likedPostIds: {
             ...state.likedPostIds,
@@ -52,7 +52,7 @@ export const useSidebarStore = create(
 
       removeFromBatch: (networkId, postId) => set((state) => {
         const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
-        
+
         return {
           likedPostIds: {
             ...state.likedPostIds,
@@ -89,7 +89,7 @@ export const useSidebarStore = create(
       // Computed layout helper that appends dynamic badges natively
       getNavItems: () => {
         const likedState = get().likedPostIds ?? {}
-        
+
         // Calculate the aggregate total length across all networks safely
         let queueCount = 0
         if (Array.isArray(likedState)) {
