@@ -19,6 +19,7 @@ import { ConversationList } from './ConversationList'
 import styles from './Chat.module.scss'
 import abiChat from '@/abis/Chat.json'
 
+import { useProfile } from '@/hooks/useProfile'
 import { Buffer } from 'buffer'
 
 const CHAT_PAGE_SIZE = 200
