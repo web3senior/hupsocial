@@ -1,6 +1,6 @@
 .page {
   min-height: 85svh;
-
+  padding-bottom: 4rem;
   &__container {
     position: relative;
     min-height: 100svh;
@@ -114,7 +114,7 @@
   &Active {
     background-color: var(--surface-selected, rgba(255, 255, 255, 0.05));
     border-color: var(--border-active, var(--text-main));
-    
+
     .networkName {
       color: var(--text-main);
       font-weight: 600;
@@ -269,7 +269,9 @@
   color: var(--link, var(--text-main));
   text-decoration: none;
   opacity: 0.8;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 
   &:hover {
     opacity: 1;
@@ -287,7 +289,9 @@
   color: var(--text-muted);
   cursor: pointer;
   border-radius: 6px;
-  transition: color 0.2s ease, background-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
 
   &:hover {
     color: var(--error, #ef4444);
@@ -302,7 +306,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 0.5;
   }
