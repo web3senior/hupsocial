@@ -2,6 +2,7 @@
   "semi": false,
   "singleQuote": true,
   "printWidth": 140,
+  "trailingComma": "es5",
   "overrides": [
     {
       "files": "*.sol",
@@ -22,19 +23,17 @@
     {
       "files": "*.json",
       "options": {
-        "semi": true,
         "printWidth": 80
       }
     },
     {
-      "files": ["*.html", "*.xhtml"],
+      "files": [
+        "*.html",
+        "*.xhtml"
+      ],
       "options": {
         "tabWidth": 4
       }
-    },
-    {
-      "files": ["*.jsx"],
-      "options": {}
     }
   ]
 }

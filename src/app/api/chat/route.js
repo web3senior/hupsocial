@@ -60,7 +60,7 @@ async function resolveAuthorizedSenderWallet(connection, signerAddress) {
 async function verifyPayloadSignature(messageObj) {
   try {
     const { signature, content, stealth_address } = messageObj;
-    
+
     if (!signature) return null;
 
     // Reconstruct the exact string payload that the burner key signed on the frontend
@@ -91,9 +91,9 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const addrsRaw = searchParams.get('addresses');
-    
+
     if (!addrsRaw) return NextResponse.json({ result: true, messages: [] });
-    
+
     const addressList = addrsRaw.split(',').map(a => a.toLowerCase().trim());
 
     if (addressList.length > 100) {
@@ -152,7 +152,7 @@ export async function POST(req) {
 
       // Recover the exact wallet address from this message signature
       const signerWallet = await verifyPayloadSignature(msg);
-  
+
       if (!signerWallet) {
         return NextResponse.json({ error: 'Cryptographic signature verification failed.' }, { status: 401 });
       }

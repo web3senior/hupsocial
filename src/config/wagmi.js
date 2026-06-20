@@ -46,6 +46,7 @@ export const CONTRACTS = {
     forwarder: '0x8466799e31a86a4d51B76154e57B14DcAF9A8756',
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
+    chat: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
   },
   chain56: {
     // bnb

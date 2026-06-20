@@ -13,6 +13,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { bytesToHex } from 'viem'
 import { ContentSpinner } from '@/components/Loading'
 import { localStorageBurnerKey, sessionStorageUnlockedKey } from '@/lib/burnerSession'
+import { unlockAppKeyFromStorage } from '@/lib/appVault'
 import { ConversationList } from './ConversationList'
 import styles from './Chat.module.scss'
 
@@ -139,38 +140,8 @@ export default function Chat() {
   }
 
   const getUnlockedKey = async () => {
-    const encryptedKey = localStorage.getItem('encryptedAppKey')
-    const storedPassCipher = sessionStorage.getItem('localPassword')
-
-    if (!encryptedKey || !storedPassCipher) return null
-
     try {
-      // 1. Decrypt the password using the master application key
-      const bytesPass = CryptoJS.AES.decrypt(storedPassCipher, process.env.NEXT_PUBLIC_ENCRYPTION_KEY)
-      const originalPassword = bytesPass.toString(CryptoJS.enc.Utf8)
-
-      // 2. Decrypt the Private Key using the user's password
-      const bytesKey = CryptoJS.AES.decrypt(encryptedKey, originalPassword)
-      const decryptedKeyHex = bytesKey.toString(CryptoJS.enc.Utf8)
-
-      // 3. Clean the private key hex string to ensure safe parsing (strip '0x' if present)
-      const cleanPrivateKey = decryptedKeyHex.startsWith('0x') ? decryptedKeyHex.slice(2) : decryptedKeyHex
-
-      // 4. Re-instantiate the ECIES object exactly like the original app
-      const privKey = new ecies.PrivateKey(Buffer.from(cleanPrivateKey, 'hex'))
-
-      // 5. Extract the 132-character uncompressed key format (65 bytes -> 130 chars + '04' prefix)
-      const pubKeyHex = privKey.publicKey.toHex(false)
-
-      // 6. Enforce '0x' prefix uniformity for perfect cross-platform compatibility
-      const formattedPubKey = pubKeyHex.startsWith('0x') ? pubKeyHex : `0x${pubKeyHex}`
-
-      // Returns the clean, three-item payload matching your application layout
-      return {
-        pubKey: formattedPubKey, // 132-character string with '0x04' prefix
-        privKey: privKey, // ECIES instance needed for cryptographic actions
-        privKeyHex: cleanPrivateKey, // Pure 64-character raw hex string for standard Ethers utils
-      }
+      return await unlockAppKeyFromStorage()
     } catch (error) {
       console.error('Decryption of stored key failed:', error)
       return null

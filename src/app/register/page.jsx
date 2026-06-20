@@ -4,8 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
 import clsx from 'clsx'
-import CryptoJS from 'crypto-js'
-import ecies from 'eciesjs'
+import { unlockAppKeyFromStorage } from '@/lib/appVault'
 import styles from './page.module.scss'
 import { ConnectWallet } from '@/components/ConnectWallet'
 
@@ -40,23 +39,9 @@ export default function Page() {
   }, [address])
 
   // Decrypts the app master key locally from storage
-  const getUnlockedKey = () => {
-    const encryptedKey = localStorage.getItem('encryptedAppKey')
-    const storedPassCipher = sessionStorage.getItem('localPassword')
-    if (!encryptedKey || !storedPassCipher) return null
-
+  const getUnlockedKey = async () => {
     try {
-      const bytesPass = CryptoJS.AES.decrypt(storedPassCipher, process.env.NEXT_PUBLIC_ENCRYPTION_KEY)
-      const originalPassword = bytesPass.toString(CryptoJS.enc.Utf8)
-      const bytesKey = CryptoJS.AES.decrypt(encryptedKey, originalPassword)
-      const decryptedKeyHex = bytesKey.toString(CryptoJS.enc.Utf8)
-      
-      const cleanPrivateKey = decryptedKeyHex.startsWith('0x') ? decryptedKeyHex.slice(2) : decryptedKeyHex
-      const privKey = new ecies.PrivateKey(Buffer.from(cleanPrivateKey, 'hex'))
-      
-      const pubKeyHex = privKey.publicKey.toHex(false)
-      const formattedPubKey = pubKeyHex.startsWith('0x') ? pubKeyHex : `0x${pubKeyHex}`
-      return { pubKey: formattedPubKey, privKey: privKey }
+      return await unlockAppKeyFromStorage()
     } catch (error) {
       console.error('Decryption of stored application master key failed:', error)
       return null
@@ -67,7 +52,7 @@ export default function Page() {
   const handleJoinChat = async () => {
     try {
       setIsActivating(true)
-      const keys = getUnlockedKey()
+      const keys = await getUnlockedKey()
       const pubKeyHex = keys?.pubKey
       if (!pubKeyHex) throw new Error('No public key found. Please complete setup.')
 
