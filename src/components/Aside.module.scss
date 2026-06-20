@@ -63,7 +63,8 @@
     width: 100%;
   }
 
-  .navContainer {}
+  .navContainer {
+  }
 
   .navList {
     overflow-y: auto;
@@ -235,7 +236,7 @@
     width: 100px; // Set to your preferred size
     height: 100px;
     transform-origin: center center;
-
+    filter: drop-shadow(0 0 1px var(--purple));
     width: 22px;
     height: 22px;
 
@@ -353,7 +354,7 @@
 }
 
 .themeWrapper {
-  padding: 0 .5rem;
+  padding: 0 0.5rem;
 }
 
 .themeItems {
