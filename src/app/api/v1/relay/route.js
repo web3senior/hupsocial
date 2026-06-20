@@ -1,20 +1,16 @@
 import { ethers } from 'ethers'
 import { NextResponse } from 'next/server'
-import abiForwarder from '@/lib/abi/forwarder.json'
+import forwarderAbi from '../../../../abis/Forwarder.json'
 
-// ■■■ Configuration ■■■
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
-const FORWARDER_ABI = abiForwarder
+const FORWARDER_ABI = forwarderAbi
 
 export async function POST(request) {
   try {
     const body = await request.json()
     const { request: forwardRequest, signature, rpcUrl, forwarderAddress } = body
     console.log(`Received relay request with RPC URL: ${rpcUrl}`)
-    // ■■■ RPC Configuration with API Key ■■■
     const fetchRequest = new ethers.FetchRequest(rpcUrl)
-    //fetchRequest.setHeader('api-key', process.env.NOWNODES_API_KEY || `12017ea9-128b-4b44-b248-a39908aa2a47`); // Use env variable!
-
     const provider = new ethers.JsonRpcProvider(fetchRequest)
     const relayer = new ethers.Wallet(RELAYER_PRIVATE_KEY, provider)
     const forwarder = new ethers.Contract(forwarderAddress, FORWARDER_ABI, relayer)
@@ -25,6 +21,7 @@ export async function POST(request) {
       to: forwardRequest.to,
       value: BigInt(forwardRequest.value || 0),
       gas: BigInt(forwardRequest.gas),
+      nonce: BigInt(forwardRequest.nonce),
       deadline: Number(forwardRequest.deadline),
       data: forwardRequest.data,
       signature: signature,

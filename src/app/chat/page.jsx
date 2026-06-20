@@ -17,7 +17,7 @@ export default function Page() {
     const sessionPassword = sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
 
     if (!key) {
-      router.push('/setup')
+      router.push('/register')
       return
     }
 

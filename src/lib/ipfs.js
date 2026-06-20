@@ -11,7 +11,7 @@ export const getIPFS = async (CID) => {
   }
 
   // Ensure the gateway URL is configured
-  const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_FALLBACK
+  const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
   if (!gatewayUrl) {
     console.error('getIPFS Error: NEXT_PUBLIC_IPFS_GATEWAY_URL environment variable is not set.')
     return { result: false }
@@ -33,9 +33,7 @@ export const getIPFS = async (CID) => {
 
     // 2. Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
     if (!response.ok) {
-      console.error(
-        `IPFS Fetch Error: Failed to fetch CID ${CID}. Status: ${response.status} ${response.statusText}`,
-      )
+      console.error(`IPFS Fetch Error: Failed to fetch CID ${CID}. Status: ${response.status} ${response.statusText}`)
       return { result: false }
     }
 

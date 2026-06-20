@@ -1,21 +1,37 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import CryptoJS from 'crypto-js'
-import { CID } from 'multiformats/cid'
 import { ethers } from 'ethers'
 import ecies from 'eciesjs'
-import { useConnection, useSignMessage } from 'wagmi'
+import { useConnection, usePublicClient } from 'wagmi'
 import { getIPFS } from '@/lib/ipfs'
 import clsx from 'clsx'
 import { ArrowUp, EllipsisVertical, MessageSquarePlus } from 'lucide-react'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { bytesToHex } from 'viem'
+import { bytesToHex, encodeFunctionData } from 'viem'
 import { ContentSpinner } from '@/components/Loading'
-import { localStorageBurnerKey, sessionStorageUnlockedKey } from '@/lib/burnerSession'
-import { unlockAppKeyFromStorage } from '@/lib/appVault'
+import { chatLocalStorageBurnerKey, chatSessionStorageUnlockedKey, CHAT_ZERO_ADDRESS as ZERO_ADDRESS } from '@/lib/chatBurnerSession'
+import { APP_PASSWORD_SESSION_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
+import { getActiveChain } from '@/lib/communication'
 import { ConversationList } from './ConversationList'
 import styles from './Chat.module.scss'
+import abiChat from '@/abis/Chat.json'
+
+import { Buffer } from 'buffer'
+
+const CHAT_PAGE_SIZE = 200
+
+const forwarderAbi = [
+  {
+    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
+    name: 'nonces',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+]
 
 function normalizeCID(cidValue) {
   if (!cidValue || typeof cidValue !== 'string') return ''
@@ -23,39 +39,6 @@ function normalizeCID(cidValue) {
     .trim()
     .replace(/^ipfs:\/\//i, '')
     .replace(/^\/ipfs\//i, '')
-}
-
-function resolveCIDDigestHash(cidValue, messageText) {
-  const normalized = normalizeCID(cidValue)
-  if (!normalized) {
-    return ethers.keccak256(ethers.toUtf8Bytes(messageText || ''))
-  }
-
-  try {
-    if (normalized.startsWith('0x') && normalized.length === 66) {
-      return normalized
-    }
-
-    if (/^[0-9a-fA-F]{64}$/.test(normalized)) {
-      return `0x${normalized}`
-    }
-
-    const parsed = CID.parse(normalized)
-    return ethers.hexlify(parsed.multihash.digest)
-  } catch {
-    // Fallback for CIDv0/base58 values without multibase parser support.
-    try {
-      const decoded = ethers.decodeBase58(normalized)
-      const hexBytes = ethers.hexlify(decoded)
-      if (hexBytes.startsWith('0x1220') && hexBytes.length >= 70) {
-        return `0x${hexBytes.slice(6)}`
-      }
-    } catch {
-      // Intentionally ignored; we fall back to deterministic hash below.
-    }
-
-    return ethers.keccak256(ethers.toUtf8Bytes(normalized))
-  }
 }
 
 function normalizePrivateKey(privateKey) {
@@ -82,6 +65,7 @@ function decodeEncryptedKeyBlob(value) {
 }
 
 export default function Chat() {
+  const router = useRouter()
   const [messageText, setMessageText] = useState('')
   const [receiverAddress, setReceiverAddress] = useState('')
   const [contacts, setContacts] = useState([])
@@ -96,17 +80,24 @@ export default function Chat() {
 
   const [isLoading, setIsLoading] = useState(false)
   const { address, isConnected } = useConnection()
-  const { signMessageAsync } = useSignMessage()
+  const publicClient = usePublicClient()
+  const [activeChainConfig, activeChainContracts] = getActiveChain()
+  const tunnelAddress = activeChainContracts?.chat
+  const forwarderAddress = activeChainContracts?.forwarder
+  const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
   const [chatHistory, setChatHistory] = useState({ list: [], isLoading: false })
   const isMounted = useClientMounted()
 
   const getRegisteredChatPublicKey = async (walletAddress) => {
-    if (!walletAddress) return null
+    if (!walletAddress || !publicClient || !tunnelAddress) return null
     try {
-      const res = await fetch(`/api/chat/join?address=${walletAddress.toLowerCase()}`)
-      const payload = await res.json().catch(() => ({}))
-      if (!res.ok || !payload?.public_key) return null
-      const key = String(payload.public_key).trim()
+      const key = await publicClient.readContract({
+        address: tunnelAddress,
+        abi: abiChat,
+        functionName: 'publicKeyRegistry',
+        args: [walletAddress],
+      })
+      if (!key || key === '0x') return null
       return key.startsWith('0x') ? key : `0x${key}`
     } catch {
       return null
@@ -125,7 +116,6 @@ export default function Chat() {
     if (!cleanPub.startsWith('0x')) {
       cleanPub = `0x${cleanPub}`
     }
-    console.log(cleanPriv)
     // 3. Initialize the key directly using the hex string format (avoiding broken Buffers)
     const signingKey = new ethers.SigningKey(cleanPriv)
 
@@ -139,46 +129,201 @@ export default function Chat() {
     return { topic, stealthAddress }
   }
 
+  const relayMetaTransaction = async (functionData) => {
+    if (!publicClient || !forwarderAddress || !tunnelAddress || !relayRpcUrl) {
+      throw new Error('Chat relay configuration is missing for this chain.')
+    }
+
+    const unlockedKey = sessionStorage.getItem(chatSessionStorageUnlockedKey)
+    const storedBurnerKey = localStorage.getItem(chatLocalStorageBurnerKey)
+    const burnerKey = normalizePrivateKey(unlockedKey) || normalizePrivateKey(storedBurnerKey)
+    if (!burnerKey) {
+      throw new Error('Session expired or burner key is missing.')
+    }
+
+    const burner = new ethers.Wallet(burnerKey)
+    const { request, signature } = await signMetaTransactionSessionMode(burner, functionData)
+
+    const res = await fetch('/api/v1/relay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress }, (_, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      ),
+    })
+
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok || !payload?.success) {
+      throw new Error(payload?.error || 'Message relay failed.')
+    }
+
+    return true
+  }
+
+  async function signMetaTransactionSessionMode(signer, functionData) {
+    const from = await signer.getAddress()
+
+    const nonce = await publicClient.readContract({
+      address: forwarderAddress,
+      abi: forwarderAbi,
+      functionName: 'nonces',
+      args: [from],
+    })
+
+    const chainId = activeChainConfig?.id
+    if (!chainId) throw new Error('Missing active chain id.')
+
+    const deadline = Math.floor(Date.now() / 1000) + 3600
+    const domain = {
+      name: 'HupForwarder',
+      version: '1',
+      chainId,
+      verifyingContract: forwarderAddress,
+    }
+
+    const types = {
+      ForwardRequest: [
+        { name: 'from', type: 'address' },
+        { name: 'to', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'gas', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint48' },
+        { name: 'data', type: 'bytes' },
+      ],
+    }
+
+    const message = {
+      from,
+      to: tunnelAddress,
+      value: 0n,
+      gas: 1_000_000n,
+      nonce,
+      deadline,
+      data: functionData,
+    }
+
+    const signature = await signer.signTypedData(domain, types, message)
+    return { request: message, signature }
+  }
+
   const getUnlockedKey = async () => {
     try {
-      return await unlockAppKeyFromStorage()
+      const unlocked = await unlockAppKeyFromStorage()
+      if (!unlocked) {
+        sessionStorage.removeItem(APP_PASSWORD_SESSION_STORAGE)
+        return null
+      }
+      return unlocked
     } catch (error) {
-      console.error('Decryption of stored key failed:', error)
+      sessionStorage.removeItem(APP_PASSWORD_SESSION_STORAGE)
+      router.push('/unlock')
       return null
     }
   }
-  // Load verified contacts from MySQL Room Registry
+  const persistContactsOnchain = async (nextContacts, keys) => {
+    if (!publicClient || !tunnelAddress || !address) {
+      throw new Error('Wallet or chain not ready for contacts sync.')
+    }
+
+    const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(nextContacts), keys.privKeyHex).toString()
+    const ipfsResult = await uploadObjectToIPFS(JSON.stringify({ version: '1', encrypted_data: encryptedData }))
+    const cid = normalizeCID(ipfsResult?.cid)
+    if (!cid) {
+      throw new Error('Failed to upload encrypted contacts to IPFS.')
+    }
+
+    const currentContacts = await publicClient.readContract({
+      address: tunnelAddress,
+      abi: abiChat,
+      functionName: 'getEncryptedContacts',
+      args: [address],
+    })
+
+    const currentVersion = Number(currentContacts?.[2] ?? currentContacts?.version ?? 0)
+    const nextVersion = BigInt(currentVersion + 1)
+    const contentHash = ethers.keccak256(ethers.toUtf8Bytes(cid))
+
+    const functionData = encodeFunctionData({
+      abi: abiChat,
+      functionName: 'setEncryptedContacts',
+      args: [address, cid, contentHash, nextVersion],
+    })
+
+    await relayMetaTransaction(functionData)
+  }
+
+  // ■■■ Logic ■■■
   const loadMyContacts = async () => {
     try {
+      if (!publicClient || !tunnelAddress || !address) return
+
       const keys = await getUnlockedKey()
       if (!keys) return
 
-      const myPrivateKeyHex = keys.privKeyHex
-      const timestamp = Math.floor(Date.now() / 1000).toString()
-      const signature = await signMessageAsync({ message: `Fetch My Contacts Log: ${timestamp}` })
+      const onchainContacts = await publicClient.readContract({
+        address: tunnelAddress,
+        abi: abiChat,
+        functionName: 'getEncryptedContacts',
+        args: [address],
+      })
 
-      const res = await fetch(`/api/chat/contacts?signature=${signature}&timestamp=${timestamp}`)
-      const data = await res.json()
-
-      if (data.success) {
-        const decrypted = data.contacts
-          .map((item) => {
-            try {
-              const bytes = CryptoJS.AES.decrypt(item.encrypted_data, myPrivateKeyHex)
-              const payload = JSON.parse(bytes.toString(CryptoJS.enc.Utf8))
-              return {
-                stealthAddress: item.stealth_address,
-                topic: item.topic,
-                contactAddress: payload.contactAddress,
-                publicKey: payload.publicKey,
-              }
-            } catch (e) {
-              return null
-            }
-          })
-          .filter(Boolean)
-        setContacts(decrypted)
+      const cid = normalizeCID(onchainContacts?.[0] ?? '')
+      const version = Number(onchainContacts?.[2] ?? 0)
+      if (!cid || version === 0) {
+        setContacts([])
+        return
       }
+
+      const payload = await getIPFS(cid)
+
+      // 1. Initial Extraction
+      let rawBlob = typeof payload === 'string' ? payload : payload?.encrypted_data || payload?.encryptedData || payload?.data || null
+
+      if (!rawBlob) {
+        setContacts([])
+        return
+      }
+
+      // 2. Deep Sanitization & Wrapper Bypass
+      rawBlob = rawBlob.replace(/^"|"$/g, '').trim()
+
+      // If the payload is a stringified JSON wrapper, parse it to extract the actual ciphertext
+      if (rawBlob.startsWith('{')) {
+        try {
+          const unwrapped = JSON.parse(rawBlob)
+          rawBlob = unwrapped.encryptedData || unwrapped.encrypted_data || unwrapped.data || rawBlob
+        } catch (e) {
+          console.warn('Failed to parse IPFS JSON wrapper. Proceeding with raw string.')
+        }
+      }
+
+      // 3. Cryptographic Execution
+      const symmetricKey = keys.privKeyHex.toLowerCase()
+      let decoded
+
+      try {
+        // Pass strictly the isolated ciphertext into the AES engine
+        const bytes = CryptoJS.AES.decrypt(rawBlob, symmetricKey)
+        decoded = bytes.toString(CryptoJS.enc.Utf8)
+
+        if (!decoded) {
+          throw new Error('Buffer is empty post-decryption. Key mismatch or corrupted bytes.')
+        }
+      } catch (decryptErr) {
+        console.error('Cryptographic Fault: Ciphertext corrupted or key mismatch.', decryptErr)
+        setContacts([])
+        return
+      }
+
+      // 4. State Normalization
+      const parsed = JSON.parse(decoded)
+      const normalized = Array.isArray(parsed) ? parsed : parsed?.contacts
+      const validContacts = Array.isArray(normalized)
+        ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress)
+        : []
+
+      setContacts(validContacts)
     } catch (err) {
       console.error('Failed loading contacts:', err)
     }
@@ -204,7 +349,6 @@ export default function Chat() {
       return uploadRequest.json()
     } catch (error) {
       console.error('Trouble uploading post metadata:', error)
-      toast('Error uploading post metadata', 'error')
       throw error
     } finally {
       // setIsUploading(false)
@@ -213,7 +357,7 @@ export default function Chat() {
 
   const readHistoryChat = async (contactAddress) => {
     const keys = await getUnlockedKey()
-    if (!keys) return []
+    if (!keys || !publicClient || !tunnelAddress || !address) return []
 
     const subtle = window.crypto.subtle
     const myAddress = address.toLowerCase()
@@ -227,40 +371,47 @@ export default function Chat() {
       const candidateTopics = Array.from(new Set([friend.topic, derivedRoom?.topic].filter(Boolean)))
       if (candidateTopics.length === 0) return []
 
-      // Fetch message histories for known/stale + latest derived room IDs and merge.
       const historyResponses = await Promise.all(
         candidateTopics.map(async (topic) => {
-          const response = await fetch(`/api/chat/history?topic=${topic}`)
-          const historyData = await response.json().catch(() => ({}))
-          return historyData?.success ? historyData.messages || [] : []
-        }),
+          const response = await publicClient.readContract({
+            address: tunnelAddress,
+            abi: abiChat,
+            functionName: 'getTopicHistory',
+            args: [topic, 0n, BigInt(CHAT_PAGE_SIZE)],
+          })
+          return Array.isArray(response?.[0]) ? response[0].map((msg) => ({ topic, msg })) : []
+        })
       )
-      const flatMessages = historyResponses.flat()
+      const flatMessages = historyResponses.flat().filter(Boolean)
       const seenIds = new Set()
-      const mergedMessages = flatMessages.filter((msg) => {
-        if (seenIds.has(msg.id)) return false
-        seenIds.add(msg.id)
+      const mergedMessages = flatMessages.filter((entry) => {
+        const meta = entry?.msg?.metadata ?? entry?.msg?.[2] ?? ''
+        const sender = entry?.msg?.sender ?? entry?.msg?.[0] ?? ''
+        const timestamp = String(entry?.msg?.timestamp ?? entry?.msg?.[1] ?? '')
+        const id = `${entry?.topic || ''}-${sender}-${timestamp}-${meta}`
+        if (seenIds.has(id)) return false
+        seenIds.add(id)
         return true
       })
 
       const decryptedList = await Promise.all(
-        mergedMessages.map(async (msg) => {
+        mergedMessages.map(async (entry) => {
           try {
-            let ipfsPayload
-            // Support both direct database cached JSON string fields and IPFS pointer channels
-            if (msg.content) {
-              ipfsPayload = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content
-            } else if (msg.cid) {
-              ipfsPayload = await getIPFS(msg.cid)
-            } else {
-              return null
-            }
+            const msg = entry.msg
+            const msgSender = String(msg.sender ?? msg[0] ?? '').toLowerCase()
+            const msgTimestamp = Number(msg.timestamp ?? msg[1] ?? 0)
+            const msgMetadata = normalizeCID(msg.metadata ?? msg[2] ?? '')
+            const msgEncryptedKey = msg.encryptedKey ?? msg[3]
+            const msgDeleted = Boolean(msg.isDeleted ?? msg[5])
+            if (!msgMetadata || msgDeleted) return null
 
-            const senderAddress = ipfsPayload.senderAddr?.toLowerCase?.() || ''
+            const ipfsPayloadRaw = await getIPFS(msgMetadata)
+            const ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
+            const senderAddress = ipfsPayload?.senderAddr?.toLowerCase?.() || msgSender
             const isIncoming = senderAddress !== myAddress
             let decryptionKey = null
 
-            const messageTopic = typeof msg.topic === 'string' && msg.topic ? msg.topic : friend.topic
+            const messageTopic = entry.topic || friend.topic
             if (messageTopic) {
               const perTopicSeed = ethers.keccak256(ethers.concat([messageTopic, ethers.toUtf8Bytes('content-encryption')]))
               const perTopicKeyRaw = ethers.getBytes(perTopicSeed)
@@ -268,10 +419,10 @@ export default function Chat() {
             }
 
             if (isIncoming) {
-              const wrappedKeyBlob = decodeEncryptedKeyBlob(msg.encrypted_key)
+              const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
               if (wrappedKeyBlob) {
                 try {
-                  const unwrappedRawKey = ecies.decrypt(Buffer.from(keys.privKeyHex, 'hex'), Buffer.from(wrappedKeyBlob))
+                  const unwrappedRawKey = ecies.decrypt(Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'), Buffer.from(wrappedKeyBlob))
                   decryptionKey = await subtle.importKey('raw', new Uint8Array(unwrappedRawKey), 'AES-GCM', true, ['decrypt'])
                 } catch {
                   // Deterministic topic key fallback stays active.
@@ -285,20 +436,18 @@ export default function Chat() {
             const decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, decryptionKey, ciphertext)
             const plaintext = new TextDecoder().decode(decryptedBuffer)
 
-            const msgTimestamp = msg.created_at ? Math.floor(new Date(msg.created_at).getTime() / 1000) : msg.timestamp
-
             return {
-              id: msg.id || msgTimestamp + ipfsPayload.senderAddr + msg.cid,
+              id: `${entry.topic}-${msgTimestamp}-${senderAddress}-${msgMetadata}`,
               message: plaintext,
               timestamp: new Date(msgTimestamp * 1000).toLocaleString(),
-              sender: ipfsPayload.senderAddr,
+              sender: senderAddress,
               side: senderAddress === myAddress ? 'me' : 'them',
               rawTimestamp: msgTimestamp,
             }
           } catch (msgErr) {
             return null
           }
-        }),
+        })
       )
 
       return decryptedList.filter((m) => m !== null).sort((a, b) => a.rawTimestamp - b.rawTimestamp)
@@ -384,21 +533,13 @@ export default function Chat() {
       }
 
       const ipfsResult = await uploadObjectToIPFS(JSON.stringify(encryptedTextPayload))
-
       const normalizedCID = normalizeCID(ipfsResult?.cid)
-      const cidHash = resolveCIDDigestHash(normalizedCID, messageText)
+      if (!normalizedCID) throw new Error('Failed to upload message payload to IPFS.')
 
       const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
       const receiverWrappedKey = ecies.encrypt(uncompressedRawKey, Buffer.from(contentKeyRawBytes))
 
-      const success = await sendShroudedMessage(
-        activeStealthAddress,
-        activeTopic,
-        cidHash,
-        normalizedCID || 'inline_cache',
-        receiverWrappedKey,
-        encryptedTextPayload,
-      )
+      const success = await sendShroudedMessage(activeStealthAddress, activeTopic, normalizedCID, receiverWrappedKey)
 
       if (success) {
         setMessageText('')
@@ -411,45 +552,14 @@ export default function Chat() {
     }
   }
 
-  const sendShroudedMessage = async (meetingPoint, topic, cidHash, fullCID, receiverWrappedKey, contentPayload) => {
-    const unlockedKey = sessionStorage.getItem(sessionStorageUnlockedKey)
-    const storedBurnerKey = localStorage.getItem(localStorageBurnerKey)
-    const burnerKey = normalizePrivateKey(unlockedKey) || normalizePrivateKey(storedBurnerKey)
+  const sendShroudedMessage = async (meetingPoint, topic, metadataCid, receiverWrappedKey) => {
     const wrappedKeyHex = typeof receiverWrappedKey === 'string' ? receiverWrappedKey : bytesToHex(receiverWrappedKey)
-    const textToSign = JSON.stringify({
-      stealth_address: meetingPoint.toLowerCase(),
-      content: JSON.stringify(contentPayload),
+    const functionData = encodeFunctionData({
+      abi: abiChat,
+      functionName: 'sendMessage',
+      args: [address || ZERO_ADDRESS, meetingPoint, topic, metadataCid, wrappedKeyHex],
     })
-    let signature = null
-    if (burnerKey) {
-      const burner = new ethers.Wallet(burnerKey)
-      signature = await burner.signMessage(textToSign)
-    } else {
-      if (!isConnected || !address) {
-        throw new Error('Connect your wallet to sign this message.')
-      }
-      signature = await signMessageAsync({ message: textToSign })
-    }
-
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        encrypted_key: wrappedKeyHex,
-        topic,
-        stealth_address: meetingPoint,
-        content: contentPayload,
-        cid: fullCID,
-        cid_hash: cidHash,
-        signature,
-      }),
-    })
-
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok || payload.result !== true) {
-      throw new Error(payload.error || 'Message relay failed.')
-    }
-    return true
+    return relayMetaTransaction(functionData)
   }
 
   const newChat = async (inputAddress) => {
@@ -475,48 +585,19 @@ export default function Chat() {
       const peerPublicKey = await getRegisteredChatPublicKey(contactAddress)
       if (!peerPublicKey) throw new Error("This profile hasn't registered cryptographic chat keys yet.")
 
-      const myPriv = keys.privKeyHex
-
-      // 1. Calculate standard room variables
-      const { stealthAddress, topic } = deriveRoomFromPeerKey(myPriv, peerPublicKey)
-
-      // 2. 🔐 THE PRIVACY FIX: Create a Blind Lookup Key unique ONLY to this user
-      // The server gets a random-looking string and cannot match it to Bob's row
-      const blindLookupKey = ethers.keccak256(ethers.solidityPacked(['bytes32', 'bytes32'], [topic, ethers.keccak256(`0x${myPriv}`)]))
-
-      // 3. Move EVERYTHING sensitive inside the encrypted bundle
-      const encryptedData = CryptoJS.AES.encrypt(
-        JSON.stringify({
+      const { stealthAddress, topic } = deriveRoomFromPeerKey(keys.privKeyHex, peerPublicKey)
+      const nextContacts = [
+        ...contacts,
+        {
           contactAddress: normalizedAddress,
           publicKey: peerPublicKey,
-          topic: topic, // Safely hidden inside the vault
-          stealthAddress: stealthAddress, // Safely hidden inside the vault
-        }),
-        myPriv,
-      ).toString()
+          topic,
+          stealthAddress,
+        },
+      ]
 
-      // 4. Sign the authorization payload using the blind lookup key
-      const signature = await signMessageAsync({
-        message: `Sync Contact Room Hash: ${blindLookupKey}`,
-      })
-
-      // 5. Send to your Web2 backend route
-      const saveContactRes = await fetch('/api/chat/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signature,
-          blind_lookup_key: blindLookupKey, // Replaces stealth_address
-          encrypted_data: encryptedData,
-        }),
-      })
-
-      const saveContactPayload = await saveContactRes.json().catch(() => ({}))
-      if (!saveContactRes.ok || !saveContactPayload.success) {
-        throw new Error(saveContactPayload.error || 'Failed to add contact.')
-      }
-
-      await loadMyContacts()
+      await persistContactsOnchain(nextContacts, keys)
+      setContacts(nextContacts)
       setContactsRefreshKey((prev) => prev + 1)
       setReceiverAddress(normalizedAddress)
       activeReceiverRef.current = normalizedAddress
@@ -545,7 +626,7 @@ export default function Chat() {
   }, [chatHistory.list])
 
   useEffect(() => {
-    if (!isConnected || !isMounted || contactsInitializedRef.current) return
+    if (!isConnected || !isMounted || !address || !publicClient || !tunnelAddress || contactsInitializedRef.current) return
 
     contactsInitializedRef.current = true
 
@@ -556,7 +637,7 @@ export default function Chat() {
     return () => {
       if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
     }
-  }, [isConnected, isMounted])
+  }, [isConnected, isMounted, address, publicClient, tunnelAddress])
 
   useEffect(() => {
     if (!isConnected) {

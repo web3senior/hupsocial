@@ -4,11 +4,33 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useCallback, useEffect } from 'react'
 import { useConnection, useSignMessage } from 'wagmi'
+import { usePublicClient, useWriteContract } from 'wagmi'
 import { ConnectWallet } from '@/components/ConnectWallet'
 import styles from './page.module.scss'
 import { ethers } from 'ethers'
 import ecies from 'eciesjs'
 import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, lockAppPrivateKey } from '@/lib/appVault'
+import { getActiveChain } from '@/lib/communication'
+
+const tunnelAbi = [
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'publicKeyRegistry',
+    outputs: [{ internalType: 'bytes', name: '', type: 'bytes' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'address', name: '_owner', type: 'address' },
+      { internalType: 'bytes', name: '_publicKey', type: 'bytes' },
+    ],
+    name: 'registerPublicKey',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+]
 
 export default function Page() {
   const [agree, setAgree] = useState(false)
@@ -16,11 +38,40 @@ export default function Page() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const { address, isConnected } = useConnection()
   const { signMessageAsync } = useSignMessage()
+  const publicClient = usePublicClient()
+  const { writeContractAsync } = useWriteContract()
+  const [, activeChainContracts] = getActiveChain()
+  const tunnelAddress = activeChainContracts?.chat
   const router = useRouter()
 
   const isPasswordValid = useCallback(() => {
     return password.length >= 8 && password === confirmPassword && agree
   }, [password, confirmPassword, agree])
+
+  const registerPublicKeyOnchain = async (pubKeyHex) => {
+    if (!address) throw new Error('Wallet address unavailable.')
+    if (!publicClient || !tunnelAddress) {
+      throw new Error('Tunnel contract is not configured for the active chain.')
+    }
+
+    const current = await publicClient.readContract({
+      address: tunnelAddress,
+      abi: tunnelAbi,
+      functionName: 'publicKeyRegistry',
+      args: [address],
+    })
+
+    if (current && current !== '0x') {
+      return
+    }
+
+    await writeContractAsync({
+      address: tunnelAddress,
+      abi: tunnelAbi,
+      functionName: 'registerPublicKey',
+      args: [address, pubKeyHex],
+    })
+  }
 
   const createAccount = async () => {
     if (!isConnected || !address) return alert('Please connect your wallet first')
@@ -53,7 +104,8 @@ export default function Page() {
 
       const privKey = new ecies.PrivateKey(ethers.getBytes(seed))
       const rawPrivateKeyHex = privKey.toHex()
-      const pubKeyHex = privKey.publicKey.toHex()
+      const rawPubKeyHex = privKey.publicKey.toHex()
+      const pubKeyHex = rawPubKeyHex.startsWith('0x') ? rawPubKeyHex : `0x${rawPubKeyHex}`
 
       const encryptedKey = await lockAppPrivateKey(rawPrivateKeyHex, password)
 
@@ -62,11 +114,13 @@ export default function Page() {
 
       console.log(`Vault successfully encrypted and stored for ${lowAddress}`)
 
-      // Register on Smart Contract
-      // await registerOnChain(pubKeyHex)
-      void pubKeyHex
-
-      router.push('/register')
+      try {
+        await registerPublicKeyOnchain(pubKeyHex)
+        router.push('/chat')
+      } catch (registrationError) {
+        console.error('Onchain public key registration failed:', registrationError)
+        router.push('/register')
+      }
     } catch (error) {
       console.error('Account creation failed:', error)
 

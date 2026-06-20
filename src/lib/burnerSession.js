@@ -2,11 +2,13 @@ import { ethers } from 'ethers'
 import { getUserSessions } from './communication'
 import { decryptData, isPrivateKeyEncrypted } from './cryptoHelper'
 
+const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
+
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-export const localStorageBurnerAddress = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_address`
-export const localStorageBurnerKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}burner_key`
-export const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
-export const sessionStorageUnlockedKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}unlocked_burner_key`
+export const localStorageBurnerAddress = `${prefix}burner_address`
+export const localStorageBurnerKey = `${prefix}burner_key`
+export const localStorageBatchLikeKey = `${prefix}batch_like_enabled`
+export const sessionStorageUnlockedKey = `${prefix}unlocked_burner_key`
 
 const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl || chain?.rpc || process.env.NEXT_PUBLIC_LUKSO_RPC_URL
 

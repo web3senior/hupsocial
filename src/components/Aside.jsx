@@ -37,7 +37,6 @@ import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
 
-
 const NAV_COMPONENTS = {
   'new-post': NewPost,
 }
@@ -221,7 +220,7 @@ export default function Aside() {
         styles.aside,
         !isMobileLayout && (isExpanded ? styles.expanded : styles.compact),
         shouldShowMobileMenu && styles.show,
-        shouldShowMobileMenu && styles.expanded,
+        shouldShowMobileMenu && styles.expanded
       )}
     >
       <div className={styles.navContainer}>
