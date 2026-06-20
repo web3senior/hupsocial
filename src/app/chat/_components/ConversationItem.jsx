@@ -20,12 +20,17 @@ export const ConversationItem = ({ chat, isActive, onSelect, chainIcon }) => {
         <div className={styles['conversation-item__user']}>
           {/* Avatar with fallback handling included in useProfile/Fetcher */}
           <img src={profile?.profileImage} alt={displayName} className={styles['conversation-item__avatar']} />
-          <div className={styles['conversation-item__info']}>
-            <div className={clsx('flex align-items-center gap-025')}>
-              <strong className={styles['conversation-item__name']}>{displayName}</strong>
-              {chainIcon && <span className={styles['conversation-item__chain-icon']} dangerouslySetInnerHTML={{ __html: chainIcon }} />}
-            </div>
+        <div className={styles['conversation-item__info']}>
+          <div className="flex justify-between align-items-center">
+            <strong className={styles['conversation-item__name']}>{profile?.name}</strong>
+            <span className={styles['conversation-item__time']}>
+              {chat.lastTimestamp && new Date(chat.lastTimestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            </span>
           </div>
+          <p className={styles['conversation-item__preview']}>
+            {chat.lastMessage || "No messages yet"}
+          </p>
+        </div>
         </div>
       </div>
     </button>

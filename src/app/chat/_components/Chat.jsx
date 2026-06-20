@@ -222,38 +222,58 @@ export default function Chat() {
       return null
     }
   }
-  const persistContactsOnchain = async (nextContacts, keys) => {
-    if (!publicClient || !tunnelAddress || !address) {
-      throw new Error('Wallet or chain not ready for contacts sync.')
-    }
-
-    const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(nextContacts), keys.privKeyHex).toString()
-    const ipfsResult = await uploadObjectToIPFS(JSON.stringify({ version: '1', encrypted_data: encryptedData }))
-    const cid = normalizeCID(ipfsResult?.cid)
-    if (!cid) {
-      throw new Error('Failed to upload encrypted contacts to IPFS.')
-    }
-
-    const currentContacts = await publicClient.readContract({
-      address: tunnelAddress,
-      abi: abiChat,
-      functionName: 'getEncryptedContacts',
-      args: [address],
-    })
-
-    const currentVersion = Number(currentContacts?.[2] ?? currentContacts?.version ?? 0)
-    const nextVersion = BigInt(currentVersion + 1)
-    const contentHash = ethers.keccak256(ethers.toUtf8Bytes(cid))
-
-    const functionData = encodeFunctionData({
-      abi: abiChat,
-      functionName: 'setEncryptedContacts',
-      args: [address, cid, contentHash, nextVersion],
-    })
-
-    await relayMetaTransaction(functionData)
+// ■■■ Logic ■■■
+const persistContactsOnchain = async (nextContacts, keys) => {
+  if (!publicClient || !tunnelAddress || !address) {
+    throw new Error('Wallet or chain not ready for contacts sync.')
   }
 
+  // 1. Schema Normalization: Ensure preview fields exist for all contacts
+  const normalizedContacts = nextContacts.map(c => ({
+    contactAddress: c.contactAddress,
+    topic: c.topic,
+    stealthAddress: c.stealthAddress,
+    lastMessage: c.lastMessage || null,
+    lastTimestamp: c.lastTimestamp || null
+  }))
+
+  // 2. Encryption Layer
+  const encryptedData = CryptoJS.AES.encrypt(
+    JSON.stringify(normalizedContacts), 
+    keys.privKeyHex
+  ).toString()
+
+  const ipfsResult = await uploadObjectToIPFS(JSON.stringify({ 
+    version: '1', 
+    encrypted_data: encryptedData 
+  }))
+  
+  const cid = normalizeCID(ipfsResult?.cid)
+  if (!cid) {
+    throw new Error('Failed to upload encrypted contacts to IPFS.')
+  }
+
+  // 3. Chain State Sync
+  const currentContacts = await publicClient.readContract({
+    address: tunnelAddress,
+    abi: abiChat,
+    functionName: 'getEncryptedContacts',
+    args: [address],
+  })
+
+  // Determine current version safely
+  const currentVersion = Number(currentContacts?.[2] ?? currentContacts?.version ?? 0)
+  const nextVersion = BigInt(currentVersion + 1)
+  const contentHash = ethers.keccak256(ethers.toUtf8Bytes(cid))
+
+  const functionData = encodeFunctionData({
+    abi: abiChat,
+    functionName: 'setEncryptedContacts',
+    args: [address, cid, contentHash, nextVersion],
+  })
+
+  return await relayMetaTransaction(functionData)
+}
   // ■■■ Logic ■■■
   const loadMyContacts = async () => {
     try {
@@ -542,10 +562,24 @@ export default function Chat() {
 
       const success = await sendShroudedMessage(activeStealthAddress, activeTopic, normalizedCID, receiverWrappedKey)
 
-      if (success) {
-        setMessageText('')
-        await viewChatWith(receiverAddress)
+if (success) {
+  const updatedContacts = contacts.map(c => {
+    if (c.contactAddress.toLowerCase() === receiverAddress.toLowerCase()) {
+      return {
+        ...c,
+        lastMessage: messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText,
+        lastTimestamp: Date.now()
       }
+    }
+    return c
+  })
+  
+  setContacts(updatedContacts)
+  await persistContactsOnchain(updatedContacts, keys) // Persist the updated "latest message" metadata
+  
+  setMessageText('')
+  await viewChatWith(receiverAddress)
+}
     } catch (error) {
       console.error('Messaging engine crashed:', error)
     } finally {
