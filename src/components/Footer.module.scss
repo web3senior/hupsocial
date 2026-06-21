@@ -36,6 +36,7 @@
       display: flex;
       align-items: center;
       justify-content: space-around;
+      gap: 0.5rem;
       list-style: none;
       margin: 0;
 
@@ -87,13 +88,16 @@
   }
 
   // Trigger the zoom expansion on hover or keyboard focus
-  // &:focus-visible::before
   @media (hover: hover) and (pointer: fine) {
-    &:hover::before {
-      opacity: 1;
-      transform: scale(1);
+    // FIX: Apply :not() to the parent element before the hover and pseudo-element
+    &:not([aria-label='New']) {
+      &:hover::before {
+        opacity: 1;
+        transform: scale(1);
+      }
     }
   }
+
   // Soft tap shrink for mobile responsiveness
   &:active {
     transform: scale(0.95);
