@@ -18,7 +18,6 @@ import { getActiveChain } from '@/lib/communication'
 import { ConversationList } from './ConversationList'
 import styles from './Chat.module.scss'
 import abiChat from '@/abis/Chat.json'
-
 import { useProfile } from '@/hooks/useProfile'
 import { Buffer } from 'buffer'
 
@@ -79,7 +78,11 @@ export default function Chat() {
   const chatIntervalRef = useRef(null)
   const scrollRef = useRef(null)
 
-  const [isLoading, setIsLoading] = useState(false)
+  // isSending: only blocks the send button, never the textarea
+  const [isSending, setIsSending] = useState(false)
+  // pendingMessage: optimistic bubble shown while TX is in flight
+  const [pendingMessage, setPendingMessage] = useState(null)
+
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
   const [activeChainConfig, activeChainContracts] = getActiveChain()
@@ -106,27 +109,14 @@ export default function Chat() {
   }
 
   const deriveRoomFromPeerKey = (myPrivateKeyHex, peerPublicKey) => {
-    // 1. Ensure Private Key is a clean, properly prefixed 0x hex string
     let cleanPriv = myPrivateKeyHex.trim()
-    if (!cleanPriv.startsWith('0x')) {
-      cleanPriv = `0x${cleanPriv}`
-    }
-
-    // 2. Ensure Public Key is a clean, properly prefixed 0x hex string
+    if (!cleanPriv.startsWith('0x')) cleanPriv = `0x${cleanPriv}`
     let cleanPub = peerPublicKey.trim()
-    if (!cleanPub.startsWith('0x')) {
-      cleanPub = `0x${cleanPub}`
-    }
-    // 3. Initialize the key directly using the hex string format (avoiding broken Buffers)
+    if (!cleanPub.startsWith('0x')) cleanPub = `0x${cleanPub}`
     const signingKey = new ethers.SigningKey(cleanPriv)
-
-    // 4. Compute the Shared Secret (Diffie-Hellman: Alice_priv * Bob_pub === Bob_priv * Alice_pub)
     const sharedSecret = signingKey.computeSharedSecret(cleanPub)
-
-    // 5. Generate matching room topics and meeting points
     const topic = ethers.keccak256(sharedSecret)
     const stealthAddress = ethers.getAddress(ethers.dataSlice(ethers.keccak256(sharedSecret), 12))
-
     return { topic, stealthAddress }
   }
 
@@ -134,17 +124,12 @@ export default function Chat() {
     if (!publicClient || !forwarderAddress || !tunnelAddress || !relayRpcUrl) {
       throw new Error('Chat relay configuration is missing for this chain.')
     }
-
     const unlockedKey = sessionStorage.getItem(chatSessionStorageUnlockedKey)
     const storedBurnerKey = localStorage.getItem(chatLocalStorageBurnerKey)
     const burnerKey = normalizePrivateKey(unlockedKey) || normalizePrivateKey(storedBurnerKey)
-    if (!burnerKey) {
-      throw new Error('Session expired or burner key is missing.')
-    }
-
+    if (!burnerKey) throw new Error('Session expired or burner key is missing.')
     const burner = new ethers.Wallet(burnerKey)
     const { request, signature } = await signMetaTransactionSessionMode(burner, functionData)
-
     const res = await fetch('/api/v1/relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -152,36 +137,23 @@ export default function Chat() {
         typeof value === 'bigint' ? value.toString() : value
       ),
     })
-
     const payload = await res.json().catch(() => ({}))
-    if (!res.ok || !payload?.success) {
-      throw new Error(payload?.error || 'Message relay failed.')
-    }
-
+    if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Message relay failed.')
     return true
   }
 
   async function signMetaTransactionSessionMode(signer, functionData) {
     const from = await signer.getAddress()
-
     const nonce = await publicClient.readContract({
       address: forwarderAddress,
       abi: forwarderAbi,
       functionName: 'nonces',
       args: [from],
     })
-
     const chainId = activeChainConfig?.id
     if (!chainId) throw new Error('Missing active chain id.')
-
     const deadline = Math.floor(Date.now() / 1000) + 3600
-    const domain = {
-      name: 'HupForwarder',
-      version: '1',
-      chainId,
-      verifyingContract: forwarderAddress,
-    }
-
+    const domain = { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress }
     const types = {
       ForwardRequest: [
         { name: 'from', type: 'address' },
@@ -193,17 +165,7 @@ export default function Chat() {
         { name: 'data', type: 'bytes' },
       ],
     }
-
-    const message = {
-      from,
-      to: tunnelAddress,
-      value: 0n,
-      gas: 1_000_000n,
-      nonce,
-      deadline,
-      data: functionData,
-    }
-
+    const message = { from, to: tunnelAddress, value: 0n, gas: 1_000_000n, nonce, deadline, data: functionData }
     const signature = await signer.signTypedData(domain, types, message)
     return { request: message, signature }
   }
@@ -222,128 +184,75 @@ export default function Chat() {
       return null
     }
   }
-// ■■■ Logic ■■■
-const persistContactsOnchain = async (nextContacts, keys) => {
-  if (!publicClient || !tunnelAddress || !address) {
-    throw new Error('Wallet or chain not ready for contacts sync.')
+
+  const persistContactsOnchain = async (nextContacts, keys) => {
+    if (!publicClient || !tunnelAddress || !address) throw new Error('Wallet or chain not ready for contacts sync.')
+    const normalizedContacts = nextContacts.map((c) => ({
+      contactAddress: c.contactAddress,
+      topic: c.topic,
+      stealthAddress: c.stealthAddress,
+    }))
+    const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(normalizedContacts), keys.privKeyHex).toString()
+    const ipfsResult = await uploadObjectToIPFS(JSON.stringify({ version: '1', encrypted_data: encryptedData }))
+    const cid = normalizeCID(ipfsResult?.cid)
+    if (!cid) throw new Error('Failed to upload encrypted contacts to IPFS.')
+    const currentContacts = await publicClient.readContract({
+      address: tunnelAddress,
+      abi: abiChat,
+      functionName: 'getEncryptedContacts',
+      args: [address],
+    })
+    const currentVersion = Number(currentContacts?.[2] ?? currentContacts?.version ?? 0)
+    const nextVersion = BigInt(currentVersion + 1)
+    const contentHash = ethers.keccak256(ethers.toUtf8Bytes(cid))
+    const functionData = encodeFunctionData({
+      abi: abiChat,
+      functionName: 'setEncryptedContacts',
+      args: [address, cid, contentHash, nextVersion],
+    })
+    return await relayMetaTransaction(functionData)
   }
 
-  // 1. Schema Normalization: Ensure preview fields exist for all contacts
-  const normalizedContacts = nextContacts.map(c => ({
-    contactAddress: c.contactAddress,
-    topic: c.topic,
-    stealthAddress: c.stealthAddress,
-    lastMessage: c.lastMessage || null,
-    lastTimestamp: c.lastTimestamp || null
-  }))
-
-  // 2. Encryption Layer
-  const encryptedData = CryptoJS.AES.encrypt(
-    JSON.stringify(normalizedContacts), 
-    keys.privKeyHex
-  ).toString()
-
-  const ipfsResult = await uploadObjectToIPFS(JSON.stringify({ 
-    version: '1', 
-    encrypted_data: encryptedData 
-  }))
-  
-  const cid = normalizeCID(ipfsResult?.cid)
-  if (!cid) {
-    throw new Error('Failed to upload encrypted contacts to IPFS.')
-  }
-
-  // 3. Chain State Sync
-  const currentContacts = await publicClient.readContract({
-    address: tunnelAddress,
-    abi: abiChat,
-    functionName: 'getEncryptedContacts',
-    args: [address],
-  })
-
-  // Determine current version safely
-  const currentVersion = Number(currentContacts?.[2] ?? currentContacts?.version ?? 0)
-  const nextVersion = BigInt(currentVersion + 1)
-  const contentHash = ethers.keccak256(ethers.toUtf8Bytes(cid))
-
-  const functionData = encodeFunctionData({
-    abi: abiChat,
-    functionName: 'setEncryptedContacts',
-    args: [address, cid, contentHash, nextVersion],
-  })
-
-  return await relayMetaTransaction(functionData)
-}
-  // ■■■ Logic ■■■
   const loadMyContacts = async () => {
     try {
       if (!publicClient || !tunnelAddress || !address) return
-
       const keys = await getUnlockedKey()
       if (!keys) return
-
       const onchainContacts = await publicClient.readContract({
         address: tunnelAddress,
         abi: abiChat,
         functionName: 'getEncryptedContacts',
         args: [address],
       })
-
       const cid = normalizeCID(onchainContacts?.[0] ?? '')
       const version = Number(onchainContacts?.[2] ?? 0)
-      if (!cid || version === 0) {
-        setContacts([])
-        return
-      }
-
+      if (!cid || version === 0) { setContacts([]); return }
       const payload = await getIPFS(cid)
-
-      // 1. Initial Extraction
       let rawBlob = typeof payload === 'string' ? payload : payload?.encrypted_data || payload?.encryptedData || payload?.data || null
-
-      if (!rawBlob) {
-        setContacts([])
-        return
-      }
-
-      // 2. Deep Sanitization & Wrapper Bypass
+      if (!rawBlob) { setContacts([]); return }
       rawBlob = rawBlob.replace(/^"|"$/g, '').trim()
-
-      // If the payload is a stringified JSON wrapper, parse it to extract the actual ciphertext
       if (rawBlob.startsWith('{')) {
         try {
           const unwrapped = JSON.parse(rawBlob)
           rawBlob = unwrapped.encryptedData || unwrapped.encrypted_data || unwrapped.data || rawBlob
-        } catch (e) {
-          console.warn('Failed to parse IPFS JSON wrapper. Proceeding with raw string.')
-        }
+        } catch { console.warn('Failed to parse IPFS JSON wrapper.') }
       }
-
-      // 3. Cryptographic Execution
       const symmetricKey = keys.privKeyHex.toLowerCase()
       let decoded
-
       try {
-        // Pass strictly the isolated ciphertext into the AES engine
         const bytes = CryptoJS.AES.decrypt(rawBlob, symmetricKey)
         decoded = bytes.toString(CryptoJS.enc.Utf8)
-
-        if (!decoded) {
-          throw new Error('Buffer is empty post-decryption. Key mismatch or corrupted bytes.')
-        }
+        if (!decoded) throw new Error('Empty decryption buffer.')
       } catch (decryptErr) {
-        console.error('Cryptographic Fault: Ciphertext corrupted or key mismatch.', decryptErr)
+        console.error('Cryptographic Fault:', decryptErr)
         setContacts([])
         return
       }
-
-      // 4. State Normalization
       const parsed = JSON.parse(decoded)
       const normalized = Array.isArray(parsed) ? parsed : parsed?.contacts
       const validContacts = Array.isArray(normalized)
         ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress)
         : []
-
       setContacts(validContacts)
     } catch (err) {
       console.error('Failed loading contacts:', err)
@@ -351,47 +260,35 @@ const persistContactsOnchain = async (nextContacts, keys) => {
   }
 
   const uploadObjectToIPFS = async (json) => {
-    // setIsUploading(true)
-
     try {
       const uploadRequest = await fetch('/api/ipfs/object', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(json),
       })
-
       if (!uploadRequest.ok) {
         const errorData = await uploadRequest.json().catch(() => ({}))
         throw new Error(errorData.error || `Upload failed with status ${uploadRequest.status}`)
       }
-
       return uploadRequest.json()
     } catch (error) {
       console.error('Trouble uploading post metadata:', error)
       throw error
-    } finally {
-      // setIsUploading(false)
     }
   }
 
   const readHistoryChat = async (contactAddress) => {
     const keys = await getUnlockedKey()
     if (!keys || !publicClient || !tunnelAddress || !address) return []
-
     const subtle = window.crypto.subtle
     const myAddress = address.toLowerCase()
-
     try {
       const friend = contacts.find((c) => c.contactAddress.toLowerCase() === contactAddress.toLowerCase())
       if (!friend) return []
-
       const latestPeerKey = await getRegisteredChatPublicKey(contactAddress)
       const derivedRoom = latestPeerKey ? deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey) : null
       const candidateTopics = Array.from(new Set([friend.topic, derivedRoom?.topic].filter(Boolean)))
       if (candidateTopics.length === 0) return []
-
       const historyResponses = await Promise.all(
         candidateTopics.map(async (topic) => {
           const response = await publicClient.readContract({
@@ -414,7 +311,6 @@ const persistContactsOnchain = async (nextContacts, keys) => {
         seenIds.add(id)
         return true
       })
-
       const decryptedList = await Promise.all(
         mergedMessages.map(async (entry) => {
           try {
@@ -425,38 +321,30 @@ const persistContactsOnchain = async (nextContacts, keys) => {
             const msgEncryptedKey = msg.encryptedKey ?? msg[3]
             const msgDeleted = Boolean(msg.isDeleted ?? msg[5])
             if (!msgMetadata || msgDeleted) return null
-
             const ipfsPayloadRaw = await getIPFS(msgMetadata)
             const ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
             const senderAddress = ipfsPayload?.senderAddr?.toLowerCase?.() || msgSender
             const isIncoming = senderAddress !== myAddress
             let decryptionKey = null
-
             const messageTopic = entry.topic || friend.topic
             if (messageTopic) {
               const perTopicSeed = ethers.keccak256(ethers.concat([messageTopic, ethers.toUtf8Bytes('content-encryption')]))
-              const perTopicKeyRaw = ethers.getBytes(perTopicSeed)
-              decryptionKey = await subtle.importKey('raw', perTopicKeyRaw, 'AES-GCM', true, ['decrypt'])
+              decryptionKey = await subtle.importKey('raw', ethers.getBytes(perTopicSeed), 'AES-GCM', true, ['decrypt'])
             }
-
             if (isIncoming) {
               const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
               if (wrappedKeyBlob) {
                 try {
                   const unwrappedRawKey = ecies.decrypt(Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'), Buffer.from(wrappedKeyBlob))
                   decryptionKey = await subtle.importKey('raw', new Uint8Array(unwrappedRawKey), 'AES-GCM', true, ['decrypt'])
-                } catch {
-                  // Deterministic topic key fallback stays active.
-                }
+                } catch { /* topic key fallback stays active */ }
               }
             }
             if (!decryptionKey) return null
-
             const iv = ethers.getBytes(ipfsPayload.iv)
             const ciphertext = ethers.getBytes(ipfsPayload.ciphertext)
             const decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, decryptionKey, ciphertext)
             const plaintext = new TextDecoder().decode(decryptedBuffer)
-
             return {
               id: `${entry.topic}-${msgTimestamp}-${senderAddress}-${msgMetadata}`,
               message: plaintext,
@@ -465,12 +353,9 @@ const persistContactsOnchain = async (nextContacts, keys) => {
               side: senderAddress === myAddress ? 'me' : 'them',
               rawTimestamp: msgTimestamp,
             }
-          } catch (msgErr) {
-            return null
-          }
+          } catch { return null }
         })
       )
-
       return decryptedList.filter((m) => m !== null).sort((a, b) => a.rawTimestamp - b.rawTimestamp)
     } catch (error) {
       console.error('Retrieval processing dropped:', error)
@@ -478,112 +363,97 @@ const persistContactsOnchain = async (nextContacts, keys) => {
     }
   }
 
-  // Inside your Chat() component structure...
-
-  const viewChatWith = async (contactAddress) => {
+  const viewChatWith = async (contactAddress, clearPending = false) => {
     if (!contactAddress) return
-
-    // Clean up any stale active poll interval references instantly
-    if (chatIntervalRef.current) {
-      clearInterval(chatIntervalRef.current)
-    }
-
+    if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
     setReceiverAddress(contactAddress)
     activeReceiverRef.current = contactAddress
 
-    const performSync = async () => {
+    const performSync = async (opts = {}) => {
       try {
-        // Direct database history call: Requires NO wallet signatures
         const freshMessages = await readHistoryChat(contactAddress)
-
         if (contactAddress !== activeReceiverRef.current) return
-
         setChatHistory((prev) => {
           if (prev.list.length === freshMessages.length) return { ...prev, isLoading: false }
-          return {
-            list: freshMessages,
-            isLoading: false,
-          }
+          return { list: freshMessages, isLoading: false }
         })
+        // Clear the optimistic bubble only once the confirmed message is in history
+        if (opts.clearPending) setPendingMessage(null)
       } catch (err) {
         console.error('Background message sync failure:', err)
         setChatHistory((prev) => ({ ...prev, isLoading: false }))
+        if (opts.clearPending) setPendingMessage(null)
       }
     }
 
-    // Set loading layout only if opening this chat context for the first time
     setChatHistory((prev) => ({ ...prev, isLoading: prev.list.length === 0 }))
-    await performSync()
-
-    // Safe polling background loop running silently off-chain
+    await performSync({ clearPending })
     chatIntervalRef.current = setInterval(performSync, 5000)
   }
 
   async function sendEncryptedMessage(e) {
     e.preventDefault()
-    if (!messageText.trim() || !receiverAddress) return
+    const trimmed = messageText.trim()
+    if (!trimmed || !receiverAddress || isSending) return
+
+    // Show optimistic bubble instantly, clear input, allow more typing
+    const optimisticMsg = {
+      id: `pending-${Date.now()}`,
+      message: trimmed,
+      timestamp: new Date().toLocaleString(),
+      sender: address?.toLowerCase(),
+      side: 'me',
+      pending: true,
+    }
+    setMessageText('')
+    setPendingMessage(optimisticMsg)
+    setIsSending(true)
 
     try {
-      setIsLoading(true)
       const keys = await getUnlockedKey()
       if (!keys) throw new Error('Vault locked.')
-
-      let friend = contacts.find((c) => c.contactAddress.toLowerCase() === receiverAddress.toLowerCase())
+      const friend = contacts.find((c) => c.contactAddress.toLowerCase() === receiverAddress.toLowerCase())
       if (!friend) throw new Error('Contact room entry missing.')
-
       const latestPeerKey = await getRegisteredChatPublicKey(friend.contactAddress)
       if (!latestPeerKey) throw new Error('Receiver has no registered chat public key.')
       const latestRoom = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
       const activeTopic = latestRoom.topic
       const activeStealthAddress = latestRoom.stealthAddress
-
       const subtle = window.crypto.subtle
       const derivedKeySeed = ethers.keccak256(ethers.concat([activeTopic, ethers.toUtf8Bytes('content-encryption')]))
-
       const contentKeyRawBytes = ethers.getBytes(derivedKeySeed)
       const contentKey = await subtle.importKey('raw', contentKeyRawBytes, 'AES-GCM', true, ['encrypt'])
-
       const iv = window.crypto.getRandomValues(new Uint8Array(12))
-      const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, contentKey, new TextEncoder().encode(messageText))
-
+      const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, contentKey, new TextEncoder().encode(trimmed))
       const encryptedTextPayload = {
         version: '1',
         iv: ethers.hexlify(iv),
         ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
         senderAddr: address,
       }
-
       const ipfsResult = await uploadObjectToIPFS(JSON.stringify(encryptedTextPayload))
       const normalizedCID = normalizeCID(ipfsResult?.cid)
       if (!normalizedCID) throw new Error('Failed to upload message payload to IPFS.')
-
       const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
       const receiverWrappedKey = ecies.encrypt(uncompressedRawKey, Buffer.from(contentKeyRawBytes))
-
       const success = await sendShroudedMessage(activeStealthAddress, activeTopic, normalizedCID, receiverWrappedKey)
-
-if (success) {
-  const updatedContacts = contacts.map(c => {
-    if (c.contactAddress.toLowerCase() === receiverAddress.toLowerCase()) {
-      return {
-        ...c,
-        lastMessage: messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText,
-        lastTimestamp: Date.now()
+      if (success) {
+        // Pass clearPending=true so the bubble is removed only when confirmed history arrives
+        await viewChatWith(receiverAddress, true)
       }
-    }
-    return c
-  })
-  
-  setContacts(updatedContacts)
-  await persistContactsOnchain(updatedContacts, keys) // Persist the updated "latest message" metadata
-  
-  setMessageText('')
-  await viewChatWith(receiverAddress)
-}
     } catch (error) {
       console.error('Messaging engine crashed:', error)
+      setPendingMessage(null)
+      setMessageText(trimmed)
     } finally {
-      setIsLoading(false)
+      setIsSending(false)
+    }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendEncryptedMessage(e)
     }
   }
 
@@ -599,47 +469,25 @@ if (success) {
 
   const newChat = async (inputAddress) => {
     const contactAddress = inputAddress?.trim()
-    if (!contactAddress || !/^0x[a-fA-F0-9]{40}$/.test(contactAddress)) {
-      throw new Error('Please enter a valid wallet address.')
-    }
-
+    if (!contactAddress || !/^0x[a-fA-F0-9]{40}$/.test(contactAddress)) throw new Error('Please enter a valid wallet address.')
     try {
       const normalizedAddress = contactAddress.toLowerCase()
       const keys = await getUnlockedKey()
       if (!keys) throw new Error('Vault locked.')
-
-      if (address && normalizedAddress === address.toLowerCase()) {
-        throw new Error('You cannot add your own wallet as a contact.')
-      }
-
+      if (address && normalizedAddress === address.toLowerCase()) throw new Error('You cannot add your own wallet as a contact.')
       const alreadyExists = contacts.some((item) => item.contactAddress.toLowerCase() === normalizedAddress)
-      if (alreadyExists) {
-        throw new Error('This contact is already in your list.')
-      }
-
+      if (alreadyExists) throw new Error('This contact is already in your list.')
       const peerPublicKey = await getRegisteredChatPublicKey(contactAddress)
       if (!peerPublicKey) throw new Error("This profile hasn't registered cryptographic chat keys yet.")
-
       const { stealthAddress, topic } = deriveRoomFromPeerKey(keys.privKeyHex, peerPublicKey)
-      const nextContacts = [
-        ...contacts,
-        {
-          contactAddress: normalizedAddress,
-          publicKey: peerPublicKey,
-          topic,
-          stealthAddress,
-        },
-      ]
-
+      const nextContacts = [...contacts, { contactAddress: normalizedAddress, publicKey: peerPublicKey, topic, stealthAddress }]
       await persistContactsOnchain(nextContacts, keys)
       setContacts(nextContacts)
       setContactsRefreshKey((prev) => prev + 1)
       setReceiverAddress(normalizedAddress)
       activeReceiverRef.current = normalizedAddress
       await viewChatWith(normalizedAddress)
-    } catch (e) {
-      throw e
-    }
+    } catch (e) { throw e }
   }
 
   const handleAddContactSubmit = async (e) => {
@@ -655,29 +503,18 @@ if (success) {
   }
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [chatHistory.list])
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [chatHistory.list, pendingMessage])
 
   useEffect(() => {
     if (!isConnected || !isMounted || !address || !publicClient || !tunnelAddress || contactsInitializedRef.current) return
-
     contactsInitializedRef.current = true
-
-    setTimeout(() => {
-      void loadMyContacts()
-    }, 0)
-
-    return () => {
-      if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
-    }
+    setTimeout(() => { void loadMyContacts() }, 0)
+    return () => { if (chatIntervalRef.current) clearInterval(chatIntervalRef.current) }
   }, [isConnected, isMounted, address, publicClient, tunnelAddress])
 
   useEffect(() => {
-    if (!isConnected) {
-      contactsInitializedRef.current = false
-    }
+    if (!isConnected) contactsInitializedRef.current = false
   }, [isConnected])
 
   if (!isMounted) return null
@@ -713,7 +550,6 @@ if (success) {
           </form>
         )}
         {contactError && <p className={styles['add-contact__error']}>{contactError}</p>}
-
         <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} contacts={contacts} refreshKey={contactsRefreshKey} />
       </aside>
 
@@ -727,20 +563,33 @@ if (success) {
               </div>
             </div>
           ))}
-          {chatHistory.list.length === 0 && <div className={styles['chat-history__empty']}>Start chatting securely!</div>}
+
+          {/* Optimistic bubble — hidden the moment confirmed history lands */}
+          {pendingMessage && (
+            <div className={clsx(styles['chat-message'], styles['chat-message--me'], styles['chat-message--pending'])}>
+              <div className={styles['chat-message__content']}>{pendingMessage.message}</div>
+              <div className={styles['chat-message__timestamp']}>
+                <small className={styles['chat-message__sending']}>Sending…</small>
+              </div>
+            </div>
+          )}
+
+          {chatHistory.list.length === 0 && !pendingMessage && (
+            <div className={styles['chat-history__empty']}>Start chatting securely!</div>
+          )}
         </div>
+
         <footer className={clsx(styles.footer, 'mt-20')}>
           <form onSubmit={sendEncryptedMessage}>
             <div className="flex align-items-center justify-content-between gap-1">
               <textarea
                 value={messageText}
-                disabled={isLoading}
                 onChange={(e) => setMessageText(e.target.value)}
-                placeholder="Write an encrypted message..."
+                onKeyDown={handleKeyDown}
+                placeholder="Write an encrypted message…"
               />
-              {isLoading && <ContentSpinner />}
-              <button type="submit" disabled={!receiverAddress || !messageText || isLoading}>
-                <ArrowUp width={18} height={18} />
+              <button type="submit" disabled={!receiverAddress || !messageText.trim() || isSending}>
+                {isSending ? <ContentSpinner /> : <ArrowUp width={18} height={18} />}
               </button>
             </div>
           </form>

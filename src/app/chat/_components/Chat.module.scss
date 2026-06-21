@@ -211,7 +211,7 @@
   text-align: left;
 
   &:hover {
-    background-color: var(--light-blue);
+    background-color: var(--hover);
     cursor: pointer;
   }
 
@@ -228,6 +228,7 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
+
   }
 
   &__user {
@@ -398,8 +399,12 @@
 
   &__content {
     // Ensuring content doesn't squeeze the timestamp logic
-    display: block;
-    width: 100%;
+      overflow: hidden;
+      line-height: 1.4;
+      position: relative;
+      padding: 0.2rem 0 0.2rem 0.3rem;
+      white-space: pre-wrap;
+      word-wrap: break-word;
   }
 }
 
