@@ -228,7 +228,6 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
-
   }
 
   &__user {
@@ -399,12 +398,12 @@
 
   &__content {
     // Ensuring content doesn't squeeze the timestamp logic
-      overflow: hidden;
-      line-height: 1.4;
-      position: relative;
-      padding: 0.2rem 0 0.2rem 0.3rem;
-      white-space: pre-wrap;
-      word-wrap: break-word;
+    overflow: hidden;
+    line-height: 1.4;
+    position: relative;
+    padding: 0.2rem 0 0.2rem 0.3rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
 }
 
@@ -540,9 +539,12 @@
     height: 36px;
     border: none;
     color: var(--white);
-    background-color: var(--color-primary);
+    background-color: var(--network-color-primary);
     aspect-ratio: 1/1;
-
+    border-radius: 1100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     &:not([disabled]) {
       will-change: transform;
       transition: transform 0.05s ease-in-out;

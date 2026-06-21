@@ -1,7 +1,6 @@
 /**
  * Fetches and parses JSON content from a specified IPFS gateway URL using the CID.
- * * @param {string} CID - The Content Identifier (hash) of the data to fetch.
- * @returns {Promise<object | {result: false}>} The parsed JSON object, or {result: false} on failure.
+
  */
 export const getIPFS = async (CID) => {
   // 1. Basic input validation
