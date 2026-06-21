@@ -8,21 +8,37 @@ import ecies from 'eciesjs'
 import { useConnection, usePublicClient } from 'wagmi'
 import { getIPFS } from '@/lib/ipfs'
 import clsx from 'clsx'
-import { ArrowUp, EllipsisVertical, MessageSquarePlus } from 'lucide-react'
+import {
+  ArrowUp,
+  EllipsisVertical,
+  MessageSquarePlus,
+  Image as ImageIcon,
+  SquarePlay,
+  X,
+} from 'lucide-react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { bytesToHex, encodeFunctionData } from 'viem'
 import { ContentSpinner } from '@/components/Loading'
-import { chatLocalStorageBurnerKey, chatSessionStorageUnlockedKey, CHAT_ZERO_ADDRESS as ZERO_ADDRESS } from '@/lib/chatBurnerSession'
+import {
+  chatLocalStorageBurnerKey,
+  chatSessionStorageUnlockedKey,
+  CHAT_ZERO_ADDRESS as ZERO_ADDRESS,
+} from '@/lib/chatBurnerSession'
 import { APP_PASSWORD_SESSION_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
+import { resolveIPFSUrl } from '@/lib/storageHelper'
 import { ConversationList } from './ConversationList'
 import styles from './Chat.module.scss'
 import abiChat from '@/abis/Chat.json'
-import { useProfile } from '@/hooks/useProfile'
 import { Buffer } from 'buffer'
-import { useChatHistory } from '@/hooks/useChatHistory';
-import { useSWRConfig } from 'swr';
+import { useChatHistory } from '@/hooks/useChatHistory'
+import { useSWRConfig } from 'swr'
+
+// ■■■ Configuration & Helpers ■■■
+
 const CHAT_PAGE_SIZE = 200
+const MAX_MEDIA_ITEMS = 4
+const MAX_MEDIA_SIZE_MB = 5
 
 const forwarderAbi = [
   {
@@ -36,10 +52,7 @@ const forwarderAbi = [
 
 function normalizeCID(cidValue) {
   if (!cidValue || typeof cidValue !== 'string') return ''
-  return cidValue
-    .trim()
-    .replace(/^ipfs:\/\//i, '')
-    .replace(/^\/ipfs\//i, '')
+  return cidValue.trim().replace(/^ipfs:\/\//i, '').replace(/^\/ipfs\//i, '')
 }
 
 function normalizePrivateKey(privateKey) {
@@ -65,8 +78,110 @@ function decodeEncryptedKeyBlob(value) {
   return null
 }
 
+const getMediaDimensions = (file, type) => {
+  return new Promise((resolve) => {
+    const localUrl = URL.createObjectURL(file)
+    if (type === 'image') {
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(localUrl)
+        resolve({ width: img.naturalWidth, height: img.naturalHeight })
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(localUrl)
+        resolve({ width: undefined, height: undefined })
+      }
+      img.src = localUrl
+    } else if (type === 'video') {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.onloadedmetadata = () => {
+        URL.revokeObjectURL(localUrl)
+        resolve({ width: video.videoWidth, height: video.videoHeight, duration: video.duration })
+      }
+      video.onerror = () => {
+        URL.revokeObjectURL(localUrl)
+        resolve({ width: undefined, height: undefined, duration: 0 })
+      }
+      video.src = localUrl
+    } else {
+      resolve({ width: undefined, height: undefined })
+    }
+  })
+}
+
+// ■■■ Lazy Decryption Component ■■■
+
+const EncryptedMediaItem = ({ item, rawKeyHex }) => {
+  const [localUrl, setLocalUrl] = useState(null)
+  const [isDecrypting, setIsDecrypting] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    const fetchAndDecrypt = async () => {
+      try {
+        const response = await fetch(resolveIPFSUrl(item.cid))
+        if (!response.ok) throw new Error('Failed to fetch encrypted media blob')
+        
+        const encryptedBuffer = await response.arrayBuffer()
+        const subtle = window.crypto.subtle
+        
+        const key = await subtle.importKey(
+          'raw',
+          ethers.getBytes(rawKeyHex),
+          'AES-GCM',
+          true,
+          ['decrypt']
+        )
+        
+        const decryptedBuffer = await subtle.decrypt(
+          { name: 'AES-GCM', iv: ethers.getBytes(item.iv) },
+          key,
+          encryptedBuffer
+        )
+        
+        if (!active) return
+        
+        const blob = new Blob([decryptedBuffer], { type: item.mimeType })
+        setLocalUrl(URL.createObjectURL(blob))
+      } catch (error) {
+        console.error('Media decryption failed:', error)
+      } finally {
+        if (active) setIsDecrypting(false)
+      }
+    }
+    
+    fetchAndDecrypt()
+    
+    return () => {
+      active = false
+      if (localUrl) URL.revokeObjectURL(localUrl)
+    }
+  }, [item.cid, item.iv, item.mimeType, rawKeyHex])
+
+  if (isDecrypting) {
+    return (
+      <div className={clsx(styles['chat-message__media-placeholder'], 'flex items-center justify-center bg-zinc-800 rounded h-32 w-32')}>
+        <ContentSpinner />
+      </div>
+    )
+  }
+
+  if (!localUrl) {
+    return <div className={clsx(styles['chat-message__media-error'])}>Media unavailable</div>
+  }
+
+  return item.type === 'image' ? (
+    <img src={localUrl} alt="Encrypted asset" className={styles['chat-message__media-item']} />
+  ) : (
+    <video src={localUrl} controls className={styles['chat-message__media-item']} />
+  )
+}
+
+// ■■■ Main Logic ■■■
+
 export default function Chat() {
-  const { mutate } = useSWRConfig();
+  const { mutate } = useSWRConfig()
   const router = useRouter()
   const [messageText, setMessageText] = useState('')
   const [pendingMessages, setPendingMessages] = useState([])
@@ -81,10 +196,12 @@ export default function Chat() {
   const chatIntervalRef = useRef(null)
   const scrollRef = useRef(null)
   const currentNonce = useRef(null)
-  // isSending: only blocks the send button, never the textarea
   const [isSending, setIsSending] = useState(false)
-  // pendingMessage: optimistic bubble shown while TX is in flight
   const [pendingMessage, setPendingMessage] = useState(null)
+
+  const [mediaItems, setMediaItems] = useState([])
+  const [selectedMediaType, setSelectedMediaType] = useState(null)
+  const fileInputRef = useRef(null)
 
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
@@ -94,14 +211,87 @@ export default function Chat() {
   const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
   const [chatHistory, setChatHistory] = useState({ list: [], isLoading: false })
   const isMounted = useClientMounted()
-const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, {
+
+  const { data: chatList } = useChatHistory(receiverAddress, contacts, {
     publicClient,
     tunnelAddress,
     address,
-  });
+  })
+
+  // ■■■ Media Handlers ■■■
+
+  const uploadFileToIPFS = async (fileOrBlob) => {
+    const data = new FormData()
+    // Append a generic filename to bypass potential multer/FormData restrictions on raw blobs
+    data.set('file', fileOrBlob, 'shrouded_asset.bin')
+    const uploadRequest = await fetch('/api/ipfs/file', {
+      method: 'POST',
+      body: data,
+    })
+    if (!uploadRequest.ok) throw new Error(`Upload failed: ${uploadRequest.status}`)
+    const result = await uploadRequest.json()
+    return result.cid
+  }
+
+  const triggerFileInput = (type) => {
+    if (mediaItems.length >= MAX_MEDIA_ITEMS) return
+    setSelectedMediaType(type)
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = type === 'image' ? 'image/*' : 'video/*'
+      fileInputRef.current.click()
+    }
+  }
+
+  const handleFileSelect = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || mediaItems.length >= MAX_MEDIA_ITEMS) return
+
+    const sizeInMB = file.size / (1024 * 1024)
+    if (sizeInMB > MAX_MEDIA_SIZE_MB) {
+      setContactError(`Maximum file size is ${MAX_MEDIA_SIZE_MB}MB`)
+      return
+    }
+
+    const isImage = file.type.startsWith('image/')
+    const isVideo = file.type.startsWith('video/')
+    if (!((isImage && selectedMediaType === 'image') || (isVideo && selectedMediaType === 'video'))) return
+
+    const dimensions = await getMediaDimensions(file, selectedMediaType)
+    const localUrl = URL.createObjectURL(file)
+    
+    // We strictly stage the file; NO UPLOAD occurs here to prevent plaintext leaks.
+    const nextItem = {
+      type: selectedMediaType,
+      file, 
+      mimeType: file.type,
+      localUrl,
+      width: dimensions.width,
+      height: dimensions.height,
+      duration: selectedMediaType === 'video' ? dimensions.duration || 0 : undefined,
+    }
+
+    setMediaItems((prev) => [...prev, nextItem])
+  }
+
+  const handleRemoveMedia = (itemIndex) => {
+    const item = mediaItems[itemIndex]
+    if (item?.localUrl) URL.revokeObjectURL(item.localUrl)
+    setMediaItems((prev) => prev.filter((_, index) => index !== itemIndex))
+  }
+
+  useEffect(() => {
+    return () => {
+      mediaItems.forEach((item) => {
+        if (item.localUrl) URL.revokeObjectURL(item.localUrl)
+      })
+    }
+  }, [mediaItems])
+
+  // ■■■ Core Chat Logic ■■■
+
   async function getNextNonce(from) {
     if (currentNonce.current === null) {
-      // Only fetch from chain if we don't have one cached
       currentNonce.current = await publicClient.readContract({
         address: forwarderAddress,
         abi: forwarderAbi,
@@ -109,7 +299,6 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
         args: [from],
       })
     } else {
-      // If we have one, just return it and increment for next time
       currentNonce.current += 1n
     }
     return currentNonce.current
@@ -153,13 +342,7 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
     if (!burnerKey) throw new Error('Session expired or burner key is missing.')
     const burner = new ethers.Wallet(burnerKey)
     const { request, signature } = await signMetaTransactionSessionMode(burner, functionData)
-    console.log('DEBUG 2: Final object payload:', { request, signature })
-    const payloadString = JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress }, (_, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    )
 
-    // ADD THIS:
-    console.log('DEBUG 3: The exact JSON string sent to server:', payloadString)
     const res = await fetch('/api/v1/relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -174,9 +357,7 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
 
   async function signMetaTransactionSessionMode(signer, functionData) {
     const from = await signer.getAddress()
-
     const nonce = await getNextNonce(from)
-    console.log(nonce)
     const chainId = activeChainConfig?.id
     if (!chainId) throw new Error('Missing active chain id.')
     const deadline = Math.floor(Date.now() / 1000) + 3600
@@ -193,7 +374,6 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
       ],
     }
     const message = { from, to: tunnelAddress, value: 0n, gas: 1_000_000n, nonce, deadline, data: functionData }
-    console.log('DEBUG 1: Message object before signing:', message)
     const signature = await signer.signTypedData(domain, types, message)
     return { request: message, signature }
   }
@@ -286,9 +466,7 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
       }
       const parsed = JSON.parse(decoded)
       const normalized = Array.isArray(parsed) ? parsed : parsed?.contacts
-      const validContacts = Array.isArray(normalized)
-        ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress)
-        : []
+      const validContacts = Array.isArray(normalized) ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress) : []
       setContacts(validContacts)
     } catch (err) {
       console.error('Failed loading contacts:', err)
@@ -325,6 +503,7 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
       const derivedRoom = latestPeerKey ? deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey) : null
       const candidateTopics = Array.from(new Set([friend.topic, derivedRoom?.topic].filter(Boolean)))
       if (candidateTopics.length === 0) return []
+
       const historyResponses = await Promise.all(
         candidateTopics.map(async (topic) => {
           const response = await publicClient.readContract({
@@ -347,6 +526,7 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
         seenIds.add(id)
         return true
       })
+
       const decryptedList = await Promise.all(
         mergedMessages.map(async (entry) => {
           try {
@@ -357,10 +537,22 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
             const msgEncryptedKey = msg.encryptedKey ?? msg[3]
             const msgDeleted = Boolean(msg.isDeleted ?? msg[5])
             if (!msgMetadata || msgDeleted) return null
-            const ipfsPayloadRaw = await getIPFS(msgMetadata)
-            const ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
+const ipfsPayloadRaw = await getIPFS(msgMetadata)
+            let ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
+            
+            // Catch legacy double-stringified payloads
+            if (typeof ipfsPayload === 'string') {
+              try {
+                ipfsPayload = JSON.parse(ipfsPayload)
+              } catch (parseError) {
+                console.error('Failed to unwrap double-stringified IPFS payload:', parseError)
+                return null
+              }
+            }
+           
             const senderAddress = ipfsPayload?.senderAddr?.toLowerCase?.() || msgSender
             const isIncoming = senderAddress !== myAddress
+
             let decryptionKey = null
             const messageTopic = entry.topic || friend.topic
             if (messageTopic) {
@@ -371,25 +563,35 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
               const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
               if (wrappedKeyBlob) {
                 try {
-                  const unwrappedRawKey = ecies.decrypt(Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'), Buffer.from(wrappedKeyBlob))
+                  const unwrappedRawKey = ecies.decrypt(
+                    Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'),
+                    Buffer.from(wrappedKeyBlob)
+                  )
                   decryptionKey = await subtle.importKey('raw', new Uint8Array(unwrappedRawKey), 'AES-GCM', true, ['decrypt'])
-                } catch {
-                  /* topic key fallback stays active */
-                }
+                } catch {}
               }
             }
             if (!decryptionKey) return null
+            
+            // Export the raw decryption key for the lazy media renderer
+            const exportedKeyBuffer = await subtle.exportKey('raw', decryptionKey)
+            const rawKeyHex = ethers.hexlify(new Uint8Array(exportedKeyBuffer))
+
             const iv = ethers.getBytes(ipfsPayload.iv)
             const ciphertext = ethers.getBytes(ipfsPayload.ciphertext)
             const decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, decryptionKey, ciphertext)
+
             const plaintext = new TextDecoder().decode(decryptedBuffer)
+            const content = JSON.parse(plaintext)
+
             return {
               id: `${entry.topic}-${msgTimestamp}-${senderAddress}-${msgMetadata}`,
-              message: plaintext,
+              content: content,
               timestamp: new Date(msgTimestamp * 1000).toLocaleString(),
               sender: senderAddress,
               side: senderAddress === myAddress ? 'me' : 'them',
               rawTimestamp: msgTimestamp,
+              rawKeyHex, // Provided to `<EncryptedMediaItem />`
             }
           } catch {
             return null
@@ -417,7 +619,6 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
           if (prev.list.length === freshMessages.length) return { ...prev, isLoading: false }
           return { list: freshMessages, isLoading: false }
         })
-        // Clear the optimistic bubble only once the confirmed message is in history
         if (opts.clearPending) setPendingMessage(null)
       } catch (err) {
         console.error('Background message sync failure:', err)
@@ -425,71 +626,111 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
         if (opts.clearPending) setPendingMessage(null)
       }
     }
-
     setChatHistory((prev) => ({ ...prev, isLoading: prev.list.length === 0 }))
     await performSync({ clearPending })
     chatIntervalRef.current = setInterval(performSync, 5000)
   }
 
-  // --- Helper to manage message state ---
   const updateMessageStatus = (id, status, error = null) => {
     setPendingMessages((prev) => prev.map((msg) => (msg.id === id ? { ...msg, status, error } : msg)))
   }
 
   async function sendEncryptedMessage(e) {
-    e.preventDefault()
+    if (e) e.preventDefault()
     const trimmed = messageText.trim()
-    if (!trimmed || !receiverAddress) return
+    const hasMedia = mediaItems.length > 0
+    if ((!trimmed && !hasMedia) || !receiverAddress || isSending) return
 
+    setIsSending(true)
+
+    // Snapshot media items to prevent UI resets mid-process
+    const capturedMediaItems = [...mediaItems]
+    
     const pendingId = `pending-${Date.now()}-${Math.random()}`
+    
+    // We clear the form early for a snappy Droid aesthetic
+    setMessageText('')
+    setMediaItems([])
+
     const optimisticMsg = {
       id: pendingId,
-      message: trimmed,
+      content: { elements: [{ type: 'text', data: { text: trimmed || 'Uploading secure payload...' } }] },
       timestamp: new Date().toLocaleString(),
       sender: address?.toLowerCase(),
       side: 'me',
-      status: 'sending', // Track lifecycle
+      status: 'sending',
     }
-
-    setMessageText('')
     setPendingMessages((prev) => [...prev, optimisticMsg])
 
     try {
-      // 1. Setup & Keys
       const keys = await getUnlockedKey()
       if (!keys) throw new Error('Vault is locked.')
-
       const friend = contacts.find((c) => c.contactAddress.toLowerCase() === receiverAddress.toLowerCase())
       if (!friend) throw new Error('Contact not found.')
-
       const latestPeerKey = await getRegisteredChatPublicKey(friend.contactAddress)
       if (!latestPeerKey) throw new Error('Receiver public key not registered.')
 
-      // 2. Encryption
       const latestRoom = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
       const subtle = window.crypto.subtle
       const derivedKeySeed = ethers.keccak256(ethers.concat([latestRoom.topic, ethers.toUtf8Bytes('content-encryption')]))
-
       const contentKey = await subtle.importKey('raw', ethers.getBytes(derivedKeySeed), 'AES-GCM', true, ['encrypt'])
-      const iv = window.crypto.getRandomValues(new Uint8Array(12))
 
-      const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, contentKey, new TextEncoder().encode(trimmed))
+      // 1. Process & Encrypt Media Binary Buffers
+      const processedMediaItems = []
+      for (const item of capturedMediaItems) {
+        const arrayBuffer = await item.file.arrayBuffer()
+        const mediaIv = window.crypto.getRandomValues(new Uint8Array(12))
+        
+        const encryptedMediaBuffer = await subtle.encrypt(
+          { name: 'AES-GCM', iv: mediaIv },
+          contentKey,
+          arrayBuffer
+        )
+        
+        const encryptedBlob = new Blob([encryptedMediaBuffer])
+        const mediaCid = await uploadFileToIPFS(encryptedBlob)
+        
+        processedMediaItems.push({
+          type: item.type,
+          cid: mediaCid,
+          iv: ethers.hexlify(mediaIv),
+          mimeType: item.mimeType,
+          width: item.width,
+          height: item.height,
+          duration: item.duration
+        })
+      }
 
-      // 3. Upload
+      // 2. Construct Master JSON Payload
+      const messageElements = []
+      if (trimmed) messageElements.push({ type: 'text', data: { text: trimmed } })
+      if (processedMediaItems.length > 0) messageElements.push({ type: 'media', data: { items: processedMediaItems } })
+
+      const messagePayload = {
+        version: '1',
+        elements: messageElements,
+      }
+      
+      const payloadIv = window.crypto.getRandomValues(new Uint8Array(12))
+      const ciphertext = await subtle.encrypt(
+        { name: 'AES-GCM', iv: payloadIv },
+        contentKey,
+        new TextEncoder().encode(JSON.stringify(messagePayload))
+      )
+
+      // 3. Dispatch Encrypted Metapacket
       const encryptedPayload = {
         version: '1',
-        iv: ethers.hexlify(iv),
+        iv: ethers.hexlify(payloadIv),
         ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
         senderAddr: address,
       }
-
-      const ipfsResult = await uploadObjectToIPFS(JSON.stringify(encryptedPayload))
+      
+      const ipfsResult = await uploadObjectToIPFS((encryptedPayload))
       if (!ipfsResult?.cid) throw new Error('IPFS upload failed.')
 
-      // 4. Transaction
       const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
       const receiverWrappedKey = ecies.encrypt(uncompressedRawKey, Buffer.from(ethers.getBytes(derivedKeySeed)))
-
       const success = await sendShroudedMessage(
         latestRoom.stealthAddress,
         latestRoom.topic,
@@ -498,9 +739,8 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
       )
 
       if (success) {
-        // Success: Remove pending bubble and refresh chat
-        //setPendingMessages((prev) => prev.filter((m) => m.id !== pendingId))
         setPendingMessages([])
+        capturedMediaItems.forEach((item) => item.localUrl && URL.revokeObjectURL(item.localUrl))
         mutate(['chat-history', receiverAddress])
         await viewChatWith(receiverAddress)
       } else {
@@ -508,13 +748,15 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
       }
     } catch (error) {
       console.error('Messaging engine error:', error)
-      // UI Feedback: Don't destroy the user's hard work; mark it as error
       updateMessageStatus(pendingId, 'error', error.message)
-
-      // Optional: Keep the text in input if you want them to fix/retry
-      // setMessageText(trimmed);
+      // Rollback UI on failure
+      setMessageText(trimmed)
+      setMediaItems(capturedMediaItems)
+    } finally {
+      setIsSending(false)
     }
   }
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -534,18 +776,23 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
 
   const newChat = async (inputAddress) => {
     const contactAddress = inputAddress?.trim()
-    if (!contactAddress || !/^0x[a-fA-F0-9]{40}$/.test(contactAddress)) throw new Error('Please enter a valid wallet address.')
+    if (!contactAddress || !/^0x[a-fA-F0-9]{40}$/.test(contactAddress))
+      throw new Error('Please enter a valid wallet address.')
     try {
       const normalizedAddress = contactAddress.toLowerCase()
       const keys = await getUnlockedKey()
       if (!keys) throw new Error('Vault locked.')
-      if (address && normalizedAddress === address.toLowerCase()) throw new Error('You cannot add your own wallet as a contact.')
+      if (address && normalizedAddress === address.toLowerCase())
+        throw new Error('You cannot add your own wallet as a contact.')
       const alreadyExists = contacts.some((item) => item.contactAddress.toLowerCase() === normalizedAddress)
       if (alreadyExists) throw new Error('This contact is already in your list.')
       const peerPublicKey = await getRegisteredChatPublicKey(contactAddress)
       if (!peerPublicKey) throw new Error("This profile hasn't registered cryptographic chat keys yet.")
       const { stealthAddress, topic } = deriveRoomFromPeerKey(keys.privKeyHex, peerPublicKey)
-      const nextContacts = [...contacts, { contactAddress: normalizedAddress, publicKey: peerPublicKey, topic, stealthAddress }]
+      const nextContacts = [
+        ...contacts,
+        { contactAddress: normalizedAddress, publicKey: peerPublicKey, topic, stealthAddress },
+      ]
       await persistContactsOnchain(nextContacts, keys)
       setContacts(nextContacts)
       setContactsRefreshKey((prev) => prev + 1)
@@ -576,20 +823,36 @@ const { data: chatList, isLoading } = useChatHistory(receiverAddress, contacts, 
   useEffect(() => {
     if (!isConnected || !isMounted || !address || !publicClient || !tunnelAddress || contactsInitializedRef.current) return
     contactsInitializedRef.current = true
-    setTimeout(() => {
-      void loadMyContacts()
-    }, 0)
-    return () => {
-      if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
-    }
+    setTimeout(() => { void loadMyContacts() }, 0)
+    return () => { if (chatIntervalRef.current) clearInterval(chatIntervalRef.current) }
   }, [isConnected, isMounted, address, publicClient, tunnelAddress])
 
   useEffect(() => {
     if (!isConnected) contactsInitializedRef.current = false
   }, [isConnected])
 
+  // ■■■ Renderers ■■■
 
-if (!isMounted) return null
+  const renderMessageElements = (elements, rawKeyHex) => {
+    return elements?.map((el, i) => {
+      if (el.type === 'text') {
+        return <p key={i}>{el.data.text}</p>
+      }
+      if (el.type === 'media') {
+        return (
+          <div key={i} className={clsx(styles['chat-message__media-grid'], 'mt-2')}>
+            {el.data.items.map((item, idx) => (
+              <EncryptedMediaItem key={idx} item={item} rawKeyHex={rawKeyHex} />
+            ))}
+          </div>
+        )
+      }
+      return null
+    })
+  }
+
+  if (!isMounted) return null
+
   return (
     <div className={clsx(styles.chat)}>
       <aside className={clsx(styles.aside, 'flex flex-column justify-content-start')}>
@@ -621,14 +884,19 @@ if (!isMounted) return null
           </form>
         )}
         {contactError && <p className={styles['add-contact__error']}>{contactError}</p>}
-        <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} contacts={contacts} refreshKey={contactsRefreshKey} />
+        <ConversationList
+          activeChat={receiverAddress}
+          onSelect={viewChatWith}
+          contacts={contacts}
+          refreshKey={contactsRefreshKey}
+        />
       </aside>
 
       <main className={clsx(styles.main)}>
         <div className={clsx(styles.chatHistory)} ref={scrollRef}>
           {chatHistory.list.map((msg) => (
             <div key={msg.id} className={clsx(styles['chat-message'], styles[`chat-message--${msg.side}`])}>
-              <div className={styles['chat-message__content']}>{msg.message}</div>
+              <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, msg.rawKeyHex)}</div>
               <div className={styles['chat-message__timestamp']}>
                 <small>{msg.timestamp.split(',')[1]?.trim() || msg.timestamp}</small>
               </div>
@@ -637,7 +905,7 @@ if (!isMounted) return null
 
           {pendingMessages.map((msg) => (
             <div key={msg.id} className={clsx(styles['chat-message'], styles['chat-message--me'], styles['chat-message--pending'])}>
-              <div className={styles['chat-message__content']}>{msg.message}</div>
+              <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, null)}</div>
               <div className={styles['chat-message__timestamp']}>
                 <small className={styles['chat-message__sending']}>Sending…</small>
               </div>
@@ -650,15 +918,60 @@ if (!isMounted) return null
         </div>
 
         <footer className={clsx(styles.footer, 'mt-20')}>
+          {mediaItems.length > 0 && (
+            <div className={clsx(styles['chat-composer__media-staging'], 'flex gap-2 mb-2')}>
+              {mediaItems.map((item, index) => {
+                return (
+                  <figure key={`${item.localUrl || index}`} className="relative">
+                    {item.type === 'image' ? (
+                      <img src={item.localUrl} alt={item.alt || ''} className="h-16 w-16 object-cover rounded" />
+                    ) : (
+                      <video src={item.localUrl} className="h-16 w-16 object-cover rounded" />
+                    )}
+                    <button
+                      type="button"
+                      className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 text-white"
+                      onClick={() => handleRemoveMedia(index)}
+                    >
+                      <X size={12} />
+                    </button>
+                  </figure>
+                )
+              })}
+            </div>
+          )}
+
           <form onSubmit={sendEncryptedMessage}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileSelect}
+              className="hidden"
+              multiple={false}
+              style={{ display: 'none' }}
+            />
+
             <div className="flex align-items-center justify-content-between gap-1">
+              <div className="flex gap-2 mr-2">
+                <button type="button" onClick={() => triggerFileInput('image')} disabled={isSending}>
+                  <ImageIcon size={20} />
+                </button>
+                <button type="button" onClick={() => triggerFileInput('video')} disabled={isSending}>
+                  <SquarePlay size={20} />
+                </button>
+              </div>
+
               <textarea
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Write a message…"
+                disabled={isSending}
               />
-              <button type="submit">{isSending ? <ContentSpinner /> : <ArrowUp width={18} height={18} />}</button>
+
+              <button type="submit" disabled={isSending || (!messageText.trim() && mediaItems.length === 0)}>
+                {isSending ? <ContentSpinner /> : <ArrowUp width={18} height={18} />}
+              </button>
             </div>
           </form>
         </footer>

@@ -7,7 +7,7 @@
 
   display: grid;
   grid-template-columns: min(40svw, 300px) 1fr;
-  grid-template-rows: 40px 1fr 50px;
+  grid-template-rows: 60px 1fr 50px;
   grid-template-areas:
     'aside header'
     'aside main'
@@ -326,7 +326,7 @@
   display: flex;
   flex-direction: column;
   /* Changed from column-reverse */
-  align-items: center;
+  // align-items: center;
   justify-content: flex-end;
   /* Keeps initial short messages pinned at the bottom */
   row-gap: 0.5rem;

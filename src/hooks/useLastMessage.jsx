@@ -2,7 +2,7 @@ import useSWR from 'swr'
 import { ethers } from 'ethers'
 import { getIPFS } from '@/lib/ipfs'
 import { unlockAppKeyFromStorage } from '@/lib/appVault'
-import { usePublicClient, useAccount } from 'wagmi'
+import { usePublicClient, useConnection } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import abiChat from '@/abis/Chat.json'
 import ecies from 'eciesjs'
@@ -36,7 +36,7 @@ function resolveIpfsData(raw) {
 
 export const useLastMessage = (topic) => {
   const publicClient = usePublicClient()
-  const { address } = useAccount()
+  const { address } = useConnection()
   const [, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
 
@@ -100,9 +100,7 @@ export const useLastMessage = (topic) => {
                 true,
                 ['decrypt']
               )
-            } catch {
-              // topic key fallback stays active
-            }
+            } catch {}
           }
         }
 
@@ -112,8 +110,16 @@ export const useLastMessage = (topic) => {
           ethers.getBytes(ipfsData.ciphertext)
         )
 
+        // --- FIXED: Parse the structured JSON ---
+        const plaintext = new TextDecoder().decode(decrypted)
+        const content = JSON.parse(plaintext) // { version: "1", elements: [...] }
+
+        // Extract the text for the preview
+        const textElement = content.elements?.find(el => el.type === 'text')
+        const previewText = textElement ? textElement.data.text : 'Media message'
+
         return {
-          message: new TextDecoder().decode(decrypted),
+          message: previewText,
           timestamp: timestamp * 1000,
         }
       } catch (err) {
