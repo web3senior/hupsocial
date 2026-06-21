@@ -67,6 +67,7 @@ function decodeEncryptedKeyBlob(value) {
 export default function Chat() {
   const router = useRouter()
   const [messageText, setMessageText] = useState('')
+  const [pendingMessages, setPendingMessages] = useState([])
   const [receiverAddress, setReceiverAddress] = useState('')
   const [contacts, setContacts] = useState([])
   const [contactsRefreshKey, setContactsRefreshKey] = useState(0)
@@ -391,71 +392,71 @@ export default function Chat() {
     chatIntervalRef.current = setInterval(performSync, 5000)
   }
 
-  async function sendEncryptedMessage(e) {
+// Remove isSending from the guard entirely
+async function sendEncryptedMessage(e) {
+  e.preventDefault()
+  const trimmed = messageText.trim()
+  if (!trimmed || !receiverAddress) return
+
+  const pendingId = `pending-${Date.now()}-${Math.random()}`
+  const optimisticMsg = {
+    id: pendingId,
+    message: trimmed,
+    timestamp: new Date().toLocaleString(),
+    sender: address?.toLowerCase(),
+    side: 'me',
+    pending: true,
+  }
+
+  setMessageText('')
+  // Append, never replace
+  setPendingMessages((prev) => [...prev, optimisticMsg])
+
+  try {
+    const keys = await getUnlockedKey()
+    if (!keys) throw new Error('Vault locked.')
+    const friend = contacts.find((c) => c.contactAddress.toLowerCase() === receiverAddress.toLowerCase())
+    if (!friend) throw new Error('Contact room entry missing.')
+    const latestPeerKey = await getRegisteredChatPublicKey(friend.contactAddress)
+    if (!latestPeerKey) throw new Error('Receiver has no registered chat public key.')
+    const latestRoom = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+    const activeTopic = latestRoom.topic
+    const activeStealthAddress = latestRoom.stealthAddress
+    const subtle = window.crypto.subtle
+    const derivedKeySeed = ethers.keccak256(ethers.concat([activeTopic, ethers.toUtf8Bytes('content-encryption')]))
+    const contentKeyRawBytes = ethers.getBytes(derivedKeySeed)
+    const contentKey = await subtle.importKey('raw', contentKeyRawBytes, 'AES-GCM', true, ['encrypt'])
+    const iv = window.crypto.getRandomValues(new Uint8Array(12))
+    const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, contentKey, new TextEncoder().encode(trimmed))
+    const encryptedTextPayload = {
+      version: '1',
+      iv: ethers.hexlify(iv),
+      ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
+      senderAddr: address,
+    }
+    const ipfsResult = await uploadObjectToIPFS(JSON.stringify(encryptedTextPayload))
+    const normalizedCID = normalizeCID(ipfsResult?.cid)
+    if (!normalizedCID) throw new Error('Failed to upload message payload to IPFS.')
+    const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
+    const receiverWrappedKey = ecies.encrypt(uncompressedRawKey, Buffer.from(contentKeyRawBytes))
+    const success = await sendShroudedMessage(activeStealthAddress, activeTopic, normalizedCID, receiverWrappedKey)
+    if (success) {
+      // Remove only this message's bubble, then sync
+      setPendingMessages((prev) => prev.filter((m) => m.id !== pendingId))
+      await viewChatWith(receiverAddress)
+    }
+  } catch (error) {
+    console.error('Messaging engine crashed:', error)
+    setPendingMessages((prev) => prev.filter((m) => m.id !== pendingId))
+    setMessageText(trimmed)
+  }
+}
+const handleKeyDown = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
-    const trimmed = messageText.trim()
-    if (!trimmed || !receiverAddress || isSending) return
-
-    // Show optimistic bubble instantly, clear input, allow more typing
-    const optimisticMsg = {
-      id: `pending-${Date.now()}`,
-      message: trimmed,
-      timestamp: new Date().toLocaleString(),
-      sender: address?.toLowerCase(),
-      side: 'me',
-      pending: true,
-    }
-    setMessageText('')
-    setPendingMessage(optimisticMsg)
-    setIsSending(true)
-
-    try {
-      const keys = await getUnlockedKey()
-      if (!keys) throw new Error('Vault locked.')
-      const friend = contacts.find((c) => c.contactAddress.toLowerCase() === receiverAddress.toLowerCase())
-      if (!friend) throw new Error('Contact room entry missing.')
-      const latestPeerKey = await getRegisteredChatPublicKey(friend.contactAddress)
-      if (!latestPeerKey) throw new Error('Receiver has no registered chat public key.')
-      const latestRoom = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
-      const activeTopic = latestRoom.topic
-      const activeStealthAddress = latestRoom.stealthAddress
-      const subtle = window.crypto.subtle
-      const derivedKeySeed = ethers.keccak256(ethers.concat([activeTopic, ethers.toUtf8Bytes('content-encryption')]))
-      const contentKeyRawBytes = ethers.getBytes(derivedKeySeed)
-      const contentKey = await subtle.importKey('raw', contentKeyRawBytes, 'AES-GCM', true, ['encrypt'])
-      const iv = window.crypto.getRandomValues(new Uint8Array(12))
-      const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, contentKey, new TextEncoder().encode(trimmed))
-      const encryptedTextPayload = {
-        version: '1',
-        iv: ethers.hexlify(iv),
-        ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
-        senderAddr: address,
-      }
-      const ipfsResult = await uploadObjectToIPFS(JSON.stringify(encryptedTextPayload))
-      const normalizedCID = normalizeCID(ipfsResult?.cid)
-      if (!normalizedCID) throw new Error('Failed to upload message payload to IPFS.')
-      const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
-      const receiverWrappedKey = ecies.encrypt(uncompressedRawKey, Buffer.from(contentKeyRawBytes))
-      const success = await sendShroudedMessage(activeStealthAddress, activeTopic, normalizedCID, receiverWrappedKey)
-      if (success) {
-        // Pass clearPending=true so the bubble is removed only when confirmed history arrives
-        await viewChatWith(receiverAddress, true)
-      }
-    } catch (error) {
-      console.error('Messaging engine crashed:', error)
-      setPendingMessage(null)
-      setMessageText(trimmed)
-    } finally {
-      setIsSending(false)
-    }
+    sendEncryptedMessage(e)
   }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendEncryptedMessage(e)
-    }
-  }
+}
 
   const sendShroudedMessage = async (meetingPoint, topic, metadataCid, receiverWrappedKey) => {
     const wrappedKeyHex = typeof receiverWrappedKey === 'string' ? receiverWrappedKey : bytesToHex(receiverWrappedKey)
@@ -502,9 +503,9 @@ export default function Chat() {
     }
   }
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [chatHistory.list, pendingMessage])
+useEffect(() => {
+  if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+}, [chatHistory.list, pendingMessages])
 
   useEffect(() => {
     if (!isConnected || !isMounted || !address || !publicClient || !tunnelAddress || contactsInitializedRef.current) return
@@ -564,15 +565,16 @@ export default function Chat() {
             </div>
           ))}
 
-          {/* Optimistic bubble — hidden the moment confirmed history lands */}
-          {pendingMessage && (
-            <div className={clsx(styles['chat-message'], styles['chat-message--me'], styles['chat-message--pending'])}>
-              <div className={styles['chat-message__content']}>{pendingMessage.message}</div>
-              <div className={styles['chat-message__timestamp']}>
-                <small className={styles['chat-message__sending']}>Sending…</small>
-              </div>
-            </div>
-          )}
+          
+
+ {pendingMessages.map((msg) => (
+  <div key={msg.id} className={clsx(styles['chat-message'], styles['chat-message--me'], styles['chat-message--pending'])}>
+    <div className={styles['chat-message__content']}>{msg.message}</div>
+    <div className={styles['chat-message__timestamp']}>
+      <small className={styles['chat-message__sending']}>Sending…</small>
+    </div>
+  </div>
+))}
 
           {chatHistory.list.length === 0 && !pendingMessage && (
             <div className={styles['chat-history__empty']}>Start chatting securely!</div>
@@ -588,9 +590,12 @@ export default function Chat() {
                 onKeyDown={handleKeyDown}
                 placeholder="Write an encrypted message…"
               />
-              <button type="submit" disabled={!receiverAddress || !messageText.trim() || isSending}>
-                {isSending ? <ContentSpinner /> : <ArrowUp width={18} height={18} />}
-              </button>
+<button type="submit">
+  {isSending
+    ? <ContentSpinner />
+    : <ArrowUp width={18} height={18} />
+  }
+</button>
             </div>
           </form>
         </footer>

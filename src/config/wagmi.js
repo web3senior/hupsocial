@@ -28,6 +28,7 @@ export const CONTRACTS = {
     forwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
+    chat: '0x7D6AE118b15177b2EdCfFF6da881229ed685757e'
   },
   chain42220: {
     // CELO
