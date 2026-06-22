@@ -96,7 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 32px;
   height: 32px;
   padding: 0 0.25rem;
@@ -420,6 +420,10 @@
   align-items: center;
   justify-content: center;
 
+  svg {
+    width: 24px;
+  }
+
   // Tiny red alert indicator badge overlay for the collapsed view state
   .compactBadgeDot {
     color: var(--liked-color);
@@ -577,4 +581,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+
+  &:after {
+    content: 'BETA';
+  }
 }

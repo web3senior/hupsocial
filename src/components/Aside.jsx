@@ -89,14 +89,14 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
   const content = (
     <>
       <div className={styles.iconWrapper} data-icon={item.name}>
-        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.5} />
+        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.8} />
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
         {isBatchLikeItem && isCompact && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
 
-      {isChatItem && !isCompact && <span className={styles.betaBadge}>BETA</span>}
+      {isChatItem && !isCompact && <span className={styles.betaBadge}></span>}
 
       {/* Render full numeric indicator tag layout when sidebar is wide/expanded */}
       {isBatchLikeItem && !isCompact && batchCount > 0 && <span className={styles.badgeCounter}>{batchCount}</span>}
