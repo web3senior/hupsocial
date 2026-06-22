@@ -2,10 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { Bold, Eye, EyeOff, Image as ImageIcon, Italic, MapPin, SlidersHorizontal, SquarePlay, Trash2, X } from 'lucide-react'
-
-import DOMPurify from 'dompurify'
-import { marked } from 'marked'
+import { Bold, Image as ImageIcon, Italic, MapPin, SlidersHorizontal, SquarePlay, Trash2, X } from 'lucide-react'
 
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
@@ -126,7 +123,6 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [selectedMediaType, setSelectedMediaType] = useState(null)
-  const [isPreview, setIsPreview] = useState(false)
   const editorRef = useRef(null)
   const composerRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -492,74 +488,53 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
           <div className={styles.composerBody}>
             <div
               ref={editorRef}
-              contentEditable={!isPreview}
+              contentEditable
               suppressContentEditableWarning
-              className={clsx(styles.editor, isPreview && styles.hidden)}
+              className={styles.editor}
               onInput={handleEditorInput}
               onPaste={handlePaste}
               data-placeholder="What's happening?"
             />
 
-            {isPreview && (
-              <div
-                className={styles.markdownPreview}
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(postText || '_Nothing to preview yet._')) }}
-              />
-            )}
-
             <div className={styles.toolbar} aria-label="Post tools">
-              {!isPreview && (
-                <>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => triggerFileInput('image')}
-                    aria-label="Add image"
-                    disabled={isBusy}
-                  >
-                    <ImageIcon size={22} strokeWidth={1.8} />
-                  </button>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => triggerFileInput('video')}
-                    aria-label="Add video"
-                    disabled={isBusy}
-                  >
-                    <SquarePlay size={22} strokeWidth={1.8} />
-                  </button>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => applyFormat('strong')}
-                    aria-label="Bold"
-                    disabled={isBusy}
-                  >
-                    <Bold size={20} strokeWidth={1.8} />
-                  </button>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => applyFormat('em')}
-                    aria-label="Italic"
-                    disabled={isBusy}
-                  >
-                    <Italic size={20} strokeWidth={1.8} />
-                  </button>
-                  <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
-                    <MapPin size={22} strokeWidth={1.8} />
-                  </button>
-                </>
-              )}
               <button
                 type="button"
-                className={styles.previewToggle}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setIsPreview((v) => !v)}
-                aria-label={isPreview ? 'Edit' : 'Preview'}
-                aria-pressed={isPreview}
+                onClick={() => triggerFileInput('image')}
+                aria-label="Add image"
+                disabled={isBusy}
               >
-                {isPreview ? <EyeOff size={20} strokeWidth={1.8} /> : <Eye size={20} strokeWidth={1.8} />}
+                <ImageIcon size={22} strokeWidth={1.8} />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => triggerFileInput('video')}
+                aria-label="Add video"
+                disabled={isBusy}
+              >
+                <SquarePlay size={22} strokeWidth={1.8} />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyFormat('strong')}
+                aria-label="Bold"
+                disabled={isBusy}
+              >
+                <Bold size={20} strokeWidth={1.8} />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyFormat('em')}
+                aria-label="Italic"
+                disabled={isBusy}
+              >
+                <Italic size={20} strokeWidth={1.8} />
+              </button>
+              <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
+                <MapPin size={22} strokeWidth={1.8} />
               </button>
             </div>
 

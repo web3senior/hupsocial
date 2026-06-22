@@ -238,38 +238,6 @@
   }
 }
 
-.hidden {
-  display: none;
-}
-
-.markdownPreview {
-  min-height: 82px;
-  margin-top: 2px;
-  font-size: 1.25rem;
-  line-height: 1.45;
-  color: var(--black);
-  word-break: break-word;
-
-  p { margin: 0 0 0.75em; }
-  p:last-child { margin-bottom: 0; }
-  strong { font-weight: 700; }
-  em { font-style: italic; }
-  ul, ol { padding-left: 1.4em; margin: 0 0 0.75em; }
-  li { margin-bottom: 0.25em; }
-  h1, h2, h3 { font-weight: 700; margin: 0.5em 0; }
-  code { font-family: monospace; background: var(--gray-100); padding: 0.1em 0.3em; border-radius: 4px; }
-  pre { background: var(--gray-100); padding: 0.75em 1em; border-radius: 8px; overflow-x: auto; margin: 0 0 0.75em; }
-  blockquote { border-left: 3px solid var(--gray-300); margin: 0 0 0.75em; padding-left: 0.75em; color: var(--gray-500); }
-}
-
-.previewToggle {
-  margin-left: auto;
-
-  &[aria-pressed='true'] {
-    color: var(--black);
-    background: var(--gray-100);
-  }
-}
 
 .composerMeta {
   display: flex;
