@@ -104,7 +104,7 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <body>
         <ServiceWorkerRegistry />
-        
+
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

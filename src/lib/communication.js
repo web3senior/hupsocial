@@ -4,6 +4,7 @@ import postAbi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import commentAbi from '@/abi/post-comment.json'
 import  HupCommunityABI  from '@/abis/HupCommunity'
+
 /**
  * Get user selected chain
  * @returns Array [chainObject, contractAddress]
@@ -32,6 +33,7 @@ export const getActiveChain = () => {
   console.error('Default chain not found in config.')
   return [null, null]
 }
+
 /**
  * Initialize post contract
  */

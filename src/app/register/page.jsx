@@ -33,10 +33,10 @@ const SESSION_DURATION_SECONDS = 3600 * 24 * 30
  */
 const SESSION_AUTH_TYPES = {
   SessionAuth: [
-    { name: 'owner',     type: 'address' },
+    { name: 'owner', type: 'address' },
     { name: 'burnerKey', type: 'address' },
     { name: 'expiresAt', type: 'uint256' },
-    { name: 'nonce',     type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
   ],
 }
 
@@ -61,13 +61,13 @@ export default function Register() {
   const { writeContractAsync } = useWriteContract()
 
   // wagmi's signTypedData — called on the connected (main) wallet, produces NO transaction.
-const { signTypedDataAsync } = useSignTypedData()
-const { signMessageAsync }   = useSignMessage()
+  const { signTypedDataAsync } = useSignTypedData()
+  const { signMessageAsync } = useSignMessage()
 
   const [activeChainConfig, activeChainContracts] = getActiveChain()
-  const tunnelAddress    = activeChainContracts?.chat
+  const tunnelAddress = activeChainContracts?.chat
   const forwarderAddress = activeChainContracts?.forwarder
-  const relayRpcUrl      = activeChainConfig?.rpcUrls?.default?.http?.[0]
+  const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
 
   // ■■■ Core State ■■■
   const [isActivating, setIsActivating] = useState(false)
@@ -133,18 +133,14 @@ const { signMessageAsync }   = useSignMessage()
       setIsPkRegistered(registered)
 
       const activeBurner = String(session?.burnerKey ?? session?.[0] ?? CHAT_ZERO_ADDRESS)
-      const expiresAt    = BigInt(session?.expiresAt  ?? session?.[1] ?? 0)
-      const networkTime  = BigInt(latestBlock?.timestamp ?? Math.floor(Date.now() / 1000))
+      const expiresAt = BigInt(session?.expiresAt ?? session?.[1] ?? 0)
+      const networkTime = BigInt(latestBlock?.timestamp ?? Math.floor(Date.now() / 1000))
 
       const isActiveOnChain = activeBurner !== CHAT_ZERO_ADDRESS && expiresAt > networkTime
 
       const localAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
-      const hasLocalKey  = !!localStorage.getItem(chatLocalStorageBurnerKey)
-      const isLocalSynced =
-        isActiveOnChain &&
-        hasLocalKey &&
-        localAddress &&
-        localAddress.toLowerCase() === activeBurner.toLowerCase()
+      const hasLocalKey = !!localStorage.getItem(chatLocalStorageBurnerKey)
+      const isLocalSynced = isActiveOnChain && hasLocalKey && localAddress && localAddress.toLowerCase() === activeBurner.toLowerCase()
 
       setSessionActive(isLocalSynced)
       setIsSessionOrphaned(isActiveOnChain && !isLocalSynced)
@@ -167,17 +163,17 @@ const { signMessageAsync }   = useSignMessage()
 
   const handleCreateVaultAndRegister = async () => {
     if (!isConnected || !address) return setErrorMsg('Please connect your wallet first.')
-    if (vaultPassword.length < 8)               return setErrorMsg('Vault password must be at least 8 characters.')
-    if (vaultPassword !== confirmVaultPassword)  return setErrorMsg('Vault passwords do not match.')
-    if (!vaultAgree)                             return setErrorMsg('You must acknowledge that the password cannot be recovered.')
+    if (vaultPassword.length < 8) return setErrorMsg('Vault password must be at least 8 characters.')
+    if (vaultPassword !== confirmVaultPassword) return setErrorMsg('Vault passwords do not match.')
+    if (!vaultAgree) return setErrorMsg('You must acknowledge that the password cannot be recovered.')
 
     setIsActivating(true)
     setErrorMsg('')
 
     try {
-      const lowAddress  = address.toLowerCase()
-      const nonceBytes  = window.crypto.getRandomValues(new Uint8Array(16))
-      const nonce       = ethers.hexlify(nonceBytes)
+      const lowAddress = address.toLowerCase()
+      const nonceBytes = window.crypto.getRandomValues(new Uint8Array(16))
+      const nonce = ethers.hexlify(nonceBytes)
 
       const message = [
         'Hup Stealth Protocol - Identity Authorization',
@@ -195,18 +191,15 @@ const { signMessageAsync }   = useSignMessage()
       ].join('\n')
 
       // This is a personal_sign — no tx, just a sig for key derivation.
-const signature = await signMessageAsync({ message })
-      const sigHash      = ethers.keccak256(signature)
+      const signature = await signMessageAsync({ message })
+      const sigHash = ethers.keccak256(signature)
       const passwordHash = ethers.keccak256(ethers.toUtf8Bytes(vaultPassword))
-      const seed         = ethers.solidityPackedKeccak256(
-        ['string', 'bytes32', 'bytes32'],
-        ['HUP_STEALTH_V1', sigHash, passwordHash]
-      )
+      const seed = ethers.solidityPackedKeccak256(['string', 'bytes32', 'bytes32'], ['HUP_STEALTH_V1', sigHash, passwordHash])
 
-      const privKey       = new ecies.PrivateKey(ethers.getBytes(seed))
+      const privKey = new ecies.PrivateKey(ethers.getBytes(seed))
       const rawPrivKeyHex = privKey.toHex()
-      const rawPubKeyHex  = privKey.publicKey.toHex()
-      const pubKeyHex     = rawPubKeyHex.startsWith('0x') ? rawPubKeyHex : `0x${rawPubKeyHex}`
+      const rawPubKeyHex = privKey.publicKey.toHex()
+      const pubKeyHex = rawPubKeyHex.startsWith('0x') ? rawPubKeyHex : `0x${rawPubKeyHex}`
 
       const encryptedKey = await lockAppPrivateKey(rawPrivKeyHex, vaultPassword)
       localStorage.setItem(ENCRYPTED_APP_KEY_STORAGE, encryptedKey)
@@ -235,13 +228,13 @@ const signature = await signMessageAsync({ message })
     try {
       setIsActivating(true)
       setErrorMsg('')
-      if (!address)       throw new Error('Wallet not connected.')
+      if (!address) throw new Error('Wallet not connected.')
       if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
 
       let pubKeyHex = directPubKeyHex
       if (!pubKeyHex) {
         const keys = await unlockAppKeyFromStorage()
-        pubKeyHex  = keys?.pubKey
+        pubKeyHex = keys?.pubKey
       }
       if (!pubKeyHex) throw new Error('No public key found. Please create the local vault first.')
 
@@ -291,17 +284,17 @@ const signature = await signMessageAsync({ message })
       setIsActivating(true)
       setErrorMsg('')
 
-      if (!address)          throw new Error('Wallet not connected.')
-      if (!tunnelAddress)    throw new Error('Tunnel contract is not configured.')
+      if (!address) throw new Error('Wallet not connected.')
+      if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
       if (!forwarderAddress) throw new Error('Forwarder contract is not configured.')
-      if (!relayRpcUrl)      throw new Error('Relay RPC URL is not configured.')
+      if (!relayRpcUrl) throw new Error('Relay RPC URL is not configured.')
 
       // ── Step 1: Prepare burner keypair ──────────────────────────────────
 
       let targetBurnerAddress
       let targetBurnerPrivKey
 
-      const storedKey     = localStorage.getItem(chatLocalStorageBurnerKey)
+      const storedKey = localStorage.getItem(chatLocalStorageBurnerKey)
       const storedAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
 
       if (!storedKey || !storedAddress) {
@@ -309,7 +302,7 @@ const signature = await signMessageAsync({ message })
         if (!customPassword || customPassword.length < 6) {
           throw new Error('Secure password required (min 6 characters).')
         }
-        const burner       = Wallet.createRandom()
+        const burner = Wallet.createRandom()
         const encryptedKey = await encryptData(burner.privateKey, customPassword)
 
         localStorage.setItem(chatLocalStorageBurnerKey, encryptedKey)
@@ -321,8 +314,8 @@ const signature = await signMessageAsync({ message })
       } else {
         // Reuse existing burner — decrypt it so we can sign with it later.
         targetBurnerAddress = storedAddress
-        const unlockedKey   = sessionStorage.getItem(chatSessionStorageUnlockedKey)
-        targetBurnerPrivKey = unlockedKey || null  // May be null if session was cleared; relay path still works.
+        const unlockedKey = sessionStorage.getItem(chatSessionStorageUnlockedKey)
+        targetBurnerPrivKey = unlockedKey || null // May be null if session was cleared; relay path still works.
       }
 
       // ── Step 2: Main wallet signs EIP-712 off-chain ──────────────────────
@@ -349,24 +342,24 @@ const signature = await signMessageAsync({ message })
       }
 
       // Main wallet signs — this is a MetaMask signature popup, NOT a transaction.
-const sig = await signTypedDataAsync({
-  domain,
-  types: {
-    SessionAuth: [
-      { name: 'owner',     type: 'address' },
-      { name: 'burnerKey', type: 'address' },
-      { name: 'expiresAt', type: 'uint256' },
-      { name: 'nonce',     type: 'uint256' },
-    ],
-  },
-  primaryType: 'SessionAuth',
-  message: {
-    owner:     address,
-    burnerKey: targetBurnerAddress,
-    expiresAt,
-    nonce:     currentNonce,
-  },
-})
+      const sig = await signTypedDataAsync({
+        domain,
+        types: {
+          SessionAuth: [
+            { name: 'owner', type: 'address' },
+            { name: 'burnerKey', type: 'address' },
+            { name: 'expiresAt', type: 'uint256' },
+            { name: 'nonce', type: 'uint256' },
+          ],
+        },
+        primaryType: 'SessionAuth',
+        message: {
+          owner: address,
+          burnerKey: targetBurnerAddress,
+          expiresAt,
+          nonce: currentNonce,
+        },
+      })
 
       // ── Step 3: Submit via relay ─────────────────────────────────────────
       // The burner (or relayer) sends the actual transaction.
@@ -401,7 +394,7 @@ const sig = await signTypedDataAsync({
       throw new Error('Relay configuration is missing for this chain.')
     }
 
-    const rawKey   = explicitBurnerPrivKey || sessionStorage.getItem(chatSessionStorageUnlockedKey)
+    const rawKey = explicitBurnerPrivKey || sessionStorage.getItem(chatSessionStorageUnlockedKey)
     const burnerKey = normalizePrivateKey(rawKey)
     if (!burnerKey) throw new Error('Session key is unavailable. Please unlock the vault first.')
 
@@ -411,9 +404,8 @@ const sig = await signTypedDataAsync({
     const res = await fetch('/api/v1/relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(
-        { request, signature, rpcUrl: relayRpcUrl, forwarderAddress },
-        (_, v) => (typeof v === 'bigint' ? v.toString() : v)
+      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress }, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v
       ),
     })
 
@@ -423,8 +415,8 @@ const sig = await signTypedDataAsync({
   }
 
   const signForwarderRequest = async (signer, functionData) => {
-    const from     = await signer.getAddress()
-    const nonce    = await publicClient.readContract({
+    const from = await signer.getAddress()
+    const nonce = await publicClient.readContract({
       address: forwarderAddress,
       abi: [
         {
@@ -439,30 +431,30 @@ const sig = await signTypedDataAsync({
       args: [from],
     })
 
-    const chainId  = activeChainConfig?.id
+    const chainId = activeChainConfig?.id
     if (!chainId) throw new Error('Missing active chain id.')
 
     const deadline = Math.floor(Date.now() / 1000) + 3600
-    const domain   = { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress }
-    const types    = {
+    const domain = { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress }
+    const types = {
       ForwardRequest: [
-        { name: 'from',     type: 'address' },
-        { name: 'to',       type: 'address' },
-        { name: 'value',    type: 'uint256' },
-        { name: 'gas',      type: 'uint256' },
-        { name: 'nonce',    type: 'uint256' },
-        { name: 'deadline', type: 'uint48'  },
-        { name: 'data',     type: 'bytes'   },
+        { name: 'from', type: 'address' },
+        { name: 'to', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'gas', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint48' },
+        { name: 'data', type: 'bytes' },
       ],
     }
-    const message  = { from, to: tunnelAddress, value: 0n, gas: 500_000n, nonce, deadline, data: functionData }
-    const sig      = await signer.signTypedData(domain, types, message)
+    const message = { from, to: tunnelAddress, value: 0n, gas: 500_000n, nonce, deadline, data: functionData }
+    const sig = await signer.signTypedData(domain, types, message)
     return { request: message, signature: sig }
   }
 
   const normalizePrivateKey = (key) => {
     if (!key || typeof key !== 'string') return null
-    const trimmed   = key.trim()
+    const trimmed = key.trim()
     const withPrefix = trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`
     return /^0x[0-9a-fA-F]{64}$/.test(withPrefix) ? withPrefix : null
   }
@@ -509,7 +501,7 @@ const sig = await signTypedDataAsync({
       }
 
       const importedWallet = new Wallet(importPrivateKeyInput)
-      const encryptedKey   = await encryptData(importPrivateKeyInput, importPassword)
+      const encryptedKey = await encryptData(importPrivateKeyInput, importPassword)
 
       localStorage.setItem(chatLocalStorageBurnerKey, encryptedKey)
       localStorage.setItem(chatLocalStorageBurnerAddress, importedWallet.address)
@@ -559,7 +551,6 @@ const sig = await signTypedDataAsync({
   return (
     <div className={clsx(styles.register)}>
       <div className={clsx(styles.register__card)}>
-
         {/* ■■■ Header ■■■ */}
         <header className={clsx(styles.register__header)}>
           <div className="d-f-c flex-column" style={{ marginBottom: '1rem' }}>
@@ -567,9 +558,7 @@ const sig = await signTypedDataAsync({
           </div>
           <h1 className={clsx(styles.register__title)}>Identity Setup</h1>
           <p className={clsx(styles.register__subtitle)}>
-            {isFullyRegistered
-              ? 'Your stealth identity is fully active.'
-              : 'Complete the steps below to enter the tunnel.'}
+            {isFullyRegistered ? 'Your stealth identity is fully active.' : 'Complete the steps below to enter the tunnel.'}
           </p>
         </header>
 
@@ -585,31 +574,52 @@ const sig = await signTypedDataAsync({
         <section className={clsx(styles.register__features)}>
           {/* Step 1 */}
           <div className={clsx(styles['register__feature-item'], hasLocalVault && styles['register__feature-item--active'])}>
-            <div className={clsx(styles.register__icon)}><DatabaseIcon size={20} /></div>
+            <div className={clsx(styles.register__icon)}>
+              <DatabaseIcon size={20} />
+            </div>
             <div className="flex-grow-1">
               <strong>1. Local App Vault</strong>
               <p>{hasLocalVault ? 'Secured and encrypted on this device' : 'Requires creation & signature'}</p>
             </div>
-            <div className={clsx(styles.register__status, hasLocalVault ? styles['register__status--ok'] : styles['register__status--pending'])}>
+            <div
+              className={clsx(
+                styles.register__status,
+                hasLocalVault ? styles['register__status--ok'] : styles['register__status--pending']
+              )}
+            >
               {hasLocalVault ? 'OK' : '!'}
             </div>
           </div>
 
           {/* Step 2 */}
           <div className={clsx(styles['register__feature-item'], isPkRegistered && styles['register__feature-item--active'])}>
-            <div className={clsx(styles.register__icon)}><ShieldAlertIcon size={20} /></div>
+            <div className={clsx(styles.register__icon)}>
+              <ShieldAlertIcon size={20} />
+            </div>
             <div className="flex-grow-1">
               <strong>2. Public Key Registry</strong>
               <p>{isPkRegistered ? 'Registered onchain' : 'Pending onchain registration'}</p>
             </div>
-            <div className={clsx(styles.register__status, isPkRegistered ? styles['register__status--ok'] : styles['register__status--pending'])}>
+            <div
+              className={clsx(
+                styles.register__status,
+                isPkRegistered ? styles['register__status--ok'] : styles['register__status--pending']
+              )}
+            >
               {isPkRegistered ? 'OK' : '!'}
             </div>
           </div>
 
           {/* Step 3 */}
-          <div className={clsx(styles['register__feature-item'], (sessionActive || isSessionOrphaned) && styles['register__feature-item--active'])}>
-            <div className={clsx(styles.register__icon)}><KeyRoundIcon size={20} /></div>
+          <div
+            className={clsx(
+              styles['register__feature-item'],
+              (sessionActive || isSessionOrphaned) && styles['register__feature-item--active']
+            )}
+          >
+            <div className={clsx(styles.register__icon)}>
+              <KeyRoundIcon size={20} />
+            </div>
             <div className="flex-grow-1">
               <strong>3. Session Burner</strong>
               <p>
@@ -625,10 +635,12 @@ const sig = await signTypedDataAsync({
                 </small>
               )}
             </div>
-            <div className={clsx(
-              styles.register__status,
-              sessionActive ? styles['register__status--ok'] : styles['register__status--pending']
-            )}>
+            <div
+              className={clsx(
+                styles.register__status,
+                sessionActive ? styles['register__status--ok'] : styles['register__status--pending']
+              )}
+            >
               {sessionActive ? 'OK' : isSessionOrphaned ? 'LOST' : '!'}
             </div>
           </div>
@@ -636,11 +648,12 @@ const sig = await signTypedDataAsync({
 
         {/* ■■■ Security Modules ■■■ */}
         <div className={clsx(styles.register__secureModules)}>
-
           {/* Vault Creation */}
           {!hasLocalVault && isConnected && (
             <div className={clsx(styles.register__secureSetup)}>
-              <h5><DatabaseIcon size={16} /> Create App Vault</h5>
+              <h5>
+                <DatabaseIcon size={16} /> Create App Vault
+              </h5>
               <p>This password encrypts your master stealth keys locally. It cannot be recovered.</p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
@@ -665,9 +678,12 @@ const sig = await signTypedDataAsync({
                 </label>
               </div>
               <div className="flex justify-between align-items-center mt-10">
-                <button type="button" onClick={() => setShowVaultPlainPassword(!showVaultPlainPassword)} className={clsx(styles.register__btnLink)}>
-                  {showVaultPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}{' '}
-                  {showVaultPlainPassword ? 'Hide' : 'Show'}
+                <button
+                  type="button"
+                  onClick={() => setShowVaultPlainPassword(!showVaultPlainPassword)}
+                  className={clsx(styles.register__btnLink)}
+                >
+                  {showVaultPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showVaultPlainPassword ? 'Hide' : 'Show'}
                 </button>
                 <button
                   onClick={handleCreateVaultAndRegister}
@@ -683,10 +699,12 @@ const sig = await signTypedDataAsync({
           {/* Session Password Setup (new burner) */}
           {showPasswordSetup && (
             <div className={clsx(styles.register__secureSetup)}>
-              <h5><KeyRoundIcon size={16} /> Secure Your Session Key</h5>
+              <h5>
+                <KeyRoundIcon size={16} /> Secure Your Session Key
+              </h5>
               <p>
-                Choose a password to encrypt the burner private key locally. After this, your main
-                wallet will be asked to sign off-chain — <strong>no transaction will be sent</strong>.
+                Choose a password to encrypt the burner private key locally. After this, your main wallet will be asked to sign off-chain —{' '}
+                <strong>no transaction will be sent</strong>.
               </p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
@@ -706,8 +724,7 @@ const sig = await signTypedDataAsync({
               </div>
               <div className="flex gap-05 justify-between align-items-center mt-10">
                 <button type="button" onClick={() => setShowPlainPassword(!showPlainPassword)} className={clsx(styles.register__btnLink)}>
-                  {showPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}{' '}
-                  {showPlainPassword ? 'Hide' : 'Show'}
+                  {showPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPlainPassword ? 'Hide' : 'Show'}
                 </button>
                 <div className="flex gap-05">
                   <button onClick={() => setShowPasswordSetup(false)} className={clsx(styles.register__btnSecondary)}>
@@ -731,7 +748,9 @@ const sig = await signTypedDataAsync({
           {/* Decrypt & Reveal */}
           {showDecryptPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
-              <h5><KeyRoundIcon size={16} /> Enter Password to Unlock</h5>
+              <h5>
+                <KeyRoundIcon size={16} /> Enter Password to Unlock
+              </h5>
               <p>Provide your password to securely decrypt the key from localStorage.</p>
               <input
                 type="password"
@@ -741,7 +760,9 @@ const sig = await signTypedDataAsync({
                 className={clsx(styles.register__input)}
               />
               <div className="flex justify-end gap-05 mt-10">
-                <button onClick={() => setShowDecryptPrompt(false)} className={clsx(styles.register__btnSecondary)}>Cancel</button>
+                <button onClick={() => setShowDecryptPrompt(false)} className={clsx(styles.register__btnSecondary)}>
+                  Cancel
+                </button>
                 <button onClick={handleDecryptAndReveal} className={clsx(styles.register__btnPrimary)} disabled={isActivating}>
                   Unlock Key
                 </button>
@@ -752,7 +773,9 @@ const sig = await signTypedDataAsync({
           {/* Import */}
           {showImportPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
-              <h5><UploadIcon size={16} /> Import Session Key</h5>
+              <h5>
+                <UploadIcon size={16} /> Import Session Key
+              </h5>
               <p>Paste the private key from your other device and choose a new password for local encryption.</p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
@@ -771,7 +794,9 @@ const sig = await signTypedDataAsync({
                 />
               </div>
               <div className="flex justify-end gap-05 mt-10">
-                <button onClick={() => setShowImportPrompt(false)} className={clsx(styles.register__btnSecondary)}>Cancel</button>
+                <button onClick={() => setShowImportPrompt(false)} className={clsx(styles.register__btnSecondary)}>
+                  Cancel
+                </button>
                 <button onClick={handleImportSessionKey} className={clsx(styles.register__btnPrimary)} disabled={isActivating}>
                   Encrypt & Import
                 </button>
@@ -783,7 +808,9 @@ const sig = await signTypedDataAsync({
           {revealKeyMode && revealedPrivateKey && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>Backup Session Private Key</h5>
-              <p><strong>CAUTION:</strong> Never share this key. Store it securely to recover your session on another device.</p>
+              <p>
+                <strong>CAUTION:</strong> Never share this key. Store it securely to recover your session on another device.
+              </p>
               <div className={clsx(styles.register__keyContainer)}>
                 <code>{revealedPrivateKey}</code>
                 <button onClick={() => copyToClipboard(revealedPrivateKey)} className={clsx(styles.register__btnIcon)} title="Copy">
@@ -792,7 +819,10 @@ const sig = await signTypedDataAsync({
               </div>
               <div className="flex justify-end mt-10">
                 <button
-                  onClick={() => { setRevealKeyMode(false); setRevealedPrivateKey(null) }}
+                  onClick={() => {
+                    setRevealKeyMode(false)
+                    setRevealedPrivateKey(null)
+                  }}
                   className={clsx(styles.register__btnSecondary)}
                 >
                   Hide Key
@@ -826,11 +856,7 @@ const sig = await signTypedDataAsync({
               onClick={triggerAuthorizeFlow}
               disabled={isActivating || !isConnected || showPasswordSetup}
             >
-              {isActivating
-                ? 'Authorizing...'
-                : isSessionOrphaned
-                  ? '3. Create New Session'
-                  : '3. Activate Session (gasless)'}
+              {isActivating ? 'Authorizing...' : isSessionOrphaned ? '3. Create New Session' : '3. Activate Session (gasless)'}
             </button>
           )}
 
@@ -844,7 +870,12 @@ const sig = await signTypedDataAsync({
               )}
               {localStorage.getItem(chatLocalStorageBurnerKey) && !revealKeyMode && (
                 <button
-                  onClick={() => { setErrorMsg(''); setShowDecryptPrompt(true); setShowPasswordSetup(false); setShowImportPrompt(false) }}
+                  onClick={() => {
+                    setErrorMsg('')
+                    setShowDecryptPrompt(true)
+                    setShowPasswordSetup(false)
+                    setShowImportPrompt(false)
+                  }}
                   className={clsx(styles.register__btnSecondary, 'btn-small')}
                   disabled={isActivating}
                 >
@@ -853,7 +884,12 @@ const sig = await signTypedDataAsync({
               )}
               {!sessionActive && (
                 <button
-                  onClick={() => { setErrorMsg(''); setShowImportPrompt(true); setShowPasswordSetup(false); setShowDecryptPrompt(false) }}
+                  onClick={() => {
+                    setErrorMsg('')
+                    setShowImportPrompt(true)
+                    setShowPasswordSetup(false)
+                    setShowDecryptPrompt(false)
+                  }}
                   className={clsx(styles.register__btnSecondary, 'btn-small')}
                   disabled={isActivating}
                 >
@@ -869,7 +905,6 @@ const sig = await signTypedDataAsync({
             </p>
           )}
         </footer>
-
       </div>
     </div>
   )

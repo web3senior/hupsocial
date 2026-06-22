@@ -8,22 +8,11 @@ import ecies from 'eciesjs'
 import { useConnection, usePublicClient } from 'wagmi'
 import { getIPFS } from '@/lib/ipfs'
 import clsx from 'clsx'
-import {
-  ArrowUp,
-  EllipsisVertical,
-  MessageSquarePlus,
-  Image as ImageIcon,
-  SquarePlay,
-  X,
-} from 'lucide-react'
+import { ArrowUp, EllipsisVertical, MessageSquarePlus, Image as ImageIcon, SquarePlay, X } from 'lucide-react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { bytesToHex, encodeFunctionData } from 'viem'
 import { ContentSpinner } from '@/components/Loading'
-import {
-  chatLocalStorageBurnerKey,
-  chatSessionStorageUnlockedKey,
-  CHAT_ZERO_ADDRESS as ZERO_ADDRESS,
-} from '@/lib/chatBurnerSession'
+import { chatLocalStorageBurnerKey, chatSessionStorageUnlockedKey, CHAT_ZERO_ADDRESS as ZERO_ADDRESS } from '@/lib/chatBurnerSession'
 import { APP_PASSWORD_SESSION_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
@@ -52,7 +41,10 @@ const forwarderAbi = [
 
 function normalizeCID(cidValue) {
   if (!cidValue || typeof cidValue !== 'string') return ''
-  return cidValue.trim().replace(/^ipfs:\/\//i, '').replace(/^\/ipfs\//i, '')
+  return cidValue
+    .trim()
+    .replace(/^ipfs:\/\//i, '')
+    .replace(/^\/ipfs\//i, '')
 }
 
 function normalizePrivateKey(privateKey) {
@@ -122,26 +114,16 @@ const EncryptedMediaItem = ({ item, rawKeyHex }) => {
       try {
         const response = await fetch(resolveIPFSUrl(item.cid))
         if (!response.ok) throw new Error('Failed to fetch encrypted media blob')
-        
+
         const encryptedBuffer = await response.arrayBuffer()
         const subtle = window.crypto.subtle
-        
-        const key = await subtle.importKey(
-          'raw',
-          ethers.getBytes(rawKeyHex),
-          'AES-GCM',
-          true,
-          ['decrypt']
-        )
-        
-        const decryptedBuffer = await subtle.decrypt(
-          { name: 'AES-GCM', iv: ethers.getBytes(item.iv) },
-          key,
-          encryptedBuffer
-        )
-        
+
+        const key = await subtle.importKey('raw', ethers.getBytes(rawKeyHex), 'AES-GCM', true, ['decrypt'])
+
+        const decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv: ethers.getBytes(item.iv) }, key, encryptedBuffer)
+
         if (!active) return
-        
+
         const blob = new Blob([decryptedBuffer], { type: item.mimeType })
         setLocalUrl(URL.createObjectURL(blob))
       } catch (error) {
@@ -150,9 +132,9 @@ const EncryptedMediaItem = ({ item, rawKeyHex }) => {
         if (active) setIsDecrypting(false)
       }
     }
-    
+
     fetchAndDecrypt()
-    
+
     return () => {
       active = false
       if (localUrl) URL.revokeObjectURL(localUrl)
@@ -259,11 +241,11 @@ export default function Chat() {
 
     const dimensions = await getMediaDimensions(file, selectedMediaType)
     const localUrl = URL.createObjectURL(file)
-    
+
     // We strictly stage the file; NO UPLOAD occurs here to prevent plaintext leaks.
     const nextItem = {
       type: selectedMediaType,
-      file, 
+      file,
       mimeType: file.type,
       localUrl,
       width: dimensions.width,
@@ -424,20 +406,25 @@ export default function Chat() {
   const loadMyContacts = async () => {
     try {
       if (!publicClient || !tunnelAddress || !address) return
+      
       const keys = await getUnlockedKey()
       if (!keys) return
+
       const onchainContacts = await publicClient.readContract({
         address: tunnelAddress,
         abi: abiChat,
         functionName: 'getEncryptedContacts',
         args: [address],
       })
+
       const cid = normalizeCID(onchainContacts?.[0] ?? '')
       const version = Number(onchainContacts?.[2] ?? 0)
+
       if (!cid || version === 0) {
         setContacts([])
         return
       }
+
       const payload = await getIPFS(cid)
       let rawBlob = typeof payload === 'string' ? payload : payload?.encrypted_data || payload?.encryptedData || payload?.data || null
       if (!rawBlob) {
@@ -453,6 +440,7 @@ export default function Chat() {
           console.warn('Failed to parse IPFS JSON wrapper.')
         }
       }
+
       const symmetricKey = keys.privKeyHex.toLowerCase()
       let decoded
       try {
@@ -465,8 +453,11 @@ export default function Chat() {
         return
       }
       const parsed = JSON.parse(decoded)
+      console.log(parsed)
       const normalized = Array.isArray(parsed) ? parsed : parsed?.contacts
-      const validContacts = Array.isArray(normalized) ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress) : []
+      const validContacts = Array.isArray(normalized)
+        ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress)
+        : []
       setContacts(validContacts)
     } catch (err) {
       console.error('Failed loading contacts:', err)
@@ -492,20 +483,88 @@ export default function Chat() {
   }
 
   const readHistoryChat = async (contactAddress) => {
-    const keys = await getUnlockedKey()
-    if (!keys || !publicClient || !tunnelAddress || !address) return []
-    const subtle = window.crypto.subtle
-    const myAddress = address.toLowerCase()
-    try {
-      const friend = contacts.find((c) => c.contactAddress.toLowerCase() === contactAddress.toLowerCase())
-      if (!friend) return []
-      const latestPeerKey = await getRegisteredChatPublicKey(contactAddress)
-      const derivedRoom = latestPeerKey ? deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey) : null
-      const candidateTopics = Array.from(new Set([friend.topic, derivedRoom?.topic].filter(Boolean)))
-      if (candidateTopics.length === 0) return []
+  const keys = await getUnlockedKey()
+  if (!keys || !publicClient || !tunnelAddress || !address) return []
+  const subtle = window.crypto.subtle
+  const myAddress = address.toLowerCase()
 
-      const historyResponses = await Promise.all(
-        candidateTopics.map(async (topic) => {
+  try {
+    const friend = contacts.find((c) => c.contactAddress.toLowerCase() === contactAddress.toLowerCase())
+    if (!friend) return []
+
+    // My current key pair
+    const myPubKey = await getRegisteredChatPublicKey(address)
+
+    // Peer's current registered public key
+    const latestPeerKey = await getRegisteredChatPublicKey(contactAddress)
+
+    // All possible topics:
+    // 1. Stored topic when I added the contact (derived with peer's key at that time)
+    // 2. Topic derived with peer's CURRENT key (may differ if they re-registered)
+    // 3. Topic from peer's perspective using MY current key (for messages they sent to me)
+    const topicsToCheck = new Set([friend.topic])
+
+    if (latestPeerKey) {
+      const myDerivation = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+      topicsToCheck.add(myDerivation.topic)
+    }
+
+    // The peer derives topic as: deriveRoomFromPeerKey(peer.privKey, myPubKey)
+    // ECDH is symmetric so this equals deriveRoomFromPeerKey(myPrivKey, peerPubKey)
+    // — already covered above. But if MY public key changed since they added me,
+    // they may be writing to an old topic. We can't enumerate those without
+    // knowing their private key. Best we can do is check the meeting point inbox.
+    if (myPubKey && latestPeerKey) {
+      // Cross-check: derive from peer's perspective using my current pubkey
+      // ECDH symmetry: same result as above, but let's be explicit
+      const crossCheck = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+      topicsToCheck.add(crossCheck.topic)
+    }
+
+    // Also pull topics from the stealth meeting point inbox — catches any
+    // topic the peer wrote to that we haven't locally indexed yet
+    if (friend.stealthAddress) {
+      try {
+        const [inboxTopics] = await publicClient.readContract({
+          address: tunnelAddress,
+          abi: abiChat,
+          functionName: 'getPaginatedTopics',
+          args: [friend.stealthAddress, 0n, 50n],
+        })
+        if (Array.isArray(inboxTopics)) {
+          inboxTopics.forEach((t) => topicsToCheck.add(t))
+        }
+      } catch (e) {
+        console.warn('Meeting point inbox fetch failed:', e)
+      }
+    }
+
+    // Also check MY meeting point inbox — messages sent to me land here
+    if (address) {
+      try {
+        const [myInboxTopics] = await publicClient.readContract({
+          address: tunnelAddress,
+          abi: abiChat,
+          functionName: 'getPaginatedTopics',
+          args: [address, 0n, 50n],
+        })
+        if (Array.isArray(myInboxTopics)) {
+          myInboxTopics.forEach((t) => topicsToCheck.add(t))
+        }
+      } catch (e) {
+        console.warn('My inbox fetch failed:', e)
+      }
+    }
+
+    const candidateTopics = Array.from(topicsToCheck)
+    console.log('candidateTopics:', candidateTopics)
+
+    if (candidateTopics.length === 0) return []
+
+    // Fetch history for all candidate topics in parallel
+    const historyResponses = await Promise.all(
+      candidateTopics.map(async (topic) => {
+        try {
           const response = await publicClient.readContract({
             address: tunnelAddress,
             abi: abiChat,
@@ -513,97 +572,152 @@ export default function Chat() {
             args: [topic, 0n, BigInt(CHAT_PAGE_SIZE)],
           })
           return Array.isArray(response?.[0]) ? response[0].map((msg) => ({ topic, msg })) : []
-        })
-      )
-      const flatMessages = historyResponses.flat().filter(Boolean)
-      const seenIds = new Set()
-      const mergedMessages = flatMessages.filter((entry) => {
-        const meta = entry?.msg?.metadata ?? entry?.msg?.[2] ?? ''
-        const sender = entry?.msg?.sender ?? entry?.msg?.[0] ?? ''
-        const timestamp = String(entry?.msg?.timestamp ?? entry?.msg?.[1] ?? '')
-        const id = `${entry?.topic || ''}-${sender}-${timestamp}-${meta}`
-        if (seenIds.has(id)) return false
-        seenIds.add(id)
-        return true
+        } catch {
+          return []
+        }
       })
+    )
 
-      const decryptedList = await Promise.all(
-        mergedMessages.map(async (entry) => {
-          try {
-            const msg = entry.msg
-            const msgSender = String(msg.sender ?? msg[0] ?? '').toLowerCase()
-            const msgTimestamp = Number(msg.timestamp ?? msg[1] ?? 0)
-            const msgMetadata = normalizeCID(msg.metadata ?? msg[2] ?? '')
-            const msgEncryptedKey = msg.encryptedKey ?? msg[3]
-            const msgDeleted = Boolean(msg.isDeleted ?? msg[5])
-            if (!msgMetadata || msgDeleted) return null
-const ipfsPayloadRaw = await getIPFS(msgMetadata)
-            let ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
-            
-            // Catch legacy double-stringified payloads
-            if (typeof ipfsPayload === 'string') {
+    const flatMessages = historyResponses.flat().filter(Boolean)
+
+    // Deduplicate
+    const seenIds = new Set()
+    const mergedMessages = flatMessages.filter((entry) => {
+      const meta      = entry?.msg?.metadata   ?? entry?.msg?.[2] ?? ''
+      const sender    = entry?.msg?.sender      ?? entry?.msg?.[0] ?? ''
+      const timestamp = String(entry?.msg?.timestamp ?? entry?.msg?.[1] ?? '')
+      const id = `${entry.topic}-${sender}-${timestamp}-${meta}`
+      if (seenIds.has(id)) return false
+      seenIds.add(id)
+      return true
+    })
+
+    // Pre-derive seed keys for all candidate topics
+    const topicSeedKeys = {}
+    for (const topic of candidateTopics) {
+      const seed = ethers.keccak256(ethers.concat([topic, ethers.toUtf8Bytes('content-encryption')]))
+      topicSeedKeys[topic] = await subtle.importKey(
+        'raw', ethers.getBytes(seed), 'AES-GCM', true, ['encrypt', 'decrypt']
+      )
+    }
+
+    // Fetch my burner address for sender identification
+    let myBurnerAddress = ''
+    try {
+      const mySession = await publicClient.readContract({
+        address: tunnelAddress,
+        abi: abiChat,
+        functionName: 'userSessions',
+        args: [address],
+      })
+      myBurnerAddress = (mySession?.burnerKey ?? mySession?.[0] ?? '').toLowerCase()
+    } catch {}
+
+    const decryptedList = await Promise.all(
+      mergedMessages.map(async (entry) => {
+        try {
+          const msg             = entry.msg
+          const onChainSender   = String(msg.sender    ?? msg[0] ?? '').toLowerCase()
+          const msgTimestamp    = Number(msg.timestamp  ?? msg[1] ?? 0)
+          const msgMetadata     = normalizeCID(msg.metadata ?? msg[2] ?? '')
+          const msgEncryptedKey = msg.encryptedKey ?? msg[3]
+          const msgDeleted      = Boolean(msg.isDeleted ?? msg[5])
+
+          if (!msgMetadata || msgDeleted) return null
+
+          const ipfsPayloadRaw = await getIPFS(msgMetadata)
+          let ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
+          if (typeof ipfsPayload === 'string') {
+            try { ipfsPayload = JSON.parse(ipfsPayload) } catch { return null }
+          }
+
+          // Determine direction using senderAddr from payload (most reliable)
+          // Fall back to on-chain sender vs known addresses
+          const payloadSender  = ipfsPayload?.senderAddr?.toLowerCase?.() ?? null
+          const effectiveSender = payloadSender ?? onChainSender
+
+          const isMine =
+            effectiveSender === myAddress ||
+            onChainSender   === myAddress ||
+            onChainSender   === myBurnerAddress
+
+          console.log('msg', msgMetadata, '| isMine:', isMine, '| effectiveSender:', effectiveSender, '| onChainSender:', onChainSender)
+
+          // Resolve decryption key
+          let decryptionKey = null
+
+          if (isMine) {
+            // Outgoing — use topic seed key (we derived it when sending)
+            decryptionKey = topicSeedKeys[entry.topic] ?? null
+          } else {
+            // Incoming — ECIES unwrap the content key seed the sender encrypted for us
+            const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
+            if (wrappedKeyBlob) {
               try {
-                ipfsPayload = JSON.parse(ipfsPayload)
-              } catch (parseError) {
-                console.error('Failed to unwrap double-stringified IPFS payload:', parseError)
+                const unwrappedSeedBytes = ecies.decrypt(
+                  Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'),
+                  Buffer.from(wrappedKeyBlob)
+                )
+                decryptionKey = await subtle.importKey(
+                  'raw',
+                  new Uint8Array(unwrappedSeedBytes),
+                  'AES-GCM',
+                  true,
+                  ['decrypt']
+                )
+              } catch (eciesErr) {
+                console.warn('ECIES unwrap failed:', msgMetadata, eciesErr?.message)
                 return null
               }
             }
-           
-            const senderAddress = ipfsPayload?.senderAddr?.toLowerCase?.() || msgSender
-            const isIncoming = senderAddress !== myAddress
+          }
 
-            let decryptionKey = null
-            const messageTopic = entry.topic || friend.topic
-            if (messageTopic) {
-              const perTopicSeed = ethers.keccak256(ethers.concat([messageTopic, ethers.toUtf8Bytes('content-encryption')]))
-              decryptionKey = await subtle.importKey('raw', ethers.getBytes(perTopicSeed), 'AES-GCM', true, ['decrypt'])
-            }
-            if (isIncoming) {
-              const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
-              if (wrappedKeyBlob) {
-                try {
-                  const unwrappedRawKey = ecies.decrypt(
-                    Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'),
-                    Buffer.from(wrappedKeyBlob)
-                  )
-                  decryptionKey = await subtle.importKey('raw', new Uint8Array(unwrappedRawKey), 'AES-GCM', true, ['decrypt'])
-                } catch {}
-              }
-            }
-            if (!decryptionKey) return null
-            
-            // Export the raw decryption key for the lazy media renderer
-            const exportedKeyBuffer = await subtle.exportKey('raw', decryptionKey)
-            const rawKeyHex = ethers.hexlify(new Uint8Array(exportedKeyBuffer))
-
-            const iv = ethers.getBytes(ipfsPayload.iv)
-            const ciphertext = ethers.getBytes(ipfsPayload.ciphertext)
-            const decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, decryptionKey, ciphertext)
-
-            const plaintext = new TextDecoder().decode(decryptedBuffer)
-            const content = JSON.parse(plaintext)
-
-            return {
-              id: `${entry.topic}-${msgTimestamp}-${senderAddress}-${msgMetadata}`,
-              content: content,
-              timestamp: new Date(msgTimestamp * 1000).toLocaleString(),
-              sender: senderAddress,
-              side: senderAddress === myAddress ? 'me' : 'them',
-              rawTimestamp: msgTimestamp,
-              rawKeyHex, // Provided to `<EncryptedMediaItem />`
-            }
-          } catch {
+          if (!decryptionKey) {
+            console.warn('No decryption key for:', msgMetadata, '| isMine:', isMine)
             return null
           }
-        })
-      )
-      return decryptedList.filter((m) => m !== null).sort((a, b) => a.rawTimestamp - b.rawTimestamp)
-    } catch (error) {
-      console.error('Retrieval processing dropped:', error)
-      return []
-    }
+
+          const exportedKeyBuffer = await subtle.exportKey('raw', decryptionKey)
+          const rawKeyHex = ethers.hexlify(new Uint8Array(exportedKeyBuffer))
+
+          const iv         = ethers.getBytes(ipfsPayload.iv)
+          const ciphertext = ethers.getBytes(ipfsPayload.ciphertext)
+
+          let decryptedBuffer
+          try {
+            decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, decryptionKey, ciphertext)
+          } catch (aesgcmErr) {
+            console.warn('AES-GCM decrypt failed:', msgMetadata, aesgcmErr?.message)
+            return null
+          }
+
+          const content = JSON.parse(new TextDecoder().decode(decryptedBuffer))
+
+          return {
+            id:           `${entry.topic}-${msgTimestamp}-${effectiveSender}-${msgMetadata}`,
+            content,
+            timestamp:    new Date(msgTimestamp * 1000).toLocaleString(),
+            sender:       effectiveSender,
+            side:         isMine ? 'me' : 'them',
+            rawTimestamp: msgTimestamp,
+            rawKeyHex,
+          }
+        } catch (err) {
+          console.warn('Message processing failed:', err)
+          return null
+        }
+      })
+    )
+
+    return decryptedList
+      .filter(Boolean)
+      .sort((a, b) => a.rawTimestamp - b.rawTimestamp)
+
+  } catch (error) {
+    console.error('readHistoryChat failed:', error)
+    return []
   }
+}
 
   const viewChatWith = async (contactAddress, clearPending = false) => {
     if (!contactAddress) return
@@ -645,9 +759,9 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
 
     // Snapshot media items to prevent UI resets mid-process
     const capturedMediaItems = [...mediaItems]
-    
+
     const pendingId = `pending-${Date.now()}-${Math.random()}`
-    
+
     // We clear the form early for a snappy Droid aesthetic
     setMessageText('')
     setMediaItems([])
@@ -680,16 +794,12 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
       for (const item of capturedMediaItems) {
         const arrayBuffer = await item.file.arrayBuffer()
         const mediaIv = window.crypto.getRandomValues(new Uint8Array(12))
-        
-        const encryptedMediaBuffer = await subtle.encrypt(
-          { name: 'AES-GCM', iv: mediaIv },
-          contentKey,
-          arrayBuffer
-        )
-        
+
+        const encryptedMediaBuffer = await subtle.encrypt({ name: 'AES-GCM', iv: mediaIv }, contentKey, arrayBuffer)
+
         const encryptedBlob = new Blob([encryptedMediaBuffer])
         const mediaCid = await uploadFileToIPFS(encryptedBlob)
-        
+
         processedMediaItems.push({
           type: item.type,
           cid: mediaCid,
@@ -697,7 +807,7 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
           mimeType: item.mimeType,
           width: item.width,
           height: item.height,
-          duration: item.duration
+          duration: item.duration,
         })
       }
 
@@ -710,7 +820,7 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
         version: '1',
         elements: messageElements,
       }
-      
+
       const payloadIv = window.crypto.getRandomValues(new Uint8Array(12))
       const ciphertext = await subtle.encrypt(
         { name: 'AES-GCM', iv: payloadIv },
@@ -725,8 +835,8 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
         ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
         senderAddr: address,
       }
-      
-      const ipfsResult = await uploadObjectToIPFS((encryptedPayload))
+
+      const ipfsResult = await uploadObjectToIPFS(encryptedPayload)
       if (!ipfsResult?.cid) throw new Error('IPFS upload failed.')
 
       const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
@@ -776,23 +886,18 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
 
   const newChat = async (inputAddress) => {
     const contactAddress = inputAddress?.trim()
-    if (!contactAddress || !/^0x[a-fA-F0-9]{40}$/.test(contactAddress))
-      throw new Error('Please enter a valid wallet address.')
+    if (!contactAddress || !/^0x[a-fA-F0-9]{40}$/.test(contactAddress)) throw new Error('Please enter a valid wallet address.')
     try {
       const normalizedAddress = contactAddress.toLowerCase()
       const keys = await getUnlockedKey()
       if (!keys) throw new Error('Vault locked.')
-      if (address && normalizedAddress === address.toLowerCase())
-        throw new Error('You cannot add your own wallet as a contact.')
+      if (address && normalizedAddress === address.toLowerCase()) throw new Error('You cannot add your own wallet as a contact.')
       const alreadyExists = contacts.some((item) => item.contactAddress.toLowerCase() === normalizedAddress)
       if (alreadyExists) throw new Error('This contact is already in your list.')
       const peerPublicKey = await getRegisteredChatPublicKey(contactAddress)
       if (!peerPublicKey) throw new Error("This profile hasn't registered cryptographic chat keys yet.")
       const { stealthAddress, topic } = deriveRoomFromPeerKey(keys.privKeyHex, peerPublicKey)
-      const nextContacts = [
-        ...contacts,
-        { contactAddress: normalizedAddress, publicKey: peerPublicKey, topic, stealthAddress },
-      ]
+      const nextContacts = [...contacts, { contactAddress: normalizedAddress, publicKey: peerPublicKey, topic, stealthAddress }]
       await persistContactsOnchain(nextContacts, keys)
       setContacts(nextContacts)
       setContactsRefreshKey((prev) => prev + 1)
@@ -823,8 +928,12 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
   useEffect(() => {
     if (!isConnected || !isMounted || !address || !publicClient || !tunnelAddress || contactsInitializedRef.current) return
     contactsInitializedRef.current = true
-    setTimeout(() => { void loadMyContacts() }, 0)
-    return () => { if (chatIntervalRef.current) clearInterval(chatIntervalRef.current) }
+    setTimeout(() => {
+      void loadMyContacts()
+    }, 0)
+    return () => {
+      if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
+    }
   }, [isConnected, isMounted, address, publicClient, tunnelAddress])
 
   useEffect(() => {
@@ -884,12 +993,7 @@ const ipfsPayloadRaw = await getIPFS(msgMetadata)
           </form>
         )}
         {contactError && <p className={styles['add-contact__error']}>{contactError}</p>}
-        <ConversationList
-          activeChat={receiverAddress}
-          onSelect={viewChatWith}
-          contacts={contacts}
-          refreshKey={contactsRefreshKey}
-        />
+        <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} contacts={contacts} refreshKey={contactsRefreshKey} />
       </aside>
 
       <main className={clsx(styles.main)}>

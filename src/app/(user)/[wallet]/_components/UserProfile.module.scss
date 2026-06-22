@@ -415,7 +415,6 @@
       font-weight: 400;
       color: var(--gray-500);
       user-select: none;
-      z-index: 1;
       isolation: isolate;
 
       p {
@@ -670,7 +669,7 @@
           background-color: var(--background);
           box-shadow: var(--shadow16);
           isolation: isolate;
-
+;
           &:after,
           &:before {
             content: '';
