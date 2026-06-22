@@ -28,13 +28,14 @@ export const CONTRACTS = {
     forwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
-    chat: '0x7D6AE118b15177b2EdCfFF6da881229ed685757e'
+    chat: '0x9E0D34d25ca0A2F21d89DE905957ac04598F0D20'
   },
   chain42220: {
     // CELO
     forwarder: '0x46a3dfcb1f4ec29db7f96c0d3962df20e6edb259',
     hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
     status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
+ chat: '0x39024439A364b2997ceDBf12869eB709dc4A4850'
   },
   chain8453: {
     // Base
@@ -47,7 +48,7 @@ export const CONTRACTS = {
     forwarder: '0x8466799e31a86a4d51B76154e57B14DcAF9A8756',
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
-    chat: '0x2e12bAED31181Af28baB5fc5F4F49a564F17B770',
+    chat: '0x3E37500b47AC2A1fC22a6bb8F8e4f8E4267017cf',
   },
   chain56: {
     // bnb

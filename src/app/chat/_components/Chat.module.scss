@@ -325,12 +325,16 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  /* Changed from column-reverse */
-  // align-items: center;
-  justify-content: flex-end;
-  /* Keeps initial short messages pinned at the bottom */
   row-gap: 0.5rem;
   padding: 1rem;
+
+  // Spacer pushes messages to the bottom when there are few of them.
+  // When messages overflow the container it collapses to 0 so the
+  // scrollbar works normally — justify-content: flex-end can't do this.
+  &::before {
+    content: '';
+    flex: 1;
+  }
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -346,16 +350,15 @@
   }
 }
 
-//
 .chat-message {
   max-width: 400px;
-  min-width: 120px;
+  min-width: 100px;
   // Use overflow-wrap for better support than text-overflow on divs
   overflow-wrap: break-word;
   word-wrap: break-word;
   word-break: break-word;
 
-  padding: 0.8rem 0.8rem 1.4rem 0.8rem; // Added bottom padding for the absolute timestamp
+  padding: 0.4rem 0.4rem 1rem 0.4rem; // Added bottom padding for the absolute timestamp
   border-radius: var(--global-border-radius);
   box-shadow: var(--shadow-xs);
   line-height: 1.4;
@@ -386,6 +389,10 @@
       opacity: 0.8;
     }
   }
+  
+  &--pending {
+    opacity: 0.8;
+  }
 
   &__timestamp {
     font-size: 10px;
@@ -393,7 +400,6 @@
     bottom: 4px;
     right: 10px;
     user-select: none;
-    pointer-events: none;
   }
 
   &__content {
@@ -401,9 +407,36 @@
     overflow: hidden;
     line-height: 1.4;
     position: relative;
-    padding: 0.2rem 0 0.2rem 0.3rem;
+    padding: 0.2rem 0 0 0.3rem;
     white-space: pre-wrap;
     word-wrap: break-word;
+  }
+
+  &__media-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  &__media-item {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+
+  &__sending {
+    position: absolute;
+    right: 0.4rem;
+    bottom: 0.4rem;
+    width: 12px;
+    height: 12px;
+    z-index: 1;
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
   }
 }
 

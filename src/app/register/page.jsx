@@ -2,9 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
-import { useConnection, usePublicClient, useWriteContract, useSignTypedData, useSignMessage } from 'wagmi'
+import { useConnection, usePublicClient, useWriteContract, useSignMessage } from 'wagmi'
 import { isHexString, Wallet, ethers } from 'ethers'
-import { encodeFunctionData } from 'viem'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
 import abiChat from '@/abis/Chat.json'
@@ -26,32 +25,6 @@ import {
 
 const SESSION_DURATION_SECONDS = 3600 * 24 * 30
 
-/**
- * EIP-712 typed data for off-chain session authorization.
- * Must exactly match the SESSION_TYPEHASH in Tunnel.sol:
- *   keccak256("SessionAuth(address owner,address burnerKey,uint256 expiresAt,uint256 nonce)")
- */
-const SESSION_AUTH_TYPES = {
-  SessionAuth: [
-    { name: 'owner', type: 'address' },
-    { name: 'burnerKey', type: 'address' },
-    { name: 'expiresAt', type: 'uint256' },
-    { name: 'nonce', type: 'uint256' },
-  ],
-}
-
-// ─── Forwarder nonce ABI (minimal) ───────────────────────────────────────────
-
-const forwarderAbi = [
-  {
-    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
-    name: 'nonces',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-]
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Register() {
@@ -59,15 +32,10 @@ export default function Register() {
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
-
-  // wagmi's signTypedData — called on the connected (main) wallet, produces NO transaction.
-  const { signTypedDataAsync } = useSignTypedData()
   const { signMessageAsync } = useSignMessage()
 
-  const [activeChainConfig, activeChainContracts] = getActiveChain()
+  const [, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
-  const forwarderAddress = activeChainContracts?.forwarder
-  const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
 
   // ■■■ Core State ■■■
   const [isActivating, setIsActivating] = useState(false)
@@ -256,25 +224,21 @@ export default function Register() {
     }
   }
 
-  // ─── Session Authorization (privacy-preserving) ──────────────────────────
+  // ─── Session Authorization ───────────────────────────────────────────────
   //
   // Flow:
   //   1. Generate (or reuse) a burner keypair and encrypt it locally.
-  //   2. Main wallet signs EIP-712 SessionAuth off-chain (no tx, no gas).
-  //   3. Burner (or relayer) submits authorizeSessionWithSig() via the relay.
-  //      → Only the burner/relayer address appears on-chain. Main wallet never touches the contract.
+  //   2. Main wallet calls authorizeSession() directly — one on-chain transaction.
 
   const triggerAuthorizeFlow = () => {
     setErrorMsg('')
     setPassword('')
     setConfirmPassword('')
 
-    const existingKey = localStorage.getItem(chatLocalStorageBurnerKey)
-    if (existingKey && isPrivateKeyEncrypted(existingKey)) {
-      // Burner already exists — go straight to signing.
+    const storedAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
+    if (storedAddress) {
       handleAuthorizeSession(null)
     } else {
-      // No burner yet — ask for a password to encrypt the new one.
       setShowPasswordSetup(true)
     }
   }
@@ -286,19 +250,13 @@ export default function Register() {
 
       if (!address) throw new Error('Wallet not connected.')
       if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
-      if (!forwarderAddress) throw new Error('Forwarder contract is not configured.')
-      if (!relayRpcUrl) throw new Error('Relay RPC URL is not configured.')
-
-      // ── Step 1: Prepare burner keypair ──────────────────────────────────
 
       let targetBurnerAddress
-      let targetBurnerPrivKey
 
       const storedKey = localStorage.getItem(chatLocalStorageBurnerKey)
       const storedAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
 
       if (!storedKey || !storedAddress) {
-        // Fresh burner — requires a password to encrypt locally.
         if (!customPassword || customPassword.length < 6) {
           throw new Error('Secure password required (min 6 characters).')
         }
@@ -310,68 +268,16 @@ export default function Register() {
         sessionStorage.setItem(chatSessionStorageUnlockedKey, burner.privateKey)
 
         targetBurnerAddress = burner.address
-        targetBurnerPrivKey = burner.privateKey
       } else {
-        // Reuse existing burner — decrypt it so we can sign with it later.
         targetBurnerAddress = storedAddress
-        const unlockedKey = sessionStorage.getItem(chatSessionStorageUnlockedKey)
-        targetBurnerPrivKey = unlockedKey || null // May be null if session was cleared; relay path still works.
       }
 
-      // ── Step 2: Main wallet signs EIP-712 off-chain ──────────────────────
-      // signTypedDataAsync triggers MetaMask / wallet popup but produces NO transaction.
-
-      const expiresAt = BigInt(Math.floor(Date.now() / 1000) + SESSION_DURATION_SECONDS)
-
-      // Fetch current session nonce for replay protection.
-      const currentNonce = await publicClient.readContract({
+      await writeContractAsync({
         address: tunnelAddress,
         abi: abiChat,
-        functionName: 'sessionNonces',
-        args: [address],
+        functionName: 'authorizeSession',
+        args: [targetBurnerAddress, BigInt(SESSION_DURATION_SECONDS)],
       })
-
-      const chainId = activeChainConfig?.id
-      if (!chainId) throw new Error('Active chain ID not found.')
-
-      const domain = {
-        name: 'Tunnel',
-        version: '1',
-        chainId,
-        verifyingContract: tunnelAddress,
-      }
-
-      // Main wallet signs — this is a MetaMask signature popup, NOT a transaction.
-      const sig = await signTypedDataAsync({
-        domain,
-        types: {
-          SessionAuth: [
-            { name: 'owner', type: 'address' },
-            { name: 'burnerKey', type: 'address' },
-            { name: 'expiresAt', type: 'uint256' },
-            { name: 'nonce', type: 'uint256' },
-          ],
-        },
-        primaryType: 'SessionAuth',
-        message: {
-          owner: address,
-          burnerKey: targetBurnerAddress,
-          expiresAt,
-          nonce: currentNonce,
-        },
-      })
-
-      // ── Step 3: Submit via relay ─────────────────────────────────────────
-      // The burner (or relayer) sends the actual transaction.
-      // The main wallet address never appears in any on-chain transaction.
-
-      const functionData = encodeFunctionData({
-        abi: abiChat,
-        functionName: 'authorizeSessionWithSig',
-        args: [address, targetBurnerAddress, expiresAt, sig],
-      })
-
-      await relayMetaTransaction(functionData, targetBurnerPrivKey)
 
       setShowPasswordSetup(false)
       await checkStatus()
@@ -381,82 +287,6 @@ export default function Register() {
     } finally {
       setIsActivating(false)
     }
-  }
-
-  // ─── Relay Helper ────────────────────────────────────────────────────────
-  // Mirrors relayMetaTransaction in Chat.jsx but accepts an optional explicit burner key.
-  // If targetBurnerPrivKey is null (key not unlocked in this session), we fall back to
-  // whatever is in sessionStorage — acceptable because this call happens right after
-  // we either created or unlocked the burner above.
-
-  const relayMetaTransaction = async (functionData, explicitBurnerPrivKey = null) => {
-    if (!publicClient || !forwarderAddress || !tunnelAddress || !relayRpcUrl) {
-      throw new Error('Relay configuration is missing for this chain.')
-    }
-
-    const rawKey = explicitBurnerPrivKey || sessionStorage.getItem(chatSessionStorageUnlockedKey)
-    const burnerKey = normalizePrivateKey(rawKey)
-    if (!burnerKey) throw new Error('Session key is unavailable. Please unlock the vault first.')
-
-    const burner = new ethers.Wallet(burnerKey)
-    const { request, signature } = await signForwarderRequest(burner, functionData)
-
-    const res = await fetch('/api/v1/relay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress }, (_, v) =>
-        typeof v === 'bigint' ? v.toString() : v
-      ),
-    })
-
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Relay failed.')
-    return true
-  }
-
-  const signForwarderRequest = async (signer, functionData) => {
-    const from = await signer.getAddress()
-    const nonce = await publicClient.readContract({
-      address: forwarderAddress,
-      abi: [
-        {
-          inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
-          name: 'nonces',
-          outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-          stateMutability: 'view',
-          type: 'function',
-        },
-      ],
-      functionName: 'nonces',
-      args: [from],
-    })
-
-    const chainId = activeChainConfig?.id
-    if (!chainId) throw new Error('Missing active chain id.')
-
-    const deadline = Math.floor(Date.now() / 1000) + 3600
-    const domain = { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress }
-    const types = {
-      ForwardRequest: [
-        { name: 'from', type: 'address' },
-        { name: 'to', type: 'address' },
-        { name: 'value', type: 'uint256' },
-        { name: 'gas', type: 'uint256' },
-        { name: 'nonce', type: 'uint256' },
-        { name: 'deadline', type: 'uint48' },
-        { name: 'data', type: 'bytes' },
-      ],
-    }
-    const message = { from, to: tunnelAddress, value: 0n, gas: 500_000n, nonce, deadline, data: functionData }
-    const sig = await signer.signTypedData(domain, types, message)
-    return { request: message, signature: sig }
-  }
-
-  const normalizePrivateKey = (key) => {
-    if (!key || typeof key !== 'string') return null
-    const trimmed = key.trim()
-    const withPrefix = trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`
-    return /^0x[0-9a-fA-F]{64}$/.test(withPrefix) ? withPrefix : null
   }
 
   // ─── Key Management ──────────────────────────────────────────────────────
@@ -703,8 +533,7 @@ export default function Register() {
                 <KeyRoundIcon size={16} /> Secure Your Session Key
               </h5>
               <p>
-                Choose a password to encrypt the burner private key locally. After this, your main wallet will be asked to sign off-chain —{' '}
-                <strong>no transaction will be sent</strong>.
+                Choose a password to encrypt the burner private key locally. After this, your main wallet will send a transaction to register the session on-chain.
               </p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
@@ -738,7 +567,7 @@ export default function Register() {
                     className={clsx(styles.register__btnPrimary)}
                     disabled={isActivating || password.length < 6}
                   >
-                    {isActivating ? 'Signing...' : 'Sign & Authorize'}
+                    {isActivating ? 'Authorizing...' : 'Authorize Session'}
                   </button>
                 </div>
               </div>
@@ -856,7 +685,7 @@ export default function Register() {
               onClick={triggerAuthorizeFlow}
               disabled={isActivating || !isConnected || showPasswordSetup}
             >
-              {isActivating ? 'Authorizing...' : isSessionOrphaned ? '3. Create New Session' : '3. Activate Session (gasless)'}
+              {isActivating ? 'Authorizing...' : isSessionOrphaned ? '3. Create New Session' : '3. Activate Session'}
             </button>
           )}
 
@@ -901,7 +730,7 @@ export default function Register() {
 
           {!isFullyRegistered && (
             <p className={clsx(styles['register__gas-note'])}>
-              * Step 2 requires a gas fee. Step 3 is gasless — your main wallet only signs.
+              * Steps 2 and 3 require a gas fee from your main wallet.
             </p>
           )}
         </footer>

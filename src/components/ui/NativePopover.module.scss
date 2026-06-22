@@ -38,7 +38,7 @@
   &[data-placement='right-end']         { transform-origin: left center;  }
   &[data-placement='left-start'],
   &[data-placement='left-end']          { transform-origin: right center; }
-  &[data-placement='center']            { transform-origin: center;       }
+  &[data-placement='center']            { transform-origin: center; translate: -50% -50%; }
   &[data-placement='bottom-right-corner'] { transform-origin: bottom right; }
   &[data-placement='bottom-left-corner']  { transform-origin: bottom left;  }
   &[data-placement='top-right-corner']    { transform-origin: top right;    }

@@ -6,7 +6,15 @@ export const Spinner = ({ size = '32px', strokeWidth = '2', strokeColor = '#FAFA
   <svg height={size} viewBox="0 0 32 32" width={size} role="img" aria-label="Loading spinner">
     <circle cx="16" cy="16" r="14" fill="none" strokeWidth={strokeWidth} stroke={strokeColor} opacity=".2" />
     <circle cx="16" cy="16" r="14" fill="none" strokeWidth={strokeWidth} stroke={color} strokeDasharray="80" strokeDashoffset="60">
-      <animateTransform attributeName="transform" attributeType="XML" type="rotate" dur="1s" from="0 16 16" to="360 16 16" repeatCount="indefinite" />
+      <animateTransform
+        attributeName="transform"
+        attributeType="XML"
+        type="rotate"
+        dur="1s"
+        from="0 16 16"
+        to="360 16 16"
+        repeatCount="indefinite"
+      />
     </circle>
   </svg>
 )
@@ -28,13 +36,32 @@ export const ContentSpinner = ({ size = '20px', color }) => (
   </div>
 )
 
-// Linear loading 
+// Linear loading
 export const LinearLoading = () => (
   <div className={styles.loading}>
     <div className={`${styles.loading__container} d-f-c flex-column`}>
       <div />
     </div>
   </div>
+)
+
+export const MessageLoader = () => (
+  <svg height="100%" viewBox="0 0 32 32" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" fill="none" r="14" stroke="white" stroke-opacity="0.25" stroke-width="4"></circle>
+    <circle
+      cx="16"
+      cy="16"
+      fill="none"
+      r="14"
+      stroke="white"
+      stroke-dasharray="87.96"
+      stroke-dashoffset="66"
+      stroke-linecap="round"
+      stroke-width="4"
+    >
+      <animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.8s" repeatCount="indefinite" />
+    </circle>
+  </svg>
 )
 
 export default GlobalLoader

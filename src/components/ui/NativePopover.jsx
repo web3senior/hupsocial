@@ -14,7 +14,7 @@ function computePosition(triggerRect, pw, ph, placement) {
 
   switch (placement) {
     case 'center':
-      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+      return { top: '50%', left: '50%', transform: '' }
     case 'bottom-right-corner':
       return { top: 'auto', left: 'auto', bottom: MARGIN + 'px', right: MARGIN + 'px' }
     case 'bottom-left-corner':

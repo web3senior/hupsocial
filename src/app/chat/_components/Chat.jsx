@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import CryptoJS from 'crypto-js'
 import { ethers } from 'ethers'
@@ -11,9 +11,9 @@ import clsx from 'clsx'
 import { ArrowUp, EllipsisVertical, MessageSquarePlus, Image as ImageIcon, SquarePlay, X } from 'lucide-react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { bytesToHex, encodeFunctionData } from 'viem'
-import { ContentSpinner } from '@/components/Loading'
-import { chatLocalStorageBurnerKey, chatSessionStorageUnlockedKey, CHAT_ZERO_ADDRESS as ZERO_ADDRESS } from '@/lib/chatBurnerSession'
-import { APP_PASSWORD_SESSION_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
+import { ContentSpinner, MessageLoader } from '@/components/Loading'
+import { chatLocalStorageBurnerKey, chatLocalStorageBurnerAddress, chatSessionStorageUnlockedKey, CHAT_ZERO_ADDRESS as ZERO_ADDRESS } from '@/lib/chatBurnerSession'
+import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
 import { ConversationList } from './ConversationList'
@@ -22,10 +22,21 @@ import abiChat from '@/abis/Chat.json'
 import { Buffer } from 'buffer'
 import { useChatHistory } from '@/hooks/useChatHistory'
 import { useSWRConfig } from 'swr'
+import { CheckCircle2 } from 'lucide-react'
 
 // ■■■ Configuration & Helpers ■■■
 
 const CHAT_PAGE_SIZE = 200
+
+// IPFS content is immutable — same CID always returns the same bytes.
+// Cache fetches at module scope so the polling interval never re-fetches known CIDs.
+const _ipfsCache = new Map()
+async function cachedGetIPFS(cid) {
+  if (_ipfsCache.has(cid)) return _ipfsCache.get(cid)
+  const data = await getIPFS(cid)
+  _ipfsCache.set(cid, data)
+  return data
+}
 const MAX_MEDIA_ITEMS = 4
 const MAX_MEDIA_SIZE_MB = 5
 
@@ -104,7 +115,7 @@ const getMediaDimensions = (file, type) => {
 
 // ■■■ Lazy Decryption Component ■■■
 
-const EncryptedMediaItem = ({ item, rawKeyHex }) => {
+const EncryptedMediaItem = ({ item, rawKeyHex, onLoad }) => {
   const [localUrl, setLocalUrl] = useState(null)
   const [isDecrypting, setIsDecrypting] = useState(true)
 
@@ -154,9 +165,9 @@ const EncryptedMediaItem = ({ item, rawKeyHex }) => {
   }
 
   return item.type === 'image' ? (
-    <img src={localUrl} alt="Encrypted asset" className={styles['chat-message__media-item']} />
+    <img src={localUrl} alt="Encrypted asset" className={styles['chat-message__media-item']} onLoad={onLoad} />
   ) : (
-    <video src={localUrl} controls className={styles['chat-message__media-item']} />
+    <video src={localUrl} controls className={styles['chat-message__media-item']} onLoadedData={onLoad} />
   )
 }
 
@@ -178,7 +189,9 @@ export default function Chat() {
   const chatIntervalRef = useRef(null)
   const scrollRef = useRef(null)
   const currentNonce = useRef(null)
-  const [isSending, setIsSending] = useState(false)
+  const sendQueueRef = useRef([])
+  const isProcessingQueueRef = useRef(false)
+  const processQueueRef = useRef(null)
   const [pendingMessage, setPendingMessage] = useState(null)
 
   const [mediaItems, setMediaItems] = useState([])
@@ -406,7 +419,7 @@ export default function Chat() {
   const loadMyContacts = async () => {
     try {
       if (!publicClient || !tunnelAddress || !address) return
-      
+
       const keys = await getUnlockedKey()
       if (!keys) return
 
@@ -425,7 +438,7 @@ export default function Chat() {
         return
       }
 
-      const payload = await getIPFS(cid)
+      const payload = await cachedGetIPFS(cid)
       let rawBlob = typeof payload === 'string' ? payload : payload?.encrypted_data || payload?.encryptedData || payload?.data || null
       if (!rawBlob) {
         setContacts([])
@@ -453,7 +466,6 @@ export default function Chat() {
         return
       }
       const parsed = JSON.parse(decoded)
-      console.log(parsed)
       const normalized = Array.isArray(parsed) ? parsed : parsed?.contacts
       const validContacts = Array.isArray(normalized)
         ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress)
@@ -483,265 +495,264 @@ export default function Chat() {
   }
 
   const readHistoryChat = async (contactAddress) => {
-  const keys = await getUnlockedKey()
-  if (!keys || !publicClient || !tunnelAddress || !address) return []
-  const subtle = window.crypto.subtle
-  const myAddress = address.toLowerCase()
+    const keys = await getUnlockedKey()
+    if (!keys || !publicClient || !tunnelAddress || !address) return []
+    const subtle = window.crypto.subtle
+    const myAddress = address.toLowerCase()
 
-  try {
-    const friend = contacts.find((c) => c.contactAddress.toLowerCase() === contactAddress.toLowerCase())
-    if (!friend) return []
+    try {
+      const friend = contacts.find((c) => c.contactAddress.toLowerCase() === contactAddress.toLowerCase())
+      if (!friend) return []
 
-    // My current key pair
-    const myPubKey = await getRegisteredChatPublicKey(address)
+      // My current key pair
+      const myPubKey = await getRegisteredChatPublicKey(address)
 
-    // Peer's current registered public key
-    const latestPeerKey = await getRegisteredChatPublicKey(contactAddress)
+      // Peer's current registered public key
+      const latestPeerKey = await getRegisteredChatPublicKey(contactAddress)
 
-    // All possible topics:
-    // 1. Stored topic when I added the contact (derived with peer's key at that time)
-    // 2. Topic derived with peer's CURRENT key (may differ if they re-registered)
-    // 3. Topic from peer's perspective using MY current key (for messages they sent to me)
-    const topicsToCheck = new Set([friend.topic])
+      // All possible topics:
+      // 1. Stored topic when I added the contact (derived with peer's key at that time)
+      // 2. Topic derived with peer's CURRENT key (may differ if they re-registered)
+      // 3. Topic from peer's perspective using MY current key (for messages they sent to me)
+      const topicsToCheck = new Set([friend.topic])
 
-    if (latestPeerKey) {
-      const myDerivation = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
-      topicsToCheck.add(myDerivation.topic)
-    }
-
-    // The peer derives topic as: deriveRoomFromPeerKey(peer.privKey, myPubKey)
-    // ECDH is symmetric so this equals deriveRoomFromPeerKey(myPrivKey, peerPubKey)
-    // — already covered above. But if MY public key changed since they added me,
-    // they may be writing to an old topic. We can't enumerate those without
-    // knowing their private key. Best we can do is check the meeting point inbox.
-    if (myPubKey && latestPeerKey) {
-      // Cross-check: derive from peer's perspective using my current pubkey
-      // ECDH symmetry: same result as above, but let's be explicit
-      const crossCheck = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
-      topicsToCheck.add(crossCheck.topic)
-    }
-
-    // Also pull topics from the stealth meeting point inbox — catches any
-    // topic the peer wrote to that we haven't locally indexed yet
-    if (friend.stealthAddress) {
-      try {
-        const [inboxTopics] = await publicClient.readContract({
-          address: tunnelAddress,
-          abi: abiChat,
-          functionName: 'getPaginatedTopics',
-          args: [friend.stealthAddress, 0n, 50n],
-        })
-        if (Array.isArray(inboxTopics)) {
-          inboxTopics.forEach((t) => topicsToCheck.add(t))
-        }
-      } catch (e) {
-        console.warn('Meeting point inbox fetch failed:', e)
+      if (latestPeerKey) {
+        const myDerivation = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+        topicsToCheck.add(myDerivation.topic)
       }
-    }
 
-    // Also check MY meeting point inbox — messages sent to me land here
-    if (address) {
-      try {
-        const [myInboxTopics] = await publicClient.readContract({
-          address: tunnelAddress,
-          abi: abiChat,
-          functionName: 'getPaginatedTopics',
-          args: [address, 0n, 50n],
-        })
-        if (Array.isArray(myInboxTopics)) {
-          myInboxTopics.forEach((t) => topicsToCheck.add(t))
-        }
-      } catch (e) {
-        console.warn('My inbox fetch failed:', e)
+      // The peer derives topic as: deriveRoomFromPeerKey(peer.privKey, myPubKey)
+      // ECDH is symmetric so this equals deriveRoomFromPeerKey(myPrivKey, peerPubKey)
+      // — already covered above. But if MY public key changed since they added me,
+      // they may be writing to an old topic. We can't enumerate those without
+      // knowing their private key. Best we can do is check the meeting point inbox.
+      if (myPubKey && latestPeerKey) {
+        // Cross-check: derive from peer's perspective using my current pubkey
+        // ECDH symmetry: same result as above, but let's be explicit
+        const crossCheck = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+        topicsToCheck.add(crossCheck.topic)
       }
-    }
 
-    const candidateTopics = Array.from(topicsToCheck)
-    console.log('candidateTopics:', candidateTopics)
-
-    if (candidateTopics.length === 0) return []
-
-    // Fetch history for all candidate topics in parallel
-    const historyResponses = await Promise.all(
-      candidateTopics.map(async (topic) => {
+      // Also pull topics from the stealth meeting point inbox — catches any
+      // topic the peer wrote to that we haven't locally indexed yet
+      if (friend.stealthAddress) {
         try {
-          const response = await publicClient.readContract({
+          const [inboxTopics] = await publicClient.readContract({
             address: tunnelAddress,
             abi: abiChat,
-            functionName: 'getTopicHistory',
-            args: [topic, 0n, BigInt(CHAT_PAGE_SIZE)],
+            functionName: 'getPaginatedTopics',
+            args: [friend.stealthAddress, 0n, 50n],
           })
-          return Array.isArray(response?.[0]) ? response[0].map((msg) => ({ topic, msg })) : []
-        } catch {
-          return []
-        }
-      })
-    )
-
-    const flatMessages = historyResponses.flat().filter(Boolean)
-
-    // Deduplicate
-    const seenIds = new Set()
-    const mergedMessages = flatMessages.filter((entry) => {
-      const meta      = entry?.msg?.metadata   ?? entry?.msg?.[2] ?? ''
-      const sender    = entry?.msg?.sender      ?? entry?.msg?.[0] ?? ''
-      const timestamp = String(entry?.msg?.timestamp ?? entry?.msg?.[1] ?? '')
-      const id = `${entry.topic}-${sender}-${timestamp}-${meta}`
-      if (seenIds.has(id)) return false
-      seenIds.add(id)
-      return true
-    })
-
-    // Pre-derive seed keys for all candidate topics
-    const topicSeedKeys = {}
-    for (const topic of candidateTopics) {
-      const seed = ethers.keccak256(ethers.concat([topic, ethers.toUtf8Bytes('content-encryption')]))
-      topicSeedKeys[topic] = await subtle.importKey(
-        'raw', ethers.getBytes(seed), 'AES-GCM', true, ['encrypt', 'decrypt']
-      )
-    }
-
-    // Fetch my burner address for sender identification
-    let myBurnerAddress = ''
-    try {
-      const mySession = await publicClient.readContract({
-        address: tunnelAddress,
-        abi: abiChat,
-        functionName: 'userSessions',
-        args: [address],
-      })
-      myBurnerAddress = (mySession?.burnerKey ?? mySession?.[0] ?? '').toLowerCase()
-    } catch {}
-
-    const decryptedList = await Promise.all(
-      mergedMessages.map(async (entry) => {
-        try {
-          const msg             = entry.msg
-          const onChainSender   = String(msg.sender    ?? msg[0] ?? '').toLowerCase()
-          const msgTimestamp    = Number(msg.timestamp  ?? msg[1] ?? 0)
-          const msgMetadata     = normalizeCID(msg.metadata ?? msg[2] ?? '')
-          const msgEncryptedKey = msg.encryptedKey ?? msg[3]
-          const msgDeleted      = Boolean(msg.isDeleted ?? msg[5])
-
-          if (!msgMetadata || msgDeleted) return null
-
-          const ipfsPayloadRaw = await getIPFS(msgMetadata)
-          let ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
-          if (typeof ipfsPayload === 'string') {
-            try { ipfsPayload = JSON.parse(ipfsPayload) } catch { return null }
+          if (Array.isArray(inboxTopics)) {
+            inboxTopics.forEach((t) => topicsToCheck.add(t))
           }
+        } catch (e) {
+          console.warn('Meeting point inbox fetch failed:', e)
+        }
+      }
 
-          // Determine direction using senderAddr from payload (most reliable)
-          // Fall back to on-chain sender vs known addresses
-          const payloadSender  = ipfsPayload?.senderAddr?.toLowerCase?.() ?? null
-          const effectiveSender = payloadSender ?? onChainSender
+      // Also check MY meeting point inbox — messages sent to me land here
+      if (address) {
+        try {
+          const [myInboxTopics] = await publicClient.readContract({
+            address: tunnelAddress,
+            abi: abiChat,
+            functionName: 'getPaginatedTopics',
+            args: [address, 0n, 50n],
+          })
+          if (Array.isArray(myInboxTopics)) {
+            myInboxTopics.forEach((t) => topicsToCheck.add(t))
+          }
+        } catch (e) {
+          console.warn('My inbox fetch failed:', e)
+        }
+      }
 
-          const isMine =
-            effectiveSender === myAddress ||
-            onChainSender   === myAddress ||
-            onChainSender   === myBurnerAddress
+      const candidateTopics = Array.from(topicsToCheck)
 
-          console.log('msg', msgMetadata, '| isMine:', isMine, '| effectiveSender:', effectiveSender, '| onChainSender:', onChainSender)
+      if (candidateTopics.length === 0) return []
 
-          // Resolve decryption key
-          let decryptionKey = null
+      // Fetch history for all candidate topics in parallel
+      const historyResponses = await Promise.all(
+        candidateTopics.map(async (topic) => {
+          try {
+            const response = await publicClient.readContract({
+              address: tunnelAddress,
+              abi: abiChat,
+              functionName: 'getTopicHistory',
+              args: [topic, 0n, BigInt(CHAT_PAGE_SIZE)],
+            })
+            return Array.isArray(response?.[0]) ? response[0].map((msg) => ({ topic, msg })) : []
+          } catch {
+            return []
+          }
+        })
+      )
 
-          if (isMine) {
-            // Outgoing — use topic seed key (we derived it when sending)
-            decryptionKey = topicSeedKeys[entry.topic] ?? null
-          } else {
-            // Incoming — ECIES unwrap the content key seed the sender encrypted for us
-            const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
-            if (wrappedKeyBlob) {
+      const flatMessages = historyResponses.flat().filter(Boolean)
+
+      // Deduplicate
+      const seenIds = new Set()
+      const mergedMessages = flatMessages.filter((entry) => {
+        const meta = entry?.msg?.metadata ?? entry?.msg?.[2] ?? ''
+        const sender = entry?.msg?.sender ?? entry?.msg?.[0] ?? ''
+        const timestamp = String(entry?.msg?.timestamp ?? entry?.msg?.[1] ?? '')
+        const id = `${entry.topic}-${sender}-${timestamp}-${meta}`
+        if (seenIds.has(id)) return false
+        seenIds.add(id)
+        return true
+      })
+
+      // Pre-derive seed keys for all candidate topics
+      const topicSeedKeys = {}
+      for (const topic of candidateTopics) {
+        const seed = ethers.keccak256(ethers.concat([topic, ethers.toUtf8Bytes('content-encryption')]))
+        topicSeedKeys[topic] = await subtle.importKey('raw', ethers.getBytes(seed), 'AES-GCM', true, ['encrypt', 'decrypt'])
+      }
+
+      // Fetch my burner address for sender identification
+      let myBurnerAddress = ''
+      try {
+        const mySession = await publicClient.readContract({
+          address: tunnelAddress,
+          abi: abiChat,
+          functionName: 'userSessions',
+          args: [address],
+        })
+        myBurnerAddress = (mySession?.burnerKey ?? mySession?.[0] ?? '').toLowerCase()
+      } catch {}
+
+      const decryptedList = await Promise.all(
+        mergedMessages.map(async (entry) => {
+          try {
+            const msg = entry.msg
+            const onChainSender = String(msg.sender ?? msg[0] ?? '').toLowerCase()
+            const msgTimestamp = Number(msg.timestamp ?? msg[1] ?? 0)
+            const msgMetadata = normalizeCID(msg.metadata ?? msg[2] ?? '')
+            const msgEncryptedKey = msg.encryptedKey ?? msg[3]
+            const msgDeleted = Boolean(msg.isDeleted ?? msg[5])
+
+            if (!msgMetadata || msgDeleted) return null
+
+            const ipfsPayloadRaw = await cachedGetIPFS(msgMetadata)
+            let ipfsPayload = typeof ipfsPayloadRaw === 'string' ? JSON.parse(ipfsPayloadRaw) : ipfsPayloadRaw
+            if (typeof ipfsPayload === 'string') {
               try {
-                const unwrappedSeedBytes = ecies.decrypt(
-                  Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'),
-                  Buffer.from(wrappedKeyBlob)
-                )
-                decryptionKey = await subtle.importKey(
-                  'raw',
-                  new Uint8Array(unwrappedSeedBytes),
-                  'AES-GCM',
-                  true,
-                  ['decrypt']
-                )
-              } catch (eciesErr) {
-                console.warn('ECIES unwrap failed:', msgMetadata, eciesErr?.message)
+                ipfsPayload = JSON.parse(ipfsPayload)
+              } catch {
                 return null
               }
             }
-          }
 
-          if (!decryptionKey) {
-            console.warn('No decryption key for:', msgMetadata, '| isMine:', isMine)
+            // Determine direction using senderAddr from payload (most reliable)
+            // Fall back to on-chain sender vs known addresses
+            const payloadSender = ipfsPayload?.senderAddr?.toLowerCase?.() ?? null
+            const effectiveSender = payloadSender ?? onChainSender
+
+            const isMine = effectiveSender === myAddress || onChainSender === myAddress || onChainSender === myBurnerAddress
+
+            // Resolve decryption key
+            let decryptionKey = null
+
+            if (isMine) {
+              // Outgoing — use topic seed key (we derived it when sending)
+              decryptionKey = topicSeedKeys[entry.topic] ?? null
+            } else {
+              // Incoming — ECIES unwrap the content key seed the sender encrypted for us
+              const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
+              if (wrappedKeyBlob) {
+                try {
+                  const unwrappedSeedBytes = ecies.decrypt(
+                    Buffer.from(keys.privKeyHex.replace(/^0x/, ''), 'hex'),
+                    Buffer.from(wrappedKeyBlob)
+                  )
+                  decryptionKey = await subtle.importKey('raw', new Uint8Array(unwrappedSeedBytes), 'AES-GCM', true, ['decrypt'])
+                } catch (eciesErr) {
+                  console.warn('ECIES unwrap failed:', msgMetadata, eciesErr?.message)
+                  return null
+                }
+              }
+            }
+
+            if (!decryptionKey) {
+              console.warn('No decryption key for:', msgMetadata, '| isMine:', isMine)
+              return null
+            }
+
+            const exportedKeyBuffer = await subtle.exportKey('raw', decryptionKey)
+            const rawKeyHex = ethers.hexlify(new Uint8Array(exportedKeyBuffer))
+
+            const iv = ethers.getBytes(ipfsPayload.iv)
+            const ciphertext = ethers.getBytes(ipfsPayload.ciphertext)
+
+            let decryptedBuffer
+            try {
+              decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, decryptionKey, ciphertext)
+            } catch (aesgcmErr) {
+              console.warn('AES-GCM decrypt failed:', msgMetadata, aesgcmErr?.message)
+              return null
+            }
+
+            const content = JSON.parse(new TextDecoder().decode(decryptedBuffer))
+
+            return {
+              id: `${entry.topic}-${msgTimestamp}-${effectiveSender}-${msgMetadata}`,
+              content,
+              timestamp: new Date(msgTimestamp * 1000).toLocaleString(),
+              sender: effectiveSender,
+              side: isMine ? 'me' : 'them',
+              rawTimestamp: msgTimestamp,
+              rawKeyHex,
+            }
+          } catch (err) {
+            console.warn('Message processing failed:', err)
             return null
           }
+        })
+      )
 
-          const exportedKeyBuffer = await subtle.exportKey('raw', decryptionKey)
-          const rawKeyHex = ethers.hexlify(new Uint8Array(exportedKeyBuffer))
-
-          const iv         = ethers.getBytes(ipfsPayload.iv)
-          const ciphertext = ethers.getBytes(ipfsPayload.ciphertext)
-
-          let decryptedBuffer
-          try {
-            decryptedBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, decryptionKey, ciphertext)
-          } catch (aesgcmErr) {
-            console.warn('AES-GCM decrypt failed:', msgMetadata, aesgcmErr?.message)
-            return null
-          }
-
-          const content = JSON.parse(new TextDecoder().decode(decryptedBuffer))
-
-          return {
-            id:           `${entry.topic}-${msgTimestamp}-${effectiveSender}-${msgMetadata}`,
-            content,
-            timestamp:    new Date(msgTimestamp * 1000).toLocaleString(),
-            sender:       effectiveSender,
-            side:         isMine ? 'me' : 'them',
-            rawTimestamp: msgTimestamp,
-            rawKeyHex,
-          }
-        } catch (err) {
-          console.warn('Message processing failed:', err)
-          return null
-        }
-      })
-    )
-
-    return decryptedList
-      .filter(Boolean)
-      .sort((a, b) => a.rawTimestamp - b.rawTimestamp)
-
-  } catch (error) {
-    console.error('readHistoryChat failed:', error)
-    return []
+      return decryptedList.filter(Boolean).sort((a, b) => a.rawTimestamp - b.rawTimestamp)
+    } catch (error) {
+      console.error('readHistoryChat failed:', error)
+      return []
+    }
   }
-}
 
-  const viewChatWith = async (contactAddress, clearPending = false) => {
+  const viewChatWith = async (contactAddress, clearPending = false, pendingIdToRemove = null) => {
     if (!contactAddress) return
     if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
     setReceiverAddress(contactAddress)
     activeReceiverRef.current = contactAddress
 
     const performSync = async (opts = {}) => {
+      // Skip background polls while the send queue is active. The queue calls
+      // viewChatWith itself after each confirm, so polling here would race and
+      // show a confirmed message alongside its still-visible optimistic bubble.
+      if (isProcessingQueueRef.current && !opts.pendingIdToRemove) return
       try {
         const freshMessages = await readHistoryChat(contactAddress)
         if (contactAddress !== activeReceiverRef.current) return
+        // Both setState calls are synchronous here — React 18 batches them into
+        // one render so the swap from optimistic to confirmed is atomic.
         setChatHistory((prev) => {
           if (prev.list.length === freshMessages.length) return { ...prev, isLoading: false }
           return { list: freshMessages, isLoading: false }
         })
+        if (opts.pendingIdToRemove) {
+          setPendingMessages((prev) => prev.filter((m) => m.id !== opts.pendingIdToRemove))
+        }
         if (opts.clearPending) setPendingMessage(null)
       } catch (err) {
         console.error('Background message sync failure:', err)
         setChatHistory((prev) => ({ ...prev, isLoading: false }))
+        if (opts.pendingIdToRemove) {
+          setPendingMessages((prev) => prev.filter((m) => m.id !== opts.pendingIdToRemove))
+        }
         if (opts.clearPending) setPendingMessage(null)
       }
     }
     setChatHistory((prev) => ({ ...prev, isLoading: prev.list.length === 0 }))
-    await performSync({ clearPending })
+    await performSync({ clearPending, pendingIdToRemove })
     chatIntervalRef.current = setInterval(performSync, 5000)
   }
 
@@ -749,37 +760,17 @@ export default function Chat() {
     setPendingMessages((prev) => prev.map((msg) => (msg.id === id ? { ...msg, status, error } : msg)))
   }
 
-  async function sendEncryptedMessage(e) {
-    if (e) e.preventDefault()
-    const trimmed = messageText.trim()
-    const hasMedia = mediaItems.length > 0
-    if ((!trimmed && !hasMedia) || !receiverAddress || isSending) return
+  // Relays queued messages one at a time so meta-tx nonces stay sequential.
+  async function processQueue() {
+    if (isProcessingQueueRef.current || sendQueueRef.current.length === 0) return
+    isProcessingQueueRef.current = true
 
-    setIsSending(true)
-
-    // Snapshot media items to prevent UI resets mid-process
-    const capturedMediaItems = [...mediaItems]
-
-    const pendingId = `pending-${Date.now()}-${Math.random()}`
-
-    // We clear the form early for a snappy Droid aesthetic
-    setMessageText('')
-    setMediaItems([])
-
-    const optimisticMsg = {
-      id: pendingId,
-      content: { elements: [{ type: 'text', data: { text: trimmed || 'Uploading secure payload...' } }] },
-      timestamp: new Date().toLocaleString(),
-      sender: address?.toLowerCase(),
-      side: 'me',
-      status: 'sending',
-    }
-    setPendingMessages((prev) => [...prev, optimisticMsg])
+    const { pendingId, capturedReceiverAddress, capturedMediaItems, trimmed } = sendQueueRef.current[0]
 
     try {
       const keys = await getUnlockedKey()
       if (!keys) throw new Error('Vault is locked.')
-      const friend = contacts.find((c) => c.contactAddress.toLowerCase() === receiverAddress.toLowerCase())
+      const friend = contacts.find((c) => c.contactAddress.toLowerCase() === capturedReceiverAddress.toLowerCase())
       if (!friend) throw new Error('Contact not found.')
       const latestPeerKey = await getRegisteredChatPublicKey(friend.contactAddress)
       if (!latestPeerKey) throw new Error('Receiver public key not registered.')
@@ -789,17 +780,13 @@ export default function Chat() {
       const derivedKeySeed = ethers.keccak256(ethers.concat([latestRoom.topic, ethers.toUtf8Bytes('content-encryption')]))
       const contentKey = await subtle.importKey('raw', ethers.getBytes(derivedKeySeed), 'AES-GCM', true, ['encrypt'])
 
-      // 1. Process & Encrypt Media Binary Buffers
       const processedMediaItems = []
       for (const item of capturedMediaItems) {
         const arrayBuffer = await item.file.arrayBuffer()
         const mediaIv = window.crypto.getRandomValues(new Uint8Array(12))
-
         const encryptedMediaBuffer = await subtle.encrypt({ name: 'AES-GCM', iv: mediaIv }, contentKey, arrayBuffer)
-
         const encryptedBlob = new Blob([encryptedMediaBuffer])
         const mediaCid = await uploadFileToIPFS(encryptedBlob)
-
         processedMediaItems.push({
           type: item.type,
           cid: mediaCid,
@@ -811,32 +798,23 @@ export default function Chat() {
         })
       }
 
-      // 2. Construct Master JSON Payload
       const messageElements = []
       if (trimmed) messageElements.push({ type: 'text', data: { text: trimmed } })
       if (processedMediaItems.length > 0) messageElements.push({ type: 'media', data: { items: processedMediaItems } })
-
-      const messagePayload = {
-        version: '1',
-        elements: messageElements,
-      }
 
       const payloadIv = window.crypto.getRandomValues(new Uint8Array(12))
       const ciphertext = await subtle.encrypt(
         { name: 'AES-GCM', iv: payloadIv },
         contentKey,
-        new TextEncoder().encode(JSON.stringify(messagePayload))
+        new TextEncoder().encode(JSON.stringify({ version: '1', elements: messageElements }))
       )
 
-      // 3. Dispatch Encrypted Metapacket
-      const encryptedPayload = {
+      const ipfsResult = await uploadObjectToIPFS({
         version: '1',
         iv: ethers.hexlify(payloadIv),
         ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
         senderAddr: address,
-      }
-
-      const ipfsResult = await uploadObjectToIPFS(encryptedPayload)
+      })
       if (!ipfsResult?.cid) throw new Error('IPFS upload failed.')
 
       const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
@@ -848,23 +826,51 @@ export default function Chat() {
         receiverWrappedKey
       )
 
-      if (success) {
-        setPendingMessages([])
-        capturedMediaItems.forEach((item) => item.localUrl && URL.revokeObjectURL(item.localUrl))
-        mutate(['chat-history', receiverAddress])
-        await viewChatWith(receiverAddress)
+      if (!success) throw new Error('Transaction submission failed.')
+
+      capturedMediaItems.forEach((item) => item.localUrl && URL.revokeObjectURL(item.localUrl))
+      if (capturedReceiverAddress === activeReceiverRef.current) {
+        mutate(['chat-history', capturedReceiverAddress])
+        await viewChatWith(capturedReceiverAddress, false, pendingId)
       } else {
-        throw new Error('Transaction submission failed.')
+        setPendingMessages((prev) => prev.filter((m) => m.id !== pendingId))
       }
     } catch (error) {
       console.error('Messaging engine error:', error)
       updateMessageStatus(pendingId, 'error', error.message)
-      // Rollback UI on failure
-      setMessageText(trimmed)
-      setMediaItems(capturedMediaItems)
     } finally {
-      setIsSending(false)
+      sendQueueRef.current.shift()
+      isProcessingQueueRef.current = false
+      processQueueRef.current?.()
     }
+  }
+  processQueueRef.current = processQueue
+
+  async function sendEncryptedMessage(e) {
+    if (e) e.preventDefault()
+    const trimmed = messageText.trim()
+    const hasMedia = mediaItems.length > 0
+    if ((!trimmed && !hasMedia) || !receiverAddress) return
+
+    const capturedMediaItems = [...mediaItems]
+    const pendingId = `pending-${Date.now()}-${Math.random()}`
+
+    setMessageText('')
+    setMediaItems([])
+    setPendingMessages((prev) => [
+      ...prev,
+      {
+        id: pendingId,
+        content: { elements: [{ type: 'text', data: { text: trimmed || 'Uploading secure payload...' } }] },
+        timestamp: new Date().toLocaleString(),
+        sender: address?.toLowerCase(),
+        side: 'me',
+        status: 'sending',
+      },
+    ])
+
+    sendQueueRef.current.push({ pendingId, capturedReceiverAddress: receiverAddress, capturedMediaItems, trimmed })
+    processQueueRef.current?.()
   }
 
   const handleKeyDown = (e) => {
@@ -921,6 +927,43 @@ export default function Chat() {
     }
   }
 
+  // ─── Registration Guards ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!isMounted) return
+    const hasVault = !!localStorage.getItem(ENCRYPTED_APP_KEY_STORAGE)
+    const hasBurner = !!localStorage.getItem(chatLocalStorageBurnerAddress)
+    if (!hasVault || !hasBurner) router.replace('/register')
+  }, [isMounted, router])
+
+  useEffect(() => {
+    if (!isMounted || !isConnected || !address || !publicClient || !tunnelAddress) return
+    const checkOnChainRegistration = async () => {
+      try {
+        const [pk, session, latestBlock] = await Promise.all([
+          publicClient.readContract({ address: tunnelAddress, abi: abiChat, functionName: 'publicKeyRegistry', args: [address] }),
+          publicClient.readContract({ address: tunnelAddress, abi: abiChat, functionName: 'userSessions', args: [address] }),
+          publicClient.getBlock({ blockTag: 'latest' }),
+        ])
+
+        const isPkRegistered = Boolean(pk && pk !== '0x')
+        const burnerKey = String(session?.burnerKey ?? session?.[0] ?? ZERO_ADDRESS)
+        const expiresAt = BigInt(session?.expiresAt ?? session?.[1] ?? 0)
+        const networkTime = BigInt(latestBlock?.timestamp ?? Math.floor(Date.now() / 1000))
+        const localBurnerAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
+        const isSessionValid =
+          burnerKey !== ZERO_ADDRESS &&
+          expiresAt > networkTime &&
+          localBurnerAddress?.toLowerCase() === burnerKey.toLowerCase()
+
+        if (!isPkRegistered || !isSessionValid) router.replace('/register')
+      } catch {
+        // Don't redirect on transient RPC errors
+      }
+    }
+    void checkOnChainRegistration()
+  }, [isMounted, isConnected, address, publicClient, tunnelAddress, router])
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [chatHistory.list, pendingMessages])
@@ -940,9 +983,13 @@ export default function Chat() {
     if (!isConnected) contactsInitializedRef.current = false
   }, [isConnected])
 
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [])
+
   // ■■■ Renderers ■■■
 
-  const renderMessageElements = (elements, rawKeyHex) => {
+  const renderMessageElements = (elements, rawKeyHex, onLoad) => {
     return elements?.map((el, i) => {
       if (el.type === 'text') {
         return <p key={i}>{el.data.text}</p>
@@ -951,7 +998,7 @@ export default function Chat() {
         return (
           <div key={i} className={clsx(styles['chat-message__media-grid'], 'mt-2')}>
             {el.data.items.map((item, idx) => (
-              <EncryptedMediaItem key={idx} item={item} rawKeyHex={rawKeyHex} />
+              <EncryptedMediaItem key={idx} item={item} rawKeyHex={rawKeyHex} onLoad={onLoad} />
             ))}
           </div>
         )
@@ -1000,9 +1047,12 @@ export default function Chat() {
         <div className={clsx(styles.chatHistory)} ref={scrollRef}>
           {chatHistory.list.map((msg) => (
             <div key={msg.id} className={clsx(styles['chat-message'], styles[`chat-message--${msg.side}`])}>
-              <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, msg.rawKeyHex)}</div>
-              <div className={styles['chat-message__timestamp']}>
-                <small>{msg.timestamp.split(',')[1]?.trim() || msg.timestamp}</small>
+              <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, msg.rawKeyHex, scrollToBottom)}</div>
+              <div className={styles['chat-message__timestamp']} title={msg.timestamp}>
+                <span className={'flex gap-025'}>
+                  {msg.timestamp.split(',')[1]?.trim() || msg.timestamp}
+                  <CheckCircle2 strokeWidth={2} size={12} />
+                </span>
               </div>
             </div>
           ))}
@@ -1010,9 +1060,10 @@ export default function Chat() {
           {pendingMessages.map((msg) => (
             <div key={msg.id} className={clsx(styles['chat-message'], styles['chat-message--me'], styles['chat-message--pending'])}>
               <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, null)}</div>
-              <div className={styles['chat-message__timestamp']}>
-                <small className={styles['chat-message__sending']}>Sending…</small>
-              </div>
+              <div className={styles['chat-message__timestamp']}></div>
+              <span className={styles['chat-message__sending']}>
+                <MessageLoader />
+              </span>
             </div>
           ))}
 
@@ -1057,10 +1108,10 @@ export default function Chat() {
 
             <div className="flex align-items-center justify-content-between gap-1">
               <div className="flex gap-2 mr-2">
-                <button type="button" onClick={() => triggerFileInput('image')} disabled={isSending}>
+                <button type="button" onClick={() => triggerFileInput('image')}>
                   <ImageIcon size={20} />
                 </button>
-                <button type="button" onClick={() => triggerFileInput('video')} disabled={isSending}>
+                <button type="button" onClick={() => triggerFileInput('video')}>
                   <SquarePlay size={20} />
                 </button>
               </div>
@@ -1070,11 +1121,10 @@ export default function Chat() {
                 onChange={(e) => setMessageText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Write a message…"
-                disabled={isSending}
               />
 
-              <button type="submit" disabled={isSending || (!messageText.trim() && mediaItems.length === 0)}>
-                {isSending ? <ContentSpinner /> : <ArrowUp width={18} height={18} />}
+              <button type="submit" disabled={!messageText.trim() && mediaItems.length === 0}>
+                <ArrowUp width={18} height={18} />
               </button>
             </div>
           </form>
