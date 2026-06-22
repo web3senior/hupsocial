@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
@@ -104,6 +104,7 @@ const editorHtmlToMarkdown = (html) => {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/g, ' ')
+    .replace(/​/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
@@ -214,6 +215,20 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     let node = selection.anchorNode
     while (node && node !== editor) {
       if (node.nodeName.toLowerCase() === tag) {
+        if (range.collapsed) {
+          // Cursor only — insert a plain-text node after the tag so the browser
+          // doesn't inherit its formatting for subsequent typing.
+          const zws = document.createTextNode('​')
+          node.parentNode.insertBefore(zws, node.nextSibling)
+          const newRange = document.createRange()
+          newRange.setStart(zws, 1)
+          newRange.collapse(true)
+          selection.removeAllRanges()
+          selection.addRange(newRange)
+          editor.focus()
+          return
+        }
+        // Text is selected — unwrap to strip formatting from the selection
         const parent = node.parentNode
         while (node.firstChild) parent.insertBefore(node.firstChild, node)
         parent.removeChild(node)
