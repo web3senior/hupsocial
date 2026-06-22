@@ -13,7 +13,7 @@ import {
   optimismSepolia,
   lineaSepolia,
 } from 'wagmi/chains'
-import { injected, metaMask, safe, walletConnect } from 'wagmi/connectors'
+import { injected, safe, walletConnect } from 'wagmi/connectors'
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 // const noopStorage = {
@@ -137,7 +137,7 @@ sepolia.textColor = `#fff`
 
 export const config = createConfig({
   chains: [lukso, celo, base, monad, bsc, monadTestnet], //somniaTestnet
-  connectors: [injected(), walletConnect({ projectId }), metaMask(), safe()],
+  connectors: [injected(), walletConnect({ projectId }), safe()],
   transports: {
     [lukso.id]: http(),
     [celo.id]: http(),

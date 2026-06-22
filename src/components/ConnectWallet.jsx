@@ -5,14 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config, setNetworkColor } from '@/config/wagmi'
-import { useDisconnect, useConnect, useSwitchChain, useConnection } from 'wagmi' // Updated useConnection to useConnection
+import { useDisconnect, useConnect, useSwitchChain, useConnection } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
 import NativePopover from '@/components/ui/NativePopover'
 import styles from './ConnectWallet.module.scss'
-
-const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
