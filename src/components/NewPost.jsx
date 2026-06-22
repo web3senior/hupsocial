@@ -2,16 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import {
-  Bold,
-  Image as ImageIcon,
-  Italic,
-  MapPin,
-  SlidersHorizontal,
-  SquarePlay,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Bold, Eye, EyeOff, Image as ImageIcon, Italic, MapPin, SlidersHorizontal, SquarePlay, Trash2, X } from 'lucide-react'
+
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
@@ -33,7 +27,6 @@ const normalizePrefillValue = (value) => {
   if (Array.isArray(value)) {
     return value.find((item) => typeof item === 'string' && item.length > 0) || ''
   }
-
   return typeof value === 'string' ? value : ''
 }
 
@@ -41,43 +34,29 @@ const createPostContent = (text = '', mediaItems = []) => ({
   version: '1',
   elements: [
     { type: 'text', data: { text } },
-    {
-      type: 'media',
-      data: {
-        items: mediaItems,
-      },
-    },
+    { type: 'media', data: { items: mediaItems } },
   ],
 })
 
 const getContentPayload = (existingPost) => {
   const content = existingPost?.content
   if (!content) return null
-
   if (typeof content === 'string') {
-    try {
-      return JSON.parse(content)
-    } catch {
-      return null
-    }
+    try { return JSON.parse(content) } catch { return null }
   }
-
   return content
 }
 
-const getContentElement = (content, type) => {
-  return content?.elements?.find((element) => element?.type === type)
-}
+const getContentElement = (content, type) =>
+  content?.elements?.find((element) => element?.type === type)
 
 const getInitialPostContent = (text, url, actionType, existingPost) => {
   if (actionType === 'edit' && existingPost) {
     const content = getContentPayload(existingPost)
     const existingText = getContentElement(content, 'text')?.data?.text || ''
     const existingMedia = getContentElement(content, 'media')?.data?.items || []
-
     return createPostContent(existingText, existingMedia)
   }
-
   return createPostContent([normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n'))
 }
 
@@ -87,7 +66,6 @@ const getSerializablePostContent = (content) => ({
   ...content,
   elements: content.elements.map((element) => {
     if (element.type !== 'media') return element
-
     return {
       ...element,
       data: {
@@ -98,21 +76,49 @@ const getSerializablePostContent = (content) => ({
   }),
 })
 
+// Convert stored markdown to editor HTML (bold/italic only — used once on init)
+const markdownToEditorHtml = (text) => {
+  if (!text) return ''
+  return text
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    )
+    .join('<br>')
+}
+
+// Convert the editor's innerHTML back to markdown for state / on-chain storage
+const editorHtmlToMarkdown = (html) => {
+  if (!html) return ''
+  return html
+    .replace(/<strong>([\s\S]*?)<\/strong>/gi, '**$1**')
+    .replace(/<b>([\s\S]*?)<\/b>/gi, '**$1**')
+    .replace(/<em>([\s\S]*?)<\/em>/gi, '*$1*')
+    .replace(/<i>([\s\S]*?)<\/i>/gi, '*$1*')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<div>/gi, '')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<p>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({
-  text = '',
-  url = '',
-  close,
-  onClose,
-  existingPost = null,
-  actionType = 'post',
-}) {
+export default function NewPost({ text = '', url = '', close, onClose, existingPost = null, actionType = 'post' }) {
   const mounted = useClientMounted()
 
   const initialPostContent = useMemo(
     () => getInitialPostContent(text, url, actionType, existingPost),
-    [text, url, actionType, existingPost],
+    [text, url, actionType, existingPost]
   )
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
@@ -120,7 +126,9 @@ export default function NewPost({
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [selectedMediaType, setSelectedMediaType] = useState(null)
-  const textareaRef = useRef(null)
+  const [isPreview, setIsPreview] = useState(false)
+  const editorRef = useRef(null)
+  const composerRef = useRef(null)
   const fileInputRef = useRef(null)
   const mediaItemsRef = useRef([])
 
@@ -134,14 +142,21 @@ export default function NewPost({
   const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
-  // ■■■ [Auto-expanding Textarea Height Calculation] ■■■
+  // Initialize editor with formatted HTML once the component mounts
   useEffect(() => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-
-    textarea.style.height = 'auto'
-    textarea.style.height = `${textarea.scrollHeight}px`
-  }, [postText])
+    if (!mounted || !editorRef.current) return
+    editorRef.current.innerHTML = markdownToEditorHtml(postText)
+    editorRef.current.focus()
+    // Move cursor to end
+    const range = document.createRange()
+    const sel = window.getSelection()
+    range.selectNodeContents(editorRef.current)
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+  // Only run on mount — postText intentionally excluded
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted])
 
   const handleClose = useCallback(
     (e) => {
@@ -149,7 +164,7 @@ export default function NewPost({
       close?.()
       onClose?.()
     },
-    [close, onClose],
+    [close, onClose]
   )
 
   const updateTextContent = (nextText) => {
@@ -157,57 +172,90 @@ export default function NewPost({
       const nextElements = [...prevContent.elements]
       nextElements[0] = {
         ...nextElements[0],
-        data: {
-          ...nextElements[0].data,
-          text: nextText,
-        },
+        data: { ...nextElements[0].data, text: nextText },
       }
-
-      return {
-        ...prevContent,
-        elements: nextElements,
-      }
+      return { ...prevContent, elements: nextElements }
     })
   }
 
-  const wrapSelection = (mark) => {
-    const textarea = textareaRef.current
-    if (!textarea) return
+  const handleEditorInput = () => {
+    const html = editorRef.current?.innerHTML || ''
+    updateTextContent(editorHtmlToMarkdown(html))
+  }
 
-    const { selectionStart, selectionEnd, value } = textarea
-    const selectedText = value.slice(selectionStart, selectionEnd)
-    const nextText = selectedText
-      ? `${value.slice(0, selectionStart)}${mark}${selectedText}${mark}${value.slice(selectionEnd)}`
-      : `${value.slice(0, selectionStart)}${mark}${mark}${value.slice(selectionEnd)}`
+  // Force plain-text paste so clipboard HTML doesn't corrupt the editor
+  const handlePaste = (event) => {
+    const text = event.clipboardData.getData('text/plain')
+    if (!text) return
+    event.preventDefault()
 
-    updateTextContent(nextText)
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount) return
 
-    requestAnimationFrame(() => {
-      textarea.focus()
-      const cursorOffset = selectedText ? mark.length : mark.length
-      const cursorPosition = selectedText ? selectionEnd + mark.length * 2 : selectionStart + cursorOffset
-      textarea.setSelectionRange(cursorPosition, cursorPosition)
-    })
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+    const textNode = document.createTextNode(text)
+    range.insertNode(textNode)
+    range.setStartAfter(textNode)
+    range.setEndAfter(textNode)
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    handleEditorInput()
+  }
+
+  // Toggle bold/italic using Selection + Range (no deprecated execCommand)
+  const applyFormat = (tag) => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount) return
+
+    const range = selection.getRangeAt(0)
+
+    // Toggle off if the selection/cursor is already inside this tag
+    let node = selection.anchorNode
+    while (node && node !== editor) {
+      if (node.nodeName.toLowerCase() === tag) {
+        const parent = node.parentNode
+        while (node.firstChild) parent.insertBefore(node.firstChild, node)
+        parent.removeChild(node)
+        handleEditorInput()
+        editor.focus()
+        return
+      }
+      node = node.parentNode
+    }
+
+    // Wrap selection in the tag
+    if (!range.collapsed) {
+      const el = document.createElement(tag)
+      try {
+        range.surroundContents(el)
+      } catch {
+        // surroundContents throws when selection crosses element boundaries
+        el.appendChild(range.extractContents())
+        range.insertNode(el)
+      }
+      selection.removeAllRanges()
+      const newRange = document.createRange()
+      newRange.selectNodeContents(el)
+      selection.addRange(newRange)
+    }
+
+    handleEditorInput()
+    editor.focus()
   }
 
   const uploadFileToIPFS = async (file) => {
     if (!file) return null
-
     setIsUploading(true)
-
     try {
       const data = new FormData()
       data.set('file', file)
-
-      const uploadRequest = await fetch('/api/ipfs/file', {
-        method: 'POST',
-        body: data,
-      })
-
-      if (!uploadRequest.ok) {
-        throw new Error(`Upload failed with status ${uploadRequest.status}`)
-      }
-
+      const uploadRequest = await fetch('/api/ipfs/file', { method: 'POST', body: data })
+      if (!uploadRequest.ok) throw new Error(`Upload failed with status ${uploadRequest.status}`)
       const result = await uploadRequest.json()
       return result.cid
     } catch (error) {
@@ -221,21 +269,16 @@ export default function NewPost({
 
   const uploadObjectToIPFS = async (json) => {
     setIsUploading(true)
-
     try {
       const uploadRequest = await fetch('/api/ipfs/object', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(json),
       })
-
       if (!uploadRequest.ok) {
         const errorData = await uploadRequest.json().catch(() => ({}))
         throw new Error(errorData.error || `Upload failed with status ${uploadRequest.status}`)
       }
-
       return uploadRequest.json()
     } catch (error) {
       console.error('Trouble uploading post metadata:', error)
@@ -251,9 +294,7 @@ export default function NewPost({
       toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
       return
     }
-
     setSelectedMediaType(type)
-
     if (fileInputRef.current) {
       fileInputRef.current.accept = type === 'image' ? 'image/*' : 'video/*'
       fileInputRef.current.click()
@@ -263,29 +304,16 @@ export default function NewPost({
   const getMediaDimensions = (file, type) => {
     return new Promise((resolve) => {
       const localUrl = URL.createObjectURL(file)
-
       if (type === 'image') {
         const img = new Image()
-        img.onload = () => {
-          URL.revokeObjectURL(localUrl)
-          resolve({ width: img.naturalWidth, height: img.naturalHeight })
-        }
-        img.onerror = () => {
-          URL.revokeObjectURL(localUrl)
-          resolve({ width: undefined, height: undefined })
-        }
+        img.onload = () => { URL.revokeObjectURL(localUrl); resolve({ width: img.naturalWidth, height: img.naturalHeight }) }
+        img.onerror = () => { URL.revokeObjectURL(localUrl); resolve({ width: undefined, height: undefined }) }
         img.src = localUrl
       } else if (type === 'video') {
         const video = document.createElement('video')
         video.preload = 'metadata'
-        video.onloadedmetadata = () => {
-          URL.revokeObjectURL(localUrl)
-          resolve({ width: video.videoWidth, height: video.videoHeight, duration: video.duration })
-        }
-        video.onerror = () => {
-          URL.revokeObjectURL(localUrl)
-          resolve({ width: undefined, height: undefined, duration: 0 })
-        }
+        video.onloadedmetadata = () => { URL.revokeObjectURL(localUrl); resolve({ width: video.videoWidth, height: video.videoHeight, duration: video.duration }) }
+        video.onerror = () => { URL.revokeObjectURL(localUrl); resolve({ width: undefined, height: undefined, duration: 0 }) }
         video.src = localUrl
       } else {
         resolve({ width: undefined, height: undefined })
@@ -296,7 +324,6 @@ export default function NewPost({
   const handleFileSelect = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-
     if (!file || mediaItems.length >= MAX_MEDIA_ITEMS) return
 
     const sizeInMB = file.size / (1024 * 1024)
@@ -308,7 +335,6 @@ export default function NewPost({
     const isImage = file.type.startsWith('image/')
     const isVideo = file.type.startsWith('video/')
     const isExpectedType = (isImage && selectedMediaType === 'image') || (isVideo && selectedMediaType === 'video')
-
     if (!isExpectedType) {
       toast(`Please select a ${selectedMediaType} file`, 'error')
       return
@@ -335,42 +361,25 @@ export default function NewPost({
     setPostContent((prevContent) => {
       const nextElements = [...prevContent.elements]
       const mediaElement = nextElements[1]
-
       nextElements[1] = {
         ...mediaElement,
-        data: {
-          ...mediaElement.data,
-          items: [...mediaElement.data.items, nextItem],
-        },
+        data: { ...mediaElement.data, items: [...mediaElement.data.items, nextItem] },
       }
-
-      return {
-        ...prevContent,
-        elements: nextElements,
-      }
+      return { ...prevContent, elements: nextElements }
     })
   }
 
   const handleRemoveMedia = (itemIndex) => {
     const item = mediaItems[itemIndex]
     if (item?.localUrl) URL.revokeObjectURL(item.localUrl)
-
     setPostContent((prevContent) => {
       const nextElements = [...prevContent.elements]
       const mediaElement = nextElements[1]
-
       nextElements[1] = {
         ...mediaElement,
-        data: {
-          ...mediaElement.data,
-          items: mediaElement.data.items.filter((_, index) => index !== itemIndex),
-        },
+        data: { ...mediaElement.data, items: mediaElement.data.items.filter((_, index) => index !== itemIndex) },
       }
-
-      return {
-        ...prevContent,
-        elements: nextElements,
-      }
+      return { ...prevContent, elements: nextElements }
     })
   }
 
@@ -378,20 +387,17 @@ export default function NewPost({
     setPostContent((prevContent) => {
       const nextElements = prevContent.elements.map((element, elementIndex) => {
         if (elementIndex !== 1) return element
-
         return {
           ...element,
           data: {
             ...element.data,
-            items: element.data.items.map((item, index) => (index === itemIndex ? { ...item, spoiler: !item.spoiler } : item)),
+            items: element.data.items.map((item, index) =>
+              index === itemIndex ? { ...item, spoiler: !item.spoiler } : item
+            ),
           },
         }
       })
-
-      return {
-        ...prevContent,
-        elements: nextElements,
-      }
+      return { ...prevContent, elements: nextElements }
     })
   }
 
@@ -404,7 +410,7 @@ export default function NewPost({
     }
 
     if (!hasPostBody) {
-      textareaRef.current?.focus()
+      editorRef.current?.focus()
       return
     }
 
@@ -416,18 +422,17 @@ export default function NewPost({
     try {
       const resultIPFS = await uploadObjectToIPFS(getSerializablePostContent(postContent))
       const metadata = resultIPFS.cid
-      if (!metadata) {
-        throw new Error('CID not found')
-      }
+      if (!metadata) throw new Error('CID not found')
 
       const activeChain = getActiveChain()
       const postContractAddress = activeChain?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
+
       if (actionType === 'edit') {
         writeContract({
           abi,
           address: postContractAddress,
           functionName: 'update',
-          args: [address, actionType === 'edit' ? existingPost.id : 0, metadata, allowComments],
+          args: [address, existingPost.id, metadata, allowComments],
         })
       } else {
         writeContract({
@@ -454,7 +459,6 @@ export default function NewPost({
 
   useEffect(() => {
     if (!isConfirmed) return
-
     localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, '')
     toast('Your post will appear once the transaction is confirmed.', 'success')
     handleClose()
@@ -476,49 +480,91 @@ export default function NewPost({
         <button type="button" className={styles.cancelButton} onClick={(e) => handleClose(e)}>
           Cancel
         </button>
-
         <h2>{actionType === 'edit' ? 'Edit post' : 'New post'}</h2>
       </header>
 
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} multiple={false} />
 
-        <div className={styles.composer}>
+        <div ref={composerRef} className={styles.composer}>
           <Profile variant="full" creator={address} />
 
           <div className={styles.composerBody}>
-            <textarea
-              ref={textareaRef}
-              name="q"
-              placeholder="What's happening?"
-              value={postText}
-              onChange={(event) => updateTextContent(event.target.value)}
-              rows={3}
-              autoFocus
+            <div
+              ref={editorRef}
+              contentEditable={!isPreview}
+              suppressContentEditableWarning
+              className={clsx(styles.editor, isPreview && styles.hidden)}
+              onInput={handleEditorInput}
+              onPaste={handlePaste}
+              data-placeholder="What's happening?"
             />
 
+            {isPreview && (
+              <div
+                className={styles.markdownPreview}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(postText || '_Nothing to preview yet._')) }}
+              />
+            )}
+
             <div className={styles.toolbar} aria-label="Post tools">
-              <button type="button" onClick={() => triggerFileInput('image')} aria-label="Add image" disabled={isBusy}>
-                <ImageIcon size={22} strokeWidth={1.8} />
-              </button>
-              <button type="button" onClick={() => triggerFileInput('video')} aria-label="Add video" disabled={isBusy}>
-                <SquarePlay size={22} strokeWidth={1.8} />
-              </button>
-              <button type="button" onClick={() => wrapSelection('**')} aria-label="Bold" disabled={isBusy}>
-                <Bold size={20} strokeWidth={1.8} />
-              </button>
-              <button type="button" onClick={() => wrapSelection('*')} aria-label="Italic" disabled={isBusy}>
-                <Italic size={20} strokeWidth={1.8} />
-              </button>
-              <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
-                <MapPin size={22} strokeWidth={1.8} />
+              {!isPreview && (
+                <>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => triggerFileInput('image')}
+                    aria-label="Add image"
+                    disabled={isBusy}
+                  >
+                    <ImageIcon size={22} strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => triggerFileInput('video')}
+                    aria-label="Add video"
+                    disabled={isBusy}
+                  >
+                    <SquarePlay size={22} strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyFormat('strong')}
+                    aria-label="Bold"
+                    disabled={isBusy}
+                  >
+                    <Bold size={20} strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyFormat('em')}
+                    aria-label="Italic"
+                    disabled={isBusy}
+                  >
+                    <Italic size={20} strokeWidth={1.8} />
+                  </button>
+                  <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
+                    <MapPin size={22} strokeWidth={1.8} />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className={styles.previewToggle}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setIsPreview((v) => !v)}
+                aria-label={isPreview ? 'Edit' : 'Preview'}
+                aria-pressed={isPreview}
+              >
+                {isPreview ? <EyeOff size={20} strokeWidth={1.8} /> : <Eye size={20} strokeWidth={1.8} />}
               </button>
             </div>
 
             <div className={styles.composerMeta}>
-              <span>
-                {mediaItems.length}/{MAX_MEDIA_ITEMS} media
-              </span>
+              <span>{mediaItems.length}/{MAX_MEDIA_ITEMS} media</span>
               <span className={clsx({ [styles.metaDanger]: isTextOverLimit })}>
                 {postText.length}/{MAX_POST_LENGTH}
               </span>
@@ -528,7 +574,6 @@ export default function NewPost({
               <div className={styles.mediaGrid}>
                 {mediaItems.map((item, index) => {
                   const mediaSrc = getMediaPreviewSrc(item)
-
                   return (
                     <figure key={`${item.cid || item.localUrl || index}`} className={styles.mediaItem}>
                       {item.type === 'image' ? (
@@ -536,7 +581,6 @@ export default function NewPost({
                       ) : (
                         <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
                       )}
-
                       <figcaption>
                         <button type="button" onClick={() => toggleSpoiler(index)}>
                           <X size={14} />
@@ -593,14 +637,10 @@ export default function NewPost({
 
           <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit}>
             {isConfirming
-              ? actionType === 'edit'
-                ? 'Updating...'
-                : 'Posting...'
+              ? actionType === 'edit' ? 'Updating...' : 'Posting...'
               : isSigning
                 ? 'Signing...'
-                : actionType === 'edit'
-                  ? 'Update'
-                  : 'Post'}
+                : actionType === 'edit' ? 'Update' : 'Post'}
           </button>
         </footer>
       </form>
