@@ -111,7 +111,7 @@ export function DefaultNetwork({ currentNetwork, onChainChange }) {
         {
           onSuccess: () => {
             localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
-            setNetworkColor(chainId)
+            setNetworkColor(chain)
           },
           onError: (error) => {
             console.error('Switch chain failed:', error)

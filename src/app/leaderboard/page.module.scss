@@ -289,7 +289,7 @@
 .leaderRow {
   appearance: none;
   display: grid;
-  grid-template-columns: 42px 2fr repeat(5, minmax(62px, 0.55fr)) minmax(72px, 0.5fr);
+  grid-template-columns: 42px 2fr repeat(6, minmax(62px, 0.55fr)) minmax(72px, 0.5fr);
   align-items: center;
   gap: 0.7rem;
   width: 100%;

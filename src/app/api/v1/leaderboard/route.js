@@ -17,6 +17,13 @@ const SORTS = {
   views: 'ranked.views_received DESC, ranked.score DESC, ranked.latest_post_at DESC',
 }
 
+const TX_COUNT_SQL = `
+  COALESCE(activity.root_posts, 0) +
+  COALESCE(activity.comments_made, 0) +
+  COALESCE(activity.reposts_made, 0) +
+  COALESCE(given.likes_given, 0)
+`
+
 const SCORE_SQL = `
   (COALESCE(activity.root_posts, 0) * 10) +
   (COALESCE(activity.comments_made, 0) * 4) +
@@ -24,7 +31,8 @@ const SCORE_SQL = `
   (COALESCE(received.likes_received, 0) * 8) +
   (COALESCE(given.likes_given, 0) * 1) +
   (COALESCE(views.views_received, 0) * 1) +
-  (COALESCE(u.follower_count, 0) * 12)
+  (COALESCE(u.follower_count, 0) * 12) +
+  (${TX_COUNT_SQL}) * 2
 `
 
 export async function GET(request) {
@@ -50,14 +58,14 @@ export async function GET(request) {
 
     const receivedFilter = buildWhere({
       alias: 'pl',
-      timeColumn: 'created_at',
+      timeColumn: 'inserted_at',
       networkId,
       since,
     })
 
     const givenFilter = buildWhere({
       alias: 'pl',
-      timeColumn: 'created_at',
+      timeColumn: 'inserted_at',
       networkId,
       since,
       baseConditions: ['pl.liker_address IS NOT NULL'],
@@ -92,6 +100,7 @@ export async function GET(request) {
           COALESCE(received.likes_received, 0) AS likes_received,
           COALESCE(given.likes_given, 0) AS likes_given,
           COALESCE(views.views_received, 0) AS views_received,
+          (${TX_COUNT_SQL}) AS tx_count,
           ${SCORE_SQL} AS score
         FROM (
           SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM users
@@ -237,7 +246,7 @@ function buildStatsQuery(networkId, since) {
   })
   const likeFilter = buildWhere({
     alias: 'pl',
-    timeColumn: 'created_at',
+    timeColumn: 'inserted_at',
     networkId,
     since,
   })
@@ -268,7 +277,7 @@ function buildStatsParams(networkId, since) {
   })
   const likeFilter = buildWhere({
     alias: 'pl',
-    timeColumn: 'created_at',
+    timeColumn: 'inserted_at',
     networkId,
     since,
   })
@@ -349,6 +358,7 @@ function serializeLeader(row, rank) {
     likes_received: toNumber(row.likes_received),
     likes_given: toNumber(row.likes_given),
     views_received: toNumber(row.views_received),
+    tx_count: toNumber(row.tx_count),
     score: toNumber(row.score),
     latest_post_at: row.latest_post_at,
   }

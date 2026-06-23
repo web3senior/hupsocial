@@ -19,6 +19,7 @@ import { resolveIPFSUrl } from '@/lib/storageHelper'
 import { ConversationList } from './ConversationList'
 import styles from './Chat.module.scss'
 import abiChat from '@/abis/Chat.json'
+import abiPublicKeyRegistry from '@/abis/PublicKeyRegistry.json'
 import { Buffer } from 'buffer'
 import { useChatHistory } from '@/hooks/useChatHistory'
 import { useSWRConfig } from 'swr'
@@ -203,6 +204,7 @@ export default function Chat() {
   const [activeChainConfig, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
   const forwarderAddress = activeChainContracts?.forwarder
+  const pkRegistryAddress = activeChainContracts?.publicKeyRegistry
   const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
   const [chatHistory, setChatHistory] = useState({ list: [], isLoading: false })
   const isMounted = useClientMounted()
@@ -300,8 +302,19 @@ export default function Chat() {
   }
 
   const getRegisteredChatPublicKey = async (walletAddress) => {
-    if (!walletAddress || !publicClient || !tunnelAddress) return null
+    if (!walletAddress || !publicClient) return null
     try {
+      if (pkRegistryAddress) {
+        const key = await publicClient.readContract({
+          address: pkRegistryAddress,
+          abi: abiPublicKeyRegistry,
+          functionName: 'getKey',
+          args: [walletAddress],
+        })
+        if (!key || key === '0x') return null
+        return key.startsWith('0x') ? key : `0x${key}`
+      }
+      if (!tunnelAddress) return null
       const key = await publicClient.readContract({
         address: tunnelAddress,
         abi: abiChat,
@@ -941,7 +954,9 @@ export default function Chat() {
     const checkOnChainRegistration = async () => {
       try {
         const [pk, session, latestBlock] = await Promise.all([
-          publicClient.readContract({ address: tunnelAddress, abi: abiChat, functionName: 'publicKeyRegistry', args: [address] }),
+          pkRegistryAddress
+            ? publicClient.readContract({ address: pkRegistryAddress, abi: abiPublicKeyRegistry, functionName: 'getKey', args: [address] })
+            : publicClient.readContract({ address: tunnelAddress, abi: abiChat, functionName: 'publicKeyRegistry', args: [address] }),
           publicClient.readContract({ address: tunnelAddress, abi: abiChat, functionName: 'userSessions', args: [address] }),
           publicClient.getBlock({ blockTag: 'latest' }),
         ])

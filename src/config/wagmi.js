@@ -28,7 +28,7 @@ export const CONTRACTS = {
     forwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
-    chat: '0x9E0D34d25ca0A2F21d89DE905957ac04598F0D20'
+    chat: ''
   },
   chain42220: {
     // CELO
@@ -48,7 +48,8 @@ export const CONTRACTS = {
     forwarder: '0x8466799e31a86a4d51B76154e57B14DcAF9A8756',
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
-    chat: '0x3E37500b47AC2A1fC22a6bb8F8e4f8E4267017cf',
+    publicKeyRegistry: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
+    chat: '0x93b3a0BBCA40cD11a03717ac31B4F45a2FDa7C52',
   },
   chain56: {
     // bnb

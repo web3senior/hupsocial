@@ -3,12 +3,13 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWRInfinite from 'swr/infinite'
-import { ArrowDown, Eye, Flame, Heart, Medal, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
+import { ArrowDown, Eye, Flame, Hash, Heart, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
 import PageTitle from '@/components/PageTitle'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
 import { useProfile } from '@/hooks/useProfile'
+import { Box } from 'lucide-react'
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
 
@@ -200,6 +201,7 @@ export default function LeaderboardPage() {
                     <Metric icon={Heart} label="Likes" value={leader.likes_received} />
                     <Metric icon={Repeat2} label="Reposts" value={leader.reposts_made} />
                     <Metric icon={Eye} label="Views" value={leader.views_received} />
+                    <Metric icon={Box} label="Transactions" value={leader.tx_count} />
                     <span className={styles.rowScore}>{compactFormatter.format(leader.score)}</span>
                   </button>
                 ))}

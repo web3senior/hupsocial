@@ -7,6 +7,7 @@ import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
 import abiChat from '@/abis/Chat.json'
+import abiPublicKeyRegistry from '@/abis/PublicKeyRegistry.json'
 import { unlockAppKeyFromStorage, lockAppPrivateKey, APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
@@ -36,6 +37,7 @@ export default function Register() {
 
   const [, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
+  const pkRegistryAddress = activeChainContracts?.publicKeyRegistry
 
   // ■■■ Core State ■■■
   const [isActivating, setIsActivating] = useState(false)
@@ -82,12 +84,14 @@ export default function Register() {
 
     try {
       const [pk, session, latestBlock] = await Promise.all([
-        publicClient.readContract({
-          address: tunnelAddress,
-          abi: abiChat,
-          functionName: 'publicKeyRegistry',
-          args: [address],
-        }),
+        pkRegistryAddress
+          ? publicClient.readContract({
+              address: pkRegistryAddress,
+              abi: abiPublicKeyRegistry,
+              functionName: 'getKey',
+              args: [address],
+            })
+          : Promise.resolve(null),
         publicClient.readContract({
           address: tunnelAddress,
           abi: abiChat,
@@ -131,9 +135,9 @@ export default function Register() {
 
   const handleCreateVaultAndRegister = async () => {
     if (!isConnected || !address) return setErrorMsg('Please connect your wallet first.')
-    if (vaultPassword.length < 8) return setErrorMsg('Vault password must be at least 8 characters.')
-    if (vaultPassword !== confirmVaultPassword) return setErrorMsg('Vault passwords do not match.')
-    if (!vaultAgree) return setErrorMsg('You must acknowledge that the password cannot be recovered.')
+    if (vaultPassword.length < 8) return setErrorMsg('Your PIN must be at least 8 characters.')
+    if (vaultPassword !== confirmVaultPassword) return setErrorMsg('PINs do not match.')
+    if (!vaultAgree) return setErrorMsg('Please check the box to confirm.')
 
     setIsActivating(true)
     setErrorMsg('')
@@ -198,6 +202,7 @@ export default function Register() {
       setErrorMsg('')
       if (!address) throw new Error('Wallet not connected.')
       if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
+      if (!pkRegistryAddress) throw new Error('Public key registry is not configured.')
 
       let pubKeyHex = directPubKeyHex
       if (!pubKeyHex) {
@@ -209,10 +214,10 @@ export default function Register() {
       const normalizedPubKey = pubKeyHex.startsWith('0x') ? pubKeyHex : `0x${pubKeyHex}`
 
       await writeContractAsync({
-        address: tunnelAddress,
-        abi: abiChat,
-        functionName: 'registerPublicKey',
-        args: [CHAT_ZERO_ADDRESS, normalizedPubKey],
+        address: pkRegistryAddress,
+        abi: abiPublicKeyRegistry,
+        functionName: 'register',
+        args: [normalizedPubKey],
       })
 
       await checkStatus()
@@ -386,9 +391,9 @@ export default function Register() {
           <div className="d-f-c flex-column" style={{ marginBottom: '1rem' }}>
             <ConnectWallet />
           </div>
-          <h1 className={clsx(styles.register__title)}>Identity Setup</h1>
+          <h1 className={clsx(styles.register__title)}>Get Started</h1>
           <p className={clsx(styles.register__subtitle)}>
-            {isFullyRegistered ? 'Your stealth identity is fully active.' : 'Complete the steps below to enter the tunnel.'}
+            {isFullyRegistered ? "You're all set!" : 'Just 3 quick steps and you can start chatting.'}
           </p>
         </header>
 
@@ -408,8 +413,8 @@ export default function Register() {
               <DatabaseIcon size={20} />
             </div>
             <div className="flex-grow-1">
-              <strong>1. Local App Vault</strong>
-              <p>{hasLocalVault ? 'Secured and encrypted on this device' : 'Requires creation & signature'}</p>
+              <strong>1. Create Your PIN</strong>
+              <p>{hasLocalVault ? 'Your PIN is saved on this device' : 'Takes about 30 seconds'}</p>
             </div>
             <div
               className={clsx(
@@ -427,8 +432,8 @@ export default function Register() {
               <ShieldAlertIcon size={20} />
             </div>
             <div className="flex-grow-1">
-              <strong>2. Public Key Registry</strong>
-              <p>{isPkRegistered ? 'Registered onchain' : 'Pending onchain registration'}</p>
+              <strong>2. Enable Private Messages</strong>
+              <p>{isPkRegistered ? 'Active' : 'Not activated yet'}</p>
             </div>
             <div
               className={clsx(
@@ -451,13 +456,13 @@ export default function Register() {
               <KeyRoundIcon size={20} />
             </div>
             <div className="flex-grow-1">
-              <strong>3. Session Burner</strong>
+              <strong>3. Activate Your Session</strong>
               <p>
                 {sessionActive
-                  ? 'Session mode active — wallet unlinked from contract'
+                  ? 'Active — your wallet stays private'
                   : isSessionOrphaned
-                    ? 'Local key missing (Import or create a new session)'
-                    : 'Activation required'}
+                    ? 'Session not found — import or start a new one'
+                    : 'Needs activation'}
               </p>
               {burnerAddress && (sessionActive || isSessionOrphaned) && (
                 <small className={clsx(styles.register__address)}>
@@ -482,20 +487,20 @@ export default function Register() {
           {!hasLocalVault && isConnected && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <DatabaseIcon size={16} /> Create App Vault
+                <DatabaseIcon size={16} /> Create Your PIN
               </h5>
-              <p>This password encrypts your master stealth keys locally. It cannot be recovered.</p>
+              <p>Your PIN protects your account on this device. Write it down — it cannot be reset if you forget it.</p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
                   type={showVaultPlainPassword ? 'text' : 'password'}
-                  placeholder="Vault password (min 8 chars)"
+                  placeholder="PIN (min 8 characters)"
                   value={vaultPassword}
                   onChange={(e) => setVaultPassword(e.target.value)}
                   className={clsx(styles.register__input)}
                 />
                 <input
                   type={showVaultPlainPassword ? 'text' : 'password'}
-                  placeholder="Confirm vault password"
+                  placeholder="Confirm PIN"
                   value={confirmVaultPassword}
                   onChange={(e) => setConfirmVaultPassword(e.target.value)}
                   className={clsx(styles.register__input)}
@@ -504,7 +509,7 @@ export default function Register() {
               <div className="flex gap-05 align-items-center mt-10 mb-10">
                 <input type="checkbox" id="vaultAgree" checked={vaultAgree} onChange={(e) => setVaultAgree(e.target.checked)} />
                 <label htmlFor="vaultAgree" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  I understand that this password cannot be recovered.
+                  I understand my PIN cannot be reset if I forget it.
                 </label>
               </div>
               <div className="flex justify-between align-items-center mt-10">
@@ -520,7 +525,7 @@ export default function Register() {
                   className={clsx(styles.register__btnPrimary)}
                   disabled={isActivating || vaultPassword.length < 8 || vaultPassword !== confirmVaultPassword || !vaultAgree}
                 >
-                  {isActivating ? 'Signing...' : 'Sign & Secure Vault'}
+                  {isActivating ? 'Joining...' : 'Join Hup'}
                 </button>
               </div>
             </div>
@@ -530,15 +535,15 @@ export default function Register() {
           {showPasswordSetup && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <KeyRoundIcon size={16} /> Secure Your Session Key
+                <KeyRoundIcon size={16} /> Protect Your Session
               </h5>
               <p>
-                Choose a password to encrypt the burner private key locally. After this, your main wallet will send a transaction to register the session on-chain.
+                Choose a password to keep your session key safe on this device.
               </p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
                   type={showPlainPassword ? 'text' : 'password'}
-                  placeholder="Enter password (min 6 chars)"
+                  placeholder="Password (min 6 characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={clsx(styles.register__input)}
@@ -567,7 +572,7 @@ export default function Register() {
                     className={clsx(styles.register__btnPrimary)}
                     disabled={isActivating || password.length < 6}
                   >
-                    {isActivating ? 'Authorizing...' : 'Authorize Session'}
+                    {isActivating ? 'Activating...' : 'Activate'}
                   </button>
                 </div>
               </div>
@@ -578,12 +583,12 @@ export default function Register() {
           {showDecryptPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <KeyRoundIcon size={16} /> Enter Password to Unlock
+                <KeyRoundIcon size={16} /> Unlock Session Key
               </h5>
-              <p>Provide your password to securely decrypt the key from localStorage.</p>
+              <p>Enter your password to reveal your session key.</p>
               <input
                 type="password"
-                placeholder="Enter session password"
+                placeholder="Your password"
                 value={decryptPassword}
                 onChange={(e) => setDecryptPassword(e.target.value)}
                 className={clsx(styles.register__input)}
@@ -593,7 +598,7 @@ export default function Register() {
                   Cancel
                 </button>
                 <button onClick={handleDecryptAndReveal} className={clsx(styles.register__btnPrimary)} disabled={isActivating}>
-                  Unlock Key
+                  Unlock
                 </button>
               </div>
             </div>
@@ -603,20 +608,20 @@ export default function Register() {
           {showImportPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <UploadIcon size={16} /> Import Session Key
+                <UploadIcon size={16} /> Use Another Device's Session
               </h5>
-              <p>Paste the private key from your other device and choose a new password for local encryption.</p>
+              <p>Paste your session key from another device and set a new password for it.</p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
                   type="text"
-                  placeholder="Private Key (0x...)"
+                  placeholder="Session key (0x...)"
                   value={importPrivateKeyInput}
                   onChange={(e) => setImportPrivateKeyInput(e.target.value)}
                   className={clsx(styles.register__input)}
                 />
                 <input
                   type="password"
-                  placeholder="New Local Password"
+                  placeholder="New password"
                   value={importPassword}
                   onChange={(e) => setImportPassword(e.target.value)}
                   className={clsx(styles.register__input)}
@@ -627,7 +632,7 @@ export default function Register() {
                   Cancel
                 </button>
                 <button onClick={handleImportSessionKey} className={clsx(styles.register__btnPrimary)} disabled={isActivating}>
-                  Encrypt & Import
+                  Import
                 </button>
               </div>
             </div>
@@ -636,9 +641,9 @@ export default function Register() {
           {/* Backup Key */}
           {revealKeyMode && revealedPrivateKey && (
             <div className={clsx(styles.register__secureSetup)}>
-              <h5>Backup Session Private Key</h5>
+              <h5>Save Your Session Key</h5>
               <p>
-                <strong>CAUTION:</strong> Never share this key. Store it securely to recover your session on another device.
+                <strong>Keep this private.</strong> Save it somewhere safe — you'll need it to restore your session on another device.
               </p>
               <div className={clsx(styles.register__keyContainer)}>
                 <code>{revealedPrivateKey}</code>
@@ -654,7 +659,7 @@ export default function Register() {
                   }}
                   className={clsx(styles.register__btnSecondary)}
                 >
-                  Hide Key
+                  Done
                 </button>
               </div>
             </div>
@@ -665,11 +670,11 @@ export default function Register() {
         <footer className={clsx(styles.register__footer)}>
           {isFullyRegistered ? (
             <button className={clsx(styles.register__button, 'btn')} onClick={() => router.push('/chat')}>
-              Enter Chat Room
+              Open Chat
             </button>
           ) : !hasLocalVault ? (
             <button className={clsx(styles.register__button, 'btn')} disabled>
-              1. Complete Vault Setup Above
+              Create your PIN first ↑
             </button>
           ) : !isPkRegistered ? (
             <button
@@ -677,7 +682,7 @@ export default function Register() {
               onClick={() => handleJoinTunnel(null)}
               disabled={isActivating || !isConnected}
             >
-              {isActivating ? 'Registering...' : '2. Register Public Key'}
+              {isActivating ? 'Activating...' : '2. Enable Private Messages'}
             </button>
           ) : (
             <button
@@ -685,7 +690,7 @@ export default function Register() {
               onClick={triggerAuthorizeFlow}
               disabled={isActivating || !isConnected || showPasswordSetup}
             >
-              {isActivating ? 'Authorizing...' : isSessionOrphaned ? '3. Create New Session' : '3. Activate Session'}
+              {isActivating ? 'Activating...' : isSessionOrphaned ? '3. Start New Session' : '3. Activate Session'}
             </button>
           )}
 
@@ -694,7 +699,7 @@ export default function Register() {
             <div className="flex flex-wrap gap-05 mt-10 justify-center">
               {sessionActive && (
                 <button onClick={handleRevokeSession} disabled={isActivating} className={clsx(styles.register__btnDanger, 'btn-small')}>
-                  Revoke Session
+                  End Session
                 </button>
               )}
               {localStorage.getItem(chatLocalStorageBurnerKey) && !revealKeyMode && (
@@ -708,7 +713,7 @@ export default function Register() {
                   className={clsx(styles.register__btnSecondary, 'btn-small')}
                   disabled={isActivating}
                 >
-                  Backup Key
+                  Save Key
                 </button>
               )}
               {!sessionActive && (
@@ -722,7 +727,7 @@ export default function Register() {
                   className={clsx(styles.register__btnSecondary, 'btn-small')}
                   disabled={isActivating}
                 >
-                  Import Session Key
+                  Use Another Device
                 </button>
               )}
             </div>
@@ -730,7 +735,7 @@ export default function Register() {
 
           {!isFullyRegistered && (
             <p className={clsx(styles['register__gas-note'])}>
-              * Steps 2 and 3 require a gas fee from your main wallet.
+              * Steps 2 and 3 need a small gas fee.
             </p>
           )}
         </footer>
