@@ -335,3 +335,6 @@ const postContent = {
   ],
 }
 ```
+## 🏷️ Version Management (SemVer)
+
+This project strictly adheres to [Semantic Versioning (SemVer)](https://semver.org/) via the `MAJOR.MINOR.PATCH` format to ensure predictable deployments and reliable cross-chain indexing.
