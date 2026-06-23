@@ -81,7 +81,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       {variant !== 'imageOnly' && (
         <div className="flex flex-column align-items-start justify-content-center gap-025">
           <div className={styles.nameRow}>
-            <b className={styles.name}>{profile.name}</b>
+            <b className={styles.name}>{profile.fullName || profile.name}</b>
             <img alt="verified" src={blueCheckMarkIcon.src} width={12} height={12} />
             {chainInfo && (
               <div className={styles.badge} title={chainInfo.name} dangerouslySetInnerHTML={{ __html: chainInfo.icon }} />
