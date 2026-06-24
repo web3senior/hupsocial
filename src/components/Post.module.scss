@@ -101,25 +101,19 @@
   &__flagBanner {
     display: flex;
     align-items: center;
-    gap: 6px;
-    color: var(--red-500, #e53e3e);
-    font-size: 0.75rem;
-    margin-bottom: 4px;
-    padding: 0 0.2rem;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    padding: 0.6rem 0.4rem;
 
     svg {
       flex-shrink: 0;
+      color: var(--red-500, #e53e3e);
     }
   }
 
   &__main {
     position: relative;
-
-    &--blurred {
-      filter: blur(46px);
-      pointer-events: none;
-      user-select: none;
-    }
 
     &__media {
       overflow: hidden;

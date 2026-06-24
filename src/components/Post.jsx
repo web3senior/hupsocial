@@ -233,15 +233,13 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
           </div>
         </header>
 
-        {isActioned && (
-          <div className={styles.post__flagBanner}>
-            <Flag size={13} fill="currentColor" strokeWidth={0} />
-            This post has been flagged for violations.
-          </div>
-        )}
-
-        <main className={clsx(styles.post__main, 'w-100', isActioned && styles['post__main--blurred'])}>
-          {displayItem?.content?.elements?.length > 1 ? (
+        <main className={clsx(styles.post__main, 'w-100')}>
+          {isActioned ? (
+            <div className={styles.post__flagBanner}>
+              <Flag size={14} fill="currentColor" strokeWidth={0} />
+              This post has been flagged for violations.
+            </div>
+          ) : displayItem?.content?.elements?.length > 1 ? (
             <>
               <PostText
                 sourceText={sourceText}
