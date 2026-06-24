@@ -180,8 +180,57 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     updateTextContent(editorHtmlToMarkdown(html))
   }
 
-  // Force plain-text paste so clipboard HTML doesn't corrupt the editor
-  const handlePaste = (event) => {
+  // Handle paste: upload clipboard images to IPFS or insert plain text
+  const handlePaste = async (event) => {
+    const items = Array.from(event.clipboardData?.items || [])
+    const imageItem = items.find((item) => item.type.startsWith('image/'))
+
+    if (imageItem) {
+      event.preventDefault()
+      if (mediaItems.length >= MAX_MEDIA_ITEMS) {
+        toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
+        return
+      }
+      const file = imageItem.getAsFile()
+      if (!file) return
+      const sizeInMB = file.size / (1024 * 1024)
+      if (sizeInMB > MAX_MEDIA_SIZE_MB) {
+        toast(`File size error. Maximum size is ${MAX_MEDIA_SIZE_MB}MB`, 'error')
+        return
+      }
+      const dimensions = await getMediaDimensions(file, 'image')
+      const cid = await uploadFileToIPFS(file)
+      if (!cid) return
+      const localUrl = URL.createObjectURL(file)
+      setPostContent((prevContent) => {
+        const nextElements = [...prevContent.elements]
+        const mediaElement = nextElements[1]
+        nextElements[1] = {
+          ...mediaElement,
+          data: {
+            ...mediaElement.data,
+            items: [
+              ...mediaElement.data.items,
+              {
+                type: 'image',
+                cid,
+                alt: `Hup asset image | ${postText.slice(0, 30)}...`,
+                storage: 'IPFS',
+                mimeType: file.type,
+                localUrl,
+                width: dimensions.width,
+                height: dimensions.height,
+                spoiler: false,
+              },
+            ],
+          },
+        }
+        return { ...prevContent, elements: nextElements }
+      })
+      return
+    }
+
+    // Force plain-text paste so clipboard HTML doesn't corrupt the editor
     const text = event.clipboardData.getData('text/plain')
     if (!text) return
     event.preventDefault()
