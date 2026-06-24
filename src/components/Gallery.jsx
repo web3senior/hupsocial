@@ -11,13 +11,16 @@ export default function MediaGallery({ data = [] }) {
   const [isMuted, setIsMuted] = useState(true)
   const [revealedItems, setRevealedItems] = useState({})
   const [resolvedUrls, setResolvedUrls] = useState({})
-  
+
   // State for Lightbox (Maximize)
   const [selectedIndex, setSelectedIndex] = useState(null)
-  
+
   const videoRefs = useRef([])
   const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
-  const isCarousel = data.length > 1
+
+  const visualData = data.filter((item) => item.type !== 'audio')
+  const audioData = data.filter((item) => item.type === 'audio')
+  const isCarousel = visualData.length > 1
 
   // Main Gallery Carousel
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -77,19 +80,17 @@ export default function MediaGallery({ data = [] }) {
 
   if (!data.length) return null
 
-  // Helper to render media content
+  const resolveUrl = (item) => {
+    if (item?.storage === '0G') return `/api/0g/file?hash=${item.cid}`
+    if (item?.storage === 'IPFS') return resolveIPFSUrl(item.cid)
+    if (item.cid) return item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+    return ''
+  }
+
+  // Helper to render visual media content (image / video only)
   const renderMedia = (item, i, isFullscreen = false) => {
     const isVideo = item.type === 'video'
-    let url = ''
-    if (item?.storage === '0G') {
-      url =`/api/0g/file?hash=${item.cid}`
-    } else if (item?.storage === 'IPFS'){
-      url = resolveIPFSUrl(item.cid)
-  }
-    else if (item.cid) {
-      url = item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
-    }
-
+    const url = resolveUrl(item)
     const isBlurred = item.spoiler && !revealedItems[i] && !isFullscreen
 
     if (item?.storage === '0G' && !url) {
@@ -129,40 +130,52 @@ export default function MediaGallery({ data = [] }) {
 
   return (
     <div className={styles.galleryWrapper} onClick={(e) => e.stopPropagation()}>
-      <div
-        className={isCarousel ? styles.embla : styles.singleView}
-        ref={isCarousel ? emblaRef : null}
-      >
-        <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
-          {data.map((item, i) => (
-            <div
-              key={`${item.cid}-${i}`}
-              className={isCarousel ? styles.embla__slide : styles.singleSlide}
-            >
-              <div className={styles.mediaItem}>
-                {renderMedia(item, i)}
-                
-                <div className={styles.controls}>
-                  {item.type === 'video' && (
+      {visualData.length > 0 && (
+        <div
+          className={isCarousel ? styles.embla : styles.singleView}
+          ref={isCarousel ? emblaRef : null}
+        >
+          <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
+            {visualData.map((item, i) => (
+              <div
+                key={`${item.cid}-${i}`}
+                className={isCarousel ? styles.embla__slide : styles.singleSlide}
+              >
+                <div className={styles.mediaItem}>
+                  {renderMedia(item, i)}
+
+                  <div className={styles.controls}>
+                    {item.type === 'video' && (
+                      <button
+                        className={styles.iconButton}
+                        onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted) }}
+                      >
+                        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                      </button>
+                    )}
                     <button
                       className={styles.iconButton}
-                      onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
+                      onClick={() => openLightbox(i)}
                     >
-                      {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                      <Maximize2 size={16} />
                     </button>
-                  )}
-                  <button 
-                    className={styles.iconButton} 
-                    onClick={() => openLightbox(i)}
-                  >
-                    <Maximize2 size={16} />
-                  </button>
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {audioData.length > 0 && (
+        <div className={styles.audioTrackList}>
+          {audioData.map((item, i) => (
+            <div key={`audio-${item.cid}-${i}`} className={styles.audioTrack}>
+              <audio src={resolveUrl(item)} controls />
             </div>
           ))}
         </div>
-      </div>
+      )}
 
       {/* Lightbox Overlay */}
       {selectedIndex !== null && (
@@ -170,17 +183,17 @@ export default function MediaGallery({ data = [] }) {
           <button className={styles.closeBtn} onClick={closeLightbox}>
             <X size={32} />
           </button>
-          
-          <button 
-            className={`${styles.navBtn} ${styles.prev}`} 
-            onClick={(e) => { e.stopPropagation(); lightboxApi?.scrollPrev(); }}
+
+          <button
+            className={`${styles.navBtn} ${styles.prev}`}
+            onClick={(e) => { e.stopPropagation(); lightboxApi?.scrollPrev() }}
           >
             <ChevronLeft size={40} />
           </button>
 
           <div className={styles.lightboxEmbla} ref={lightboxRef} onClick={(e) => e.stopPropagation()}>
             <div className={styles.lightboxContainer}>
-              {data.map((item, i) => (
+              {visualData.map((item, i) => (
                 <div className={styles.lightboxSlide} key={`full-${i}`}>
                   {renderMedia(item, i, true)}
                 </div>
@@ -188,9 +201,9 @@ export default function MediaGallery({ data = [] }) {
             </div>
           </div>
 
-          <button 
-            className={`${styles.navBtn} ${styles.next}`} 
-            onClick={(e) => { e.stopPropagation(); lightboxApi?.scrollNext(); }}
+          <button
+            className={`${styles.navBtn} ${styles.next}`}
+            onClick={(e) => { e.stopPropagation(); lightboxApi?.scrollNext() }}
           >
             <ChevronRight size={40} />
           </button>

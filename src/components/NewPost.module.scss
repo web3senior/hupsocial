@@ -279,6 +279,7 @@
     object-fit: cover;
   }
 
+
   figcaption {
     position: absolute;
     inset: auto 8px 8px 8px;
@@ -309,6 +310,49 @@
     cursor: pointer;
     font-size: 0.75rem;
     backdrop-filter: blur(8px);
+  }
+}
+
+.audioList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 0 18px;
+}
+
+.audioListItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+
+  audio {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+  }
+}
+
+.audioRemoveButton {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--gray-500);
+  background: transparent;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    color: #cb2e2e;
+    border-color: #cb2e2e;
+    background: rgba(203, 46, 46, 0.06);
   }
 }
 

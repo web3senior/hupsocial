@@ -3,7 +3,7 @@
   "elements": [
     {
       "type": "text",
-      "data": { "text": "Your comment text here" }
+      "data": { "text": "Your post text here" }
     },
     {
       "type": "media",
@@ -13,19 +13,41 @@
             "type": "image",
             "cid": "Qm1234...image-cid-1",
             "alt": "Photo of the launch party.",
-            "mimeType": "image/jpeg"
+            "storage": "IPFS",
+            "mimeType": "image/jpeg",
+            "width": 1920,
+            "height": 1080,
+            "spoiler": false
           },
           {
             "type": "image",
             "cid": "Qm5678...image-cid-2",
             "alt": "Screenshot of the new interface.",
-            "mimeType": "image/jpeg"
+            "storage": "IPFS",
+            "mimeType": "image/png",
+            "width": 1280,
+            "height": 800,
+            "spoiler": false
           },
           {
             "type": "video",
             "cid": "Qm9012...video-cid-3",
-            "format": "mp4",
-            "duration": 45
+            "alt": "Hup asset video | Your post text...",
+            "storage": "IPFS",
+            "mimeType": "video/mp4",
+            "width": 1920,
+            "height": 1080,
+            "duration": 45.0,
+            "spoiler": false
+          },
+          {
+            "type": "audio",
+            "cid": "Qm3456...audio-cid-4",
+            "alt": "Hup asset audio | Your post text...",
+            "storage": "IPFS",
+            "mimeType": "audio/mpeg",
+            "duration": 120.5,
+            "spoiler": false
           }
         ]
       }

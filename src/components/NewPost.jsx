@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { Bold, Image as ImageIcon, Italic, MapPin, SlidersHorizontal, SquarePlay, Trash2, X } from 'lucide-react'
+import { Bold, Image as ImageIcon, Italic, MapPin, Mic, SlidersHorizontal, SquarePlay, Trash2, X } from 'lucide-react'
 
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
@@ -356,7 +356,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     }
     setSelectedMediaType(type)
     if (fileInputRef.current) {
-      fileInputRef.current.accept = type === 'image' ? 'image/*' : 'video/*'
+      fileInputRef.current.accept = type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : 'audio/*'
+      fileInputRef.current.multiple = type === 'image'
       fileInputRef.current.click()
     }
   }
@@ -375,6 +376,12 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
         video.onloadedmetadata = () => { URL.revokeObjectURL(localUrl); resolve({ width: video.videoWidth, height: video.videoHeight, duration: video.duration }) }
         video.onerror = () => { URL.revokeObjectURL(localUrl); resolve({ width: undefined, height: undefined, duration: 0 }) }
         video.src = localUrl
+      } else if (type === 'audio') {
+        const audio = document.createElement('audio')
+        audio.preload = 'metadata'
+        audio.onloadedmetadata = () => { URL.revokeObjectURL(localUrl); resolve({ duration: audio.duration }) }
+        audio.onerror = () => { URL.revokeObjectURL(localUrl); resolve({ duration: 0 }) }
+        audio.src = localUrl
       } else {
         resolve({ width: undefined, height: undefined })
       }
@@ -382,48 +389,68 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   }
 
   const handleFileSelect = async (event) => {
-    const file = event.target.files?.[0]
+    const files = Array.from(event.target.files || [])
     event.target.value = ''
-    if (!file || mediaItems.length >= MAX_MEDIA_ITEMS) return
+    if (!files.length) return
 
-    const sizeInMB = file.size / (1024 * 1024)
-    if (sizeInMB > MAX_MEDIA_SIZE_MB) {
-      toast(`File size error. Maximum size is ${MAX_MEDIA_SIZE_MB}MB`, 'error')
+    const remainingSlots = MAX_MEDIA_ITEMS - mediaItems.length
+    if (remainingSlots <= 0) {
+      toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
       return
     }
 
-    const isImage = file.type.startsWith('image/')
-    const isVideo = file.type.startsWith('video/')
-    const isExpectedType = (isImage && selectedMediaType === 'image') || (isVideo && selectedMediaType === 'video')
-    if (!isExpectedType) {
-      toast(`Please select a ${selectedMediaType} file`, 'error')
-      return
+    const filesToProcess = files.slice(0, remainingSlots)
+    if (files.length > remainingSlots) {
+      toast(`Only ${remainingSlots} slot(s) remaining — processing first ${remainingSlots} file(s)`, 'info')
     }
 
-    const dimensions = await getMediaDimensions(file, selectedMediaType)
-    const cid = await uploadFileToIPFS(file)
-    if (!cid) return
+    const newItems = []
+    for (const file of filesToProcess) {
+      const sizeInMB = file.size / (1024 * 1024)
+      if (sizeInMB > MAX_MEDIA_SIZE_MB) {
+        toast(`"${file.name}" exceeds the ${MAX_MEDIA_SIZE_MB}MB limit`, 'error')
+        continue
+      }
 
-    const localUrl = URL.createObjectURL(file)
-    const nextItem = {
-      type: selectedMediaType,
-      cid,
-      alt: `Hup asset ${selectedMediaType} | ${postText.slice(0, 30)}...`,
-      storage: 'IPFS',
-      mimeType: file.type,
-      localUrl,
-      width: dimensions.width,
-      height: dimensions.height,
-      duration: selectedMediaType === 'video' ? dimensions.duration || 0 : undefined,
-      spoiler: false,
+      const isImage = file.type.startsWith('image/')
+      const isVideo = file.type.startsWith('video/')
+      const isAudio = file.type.startsWith('audio/')
+      const isExpectedType =
+        (isImage && selectedMediaType === 'image') ||
+        (isVideo && selectedMediaType === 'video') ||
+        (isAudio && selectedMediaType === 'audio')
+      if (!isExpectedType) {
+        toast(`Please select a ${selectedMediaType} file`, 'error')
+        continue
+      }
+
+      const dimensions = await getMediaDimensions(file, selectedMediaType)
+      const cid = await uploadFileToIPFS(file)
+      if (!cid) continue
+
+      const localUrl = URL.createObjectURL(file)
+      newItems.push({
+        type: selectedMediaType,
+        cid,
+        alt: `Hup asset ${selectedMediaType} | ${postText.slice(0, 30)}...`,
+        storage: 'IPFS',
+        mimeType: file.type,
+        localUrl,
+        width: dimensions.width,
+        height: dimensions.height,
+        duration: selectedMediaType !== 'image' ? (dimensions.duration || 0) : undefined,
+        spoiler: false,
+      })
     }
+
+    if (newItems.length === 0) return
 
     setPostContent((prevContent) => {
       const nextElements = [...prevContent.elements]
       const mediaElement = nextElements[1]
       nextElements[1] = {
         ...mediaElement,
-        data: { ...mediaElement.data, items: [...mediaElement.data.items, nextItem] },
+        data: { ...mediaElement.data, items: [...mediaElement.data.items, ...newItems] },
       }
       return { ...prevContent, elements: nextElements }
     })
@@ -544,7 +571,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       </header>
 
       <form className={styles.form} onSubmit={handleCreatePost}>
-        <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} multiple={false} />
+        <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} />
 
         <div ref={composerRef} className={styles.composer}>
           <Profile variant="full" creator={address} />
@@ -582,6 +609,15 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
+                onClick={() => triggerFileInput('audio')}
+                aria-label="Add audio"
+                disabled={isBusy}
+              >
+                <Mic size={22} strokeWidth={1.8} />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => applyFormat('strong')}
                 aria-label="Bold"
                 disabled={isBusy}
@@ -609,9 +645,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
               </span>
             </div>
 
-            {mediaItems.length > 0 && (
+            {mediaItems.some((item) => item.type !== 'audio') && (
               <div className={styles.mediaGrid}>
                 {mediaItems.map((item, index) => {
+                  if (item.type === 'audio') return null
                   const mediaSrc = getMediaPreviewSrc(item)
                   return (
                     <figure key={`${item.cid || item.localUrl || index}`} className={styles.mediaItem}>
@@ -631,6 +668,23 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                         </button>
                       </figcaption>
                     </figure>
+                  )
+                })}
+              </div>
+            )}
+
+            {mediaItems.some((item) => item.type === 'audio') && (
+              <div className={styles.audioList}>
+                {mediaItems.map((item, index) => {
+                  if (item.type !== 'audio') return null
+                  const mediaSrc = getMediaPreviewSrc(item)
+                  return (
+                    <div key={`${item.cid || item.localUrl || index}`} className={styles.audioListItem}>
+                      <audio src={mediaSrc} controls />
+                      <button type="button" className={styles.audioRemoveButton} onClick={() => handleRemoveMedia(index)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
