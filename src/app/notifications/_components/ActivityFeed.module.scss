@@ -29,6 +29,14 @@
 
 .unread {
   background-color: var(--blue-050) !important;
+
+  :global([data-theme='dark']) & {
+    background-color: rgba(55, 159, 239, 0.1) !important;
+  }
+
+  :global([data-theme='terminal']) & {
+    background-color: rgba(163, 255, 173, 0.08) !important;
+  }
 }
 
 .headerActions {
