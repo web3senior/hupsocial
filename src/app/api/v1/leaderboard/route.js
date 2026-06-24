@@ -15,6 +15,7 @@ const SORTS = {
   posts: 'ranked.total_posts DESC, ranked.score DESC, ranked.latest_post_at DESC',
   engagement: 'ranked.likes_received DESC, ranked.reposts_made DESC, ranked.score DESC',
   views: 'ranked.views_received DESC, ranked.score DESC, ranked.latest_post_at DESC',
+  transactions: 'ranked.tx_count DESC, ranked.score DESC, ranked.latest_post_at DESC',
 }
 
 const TX_COUNT_SQL = `

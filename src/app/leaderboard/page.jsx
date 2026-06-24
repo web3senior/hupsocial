@@ -30,6 +30,7 @@ const SORT_OPTIONS = [
   { value: 'engagement', label: 'Engagement' },
   { value: 'posts', label: 'Posts' },
   { value: 'views', label: 'Views' },
+  { value: 'transactions', label: 'Transactions' },
 ]
 
 const numberFormatter = new Intl.NumberFormat('en-US')
