@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   Bell,
+  CheckCheck,
   Clock,
   ExternalLink,
   Heart,
@@ -14,7 +15,7 @@ import {
   CirclePlus,
   User,
 } from 'lucide-react'
-import { useConnection } from 'wagmi'
+import { useConnection, useSignMessage } from 'wagmi'
 import Profile from '@/components/Profile'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { getPostById, getViewPost } from '@/lib/api'
@@ -47,6 +48,7 @@ const ACTION_META = {
 
 export default function ActivityFeed() {
   const { address, isConnected } = useConnection()
+  const { mutateAsync: signMessageAsync } = useSignMessage()
   const [notifications, setNotifications] = useState([])
   const [nextPage, setNextPage] = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -55,6 +57,33 @@ export default function ActivityFeed() {
 
   const pendingReadIds = useRef(new Set())
   const readBatchTimer = useRef(null)
+
+  const markAllAsRead = useCallback(async () => {
+    if (!address || unreadCount === 0) return
+
+    const timestamp = Date.now()
+    const message = `Mark all notifications as read\nTimestamp: ${timestamp}`
+
+    let signature
+    try {
+      signature = await signMessageAsync({ message })
+    } catch {
+      return
+    }
+
+    setNotifications((prev) => prev.map((n) => (n.is_read ? n : { ...n, is_read: true, read_at: new Date().toISOString() })))
+    setUnreadCount(0)
+
+    try {
+      await fetch('/api/v1/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mark_all: true, message, signature }),
+      })
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err)
+    }
+  }, [address, unreadCount, signMessageAsync])
 
   const markAsRead = useCallback(
     (id) => {
@@ -168,16 +197,30 @@ export default function ActivityFeed() {
           <Activity size={18} />
           {headerLabel}
         </h4>
-        <button
-          type="button"
-          onClick={() => loadNotifications()}
-          className={styles.refreshButton}
-          disabled={isLoading}
-          aria-label="Refresh notifications"
-          title="Refresh notifications"
-        >
-          <LucideRefreshCcw className={isLoading ? styles.spin : undefined} size={16} />
-        </button>
+        <div className={styles.headerActions}>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={markAllAsRead}
+              className={styles.markAllButton}
+              aria-label="Mark all as read"
+              title="Mark all as read"
+            >
+              <CheckCheck size={14} />
+              Mark all read
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => loadNotifications()}
+            className={styles.refreshButton}
+            disabled={isLoading}
+            aria-label="Refresh notifications"
+            title="Refresh notifications"
+          >
+            <LucideRefreshCcw className={isLoading ? styles.spin : undefined} size={16} />
+          </button>
+        </div>
       </div>
 
       <div className={styles.feed}>

@@ -31,6 +31,34 @@
   background-color: var(--blue-050) !important;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.markAllButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-color-pale);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.2s var(--transition-soft),
+    color 0.2s var(--transition-soft);
+
+  &:hover {
+    background-color: var(--gray-100);
+    color: var(--color);
+  }
+}
+
 .refreshButton {
   --size: 2.25rem;
   width: var(--size);

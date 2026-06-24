@@ -1,5 +1,8 @@
+import { ethers } from 'ethers'
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+
+const SIG_MAX_AGE_MS = 5 * 60 * 1000
 
 export const runtime = 'nodejs'
 
@@ -97,7 +100,34 @@ export async function GET(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json()
-    const { ids, wallet_address } = body
+    const { ids, wallet_address, mark_all, message, signature } = body
+
+    if (mark_all) {
+      if (!message || !signature) {
+        return NextResponse.json({ success: false, error: 'message and signature are required' }, { status: 400 })
+      }
+
+      const timestampMatch = message.match(/Timestamp:\s*(\d+)/)
+      if (!timestampMatch) {
+        return NextResponse.json({ success: false, error: 'Invalid message format' }, { status: 400 })
+      }
+      if (Date.now() - Number(timestampMatch[1]) > SIG_MAX_AGE_MS) {
+        return NextResponse.json({ success: false, error: 'Signature expired' }, { status: 400 })
+      }
+
+      let recovered
+      try {
+        recovered = ethers.verifyMessage(message, signature)
+      } catch {
+        return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
+      }
+
+      await pool.execute(
+        `UPDATE notifications SET is_read = 1, read_at = NOW() WHERE recipient_wallet_address = ? AND is_read = 0`,
+        [recovered.toLowerCase()],
+      )
+      return NextResponse.json({ success: true })
+    }
 
     if (!isWalletAddress(wallet_address)) {
       return NextResponse.json({ success: false, error: 'Valid wallet address is required' }, { status: 400 })
