@@ -40,7 +40,7 @@ export async function GET(request) {
         AND (
           SELECT COUNT(*) FROM user_reports
           WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned'
-        ) < 5
+        ) < 3
     `
 
     // Apply dynamic filters using chain_id from the networks table
