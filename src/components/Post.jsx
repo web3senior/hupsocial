@@ -49,6 +49,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   const repostedPostId = isRepost ? Number(item.is_repost) : null
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(null)
 
   // Fetch the original post data if this item is a repost
   useEffect(() => {
@@ -167,6 +168,8 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
       {showShareModal && <ShareModal item={showShareModal} setShowShareModal={setShowShareModal} />}
 
+      {showReportModal && <ReportModal item={showReportModal} setShowReportModal={setShowReportModal} />}
+
       {showEditModal && (
         <>
           <NewPost
@@ -225,7 +228,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
               </div>
             )}
 
-            <Nav item={item} setShowEditModal={setShowEditModal} />
+            <Nav item={item} setShowEditModal={setShowEditModal} setShowReportModal={setShowReportModal} />
           </div>
         </header>
 
@@ -329,7 +332,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   )
 }
 
-const Nav = ({ item, setShowEditModal }) => {
+const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
@@ -417,6 +420,19 @@ const Nav = ({ item, setShowEditModal }) => {
               <li>
                 <button onClick={(e) => deletePost(e, item.id)}>Delete post</button>
               </li>
+              {address?.toLowerCase() !== item.wallet_address?.toLowerCase() && (
+                <li>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowReportModal(item)
+                      close()
+                    }}
+                  >
+                    Report post
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
         )}
@@ -460,6 +476,93 @@ function getCommentPreviewText(content) {
   }
 
   return content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
+}
+
+const ReportModal = ({ item, setShowReportModal }) => {
+  const { address } = useConnection()
+  const [categories, setCategories] = useState([])
+  const [categoryId, setCategoryId] = useState('')
+  const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/v1/reports/categories')
+      .then((r) => r.json())
+      .then((body) => { if (body.success) setCategories(body.data) })
+      .catch(() => {})
+  }, [])
+
+  const handleSubmit = async (e) => {
+    e.stopPropagation()
+    if (!categoryId) return
+
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/v1/networks/${item.network_id}/${item.id}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reporter_address: address, category_id: Number(categoryId), reason }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Failed')
+      setDone(true)
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className={`${styles.modal} animate fade`}
+      onClick={(e) => { e.stopPropagation(); setShowReportModal(null) }}
+    >
+      <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
+        <header>
+          <div className="pointer" onClick={() => setShowReportModal(null)}>Cancel</div>
+          <div className="flex-1"><h3>Report post</h3></div>
+          <div />
+        </header>
+        <main className="flex flex-column align-items-start justify-content-between gap-050">
+          {done ? (
+            <p>Thank you. Your report has been submitted.</p>
+          ) : (
+            <>
+              <div className="flex flex-column align-items-start w-100 gap-050">
+                <label>Reason</label>
+                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-100">
+                  <option value="">Select a category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.category_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-column align-items-start w-100 gap-050">
+                <label>Additional details (optional)</label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  className="w-100"
+                  placeholder="Describe the issue..."
+                />
+              </div>
+            </>
+          )}
+        </main>
+        {!done && (
+          <footer>
+            <button onClick={handleSubmit} disabled={!categoryId || submitting}>
+              {submitting ? 'Submitting…' : 'Submit report'}
+            </button>
+          </footer>
+        )}
+      </div>
+    </div>
+  )
 }
 
 const TipModal = ({ item, setShowTipModal }) => {

@@ -37,6 +37,10 @@ export async function GET(request) {
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
       JOIN networks n ON p.network_id = n.id
       WHERE 1=1
+        AND (
+          SELECT COUNT(*) FROM user_reports
+          WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned'
+        ) < 5
     `
 
     // Apply dynamic filters using chain_id from the networks table
