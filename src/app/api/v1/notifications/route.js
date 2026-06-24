@@ -145,7 +145,7 @@ export async function PATCH(request) {
           return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
         }
       }
-console.log(resolvedAddress)
+
       await pool.execute(
         `UPDATE notifications SET is_read = 1, read_at = NOW() WHERE recipient_wallet_address = ? AND is_read = 0`,
         [resolvedAddress],
