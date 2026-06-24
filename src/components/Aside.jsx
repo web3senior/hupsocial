@@ -71,7 +71,7 @@ const normalizeNavItem = (item) => {
   }
 }
 
-const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
+const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCount, onNavigate }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
 
@@ -85,6 +85,7 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
   // Match target item flags against common dynamic identifier properties
   const isBatchLikeItem = item.id === 'batch-like' || item.path === '/batch-like' || item.name === 'Batch Like'
   const isChatItem = item.id === 'chat' || item.path === '/chat' || item.name === 'Chat'
+  const isNotificationItem = item.id === 'notifications' || item.path === '/notifications' || item.name === 'Notifications'
 
   const content = (
     <>
@@ -93,6 +94,7 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
         {isBatchLikeItem && isCompact && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
+        {isNotificationItem && isCompact && unreadCount > 0 && <span className={styles.notificationBadgeDot} aria-hidden="true" />}
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
 
@@ -100,6 +102,7 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
 
       {/* Render full numeric indicator tag layout when sidebar is wide/expanded */}
       {isBatchLikeItem && !isCompact && batchCount > 0 && <span className={styles.badgeCounter}>{batchCount}</span>}
+      {isNotificationItem && !isCompact && unreadCount > 0 && <span className={styles.notificationBadgeCounter}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
     </>
   )
 
@@ -110,7 +113,7 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
           type="button"
           className={clsx(styles.link, styles.moreButton)}
           aria-label={item.name}
-          data-tooltip={isCompact ? item.name : undefined}
+          data-tooltip={showTooltip ? item.name : undefined}
           onClick={() => {
             setIsComponentOpen(true)
             onNavigate?.()
@@ -129,7 +132,7 @@ const NavLink = ({ item, isActive, isCompact, batchCount, onNavigate }) => {
       href={item.path}
       className={clsx(styles.link, isActive && styles.linkActive)}
       aria-label={item.name}
-      data-tooltip={isCompact ? item.name : undefined}
+      data-tooltip={showTooltip ? item.name : undefined}
       aria-current={isActive ? 'page' : undefined}
       onClick={onNavigate}
     >
@@ -169,6 +172,26 @@ export default function Aside() {
     }, 0)
   }, [likedPostIdsMap])
 
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    if (!isConnected || !address) return
+
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`/api/v1/notifications?wallet_address=${address}&limit=1`)
+        const json = await res.json()
+        if (json.success) setUnreadCount(json.meta?.unread_count ?? 0)
+      } catch {
+        // ignore
+      }
+    }
+
+    fetchUnread()
+    const id = setInterval(fetchUnread, 60_000)
+    return () => clearInterval(id)
+  }, [address, isConnected])
+
   const [isWideScreen, setIsWideScreen] = useState(false)
 
   useEffect(() => {
@@ -201,6 +224,18 @@ export default function Aside() {
   const isCompact = !isExpanded
   const shouldShowMobileMenu = isMobileLayout && isMobileMenuOpen
   const closeSidebar = isMobileLayout ? closeMobileMenu : closeMenu
+
+  const [tooltipReady, setTooltipReady] = useState(false)
+
+  useEffect(() => {
+    if (!isCompact) {
+      setTooltipReady(false)
+      return
+    }
+    // Wait for sidebar close transition to finish (0.1s delay + 0.3s transition)
+    const t = setTimeout(() => setTooltipReady(true), 420)
+    return () => clearTimeout(t)
+  }, [isCompact])
 
   const handleToggleMenu = () => {
     if (isMobileLayout) {
@@ -263,8 +298,10 @@ export default function Aside() {
                 item={item}
                 isActive={isActivePath(pathname, item.path)}
                 isCompact={isCompact}
+                showTooltip={tooltipReady}
                 batchCount={batchCount}
-                onNavigate={closeSidebar}
+                unreadCount={unreadCount}
+                onNavigate={isMobileLayout ? closeSidebar : undefined}
               />
             </li>
           ))}
@@ -381,7 +418,7 @@ export default function Aside() {
             href="/networks"
             className={clsx(styles.link, isActivePath(pathname, '/networks') && styles.linkActive)}
             aria-label="Networks"
-            data-tooltip={isCompact ? 'Networks' : undefined}
+            data-tooltip={tooltipReady ? 'Networks' : undefined}
             aria-current={isActivePath(pathname, '/networks') ? 'page' : undefined}
             onClick={closeSidebar}
           >

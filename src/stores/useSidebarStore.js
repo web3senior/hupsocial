@@ -19,7 +19,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'apps', name: 'Apps', path: '/apps', icon: LayoutGrid },
   { id: 'divider-secondary', type: 'divider' },
   { id: 'chat', name: 'Chat', path: '/chat', icon: MessageCircle },
-  { id: 'notifications', name: 'Notifications', path: '/notifications', icon: Bell },
+  { id: 'notifications', name: 'Notifications', path: '/notifications', icon: Bell, hasBadge: true },
   { id: 'batch-like', name: 'Batch Like', path: '/batch-like', icon: Heart, hasBadge: true },
   { id: 'saved', name: 'Saved', path: '/saved', icon: Bookmark },
 ]

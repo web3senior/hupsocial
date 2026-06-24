@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   Bell,
@@ -52,6 +52,37 @@ export default function ActivityFeed() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  const pendingReadIds = useRef(new Set())
+  const readBatchTimer = useRef(null)
+
+  const markAsRead = useCallback(
+    (id) => {
+      if (!address) return
+
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id && !n.is_read ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)),
+      )
+      setUnreadCount((c) => Math.max(0, c - 1))
+
+      pendingReadIds.current.add(id)
+      clearTimeout(readBatchTimer.current)
+      readBatchTimer.current = setTimeout(async () => {
+        const ids = [...pendingReadIds.current]
+        pendingReadIds.current.clear()
+        try {
+          await fetch('/api/v1/notifications', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, wallet_address: address }),
+          })
+        } catch (err) {
+          console.error('Failed to mark notifications as read:', err)
+        }
+      }, 500)
+    },
+    [address],
+  )
 
   const loadNotifications = useCallback(
     async ({ page = 1, append = false, signal } = {}) => {
@@ -165,10 +196,11 @@ export default function ActivityFeed() {
         ) : null}
 
         {visibleNotifications.map((notification) => (
-          <NotificationRow 
-            key={notification.id} 
-            notification={notification} 
-            currentAddress={address} 
+          <NotificationRow
+            key={notification.id}
+            notification={notification}
+            currentAddress={address}
+            onRead={markAsRead}
           />
         ))}
       </div>
@@ -204,7 +236,7 @@ export default function ActivityFeed() {
     </div>
   )
 }
-function NotificationRow({ notification, currentAddress }) {
+function NotificationRow({ notification, currentAddress, onRead }) {
   const actor = notification.actor_wallet_address || notification.recipient_wallet_address
   const href = getNotificationHref(notification)
   const { icon: Icon, label } = ACTION_META[notification.action_type] || {
@@ -212,8 +244,32 @@ function NotificationRow({ notification, currentAddress }) {
     label: formatActionType(notification.action_type),
   }
 
+  const rowRef = useRef(null)
+  const hasMarkedRead = useRef(false)
+
   const [post, setPost] = useState(null)
   const [isLoadingPost, setIsLoadingPost] = useState(false)
+
+  useEffect(() => {
+    if (notification.is_read || !onRead) return
+
+    const el = rowRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasMarkedRead.current) {
+          hasMarkedRead.current = true
+          onRead(notification.id)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.5 },
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [notification.id, notification.is_read, onRead])
 
   // Extract variables safely using top level parameters or data attributes
   const entityId = notification.data?.parent_post_id || notification.entity_id || notification.data?.post_id
@@ -258,7 +314,7 @@ function NotificationRow({ notification, currentAddress }) {
   }, [post])
 
   return (
-    <article className={`${styles.activityRow} ${notification.is_read ? '' : styles.unread}`}>
+    <article ref={rowRef} className={`${styles.activityRow} ${notification.is_read ? '' : styles.unread}`}>
       <div className={styles.iconBox}>
         <Icon size={18} />
       </div>

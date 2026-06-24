@@ -94,6 +94,37 @@ export async function GET(request) {
   }
 }
 
+export async function PATCH(request) {
+  try {
+    const body = await request.json()
+    const { ids, wallet_address } = body
+
+    if (!isWalletAddress(wallet_address)) {
+      return NextResponse.json({ success: false, error: 'Valid wallet address is required' }, { status: 400 })
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ success: false, error: 'ids must be a non-empty array' }, { status: 400 })
+    }
+
+    const safeIds = ids.map(Number).filter(Number.isFinite)
+    if (safeIds.length === 0) {
+      return NextResponse.json({ success: false, error: 'No valid ids provided' }, { status: 400 })
+    }
+
+    const placeholders = safeIds.map(() => '?').join(', ')
+    await pool.execute(
+      `UPDATE notifications SET is_read = 1, read_at = NOW() WHERE id IN (${placeholders}) AND recipient_wallet_address = ? AND is_read = 0`,
+      [...safeIds, wallet_address],
+    )
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[NOTIFICATIONS_MARK_READ_ERROR]:', error.message)
+    return NextResponse.json({ success: false, error: 'Failed to mark notifications as read' }, { status: 500 })
+  }
+}
+
 function serializeNotification(row) {
   return {
     id: String(row.id),

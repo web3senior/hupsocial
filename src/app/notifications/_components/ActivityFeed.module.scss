@@ -6,11 +6,15 @@
 }
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding-bottom: 0.5rem;
+  background: var(--surface);
 
   h4 {
     display: flex;
@@ -21,6 +25,12 @@
     color: var(--text-color);
     margin: 0;
   }
+}
+
+.unread {
+  background-color: var(--blue-050);
+  border-left: 3px solid var(--blue-500);
+  padding-left: calc(1rem - 2px);
 }
 
 .refreshButton {

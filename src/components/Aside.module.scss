@@ -117,7 +117,7 @@
     transform: scale(0.95);
   }
 
-  // ■■■ Tooltip ■■■
+  // Tooltip
   &[data-tooltip] {
     position: relative;
 
@@ -132,10 +132,14 @@
       border: 1px solid var(--border);
       padding: 4px 8px;
       font-size: var(--font-size-12);
+      font-family: inherit;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
       border-radius: 1000px;
       pointer-events: none;
       opacity: 0;
       white-space: nowrap;
+      will-change: transform, opacity;
       z-index: 10;
       box-shadow: var(--shadow-sm);
 
@@ -173,20 +177,6 @@
   align-items: center;
   color: var(--black);
 
-  &[data-icon='Notifications'] {
-    &:after {
-      content: '';
-      color: var(--liked-color);
-      position: absolute;
-      top: 2px;
-      right: 3px;
-      outline: 2px solid var(--background);
-      width: 7px;
-      height: 7px;
-      border-radius: 1000px;
-      background-color: var(--liked-color);
-    }
-  }
 }
 
 .linkText {
@@ -541,6 +531,31 @@
   margin-left: auto;
   background-color: var(--batch-like-color);
   color: #000000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notificationBadgeDot {
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  outline: 2px solid var(--background);
+  width: 7px;
+  height: 7px;
+  border-radius: 1000px;
+  background-color: var(--liked-color);
+}
+
+.notificationBadgeCounter {
+  margin-left: auto;
+  background-color: var(--liked-color);
+  color: #ffffff;
   font-size: 0.75rem;
   font-weight: 700;
   padding: 2px 6px;
