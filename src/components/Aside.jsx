@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import useSWR from 'swr'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -172,25 +173,12 @@ export default function Aside() {
     }, 0)
   }, [likedPostIdsMap])
 
-  const [unreadCount, setUnreadCount] = useState(0)
-
-  useEffect(() => {
-    if (!isConnected || !address) return
-
-    const fetchUnread = async () => {
-      try {
-        const res = await fetch(`/api/v1/notifications?wallet_address=${address}&limit=1`)
-        const json = await res.json()
-        if (json.success) setUnreadCount(json.meta?.unread_count ?? 0)
-      } catch {
-        // ignore
-      }
-    }
-
-    fetchUnread()
-    const id = setInterval(fetchUnread, 60_000)
-    return () => clearInterval(id)
-  }, [address, isConnected])
+  const { data: notifData } = useSWR(
+    isConnected && address ? `/api/v1/notifications?wallet_address=${address}&limit=1` : null,
+    (url) => fetch(url).then((r) => r.json()),
+    { refreshInterval: 60_000, revalidateOnFocus: true }
+  )
+  const unreadCount = notifData?.success ? (notifData.meta?.unread_count ?? 0) : 0
 
   const [isWideScreen, setIsWideScreen] = useState(false)
 
