@@ -47,7 +47,7 @@ const ACTION_META = {
 }
 
 export default function ActivityFeed() {
-  const { address, isConnected } = useConnection()
+  const { address, isConnected, chain } = useConnection()
   const { mutateAsync: signMessageAsync } = useSignMessage()
   const [notifications, setNotifications] = useState([])
   const [nextPage, setNextPage] = useState(null)
@@ -74,16 +74,19 @@ export default function ActivityFeed() {
     setNotifications((prev) => prev.map((n) => (n.is_read ? n : { ...n, is_read: true, read_at: new Date().toISOString() })))
     setUnreadCount(0)
 
+    const isLukso = chain?.id === 42 || chain?.id === 4201
+    const body = { mark_all: true, message, signature, ...(isLukso && { up_address: address }) }
+
     try {
       await fetch('/api/v1/notifications', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mark_all: true, message, signature }),
+        body: JSON.stringify(body),
       })
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err)
     }
-  }, [address, unreadCount, signMessageAsync])
+  }, [address, chain, unreadCount, signMessageAsync])
 
   const markAsRead = useCallback(
     (id) => {

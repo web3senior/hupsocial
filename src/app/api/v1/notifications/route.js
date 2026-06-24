@@ -4,6 +4,22 @@ import pool from '@/lib/db'
 
 const SIG_MAX_AGE_MS = 5 * 60 * 1000
 
+const ERC1271_ABI = ['function isValidSignature(bytes32 hash, bytes memory signature) external view returns (bytes4)']
+const ERC1271_MAGIC_VALUE = '0x1626ba7e'
+
+async function verifyERC1271(contractAddress, message, signature) {
+  const rpcUrl = process.env.NEXT_PUBLIC_LUKSO_RPC_URL || 'https://rpc.mainnet.lukso.network'
+  const provider = new ethers.JsonRpcProvider(rpcUrl)
+  const contract = new ethers.Contract(contractAddress, ERC1271_ABI, provider)
+  const msgHash = ethers.hashMessage(message)
+  try {
+    const result = await contract.isValidSignature(msgHash, signature)
+    return result.toLowerCase() === ERC1271_MAGIC_VALUE
+  } catch {
+    return false
+  }
+}
+
 export const runtime = 'nodejs'
 
 const DEFAULT_LIMIT = 20
@@ -100,7 +116,7 @@ export async function GET(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json()
-    const { ids, wallet_address, mark_all, message, signature } = body
+    const { ids, wallet_address, mark_all, message, signature, up_address } = body
 
     if (mark_all) {
       if (!message || !signature) {
@@ -115,16 +131,24 @@ export async function PATCH(request) {
         return NextResponse.json({ success: false, error: 'Signature expired' }, { status: 400 })
       }
 
-      let recovered
-      try {
-        recovered = ethers.verifyMessage(message, signature)
-      } catch {
-        return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
+      let resolvedAddress
+      if (up_address && isWalletAddress(up_address)) {
+        const isValid = await verifyERC1271(up_address, message, signature)
+        if (!isValid) {
+          return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
+        }
+        resolvedAddress = up_address.toLowerCase()
+      } else {
+        try {
+          resolvedAddress = ethers.verifyMessage(message, signature).toLowerCase()
+        } catch {
+          return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
+        }
       }
-
+console.log(resolvedAddress)
       await pool.execute(
         `UPDATE notifications SET is_read = 1, read_at = NOW() WHERE recipient_wallet_address = ? AND is_read = 0`,
-        [recovered.toLowerCase()],
+        [resolvedAddress],
       )
       return NextResponse.json({ success: true })
     }
