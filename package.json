@@ -12,7 +12,10 @@
     "build:webpack": "next build --webpack",
     "ngrok": "ngrok http 3000",
     "clean:cache": "rm -rf .next",
-    "init:env": "copy .env.example .env"
+    "init:env": "copy .env.example .env",
+    "release:patch": "npm version patch -m 'chore: bump version to %s'",
+    "release:minor": "npm version minor -m 'chore: bump version to %s'",
+    "release:major": "npm version major -m 'chore: bump version to %s'"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.8",
