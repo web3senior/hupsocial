@@ -27,6 +27,9 @@ import NewPost from './NewPost'
 import { checkIsEnglish } from '@/lib/languageHelper'
 import Like from './ui/Like'
 import Comment from './ui/Comment'
+import { Edit } from 'lucide-react'
+import { Trash } from 'lucide-react'
+import { Eye } from 'lucide-react'
 
 // import React, { useState, useEffect } from 'react'
 // import clsx from 'clsx'
@@ -408,9 +411,12 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
           <div className={`${styles.postDropdown} flex flex-column align-items-center justify-content-start gap-050`}>
             <ul>
               <li>
-                <Link href={`/networks/${item.network_id}/${item.id}`}>View post</Link>
+                <Link href={`/networks/${item.network_id}/${item.id}`}>
+                  <span>View</span>
+                  <Eye size={16} />
+                </Link>
               </li>
-              {item.is_repost < 1 && (
+              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && item.is_repost < 1 && (
                 <li>
                   <button
                     onClick={(e) => {
@@ -419,13 +425,19 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                       close()
                     }}
                   >
-                    Edit post
+                    <span>Edit</span>
+                    <Edit size={16} />
                   </button>
                 </li>
               )}
-              <li>
-                <button onClick={(e) => deletePost(e, item.id)}>Delete post</button>
-              </li>
+              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
+                <li>
+                  <button onClick={(e) => deletePost(e, item.id)}>
+                    <span>Delete</span>
+                    <Trash size={16} />
+                  </button>
+                </li>
+              )}
               {address?.toLowerCase() !== item.wallet_address?.toLowerCase() && (
                 <li>
                   <button
@@ -435,7 +447,8 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                       close()
                     }}
                   >
-                    Report post
+                  <span>Report</span>
+                    <Flag size={16} />
                   </button>
                 </li>
               )}
