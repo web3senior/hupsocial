@@ -32,15 +32,12 @@ export async function GET(request) {
         u.profileImage as profile_image,
         n.name as network_name,
         n.chain_id,
-        n.explorer_url
+        n.explorer_url,
+        (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports
       FROM posts p
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
       JOIN networks n ON p.network_id = n.id
       WHERE 1=1
-        AND (
-          SELECT COUNT(*) FROM user_reports
-          WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned'
-        ) < 3
     `
 
     // Apply dynamic filters using chain_id from the networks table

@@ -15,7 +15,7 @@ import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon, TipIcon, ViewIcon } from '@/components/Icons'
 import MediaGallery from './Gallery'
-import { Ellipsis, Pen, Repeat2, MessageCircle, Box, SendHorizonal, MessageSquareQuote } from 'lucide-react'
+import { Ellipsis, Flag, Pen, Repeat2, MessageCircle, Box, SendHorizonal, MessageSquareQuote } from 'lucide-react'
 import { CONTRACTS } from '@/config/wagmi'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
@@ -47,6 +47,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const [lastComment, setLastComment] = useState(null)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
+  const isActioned = Number(item.actioned_reports || 0) >= 3
   const repostedPostId = isRepost ? Number(item.is_repost) : null
   const [showEditModal, setShowEditModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(null)
@@ -232,7 +233,14 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
           </div>
         </header>
 
-        <main className={`${styles.post__main} w-100`}>
+        {isActioned && (
+          <div className={styles.post__flagBanner}>
+            <Flag size={13} fill="currentColor" strokeWidth={0} />
+            This post has been flagged for violations.
+          </div>
+        )}
+
+        <main className={clsx(styles.post__main, 'w-100', isActioned && styles['post__main--blurred'])}>
           {displayItem?.content?.elements?.length > 1 ? (
             <>
               <PostText
