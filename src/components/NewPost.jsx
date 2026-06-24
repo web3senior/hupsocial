@@ -559,6 +559,14 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     }
   }, [])
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isBusy) handleClose()
+    }
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [handleClose, isBusy])
+
   if (!mounted) return null
 
   return (

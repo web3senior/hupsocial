@@ -61,8 +61,10 @@ export default function NativePopover({
   const popoverId = `popover-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const popoverRef = useRef(null)
   const triggerRef = useRef(null)
+  const measuringRef = useRef(false)
 
   const applyPosition = useCallback(() => {
+    if (measuringRef.current) return
     const triggerEl = triggerRef.current
     const popoverEl = popoverRef.current
     if (!triggerEl || !popoverEl) return
@@ -71,6 +73,7 @@ export default function NativePopover({
     // Move it off-screen, make it visible just long enough to measure, then position.
     const wasHidden = !popoverEl.matches(':popover-open')
     if (wasHidden) {
+      measuringRef.current = true
       Object.assign(popoverEl.style, { position: 'fixed', top: '-9999px', left: '-9999px', visibility: 'hidden' })
       popoverEl.showPopover()
     }
@@ -82,6 +85,7 @@ export default function NativePopover({
     if (wasHidden) {
       popoverEl.hidePopover()
       popoverEl.style.visibility = ''
+      measuringRef.current = false
     }
 
     const pos = computePosition(rect, pw, ph, placement)
@@ -97,12 +101,20 @@ export default function NativePopover({
       onBeforeToggle?.(e)
     }
 
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        try { node.hidePopover() } catch { /* not open */ }
+      }
+    }
+
     node.addEventListener('beforetoggle', handleBeforeToggle)
     if (onToggle) node.addEventListener('toggle', onToggle)
+    window.addEventListener('keydown', handleKeyDown, true)
 
     return () => {
       node.removeEventListener('beforetoggle', handleBeforeToggle)
       if (onToggle) node.removeEventListener('toggle', onToggle)
+      window.removeEventListener('keydown', handleKeyDown, true)
     }
   }, [applyPosition, onBeforeToggle, onToggle])
 
