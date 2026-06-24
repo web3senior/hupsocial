@@ -256,19 +256,31 @@ function NotificationRow({ notification, currentAddress, onRead }) {
     const el = rowRef.current
     if (!el) return
 
+    let readTimer = null
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !hasMarkedRead.current) {
-          hasMarkedRead.current = true
-          onRead(notification.id)
-          observer.disconnect()
+          readTimer = setTimeout(() => {
+            if (!hasMarkedRead.current) {
+              hasMarkedRead.current = true
+              onRead(notification.id)
+              observer.disconnect()
+            }
+          }, 3000)
+        } else {
+          clearTimeout(readTimer)
+          readTimer = null
         }
       },
       { threshold: 0.5 },
     )
 
     observer.observe(el)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      clearTimeout(readTimer)
+    }
   }, [notification.id, notification.is_read, onRead])
 
   // Extract variables safely using top level parameters or data attributes

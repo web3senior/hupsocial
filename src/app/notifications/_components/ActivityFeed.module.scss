@@ -22,15 +22,13 @@
     gap: 0.5rem;
     font-size: 1.1rem;
     font-weight: 700;
-    color: var(--text-color);
+    color: var(--color);
     margin: 0;
   }
 }
 
 .unread {
-  background-color: var(--blue-050);
-  border-left: 3px solid var(--blue-500);
-  padding-left: calc(1rem - 2px);
+  background-color: var(--blue-050) !important;
 }
 
 .refreshButton {
@@ -76,6 +74,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   animation: fadeIn 0.28s ease-out both;
+  transition: background-color 0.6s ease;
 }
 
 .iconBox {
@@ -259,6 +258,14 @@
     width: auto;
     min-width: 2.25rem;
   }
+}
+
+.postPreviewLoader {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-color-pale);
+  font-size: 0.8rem;
 }
 
 .postPreview {
