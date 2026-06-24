@@ -16,7 +16,7 @@ import clsx from 'clsx'
 
 export default function InAppWallet() {
   // Establish state to track whether the switch is turned on or off
-  const [isOn, setIsOn] = useState(false)
+  const [isOn, setIsOn] = useState(true)
 
   const { address } = useConnection()
   const publicClient = usePublicClient()

@@ -230,7 +230,7 @@ export const Like = ({ post, onUpdate }) => {
       removeFromBatch(post.network_id, post.id)
     } else {
       const batchLikePref = localStorage.getItem(localStorageBatchLikeKey)
-      const isBatchLikeEnabled = batchLikePref === 'true'
+      const isBatchLikeEnabled = batchLikePref !== 'false'
 
       if (isBatchLikeEnabled) {
         addToBatch(post.network_id, post.id)
