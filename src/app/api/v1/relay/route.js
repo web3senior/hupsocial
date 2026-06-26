@@ -15,7 +15,6 @@ export async function POST(request) {
     const relayer = new ethers.Wallet(RELAYER_PRIVATE_KEY, provider)
     const forwarder = new ethers.Contract(forwarderAddress, FORWARDER_ABI, relayer)
 
-    // ... (rest of your formatting and verify logic)
     const fullRequest = {
       from: forwardRequest.from,
       to: forwardRequest.to,
@@ -27,13 +26,13 @@ export async function POST(request) {
       signature: signature,
     }
 
-    // 1. Verify offchain
+    // Verify offchain
     const isValid = await forwarder.verify(fullRequest)
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid Signature' }, { status: 400 })
     }
 
-    // 2. Broadcast — don't wait for mining, the client shows optimistic UI.
+    // Broadcast — don't wait for mining, the client shows optimistic UI.
     const tx = await forwarder.execute(fullRequest, {
       maxPriorityFeePerGas: ethers.parseUnits('2', 'gwei'),
     })
