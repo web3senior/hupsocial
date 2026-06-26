@@ -133,11 +133,21 @@ export async function PATCH(request) {
 
       let resolvedAddress
       if (up_address && isWalletAddress(up_address)) {
-        const isValid = await verifyERC1271(up_address, message, signature)
-        if (!isValid) {
-          return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
+        const isValidERC1271 = await verifyERC1271(up_address, message, signature)
+        if (isValidERC1271) {
+          resolvedAddress = up_address.toLowerCase()
+        } else {
+          // EOA wallet on Lukso network — ERC1271 returns false for plain accounts
+          try {
+            const recovered = ethers.verifyMessage(message, signature).toLowerCase()
+            if (recovered !== up_address.toLowerCase()) {
+              return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
+            }
+            resolvedAddress = recovered
+          } catch {
+            return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 })
+          }
         }
-        resolvedAddress = up_address.toLowerCase()
       } else {
         try {
           resolvedAddress = ethers.verifyMessage(message, signature).toLowerCase()
