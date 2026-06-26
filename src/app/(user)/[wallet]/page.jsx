@@ -77,11 +77,14 @@ export async function generateMetadata({ params }, parent) {
   const { wallet } = await params
 
   try {
-    const rawProfile  = await getProfile(wallet)
-    const profile = rawProfile?.data ? rawProfile?.data : null
+    const rawProfile = await getProfile(wallet)
+    const profile = rawProfile?.data ?? null
 
     if (!profile) {
-      throw new Error('Profile not found')
+      return {
+        title: 'Profile Not Found',
+        description: parentMetadata.description || 'The requested user profile could not be retrieved.',
+      }
     }
 
     // Format shortened wallet identity

@@ -27,20 +27,20 @@ export async function POST(request) {
       signature: signature,
     }
 
-    // 1. Verify off-chain
+    // 1. Verify offchain
     const isValid = await forwarder.verify(fullRequest)
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid Signature' }, { status: 400 })
     }
 
-    // 2. Execute on LUKSO
-    const tx = await forwarder.execute(fullRequest)
-
-    const receipt = await tx.wait()
+    // 2. Broadcast — don't wait for mining, the client shows optimistic UI.
+    const tx = await forwarder.execute(fullRequest, {
+      maxPriorityFeePerGas: ethers.parseUnits('2', 'gwei'),
+    })
 
     return NextResponse.json({
       success: true,
-      txHash: receipt.hash,
+      txHash: tx.hash,
     })
   } catch (error) {
     console.error('RELAY_ERROR:', error)

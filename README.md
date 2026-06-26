@@ -338,3 +338,32 @@ const postContent = {
 ## 🏷️ Version Management (SemVer)
 
 This project strictly adheres to [Semantic Versioning (SemVer)](https://semver.org/) via the `MAJOR.MINOR.PATCH` format to ensure predictable deployments and reliable cross-chain indexing.
+
+
+# Monetization: Subscription NFT (Future)
+
+The protocol is currently open and free. If monetization is introduced, the preferred approach is a **subscription NFT** — not an on-chain license key check.
+
+## How it would work
+
+A separate `HupSubscription` ERC-721 (or ERC-1155) contract is deployed independently of the core protocol. Users mint a subscription token with an expiry timestamp encoded in the token metadata or a contract mapping.
+
+The **relayer/meta-transaction forwarder** checks subscription validity before forwarding a transaction. The core `Tunnel` contract itself stays unchanged — no license gate added to `sendMessage` or any other function.
+
+```
+User → Relayer → [check: does this wallet hold a valid subscription token?] → Tunnel contract
+```
+
+If the user has no valid subscription, the relayer rejects the request off-chain. Gas cost: zero.
+
+## Why this approach
+
+- **Zero gas overhead** — the check happens at the relay layer, not in the EVM
+- **Protocol stays trustless** — anyone can call the contract directly without the relayer; subscription is a product-layer concern, not a protocol constraint
+- **Non-custodial** — subscription NFTs can be transferred, gifted, or sold on secondary markets
+- **Upgradeable without redeployment** — subscription tiers, pricing, and logic live in a separate contract; the core protocol is never touched
+- **Avoids the alternative** — adding an on-chain `licenseOf[address]` check to every `sendMessage` call would add gas to every transaction and break permissionlessness
+
+## What stays free
+
+Direct contract interaction bypasses the relayer entirely, so technically the protocol always remains open. Subscription would gate the **app experience** (meta-tx relay, IPFS pinning, push notifications, etc.), not the raw protocol.

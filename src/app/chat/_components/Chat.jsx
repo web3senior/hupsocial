@@ -14,6 +14,7 @@ import { bytesToHex, encodeFunctionData } from 'viem'
 import { ContentSpinner, MessageLoader } from '@/components/Loading'
 import { chatLocalStorageBurnerKey, chatLocalStorageBurnerAddress, chatSessionStorageUnlockedKey, CHAT_ZERO_ADDRESS as ZERO_ADDRESS } from '@/lib/chatBurnerSession'
 import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
+import { decryptData } from '@/lib/cryptoHelper'
 import { getActiveChain } from '@/lib/communication'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
 import { ConversationList } from './ConversationList'
@@ -346,8 +347,20 @@ export default function Chat() {
       throw new Error('Chat relay configuration is missing for this chain.')
     }
     const unlockedKey = sessionStorage.getItem(chatSessionStorageUnlockedKey)
-    const storedBurnerKey = localStorage.getItem(chatLocalStorageBurnerKey)
-    const burnerKey = normalizePrivateKey(unlockedKey) || normalizePrivateKey(storedBurnerKey)
+    let burnerKey = normalizePrivateKey(unlockedKey)
+
+    if (!burnerKey) {
+      const encryptedBurnerKey = localStorage.getItem(chatLocalStorageBurnerKey)
+      const pin = sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
+      if (encryptedBurnerKey && pin) {
+        try {
+          const decrypted = await decryptData(encryptedBurnerKey, pin)
+          burnerKey = normalizePrivateKey(decrypted)
+          if (burnerKey) sessionStorage.setItem(chatSessionStorageUnlockedKey, burnerKey)
+        } catch {}
+      }
+    }
+
     if (!burnerKey) throw new Error('Session expired or burner key is missing.')
     const burner = new ethers.Wallet(burnerKey)
     const { request, signature } = await signMetaTransactionSessionMode(burner, functionData)
@@ -814,13 +827,23 @@ export default function Chat() {
         new TextEncoder().encode(JSON.stringify({ version: '1', elements: messageElements }))
       )
 
-      const ipfsResult = await uploadObjectToIPFS({
-        version: '1',
-        iv: ethers.hexlify(payloadIv),
-        ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
-        senderAddr: address,
-      })
+      // Prefetch nonce from forwarder in parallel with IPFS — saves one RPC round-trip on first send.
+      const burnerAddr = localStorage.getItem(chatLocalStorageBurnerAddress)
+      const shouldPrefetchNonce = currentNonce.current === null && !!burnerAddr && !!publicClient && !!forwarderAddress
+      const [ipfsResult, rawPrefetchedNonce] = await Promise.all([
+        uploadObjectToIPFS({
+          version: '1',
+          iv: ethers.hexlify(payloadIv),
+          ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
+          senderAddr: address,
+        }),
+        shouldPrefetchNonce
+          ? publicClient.readContract({ address: forwarderAddress, abi: forwarderAbi, functionName: 'nonces', args: [burnerAddr] })
+          : Promise.resolve(null),
+      ])
       if (!ipfsResult?.cid) throw new Error('IPFS upload failed.')
+      // Prime the nonce cache: getNextNonce will increment, so we store prefetched - 1.
+      if (rawPrefetchedNonce !== null) currentNonce.current = rawPrefetchedNonce - 1n
 
       const uncompressedRawKey = latestPeerKey.startsWith('0x') ? latestPeerKey : `0x${latestPeerKey}`
       const receiverWrappedKey = ecies.encrypt(uncompressedRawKey, Buffer.from(ethers.getBytes(derivedKeySeed)))

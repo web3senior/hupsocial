@@ -7,7 +7,8 @@ export const getProfile= async (address) => {
   const url = `${baseUrl}/api/v1/users/profile/${address.toLowerCase()}`
 
   const response = await fetch(url)
-  if (!response.ok) throw new Error('Post fetch failed')
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error('Profile fetch failed')
   const data = await response.json()
   return data
 }

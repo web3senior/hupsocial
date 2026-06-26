@@ -7,11 +7,9 @@ import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
 import abiChat from '@/abis/Chat.json'
-import abiPublicKeyRegistry from '@/abis/PublicKeyRegistry.json'
-import { unlockAppKeyFromStorage, lockAppPrivateKey, APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE } from '@/lib/appVault'
+import { unlockAppKeyFromStorage, unlockAppKeyWithPassword, lockAppPrivateKey, APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
-import { ConnectWallet } from '@/components/ConnectWallet'
 import { EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, CheckIcon, CopyIcon, UploadIcon, DatabaseIcon } from 'lucide-react'
 import styles from './page.module.scss'
 
@@ -24,7 +22,7 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const SESSION_DURATION_SECONDS = 3600 * 24 * 30
+const SESSION_DURATION_SECONDS = 3600 * 24 * 365
 
 const FORWARDER_NONCES_ABI = [
   {
@@ -59,13 +57,13 @@ export default function Register() {
 
   const [activeChainConfig, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
-  const pkRegistryAddress = activeChainContracts?.publicKeyRegistry
   const forwarderAddress = activeChainContracts?.forwarder
   const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
 
   // ■■■ Core State ■■■
   const [isActivating, setIsActivating] = useState(false)
   const [hasLocalVault, setHasLocalVault] = useState(false)
+  const [hasBurnerKey, setHasBurnerKey] = useState(false)
   const [isPkRegistered, setIsPkRegistered] = useState(false)
   const [sessionActive, setSessionActive] = useState(false)
   const [isSessionOrphaned, setIsSessionOrphaned] = useState(false)
@@ -75,29 +73,30 @@ export default function Register() {
   // ■■■ Vault Setup State ■■■
   const [vaultPassword, setVaultPassword] = useState('')
   const [confirmVaultPassword, setConfirmVaultPassword] = useState('')
-  const [vaultAgree, setVaultAgree] = useState(false)
   const [showVaultPlainPassword, setShowVaultPlainPassword] = useState(false)
 
-  // ■■■ Security & UI State ■■■
-  const [showPasswordSetup, setShowPasswordSetup] = useState(false)
+  // ■■■ PIN Re-entry (when sessionStorage cleared between visits) ■■■
+  const [showPinEntry, setShowPinEntry] = useState(false)
+  const [pinEntry, setPinEntry] = useState('')
+  const [showPinEntryPlain, setShowPinEntryPlain] = useState(false)
+
+  // ■■■ Key Management State ■■■
   const [showDecryptPrompt, setShowDecryptPrompt] = useState(false)
   const [showImportPrompt, setShowImportPrompt] = useState(false)
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [decryptPassword, setDecryptPassword] = useState('')
   const [revealKeyMode, setRevealKeyMode] = useState(false)
   const [revealedPrivateKey, setRevealedPrivateKey] = useState(null)
   const [copied, setCopied] = useState(false)
-
   const [importPrivateKeyInput, setImportPrivateKeyInput] = useState('')
   const [importPassword, setImportPassword] = useState('')
-  const [showPlainPassword, setShowPlainPassword] = useState(false)
 
   // ─── Status Polling ──────────────────────────────────────────────────────
 
   const checkStatus = useCallback(async () => {
     const vaultExists = !!localStorage.getItem(ENCRYPTED_APP_KEY_STORAGE)
+    const burnerExists = !!localStorage.getItem(chatLocalStorageBurnerKey)
     setHasLocalVault(vaultExists)
+    setHasBurnerKey(burnerExists)
 
     if (!address || !publicClient || !tunnelAddress) {
       setIsPkRegistered(false)
@@ -108,14 +107,12 @@ export default function Register() {
 
     try {
       const [pk, session, latestBlock] = await Promise.all([
-        pkRegistryAddress
-          ? publicClient.readContract({
-              address: pkRegistryAddress,
-              abi: abiPublicKeyRegistry,
-              functionName: 'getKey',
-              args: [address],
-            })
-          : Promise.resolve(null),
+        publicClient.readContract({
+          address: tunnelAddress,
+          abi: abiChat,
+          functionName: 'publicKeyRegistry',
+          args: [address],
+        }),
         publicClient.readContract({
           address: tunnelAddress,
           abi: abiChat,
@@ -150,19 +147,18 @@ export default function Register() {
   }, [address, publicClient, tunnelAddress])
 
   useEffect(() => {
+    if (!isConnected) return
     void checkStatus()
     const interval = setInterval(() => void checkStatus(), 30000)
     return () => clearInterval(interval)
-  }, [checkStatus])
+  }, [checkStatus, isConnected])
 
   // ─── Vault Creation ──────────────────────────────────────────────────────
 
-  const handleCreateVaultAndRegister = async () => {
+  const handleCreateVaultAndActivate = async () => {
     if (!isConnected || !address) return setErrorMsg('Please connect your wallet first.')
     if (vaultPassword.length < 8) return setErrorMsg('Your PIN must be at least 8 characters.')
     if (vaultPassword !== confirmVaultPassword) return setErrorMsg('PINs do not match.')
-    if (!vaultAgree) return setErrorMsg('Please check the box to confirm.')
-
     setIsActivating(true)
     setErrorMsg('')
 
@@ -186,24 +182,24 @@ export default function Register() {
         'Version: 1.0.0',
       ].join('\n')
 
-      // This is a personal_sign — no tx, just a sig for key derivation.
+      // personal_sign — no tx, just a sig for key derivation.
       const signature = await signMessageAsync({ message })
       const sigHash = ethers.keccak256(signature)
-      const passwordHash = ethers.keccak256(ethers.toUtf8Bytes(vaultPassword))
-      const seed = ethers.solidityPackedKeccak256(['string', 'bytes32', 'bytes32'], ['HUP_STEALTH_V1', sigHash, passwordHash])
+      const seed = ethers.solidityPackedKeccak256(['string', 'bytes32'], ['HUP_STEALTH_V1', sigHash])
 
       const privKey = new ecies.PrivateKey(ethers.getBytes(seed))
       const rawPrivKeyHex = privKey.toHex()
-      const rawPubKeyHex = privKey.publicKey.toHex()
-      const pubKeyHex = rawPubKeyHex.startsWith('0x') ? rawPubKeyHex : `0x${rawPubKeyHex}`
+      // Contract requires uncompressed pubkey (64 or 65 bytes); eciesjs gives compressed (33 bytes).
+      const privKeyWith0x = rawPrivKeyHex.startsWith('0x') ? rawPrivKeyHex : `0x${rawPrivKeyHex}`
+      const pubKeyHex = new ethers.SigningKey(privKeyWith0x).publicKey // 0x04... 65 bytes
 
       const encryptedKey = await lockAppPrivateKey(rawPrivKeyHex, vaultPassword)
       localStorage.setItem(ENCRYPTED_APP_KEY_STORAGE, encryptedKey)
       sessionStorage.setItem(APP_PASSWORD_SESSION_STORAGE, vaultPassword)
       setHasLocalVault(true)
 
-      // Immediately chain into public key registration (still requires one tx from main wallet).
-      await handleJoinTunnel(pubKeyHex)
+      // Chain directly into combined relay: register PK + authorize session in one call.
+      await handleActivateIdentity(vaultPassword, pubKeyHex)
     } catch (error) {
       console.error('Vault creation failed:', error)
       setErrorMsg(
@@ -254,91 +250,96 @@ export default function Register() {
     if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Relay failed.')
   }
 
-  // ─── Public Key Registration ─────────────────────────────────────────────
+  // ─── Combined Activation (PK + Session in one relay call) ────────────────
+  //
+  // explicitPin: provided when called right after vault creation (sessionStorage already set),
+  //              or when user re-enters PIN after the session tab was closed.
+  // directPubKey: optional pre-derived pubKey hex; if omitted, unlocked from vault.
 
-  const handleJoinTunnel = async (directPubKeyHex = null) => {
+  const handleActivateIdentity = async (explicitPin = null, directPubKey = null) => {
     try {
       setIsActivating(true)
       setErrorMsg('')
+
       if (!address) throw new Error('Wallet not connected.')
       if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
-      if (!pkRegistryAddress) throw new Error('Public key registry is not configured.')
 
-      let pubKeyHex = directPubKeyHex
-      if (!pubKeyHex) {
-        const keys = await unlockAppKeyFromStorage()
-        pubKeyHex = keys?.pubKey
+      // Unlock vault to get the public key (if not already registered).
+      let pubKeyArg = '0x'
+      if (!isPkRegistered) {
+        let pubKeyHex = directPubKey
+        if (!pubKeyHex) {
+          const keys = explicitPin
+            ? await unlockAppKeyWithPassword(explicitPin)
+            : await unlockAppKeyFromStorage()
+          if (!keys) throw new Error('Cannot unlock vault. Please re-enter your PIN.')
+          pubKeyHex = keys.pubKey
+        }
+        pubKeyArg = pubKeyHex.startsWith('0x') ? pubKeyHex : `0x${pubKeyHex}`
       }
-      if (!pubKeyHex) throw new Error('No public key found. Please create the local vault first.')
 
-      const normalizedPubKey = pubKeyHex.startsWith('0x') ? pubKeyHex : `0x${pubKeyHex}`
+      // Derive the PIN we'll use to encrypt the burner key.
+      const pin = explicitPin || sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
+      if (!pin) throw new Error('Session expired. Please re-enter your PIN.')
 
-      await relayViaForwarder(pkRegistryAddress, abiPublicKeyRegistry, 'register', [normalizedPubKey], 150000)
+      // Get or create burner wallet.
+      let targetBurnerAddress
+      const storedKey = localStorage.getItem(chatLocalStorageBurnerKey)
+      const storedAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
 
+      if (storedKey && storedAddress) {
+        targetBurnerAddress = storedAddress
+      } else {
+        const burner = Wallet.createRandom()
+        const encryptedKey = await encryptData(burner.privateKey, pin)
+        localStorage.setItem(chatLocalStorageBurnerKey, encryptedKey)
+        localStorage.setItem(chatLocalStorageBurnerAddress, burner.address)
+        sessionStorage.setItem(chatSessionStorageUnlockedKey, burner.privateKey)
+        targetBurnerAddress = burner.address
+      }
+
+      // One relay call: activateIdentity registers PK (if pubKeyArg non-empty) + session.
+      await relayViaForwarder(
+        tunnelAddress, abiChat, 'activateIdentity',
+        [targetBurnerAddress, BigInt(SESSION_DURATION_SECONDS), pubKeyArg],
+        180000
+      )
+
+      setShowPinEntry(false)
+      setPinEntry('')
       await checkStatus()
     } catch (err) {
-      console.error('Public key registration failed:', err)
-      setErrorMsg(err.message || 'Registration failed.')
+      console.error('Activation failed:', err)
+      setErrorMsg(err.message || 'Activation failed. Please try again.')
     } finally {
       setIsActivating(false)
     }
   }
 
-  // ─── Session Authorization ───────────────────────────────────────────────
-  //
-  // Flow:
-  //   1. Generate (or reuse) a burner keypair and encrypt it locally.
-  //   2. Main wallet signs a ForwardRequest off-chain; relayer pays gas.
+  // ─── Trigger activation — reads PIN from sessionStorage or shows re-entry form ─
 
-  const triggerAuthorizeFlow = () => {
+  const triggerActivation = () => {
     setErrorMsg('')
-    setPassword('')
-    setConfirmPassword('')
-
-    const storedAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
-    if (storedAddress) {
-      handleAuthorizeSession(null)
+    const pin = sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
+    if (pin) {
+      handleActivateIdentity(pin)
     } else {
-      setShowPasswordSetup(true)
+      setShowPinEntry(true)
+      setShowDecryptPrompt(false)
+      setShowImportPrompt(false)
     }
   }
 
-  const handleAuthorizeSession = async (customPassword = null) => {
+  // ─── Session Revocation ──────────────────────────────────────────────────
+
+  const handleRevokeSession = async () => {
     try {
       setIsActivating(true)
-      setErrorMsg('')
-
-      if (!address) throw new Error('Wallet not connected.')
-      if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
-
-      let targetBurnerAddress
-
-      const storedKey = localStorage.getItem(chatLocalStorageBurnerKey)
-      const storedAddress = localStorage.getItem(chatLocalStorageBurnerAddress)
-
-      if (!storedKey || !storedAddress) {
-        if (!customPassword || customPassword.length < 6) {
-          throw new Error('Secure password required (min 6 characters).')
-        }
-        const burner = Wallet.createRandom()
-        const encryptedKey = await encryptData(burner.privateKey, customPassword)
-
-        localStorage.setItem(chatLocalStorageBurnerKey, encryptedKey)
-        localStorage.setItem(chatLocalStorageBurnerAddress, burner.address)
-        sessionStorage.setItem(chatSessionStorageUnlockedKey, burner.privateKey)
-
-        targetBurnerAddress = burner.address
-      } else {
-        targetBurnerAddress = storedAddress
-      }
-
-      await relayViaForwarder(tunnelAddress, abiChat, 'authorizeSession', [targetBurnerAddress, BigInt(SESSION_DURATION_SECONDS)], 120000)
-
-      setShowPasswordSetup(false)
+      await relayViaForwarder(tunnelAddress, abiChat, 'revokeSession', [], 80000)
       await checkStatus()
     } catch (err) {
-      console.error('Session authorization failed:', err)
-      setErrorMsg(err.message || 'Authorization failed. Please try again.')
+      console.error('Session revocation failed:', err)
+      setErrorMsg(err.message || 'Revocation failed.')
     } finally {
       setIsActivating(false)
     }
@@ -403,21 +404,6 @@ export default function Register() {
     }
   }
 
-  const handleRevokeSession = async () => {
-    try {
-      setIsActivating(true)
-      // revokeSession is called by the main wallet (it deletes its own entry).
-      // This intentionally links the wallet but is an explicit user action to close the session.
-      await relayViaForwarder(tunnelAddress, abiChat, 'revokeSession', [], 80000)
-      await checkStatus()
-    } catch (err) {
-      console.error('Session revocation failed:', err)
-      setErrorMsg(err.message || 'Revocation failed.')
-    } finally {
-      setIsActivating(false)
-    }
-  }
-
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
     setCopied(true)
@@ -433,12 +419,9 @@ export default function Register() {
       <div className={clsx(styles.register__card)}>
         {/* ■■■ Header ■■■ */}
         <header className={clsx(styles.register__header)}>
-          <div className="d-f-c flex-column" style={{ marginBottom: '1rem' }}>
-            <ConnectWallet />
-          </div>
           <h1 className={clsx(styles.register__title)}>Get Started</h1>
           <p className={clsx(styles.register__subtitle)}>
-            {isFullyRegistered ? "You're all set!" : 'Just 3 quick steps and you can start chatting.'}
+            {isFullyRegistered ? "You're all set!" : 'Just 2 quick steps and you can start chatting.'}
           </p>
         </header>
 
@@ -458,8 +441,12 @@ export default function Register() {
               <DatabaseIcon size={20} />
             </div>
             <div className="flex-grow-1">
-              <strong>1. Create Your PIN</strong>
-              <p>{hasLocalVault ? 'Your PIN is saved on this device' : 'Takes about 30 seconds'}</p>
+              <strong>1. Set PIN</strong>
+              <p>{hasLocalVault ? 'Vault saved on this device' : 'Takes about 30 seconds'}</p>
+              <details className={clsx(styles.register__stepDetails)}>
+                <summary>Advanced info</summary>
+                <p>Your PIN protects the vault on this device. If you forget it, you can recover by re-signing the same message with your wallet — your keypair is derived from your signature, not the PIN.</p>
+              </details>
             </div>
             <div
               className={clsx(
@@ -472,56 +459,41 @@ export default function Register() {
           </div>
 
           {/* Step 2 */}
-          <div className={clsx(styles['register__feature-item'], isPkRegistered && styles['register__feature-item--active'])}>
-            <div className={clsx(styles.register__icon)}>
-              <ShieldAlertIcon size={20} />
-            </div>
-            <div className="flex-grow-1">
-              <strong>2. Enable Private Messages</strong>
-              <p>{isPkRegistered ? 'Active' : 'Not activated yet'}</p>
-            </div>
-            <div
-              className={clsx(
-                styles.register__status,
-                isPkRegistered ? styles['register__status--ok'] : styles['register__status--pending']
-              )}
-            >
-              {isPkRegistered ? 'OK' : '!'}
-            </div>
-          </div>
-
-          {/* Step 3 */}
           <div
             className={clsx(
               styles['register__feature-item'],
-              (sessionActive || isSessionOrphaned) && styles['register__feature-item--active']
+              (isPkRegistered && sessionActive) && styles['register__feature-item--active']
             )}
           >
             <div className={clsx(styles.register__icon)}>
               <KeyRoundIcon size={20} />
             </div>
             <div className="flex-grow-1">
-              <strong>3. Activate Your Session</strong>
+              <strong>2. Join Chat</strong>
               <p>
-                {sessionActive
-                  ? 'Active — your wallet stays private'
+                {isPkRegistered && sessionActive
+                  ? 'Active — private messages and session enabled'
                   : isSessionOrphaned
-                    ? 'Session not found — import or start a new one'
-                    : 'Needs activation'}
+                    ? 'Session lost — import or start a new one'
+                    : 'Opens a 1-year session — you\'ll re-enter once a year'}
               </p>
               {burnerAddress && (sessionActive || isSessionOrphaned) && (
                 <small className={clsx(styles.register__address)}>
                   {burnerAddress.slice(0, 8)}...{burnerAddress.slice(-6)}
                 </small>
               )}
+              <details className={clsx(styles.register__stepDetails)}>
+                <summary>Advanced info</summary>
+                <p>Registers your encryption public key on-chain once, then opens a 1-year signing session via a temporary burner key. You'll only need to redo this step once a year. Fully gas-free — HUP's relayer covers the fee.</p>
+              </details>
             </div>
             <div
               className={clsx(
                 styles.register__status,
-                sessionActive ? styles['register__status--ok'] : styles['register__status--pending']
+                (isPkRegistered && sessionActive) ? styles['register__status--ok'] : styles['register__status--pending']
               )}
             >
-              {sessionActive ? 'OK' : isSessionOrphaned ? 'LOST' : '!'}
+              {isPkRegistered && sessionActive ? 'OK' : isSessionOrphaned ? 'LOST' : '!'}
             </div>
           </div>
         </section>
@@ -532,17 +504,27 @@ export default function Register() {
           {!hasLocalVault && isConnected && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <DatabaseIcon size={16} /> Create Your PIN
+                <DatabaseIcon size={16} /> Set PIN
               </h5>
-              <p>Your PIN protects your account on this device. Write it down — it cannot be reset if you forget it.</p>
+              <p>Locks your vault on this device. Forgot it? Re-sign with your wallet anytime to recover.</p>
               <div className={clsx(styles.register__formGroup)}>
-                <input
-                  type={showVaultPlainPassword ? 'text' : 'password'}
-                  placeholder="PIN (min 8 characters)"
-                  value={vaultPassword}
-                  onChange={(e) => setVaultPassword(e.target.value)}
-                  className={clsx(styles.register__input)}
-                />
+                <div className={clsx(styles.register__inputWrapper)}>
+                  <input
+                    type={showVaultPlainPassword ? 'text' : 'password'}
+                    placeholder="Choose a PIN (min 8 chars)"
+                    value={vaultPassword}
+                    onChange={(e) => setVaultPassword(e.target.value)}
+                    className={clsx(styles.register__input)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVaultPlainPassword(!showVaultPlainPassword)}
+                    className={clsx(styles.register__inputEye)}
+                    tabIndex={-1}
+                  >
+                    {showVaultPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
+                  </button>
+                </div>
                 <input
                   type={showVaultPlainPassword ? 'text' : 'password'}
                   placeholder="Confirm PIN"
@@ -551,24 +533,11 @@ export default function Register() {
                   className={clsx(styles.register__input)}
                 />
               </div>
-              <div className="flex gap-05 align-items-center mt-10 mb-10">
-                <input type="checkbox" id="vaultAgree" checked={vaultAgree} onChange={(e) => setVaultAgree(e.target.checked)} />
-                <label htmlFor="vaultAgree" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  I understand my PIN cannot be reset if I forget it.
-                </label>
-              </div>
-              <div className="flex justify-between align-items-center mt-10">
+              <div className="flex justify-end mt-10">
                 <button
-                  type="button"
-                  onClick={() => setShowVaultPlainPassword(!showVaultPlainPassword)}
-                  className={clsx(styles.register__btnLink)}
-                >
-                  {showVaultPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showVaultPlainPassword ? 'Hide' : 'Show'}
-                </button>
-                <button
-                  onClick={handleCreateVaultAndRegister}
+                  onClick={handleCreateVaultAndActivate}
                   className={clsx(styles.register__btnPrimary)}
-                  disabled={isActivating || vaultPassword.length < 8 || vaultPassword !== confirmVaultPassword || !vaultAgree}
+                  disabled={isActivating || vaultPassword.length < 8 || vaultPassword !== confirmVaultPassword}
                 >
                   {isActivating ? 'Joining...' : 'Join Hup'}
                 </button>
@@ -576,61 +545,49 @@ export default function Register() {
             </div>
           )}
 
-          {/* Session Password Setup (new burner) */}
-          {showPasswordSetup && (
+          {/* PIN Re-entry (vault exists, sessionStorage cleared) */}
+          {showPinEntry && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <KeyRoundIcon size={16} /> Protect Your Session
+                <KeyRoundIcon size={16} /> Re-enter Your PIN
               </h5>
-              <p>
-                Choose a password to keep your session key safe on this device.
-              </p>
+              <p>Enter your vault PIN to activate your identity.</p>
               <div className={clsx(styles.register__formGroup)}>
                 <input
-                  type={showPlainPassword ? 'text' : 'password'}
-                  placeholder="Password (min 6 characters)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={clsx(styles.register__input)}
-                />
-                <input
-                  type={showPlainPassword ? 'text' : 'password'}
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  type={showPinEntryPlain ? 'text' : 'password'}
+                  placeholder="Your PIN"
+                  value={pinEntry}
+                  onChange={(e) => setPinEntry(e.target.value)}
                   className={clsx(styles.register__input)}
                 />
               </div>
               <div className="flex gap-05 justify-between align-items-center mt-10">
-                <button type="button" onClick={() => setShowPlainPassword(!showPlainPassword)} className={clsx(styles.register__btnLink)}>
-                  {showPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPlainPassword ? 'Hide' : 'Show'}
+                <button type="button" onClick={() => setShowPinEntryPlain(!showPinEntryPlain)} className={clsx(styles.register__btnLink)}>
+                  {showPinEntryPlain ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPinEntryPlain ? 'Hide' : 'Show'}
                 </button>
                 <div className="flex gap-05">
-                  <button onClick={() => setShowPasswordSetup(false)} className={clsx(styles.register__btnSecondary)}>
+                  <button onClick={() => { setShowPinEntry(false); setPinEntry('') }} className={clsx(styles.register__btnSecondary)}>
                     Cancel
                   </button>
                   <button
-                    onClick={() => {
-                      if (password !== confirmPassword) return setErrorMsg('Passwords do not match.')
-                      handleAuthorizeSession(password)
-                    }}
+                    onClick={() => handleActivateIdentity(pinEntry)}
                     className={clsx(styles.register__btnPrimary)}
-                    disabled={isActivating || password.length < 6}
+                    disabled={isActivating || pinEntry.length < 8}
                   >
-                    {isActivating ? 'Activating...' : 'Activate'}
+                    {isActivating ? 'Joining...' : 'Activate'}
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Decrypt & Reveal */}
+          {/* Decrypt & Reveal session key */}
           {showDecryptPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
                 <KeyRoundIcon size={16} /> Unlock Session Key
               </h5>
-              <p>Enter your password to reveal your session key.</p>
+              <p>Enter the password used when this session was created.</p>
               <input
                 type="password"
                 placeholder="Your password"
@@ -649,7 +606,7 @@ export default function Register() {
             </div>
           )}
 
-          {/* Import */}
+          {/* Import session key from another device */}
           {showImportPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
@@ -683,7 +640,7 @@ export default function Register() {
             </div>
           )}
 
-          {/* Backup Key */}
+          {/* Backup Key display */}
           {revealKeyMode && revealedPrivateKey && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>Save Your Session Key</h5>
@@ -698,10 +655,7 @@ export default function Register() {
               </div>
               <div className="flex justify-end mt-10">
                 <button
-                  onClick={() => {
-                    setRevealKeyMode(false)
-                    setRevealedPrivateKey(null)
-                  }}
+                  onClick={() => { setRevealKeyMode(false); setRevealedPrivateKey(null) }}
                   className={clsx(styles.register__btnSecondary)}
                 >
                   Done
@@ -719,23 +673,15 @@ export default function Register() {
             </button>
           ) : !hasLocalVault ? (
             <button className={clsx(styles.register__button, 'btn')} disabled>
-              Create your PIN first ↑
-            </button>
-          ) : !isPkRegistered ? (
-            <button
-              className={clsx(styles.register__button, 'btn')}
-              onClick={() => handleJoinTunnel(null)}
-              disabled={isActivating || !isConnected}
-            >
-              {isActivating ? 'Activating...' : '2. Enable Private Messages'}
+              Set your PIN first ↑
             </button>
           ) : (
             <button
               className={clsx(styles.register__button, 'btn')}
-              onClick={triggerAuthorizeFlow}
-              disabled={isActivating || !isConnected || showPasswordSetup}
+              onClick={triggerActivation}
+              disabled={isActivating || !isConnected || showPinEntry}
             >
-              {isActivating ? 'Activating...' : isSessionOrphaned ? '3. Start New Session' : '3. Activate Session'}
+              {isActivating ? 'Joining...' : isSessionOrphaned ? 'New Session' : 'Join Chat'}
             </button>
           )}
 
@@ -747,12 +693,12 @@ export default function Register() {
                   End Session
                 </button>
               )}
-              {localStorage.getItem(chatLocalStorageBurnerKey) && !revealKeyMode && (
+              {hasBurnerKey && !revealKeyMode && (
                 <button
                   onClick={() => {
                     setErrorMsg('')
                     setShowDecryptPrompt(true)
-                    setShowPasswordSetup(false)
+                    setShowPinEntry(false)
                     setShowImportPrompt(false)
                   }}
                   className={clsx(styles.register__btnSecondary, 'btn-small')}
@@ -766,7 +712,7 @@ export default function Register() {
                   onClick={() => {
                     setErrorMsg('')
                     setShowImportPrompt(true)
-                    setShowPasswordSetup(false)
+                    setShowPinEntry(false)
                     setShowDecryptPrompt(false)
                   }}
                   className={clsx(styles.register__btnSecondary, 'btn-small')}
@@ -780,7 +726,7 @@ export default function Register() {
 
           {!isFullyRegistered && (
             <p className={clsx(styles['register__gas-note'])}>
-              * Steps 2 and 3 need a small gas fee.
+              ✓ Gas-free · fees covered by HUP
             </p>
           )}
         </footer>
