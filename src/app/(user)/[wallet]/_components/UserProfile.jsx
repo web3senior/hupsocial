@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts } from '@/lib/api'
+import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView } from '@/lib/api'
 import { initHupContract, initStatusContract, getStatus, getMaxLength, getPostsByCreator } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
@@ -26,9 +26,8 @@ import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
 import styles from './UserProfile.module.scss'
 
-
-//import SettingsTab from '@/components/tabs/SettingsTab'
-//const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
+// import SettingsTab from '@/components/tabs/SettingsTab'
+// const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 // todo: this cause to handle loading.jsx again
 
 export default function UserProfile() {
@@ -137,6 +136,8 @@ export default function UserProfile() {
   // const data = await getPoapsForAddress('atenyun.eth');
 
   useEffect(() => {
+    recordProfileView(params.wallet, address || null)
+
     getPoapsForAddress(params.wallet).then((res) => {
       console.log(res)
       setPOAPs(res)
@@ -156,7 +157,7 @@ export default function UserProfile() {
     })
   }, [])
 
-    const handlePostClick = (postId, chainId) => {
+  const handlePostClick = (postId, chainId) => {
     const selection = window.getSelection()
     if (selection && selection.toString().length > 0) return
 
@@ -229,11 +230,7 @@ export default function UserProfile() {
                 {posts.list.length > 0 &&
                   posts.list.map((item, i) => {
                     return (
-                      <section
-                        key={i}
-                        className={`${styles.post} animate fade`}
-                        onClick={() => handlePostClick(item.id, item.network_id)}
-                      >
+                      <section key={i} className={`${styles.post} animate fade`} onClick={() => handlePostClick(item.id, item.network_id)}>
                         <Post item={item} actions={[`like`, `comment`, `repost`, `view`, `share`]} />
                         {i < posts.list.length - 1 && <hr />}
                       </section>
@@ -322,6 +319,7 @@ const Profile = ({ addr }) => {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [isItUp, setIsItUp] = useState(false)
   const [resolved0gUrl, setResolved0gUrl] = useState(null)
+  const [viewCount, setViewCount] = useState(null)
 
   const params = useParams()
   const { address, isConnected } = useConnection()
@@ -338,6 +336,13 @@ const Profile = ({ addr }) => {
   } = useWaitForTransactionReceipt({
     hash,
   })
+
+  useEffect(() => {
+    fetch(`/api/v1/users/${addr}/view`)
+      .then((r) => r.json())
+      .then((res) => res.success && setViewCount(res.total))
+      .catch(() => {})
+  }, [addr])
 
   const follow = async () => toast(`Coming soon`, `warning`)
 
@@ -402,12 +407,7 @@ const Profile = ({ addr }) => {
   return (
     <>
       {showProfileModal && profile && (
-        <ProfileModal
-          getActiveChain={getActiveChain}
-          profile={profile}
-          setShowProfileModal={setShowProfileModal}
-          mutate={mutate}
-        />
+        <ProfileModal getActiveChain={getActiveChain} profile={profile} setShowProfileModal={setShowProfileModal} mutate={mutate} />
       )}
 
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
@@ -453,12 +453,21 @@ const Profile = ({ addr }) => {
         <footer className="w-100">
           <ul className="flex flex-column align-items-center justify-content-between gap-1 padding-left-0">
             <li className="flex flex-row align-items-center justify-content-between gap-025 w-100">
-              <div className="flex flex-row align-items-center justify-content-start gap-025">
+             
+              <div className={clsx(styles.profile__stats, 'flex flex-row align-items-center justify-content-start gap-025')}>
                 <button className={styles.btnFollowers} type="button">
-                  <span className="text-secondary">0 followers</span>
+                  <span>0 followers</span>
                 </button>
-                <span>•</span>
-                <ProfileLink targetWallet={targetWallet} displayWalletString={displayWalletString} />
+                {viewCount !== null && (
+                  <>
+                    <span>·</span>
+                    <button className={styles.btnFollowers} type="button">
+                      <span>
+                        {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)} recent views
+                      </span>
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className={clsx(`flex gap-025`)}>
@@ -473,6 +482,10 @@ const Profile = ({ addr }) => {
 
                 <ProfileQRCode profileUrl={`https://hup.social/${addr}`} styles={styles} />
               </div>
+            </li>
+
+            <li className="w-100">
+              <ProfileLink targetWallet={targetWallet} displayWalletString={displayWalletString} />
             </li>
 
             {isConnected && (
@@ -966,13 +979,17 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
     <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
       <div className={styles.profileModal__card} onMouseDown={(e) => e.stopPropagation()}>
         <header className={styles.profileModal__header}>
-          <button
-            type="button"
-            className={styles.profileModal__closeBtn}
-            aria-label="Close"
-            onClick={() => setShowProfileModal(false)}
-          >
-            <svg fill="none" height="16" width="16" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button type="button" className={styles.profileModal__closeBtn} aria-label="Close" onClick={() => setShowProfileModal(false)}>
+            <svg
+              fill="none"
+              height="16"
+              width="16"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -996,7 +1013,14 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
                   </div>
                 </figure>
               </label>
-              <input id="pm-profileImage" type="file" name="profileImage" accept="image/*" onChange={showPFP} className={styles.profileModal__fileInput} />
+              <input
+                id="pm-profileImage"
+                type="file"
+                name="profileImage"
+                accept="image/*"
+                onChange={showPFP}
+                className={styles.profileModal__fileInput}
+              />
               <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
               <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
             </div>
@@ -1010,7 +1034,13 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
             {/* Bio */}
             <div className={styles.profileModal__field}>
               <label className={styles.profileModal__label}>Bio</label>
-              <textarea className={styles.profileModal__textarea} name="description" defaultValue={profile?.description} placeholder="Tell us about yourself..." rows={3} />
+              <textarea
+                className={styles.profileModal__textarea}
+                name="description"
+                defaultValue={profile?.description}
+                placeholder="Tell us about yourself..."
+                rows={3}
+              />
             </div>
 
             {/* Tags */}
@@ -1021,7 +1051,9 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
                   {tags.list.map((tag, i) => (
                     <span key={`tag-${i}`} className={styles.profileModal__chip}>
                       #{tag}
-                      <button type="button" onClick={(e) => removeTag(e, tag)} aria-label={`Remove ${tag}`}>×</button>
+                      <button type="button" onClick={(e) => removeTag(e, tag)} aria-label={`Remove ${tag}`}>
+                        ×
+                      </button>
                     </span>
                   ))}
                 </div>
@@ -1032,9 +1064,16 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
                   type="text"
                   placeholder="Add a tag…"
                   className={styles.profileModal__input}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addTag()
+                    }
+                  }}
                 />
-                <button type="button" onClick={addTag} className={styles.profileModal__addBtn}>Add</button>
+                <button type="button" onClick={addTag} className={styles.profileModal__addBtn}>
+                  Add
+                </button>
               </div>
             </div>
 
@@ -1049,7 +1088,14 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
                         <span className={styles.profileModal__linkName}>{link.name}</span>
                         <span className={styles.profileModal__linkUrl}>{link.url}</span>
                       </div>
-                      <button type="button" onClick={(e) => removeLink(e, link)} aria-label={`Remove ${link.name}`} className={styles.profileModal__linkRemove}>×</button>
+                      <button
+                        type="button"
+                        onClick={(e) => removeLink(e, link)}
+                        aria-label={`Remove ${link.name}`}
+                        className={styles.profileModal__linkRemove}
+                      >
+                        ×
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1057,7 +1103,9 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
               <div className={styles.profileModal__addRow}>
                 <input ref={linkNameRef} type="text" placeholder="Label" className={styles.profileModal__input} />
                 <input ref={linkURLRef} type="text" placeholder="https://…" className={styles.profileModal__input} />
-                <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>Add</button>
+                <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>
+                  Add
+                </button>
               </div>
             </div>
 

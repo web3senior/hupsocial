@@ -188,15 +188,19 @@
   color: var(--white);
 }
 
-.btnFollowers {
-  all: unset;
-  cursor: pointer;
+.profile__stats {
+  flex-wrap: wrap;
 
-  transition: color 0.2s ease-in-out;
+  button {
+    all: unset;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color 0.2s ease-in-out;
 
-  &:hover {
-    text-decoration-line: underline;
-    text-decoration-thickness: 2px;
+    // &:hover {
+    //   text-decoration-line: underline;
+    //   text-decoration-thickness: 2px;
+    // }
   }
 }
 
@@ -225,7 +229,10 @@
     color: var(--text-muted, #888888);
     cursor: pointer;
     border-radius: 4px;
-    transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    transition:
+      opacity 0.2s ease-in-out,
+      background-color 0.2s ease-in-out,
+      color 0.2s ease-in-out;
 
     &:hover {
       background-color: rgba(255, 255, 255, 0.08);
@@ -669,7 +676,6 @@
           background-color: var(--background);
           box-shadow: var(--shadow16);
           isolation: isolate;
-;
           &:after,
           &:before {
             content: '';
@@ -814,7 +820,9 @@
     cursor: pointer;
     border-radius: 50%;
     flex-shrink: 0;
-    transition: background-color 0.15s, color 0.15s;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
 
     &:hover {
       background-color: var(--hover);
@@ -1032,7 +1040,9 @@
       line-height: 1;
       padding: 0;
       border-radius: 50%;
-      transition: background-color 0.15s, color 0.15s;
+      transition:
+        background-color 0.15s,
+        color 0.15s;
 
       &:hover {
         background: var(--hover);
@@ -1093,7 +1103,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.15s, color 0.15s;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
 
     &:hover {
       background: var(--hover);
@@ -1122,7 +1134,9 @@
     border: none;
     border-radius: var(--global-border-radius);
     cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s;
+    transition:
+      opacity 0.2s,
+      transform 0.15s;
 
     &:hover:not(:disabled) {
       opacity: 0.9;

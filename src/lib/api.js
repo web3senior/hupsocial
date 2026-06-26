@@ -87,6 +87,25 @@ export const getPostById = async (networkId, postId, viewerAddress = null) => {
   const data = await response.json()
   return data
 }
+export const recordProfileView = async (address, walletAddress = null) => {
+  try {
+    const viewerId = getViewerId(walletAddress)
+    const url = `/api/v1/users/${address.toLowerCase()}/view`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ viewer_id: viewerId }),
+    })
+
+    return await response.json()
+  } catch (error) {
+    console.error('Profile view tracking failed:', error)
+  }
+}
+
 export const recordPostView = async (networkId, postId, walletAddress = null) => {
   try {
     /* Resolve the identity (Wallet or Guest UUID) */
