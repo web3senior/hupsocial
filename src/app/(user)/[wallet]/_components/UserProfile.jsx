@@ -327,7 +327,7 @@ const Profile = ({ addr }) => {
   const { address, isConnected } = useConnection()
   const { disconnect } = useDisconnect()
   const activeChain = getActiveChain()
-  const { profile, isLoading } = useProfile(addr)
+  const { profile, isLoading, mutate } = useProfile(addr)
   /* Error during submission (e.g., user rejected)  */
   const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
   /* Error after mining (e.g., transaction reverted) */
@@ -406,7 +406,7 @@ const Profile = ({ addr }) => {
           getActiveChain={getActiveChain}
           profile={profile}
           setShowProfileModal={setShowProfileModal}
-          updateProfile={updateProfile}
+          mutate={mutate}
         />
       )}
 
@@ -794,8 +794,7 @@ const Status = ({ addr, profile, selfView }) => {
  * @param {Function} props.getActiveChain - Helper to get the current active blockchain network.
  * @returns {JSX.Element}
  */
-const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
-  console.log(`withing profile modal`, profile)
+const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) => {
   // Safe helper to parse structural lists from DB and strip away malformed or empty data structures
   const parseSafeList = (data, isLinkList = false) => {
     try {
@@ -831,16 +830,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
   const tagRef = useRef()
   const linkNameRef = useRef()
   const linkURLRef = useRef()
-
-  // Contract Hooks
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: receiptError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  })
 
   // Handlers
   const uploadFileToIPFS = async (file) => {
@@ -907,6 +896,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
       const res = await updateProfile(formData, address)
       if (res.success) {
         toast(`Your profile has been updated.`, 'success')
+        mutate()
         setShowProfileModal(false)
       } else {
         setError(res.error || 'Failed to update profile')
@@ -974,119 +964,112 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain }) => {
 
   return (
     <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
-      <div className={`${styles.profileModal__card}`} onMouseDown={(e) => e.stopPropagation()}>
-        <header className="flex align-items-center">
-          <div className="pointer" aria-label="Close" onClick={() => setShowProfileModal(false)}>
-            <svg className="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
-              <title>Close</title>
-              <line
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                x1="21"
-                x2="3"
-                y1="3"
-                y2="21"
-              ></line>
-              <line
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                x1="21"
-                x2="3"
-                y1="21"
-                y2="3"
-              ></line>
+      <div className={styles.profileModal__card} onMouseDown={(e) => e.stopPropagation()}>
+        <header className={styles.profileModal__header}>
+          <button
+            type="button"
+            className={styles.profileModal__closeBtn}
+            aria-label="Close"
+            onClick={() => setShowProfileModal(false)}
+          >
+            <svg fill="none" height="16" width="16" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-          </div>
-          <div className="flex-1">
-            <h3>Update profile</h3>
-          </div>
+          </button>
+          <h3 className={styles.profileModal__title}>Edit Profile</h3>
+          <div className={styles.profileModal__headerSpacer} />
         </header>
 
-        <main className="flex flex-column align-items-center gap-1">
-          {isConfirmed && <p className="text-center badge badge-success">Done</p>}
-          <form className="form" onSubmit={handleSubmit} encType="multipart/form-data">
-            <div className="form-group">
-              <figure className="rounded">
-                <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" />
-              </figure>
-            </div>
-
-            <div className="form-group">
-              <label>Profile picture</label>
-              <input type="file" name="profileImage" accept="image/*" onChange={showPFP} />
+        <form className={styles.profileModal__form} onSubmit={handleSubmit} encType="multipart/form-data">
+          <main className={styles.profileModal__body}>
+            {/* Avatar */}
+            <div className={styles.profileModal__avatarWrap}>
+              <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
+                <figure className={styles.profileModal__avatar}>
+                  <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" />
+                  <div className={styles.profileModal__avatarOverlay}>
+                    <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                  </div>
+                </figure>
+              </label>
+              <input id="pm-profileImage" type="file" name="profileImage" accept="image/*" onChange={showPFP} className={styles.profileModal__fileInput} />
               <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
+              <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
             </div>
 
-            <div className="form-group">
-              <label>Name</label>
-              <input type="text" name="name" defaultValue={profile?.name} placeholder="Name" />
+            {/* Name */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Name</label>
+              <input className={styles.profileModal__input} type="text" name="name" defaultValue={profile?.name} placeholder="Your name" />
             </div>
 
-            <div className="form-group">
-              <label>Bio</label>
-              <textarea name="description" defaultValue={profile?.description} placeholder="Profile bio"></textarea>
+            {/* Bio */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Bio</label>
+              <textarea className={styles.profileModal__textarea} name="description" defaultValue={profile?.description} placeholder="Tell us about yourself..." rows={3} />
             </div>
 
-            <details open>
-              <summary>Advanced</summary>
-              <div className="advanced-content">
-                <div className="tag-section">
-                  <div className="flex flex-wrap gap-0-5 margin-bottom-0-5">
-                    {tags.list.map((tag, i) => (
-                      <span key={`tag-${i}`} className={styles['form-tag']}>
-                        {tag}
-                        <button type="button" onClick={(e) => removeTag(e, tag)}>
-                          X
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="form-group flex">
-                    <input ref={tagRef} type="text" placeholder="Tag" />
-                    <button type="button" onClick={addTag}>
-                      Add
-                    </button>
-                  </div>
+            {/* Tags */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Tags</label>
+              {tags.list.length > 0 && (
+                <div className={styles.profileModal__chips}>
+                  {tags.list.map((tag, i) => (
+                    <span key={`tag-${i}`} className={styles.profileModal__chip}>
+                      #{tag}
+                      <button type="button" onClick={(e) => removeTag(e, tag)} aria-label={`Remove ${tag}`}>×</button>
+                    </span>
+                  ))}
                 </div>
-
-                <div className="link-section">
-                  <div className="flex flex-wrap gap-0-5 margin-bottom-0-5">
-                    {links.list.map((link, i) => (
-                      <span key={`link-${i}`} className={styles['form-link']}>
-                        {link.name}
-                        <button type="button" onClick={(e) => removeLink(e, link)}>
-                          X
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="form-group flex gap-0-5">
-                    <input ref={linkNameRef} type="text" placeholder="Link Name" />
-                    <input ref={linkURLRef} type="text" placeholder="Link URL" />
-                    <button type="button" onClick={addLink}>
-                      Add
-                    </button>
-                  </div>
-                </div>
+              )}
+              <div className={styles.profileModal__addRow}>
+                <input
+                  ref={tagRef}
+                  type="text"
+                  placeholder="Add a tag…"
+                  className={styles.profileModal__input}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+                />
+                <button type="button" onClick={addTag} className={styles.profileModal__addBtn}>Add</button>
               </div>
-            </details>
-
-            <div className="form-group margin-top-1">
-              <button type="submit" className="btn" disabled={isPending}>
-                {isPending ? 'Updating...' : 'Update'}
-              </button>
-              {error && <p className="error-text">{error}</p>}
             </div>
-          </form>
-        </main>
+
+            {/* Links */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Links</label>
+              {links.list.length > 0 && (
+                <div className={styles.profileModal__linkList}>
+                  {links.list.map((link, i) => (
+                    <div key={`link-${i}`} className={styles.profileModal__linkItem}>
+                      <div className={styles.profileModal__linkInfo}>
+                        <span className={styles.profileModal__linkName}>{link.name}</span>
+                        <span className={styles.profileModal__linkUrl}>{link.url}</span>
+                      </div>
+                      <button type="button" onClick={(e) => removeLink(e, link)} aria-label={`Remove ${link.name}`} className={styles.profileModal__linkRemove}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className={styles.profileModal__addRow}>
+                <input ref={linkNameRef} type="text" placeholder="Label" className={styles.profileModal__input} />
+                <input ref={linkURLRef} type="text" placeholder="https://…" className={styles.profileModal__input} />
+                <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>Add</button>
+              </div>
+            </div>
+
+            {error && <p className={styles.profileModal__error}>{error}</p>}
+          </main>
+
+          <footer className={styles.profileModal__footer}>
+            <button type="submit" className={styles.profileModal__submitBtn} disabled={isPending}>
+              {isPending ? 'Saving…' : 'Save changes'}
+            </button>
+          </footer>
+        </form>
       </div>
     </div>
   )
