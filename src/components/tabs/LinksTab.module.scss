@@ -18,7 +18,8 @@
       transform 0.2s ease;
 
     &:hover {
-      background-color: var(--background);
+      background-color: var(--surface);
+      border-color: var(--border-hover, var(--border));
       transform: translateY(-1px);
     }
 

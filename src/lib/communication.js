@@ -13,9 +13,16 @@ export const getActiveChain = () => {
   const DEFAULT_CHAIN_ID = 42
 
   if (typeof window !== 'undefined') {
-    // Check if wagmi has a live connected chain first!
-    // This allows wagmi to act as your single source of truth.
-    
+    // Wallet chain is the source of truth when connected
+    const uid = config.state.current
+    const connection = config.state.connections.get(uid)
+    const isConnected = config.state.status === 'connected'
+    const walletChain = isConnected && connection ? config.chains.find((c) => c.id === connection.chainId) : null
+    if (walletChain) {
+      setNetworkColor(walletChain)
+      return [walletChain, CONTRACTS[`chain${walletChain.id}`]]
+    }
+
     const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || DEFAULT_CHAIN_ID.toString()
     const userSelectedChain = config.chains.filter((filterItem) => filterItem.id.toString() === activeChain.toString())
 

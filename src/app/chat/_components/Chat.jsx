@@ -25,8 +25,6 @@ import { useChatHistory } from '@/hooks/useChatHistory'
 import { useSWRConfig } from 'swr'
 import { CheckCircle2 } from 'lucide-react'
 
-// ■■■ Configuration & Helpers ■■■
-
 const CHAT_PAGE_SIZE = 200
 
 // IPFS content is immutable — same CID always returns the same bytes.
@@ -183,6 +181,7 @@ export default function Chat() {
   const [contacts, setContacts] = useState([])
   const [contactsRefreshKey, setContactsRefreshKey] = useState(0)
   const [isAddingContact, setIsAddingContact] = useState(false)
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false)
   const [contactInput, setContactInput] = useState('')
   const [contactError, setContactError] = useState('')
   const contactsInitializedRef = useRef(false)
@@ -479,6 +478,7 @@ export default function Chat() {
         return
       }
       const parsed = JSON.parse(decoded)
+      console.log(parsed)
       const normalized = Array.isArray(parsed) ? parsed : parsed?.contacts
       const validContacts = Array.isArray(normalized)
         ? normalized.filter((item) => item?.contactAddress && item?.topic && item?.stealthAddress)
@@ -931,12 +931,15 @@ export default function Chat() {
   const handleAddContactSubmit = async (e) => {
     e.preventDefault()
     setContactError('')
+    setIsSubmittingContact(true)
     try {
       await newChat(contactInput)
       setContactInput('')
       setIsAddingContact(false)
     } catch (error) {
       setContactError(error.message || 'Failed to add contact.')
+    } finally {
+      setIsSubmittingContact(false)
     }
   }
 
@@ -1051,7 +1054,9 @@ export default function Chat() {
               placeholder="0x... wallet address"
               autoFocus
             />
-            <button type="submit">Add</button>
+            <button type="submit" disabled={isSubmittingContact}>
+              {isSubmittingContact ? <ContentSpinner /> : 'Add'}
+            </button>
           </form>
         )}
         {contactError && <p className={styles['add-contact__error']}>{contactError}</p>}

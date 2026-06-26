@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
-import { useConnection, usePublicClient, useWriteContract, useSignMessage } from 'wagmi'
+import { useConnection, usePublicClient, useSignMessage, useSignTypedData } from 'wagmi'
 import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
@@ -26,18 +26,42 @@ import {
 
 const SESSION_DURATION_SECONDS = 3600 * 24 * 30
 
+const FORWARDER_NONCES_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
+    name: 'nonces',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+]
+
+const FORWARD_REQUEST_TYPES = {
+  ForwardRequest: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'gas', type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint48' },
+    { name: 'data', type: 'bytes' },
+  ],
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Register() {
   const router = useRouter()
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
-  const { writeContractAsync } = useWriteContract()
   const { signMessageAsync } = useSignMessage()
+  const { signTypedDataAsync } = useSignTypedData()
 
-  const [, activeChainContracts] = getActiveChain()
+  const [activeChainConfig, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
   const pkRegistryAddress = activeChainContracts?.publicKeyRegistry
+  const forwarderAddress = activeChainContracts?.forwarder
+  const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
 
   // ■■■ Core State ■■■
   const [isActivating, setIsActivating] = useState(false)
@@ -191,10 +215,46 @@ export default function Register() {
     }
   }
 
+  // ─── Gasless Relay Helper ────────────────────────────────────────────────
+
+  const relayViaForwarder = async (to, abi, functionName, args, gas) => {
+    if (!forwarderAddress || !address || !publicClient || !relayRpcUrl) {
+      throw new Error('Gasless relay is not configured for this chain.')
+    }
+
+    const nonce = await publicClient.readContract({
+      address: forwarderAddress,
+      abi: FORWARDER_NONCES_ABI,
+      functionName: 'nonces',
+      args: [address],
+    })
+
+    const chainId = publicClient.chain.id
+    const deadline = Math.floor(Date.now() / 1000) + 3600
+    const iface = new ethers.Interface(abi)
+    const data = iface.encodeFunctionData(functionName, args)
+    const message = { from: address, to, value: 0n, gas: BigInt(gas), nonce, deadline }
+
+    const signature = await signTypedDataAsync({
+      domain: { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress },
+      types: FORWARD_REQUEST_TYPES,
+      primaryType: 'ForwardRequest',
+      message: { ...message, data },
+    })
+
+    const res = await fetch('/api/v1/relay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        { request: { ...message, data }, signature, rpcUrl: relayRpcUrl, forwarderAddress },
+        (_, v) => (typeof v === 'bigint' ? v.toString() : v)
+      ),
+    })
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Relay failed.')
+  }
+
   // ─── Public Key Registration ─────────────────────────────────────────────
-  // This is the ONLY action that still requires a direct tx from the main wallet.
-  // It registers the ECIES public key — unrelated to wallet identity; no link
-  // is created beyond what the user has already accepted by connecting.
 
   const handleJoinTunnel = async (directPubKeyHex = null) => {
     try {
@@ -213,12 +273,7 @@ export default function Register() {
 
       const normalizedPubKey = pubKeyHex.startsWith('0x') ? pubKeyHex : `0x${pubKeyHex}`
 
-      await writeContractAsync({
-        address: pkRegistryAddress,
-        abi: abiPublicKeyRegistry,
-        functionName: 'register',
-        args: [normalizedPubKey],
-      })
+      await relayViaForwarder(pkRegistryAddress, abiPublicKeyRegistry, 'register', [normalizedPubKey], 150000)
 
       await checkStatus()
     } catch (err) {
@@ -233,7 +288,7 @@ export default function Register() {
   //
   // Flow:
   //   1. Generate (or reuse) a burner keypair and encrypt it locally.
-  //   2. Main wallet calls authorizeSession() directly — one on-chain transaction.
+  //   2. Main wallet signs a ForwardRequest off-chain; relayer pays gas.
 
   const triggerAuthorizeFlow = () => {
     setErrorMsg('')
@@ -277,12 +332,7 @@ export default function Register() {
         targetBurnerAddress = storedAddress
       }
 
-      await writeContractAsync({
-        address: tunnelAddress,
-        abi: abiChat,
-        functionName: 'authorizeSession',
-        args: [targetBurnerAddress, BigInt(SESSION_DURATION_SECONDS)],
-      })
+      await relayViaForwarder(tunnelAddress, abiChat, 'authorizeSession', [targetBurnerAddress, BigInt(SESSION_DURATION_SECONDS)], 120000)
 
       setShowPasswordSetup(false)
       await checkStatus()
@@ -358,12 +408,7 @@ export default function Register() {
       setIsActivating(true)
       // revokeSession is called by the main wallet (it deletes its own entry).
       // This intentionally links the wallet but is an explicit user action to close the session.
-      await writeContractAsync({
-        address: tunnelAddress,
-        abi: abiChat,
-        functionName: 'revokeSession',
-        args: [],
-      })
+      await relayViaForwarder(tunnelAddress, abiChat, 'revokeSession', [], 80000)
       await checkStatus()
     } catch (err) {
       console.error('Session revocation failed:', err)
