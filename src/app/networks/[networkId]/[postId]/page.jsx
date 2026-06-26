@@ -9,9 +9,6 @@ export async function generateMetadata({ params }, parent) {
   // Fetch and resolve the parent metadata object
   const parentMetadata = await parent
 
-  // Extract previously resolved images from parent Open Graph properties
-  const previousImages = parentMetadata.openGraph?.images || []
-
   // Extract required parameters for fetching the dynamic post
   const { networkId, postId } = await params
 
@@ -26,10 +23,7 @@ export async function generateMetadata({ params }, parent) {
     // Check if the post structure contains elements, media layout, and items
     if (item?.content?.elements?.[1]?.type === 'media' && item?.content?.elements?.[1]?.data?.items.length > 0) {
       item.content.elements[1].data.items.forEach((mediaItem) => {
-        // Log individual items to aid with diagnostic tracing
-        console.log(`Processing media item for metadata:`, mediaItem)
         if (mediaItem.type === 'image') {
-          // Normalize and push structural image configuration object
           images.push({
             url: mediaItem.cid.startsWith('http') ? mediaItem.cid : `${resolveIPFSUrl(mediaItem.cid)}`,
             width: mediaItem.width || 1200,
@@ -39,9 +33,6 @@ export async function generateMetadata({ params }, parent) {
         }
       })
     }
-
-    // Append inherited parent images to maintain complete metadata chains
-    images.push(...previousImages)
 
     // Fall back to empty text string if body content cannot be resolved
     const bodyText = post?.data?.content?.elements?.[0]?.data?.text || ''
@@ -55,15 +46,12 @@ export async function generateMetadata({ params }, parent) {
       description: bodyText.slice(0, 160).trim() || parentMetadata.description || 'View the details of this post on our platform.',
 
       // Build out Open Graph specific data representations
-      openGraph: {
-        images: images.length > 0 ? images : parentMetadata.openGraph?.images || [],
-      },
+      openGraph: images.length > 0 ? { images } : {},
 
-      // Construct corresponding Twitter metadata mappings
-      twitter: {
-        // Direct the Twitter crawler to map extracted dynamic image variants
-        images: images.length > 0 ? images : parentMetadata.twitter?.images || [],
-      },
+      // Use summary_large_image only when there's a post image, otherwise summary
+      twitter: images.length > 0
+        ? { card: 'summary_large_image', images }
+        : { card: 'summary' },
     }
 
     return metadata
