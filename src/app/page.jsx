@@ -11,7 +11,6 @@ import Post from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import { usePostStore } from '@/stores/usePostStore'
-import { ContentSpinner } from '@/components/Loading'
 
 const PollsTab = lazy(() => import('@/components/tabs/PollsTab'))
 const CommunitiesTab = lazy(() => import('@/components/tabs/CommunitiesTab'))
@@ -197,11 +196,27 @@ export default function Page() {
         <div className={clsx(styles.tabContent, styles.feedTab, 'relative')}>
           <div className={clsx(styles.page, 'motion-slideDownIn')}>
             <div className={clsx('__container', styles.page__container)} data-width={`medium`}>
-
               {/* 1. Inline Top Loader (Shown while preserving existing posts) */}
               {isRefreshing && (
-                <div className="flex justify-content-center w-full p-20 animate fade">
-                  <ContentSpinner />
+                <div className={clsx(styles.refreshSpinnerWrap, 'animate fade')}>
+                  <svg
+                    className={clsx(styles.refreshSpinner)}
+                    width={24}
+                    height={24}
+                    xmlns="http://www.w3.org/2000/svg"
+                    xmlnsXlink="http://www.w3.org/1999/xlink"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="xMidYMid"
+                    style={{ background: 'none' }}
+                  >
+                    {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg, i) => (
+                      <g key={deg} transform={`rotate(${deg} 50 50)`}>
+                        <rect x="45" y="0" rx="0" ry="0" width="10" height="30" fill="var(--color-icon-muted)">
+                          <animate attributeName="opacity" values="1;0" dur="1s" begin={`${-(11 - i) / 12}s`} repeatCount="indefinite" />
+                        </rect>
+                      </g>
+                    ))}
+                  </svg>
                 </div>
               )}
 
