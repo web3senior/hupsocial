@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity,
   Bell,
   CheckCheck,
   Clock,
@@ -197,7 +196,7 @@ export default function ActivityFeed() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h4>
-          <Activity size={18} />
+          <Bell size={18} />
           {headerLabel}
         </h4>
         <div className={styles.headerActions}>
