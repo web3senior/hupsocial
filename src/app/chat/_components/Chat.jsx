@@ -182,6 +182,7 @@ export default function Chat() {
   const [contactsRefreshKey, setContactsRefreshKey] = useState(0)
   const [isAddingContact, setIsAddingContact] = useState(false)
   const [isSubmittingContact, setIsSubmittingContact] = useState(false)
+  const [deletingContact, setDeletingContact] = useState(null)
   const [contactInput, setContactInput] = useState('')
   const [contactError, setContactError] = useState('')
   const contactsInitializedRef = useRef(false)
@@ -327,16 +328,17 @@ export default function Chat() {
     }
   }
 
-  const deriveRoomFromPeerKey = (myPrivateKeyHex, peerPublicKey) => {
-    let cleanPriv = myPrivateKeyHex.trim()
-    if (!cleanPriv.startsWith('0x')) cleanPriv = `0x${cleanPriv}`
-    let cleanPub = peerPublicKey.trim()
-    if (!cleanPub.startsWith('0x')) cleanPub = `0x${cleanPub}`
-    const signingKey = new ethers.SigningKey(cleanPriv)
-    const sharedSecret = signingKey.computeSharedSecret(cleanPub)
-    const topic = ethers.keccak256(sharedSecret)
-    const stealthAddress = ethers.getAddress(ethers.dataSlice(ethers.keccak256(sharedSecret), 12))
-    return { topic, stealthAddress }
+  const deriveRoomFromPeerKey = (myAddress, peerAddress) => {
+    // Both topic and stealthAddress are derived from sorted wallet addresses so that
+    // both parties always compute the same values, independent of ECDH direction.
+    // Content privacy is maintained by ECIES (receiver's public key) for delivery of
+    // the per-message AES key — the topic only lets the sender re-derive their own key.
+    const [addrA, addrB] = [myAddress.toLowerCase(), peerAddress.toLowerCase()].sort()
+    const pairHash = ethers.keccak256(ethers.solidityPacked(['address', 'address'], [addrA, addrB]))
+    return {
+      topic: pairHash,
+      stealthAddress: ethers.getAddress(ethers.dataSlice(pairHash, 12)),
+    }
   }
 
   const relayMetaTransaction = async (functionData) => {
@@ -517,9 +519,6 @@ export default function Chat() {
       const friend = contacts.find((c) => c.contactAddress.toLowerCase() === contactAddress.toLowerCase())
       if (!friend) return []
 
-      // My current key pair
-      const myPubKey = await getRegisteredChatPublicKey(address)
-
       // Peer's current registered public key
       const latestPeerKey = await getRegisteredChatPublicKey(contactAddress)
 
@@ -529,26 +528,20 @@ export default function Chat() {
       // 3. Topic from peer's perspective using MY current key (for messages they sent to me)
       const topicsToCheck = new Set([friend.topic])
 
+      // Symmetric meeting point: sort addresses so both parties derive the same inbox
+      const [addrA, addrB] = [myAddress, contactAddress.toLowerCase()].sort()
+      const symmetricStealthAddress = ethers.getAddress(
+        ethers.dataSlice(ethers.keccak256(ethers.solidityPacked(['address', 'address'], [addrA, addrB])), 12)
+      )
+
       if (latestPeerKey) {
-        const myDerivation = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+        const myDerivation = deriveRoomFromPeerKey(address, contactAddress)
         topicsToCheck.add(myDerivation.topic)
       }
 
-      // The peer derives topic as: deriveRoomFromPeerKey(peer.privKey, myPubKey)
-      // ECDH is symmetric so this equals deriveRoomFromPeerKey(myPrivKey, peerPubKey)
-      // — already covered above. But if MY public key changed since they added me,
-      // they may be writing to an old topic. We can't enumerate those without
-      // knowing their private key. Best we can do is check the meeting point inbox.
-      if (myPubKey && latestPeerKey) {
-        // Cross-check: derive from peer's perspective using my current pubkey
-        // ECDH symmetry: same result as above, but let's be explicit
-        const crossCheck = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
-        topicsToCheck.add(crossCheck.topic)
-      }
-
-      // Also pull topics from the stealth meeting point inbox — catches any
-      // topic the peer wrote to that we haven't locally indexed yet
-      if (friend.stealthAddress) {
+      // Also pull topics from the stored stealthAddress inbox (backward compat for contacts
+      // added before the symmetric stealthAddress fix)
+      if (friend.stealthAddress && friend.stealthAddress.toLowerCase() !== symmetricStealthAddress.toLowerCase()) {
         try {
           const [inboxTopics] = await publicClient.readContract({
             address: tunnelAddress,
@@ -560,25 +553,23 @@ export default function Chat() {
             inboxTopics.forEach((t) => topicsToCheck.add(t))
           }
         } catch (e) {
-          console.warn('Meeting point inbox fetch failed:', e)
+          console.warn('Legacy meeting point inbox fetch failed:', e)
         }
       }
 
-      // Also check MY meeting point inbox — messages sent to me land here
-      if (address) {
-        try {
-          const [myInboxTopics] = await publicClient.readContract({
-            address: tunnelAddress,
-            abi: abiChat,
-            functionName: 'getPaginatedTopics',
-            args: [address, 0n, 50n],
-          })
-          if (Array.isArray(myInboxTopics)) {
-            myInboxTopics.forEach((t) => topicsToCheck.add(t))
-          }
-        } catch (e) {
-          console.warn('My inbox fetch failed:', e)
+      // Primary inbox: symmetric meeting point (same for both parties)
+      try {
+        const [inboxTopics] = await publicClient.readContract({
+          address: tunnelAddress,
+          abi: abiChat,
+          functionName: 'getPaginatedTopics',
+          args: [symmetricStealthAddress, 0n, 50n],
+        })
+        if (Array.isArray(inboxTopics)) {
+          inboxTopics.forEach((t) => topicsToCheck.add(t))
         }
+      } catch (e) {
+        console.warn('Symmetric meeting point inbox fetch failed:', e)
       }
 
       const candidateTopics = Array.from(topicsToCheck)
@@ -667,11 +658,13 @@ export default function Chat() {
             // Resolve decryption key
             let decryptionKey = null
 
-            if (isMine) {
-              // Outgoing — use topic seed key (we derived it when sending)
-              decryptionKey = topicSeedKeys[entry.topic] ?? null
-            } else {
-              // Incoming — ECIES unwrap the content key seed the sender encrypted for us
+            // Primary path: topic seed key — both parties derive the same key independently
+            // since topic = pairHash(sorted addresses) is symmetric for sender and receiver
+            decryptionKey = topicSeedKeys[entry.topic] ?? null
+
+            // Fallback for incoming messages: ECIES unwrap
+            // (only works when vault private key matches the registered on-chain public key)
+            if (!decryptionKey && !isMine) {
               const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
               if (wrappedKeyBlob) {
                 try {
@@ -682,7 +675,6 @@ export default function Chat() {
                   decryptionKey = await subtle.importKey('raw', new Uint8Array(unwrappedSeedBytes), 'AES-GCM', true, ['decrypt'])
                 } catch (eciesErr) {
                   console.warn('ECIES unwrap failed:', msgMetadata, eciesErr?.message)
-                  return null
                 }
               }
             }
@@ -788,7 +780,7 @@ export default function Chat() {
       const latestPeerKey = await getRegisteredChatPublicKey(friend.contactAddress)
       if (!latestPeerKey) throw new Error('Receiver public key not registered.')
 
-      const latestRoom = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+      const latestRoom = deriveRoomFromPeerKey(address, capturedReceiverAddress)
       const subtle = window.crypto.subtle
       const derivedKeySeed = ethers.keccak256(ethers.concat([latestRoom.topic, ethers.toUtf8Bytes('content-encryption')]))
       const contentKey = await subtle.importKey('raw', ethers.getBytes(derivedKeySeed), 'AES-GCM', true, ['encrypt'])
@@ -915,7 +907,7 @@ export default function Chat() {
       if (alreadyExists) throw new Error('This contact is already in your list.')
       const peerPublicKey = await getRegisteredChatPublicKey(contactAddress)
       if (!peerPublicKey) throw new Error("This profile hasn't registered cryptographic chat keys yet.")
-      const { stealthAddress, topic } = deriveRoomFromPeerKey(keys.privKeyHex, peerPublicKey)
+      const { stealthAddress, topic } = deriveRoomFromPeerKey(address, normalizedAddress)
       const nextContacts = [...contacts, { contactAddress: normalizedAddress, publicKey: peerPublicKey, topic, stealthAddress }]
       await persistContactsOnchain(nextContacts, keys)
       setContacts(nextContacts)
@@ -940,6 +932,28 @@ export default function Chat() {
       setContactError(error.message || 'Failed to add contact.')
     } finally {
       setIsSubmittingContact(false)
+    }
+  }
+
+  const deleteContact = async (contactAddress) => {
+    setDeletingContact(contactAddress)
+    try {
+      const keys = await getUnlockedKey()
+      if (!keys) throw new Error('Vault locked.')
+      const nextContacts = contacts.filter((c) => c.contactAddress.toLowerCase() !== contactAddress.toLowerCase())
+      await persistContactsOnchain(nextContacts, keys)
+      setContacts(nextContacts)
+      setContactsRefreshKey((prev) => prev + 1)
+      if (receiverAddress.toLowerCase() === contactAddress.toLowerCase()) {
+        setReceiverAddress('')
+        activeReceiverRef.current = null
+        setChatHistory({ list: [], isLoading: false })
+        if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
+      }
+    } catch (err) {
+      setContactError(err.message || 'Failed to delete contact.')
+    } finally {
+      setDeletingContact(null)
     }
   }
 
@@ -1060,7 +1074,7 @@ export default function Chat() {
           </form>
         )}
         {contactError && <p className={styles['add-contact__error']}>{contactError}</p>}
-        <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} contacts={contacts} refreshKey={contactsRefreshKey} />
+        <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} onDelete={deleteContact} deletingContact={deletingContact} contacts={contacts} refreshKey={contactsRefreshKey} />
       </aside>
 
       <main className={clsx(styles.main)}>
@@ -1071,7 +1085,7 @@ export default function Chat() {
               <div className={styles['chat-message__timestamp']} title={msg.timestamp}>
                 <span className={'flex gap-025'}>
                   {msg.timestamp.split(',')[1]?.trim() || msg.timestamp}
-                  <CheckCircle2 strokeWidth={2} size={12} />
+                  <CheckCircle2 strokeWidth={2} size={12}/>
                 </span>
               </div>
             </div>

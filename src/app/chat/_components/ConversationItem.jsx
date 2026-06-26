@@ -2,16 +2,23 @@ import { useProfile } from '@/hooks/useProfile'
 import clsx from 'clsx'
 import styles from './Chat.module.scss'
 import { useLastMessage } from '@/hooks/useLastMessage'
+import { Trash2 } from 'lucide-react'
+import { ContentSpinner } from '@/components/Loading'
 
-export const ConversationItem = ({ chat, isActive, onSelect }) => {
+export const ConversationItem = ({ chat, isActive, onSelect, onDelete, isDeleting }) => {
   const { profile } = useProfile(chat.contactAddress)
   const { latestMessage, isLoading: isLastMessageLoading } = useLastMessage(chat.topic)
 
   const displayAddr = `${chat.contactAddress.slice(0, 6)}...${chat.contactAddress.slice(-4)}`
   const displayName = profile?.name || displayAddr
 
+  const handleDelete = (e) => {
+    e.stopPropagation()
+    onDelete?.(chat.contactAddress)
+  }
+
   return (
-    <button
+    <div
       className={clsx(styles['conversation-item'], {
         [styles['conversation-item--active']]: isActive,
       })}
@@ -46,7 +53,16 @@ export const ConversationItem = ({ chat, isActive, onSelect }) => {
             </p>
           </div>
         </div>
+        <button
+          type="button"
+          className={styles['conversation-item__delete']}
+          onClick={handleDelete}
+          disabled={isDeleting}
+          title="Remove contact"
+        >
+          {isDeleting ? <ContentSpinner size="14px" /> : <Trash2 size={14} strokeWidth={1.5} />}
+        </button>
       </div>
-    </button>
+    </div>
   )
 }

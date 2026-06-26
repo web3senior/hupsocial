@@ -213,6 +213,10 @@
   &:hover {
     background-color: var(--hover);
     cursor: pointer;
+
+    .conversation-item__delete {
+      opacity: 1;
+    }
   }
 
   &:active {
@@ -226,8 +230,32 @@
   &__content {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
+  }
+
+  &__delete {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    padding: 4px;
+    border-radius: 6px;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease;
+    cursor: pointer;
+
+    &:hover {
+      color: #ef4444;
+    }
+
+    &:disabled {
+      opacity: 1;
+      cursor: default;
+    }
   }
 
   &__user {
@@ -375,6 +403,11 @@
     .chat-message__timestamp {
       color: var(--white);
       opacity: 0.8;
+
+      svg {
+        color: var(--network-color-primary);
+        fill: var(--white);
+      }
     }
   }
 

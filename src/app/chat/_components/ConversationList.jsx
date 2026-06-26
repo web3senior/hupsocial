@@ -4,7 +4,7 @@ import { getActiveChain } from '@/lib/communication'
 import clsx from 'clsx'
 import styles from './Chat.module.scss'
 
-export const ConversationList = ({ activeChat, onSelect, contacts = [] }) => {
+export const ConversationList = ({ activeChat, onSelect, onDelete, deletingContact, contacts = [] }) => {
   const activeChain = getActiveChain()
   const chainIcon = activeChain?.[0]?.icon
 
@@ -16,10 +16,12 @@ export const ConversationList = ({ activeChat, onSelect, contacts = [] }) => {
         ) : (
           contacts.map((chat) => (
             <ConversationItem
-              key={chat.topic} // Assuming topic is a unique identifier
+              key={chat.topic}
               chat={chat}
               isActive={activeChat?.toLowerCase() === chat.contactAddress.toLowerCase()}
               onSelect={onSelect}
+              onDelete={onDelete}
+              isDeleting={deletingContact?.toLowerCase() === chat.contactAddress.toLowerCase()}
               chainIcon={chainIcon}
             />
           ))
