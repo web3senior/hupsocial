@@ -2,8 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { Bookmark, FolderHeart, Briefcase, Calendar, MessageCircle, Heart, House, LayoutGrid, Plus, Search, Trophy, Users } from 'lucide-react'
-import { Bell } from 'lucide-react'
+import { Bookmark, Bell, Briefcase, Calendar, MessageCircle, Heart, House, LayoutGrid, Plus, Search, Trophy, Users } from 'lucide-react'
 
 // Static navigation schema with icons.
 // Keeps components out of localStorage to prevent serialization crashes.
