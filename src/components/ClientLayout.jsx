@@ -13,18 +13,21 @@ import styles from './ClientLayout.module.scss'
 
 export default function ClientLayout({ children }) {
   const [isLoading, setIsLoading] = useState(true)
+  const [isExiting, setIsExiting] = useState(false)
 
   useEffect(() => {
-    // Hide splash screen once the app is mounted
-    // A 1000ms-2000ms delay is common to avoid "flicker"
-    const timer = setTimeout(() => setIsLoading(false), 1500)
-    return () => clearTimeout(timer)
+    const exitTimer = setTimeout(() => setIsExiting(true), 1200)
+    const doneTimer = setTimeout(() => setIsLoading(false), 1500)
+    return () => {
+      clearTimeout(exitTimer)
+      clearTimeout(doneTimer)
+    }
   }, [])
 
   if (isLoading)
     return (
       <Providers>
-        <SplashScreen />
+        <SplashScreen isExiting={isExiting} />
       </Providers>
     )
 
