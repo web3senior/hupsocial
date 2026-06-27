@@ -129,7 +129,7 @@ const NetworkDetails = ({ id }) => {
                       </tbody>
                     </table>
 
-                    <Link href={`/chains`}>&larr; Back to all networks</Link>
+                    <Link href={`/networks`}>&larr; Back to all networks</Link>
                   </div>
                 </div>
               </div>
