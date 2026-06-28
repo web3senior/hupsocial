@@ -20,7 +20,7 @@ export default function SplashScreen() {
       />
 
       <footer className={styles.footer}>
-        <span className={styles.label}>fully onchain</span>
+        <span className={styles.label}>decentralized</span>
       </footer>
     </div>
   )
