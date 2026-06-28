@@ -69,6 +69,7 @@ export default function Register() {
   const [isSessionOrphaned, setIsSessionOrphaned] = useState(false)
   const [burnerAddress, setBurnerAddress] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [statusMsg, setStatusMsg] = useState('')
 
   // ■■■ Vault Setup State ■■■
   const [vaultPassword, setVaultPassword] = useState('')
@@ -164,11 +165,12 @@ export default function Register() {
 
     try {
       const lowAddress = address.toLowerCase()
-      const nonceBytes = window.crypto.getRandomValues(new Uint8Array(16))
-      const nonce = ethers.hexlify(nonceBytes)
 
+      // Deterministic: no nonce — same wallet always produces the same vault key.
+      // This means re-signing on any device recovers the original key and on-chain PK
+      // stays in sync, preventing ECDH topic mismatches for existing contacts.
       const message = [
-        'Hup Stealth Protocol - Identity Authorization',
+        'Tunnel Stealth Protocol - Identity Authorization',
         '',
         'By signing this message, you are generating a unique encryption key for this wallet.',
         '',
@@ -178,14 +180,15 @@ export default function Register() {
         '- Keep your password safe; it is required to unlock this key.',
         '',
         `Wallet: ${lowAddress}`,
-        `Nonce: ${nonce}`,
         'Version: 1.0.0',
       ].join('\n')
 
       // personal_sign — no tx, just a sig for key derivation.
+      setStatusMsg('Check your wallet — sign the message to generate your encryption key.')
       const signature = await signMessageAsync({ message })
+      setStatusMsg('')
       const sigHash = ethers.keccak256(signature)
-      const seed = ethers.solidityPackedKeccak256(['string', 'bytes32'], ['HUP_STEALTH_V1', sigHash])
+      const seed = ethers.solidityPackedKeccak256(['string', 'bytes32'], ['Tunnel', sigHash])
 
       const privKey = new ecies.PrivateKey(ethers.getBytes(seed))
       const rawPrivKeyHex = privKey.toHex()
@@ -202,6 +205,7 @@ export default function Register() {
       await handleActivateIdentity(vaultPassword, pubKeyHex)
     } catch (error) {
       console.error('Vault creation failed:', error)
+      setStatusMsg('')
       setErrorMsg(
         error?.name === 'UserRejectedRequestError'
           ? 'Signature rejected. You must sign to generate your secure vault.'
@@ -231,18 +235,20 @@ export default function Register() {
     const data = iface.encodeFunctionData(functionName, args)
     const message = { from: address, to, value: 0n, gas: BigInt(gas), nonce, deadline }
 
+    setStatusMsg('Check your wallet — sign the gasless transaction to activate your chat identity.')
     const signature = await signTypedDataAsync({
       domain: { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress },
       types: FORWARD_REQUEST_TYPES,
       primaryType: 'ForwardRequest',
       message: { ...message, data },
     })
+    setStatusMsg('')
 
     const res = await fetch('/api/v1/relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { request: { ...message, data }, signature, rpcUrl: relayRpcUrl, forwarderAddress },
+        { request: { ...message, data }, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId },
         (_, v) => (typeof v === 'bigint' ? v.toString() : v)
       ),
     })
@@ -264,9 +270,11 @@ export default function Register() {
       if (!address) throw new Error('Wallet not connected.')
       if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
 
-      // Unlock vault to get the public key (if not already registered).
+      // Unlock vault to get the public key.
+      // Also register when directPubKey is provided — this handles the case where
+      // the message format changed (version bump) and the on-chain PK needs updating.
       let pubKeyArg = '0x'
-      if (!isPkRegistered) {
+      if (!isPkRegistered || directPubKey) {
         let pubKeyHex = directPubKey
         if (!pubKeyHex) {
           const keys = explicitPin
@@ -310,6 +318,7 @@ export default function Register() {
       await checkStatus()
     } catch (err) {
       console.error('Activation failed:', err)
+      setStatusMsg('')
       setErrorMsg(err.message || 'Activation failed. Please try again.')
     } finally {
       setIsActivating(false)
@@ -425,6 +434,13 @@ export default function Register() {
           </p>
         </header>
 
+        {/* ■■■ Status Banner ■■■ */}
+        {statusMsg && (
+          <div className={clsx(styles.register__alertInfo)}>
+            <span>{statusMsg}</span>
+          </div>
+        )}
+
         {/* ■■■ Error Banner ■■■ */}
         {errorMsg && (
           <div className={clsx(styles.register__alertError)}>
@@ -475,7 +491,7 @@ export default function Register() {
                   ? 'Active — private messages and session enabled'
                   : isSessionOrphaned
                     ? 'Session lost — import or start a new one'
-                    : 'Opens a 1-year session — you\'ll re-enter once a year'}
+                    : 'Sign a message to activate your session — revoke anytime'}
               </p>
               {burnerAddress && (sessionActive || isSessionOrphaned) && (
                 <small className={clsx(styles.register__address)}>
@@ -484,7 +500,7 @@ export default function Register() {
               )}
               <details className={clsx(styles.register__stepDetails)}>
                 <summary>Advanced info</summary>
-                <p>Registers your encryption public key on-chain once, then opens a 1-year signing session via a temporary burner key. You'll only need to redo this step once a year. Fully gas-free — HUP's relayer covers the fee.</p>
+                <p>Registers your encryption public key on-chain once, then signs a message to open a session via a temporary burner key. You can revoke your session at any time via the contract. Fully gas-free — HUP's relayer covers the fee.</p>
               </details>
             </div>
             <div
@@ -726,7 +742,7 @@ export default function Register() {
 
           {!isFullyRegistered && (
             <p className={clsx(styles['register__gas-note'])}>
-              ✓ Gas-free · fees covered by HUP
+             ✓ Gas-free · fees covered by {process.env.NEXT_PUBLIC_NAME}
             </p>
           )}
         </footer>

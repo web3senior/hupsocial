@@ -7,7 +7,7 @@ import { Bookmark, Bell, Briefcase, Calendar, MessageCircle, Heart, House, Layou
 // Static navigation schema with icons.
 // Keeps components out of localStorage to prevent serialization crashes.
 export const NAV_ITEMS_SCHEMA = [
-  { id: 'onchain', name: 'Onchain', path: '/', icon: House },
+  { id: 'foryou', name: 'For you', path: '/', icon: House },
   { id: 'new-post', name: 'New post', component: 'new-post', icon: Plus },
   { id: 'search', name: 'Search', path: '/search', icon: Search },
   { id: 'divider-primary', type: 'divider' },

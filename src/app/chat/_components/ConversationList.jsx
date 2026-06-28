@@ -1,8 +1,7 @@
 // ConversationList.jsx
 import { ConversationItem } from './ConversationItem'
 import { getActiveChain } from '@/lib/communication'
-import clsx from 'clsx'
-import styles from './Chat.module.scss'
+import styles from './ConversationList.module.scss'
 
 export const ConversationList = ({ activeChat, onSelect, onDelete, deletingContact, contacts = [] }) => {
   const activeChain = getActiveChain()
@@ -10,9 +9,9 @@ export const ConversationList = ({ activeChat, onSelect, onDelete, deletingConta
 
   return (
     <div className={styles['conversation-list']}>
-      <div className={clsx(styles['conversation-list__container'], 'flex flex-column gap-1 mt-20')}>
+      <div className={styles['conversation-list__container']}>
         {contacts.length === 0 ? (
-          <p className={styles['conversation-list__empty']}>No active conversations found.</p>
+          <p className={styles['conversation-list__empty']}>No messages yet.</p>
         ) : (
           contacts.map((chat) => (
             <ConversationItem

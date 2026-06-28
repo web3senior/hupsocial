@@ -183,7 +183,7 @@ export default function Page() {
   return (
     <div className={styles.page}>
       <div onClick={handleManualRefresh} className={clsx(styles.page__header)} role="button" tabIndex={0}>
-        <PageTitle name={`Onchain`} changeDocumentTitle={false} />
+        <PageTitle name={`For you`} changeDocumentTitle={false} />
       </div>
 
       <div className={clsx('__container')} data-width={`small`}>

@@ -47,17 +47,17 @@ export const LinearLoading = () => (
 
 export const MessageLoader = () => (
   <svg height="100%" viewBox="0 0 32 32" width="100%" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" fill="none" r="14" stroke="white" stroke-opacity="0.25" stroke-width="4"></circle>
+    <circle cx="16" cy="16" fill="none" r="14" stroke="white" strokeOpacity="0.25" strokeWidth="4"></circle>
     <circle
       cx="16"
       cy="16"
       fill="none"
       r="14"
       stroke="white"
-      stroke-dasharray="87.96"
-      stroke-dashoffset="66"
-      stroke-linecap="round"
-      stroke-width="4"
+      strokeDasharray="87.96"
+      strokeDashoffset="66"
+      strokeLinecap="round"
+      strokeWidth="4"
     >
       <animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.8s" repeatCount="indefinite" />
     </circle>

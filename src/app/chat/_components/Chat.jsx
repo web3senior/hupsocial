@@ -8,7 +8,7 @@ import ecies from 'eciesjs'
 import { useConnection, usePublicClient } from 'wagmi'
 import { getIPFS } from '@/lib/ipfs'
 import clsx from 'clsx'
-import { ArrowUp, EllipsisVertical, MessageSquarePlus, Image as ImageIcon, SquarePlay, X } from 'lucide-react'
+import { ArrowUp, EllipsisVertical, MessageSquarePlus, Image as ImageIcon, SquarePlay, X, ChevronLeft, Smile, MoreHorizontal, Pencil, Trash2, Check } from 'lucide-react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { bytesToHex, encodeFunctionData } from 'viem'
 import { ContentSpinner, MessageLoader } from '@/components/Loading'
@@ -23,6 +23,7 @@ import abiChat from '@/abis/Chat.json'
 import abiPublicKeyRegistry from '@/abis/PublicKeyRegistry.json'
 import { Buffer } from 'buffer'
 import { useChatHistory } from '@/hooks/useChatHistory'
+import { useProfile } from '@/hooks/useProfile'
 import { useSWRConfig } from 'swr'
 import { CheckCircle2 } from 'lucide-react'
 
@@ -194,11 +195,22 @@ export default function Chat() {
   const sendQueueRef = useRef([])
   const isProcessingQueueRef = useRef(false)
   const processQueueRef = useRef(null)
+  const lastConfirmedCountRef = useRef(0)
   const [pendingMessage, setPendingMessage] = useState(null)
+  const [showChat, setShowChat] = useState(false)
+  const [reactionTypes, setReactionTypes] = useState([])
+  const [activeMessageMenu, setActiveMessageMenu] = useState(null)
+  const [editingMessageId, setEditingMessageId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [deletingMessageId, setDeletingMessageId] = useState(null)
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null)
+  const [myReactions, setMyReactions] = useState({})
+  const [pendingReactionId, setPendingReactionId] = useState(null)
 
   const [mediaItems, setMediaItems] = useState([])
   const [selectedMediaType, setSelectedMediaType] = useState(null)
   const fileInputRef = useRef(null)
+  const textareaRef = useRef(null)
 
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
@@ -209,6 +221,8 @@ export default function Chat() {
   const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
   const [chatHistory, setChatHistory] = useState({ list: [], isLoading: false })
   const isMounted = useClientMounted()
+
+  const { profile: receiverProfile } = useProfile(receiverAddress)
 
   const { data: chatList } = useChatHistory(receiverAddress, contacts, {
     publicClient,
@@ -329,13 +343,11 @@ export default function Chat() {
     }
   }
 
-  const deriveRoomFromPeerKey = (myAddress, peerAddress) => {
-    // Both topic and stealthAddress are derived from sorted wallet addresses so that
-    // both parties always compute the same values, independent of ECDH direction.
-    // Content privacy is maintained by ECIES (receiver's public key) for delivery of
-    // the per-message AES key — the topic only lets the sender re-derive their own key.
-    const [addrA, addrB] = [myAddress.toLowerCase(), peerAddress.toLowerCase()].sort()
-    const pairHash = ethers.keccak256(ethers.solidityPacked(['address', 'address'], [addrA, addrB]))
+  const deriveRoomFromPeerKey = (privKeyHex, peerPublicKey) => {
+    const normalizedPrivKey = privKeyHex.startsWith('0x') ? privKeyHex : `0x${privKeyHex}`
+    const signingKey = new ethers.SigningKey(normalizedPrivKey)
+    const secret = signingKey.computeSharedSecret(peerPublicKey)
+    const pairHash = ethers.keccak256(secret)
     return {
       topic: pairHash,
       stealthAddress: ethers.getAddress(ethers.dataSlice(pairHash, 12)),
@@ -368,7 +380,7 @@ export default function Chat() {
     const res = await fetch('/api/v1/relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress }, (_, value) =>
+      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId: activeChainConfig?.id }, (_, value) =>
         typeof value === 'bigint' ? value.toString() : value
       ),
     })
@@ -415,6 +427,26 @@ export default function Chat() {
     }
   }
 
+  const loadReactionTypes = async () => {
+    if (!publicClient || !tunnelAddress) return
+    try {
+      const result = await publicClient.readContract({
+        address: tunnelAddress,
+        abi: abiChat,
+        functionName: 'getReactionTypes',
+        args: [0n, 20n],
+      })
+      const [ids, labels, enabled] = result
+      const types = Array.from(ids)
+        .map((id, i) => ({ id: Number(id), label: labels[i], enabled: enabled[i] }))
+        .filter((t) => t.enabled)
+      console.debug('[chat] reactionTypes loaded:', types)
+      setReactionTypes(types)
+    } catch (e) {
+      console.warn('[chat] loadReactionTypes failed:', e?.message)
+    }
+  }
+
   const persistContactsOnchain = async (nextContacts, keys) => {
     if (!publicClient || !tunnelAddress || !address) throw new Error('Wallet or chain not ready for contacts sync.')
     const normalizedContacts = nextContacts.map((c) => ({
@@ -423,7 +455,7 @@ export default function Chat() {
       stealthAddress: c.stealthAddress,
     }))
     const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(normalizedContacts), keys.privKeyHex).toString()
-    const ipfsResult = await uploadObjectToIPFS(JSON.stringify({ version: '1', encrypted_data: encryptedData }))
+    const ipfsResult = await uploadObjectToIPFS({ version: '1', encrypted_data: encryptedData })
     const cid = normalizeCID(ipfsResult?.cid)
     if (!cid) throw new Error('Failed to upload encrypted contacts to IPFS.')
     const currentContacts = await publicClient.readContract({
@@ -481,14 +513,19 @@ export default function Chat() {
         }
       }
 
-      const symmetricKey = keys.privKeyHex.toLowerCase()
-      let decoded
-      try {
-        const bytes = CryptoJS.AES.decrypt(rawBlob, symmetricKey)
-        decoded = bytes.toString(CryptoJS.enc.Utf8)
-        if (!decoded) throw new Error('Empty decryption buffer.')
-      } catch (decryptErr) {
-        console.error('Cryptographic Fault:', decryptErr)
+      // Try both key formats: the vault normalises to bare hex, but contacts
+      // saved before that normalisation may have been encrypted with the 0x-prefixed form.
+      const keyVariants = [keys.privKeyHex, `0x${keys.privKeyHex}`]
+      let decoded = null
+      for (const key of keyVariants) {
+        try {
+          const bytes = CryptoJS.AES.decrypt(rawBlob, key)
+          const candidate = bytes.toString(CryptoJS.enc.Utf8)
+          if (candidate) { decoded = candidate; break }
+        } catch {}
+      }
+      if (!decoded) {
+        console.error('Cryptographic Fault: could not decrypt contacts with any known key format.')
         setContacts([])
         return
       }
@@ -530,31 +567,27 @@ export default function Chat() {
 
     try {
       const friend = contacts.find((c) => c.contactAddress.toLowerCase() === contactAddress.toLowerCase())
-      if (!friend) return []
 
-      // Peer's current registered public key
+      // Peer's current registered public key — needed for ECDH room derivation
       const latestPeerKey = await getRegisteredChatPublicKey(contactAddress)
 
-      // All possible topics:
-      // 1. Stored topic when I added the contact (derived with peer's key at that time)
-      // 2. Topic derived with peer's CURRENT key (may differ if they re-registered)
-      // 3. Topic from peer's perspective using MY current key (for messages they sent to me)
-      const topicsToCheck = new Set([friend.topic])
+      // Without a stored contact AND without an on-chain key we have no room to look in
+      if (!friend && !latestPeerKey) return []
 
-      // Symmetric meeting point: sort addresses so both parties derive the same inbox
-      const [addrA, addrB] = [myAddress, contactAddress.toLowerCase()].sort()
-      const symmetricStealthAddress = ethers.getAddress(
-        ethers.dataSlice(ethers.keccak256(ethers.solidityPacked(['address', 'address'], [addrA, addrB])), 12)
-      )
+      const topicsToCheck = new Set()
+      if (friend?.topic) topicsToCheck.add(friend.topic)
 
+      // ECDH-derived room — uncomputable without a private key, breaks the address-pair link
+      let ecdhStealthAddress = null
       if (latestPeerKey) {
-        const myDerivation = deriveRoomFromPeerKey(address, contactAddress)
-        topicsToCheck.add(myDerivation.topic)
+        const ecdhRoom = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
+        topicsToCheck.add(ecdhRoom.topic)
+        ecdhStealthAddress = ecdhRoom.stealthAddress
+        console.debug('[readHistoryChat] ECDH room:', ecdhRoom.topic, ecdhRoom.stealthAddress)
       }
 
-      // Also pull topics from the stored stealthAddress inbox (backward compat for contacts
-      // added before the symmetric stealthAddress fix)
-      if (friend.stealthAddress && friend.stealthAddress.toLowerCase() !== symmetricStealthAddress.toLowerCase()) {
+      // Legacy inbox (stored when contact was added — may be old address-based derivation)
+      if (friend?.stealthAddress && friend.stealthAddress.toLowerCase() !== ecdhStealthAddress?.toLowerCase()) {
         try {
           const [inboxTopics] = await publicClient.readContract({
             address: tunnelAddress,
@@ -570,19 +603,21 @@ export default function Chat() {
         }
       }
 
-      // Primary inbox: symmetric meeting point (same for both parties)
-      try {
-        const [inboxTopics] = await publicClient.readContract({
-          address: tunnelAddress,
-          abi: abiChat,
-          functionName: 'getPaginatedTopics',
-          args: [symmetricStealthAddress, 0n, 50n],
-        })
-        if (Array.isArray(inboxTopics)) {
-          inboxTopics.forEach((t) => topicsToCheck.add(t))
+      // Primary inbox: ECDH-derived stealth address
+      if (ecdhStealthAddress) {
+        try {
+          const [inboxTopics] = await publicClient.readContract({
+            address: tunnelAddress,
+            abi: abiChat,
+            functionName: 'getPaginatedTopics',
+            args: [ecdhStealthAddress, 0n, 50n],
+          })
+          if (Array.isArray(inboxTopics)) {
+            inboxTopics.forEach((t) => topicsToCheck.add(t))
+          }
+        } catch (e) {
+          console.warn('ECDH meeting point inbox fetch failed:', e)
         }
-      } catch (e) {
-        console.warn('Symmetric meeting point inbox fetch failed:', e)
       }
 
       const candidateTopics = Array.from(topicsToCheck)
@@ -599,7 +634,11 @@ export default function Chat() {
               functionName: 'getTopicHistory',
               args: [topic, 0n, BigInt(CHAT_PAGE_SIZE)],
             })
-            return Array.isArray(response?.[0]) ? response[0].map((msg) => ({ topic, msg })) : []
+            if (!Array.isArray(response?.[0])) return []
+            // getTopicHistory returns newest-first; conversationThreads indexes oldest-first.
+            // Map each JS position back to the correct on-chain index so messageId lookups land on the right slot.
+            const total = Number(response[1])
+            return response[0].map((msg, jsIndex) => ({ topic, index: total - 1 - jsIndex, msg }))
           } catch {
             return []
           }
@@ -619,6 +658,29 @@ export default function Chat() {
         seenIds.add(id)
         return true
       })
+
+      // ── Resolve message IDs via conversationThreads (direct contract read) ──────
+      if (mergedMessages.length > 0) {
+        try {
+          const results = await publicClient.multicall({
+            contracts: mergedMessages.map((entry) => ({
+              address: tunnelAddress,
+              abi: abiChat,
+              functionName: 'conversationThreads',
+              args: [entry.topic, BigInt(entry.index)],
+            })),
+            allowFailure: true,
+          })
+          mergedMessages.forEach((entry, i) => {
+            const r = results[i]
+            // 0n means uninitialized slot — not a valid message ID
+            entry.messageId = r.status === 'success' && r.result != null && r.result !== 0n ? r.result : null
+          })
+        } catch {
+          mergedMessages.forEach((entry) => { entry.messageId = null })
+        }
+      }
+      console.debug('[chat] messageIds resolved:', mergedMessages.map((e) => e.messageId?.toString() ?? 'null'))
 
       // Pre-derive seed keys for all candidate topics
       const topicSeedKeys = {}
@@ -718,9 +780,15 @@ export default function Chat() {
               content,
               timestamp: new Date(msgTimestamp * 1000).toLocaleString(),
               sender: effectiveSender,
+              onChainSender,
               side: isMine ? 'me' : 'them',
               rawTimestamp: msgTimestamp,
               rawKeyHex,
+              messageId: entry.messageId,
+              topic: entry.topic,
+              isEdited: Boolean(msg.isEdited ?? msg[4]),
+              isMine,
+              encryptedKey: msgEncryptedKey ?? '0x',
             }
           } catch (err) {
             console.warn('Message processing failed:', err)
@@ -736,41 +804,45 @@ export default function Chat() {
     }
   }
 
-  const viewChatWith = async (contactAddress, clearPending = false, pendingIdToRemove = null) => {
-    if (!contactAddress) return
+  const handleBack = () => {
+    setShowChat(false)
+    setReceiverAddress('')
+    activeReceiverRef.current = null
+    setChatHistory({ list: [], isLoading: false })
     if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
+  }
+
+  const viewChatWith = async (contactAddress, clearPending = false) => {
+    if (!contactAddress) return
+    if (activeReceiverRef.current !== contactAddress) lastConfirmedCountRef.current = 0
+    if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
+    setShowChat(true)
     setReceiverAddress(contactAddress)
     activeReceiverRef.current = contactAddress
 
     const performSync = async (opts = {}) => {
-      // Skip background polls while the send queue is active. The queue calls
-      // viewChatWith itself after each confirm, so polling here would race and
-      // show a confirmed message alongside its still-visible optimistic bubble.
-      if (isProcessingQueueRef.current && !opts.pendingIdToRemove) return
+      if (isProcessingQueueRef.current) return
       try {
+        const prevCount = lastConfirmedCountRef.current
         const freshMessages = await readHistoryChat(contactAddress)
         if (contactAddress !== activeReceiverRef.current) return
-        // Both setState calls are synchronous here — React 18 batches them into
-        // one render so the swap from optimistic to confirmed is atomic.
-        setChatHistory((prev) => {
-          if (prev.list.length === freshMessages.length) return { ...prev, isLoading: false }
-          return { list: freshMessages, isLoading: false }
-        })
-        if (opts.pendingIdToRemove) {
-          setPendingMessages((prev) => prev.filter((m) => m.id !== opts.pendingIdToRemove))
+        lastConfirmedCountRef.current = freshMessages.length
+        setChatHistory({ list: freshMessages, isLoading: false })
+        // Remove 'sent' pending bubbles only once their message actually lands on chain.
+        // On fast chains this is immediate; on LUKSO it waits for the next poll that
+        // sees a higher message count, avoiding the disappear-then-reappear flash.
+        if (freshMessages.length > prevCount) {
+          setPendingMessages((prev) => prev.filter((m) => m.status === 'sending'))
         }
         if (opts.clearPending) setPendingMessage(null)
       } catch (err) {
         console.error('Background message sync failure:', err)
         setChatHistory((prev) => ({ ...prev, isLoading: false }))
-        if (opts.pendingIdToRemove) {
-          setPendingMessages((prev) => prev.filter((m) => m.id !== opts.pendingIdToRemove))
-        }
         if (opts.clearPending) setPendingMessage(null)
       }
     }
     setChatHistory((prev) => ({ ...prev, isLoading: prev.list.length === 0 }))
-    await performSync({ clearPending, pendingIdToRemove })
+    await performSync({ clearPending })
     chatIntervalRef.current = setInterval(performSync, 5000)
   }
 
@@ -793,7 +865,7 @@ export default function Chat() {
       const latestPeerKey = await getRegisteredChatPublicKey(friend.contactAddress)
       if (!latestPeerKey) throw new Error('Receiver public key not registered.')
 
-      const latestRoom = deriveRoomFromPeerKey(address, capturedReceiverAddress)
+      const latestRoom = deriveRoomFromPeerKey(keys.privKeyHex, latestPeerKey)
       const subtle = window.crypto.subtle
       const derivedKeySeed = ethers.keccak256(ethers.concat([latestRoom.topic, ethers.toUtf8Bytes('content-encryption')]))
       const contentKey = await subtle.importKey('raw', ethers.getBytes(derivedKeySeed), 'AES-GCM', true, ['encrypt'])
@@ -858,8 +930,12 @@ export default function Chat() {
 
       capturedMediaItems.forEach((item) => item.localUrl && URL.revokeObjectURL(item.localUrl))
       if (capturedReceiverAddress === activeReceiverRef.current) {
+        // Mark as sent (shows checkmark) and refresh. The pending bubble is removed
+        // only when polling sees the confirmed message on chain — prevents the flash
+        // on slow chains (LUKSO) where the tx isn't mined before the first refresh.
+        updateMessageStatus(pendingId, 'sent')
         mutate(['chat-history', capturedReceiverAddress])
-        await viewChatWith(capturedReceiverAddress, false, pendingId)
+        await viewChatWith(capturedReceiverAddress)
       } else {
         setPendingMessages((prev) => prev.filter((m) => m.id !== pendingId))
       }
@@ -885,6 +961,7 @@ export default function Chat() {
 
     setMessageText('')
     setMediaItems([])
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setPendingMessages((prev) => [
       ...prev,
       {
@@ -901,19 +978,25 @@ export default function Chat() {
     processQueueRef.current?.()
   }
 
+  const handleTextareaChange = (e) => {
+    setMessageText(e.target.value)
+    e.target.style.height = 'auto'
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
+  }
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       sendEncryptedMessage(e)
     }
   }
-
+// mettingPoint = stealth address and topic is the thread topic id
   const sendShroudedMessage = async (meetingPoint, topic, metadataCid, receiverWrappedKey) => {
     const wrappedKeyHex = typeof receiverWrappedKey === 'string' ? receiverWrappedKey : bytesToHex(receiverWrappedKey)
     const functionData = encodeFunctionData({
       abi: abiChat,
       functionName: 'sendMessage',
-      args: [address || ZERO_ADDRESS, meetingPoint, topic, metadataCid, wrappedKeyHex],
+      args: [ZERO_ADDRESS, meetingPoint, topic, metadataCid, wrappedKeyHex],
     })
     return relayMetaTransaction(functionData)
   }
@@ -930,7 +1013,7 @@ export default function Chat() {
       if (alreadyExists) throw new Error('This contact is already in your list.')
       const peerPublicKey = await getRegisteredChatPublicKey(contactAddress)
       if (!peerPublicKey) throw new Error("This profile hasn't registered cryptographic chat keys yet.")
-      const { stealthAddress, topic } = deriveRoomFromPeerKey(address, normalizedAddress)
+      const { stealthAddress, topic } = deriveRoomFromPeerKey(keys.privKeyHex, peerPublicKey)
       const nextContacts = [...contacts, { contactAddress: normalizedAddress, publicKey: peerPublicKey, topic, stealthAddress }]
       await persistContactsOnchain(nextContacts, keys)
       setContacts(nextContacts)
@@ -967,11 +1050,10 @@ export default function Chat() {
       await persistContactsOnchain(nextContacts, keys)
       setContacts(nextContacts)
       setContactsRefreshKey((prev) => prev + 1)
-      if (receiverAddress.toLowerCase() === contactAddress.toLowerCase()) {
-        setReceiverAddress('')
-        activeReceiverRef.current = null
+      if (receiverAddress?.toLowerCase() === contactAddress.toLowerCase()) {
+        handleBack()
+      } else {
         setChatHistory({ list: [], isLoading: false })
-        if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
       }
     } catch (err) {
       setContactError(err.message || 'Failed to delete contact.')
@@ -1011,7 +1093,30 @@ export default function Chat() {
           expiresAt > networkTime &&
           localBurnerAddress?.toLowerCase() === burnerKey.toLowerCase()
 
-        if (!isPkRegistered || !isSessionValid) router.replace('/register')
+        if (!isPkRegistered || !isSessionValid) {
+          router.replace('/register')
+          return
+        }
+
+        // Verify vault private key matches the on-chain registered public key.
+        // A mismatch means the vault was re-created without updating the on-chain PK,
+        // which would make ECDH produce different topics for sender and receiver.
+        const sessionPin = sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
+        if (sessionPin && isPkRegistered) {
+          try {
+            const keys = await unlockAppKeyFromStorage()
+            if (keys) {
+              const vaultPubKey = new ethers.SigningKey(`0x${keys.privKeyHex}`).publicKey
+              const onChainPubKey = String(pk)
+              if (vaultPubKey.toLowerCase() !== onChainPubKey.toLowerCase()) {
+                console.warn('[chat] Vault key mismatch with on-chain PK — redirecting to re-register')
+                router.replace('/register')
+              }
+            }
+          } catch {
+            // Unlock failure handled by getUnlockedKey() elsewhere
+          }
+        }
       } catch {
         // Don't redirect on transient RPC errors
       }
@@ -1028,6 +1133,7 @@ export default function Chat() {
     contactsInitializedRef.current = true
     setTimeout(() => {
       void loadMyContacts()
+      void loadReactionTypes()
     }, 0)
     return () => {
       if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
@@ -1041,6 +1147,157 @@ export default function Chat() {
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [])
+
+  // Close menus/pickers on outside click
+  useEffect(() => {
+    if (!activeMessageMenu && !reactionPickerMessageId) return
+    const close = () => {
+      setActiveMessageMenu(null)
+      setReactionPickerMessageId(null)
+    }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [activeMessageMenu, reactionPickerMessageId])
+
+  const handleToggleMenu = (e, msgId) => {
+    e.stopPropagation()
+    setActiveMessageMenu((prev) => (prev === msgId ? null : msgId))
+    setReactionPickerMessageId(null)
+  }
+
+  const handleToggleReactionPicker = (e, msgId) => {
+    e.stopPropagation()
+    setReactionPickerMessageId((prev) => (prev === msgId ? null : msgId))
+    setActiveMessageMenu(null)
+  }
+
+  const handleDeleteMessage = async (msg) => {
+    if (msg.messageId == null || !msg.isMine) {
+      console.warn('[delete] blocked — messageId:', msg.messageId, 'isMine:', msg.isMine)
+      return
+    }
+    console.log('[delete] messageId:', msg.messageId?.toString(), 'owner:', address)
+    setDeletingMessageId(msg.id)
+    setActiveMessageMenu(null)
+    try {
+      const functionData = encodeFunctionData({
+        abi: abiChat,
+        functionName: 'deleteMessage',
+        args: [resolveOwnerArg(msg), msg.messageId],
+      })
+      currentNonce.current = null
+      await relayMetaTransaction(functionData)
+      setChatHistory((prev) => ({
+        ...prev,
+        list: prev.list.filter((m) => m.id !== msg.id),
+      }))
+    } catch (err) {
+      console.error('Delete message failed:', err)
+      if (err.message === 'MessageDeletedError') {
+        // Already deleted on-chain — sync the UI
+        setChatHistory((prev) => ({
+          ...prev,
+          list: prev.list.filter((m) => String(m.messageId) !== String(msg.messageId)),
+        }))
+      } else {
+        alert(`Delete failed: ${err.message}`)
+      }
+    } finally {
+      setDeletingMessageId(null)
+    }
+  }
+
+  const handleStartEdit = (msg) => {
+    const textEl = msg.content?.elements?.find((el) => el.type === 'text')
+    setEditText(textEl?.data?.text ?? '')
+    setEditingMessageId(msg.id)
+    setActiveMessageMenu(null)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditText('')
+  }
+
+  // _resolveActor in the contract short-circuits when _owner == address(0) OR _owner == _msgSender()
+  // (the burner), so no session check is required. Use ZERO_ADDRESS when the message was stored
+  // under the burner wallet; use mainWallet when stored under mainWallet (requires valid session).
+  const resolveOwnerArg = (msg) =>
+    (msg.onChainSender ?? '').toLowerCase() === address?.toLowerCase() ? address : ZERO_ADDRESS
+
+  const handleSaveEdit = async () => {
+    const msg = chatHistory.list.find((m) => m.id === editingMessageId)
+    if (!msg || !msg.topic || msg.messageId == null) {
+      console.warn('[edit] blocked — msg:', msg, 'editingMessageId:', editingMessageId)
+      return
+    }
+    console.log('[edit] messageId:', msg.messageId, 'topic:', msg.topic)
+    const newText = editText.trim()
+    if (!newText) return
+    try {
+      const keys = await getUnlockedKey()
+      if (!keys) throw new Error('Vault locked.')
+      const subtle = window.crypto.subtle
+      const derivedKeySeed = ethers.keccak256(ethers.concat([msg.topic, ethers.toUtf8Bytes('content-encryption')]))
+      const contentKey = await subtle.importKey('raw', ethers.getBytes(derivedKeySeed), 'AES-GCM', true, ['encrypt'])
+      const payloadIv = window.crypto.getRandomValues(new Uint8Array(12))
+      const ciphertext = await subtle.encrypt(
+        { name: 'AES-GCM', iv: payloadIv },
+        contentKey,
+        new TextEncoder().encode(JSON.stringify({ version: '1', elements: [{ type: 'text', data: { text: newText } }] }))
+      )
+      const ipfsResult = await uploadObjectToIPFS({
+        version: '1',
+        iv: ethers.hexlify(payloadIv),
+        ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
+        senderAddr: address,
+      })
+      if (!ipfsResult?.cid) throw new Error('IPFS upload failed.')
+      const functionData = encodeFunctionData({
+        abi: abiChat,
+        functionName: 'updateMessage',
+        args: [resolveOwnerArg(msg), msg.messageId, normalizeCID(ipfsResult.cid), msg.encryptedKey ?? '0x'],
+      })
+      currentNonce.current = null
+      await relayMetaTransaction(functionData)
+      setChatHistory((prev) => ({
+        ...prev,
+        list: prev.list.map((m) =>
+          m.id === editingMessageId
+            ? { ...m, content: { elements: [{ type: 'text', data: { text: newText } }] }, isEdited: true }
+            : m
+        ),
+      }))
+      setEditingMessageId(null)
+      setEditText('')
+    } catch (err) {
+      console.error('Edit message failed:', err)
+      alert(`Edit failed: ${err.message}`)
+    }
+  }
+
+  const handleSetReaction = async (msg, reactionTypeId) => {
+    if (msg.messageId == null) {
+      console.warn('[reaction] blocked — messageId is null')
+      return
+    }
+    setReactionPickerMessageId(null)
+    setPendingReactionId(msg.messageId)
+    try {
+      const functionData = encodeFunctionData({
+        abi: abiChat,
+        functionName: 'setMessageReaction',
+        args: [resolveOwnerArg(msg), msg.messageId, reactionTypeId],
+      })
+      currentNonce.current = null
+      await relayMetaTransaction(functionData)
+      setMyReactions((prev) => ({ ...prev, [String(msg.messageId)]: reactionTypeId }))
+    } catch (err) {
+      console.error('Reaction failed:', err)
+    } finally {
+      setPendingReactionId(null)
+    }
+  }
 
   // ■■■ Renderers ■■■
 
@@ -1066,7 +1323,7 @@ export default function Chat() {
 
   return (
     <div className={clsx(styles.chat)}>
-      <aside className={clsx(styles.aside, 'flex flex-column justify-content-start')}>
+      <aside className={clsx(styles.aside, 'flex flex-column justify-content-start', showChat && styles['aside--mobile-hidden'])}>
         <header className={clsx(styles.aside__header, 'flex align-items-center justify-content-between')}>
           <h4 className="flex flex-row align-items-center justify-content-center">Messages</h4>
           <ul className="flex align-items-center justify-content-between">
@@ -1082,110 +1339,218 @@ export default function Chat() {
             </li>
           </ul>
         </header>
-        {isAddingContact && (
-          <form onSubmit={handleAddContactSubmit} className={styles['add-contact']}>
-            <input
-              type="text"
-              value={contactInput}
-              onChange={(e) => setContactInput(e.target.value)}
-              placeholder="0x... wallet address"
-              autoFocus
-            />
-            <button type="submit" disabled={isSubmittingContact}>
-              {isSubmittingContact ? <ContentSpinner /> : 'Add'}
-            </button>
-          </form>
-        )}
-        {contactError && <p className={styles['add-contact__error']}>{contactError}</p>}
-        <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} onDelete={deleteContact} deletingContact={deletingContact} contacts={contacts} refreshKey={contactsRefreshKey} />
+        <div className={styles['aside__body']}>
+          {isAddingContact && (
+            <form onSubmit={handleAddContactSubmit} className={styles['add-contact']}>
+              <input
+                type="text"
+                value={contactInput}
+                onChange={(e) => setContactInput(e.target.value)}
+                placeholder="0x... wallet address"
+                autoFocus
+              />
+              <button type="submit" disabled={isSubmittingContact}>
+                {isSubmittingContact ? <ContentSpinner /> : 'Add'}
+              </button>
+            </form>
+          )}
+          {contactError && <p className={styles['add-contact__error']}>{contactError}</p>}
+          <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} 
+          onDelete={deleteContact} deletingContact={deletingContact} contacts={contacts} refreshKey={contactsRefreshKey} />
+        </div>
+        <div className={styles['aside__features']}>
+          <p className={styles['aside__features__title']}>Why Tunnel</p>
+          <ul className={styles['aside__features__list']}>
+            <li>No email, phone, or real name needed</li>
+            <li>Stealth address — your wallet stays hidden</li>
+            <li>Only you and your contact can read messages</li>
+            <li>Contacts and chats live onchain, not our servers</li>
+            <li>Zero gas fees to send messages</li>
+            <li>No one can block or delete your conversations</li>
+            <li>No trail linking sender to receiver</li>
+            <li>Hosted on blockchain and IPFS</li>
+            <li>Works across multiple chains</li>
+          </ul>
+        </div>
       </aside>
 
-      <main className={clsx(styles.main)}>
-        <div className={clsx(styles.chatHistory)} ref={scrollRef}>
-          {chatHistory.list.map((msg) => (
-            <div key={msg.id} className={clsx(styles['chat-message'], styles[`chat-message--${msg.side}`])}>
-              <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, msg.rawKeyHex, scrollToBottom)}</div>
-              <div className={styles['chat-message__timestamp']} title={msg.timestamp}>
-                <span className={'flex gap-025'}>
-                  {msg.timestamp.split(',')[1]?.trim() || msg.timestamp}
-                  <CheckCircle2 strokeWidth={2} size={12}/>
-                </span>
-              </div>
-            </div>
-          ))}
-
-          {pendingMessages.map((msg) => (
-            <div key={msg.id} className={clsx(styles['chat-message'], styles['chat-message--me'], styles['chat-message--pending'])}>
-              <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, null)}</div>
-              <div className={styles['chat-message__timestamp']}></div>
-              <span className={styles['chat-message__sending']}>
-                <MessageLoader />
+      <main className={clsx(styles.main, !showChat && styles['main--mobile-hidden'], receiverAddress && styles['main--has-header'])}>
+        {receiverAddress && (
+          <div className={styles['main__header']}>
+            <button className={styles['back-button']} onClick={handleBack} aria-label="Back to conversations">
+              <ChevronLeft size={20} />
+            </button>
+            <div className={styles['main__header-profile']}>
+              {receiverProfile?.name && (
+                <strong className={styles['main__header-name']}>
+                  {receiverProfile.fullName || receiverProfile.name}
+                </strong>
+              )}
+              <span className={styles['main__header-address']}>
+                {receiverAddress.slice(0, 6)}...{receiverAddress.slice(-4)}
               </span>
             </div>
-          ))}
-
-          {chatHistory.list.length === 0 && !pendingMessage && (
-            <div className={styles['chat-history__empty']}>Start chatting securely!</div>
-          )}
-        </div>
-
-        <footer className={clsx(styles.footer, 'mt-20')}>
-          {mediaItems.length > 0 && (
-            <div className={clsx(styles['chat-composer__media-staging'], 'flex gap-2 mb-2')}>
-              {mediaItems.map((item, index) => {
-                return (
-                  <figure key={`${item.localUrl || index}`} className="relative">
-                    {item.type === 'image' ? (
-                      <img src={item.localUrl} alt={item.alt || ''} className="h-16 w-16 object-cover rounded" />
-                    ) : (
-                      <video src={item.localUrl} className="h-16 w-16 object-cover rounded" />
+          </div>
+        )}
+        {!receiverAddress ? (
+          <div className={styles['main__empty']}>
+            <p>Select a chat to start messaging</p>
+          </div>
+        ) : (
+          <>
+            <div className={clsx(styles.chatHistory)} ref={scrollRef}>
+              {chatHistory.list.map((msg) => (
+                <div key={msg.id} className={clsx(styles['chat-message__wrapper'], styles[`chat-message__wrapper--${msg.side}`])}>
+                  <div className={styles['chat-message__actions']}>
+                    {reactionTypes.length > 0 && (
+                      <div className={styles['chat-message__menu-wrapper']}>
+                        <button
+                          className={styles['chat-message__action-btn']}
+                          onClick={(e) => handleToggleReactionPicker(e, msg.id)}
+                          disabled={msg.messageId == null || pendingReactionId === msg.messageId}
+                        >
+                          <Smile size={14} />
+                        </button>
+                        {reactionPickerMessageId === msg.id && (
+                          <div
+                            className={clsx(styles['chat-message__reaction-picker'], styles[`chat-message__reaction-picker--${msg.side}`])}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {reactionTypes.map((rt) => (
+                              <button key={rt.id} onClick={() => handleSetReaction(msg, rt.id)} title={rt.label}>
+                                {rt.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
-                    <button
-                      type="button"
-                      className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 text-white"
-                      onClick={() => handleRemoveMedia(index)}
-                    >
-                      <X size={12} />
+                    {msg.isMine && (
+                      <div className={styles['chat-message__menu-wrapper']}>
+                        <button
+                          className={styles['chat-message__action-btn']}
+                          onClick={(e) => handleToggleMenu(e, msg.id)}
+                        >
+                          <MoreHorizontal size={14} />
+                        </button>
+                        {activeMessageMenu === msg.id && (
+                          <ul className={styles['chat-message__menu']} onClick={(e) => e.stopPropagation()}>
+                            <li>
+                              <button onClick={() => handleStartEdit(msg)}>
+                                <Pencil size={12} /> Edit
+                              </button>
+                            </li>
+                            <li>
+                              <button
+                                className={styles['chat-message__menu-item--danger']}
+                                onClick={() => handleDeleteMessage(msg)}
+                                disabled={deletingMessageId === msg.id}
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </li>
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className={clsx(styles['chat-message'], styles[`chat-message--${msg.side}`])}>
+                    {editingMessageId != null && editingMessageId === msg.id ? (
+                      <div className={styles['chat-message__edit']}>
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit() }
+                            if (e.key === 'Escape') handleCancelEdit()
+                          }}
+                        />
+                        <div className={styles['chat-message__edit__actions']}>
+                          <button className={styles['chat-message__edit__btn']} onClick={handleCancelEdit}><X size={12} /></button>
+                          <button className={styles['chat-message__edit__btn']} onClick={handleSaveEdit}><Check size={12} /></button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles['chat-message__content']}>
+                        {renderMessageElements(msg.content?.elements, msg.rawKeyHex, scrollToBottom)}
+                        {msg.isEdited && <span className={styles['chat-message__edited']}>(edited)</span>}
+                      </div>
+                    )}
+                    <div className={styles['chat-message__timestamp']} title={msg.timestamp}>
+                      <span className={'flex gap-025'}>
+                        {msg.timestamp.split(',')[1]?.trim() || msg.timestamp}
+                        <CheckCircle2 strokeWidth={2} size={12} />
+                      </span>
+                    </div>
+                    {myReactions[String(msg.messageId)] && (
+                      <div className={styles['chat-message__reaction-badge']}>
+                        {reactionTypes.find((rt) => rt.id === myReactions[String(msg.messageId)])?.label}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {pendingMessages.map((msg) => (
+                <div key={msg.id} className={clsx(styles['chat-message'], styles['chat-message--me'], styles['chat-message--pending'])}>
+                  <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, null)}</div>
+                  <div className={styles['chat-message__timestamp']}></div>
+                  <span className={styles['chat-message__sending']}>
+                    {msg.status === 'sent' ? <Check size={12} /> : <MessageLoader />}
+                  </span>
+                </div>
+              ))}
+
+              {chatHistory.list.length === 0 && !pendingMessage && (
+                <div className={styles['chat-history__empty']}>Start chatting securely!</div>
+              )}
+            </div>
+
+            <footer className={styles.footer}>
+              <form onSubmit={sendEncryptedMessage}>
+                <input ref={fileInputRef} type="file" onChange={handleFileSelect} multiple={false} style={{ display: 'none' }} />
+                {mediaItems.length > 0 && (
+                  <div className={styles['footer__media-staging']}>
+                    {mediaItems.map((item, index) => (
+                      <figure key={`${item.localUrl || index}`} className={styles['footer__media-item']}>
+                        {item.type === 'image' ? (
+                          <img src={item.localUrl} alt={item.alt || ''} />
+                        ) : (
+                          <video src={item.localUrl} />
+                        )}
+                        <button type="button" className={styles['footer__media-remove']} onClick={() => handleRemoveMedia(index)}>
+                          <X size={10} />
+                        </button>
+                      </figure>
+                    ))}
+                  </div>
+                )}
+                <div className={styles['footer__row']}>
+                  <textarea
+                    ref={textareaRef}
+                    value={messageText}
+                    onChange={handleTextareaChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Write a message…"
+                    rows={1}
+                  />
+                  <div className={styles['footer__actions']}>
+                    <button type="button" className={styles['footer__action-btn']} onClick={() => triggerFileInput('image')}>
+                      <ImageIcon size={18} />
                     </button>
-                  </figure>
-                )
-              })}
-            </div>
-          )}
-
-          <form onSubmit={sendEncryptedMessage}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleFileSelect}
-              className="hidden"
-              multiple={false}
-              style={{ display: 'none' }}
-            />
-
-            <div className="flex align-items-center justify-content-between gap-1">
-              <div className="flex gap-2 mr-2">
-                <button type="button" onClick={() => triggerFileInput('image')}>
-                  <ImageIcon size={20} />
-                </button>
-                <button type="button" onClick={() => triggerFileInput('video')}>
-                  <SquarePlay size={20} />
-                </button>
-              </div>
-
-              <textarea
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Write a message…"
-              />
-
-              <button type="submit" disabled={!messageText.trim() && mediaItems.length === 0}>
-                <ArrowUp width={18} height={18} />
-              </button>
-            </div>
-          </form>
-        </footer>
+                    <button type="button" className={styles['footer__action-btn']} onClick={() => triggerFileInput('video')}>
+                      <SquarePlay size={18} />
+                    </button>
+                    <button type="submit" className={styles['footer__send-btn']} disabled={!messageText.trim() && mediaItems.length === 0}>
+                      <ArrowUp size={18} />
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </footer>
+          </>
+        )}
       </main>
     </div>
   )

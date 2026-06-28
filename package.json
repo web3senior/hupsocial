@@ -31,6 +31,7 @@
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
     "dompurify": "^3.4.2",
+    "driver.js": "^1.6.0",
     "eciesjs": "^0.5.0",
     "embla-carousel-react": "^8.6.0",
     "ethereum-blockies-base64": "^1.0.2",

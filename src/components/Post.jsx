@@ -197,7 +197,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
             <Repeat2 strokeWidth={1.3} width={20} height={20} />
             {isRepost
               ? `${item.wallet_address.slice(0, 4)}...${item.wallet_address.slice(-4)}`
-              : `${repostedPost?.wallet_address?.slice(0, 4)}...${repostedPost?.wallet_address?.slice(-4)}`}
+              : `${repostedPost?.wallet_address?.slice(0, 6)}...${repostedPost?.wallet_address?.slice(-4)}`}
             {` Reposted`}
           </div>
         )}

@@ -16,6 +16,7 @@
 
   --scrollbarBG: #f4f4f4;
   --thumbBG: var(--gray);
+  --network-color-primary-light: color-mix(in srgb, var(--network-color-primary) 35%, transparent);
 
   --fingerprint-border: var(--white, #fff);
   --beta-badge-background: var(--gray-400);
