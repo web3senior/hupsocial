@@ -49,11 +49,13 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const [lastComment, setLastComment] = useState(null)
+  const [isLastCommentLoading, setIsLastCommentLoading] = useState(false)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   const isActioned = Number(item.actioned_reports || 0) >= 3
   const repostedPostId = isRepost ? Number(item.is_repost) : null
   const [showEditModal, setShowEditModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(null)
+  const sectionRef = useRef(null)
 
   // Fetch the original post data if this item is a repost
   useEffect(() => {
@@ -90,12 +92,25 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   const displayItem = isRepost ? repostedPost : item
   const commentTarget = displayItem || item
 
+  // Fire view recording only when the post scrolls into the viewport
+  useEffect(() => {
+    const el = sectionRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          recordPostView(item.network_id, item.id, address)
+          io.disconnect()
+        }
+      },
+      { threshold: 0.5 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [item.network_id, item.id, address])
+
   // Retrieve the latest comment metadata for the active post context
   useEffect(() => {
-
-    // View post 
-    recordPostView(item.network_id, item.id, address)
-
     let cancelled = false
 
     if (!commentTarget?.id || !commentTarget?.network_id || Number(commentTarget?.total_comments || 0) < 1) {
@@ -103,6 +118,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
       return
     }
 
+    setIsLastCommentLoading(true)
     const params = new URLSearchParams({ last: 'true' })
     if (address) params.set('viewer_address', address)
 
@@ -128,6 +144,9 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
           setLastComment(null)
         }
       })
+      .finally(() => {
+        if (!cancelled) setIsLastCommentLoading(false)
+      })
 
     return () => {
       cancelled = true
@@ -144,15 +163,12 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
 
   const sourceText = getRawContentText()
   const lastCommentText = getCommentPreviewText(lastComment?.content)
-  const hasLastCommentPreview = Boolean(lastCommentText) && showLastComment
+  const actionsSet = useMemo(() => new Set(actions.map((a) => a.toLowerCase())), [actions])
+  const shouldReserveLastComment = showLastComment && Number(commentTarget?.total_comments || 0) > 0
 
   // Guard clause: Render global loading state until repost data is completely ready
   if (isRepost && isLoadingRepost) {
-    return (
-      <div className={`${styles.post} flex align-items-center justify-content-center p-4`}>
-        <div className={styles.post__content}>Loading repost...</div>
-      </div>
-    )
+    return <PostSkeleton />
   }
 
   // Guard clause: Handle instances where fallback records for repost data cannot be found
@@ -186,11 +202,12 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
       )}
 
       <section
+        ref={sectionRef}
         className={`${styles.post} flex flex-column align-items-start justify-content-between`}
         data-content={showContent ? true : false}
         data-commentable={item.allow_comment ? true : false}
-        data-has-comments={hasLastCommentPreview ? true : false}
-        data-has-last-comment={hasLastCommentPreview ? true : false}
+        data-has-comments={shouldReserveLastComment ? true : false}
+        data-has-last-comment={shouldReserveLastComment ? true : false}
       >
         {isRepost && (
           <div className={styles.post__repostLabel}>
@@ -274,9 +291,9 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
             onClick={(e) => e.stopPropagation()}
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
           >
-            {actions.find((action) => action.toLowerCase() === 'like') !== undefined && <Like post={displayItem || item} />}
+            {actionsSet.has('like') && <Like post={displayItem || item} />}
 
-            {actions.find((action) => action.toLowerCase() === 'comment') !== undefined && (
+            {actionsSet.has('comment') && (
               <>
                 {commentTarget.allow_comment && (
                   <button
@@ -291,9 +308,9 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
               </>
             )}
 
-            {actions.find((action) => action.toLowerCase() === 'repost') !== undefined && <Repost item={displayItem || item} />}
+            {actionsSet.has('repost') && <Repost item={displayItem || item} />}
 
-            {actions.find((action) => action.toLowerCase() === 'tip') !== undefined && (
+            {actionsSet.has('tip') && (
               <button
                 onClick={() => {
                   isConnected ? setShowTipModal(item) : toast(`Please connect wallet`, `error`)
@@ -303,7 +320,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
               </button>
             )}
 
-            {actions.find((action) => action.toLowerCase() === 'view') !== undefined && (
+            {actionsSet.has('view') && (
               <button>
                 <ViewIcon />
                 {item.total_views > 0 && (
@@ -317,13 +334,13 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
               </button>
             )}
 
-            {actions.find((action) => action.toLowerCase() === 'hash') !== undefined && (
+            {actionsSet.has('hash') && (
               <a href={`${item.explorer_url}/tx/${item.tx_hash}`} target="_blank" rel="noopener noreferrer">
                 <Box strokeWidth={1.5} width={17} height={17} />
               </a>
             )}
 
-            {actions.find((action) => action.toLowerCase() === 'share') !== undefined && (
+            {actionsSet.has('share') && (
               <button
                 onClick={() => {
                   isConnected ? setShowShareModal(displayItem) : toast(`Please connect wallet`, `error`)
@@ -335,7 +352,13 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
           </div>
         </footer>
 
-        {hasLastCommentPreview && <LastCommentPreview comment={lastComment} text={lastCommentText} />}
+        {shouldReserveLastComment && (
+          isLastCommentLoading
+            ? <LastCommentShimmer />
+            : lastComment && lastCommentText
+              ? <LastCommentPreview comment={lastComment} text={lastCommentText} />
+              : null
+        )}
       </section>
     </>
   )
@@ -482,6 +505,26 @@ const LastCommentPreview = ({ comment, text }) => {
     </aside>
   )
 }
+
+const PostSkeleton = () => (
+  <div style={{ padding: '20px 20px 0.5rem 20px' }}>
+    <div className="flex align-items-start gap-050">
+      <div className="shimmer rounded" style={{ width: 36, height: 36, flexShrink: 0 }} />
+      <div className="flex flex-column gap-025" style={{ flex: 1 }}>
+        <div className="shimmer rounded" style={{ width: '25%', height: 12 }} />
+        <div className="shimmer rounded" style={{ width: '60%', height: 12, marginTop: 4 }} />
+        <div className="shimmer rounded" style={{ width: '45%', height: 12, marginTop: 2 }} />
+      </div>
+    </div>
+  </div>
+)
+
+const LastCommentShimmer = () => (
+  <aside className={styles.post__lastCommentShimmer} onClick={(e) => e.stopPropagation()}>
+    <div className="shimmer" style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0 }} />
+    <div className="shimmer rounded" style={{ width: '65%', height: 12 }} />
+  </aside>
+)
 
 function getCommentPreviewText(content) {
   if (!content) return ''

@@ -303,6 +303,14 @@
     }
   }
 
+  &__lastCommentShimmer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0 0.5rem;
+    min-height: 48px;
+  }
+
   &__lastComment {
     border-radius: 8px;
     background-color: var(--surface);
