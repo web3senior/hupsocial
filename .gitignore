@@ -14,9 +14,6 @@
 !.yarn/releases
 !.yarn/versions
 
-# contracts
-/src/contracts/tunnel/**
-
 # testing
 /coverage
 
