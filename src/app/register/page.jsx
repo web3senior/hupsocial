@@ -421,6 +421,8 @@ export default function Register() {
 
   const isFullyRegistered = hasLocalVault && isPkRegistered && sessionActive
 
+  const hasSessionUnlocked = typeof window !== 'undefined' && !!sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
+
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
@@ -684,8 +686,8 @@ export default function Register() {
         {/* ■■■ Footer Actions ■■■ */}
         <footer className={clsx(styles.register__footer)}>
           {isFullyRegistered ? (
-            <button className={clsx(styles.register__button, 'btn')} onClick={() => router.push('/chat')}>
-              Open Chat
+            <button className={clsx(styles.register__button, 'btn')} onClick={() => router.push(hasSessionUnlocked ? '/chat' : '/unlock')}>
+              {hasSessionUnlocked ? 'Open Chat' : 'Unlock to Enter'}
             </button>
           ) : !hasLocalVault ? (
             <button className={clsx(styles.register__button, 'btn')} disabled>

@@ -152,8 +152,6 @@ export async function getSessionWallet(password = null) {
   if (!password) {
     throw new Error('PASSWORD_REQUIRED')
   }
-console.log(storedKey)
-return
   const decryptedKey = await decryptData(storedKey, password)
 
   // Cache in sessionStorage for fast future lookup
