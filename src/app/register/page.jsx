@@ -248,12 +248,15 @@ export default function Register() {
       // Standard path: wallets that support eth_signTypedData_v4 (MetaMask, etc.)
       signature = await signTypedDataAsync(typedDataParams)
     } catch (typedDataErr) {
-      // Fallback for wallets that reject eth_signTypedData_v4 (e.g. LUKSO Universal Profiles).
-      // Compute the EIP-712 digest locally and sign it via eth_sign. The relay and forwarder
-      // must be ERC-1271 aware to verify this signature — see HupChatForwarder.sol.
-      // personal_sign works on LUKSO (same as notifications "mark all read" flow).
-      const notSupported = /not supported|eth_signTypedData/i.test(typedDataErr?.message ?? '')
-      if (!notSupported) throw typedDataErr
+      // Fallback for any wallet that can't handle eth_signTypedData_v4:
+      //   - LUKSO UP: "eth_signTypedData_v4 is not supported"
+      //   - LUKSO UP on wrong chain: "Provided chainId X must match active chainId Y"
+      //   - Other smart-contract wallets with similar constraints
+      // Only re-throw on explicit user rejection; everything else falls through to personal_sign.
+      const isRejection =
+        typedDataErr?.name === 'UserRejectedRequestError' ||
+        /user rejected|user denied|rejected the request/i.test(typedDataErr?.message ?? '')
+      if (isRejection) throw typedDataErr
       const digest = ethers.TypedDataEncoder.hash(
         typedDataParams.domain,
         FORWARD_REQUEST_TYPES,
