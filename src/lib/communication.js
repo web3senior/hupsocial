@@ -20,7 +20,16 @@ export const getActiveChain = () => {
     const walletChain = isConnected && connection ? config.chains.find((c) => c.id === connection.chainId) : null
     if (walletChain) {
       setNetworkColor(walletChain)
-      return [walletChain, CONTRACTS[`chain${walletChain.id}`]]
+      const baseContracts = CONTRACTS[`chain${walletChain.id}`]
+      if (baseContracts) {
+        const cloned = { ...baseContracts }
+        const override = localStorage.getItem(`hupsocial_forwarder_name_override_${walletChain.id}`)
+        if (override) {
+          cloned.forwarderName = override
+        }
+        return [walletChain, cloned]
+      }
+      return [walletChain, null]
     }
 
     const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || DEFAULT_CHAIN_ID.toString()
@@ -28,13 +37,33 @@ export const getActiveChain = () => {
 
     if (userSelectedChain.length > 0) {
       setNetworkColor(userSelectedChain[0])
-      return [userSelectedChain[0], CONTRACTS[`chain${userSelectedChain[0].id}`]]
+      const baseContracts = CONTRACTS[`chain${userSelectedChain[0].id}`]
+      if (baseContracts) {
+        const cloned = { ...baseContracts }
+        const override = localStorage.getItem(`hupsocial_forwarder_name_override_${userSelectedChain[0].id}`)
+        if (override) {
+          cloned.forwarderName = override
+        }
+        return [userSelectedChain[0], cloned]
+      }
+      return [userSelectedChain[0], null]
     }
   }
 
   const defaultChain = config.chains.find((filterItem) => filterItem.id === DEFAULT_CHAIN_ID)
   if (defaultChain) {
-    return [defaultChain, CONTRACTS[`chain${DEFAULT_CHAIN_ID}`]]
+    const baseContracts = CONTRACTS[`chain${DEFAULT_CHAIN_ID}`]
+    if (baseContracts) {
+      const cloned = { ...baseContracts }
+      if (typeof window !== 'undefined') {
+        const override = localStorage.getItem(`hupsocial_forwarder_name_override_${DEFAULT_CHAIN_ID}`)
+        if (override) {
+          cloned.forwarderName = override
+        }
+      }
+      return [defaultChain, cloned]
+    }
+    return [defaultChain, null]
   }
 
   console.error('Default chain not found in config.')
