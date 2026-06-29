@@ -96,16 +96,49 @@ export async function POST(request) {
       deadline: fullRequest.deadline,
       data: fullRequest.data,
     }
-    const recoveredSigner = ethers.verifyTypedData(domain, FORWARD_REQUEST_TYPES, message, signature)
-    if (recoveredSigner.toLowerCase() !== fullRequest.from.toLowerCase()) {
-      console.error('RELAY_SIG_MISMATCH:', {
-        recovered: recoveredSigner,
-        expected: fullRequest.from,
-        chainId: domain.chainId,
-        nonce: fullRequest.nonce?.toString(),
-      })
+    // Compute the EIP-712 digest once; reused by all three verification steps below.
+    const digest = ethers.TypedDataEncoder.hash(domain, FORWARD_REQUEST_TYPES, message)
+    let sigValid = false
+    let sigStep = null
+
+    // Step 1 — raw ECDSA of EIP-712 digest (regular EOAs via eth_signTypedData_v4).
+    try {
+      const recovered = ethers.recoverAddress(digest, signature)
+      if (recovered.toLowerCase() === fullRequest.from.toLowerCase()) { sigValid = true; sigStep = 'ecdsa' }
+    } catch (e1) { console.warn('RELAY_SIG_S1:', e1.message) }
+
+    // Step 2 — personal_sign / eth_sign of EIP-712 digest (LUKSO controller EOAs or wallets
+    //           that don't support typed-data signing; eth_sign adds the Ethereum prefix).
+    if (!sigValid) {
+      try {
+        const recovered = ethers.verifyMessage(ethers.getBytes(digest), signature)
+        if (recovered.toLowerCase() === fullRequest.from.toLowerCase()) { sigValid = true; sigStep = 'personal_eoa' }
+      } catch (e2) { console.warn('RELAY_SIG_S2:', e2.message) }
+    }
+
+    // Step 3 — ERC-1271 for smart-contract wallets (LUKSO Universal Profiles).
+    //           personal_sign produces a sig over personal_hash(digest). LUKSO UP's
+    //           isValidSignature does ECDSA.recover(dataHash, sig) directly, so we must
+    //           pass the already-prefixed personal hash — same pattern as the notifications API.
+    if (!sigValid) {
+      try {
+        const code = await provider.getCode(fullRequest.from)
+        console.log('RELAY_ERC1271: from', fullRequest.from, 'codeLen', code?.length)
+        if (code && code !== '0x') {
+          const personalHash = ethers.hashMessage(ethers.getBytes(digest))
+          const iface = new ethers.Interface(['function isValidSignature(bytes32,bytes) view returns (bytes4)'])
+          const raw = await provider.call({ to: fullRequest.from, data: iface.encodeFunctionData('isValidSignature', [personalHash, signature]) })
+          console.log('RELAY_ERC1271: raw', raw)
+          if (raw && raw.length >= 10 && raw.slice(0, 10).toLowerCase() === '0x1626ba7e') { sigValid = true; sigStep = 'erc1271' }
+        }
+      } catch (e3) { console.error('RELAY_SIG_S3:', e3.message) }
+    }
+
+    if (!sigValid) {
+      console.error('RELAY_SIG_MISMATCH:', { from: fullRequest.from, chainId: domain.chainId, digest })
       return NextResponse.json({ error: 'Invalid Signature' }, { status: 400 })
     }
+    console.log('RELAY_SIG_OK via', sigStep)
 
     // eth_estimateGas on LUKSO returns no revert data and is unreliable.
     // Skip auto-estimation by providing an explicit gasLimit (inner gas + forwarder overhead).

@@ -1324,7 +1324,7 @@ export default function Chat() {
   return (
     <div className={clsx(styles.chat)}>
       <aside className={clsx(styles.aside, 'flex flex-column justify-content-start', showChat && styles['aside--mobile-hidden'])}>
-        <header className={clsx(styles.aside__header, 'flex align-items-center justify-content-between')}>
+        <header className={clsx(styles.aside__header, 'flex align-items-center justify-content-start')}>
           <h4 className="flex flex-row align-items-center justify-content-center">Messages</h4>
           <ul className="flex align-items-center justify-content-between">
             <li>

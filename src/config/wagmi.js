@@ -25,10 +25,10 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 export const CONTRACTS = {
   chain42: {
     name: 'lukso',
-    forwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
+    forwarder: '0x2C2d66640BF531F33f42b120361cFa95A43D43BA',//'0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
-    chat: '0xd1f3cE330001eA972019c6D9E5690E3E72680179',
+    chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
   },
   chain42220: {
     name: 'celo',

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
-import { useConnection, usePublicClient, useSignMessage, useWalletClient } from 'wagmi'
+import { useConnection, usePublicClient, useSignMessage, useSignTypedData } from 'wagmi'
 import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
@@ -53,7 +53,7 @@ export default function Register() {
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
   const { signMessageAsync } = useSignMessage()
-  const { data: walletClient } = useWalletClient()
+  const { signTypedDataAsync } = useSignTypedData()
 
   const [activeChainConfig, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
@@ -218,7 +218,7 @@ export default function Register() {
   // ─── Gasless Relay Helper ────────────────────────────────────────────────
 
   const relayViaForwarder = async (to, abi, functionName, args, gas) => {
-    if (!forwarderAddress || !address || !publicClient || !relayRpcUrl || !walletClient) {
+    if (!forwarderAddress || !address || !publicClient || !relayRpcUrl) {
       throw new Error('Gasless relay is not configured for this chain.')
     }
 
@@ -235,16 +235,32 @@ export default function Register() {
     const data = iface.encodeFunctionData(functionName, args)
     const message = { from: address, to, value: 0n, gas: BigInt(gas), nonce, deadline }
 
-    // eth_signTypedData_v4 is not supported on LUKSO — manually compute the EIP-712
-    // digest and sign it raw via eth_sign, which the LUKSO RPC does support.
-    const digest = ethers.TypedDataEncoder.hash(
-      { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress },
-      FORWARD_REQUEST_TYPES,
-      { ...message, data },
-    )
+    const typedDataParams = {
+      domain: { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress },
+      types: FORWARD_REQUEST_TYPES,
+      primaryType: 'ForwardRequest',
+      message: { ...message, data },
+    }
 
     setStatusMsg('Check your wallet — sign the gasless transaction to activate your chat identity.')
-    const signature = await walletClient.request({ method: 'eth_sign', params: [address, digest] })
+    let signature
+    try {
+      // Standard path: wallets that support eth_signTypedData_v4 (MetaMask, etc.)
+      signature = await signTypedDataAsync(typedDataParams)
+    } catch (typedDataErr) {
+      // Fallback for wallets that reject eth_signTypedData_v4 (e.g. LUKSO Universal Profiles).
+      // Compute the EIP-712 digest locally and sign it via eth_sign. The relay and forwarder
+      // must be ERC-1271 aware to verify this signature — see HupChatForwarder.sol.
+      // personal_sign works on LUKSO (same as notifications "mark all read" flow).
+      const notSupported = /not supported|eth_signTypedData/i.test(typedDataErr?.message ?? '')
+      if (!notSupported) throw typedDataErr
+      const digest = ethers.TypedDataEncoder.hash(
+        typedDataParams.domain,
+        FORWARD_REQUEST_TYPES,
+        typedDataParams.message,
+      )
+      signature = await signMessageAsync({ message: { raw: digest } })
+    }
     setStatusMsg('')
 
     const res = await fetch('/api/v1/relay', {
@@ -257,6 +273,7 @@ export default function Register() {
     })
     const payload = await res.json().catch(() => ({}))
     if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Relay failed.')
+    return payload.txHash
   }
 
   // ─── Combined Activation (PK + Session in one relay call) ────────────────
@@ -310,14 +327,21 @@ export default function Register() {
       }
 
       // One relay call: activateIdentity registers PK (if pubKeyArg non-empty) + session.
-      await relayViaForwarder(
+      const txHash = await relayViaForwarder(
         tunnelAddress, abiChat, 'activateIdentity',
         [targetBurnerAddress, BigInt(SESSION_DURATION_SECONDS), pubKeyArg],
         180000
       )
 
+      // Wait for on-chain confirmation before reading contract state.
+      if (txHash) {
+        setStatusMsg('Waiting for transaction to confirm…')
+        await publicClient.waitForTransactionReceipt({ hash: txHash })
+      }
+
       setShowPinEntry(false)
       setPinEntry('')
+      setStatusMsg('')
       await checkStatus()
     } catch (err) {
       console.error('Activation failed:', err)
@@ -347,7 +371,12 @@ export default function Register() {
   const handleRevokeSession = async () => {
     try {
       setIsActivating(true)
-      await relayViaForwarder(tunnelAddress, abiChat, 'revokeSession', [], 80000)
+      const txHash = await relayViaForwarder(tunnelAddress, abiChat, 'revokeSession', [], 80000)
+      if (txHash) {
+        setStatusMsg('Waiting for transaction to confirm…')
+        await publicClient.waitForTransactionReceipt({ hash: txHash })
+        setStatusMsg('')
+      }
       await checkStatus()
     } catch (err) {
       console.error('Session revocation failed:', err)
