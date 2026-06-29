@@ -179,9 +179,16 @@ export async function POST(request) {
 
     // eth_estimateGas on LUKSO returns no revert data and is unreliable.
     // Skip auto-estimation by providing an explicit gasLimit (inner gas + forwarder overhead).
+    // EIP-1559: maxFeePerGas must be >= maxPriorityFeePerGas; clamp to whichever is larger
+    // so low-base-fee chains (e.g. LUKSO) don't reject the tx with "priorityFee > maxFee".
+    const maxPriorityFeePerGas = ethers.parseUnits('2', 'gwei')
+    const feeData = await provider.getFeeData()
+    const networkMax = feeData.maxFeePerGas ?? 0n
+    const maxFeePerGas = networkMax >= maxPriorityFeePerGas ? networkMax : maxPriorityFeePerGas
     const tx = await forwarder.execute(fullRequest, {
       gasLimit: BigInt(fullRequest.gas) + 100000n,
-      maxPriorityFeePerGas: ethers.parseUnits('2', 'gwei'),
+      maxPriorityFeePerGas,
+      maxFeePerGas,
     })
 
     return NextResponse.json({
