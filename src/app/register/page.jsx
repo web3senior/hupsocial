@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
-import { useConnection, usePublicClient, useSignMessage, useSignTypedData } from 'wagmi'
+import { useConnection, usePublicClient, useSignMessage, useWalletClient } from 'wagmi'
 import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
@@ -53,7 +53,7 @@ export default function Register() {
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
   const { signMessageAsync } = useSignMessage()
-  const { signTypedDataAsync } = useSignTypedData()
+  const { data: walletClient } = useWalletClient()
 
   const [activeChainConfig, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
@@ -218,7 +218,7 @@ export default function Register() {
   // ─── Gasless Relay Helper ────────────────────────────────────────────────
 
   const relayViaForwarder = async (to, abi, functionName, args, gas) => {
-    if (!forwarderAddress || !address || !publicClient || !relayRpcUrl) {
+    if (!forwarderAddress || !address || !publicClient || !relayRpcUrl || !walletClient) {
       throw new Error('Gasless relay is not configured for this chain.')
     }
 
@@ -235,13 +235,16 @@ export default function Register() {
     const data = iface.encodeFunctionData(functionName, args)
     const message = { from: address, to, value: 0n, gas: BigInt(gas), nonce, deadline }
 
+    // eth_signTypedData_v4 is not supported on LUKSO — manually compute the EIP-712
+    // digest and sign it raw via eth_sign, which the LUKSO RPC does support.
+    const digest = ethers.TypedDataEncoder.hash(
+      { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress },
+      FORWARD_REQUEST_TYPES,
+      { ...message, data },
+    )
+
     setStatusMsg('Check your wallet — sign the gasless transaction to activate your chat identity.')
-    const signature = await signTypedDataAsync({
-      domain: { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress },
-      types: FORWARD_REQUEST_TYPES,
-      primaryType: 'ForwardRequest',
-      message: { ...message, data },
-    })
+    const signature = await walletClient.request({ method: 'eth_sign', params: [address, digest] })
     setStatusMsg('')
 
     const res = await fetch('/api/v1/relay', {
