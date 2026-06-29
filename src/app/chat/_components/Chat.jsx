@@ -381,7 +381,7 @@ export default function Chat() {
     const res = await fetch('/api/v1/relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId: activeChainConfig?.id, forwarderName: activeChainContracts?.forwarderName ?? 'HupForwarder' }, (_, value) =>
+      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId: activeChainConfig?.id, forwarderName: activeChainContracts?.forwarderName ?? 'HupChatForwarder' }, (_, value) =>
         typeof value === 'bigint' ? value.toString() : value
       ),
     })

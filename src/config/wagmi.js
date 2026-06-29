@@ -26,9 +26,18 @@ export const CONTRACTS = {
   chain42: {
     name: 'lukso',
     forwarder: '0x2C2d66640BF531F33f42b120361cFa95A43D43BA',//'0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
+    forwarderName: 'HupChatForwarder',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
+  },
+  chain143: {
+    name: 'monad',
+    forwarder: '0x09FAf2fddED624958589aD9ca704Bc4C6C232e72',
+    forwarderName: 'HupChatForwarder',
+    hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
+    status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
+    chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
   },
   chain42220: {
     name: 'celo',
@@ -42,14 +51,6 @@ export const CONTRACTS = {
     forwarder: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
-  },
-  chain143: {
-    name: 'monad',
-    forwarder: '0x09FAf2fddED624958589aD9ca704Bc4C6C232e72',
-    forwarderName: 'HupChatForwarder',
-    hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
-    status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
-    chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
   },
   chain56: {
     name: 'bnb',
