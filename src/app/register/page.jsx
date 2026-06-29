@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
-import { useConnection, usePublicClient, useSignMessage, useSignTypedData } from 'wagmi'
+import { useChainId, useConnection, usePublicClient, useSignMessage, useSignTypedData } from 'wagmi'
 import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
@@ -51,7 +51,8 @@ const FORWARD_REQUEST_TYPES = {
 export default function Register() {
   const router = useRouter()
   const { address, isConnected } = useConnection()
-  const publicClient = usePublicClient()
+  const connectedChainId = useChainId()
+  const publicClient = usePublicClient({ chainId: connectedChainId })
   const { signMessageAsync } = useSignMessage()
   const { signTypedDataAsync } = useSignTypedData()
 
@@ -229,14 +230,15 @@ export default function Register() {
       args: [address],
     })
 
-    const chainId = publicClient.chain.id
+    const chainId = activeChainConfig?.id ?? publicClient.chain.id
+    const fwdName = activeChainContracts?.forwarderName ?? 'HupChatForwarder'
     const deadline = Math.floor(Date.now() / 1000) + 3600
     const iface = new ethers.Interface(abi)
     const data = iface.encodeFunctionData(functionName, args)
     const message = { from: address, to, value: 0n, gas: BigInt(gas), nonce, deadline }
 
     const typedDataParams = {
-      domain: { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress },
+      domain: { name: fwdName, version: '1', chainId, verifyingContract: forwarderAddress },
       types: FORWARD_REQUEST_TYPES,
       primaryType: 'ForwardRequest',
       message: { ...message, data },
@@ -270,7 +272,7 @@ export default function Register() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { request: { ...message, data }, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId },
+        { request: { ...message, data }, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId, forwarderName: fwdName },
         (_, v) => (typeof v === 'bigint' ? v.toString() : v)
       ),
     })
@@ -339,7 +341,10 @@ export default function Register() {
       // Wait for on-chain confirmation before reading contract state.
       if (txHash) {
         setStatusMsg('Waiting for transaction to confirm…')
-        await publicClient.waitForTransactionReceipt({ hash: txHash })
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+        if (receipt.status === 'reverted') {
+          throw new Error(`Transaction reverted on-chain (${txHash.slice(0, 10)}…). The forwarder rejected the call — check that the forwarder name and chain ID match what was signed.`)
+        }
       }
 
       setShowPinEntry(false)
@@ -377,7 +382,8 @@ export default function Register() {
       const txHash = await relayViaForwarder(tunnelAddress, abiChat, 'revokeSession', [], 80000)
       if (txHash) {
         setStatusMsg('Waiting for transaction to confirm…')
-        await publicClient.waitForTransactionReceipt({ hash: txHash })
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+        if (receipt.status === 'reverted') throw new Error(`Revocation reverted on-chain (${txHash.slice(0, 10)}…).`)
         setStatusMsg('')
       }
       await checkStatus()

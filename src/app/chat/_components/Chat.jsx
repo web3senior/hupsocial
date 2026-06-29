@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import CryptoJS from 'crypto-js'
 import { ethers } from 'ethers'
 import ecies from 'eciesjs'
-import { useConnection, usePublicClient } from 'wagmi'
+import { useChainId, useConnection, usePublicClient } from 'wagmi'
 import { getIPFS } from '@/lib/ipfs'
 import clsx from 'clsx'
 import { ArrowUp, EllipsisVertical, MessageSquarePlus, Image as ImageIcon, SquarePlay, X, ChevronLeft, Smile, MoreHorizontal, Pencil, Trash2, Check } from 'lucide-react'
@@ -213,7 +213,8 @@ export default function Chat() {
   const textareaRef = useRef(null)
 
   const { address, isConnected } = useConnection()
-  const publicClient = usePublicClient()
+  const connectedChainId = useChainId()
+  const publicClient = usePublicClient({ chainId: connectedChainId })
   const [activeChainConfig, activeChainContracts] = getActiveChain()
   const tunnelAddress = activeChainContracts?.chat
   const forwarderAddress = activeChainContracts?.forwarder
@@ -380,7 +381,7 @@ export default function Chat() {
     const res = await fetch('/api/v1/relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId: activeChainConfig?.id }, (_, value) =>
+      body: JSON.stringify({ request, signature, rpcUrl: relayRpcUrl, forwarderAddress, chainId: activeChainConfig?.id, forwarderName: activeChainContracts?.forwarderName ?? 'HupForwarder' }, (_, value) =>
         typeof value === 'bigint' ? value.toString() : value
       ),
     })
@@ -395,7 +396,7 @@ export default function Chat() {
     const chainId = activeChainConfig?.id
     if (!chainId) throw new Error('Missing active chain id.')
     const deadline = Math.floor(Date.now() / 1000) + 3600
-    const domain = { name: 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress }
+    const domain = { name: activeChainContracts?.forwarderName ?? 'HupForwarder', version: '1', chainId, verifyingContract: forwarderAddress }
     const types = {
       ForwardRequest: [
         { name: 'from', type: 'address' },

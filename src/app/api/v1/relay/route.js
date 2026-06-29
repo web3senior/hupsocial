@@ -82,7 +82,7 @@ export async function POST(request) {
     // Accepting it here eliminates the getNetwork() round-trip on every relay call.
     const chainId = bodyChainId ?? Number((await provider.getNetwork()).chainId)
     const domain = {
-      name: 'HupForwarder',
+      name: 'HupChatForwarder',
       version: '1',
       chainId,
       verifyingContract: forwarderAddress,
@@ -139,6 +139,43 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid Signature' }, { status: 400 })
     }
     console.log('RELAY_SIG_OK via', sigStep)
+
+    // Pre-flight simulation: catch reverts before spending gas and return a
+    // human-readable reason instead of a silent on-chain failure.
+    try {
+      await forwarder.execute.staticCall(fullRequest, {
+        gasLimit: BigInt(fullRequest.gas) + 100000n,
+      })
+    } catch (simErr) {
+      let reason = simErr.shortMessage || simErr.message || 'unknown revert'
+      if (simErr.data) {
+        try { reason = new ethers.Interface(forwarderAbi).parseError(simErr.data)?.name ?? reason } catch {}
+        try { reason = new ethers.Interface(chatAbi).parseError(simErr.data)?.name ?? reason } catch {}
+      }
+
+      // For InvalidSigner: read the forwarder's actual EIP-712 domain to surface mismatches.
+      if (reason === 'ERC2771ForwarderInvalidSigner') {
+        try {
+          const eip712Iface = new ethers.Interface(['function eip712Domain() view returns (bytes1,string,string,uint256,address,bytes32,uint256[])'])
+          const raw = await provider.call({ to: forwarderAddress, data: eip712Iface.encodeFunctionData('eip712Domain') })
+          const [, fwdName, fwdVer, fwdChainId] = eip712Iface.decodeFunctionResult('eip712Domain', raw)
+          if (fwdName !== domain.name) {
+            reason = `ERC2771ForwarderInvalidSigner — domain name mismatch: forwarder="${fwdName}" but signed with "${domain.name}"`
+          } else if (fwdChainId.toString() !== domain.chainId.toString()) {
+            reason = `ERC2771ForwarderInvalidSigner — chainId mismatch: forwarder=${fwdChainId} but signed with ${domain.chainId}`
+          } else if (fwdVer !== domain.version) {
+            reason = `ERC2771ForwarderInvalidSigner — version mismatch: forwarder="${fwdVer}" but signed with "${domain.version}"`
+          } else {
+            reason = `ERC2771ForwarderInvalidSigner — domain matches (name="${fwdName}" chainId=${fwdChainId}), nonce or deadline mismatch`
+          }
+        } catch (diagErr) {
+          reason = `ERC2771ForwarderInvalidSigner (domain read failed: ${diagErr.message})`
+        }
+      }
+
+      console.error('RELAY_SIM_FAIL:', reason)
+      return NextResponse.json({ error: `Simulation failed: ${reason}` }, { status: 400 })
+    }
 
     // eth_estimateGas on LUKSO returns no revert data and is unreliable.
     // Skip auto-estimation by providing an explicit gasLimit (inner gas + forwarder overhead).
