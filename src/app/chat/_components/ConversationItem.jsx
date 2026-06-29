@@ -61,7 +61,7 @@ export const ConversationItem = ({ chat, isActive, onSelect, onDelete, isDeletin
               </span>
             </div>
             <p className={styles['conversation-item__preview']}>
-              {isLastMessageLoading ? '...' : latestMessage?.message.slice(0, 50) + '...' || 'No messages'}
+              {isLastMessageLoading ? '...' : latestMessage?.message.slice(0, 10) + '...' || 'No messages'}
             </p>
           </div>
         </div>
