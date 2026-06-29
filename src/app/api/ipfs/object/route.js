@@ -1,57 +1,68 @@
-// app/api/ipfs/route.js
+// app/api/ipfs/object/route.js
 
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
-// --- Configuration ---
 
-// Initialize Pinata SDK using the JWT stored in environment variables
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
 })
 
-// *** IMPORTANT FIX: REMOVE THE bodyParser: false CONFIGURATION ***
-// By removing it, Next.js will automatically parse the JSON body
-// when the client sends Content-Type: application/json.
-// Example for file uploads (what you are likely trying to achieve)
-// export const config = {
-//   api: {
-//     bodyParser: false, // This is deprecated for App Router, you should use the Request object
-//   }
-// }
-// For App Router, you would typically use this:
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-// Note: When handling FormData/file uploads, Next.js handles the request body parsing automatically.
-// The issue here is likely an old config structure being used.
-// ---------------------
+
+async function uploadToFilebase(json) {
+  const form = new FormData()
+  form.append(
+    'file',
+    new Blob([JSON.stringify(json)], { type: 'application/json' }),
+    'metadata.json'
+  )
+
+  const res = await fetch('https://rpc.filebase.io/api/v0/add', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.FILEBASE_IPFS_RPC_TOKEN}`,
+    },
+    body: form,
+  })
+
+  if (!res.ok) throw new Error(`Filebase RPC ${res.status}: ${await res.text()}`)
+
+  const { Hash } = await res.json()
+  console.log('[filebase] uploaded, CID:', Hash)
+  return Hash
+}
+
+async function uploadToPinata(json) {
+  const result = await pinata.upload.public.json(json, {
+    pinataMetadata: { name: 'metadata' },
+  })
+  console.log('[pinata] uploaded, CID:', result.cid)
+  return result.cid
+}
 
 export async function POST(request) {
   try {
-    // 1. Get the JSON object sent from the client
-    // Next.js automatically parses the JSON body here
     const json = await request.json()
 
     if (!json) {
       return NextResponse.json({ error: 'No JSON data provided' }, { status: 400 })
     }
 
-    // 2. Pin the JSON object to IPFS using the Pinata SDK
-    console.log(`Attempting to upload JSON object...`)
-
-    // Use the Pinata 'json' upload method.
-    const { cid: rawCID } = await pinata.upload.public.json(json, {
-      pinataMetadata: { name: `metadata` },
-    })
+    let rawCID
+    try {
+      rawCID = await uploadToFilebase(json)
+    } catch (e) {
+      console.warn('[filebase] upload failed, falling back to Pinata:', e.message)
+      rawCID = await uploadToPinata(json)
+    }
 
     const cid = `ipfs://${rawCID}`
-
-    const url = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${cid}`
-    console.log(`JSON object uploaded successfully. CID: ${cid}`)
-
+    const url = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${rawCID}`
+    console.log('Upload complete. CID:', cid)
     return NextResponse.json({ url, cid }, { status: 200 })
   } catch (e) {
-    console.error('Pinata JSON upload error:', e)
-    // Provide a clearer error message for debugging
+    console.error('JSON upload error:', e)
     return NextResponse.json({ error: 'Internal Server Error during JSON upload' }, { status: 500 })
   }
 }

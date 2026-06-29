@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Set-Location \"c:\\\\xampp\\\\htdocs\\\\hupsocial\"; npm install @aws-sdk/client-s3 --install-strategy=nested --legacy-peer-deps 2>&1; Write-Host \"Exit: $LASTEXITCODE\")",
+      "PowerShell(Set-Location \"c:\\\\xampp\\\\htdocs\\\\hupsocial\"; npm install aws4 --legacy-peer-deps 2>&1; Write-Host \"Exit: $LASTEXITCODE\")",
+      "PowerShell(node -e \"require\\('aws4'\\); console.log\\('aws4 found'\\)\" 2>&1)"
+    ]
+  }
+}

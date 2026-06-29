@@ -3,7 +3,7 @@ import PageTitle from '@/components/PageTitle'
 import PostDetails from './_components/PostDetails'
 import { notFound } from 'next/navigation'
 import styles from './page.module.scss'
-import { resolveIPFSUrl } from '@/lib/storageHelper'
+import { resolveStorageUrl } from '@/lib/storageHelper'
 
 export async function generateMetadata({ params }, parent) {
   // Fetch and resolve the parent metadata object
@@ -20,16 +20,19 @@ export async function generateMetadata({ params }, parent) {
     // Initialize an array to hold mapped images for metadata tags
     let images = []
 
-    // Check if the post structure contains elements, media layout, and items
-    if (item?.content?.elements?.[1]?.type === 'media' && item?.content?.elements?.[1]?.data?.items.length > 0) {
-      item.content.elements[1].data.items.forEach((mediaItem) => {
+    const mediaElement = item?.content?.elements?.find((el) => el?.type === 'media')
+    if (mediaElement?.data?.items?.length > 0) {
+      mediaElement.data.items.forEach((mediaItem) => {
         if (mediaItem.type === 'image') {
-          images.push({
-            url: mediaItem.cid.startsWith('http') ? mediaItem.cid : `${resolveIPFSUrl(mediaItem.cid)}`,
-            width: mediaItem.width || 1200,
-            height: mediaItem.height || 630,
-            alt: mediaItem.alt || 'Post Image',
-          })
+          const url = mediaItem.cid.startsWith('http') ? mediaItem.cid : resolveStorageUrl(mediaItem.cid)
+          if (url) {
+            images.push({
+              url,
+              width: mediaItem.width || 1200,
+              height: mediaItem.height || 630,
+              alt: mediaItem.alt || 'Post Image',
+            })
+          }
         }
       })
     }
