@@ -40,7 +40,7 @@ export async function POST(request) {
 
     // Use the Pinata 'json' upload method.
     const { cid: rawCID } = await pinata.upload.public.json(json, {
-      pinataMetadata: { name: `hup-metadata` },
+      pinataMetadata: { name: `metadata` },
     })
 
     const cid = `ipfs://${rawCID}`
