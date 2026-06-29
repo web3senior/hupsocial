@@ -159,7 +159,7 @@ export default function Register() {
 
   const handleCreateVaultAndActivate = async () => {
     if (!isConnected || !address) return setErrorMsg('Please connect your wallet first.')
-    if (vaultPassword.length < 8) return setErrorMsg('Your PIN must be at least 8 characters.')
+    if (vaultPassword.length < 4) return setErrorMsg('Your PIN must be at least 8 characters.')
     if (vaultPassword !== confirmVaultPassword) return setErrorMsg('PINs do not match.')
     setIsActivating(true)
     setErrorMsg('')
@@ -596,7 +596,7 @@ export default function Register() {
                 <button
                   onClick={handleCreateVaultAndActivate}
                   className={clsx(styles.register__btnPrimary)}
-                  disabled={isActivating || vaultPassword.length < 8 || vaultPassword !== confirmVaultPassword}
+                  disabled={isActivating || vaultPassword.length < 4 || vaultPassword !== confirmVaultPassword}
                 >
                   {isActivating ? 'Joining...' : 'Join Hup'}
                 </button>
