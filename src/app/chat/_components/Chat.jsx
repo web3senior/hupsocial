@@ -783,6 +783,7 @@ export default function Chat() {
               onChainSender,
               side: isMine ? 'me' : 'them',
               rawTimestamp: msgTimestamp,
+              onChainIndex: entry.index,
               rawKeyHex,
               messageId: entry.messageId,
               topic: entry.topic,
@@ -797,7 +798,15 @@ export default function Chat() {
         })
       )
 
-      return decryptedList.filter(Boolean).sort((a, b) => a.rawTimestamp - b.rawTimestamp)
+      return decryptedList.filter(Boolean).sort((a, b) => {
+        // Block timestamp is the primary key — gives correct cross-topic and cross-user order.
+        if (a.rawTimestamp !== b.rawTimestamp) return a.rawTimestamp - b.rawTimestamp
+        // Same block: only compare on-chain indices when both messages are on the same topic.
+        // Cross-topic index comparison is meaningless (different namespaces); return 0 so the
+        // stable sort preserves fetch order, avoiding spurious interleaving.
+        if (a.topic === b.topic) return (a.onChainIndex ?? 0) - (b.onChainIndex ?? 0)
+        return 0
+      })
     } catch (error) {
       console.error('readHistoryChat failed:', error)
       return []
