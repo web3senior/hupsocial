@@ -82,7 +82,7 @@ export const getPostById = async (networkId, postId, viewerAddress = null) => {
 
   const url = `${baseUrl}${path}`
 
-  const response = await fetch(url)
+  const response = await fetch(url, { next: { revalidate: 30 } })
   if (!response.ok) throw new Error('Post fetch failed')
   const data = await response.json()
   return data

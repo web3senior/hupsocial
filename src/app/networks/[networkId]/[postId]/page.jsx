@@ -1,9 +1,13 @@
+import { cache } from 'react'
 import { getPostById } from '@/lib/api'
 import PageTitle from '@/components/PageTitle'
 import PostDetails from './_components/PostDetails'
 import { notFound } from 'next/navigation'
 import styles from './page.module.scss'
 import { resolveStorageUrl } from '@/lib/storageHelper'
+
+// Deduplicate the fetch so generateMetadata and Page share one request per render
+const fetchPost = cache((networkId, postId) => getPostById(networkId, postId, null))
 
 export async function generateMetadata({ params }, parent) {
   // Fetch and resolve the parent metadata object
@@ -14,7 +18,7 @@ export async function generateMetadata({ params }, parent) {
 
   try {
     // Attempt to fetch post data from the external source
-    const post = await getPostById(networkId, postId, null)
+    const post = await fetchPost(networkId, postId)
     const item = post?.data
 
     // Initialize an array to hold mapped images for metadata tags
@@ -76,10 +80,10 @@ export default async function Page({ params, searchParams }) {
   const { networkId, postId } = resolvedParams
   const advancedView = resolvedSearchParams?.advancedView === 'true'
 
-  // Fetch target post data directly on the server
+  // Fetch target post data directly on the server (shares cache with generateMetadata)
   let post = null
   try {
-    post = await getPostById(networkId, postId, null)
+    post = await fetchPost(networkId, postId)
   } catch (error) {
     console.error(`Failed to fetch post ${postId}:`, error)
   }
