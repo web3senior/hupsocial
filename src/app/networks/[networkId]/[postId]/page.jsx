@@ -40,10 +40,9 @@ export async function generateMetadata({ params }, parent) {
     // Fall back to empty text string if body content cannot be resolved
     const bodyText = post?.data?.content?.elements?.[0]?.data?.text || ''
 
-    const fallbackImages = parentMetadata.openGraph?.images ?? [
-      { url: '/open-graph.png', width: 1200, height: 630, alt: 'Open Graph Image' },
-    ]
-    const ogImages = images.length > 0 ? images : fallbackImages
+    const ogImages = images.length > 0
+      ? images
+      : [{ url: '/open-graph.png', width: 1200, height: 630, alt: 'Open Graph Image' }]
 
     // Construct unified dynamic metadata configuration payload
     const metadata = {
