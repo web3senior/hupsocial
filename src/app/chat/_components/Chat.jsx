@@ -1372,20 +1372,6 @@ export default function Chat() {
           <ConversationList activeChat={receiverAddress} onSelect={viewChatWith} 
           onDelete={deleteContact} deletingContact={deletingContact} contacts={contacts} refreshKey={contactsRefreshKey} />
         </div>
-        <div className={styles['aside__features']}>
-          <p className={styles['aside__features__title']}>Why Tunnel</p>
-          <ul className={styles['aside__features__list']}>
-            <li>No email, phone, or real name needed</li>
-            <li>Stealth address — your wallet stays hidden</li>
-            <li>Only you and your contact can read messages</li>
-            <li>Contacts and chats live onchain, not our servers</li>
-            <li>Zero gas fees to send messages</li>
-            <li>No one can block or delete your conversations</li>
-            <li>No trail linking sender to receiver</li>
-            <li>Hosted on blockchain and IPFS</li>
-            <li>Works across multiple chains</li>
-          </ul>
-        </div>
       </aside>
 
       <main className={clsx(styles.main, !showChat && styles['main--mobile-hidden'], receiverAddress && styles['main--has-header'])}>
