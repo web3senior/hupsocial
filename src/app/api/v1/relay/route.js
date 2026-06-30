@@ -140,41 +140,58 @@ export async function POST(request) {
     }
     console.log('RELAY_SIG_OK via', sigStep)
 
+    // Check the on-chain nonce to decide whether simulation is meaningful.
+    // When the client sends messages faster than blocks are mined, previous txs
+    // sit in the mempool with a lower nonce. Simulating against the confirmed state
+    // will always fail with InvalidSigner/nonce-mismatch even though the request is
+    // perfectly valid — so we only simulate when the nonce matches the confirmed state.
+    const onChainNonce = BigInt(await forwarder.nonces(fullRequest.from))
+    if (fullRequest.nonce < onChainNonce) {
+      console.error('RELAY_NONCE_REPLAY:', { requested: fullRequest.nonce.toString(), onChain: onChainNonce.toString() })
+      return NextResponse.json({ error: 'Nonce already used (replay).' }, { status: 400 })
+    }
+
     // Pre-flight simulation: catch reverts before spending gas and return a
     // human-readable reason instead of a silent on-chain failure.
-    try {
-      await forwarder.execute.staticCall(fullRequest, {
-        gasLimit: BigInt(fullRequest.gas) + 100000n,
-      })
-    } catch (simErr) {
-      let reason = simErr.shortMessage || simErr.message || 'unknown revert'
-      if (simErr.data) {
-        try { reason = new ethers.Interface(forwarderAbi).parseError(simErr.data)?.name ?? reason } catch {}
-        try { reason = new ethers.Interface(chatAbi).parseError(simErr.data)?.name ?? reason } catch {}
-      }
-
-      // For InvalidSigner: read the forwarder's actual EIP-712 domain to surface mismatches.
-      if (reason === 'ERC2771ForwarderInvalidSigner') {
-        try {
-          const eip712Iface = new ethers.Interface(['function eip712Domain() view returns (bytes1,string,string,uint256,address,bytes32,uint256[])'])
-          const raw = await provider.call({ to: forwarderAddress, data: eip712Iface.encodeFunctionData('eip712Domain') })
-          const [, fwdName, fwdVer, fwdChainId] = eip712Iface.decodeFunctionResult('eip712Domain', raw)
-          if (fwdName !== domain.name) {
-            reason = `ERC2771ForwarderInvalidSigner — domain name mismatch: forwarder="${fwdName}" but signed with "${domain.name}"`
-          } else if (fwdChainId.toString() !== domain.chainId.toString()) {
-            reason = `ERC2771ForwarderInvalidSigner — chainId mismatch: forwarder=${fwdChainId} but signed with ${domain.chainId}`
-          } else if (fwdVer !== domain.version) {
-            reason = `ERC2771ForwarderInvalidSigner — version mismatch: forwarder="${fwdVer}" but signed with "${domain.version}"`
-          } else {
-            reason = `ERC2771ForwarderInvalidSigner — domain matches (name="${fwdName}" chainId=${fwdChainId}), nonce or deadline mismatch`
-          }
-        } catch (diagErr) {
-          reason = `ERC2771ForwarderInvalidSigner (domain read failed: ${diagErr.message})`
+    // Skip when nonce > onChainNonce — a pending tx is already in the mempool ahead
+    // of this one; simulation against confirmed state would report a false nonce error.
+    if (fullRequest.nonce === onChainNonce) {
+      try {
+        await forwarder.execute.staticCall(fullRequest, {
+          gasLimit: BigInt(fullRequest.gas) + 100000n,
+        })
+      } catch (simErr) {
+        let reason = simErr.shortMessage || simErr.message || 'unknown revert'
+        if (simErr.data) {
+          try { reason = new ethers.Interface(forwarderAbi).parseError(simErr.data)?.name ?? reason } catch {}
+          try { reason = new ethers.Interface(chatAbi).parseError(simErr.data)?.name ?? reason } catch {}
         }
-      }
 
-      console.error('RELAY_SIM_FAIL:', reason)
-      return NextResponse.json({ error: `Simulation failed: ${reason}` }, { status: 400 })
+        // For InvalidSigner: read the forwarder's actual EIP-712 domain to surface mismatches.
+        if (reason === 'ERC2771ForwarderInvalidSigner') {
+          try {
+            const eip712Iface = new ethers.Interface(['function eip712Domain() view returns (bytes1,string,string,uint256,address,bytes32,uint256[])'])
+            const raw = await provider.call({ to: forwarderAddress, data: eip712Iface.encodeFunctionData('eip712Domain') })
+            const [, fwdName, fwdVer, fwdChainId] = eip712Iface.decodeFunctionResult('eip712Domain', raw)
+            if (fwdName !== domain.name) {
+              reason = `ERC2771ForwarderInvalidSigner — domain name mismatch: forwarder="${fwdName}" but signed with "${domain.name}"`
+            } else if (fwdChainId.toString() !== domain.chainId.toString()) {
+              reason = `ERC2771ForwarderInvalidSigner — chainId mismatch: forwarder=${fwdChainId} but signed with ${domain.chainId}`
+            } else if (fwdVer !== domain.version) {
+              reason = `ERC2771ForwarderInvalidSigner — version mismatch: forwarder="${fwdVer}" but signed with "${domain.version}"`
+            } else {
+              reason = `ERC2771ForwarderInvalidSigner — domain matches (name="${fwdName}" chainId=${fwdChainId}), nonce or deadline mismatch`
+            }
+          } catch (diagErr) {
+            reason = `ERC2771ForwarderInvalidSigner (domain read failed: ${diagErr.message})`
+          }
+        }
+
+        console.error('RELAY_SIM_FAIL:', reason)
+        return NextResponse.json({ error: `Simulation failed: ${reason}` }, { status: 400 })
+      }
+    } else {
+      console.log(`RELAY_SIM_SKIP: nonce=${fullRequest.nonce} > onChain=${onChainNonce} (pending tx path)`)
     }
 
     // eth_estimateGas on LUKSO returns no revert data and is unreliable.

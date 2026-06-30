@@ -952,6 +952,10 @@ export default function Chat() {
     } catch (error) {
       console.error('Messaging engine error:', error)
       updateMessageStatus(pendingId, 'error', error.message)
+      // Drop the locally-cached nonce so the next message fetches fresh from chain.
+      // Without this, a relay failure leaves currentNonce at the wrong (too-high) value
+      // and every subsequent queued message would also fail with a nonce mismatch.
+      currentNonce.current = null
     } finally {
       sendQueueRef.current.shift()
       isProcessingQueueRef.current = false
