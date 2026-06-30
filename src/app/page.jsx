@@ -129,7 +129,7 @@ export default function Page() {
     const nextPage = page + 1
 
     try {
-      const response = await getPosts(nextPage, 10)
+      const response = await getPosts(nextPage, 20)
 
       if (response.success && response.data.length > 0) {
         appendPosts(response)
@@ -167,7 +167,7 @@ export default function Page() {
     setIsRefreshing(true)
     setIsFetching(true)
     try {
-      const postsRes = await getPosts(1, 10, null, null, address)
+      const postsRes = await getPosts(1, 20, null, null, address)
       setInitialData([], postsRes)
       setPage(1)
       setNewPostsQueue([])
