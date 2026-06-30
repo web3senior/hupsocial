@@ -6,7 +6,7 @@ import CryptoJS from 'crypto-js'
 import { ethers } from 'ethers'
 import ecies from 'eciesjs'
 import { useChainId, useConnection, usePublicClient } from 'wagmi'
-import { getIPFS } from '@/lib/ipfs'
+import { getIPFS, uploadFileToIPFS } from '@/lib/ipfs'
 import clsx from 'clsx'
 import { ArrowUp, EllipsisVertical, MessageSquarePlus, Image as ImageIcon, SquarePlay, X, ChevronLeft, Smile, MoreHorizontal, Pencil, Trash2, Check } from 'lucide-react'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -232,19 +232,6 @@ export default function Chat() {
   })
 
   // ■■■ Media Handlers ■■■
-
-  const uploadFileToIPFS = async (fileOrBlob) => {
-    const data = new FormData()
-    // Append a generic filename to bypass potential multer/FormData restrictions on raw blobs
-    data.set('file', fileOrBlob, 'shrouded_asset.bin')
-    const uploadRequest = await fetch('/api/ipfs/file', {
-      method: 'POST',
-      body: data,
-    })
-    if (!uploadRequest.ok) throw new Error(`Upload failed: ${uploadRequest.status}`)
-    const result = await uploadRequest.json()
-    return result.cid
-  }
 
   const triggerFileInput = (type) => {
     if (mediaItems.length >= MAX_MEDIA_ITEMS) return

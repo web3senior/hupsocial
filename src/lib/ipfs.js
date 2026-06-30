@@ -1,6 +1,27 @@
+// Upload a File/Blob directly to Pinata via a presigned URL, bypassing the
+// Vercel 4.5 MB function payload limit. Returns the CID as "ipfs://<hash>".
+export async function uploadFileToIPFS(file) {
+  const filename = file.name ?? 'upload'
+
+  const presignRes = await fetch('/api/ipfs/presign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: filename, mimeType: file.type }),
+  })
+  if (!presignRes.ok) throw new Error('Failed to get presigned upload URL')
+  const { url } = await presignRes.json()
+
+  const form = new FormData()
+  form.append('file', file, filename)
+  const uploadRes = await fetch(url, { method: 'POST', body: form })
+  if (!uploadRes.ok) throw new Error(`Pinata upload failed: ${uploadRes.status}`)
+
+  const { data } = await uploadRes.json()
+  return `ipfs://${data.cid}`
+}
+
 /**
  * Fetches and parses JSON content from a specified IPFS gateway URL using the CID.
-
  */
 export const getIPFS = async (CID) => {
   // 1. Basic input validation

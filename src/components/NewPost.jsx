@@ -13,9 +13,10 @@ import styles from '@/components/NewPost.module.scss'
 import Profile from './Profile'
 import clsx from 'clsx'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
+import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
 
-const MAX_MEDIA_ITEMS = 4
-const MAX_MEDIA_SIZE_MB = 5
+const MAX_MEDIA_ITEMS = 8
+const MAX_MEDIA_SIZE_MB = 10
 const MAX_POST_LENGTH = 5000
 
 // ■■■ [Utility Helpers] ■■■
@@ -312,12 +313,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     if (!file) return null
     setIsUploading(true)
     try {
-      const data = new FormData()
-      data.set('file', file)
-      const uploadRequest = await fetch('/api/ipfs/file', { method: 'POST', body: data })
-      if (!uploadRequest.ok) throw new Error(`Upload failed with status ${uploadRequest.status}`)
-      const result = await uploadRequest.json()
-      return result.cid
+      return await uploadToIPFS(file)
     } catch (error) {
       console.error('Trouble uploading file:', error)
       toast('Error uploading file', 'error')

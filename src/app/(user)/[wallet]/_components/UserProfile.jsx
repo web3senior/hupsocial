@@ -18,6 +18,7 @@ import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
 import AISummary from '@/components/AISummary'
 import UPlogo from '@/../public/up.png'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
+import { uploadFileToIPFS } from '@/lib/ipfs'
 import LinksTab from '@/components/tabs/LinksTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
@@ -845,29 +846,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
   const linkURLRef = useRef()
 
   // Handlers
-  const uploadFileToIPFS = async (file) => {
-    try {
-      if (!file) {
-        console.error('No file selected.')
-        return
-      }
-
-      const data = new FormData()
-      data.set('file', file)
-
-      const uploadRequest = await fetch(`/api/ipfs/file`, {
-        method: 'POST',
-        body: data,
-      })
-      const signedUrl = await uploadRequest.json()
-
-      console.log(`cid: ${signedUrl.cid}`)
-      return signedUrl.cid
-    } catch (e) {
-      console.error('Trouble uploading file:', e)
-    }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isConnected) return
