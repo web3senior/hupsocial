@@ -8,6 +8,9 @@ export const usePostStore = create((set, get) => ({
   apps: { list: [] },
   TABS_DATA: [],
   hasInitialized: false,
+  currentPost: null,
+
+  setCurrentPost: (post) => set({ currentPost: post }),
 
   setInitialData: (apps, postsResponse) => {
     const initialPosts = postsResponse?.data || []

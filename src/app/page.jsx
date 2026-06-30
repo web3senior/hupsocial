@@ -17,7 +17,7 @@ const CommunitiesTab = lazy(() => import('@/components/tabs/CommunitiesTab'))
 
 export default function Page() {
   // ■■■ STATE & STORE ■■■
-  const { posts, postsLoaded, hasMore, hasInitialized, TABS_DATA, setInitialData, appendPosts } = usePostStore()
+  const { posts, postsLoaded, hasMore, hasInitialized, TABS_DATA, setInitialData, appendPosts, setCurrentPost } = usePostStore()
 
   const [isFetching, setIsFetching] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -111,7 +111,7 @@ export default function Page() {
   }, [mounted, posts?.list, address])
 
   // ■■■ HANDLERS ■■■
-  const handlePostClick = (postId, chainId) => {
+  const handlePostClick = (item) => {
     const selection = window.getSelection()
     if (selection && selection.toString().length > 0) return
 
@@ -119,7 +119,8 @@ export default function Page() {
       navigator.vibrate(200)
     }
 
-    router.push(`networks/${chainId}/${postId}`)
+    setCurrentPost(item)
+    router.push(`networks/${item.network_id}/${item.id}`)
   }
 
   const loadMorePosts = useCallback(async () => {
@@ -228,7 +229,7 @@ export default function Page() {
                 <section
                   key={item.id}
                   className={clsx(styles.post, 'animate', 'fade')}
-                  onClick={() => handlePostClick(item.id, item.network_id)}
+                  onClick={() => handlePostClick(item)}
                 >
                   <PostCard
                     item={item}

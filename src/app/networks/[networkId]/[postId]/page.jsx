@@ -2,7 +2,6 @@ import { cache } from 'react'
 import { getPostById } from '@/lib/api'
 import PageTitle from '@/components/PageTitle'
 import PostDetails from './_components/PostDetails'
-import { notFound } from 'next/navigation'
 import styles from './page.module.scss'
 import { resolveStorageUrl } from '@/lib/storageHelper'
 
@@ -73,31 +72,15 @@ export async function generateMetadata({ params }, parent) {
   }
 }
 
-export default async function Page({ params, searchParams }) {
-  // Resolve params and searchParams in parallel to avoid waterfalls
-  const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
-
+export default async function Page({ params }) {
+  const resolvedParams = await params
   const { networkId, postId } = resolvedParams
-  const advancedView = resolvedSearchParams?.advancedView === 'true'
-
-  // Fetch target post data directly on the server (shares cache with generateMetadata)
-  let post = null
-  try {
-    post = await fetchPost(networkId, postId)
-  } catch (error) {
-    console.error(`Failed to fetch post ${postId}:`, error)
-  }
-
-  // Trigger Next.js native 404 page if the post explicitly doesn't exist
-  if (!post || !post.data) {
-    notFound()
-  }
 
   return (
     <>
       <PageTitle name={`Post`} changeDocumentTitle={false} />
       <div className={`${styles.page}`}>
-        <PostDetails post={post.data} advancedMode={advancedView} />
+        <PostDetails networkId={networkId} postId={postId} />
       </div>
     </>
   )

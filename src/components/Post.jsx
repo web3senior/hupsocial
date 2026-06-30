@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useId, useRef, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { usePostStore } from '@/stores/usePostStore'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
 import { initHupContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getPostById, recordPostView } from '@/lib/api'
@@ -312,6 +314,8 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isMounted = useClientMounted()
+  const router = useRouter()
+  const { setCurrentPost } = usePostStore()
   const { address, isConnected } = useConnection()
   const { data: hash, isPending, writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -378,10 +382,17 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
           <div className={`${styles.postDropdown} flex flex-column align-items-center justify-content-start gap-050`}>
             <ul>
               <li>
-                <Link href={`/networks/${item.network_id}/${item.id}`}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setCurrentPost(item)
+                    router.push(`/networks/${item.network_id}/${item.id}`)
+                  }}
+                  style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}
+                >
                   <span>View</span>
                   <Eye size={16} />
-                </Link>
+                </button>
               </li>
               {address?.toLowerCase() === item.wallet_address?.toLowerCase() && item.is_repost < 1 && (
                 <li>
