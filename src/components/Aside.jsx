@@ -37,6 +37,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import NativePopover from './ui/NativePopover'
 import styles from './Aside.module.scss'
+import { GitHub } from './Icons'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
@@ -387,7 +388,7 @@ export default function Aside() {
                       onClick={close}
                       className="flex align-items-center gap-050"
                     >
-                      <Code size={16} />
+                      <GitHub />
                       <span>GitHub</span>
                     </a>
                   </li>
