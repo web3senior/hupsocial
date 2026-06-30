@@ -40,6 +40,11 @@ export async function generateMetadata({ params }, parent) {
     // Fall back to empty text string if body content cannot be resolved
     const bodyText = post?.data?.content?.elements?.[0]?.data?.text || ''
 
+    const fallbackImages = parentMetadata.openGraph?.images ?? [
+      { url: '/open-graph.png', width: 1200, height: 630, alt: 'Open Graph Image' },
+    ]
+    const ogImages = images.length > 0 ? images : fallbackImages
+
     // Construct unified dynamic metadata configuration payload
     const metadata = {
       // Slice the first 60 characters for the SEO title
@@ -49,12 +54,10 @@ export async function generateMetadata({ params }, parent) {
       description: bodyText.slice(0, 160).trim() || parentMetadata.description || 'View the details of this post on our platform.',
 
       // Build out Open Graph specific data representations
-      openGraph: images.length > 0 ? { images } : {},
+      openGraph: { images: ogImages },
 
-      // Use summary_large_image only when there's a post image, otherwise summary
-      twitter: images.length > 0
-        ? { card: 'summary_large_image', images }
-        : { card: 'summary' },
+      // Always use summary_large_image since we always have an OG image now
+      twitter: { card: 'summary_large_image', images: ogImages },
     }
 
     return metadata
