@@ -7,7 +7,7 @@ import clsx from 'clsx'
 import { getApps, getPosts } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { getActiveChain } from '@/lib/communication'
-import Post from '@/components/Post'
+import Post, { PostCard } from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import { usePostStore } from '@/stores/usePostStore'
@@ -230,11 +230,10 @@ export default function Page() {
                   className={clsx(styles.post, 'animate', 'fade')}
                   onClick={() => handlePostClick(item.id, item.network_id)}
                 >
-                  <Post
+                  <PostCard
                     item={item}
                     networkName={item.network_name}
                     actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'hash']}
-                    showLastComment={true}
                   />
                   {i < posts.list.length - 1 && <hr />}
                 </section>

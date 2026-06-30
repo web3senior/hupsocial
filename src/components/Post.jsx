@@ -35,7 +35,7 @@ import { Eye } from 'lucide-react'
 // import clsx from 'clsx'
 // import { PostText } from './PostText'
 
-export default function Post({ item, showContent, actions, chainId, showLastComment = false }) {
+export default function Post({ item, showContent, actions, chainId, hasCommentBelow = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showShareModal, setShowShareModal] = useState()
@@ -48,8 +48,6 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   })
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
-  const [lastComment, setLastComment] = useState(null)
-  const [isLastCommentLoading, setIsLastCommentLoading] = useState(false)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   const isActioned = Number(item.actioned_reports || 0) >= 3
   const repostedPostId = isRepost ? Number(item.is_repost) : null
@@ -109,50 +107,6 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
     return () => io.disconnect()
   }, [item.network_id, item.id, address])
 
-  // Retrieve the latest comment metadata for the active post context
-  useEffect(() => {
-    let cancelled = false
-
-    if (!commentTarget?.id || !commentTarget?.network_id || Number(commentTarget?.total_comments || 0) < 1) {
-      setLastComment(null)
-      return
-    }
-
-    setIsLastCommentLoading(true)
-    const params = new URLSearchParams({ last: 'true' })
-    if (address) params.set('viewer_address', address)
-
-    fetch(`/api/v1/networks/${commentTarget.network_id}/${commentTarget.id}/comments?${params.toString()}`)
-      .then(async (res) => {
-        const body = await res.json().catch(() => null)
-
-        if (!res.ok || body?.success === false) {
-          throw new Error(body?.error || 'Failed to fetch last comment')
-        }
-
-        return body
-      })
-      .then((res) => {
-        if (cancelled) return
-
-        const comment = Array.isArray(res?.data) ? res.data[0] : res?.data
-        setLastComment(comment || null)
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.error('[LAST_COMMENT_ERROR]:', error.message)
-          setLastComment(null)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLastCommentLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [commentTarget?.id, commentTarget?.network_id, commentTarget?.total_comments, address])
-
   // Extract raw source content string contextually based on data schema structure
   const getRawContentText = () => {
     if (displayItem?.content?.elements?.length > 1) {
@@ -162,9 +116,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
   }
 
   const sourceText = getRawContentText()
-  const lastCommentText = getCommentPreviewText(lastComment?.content)
   const actionsSet = useMemo(() => new Set(actions.map((a) => a.toLowerCase())), [actions])
-  const shouldReserveLastComment = showLastComment && Number(commentTarget?.total_comments || 0) > 0
 
   // Guard clause: Render global loading state until repost data is completely ready
   if (isRepost && isLoadingRepost) {
@@ -206,8 +158,7 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
         className={`${styles.post} flex flex-column align-items-start justify-content-between`}
         data-content={showContent ? true : false}
         data-commentable={item.allow_comment ? true : false}
-        data-has-comments={shouldReserveLastComment ? true : false}
-        data-has-last-comment={shouldReserveLastComment ? true : false}
+        data-has-comments={hasCommentBelow ? true : false}
       >
         {isRepost && (
           <div className={styles.post__repostLabel}>
@@ -352,13 +303,6 @@ export default function Post({ item, showContent, actions, chainId, showLastComm
           </div>
         </footer>
 
-        {shouldReserveLastComment && (
-          isLastCommentLoading
-            ? <LastCommentShimmer />
-            : lastComment && lastCommentText
-              ? <LastCommentPreview comment={lastComment} text={lastCommentText} />
-              : null
-        )}
       </section>
     </>
   )
@@ -483,28 +427,6 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   )
 }
 
-const LastCommentPreview = ({ comment, text }) => {
-  const commenterLabel =
-    comment?.display_name ||
-    (comment?.wallet_address ? `${comment.wallet_address.slice(0, 4)}...${comment.wallet_address.slice(-4)}` : 'Last comment')
-
-  return (
-    <aside className={styles.post__lastComment} onClick={(e) => e.stopPropagation()}>
-      <div className={styles.post__lastComment__avatar}>
-        <Profile variant="full" creator={comment.wallet_address} createdAt={comment.created_at} networkId={comment.network_id} />
-      </div>
-
-      <div className={styles.post__lastComment__body}>
-        <div
-          className={styles.post__lastComment__content}
-          dangerouslySetInnerHTML={{
-            __html: renderMarkdown(text),
-          }}
-        />
-      </div>
-    </aside>
-  )
-}
 
 const PostSkeleton = () => (
   <div style={{ padding: '20px 20px 0.5rem 20px' }}>
@@ -526,19 +448,63 @@ const LastCommentShimmer = () => (
   </aside>
 )
 
-function getCommentPreviewText(content) {
-  if (!content) return ''
+export function PostCard({ item, actions, chainId, networkName }) {
+  const [lastComment, setLastComment] = useState(null)
+  const [isLastCommentLoading, setIsLastCommentLoading] = useState(false)
+  const { address } = useConnection()
 
-  if (typeof content === 'string') {
-    try {
-      return getCommentPreviewText(JSON.parse(content))
-    } catch {
-      return content
+  const shouldFetch = Number(item?.total_comments || 0) > 0
+
+  useEffect(() => {
+    if (!shouldFetch || !item?.id || !item?.network_id) {
+      setLastComment(null)
+      return
     }
-  }
 
-  return content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
+    let cancelled = false
+    setIsLastCommentLoading(true)
+
+    const params = new URLSearchParams({ last: 'true' })
+    if (address) params.set('viewer_address', address)
+
+    fetch(`/api/v1/networks/${item.network_id}/${item.id}/comments?${params.toString()}`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => null)
+        if (!res.ok || body?.success === false) throw new Error(body?.error || 'Failed to fetch last comment')
+        return body
+      })
+      .then((res) => {
+        if (cancelled) return
+        const comment = Array.isArray(res?.data) ? res.data[0] : res?.data
+        setLastComment(comment || null)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('[LAST_COMMENT_ERROR]:', err.message)
+          setLastComment(null)
+        }
+      })
+      .finally(() => { if (!cancelled) setIsLastCommentLoading(false) })
+
+    return () => { cancelled = true }
+  }, [item?.id, item?.network_id, item?.total_comments, address, shouldFetch])
+
+  const hasCommentBelow = shouldFetch && (isLastCommentLoading || !!lastComment)
+
+  return (
+    <>
+      <Post item={item} actions={actions} chainId={chainId} networkName={networkName} hasCommentBelow={hasCommentBelow} />
+      {shouldFetch && (
+        isLastCommentLoading
+          ? <LastCommentShimmer />
+          : lastComment
+            ? <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'hash']} chainId={chainId} />
+            : null
+      )}
+    </>
+  )
 }
+
 
 const ReportModal = ({ item, setShowReportModal }) => {
   const { address } = useConnection()

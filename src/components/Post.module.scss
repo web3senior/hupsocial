@@ -96,6 +96,7 @@
     background: transparent;
     height: 40px;
     padding-right: 1rem;
+    text-align: left;
   }
 
   &__flagBanner {
@@ -123,10 +124,18 @@
     &__content {
       overflow: hidden;
       line-height: 1.4;
+      padding-bottom: .3rem;
       position: relative;
-      padding: 0.2rem 0 0.2rem 0.3rem;
       white-space: pre-wrap;
       word-wrap: break-word;
+
+      p {
+        margin: 0;
+
+        &:empty {
+          display: none;
+        }
+      }
 
       &_collapsed {
         max-height: 180px;

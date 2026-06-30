@@ -10,7 +10,7 @@ function escapeAttr(value) {
 }
 
 export function renderMarkdown(markdown) {
-  const content = typeof markdown === 'string' ? markdown : ''
+  const content = typeof markdown === 'string' ? markdown.trim() : ''
 
   const renderer = new marked.Renderer()
 
@@ -39,5 +39,5 @@ export function renderMarkdown(markdown) {
   return DOMPurify.sanitize(dirtyHtml, {
     ADD_TAGS: ['span'],
     ADD_ATTR: ['target', 'rel', 'data-symbol', 'data-chain', 'data-address'],
-  })
+  }).trim()
 }
