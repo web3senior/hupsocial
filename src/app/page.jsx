@@ -74,7 +74,7 @@ export default function Page() {
       if (hasInitialized || isFetchingRef.current) return
 
       try {
-        const postsRes = await getPosts(1, 10, null, null, address)
+        const postsRes = await getPosts(1, 20, null, null, address)
         setInitialData([], postsRes)
       } catch (error) {
         console.error('Initialization error:', error)
