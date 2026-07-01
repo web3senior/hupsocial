@@ -464,7 +464,7 @@ const Profile = ({ addr }) => {
                     <span>·</span>
                     <button className={styles.btnFollowers} type="button">
                       <span>
-                        {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(viewCount)} recent views
+                        {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(++viewCount)} recent views
                       </span>
                     </button>
                   </>
