@@ -6,6 +6,27 @@ import { decryptData, encryptData } from './cryptoHelper'
 export const ENCRYPTED_APP_KEY_STORAGE = 'encryptedAppKey'
 export const APP_PASSWORD_SESSION_STORAGE = 'localPassword'
 
+const LAST_WALLET_KEY = '_lastWallet'
+
+// Clears all vault / burner / session keys when the connected wallet changes.
+// Call this at the start of any effect that reads vault data.
+// Returns true if stale data was cleared.
+export function clearVaultIfWalletChanged(address) {
+  if (!address || typeof window === 'undefined') return false
+  const current = address.toLowerCase()
+  const last = localStorage.getItem(LAST_WALLET_KEY)
+  localStorage.setItem(LAST_WALLET_KEY, current)
+  if (!last || last === current) return false
+
+  const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
+  localStorage.removeItem(ENCRYPTED_APP_KEY_STORAGE)
+  localStorage.removeItem(`${prefix}chat_burner_key`)
+  localStorage.removeItem(`${prefix}chat_burner_address`)
+  sessionStorage.removeItem(APP_PASSWORD_SESSION_STORAGE)
+  sessionStorage.removeItem(`${prefix}chat_unlocked_burner_key`)
+  return true
+}
+
 function normalizePrivateKeyHex(rawHex) {
   if (!rawHex || typeof rawHex !== 'string') return null
   const withoutPrefix = rawHex.startsWith('0x') ? rawHex.slice(2) : rawHex

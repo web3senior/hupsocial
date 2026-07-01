@@ -41,7 +41,7 @@ export const useLastMessage = (topic) => {
   const tunnelAddress = activeChainContracts?.chat
 
   const { data, isLoading } = useSWR(
-    topic && tunnelAddress && publicClient ? `last-msg-${topic}` : null,
+    topic && tunnelAddress && publicClient && address ? `last-msg-${address.toLowerCase()}-${topic}` : null,
     async () => {
       try {
         const keys = await unlockAppKeyFromStorage()

@@ -1187,14 +1187,20 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
     },
   )
 
-  // Track layout heights to evaluate if the content body needs a show-more interface
   useEffect(() => {
     if (!isCollapsible) return
     const el = contentRef.current
     if (!el) return
 
-    setCanShowMore(el.scrollHeight > el.clientHeight)
-  }, [sourceText, showTranslation, translatedText, isCollapsible])
+    const measure = () => {
+      if (!isExpanded) setCanShowMore(el.scrollHeight > el.clientHeight)
+    }
+    measure()
+
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [isCollapsible, isExpanded, sourceText, showTranslation, translatedText])
 
   const handleToggleTranslation = (e) => {
     e.stopPropagation()

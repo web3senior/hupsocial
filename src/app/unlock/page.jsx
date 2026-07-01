@@ -3,12 +3,14 @@
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import styles from './page.module.scss'
-import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage, unlockAppKeyWithPassword } from '@/lib/appVault'
+import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage, unlockAppKeyWithPassword, clearVaultIfWalletChanged } from '@/lib/appVault'
+import { useConnection } from 'wagmi'
 
 export default function Page() {
   const [password, setPassword] = useState('')
   const [isUnlocking, setIsUnlocking] = useState(false)
   const router = useRouter()
+  const { address } = useConnection()
 
   const unlock = async () => {
     if (!password) {
@@ -29,9 +31,11 @@ export default function Page() {
   }
 
   useEffect(() => {
+    clearVaultIfWalletChanged(address)
+
     const encryptedAppKey = localStorage.getItem(ENCRYPTED_APP_KEY_STORAGE)
     if (!encryptedAppKey) {
-      router.push('/setup')
+      router.push('/register')
       return
     }
 
@@ -45,7 +49,7 @@ export default function Page() {
       .catch(() => {
         sessionStorage.removeItem(APP_PASSWORD_SESSION_STORAGE)
       })
-  }, [router])
+  }, [router, address])
 
   return (
     <>

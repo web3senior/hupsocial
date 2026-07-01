@@ -4,15 +4,19 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import Chat from '@/app/chat/_components/Chat'
-import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
+import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage, clearVaultIfWalletChanged } from '@/lib/appVault'
+import { useConnection } from 'wagmi'
 import styles from './page.module.scss'
 
 export default function Page() {
   const [activeTab] = useState('chat')
   const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
+  const { address } = useConnection()
 
   useEffect(() => {
+    clearVaultIfWalletChanged(address)
+
     const key = localStorage.getItem(ENCRYPTED_APP_KEY_STORAGE)
     const sessionPassword = sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
 
@@ -39,7 +43,7 @@ export default function Page() {
         sessionStorage.removeItem(APP_PASSWORD_SESSION_STORAGE)
         router.push('/unlock')
       })
-  }, [router])
+  }, [router, address])
 
   if (!isAuthorized) {
     return null

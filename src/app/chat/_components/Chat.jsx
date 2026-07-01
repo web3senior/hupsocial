@@ -13,7 +13,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { bytesToHex, encodeFunctionData } from 'viem'
 import { ContentSpinner, MessageLoader } from '@/components/Loading'
 import { chatLocalStorageBurnerKey, chatLocalStorageBurnerAddress, chatSessionStorageUnlockedKey, CHAT_ZERO_ADDRESS as ZERO_ADDRESS } from '@/lib/chatBurnerSession'
-import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage } from '@/lib/appVault'
+import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFromStorage, clearVaultIfWalletChanged } from '@/lib/appVault'
 import { decryptData } from '@/lib/cryptoHelper'
 import { getActiveChain } from '@/lib/communication'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
@@ -188,6 +188,7 @@ export default function Chat() {
   const [contactInput, setContactInput] = useState('')
   const [contactError, setContactError] = useState('')
   const contactsInitializedRef = useRef(false)
+  const prevAddressRef = useRef(null)
   const activeReceiverRef = useRef(null)
   const chatIntervalRef = useRef(null)
   const scrollRef = useRef(null)
@@ -1067,10 +1068,27 @@ export default function Chat() {
 
   useEffect(() => {
     if (!isMounted) return
+    clearVaultIfWalletChanged(address)
     const hasVault = !!localStorage.getItem(ENCRYPTED_APP_KEY_STORAGE)
     const hasBurner = !!localStorage.getItem(chatLocalStorageBurnerAddress)
     if (!hasVault || !hasBurner) router.replace('/register')
-  }, [isMounted, router])
+  }, [isMounted, address, router])
+
+  useEffect(() => {
+    if (!address) return
+    const prev = prevAddressRef.current
+    prevAddressRef.current = address
+    if (!prev || prev === address) return
+    contactsInitializedRef.current = false
+    if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
+    setContacts([])
+    setReceiverAddress('')
+    activeReceiverRef.current = null
+    setShowChat(false)
+    setChatHistory({ list: [], isLoading: false })
+    setPendingMessages([])
+    setPendingMessage(null)
+  }, [address])
 
   useEffect(() => {
     if (!isMounted || !isConnected || !address || !publicClient || !tunnelAddress) return
@@ -1143,7 +1161,7 @@ export default function Chat() {
 
   useEffect(() => {
     if (!isConnected) contactsInitializedRef.current = false
-  }, [isConnected])
+  }, [isConnected, address])
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight

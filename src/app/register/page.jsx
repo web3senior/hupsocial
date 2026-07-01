@@ -7,7 +7,7 @@ import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
 import abiChat from '@/abis/Chat.json'
-import { unlockAppKeyFromStorage, unlockAppKeyWithPassword, lockAppPrivateKey, APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE } from '@/lib/appVault'
+import { unlockAppKeyFromStorage, unlockAppKeyWithPassword, lockAppPrivateKey, APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, clearVaultIfWalletChanged } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
 import { EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, CheckIcon, CopyIcon, UploadIcon, DatabaseIcon } from 'lucide-react'
@@ -95,6 +95,8 @@ export default function Register() {
   // ─── Status Polling ──────────────────────────────────────────────────────
 
   const checkStatus = useCallback(async () => {
+    clearVaultIfWalletChanged(address)
+
     const vaultExists = !!localStorage.getItem(ENCRYPTED_APP_KEY_STORAGE)
     const burnerExists = !!localStorage.getItem(chatLocalStorageBurnerKey)
     setHasLocalVault(vaultExists)
