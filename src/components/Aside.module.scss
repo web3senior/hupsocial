@@ -203,45 +203,6 @@
   cursor: pointer;
   will-change: transform;
   transition: transform 0.2s ease;
-
-  &:before {
-    content: '';
-    position: absolute;
-    left: -2px;
-    bottom: 1px;
-    width: 15px;
-    height: 21px;
-    background-image: url('/socer-ball-light.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-    z-index: -1;
-  }
-
-  &__ball {
-    position: absolute;
-    left: -3px;
-    bottom: -3px;
-    width: 100px; // Set to your preferred size
-    height: 100px;
-    transform-origin: center center;
-    filter: drop-shadow(0 0 1px var(--purple));
-    width: 22px;
-    height: 22px;
-
-    animation: spin-and-zoom 3s ease-in-out 1;
-
-    &:hover {
-      animation: spin-and-zoom 3s ease-in-out 1;
-    }
-  }
-
-  // &:hover {
-  //   transform: scale(1.03);
-  // }
-
-  // &:active {
-  //   transform: scale(0.98);
-  // }
 }
 
 .logoWrapper img {

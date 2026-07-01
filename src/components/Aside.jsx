@@ -12,7 +12,6 @@ import {
   Book,
   Bug,
   Circle,
-  Code,
   Equal,
   Heart,
   HelpCircle,
@@ -31,7 +30,6 @@ import {
   Plus,
 } from 'lucide-react'
 import logo from '@/../public/logo.svg'
-import socerBall from '@/../public/socer-ball.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -252,7 +250,6 @@ export default function Aside() {
           <div className={styles.logoWrapper}>
             <Link href="/" className="flex align-items-center gap-025" aria-label="Home">
               <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
-              <Image src={socerBall} alt="World Cup" className={styles.logoWrapper__ball} />
               {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
             </Link>
           </div>
