@@ -14,6 +14,25 @@ import {
   lineaSepolia,
 } from 'wagmi/chains'
 import { injected, safe, walletConnect } from 'wagmi/connectors'
+import { defineChain } from 'viem'
+
+// Robinhood Chain (Arbitrum Orbit L2, ETH as native gas token)
+export const robinhood = defineChain({
+  id: 4663,
+  name: 'Robinhood',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: {
+      http: [`https://rpc.mainnet.chain.robinhood.com`],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Blockscout',
+      url: `https://robinhoodchain.blockscout.com`,
+    },
+  },
+})
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 // const noopStorage = {
@@ -30,6 +49,7 @@ export const CONTRACTS = {
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
+    store: '0x55B164895A2a99FDA5f14E8aFE3Dc7EFb5a440D5',
   },
   chain143: {
     name: 'monad',
@@ -38,6 +58,7 @@ export const CONTRACTS = {
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
     chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
+    store: '',
   },
   chain42220: {
     name: 'celo',
@@ -45,18 +66,29 @@ export const CONTRACTS = {
     hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
     status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
     chat: '',
+    store: '',
   },
   chain8453: {
     name: 'base',
     forwarder: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
+    store: '',
   },
   chain56: {
     name: 'bnb',
     forwarder: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
     status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
+    store: '',
+  },
+  chain4663: {
+    name: 'robinhood',
+    forwarder: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
+    hup: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
+    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    chat: '',
+    store: '',
   },
   chain10143: {
     name: 'monad-testnet',
@@ -65,6 +97,7 @@ export const CONTRACTS = {
     status: '',
     community: '0x021Ee55BaA5058A38A4BF3AAbd90f5c1b31068CD',
     nft: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F', // GenesisHup
+    store: '',
   },
 }
 
@@ -125,6 +158,11 @@ somniaTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none
 somniaTestnet.primaryColor = `#000`
 somniaTestnet.textColor = `#F50947`
 
+// Robinhood
+robinhood.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12346_3576)"><path d="M0 0H18V18H0V0Z" fill="#CCFF00"/><path d="M10.4083 4.83522H6.95223C6.82718 4.83522 6.72145 4.88525 6.63391 4.99438L4.15557 8.06389C3.79178 8.51863 3.70083 8.93927 3.70083 9.5418V12.6795C2.89366 14.9419 2.38208 16.4766 2.00691 17.8636C1.98418 17.9523 2.01828 18 2.09786 18H2.47303C2.54124 18 2.60945 17.9659 2.63218 17.9091C5.46295 10.7014 8.54383 7.13167 10.4765 4.99438C10.5561 4.90344 10.522 4.83522 10.4083 4.83522Z" fill="black"/><path d="M10.5108 1.29869C10.2789 1.3885 10.056 1.54084 9.95371 1.62838C8.93054 2.50376 8.24843 3.19724 7.60042 3.87935C7.52084 3.95893 7.55495 4.03851 7.66864 4.03851H11.4998C11.8523 4.03851 12.0569 4.24314 12.0569 4.59557V8.91562C12.0569 9.0293 12.1478 9.06341 12.2161 8.96109L14.5239 5.94843C14.899 5.45958 15.0127 5.31179 15.115 4.62968C15.2515 3.62924 15.1719 2.09449 14.5693 1.45785C14.035 0.889424 11.6249 0.866687 10.5108 1.29869Z" fill="black"/><path d="M11.0904 5.69919C8.71433 8.34806 6.86126 11.1334 5.14461 14.4871C5.10141 14.5712 5.15598 14.6462 5.25829 14.6121L8.80528 13.5207C9.20545 13.398 9.43055 13.2365 9.62382 12.9182L11.204 10.3148C11.2381 10.2466 11.2495 10.167 11.2495 10.1102V5.7674C11.2495 5.65372 11.1699 5.60824 11.0904 5.69919Z" fill="black"/></g><defs><clipPath id="clip0_12346_3576"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+robinhood.primaryColor = `#00C805`
+robinhood.textColor = `#fff`
+
 // BNB
 bsc.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10769_2638)"><rect width="18" height="18" fill="#0E0F13"/><path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10769_2638)"/><path d="M4.57333 3.45333L8.66667 1L12.76 3.45333L11.2533 4.36L8.66667 2.81333L6.08 4.36L4.57333 3.45333ZM12.76 6.54667L11.2533 5.64L8.66667 7.18667L6.08 5.64L4.57333 6.54667V8.33333L7.16 9.88V13L8.66667 13.9067L10.1733 13V9.89333L12.76 8.34667V6.54667ZM12.76 11.44V9.62667L11.2533 10.5333V12.3467L12.76 11.44ZM13.8267 12.08L11.24 13.6267V15.44L15.3333 12.9867V8.09333L13.8267 8.98667V12.08ZM12.32 5L13.8267 5.90667V7.70667L15.3333 6.81333V5L13.8267 4.09333L12.32 5ZM7.16 14.28V16.0933L8.66667 17L10.1733 16.0933V14.28L8.66667 15.1867L7.16 14.28ZM4.57333 11.44L6.08 12.3467V10.5333L4.57333 9.62667V11.44ZM7.16 5L8.66667 5.90667L10.1733 5L8.66667 4.09333L7.16 5ZM3.50667 5.90667L5.01333 5L3.50667 4.09333L2 5V6.81333L3.50667 7.70667V5.90667ZM3.50667 8.98667L2 8.09333V12.9867L6.09333 15.44V13.6267L3.50667 12.08V9V8.98667Z" fill="#F0B90B"/></g><defs><linearGradient id="paint0_linear_10769_2638" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"><stop stop-color="#1A1E21"/><stop offset="1" stop-color="#06060A"/></linearGradient><clipPath id="clip0_10769_2638"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
 bsc.primaryColor = `#F0B90B`
@@ -139,7 +177,7 @@ sepolia.textColor = `#fff`
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
 export const config = createConfig({
-  chains: [lukso, celo, base, monad, bsc, monadTestnet], //somniaTestnet
+  chains: [lukso, celo, base, monad, bsc, robinhood, monadTestnet], //somniaTestnet
   connectors: [injected(), walletConnect({ projectId }), safe()],
   transports: {
     [lukso.id]: http(),
@@ -147,6 +185,7 @@ export const config = createConfig({
     [base.id]: http(),
     [monad.id]: http(),
     [bsc.id]: http(),
+    [robinhood.id]: http(),
     [monadTestnet.id]: http(),
   },
   ssr: true,
