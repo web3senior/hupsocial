@@ -68,12 +68,18 @@
   }
 }
 
+.filterbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
 .filters {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-bottom: 1.25rem;
 
   &__chip {
     display: inline-flex;

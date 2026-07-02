@@ -25,12 +25,14 @@ const fetcher = async (url) => {
 
 export default function AppsPage() {
   const [categoryId, setCategoryId] = useState('all')
+  const [networkId, setNetworkId] = useState('all')
   const [query, setQuery] = useState('')
 
   const { data, error, isLoading } = useSWR('/api/v1/apps', fetcher)
 
   const apps = useMemo(() => data?.data || [], [data])
   const categories = data?.meta?.categories || []
+  const networks = data?.meta?.networks || []
   const total = data?.meta?.total || 0
 
   const filteredApps = useMemo(() => {
@@ -38,6 +40,7 @@ export default function AppsPage() {
 
     return apps.filter((app) => {
       if (categoryId !== 'all' && app.category.id !== categoryId) return false
+      if (networkId !== 'all' && app.network.id !== networkId) return false
       if (!search) return true
 
       const haystack = [app.name, app.description, app.category.name, app.network.name, ...app.tags]
@@ -47,7 +50,7 @@ export default function AppsPage() {
 
       return haystack.includes(search)
     })
-  }, [apps, categoryId, query])
+  }, [apps, categoryId, networkId, query])
 
   return (
     <>
@@ -72,29 +75,56 @@ export default function AppsPage() {
             </label>
           </header>
 
-          <nav className={styles.filters} aria-label="App categories">
-            <button
-              type="button"
-              className={clsx(styles.filters__chip, categoryId === 'all' && styles['filters__chip--active'])}
-              onClick={() => setCategoryId('all')}
-            >
-              <LayoutGrid size={14} aria-hidden="true" />
-              <span>All</span>
-              <small>{total}</small>
-            </button>
-
-            {categories.map((category) => (
+          <div className={styles.filterbar}>
+            <nav className={styles.filters} aria-label="App categories">
               <button
-                key={category.id}
                 type="button"
-                className={clsx(styles.filters__chip, categoryId === category.id && styles['filters__chip--active'])}
-                onClick={() => setCategoryId(category.id)}
+                className={clsx(styles.filters__chip, categoryId === 'all' && styles['filters__chip--active'])}
+                onClick={() => setCategoryId('all')}
               >
-                <span>{category.name}</span>
-                <small>{category.app_count}</small>
+                <LayoutGrid size={14} aria-hidden="true" />
+                <span>All</span>
+                <small>{total}</small>
               </button>
-            ))}
-          </nav>
+
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={clsx(styles.filters__chip, categoryId === category.id && styles['filters__chip--active'])}
+                  onClick={() => setCategoryId(category.id)}
+                >
+                  <span>{category.name}</span>
+                  <small>{category.app_count}</small>
+                </button>
+              ))}
+            </nav>
+
+            {networks.length > 0 && (
+              <nav className={styles.filters} aria-label="App networks">
+                <button
+                  type="button"
+                  className={clsx(styles.filters__chip, networkId === 'all' && styles['filters__chip--active'])}
+                  onClick={() => setNetworkId('all')}
+                >
+                  <Globe size={14} aria-hidden="true" />
+                  <span>All networks</span>
+                </button>
+
+                {networks.map((network) => (
+                  <button
+                    key={network.id}
+                    type="button"
+                    className={clsx(styles.filters__chip, networkId === network.id && styles['filters__chip--active'])}
+                    onClick={() => setNetworkId(network.id)}
+                  >
+                    <span>{network.name}</span>
+                    <small>{network.app_count}</small>
+                  </button>
+                ))}
+              </nav>
+            )}
+          </div>
 
           {error ? (
             <div className={styles.state}>
