@@ -144,12 +144,12 @@ export default function HelpCenter() {
         <form onSubmit={handleSubmitTicket} className={styles.ticketForm}>
           {isConnected ? (
             <div className={styles.walletHint}>
-              Connected wallet <strong>{address.slice(0, 6)}...{address.slice(-4)}</strong> will be automatically attached to this support profile payload.
+              Connected wallet <strong>{address.slice(0, 6)}...{address.slice(-4)}</strong> will be automatically attached to this support profile.
             </div>
           ) : (
             <div className={styles.walletHint}>
               <GuestIcon size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-              You are currently browsing as a guest. A secure visitor identity token will be assigned to track this ticket request.
+              You are currently browsing as a guest. A secure visitor identity token will be assigned to track this ticket.
             </div>
           )}
 
@@ -163,8 +163,9 @@ export default function HelpCenter() {
             >
               <option value="general">General Protocol Question</option>
               <option value="indexing">Profile Sync / Indexing Issue</option>
-              <option value="transaction">On-Chain Transaction Problem</option>
+              <option value="transaction">Onchain Transaction Problem</option>
               <option value="bug">Bug Report / App Error</option>
+              <option value="app_listing">List My App on the Apps Page</option>
               <option value="feedback">Feedback / Suggestion</option>
             </select>
           </div>
@@ -198,7 +199,11 @@ export default function HelpCenter() {
             <label htmlFor="message">Message Description</label>
             <textarea
               id="message"
-              placeholder="Provide explicit operational details regarding your issue..."
+              placeholder={
+                category === 'app_listing'
+                  ? 'Tell us about your app: name, category (AI, DeFi, DAO, NFT...), network, website URL, logo, short description, and social/repo links...'
+                  : 'Provide explicit operational details regarding your issue...'
+              }
               required
               value={message}
               onChange={(e) => setMessage(e.target.value)}
