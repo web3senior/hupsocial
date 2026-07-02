@@ -1,151 +1,194 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import useSWRInfinite from 'swr/infinite'
-import { ArrowDown, Eye, Flame, Heart, Medal, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
+import useSWR from 'swr'
+import { Code2, ExternalLink, Globe, LayoutGrid, Link2, Search } from 'lucide-react'
 import PageTitle from '@/components/PageTitle'
-import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
-import Profile from '@/components/Profile'
 import clsx from 'clsx'
 import styles from './page.module.scss'
 
-const DEFAULT_AVATAR = '/default-pfp.svg'
-const PAGE_SIZE = 20
-
-const PERIOD_OPTIONS = [
-  { value: 'all', label: 'All time' },
-  { value: '30d', label: '30D' },
-  { value: '7d', label: '7D' },
-]
-
-const SORT_OPTIONS = [
-  { value: 'score', label: 'Score' },
-  { value: 'engagement', label: 'Engagement' },
-  { value: 'posts', label: 'Posts' },
-  { value: 'views', label: 'Views' },
-]
-
-const numberFormatter = new Intl.NumberFormat('en-US')
 const compactFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1,
 })
-
-const EMPTY_STATS = {
-  active_users: 0,
-  root_posts: 0,
-  comments: 0,
-  likes: 0,
-  views: 0,
-}
 
 const fetcher = async (url) => {
   const response = await fetch(url)
   const json = await response.json()
 
   if (!response.ok || !json.success) {
-    throw new Error(json.error || 'Leaderboard failed to load')
+    throw new Error(json.error || 'Apps failed to load')
   }
 
   return json
 }
 
-export default function LeaderboardPage() {
-  const router = useRouter()
-  const [period, setPeriod] = useState('all')
-  const [sort, setSort] = useState('score')
-  const [networkId, setNetworkId] = useState('all')
+export default function AppsPage() {
+  const [categoryId, setCategoryId] = useState('all')
+  const [query, setQuery] = useState('')
 
-  const getKey = (pageIndex, previousPageData) => {
-    if (previousPageData && !previousPageData.meta?.hasMore) return null
+  const { data, error, isLoading } = useSWR('/api/v1/apps', fetcher)
 
-    const params = new URLSearchParams({
-      page: String(pageIndex + 1),
-      limit: String(PAGE_SIZE),
-      period,
-      sort,
+  const apps = useMemo(() => data?.data || [], [data])
+  const categories = data?.meta?.categories || []
+  const total = data?.meta?.total || 0
+
+  const filteredApps = useMemo(() => {
+    const search = query.trim().toLowerCase()
+
+    return apps.filter((app) => {
+      if (categoryId !== 'all' && app.category.id !== categoryId) return false
+      if (!search) return true
+
+      const haystack = [app.name, app.description, app.category.name, app.network.name, ...app.tags]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(search)
     })
-
-    if (networkId !== 'all') {
-      params.set('network_id', networkId)
-    }
-
-    return `/api/v1/leaderboard?${params.toString()}`
-  }
-
-  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite(getKey, fetcher, {
-    persistSize: false,
-    revalidateFirstPage: false,
-  })
-
-  const leaders = useMemo(() => data?.flatMap((pageData) => pageData.data || []) || [], [data])
-  const meta = data?.[data.length - 1]?.meta || data?.[0]?.meta || { stats: EMPTY_STATS, networks: [] }
-  const stats = meta?.stats || EMPTY_STATS
-  const networks = meta?.networks || []
-  const topLeaders = useMemo(() => leaders.slice(0, 3), [leaders])
-  const hasMore = Boolean(meta?.hasMore)
-  const isLoadingMore = isValidating && size > 1
-
-  const openProfile = (walletAddress) => {
-    if (!walletAddress) return
-    router.push(`/${walletAddress}`)
-  }
+  }, [apps, categoryId, query])
 
   return (
     <>
       <PageTitle name="Apps" />
       <div className={clsx(styles.page, 'animate', 'fade')}>
-        <div className={`__container ${styles.page__container} ${styles['animated-soft-background']}`} data-width="medium">
-          <div className={styles.gradientBgContainer}>
-            <div className={styles.blurWrapper}>
-              <div className={styles.blobBlue} />
-              <div className={styles.blobPink} />
-              <div className={styles.blobPurple} />
-              <div className={styles.blobYellow} />
+        <div className={`__container ${styles.page__container}`} data-width="medium">
+          <header className={styles.page__header}>
+            <div className={styles.page__heading}>
+              <h1>Apps</h1>
+              <p>{total > 0 ? `Discover ${compactFormatter.format(total)} apps building across the ecosystem` : 'Discover apps building across the ecosystem'}</p>
             </div>
 
-            <>Coming soon - we're working hard to bring you an exciting new experience! Stay tuned for updates.</>
-          </div>
+            <label className={styles.search}>
+              <Search size={16} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search apps, tags, networks..."
+                aria-label="Search apps"
+              />
+            </label>
+          </header>
+
+          <nav className={styles.filters} aria-label="App categories">
+            <button
+              type="button"
+              className={clsx(styles.filters__chip, categoryId === 'all' && styles['filters__chip--active'])}
+              onClick={() => setCategoryId('all')}
+            >
+              <LayoutGrid size={14} aria-hidden="true" />
+              <span>All</span>
+              <small>{total}</small>
+            </button>
+
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                className={clsx(styles.filters__chip, categoryId === category.id && styles['filters__chip--active'])}
+                onClick={() => setCategoryId(category.id)}
+              >
+                <span>{category.name}</span>
+                <small>{category.app_count}</small>
+              </button>
+            ))}
+          </nav>
+
+          {error ? (
+            <div className={styles.state}>
+              <p>{error.message}</p>
+            </div>
+          ) : isLoading ? (
+            <AppsSkeleton />
+          ) : filteredApps.length === 0 ? (
+            <div className={styles.state}>
+              <p>No apps found{query ? ` for "${query}"` : ''}.</p>
+            </div>
+          ) : (
+            <ul className={styles.grid}>
+              {filteredApps.map((app) => (
+                <AppCard key={app.id} app={app} />
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </>
   )
 }
 
-function StatCard({ icon: Icon, label, value }) {
+function AppCard({ app }) {
   return (
-    <div className={styles.statCard}>
-      <Icon size={16} />
-      <span>{label}</span>
-      <strong>{compactFormatter.format(value)}</strong>
-    </div>
+    <li className={styles.card}>
+      <div className={styles.card__header}>
+        <AppLogo name={app.name} logo={app.logo} />
+
+        <div className={styles.card__title}>
+          <h3>{app.name}</h3>
+          <div className={styles.card__badges}>
+            <span className={styles.card__category}>{app.category.name}</span>
+            {app.network.name && <span className={styles.card__network}>{app.network.name}</span>}
+          </div>
+        </div>
+      </div>
+
+      {app.description && <p className={styles.card__description}>{app.description}</p>}
+
+      {app.tags.length > 0 && (
+        <div className={styles.card__tags}>
+          {app.tags.slice(0, 5).map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
+        </div>
+      )}
+
+      <div className={styles.card__footer}>
+        <div className={styles.card__links}>
+          {app.repo && (
+            <a href={app.repo} target="_blank" rel="noopener noreferrer" title="Repository" aria-label={`${app.name} repository`}>
+              <Code2 size={16} />
+            </a>
+          )}
+          {app.links.map((link) => (
+            <a key={`${link.name}-${link.url}`} href={link.url} target="_blank" rel="noopener noreferrer" title={link.name} aria-label={`${app.name} on ${link.name}`}>
+              <Link2 size={16} />
+            </a>
+          ))}
+        </div>
+
+        {app.url && (
+          <a className={styles.card__visit} href={app.url} target="_blank" rel="noopener noreferrer">
+            <Globe size={14} aria-hidden="true" />
+            <span>Visit</span>
+            <ExternalLink size={13} aria-hidden="true" />
+          </a>
+        )}
+      </div>
+    </li>
   )
 }
 
-function Metric({ icon: Icon, label, value }) {
-  return (
-    <span className={styles.metric} title={label}>
-      <Icon size={15} />
-      <span>{compactFormatter.format(value)}</span>
-    </span>
-  )
+function AppLogo({ name, logo }) {
+  const [failed, setFailed] = useState(false)
+
+  if (!logo || failed) {
+    return (
+      <span className={styles.card__logoFallback} aria-hidden="true">
+        {(name || '?').slice(0, 1).toUpperCase()}
+      </span>
+    )
+  }
+
+  return <img className={styles.card__logo} src={logo} alt={`${name} logo`} loading="lazy" onError={() => setFailed(true)} />
 }
 
-function RankBadge({ rank }) {
+function AppsSkeleton() {
   return (
-    <span className={styles.rankBadge}>
-      {rank <= 3 ? <Medal size={16} /> : null}
-      <span>#{rank}</span>
-    </span>
-  )
-}
-
-function LeaderboardSkeleton() {
-  return (
-    <div className={styles.skeletonList} aria-label="Loading leaderboard">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className={styles.skeletonRow}>
+    <div className={styles.skeleton} aria-label="Loading apps">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className={styles.skeleton__card}>
           <span />
           <div />
           <p />
@@ -153,16 +196,4 @@ function LeaderboardSkeleton() {
       ))}
     </div>
   )
-}
-
-function getRankClass(rank) {
-  if (rank === 1) return styles.rankFirst
-  if (rank === 2) return styles.rankSecond
-  if (rank === 3) return styles.rankThird
-  return ''
-}
-
-function formatWallet(wallet = '') {
-  if (wallet.length <= 12) return wallet
-  return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
 }
