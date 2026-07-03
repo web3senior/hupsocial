@@ -25,12 +25,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: .7rem 1.2rem;
+  padding: 0.7rem 1.2rem;
   background-color: var(--search-bg, var(--surface-muted));
   border: 1px solid var(--border);
   color: var(--text-muted);
   width: 100%;
-  
 
   &__input {
     min-width: 220px;
@@ -47,29 +46,6 @@
   }
 }
 
-// Global Theme Hooks
-:global([data-theme='light']) {
-  .search {
-    --search-bg: var(--gray-050); 
-    --border: var(--gray-200);
-
-    svg {
-      color: var(--gray-400)
-    }
-  }
-}
-
-:global([data-theme='dark']) {
-  .search {
-    --search-bg: #20232a;
-  }
-}
-
-:global([data-theme='terminal']) {
-  .search {
-    --search-bg: #12301c;
-  }
-}
 .filterbar {
   display: flex;
   flex-direction: column;
@@ -139,15 +115,6 @@
   transition:
     border-color 0.15s ease,
     transform 0.15s ease;
-
-    :global([data-theme='dark']) .post {
-  --post-button-bg: #20232a;
-}
-
-:global([data-theme='terminal']) .post {
-  --post-button-bg: #12301c;
-}
-
 
   &:hover {
     border-color: var(--network-color-primary);
@@ -278,16 +245,15 @@
   }
 
   &__visit {
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
-    padding: 0.4rem 0.75rem;
-    background-color: var(--network-color-primary);
-    border-radius: var(--global-border-radius);
-    font-size: 0.78rem;
+    height: 40px;
+    width: 100%;
     font-weight: 600;
-    color: var(--white);
     text-decoration: none;
+    text-align: center;
     transition: opacity 0.15s ease;
 
     &:hover {
@@ -295,8 +261,6 @@
     }
   }
 }
-
-
 
 .state {
   display: grid;
@@ -352,5 +316,49 @@
   }
   50% {
     opacity: 0.45;
+  }
+}
+
+:global([data-theme='light']) {
+  .search {
+    --search-bg: var(--gray-050);
+    --border: var(--gray-200);
+
+    svg {
+      color: var(--gray-400);
+    }
+  }
+
+  .card {
+    &__visit {
+      background-color: var(--gray-100);
+      color: var(--black);
+    }
+  }
+}
+
+:global([data-theme='dark']) {
+  .search {
+    --search-bg: #20232a;
+  }
+
+  .card {
+    &__visit {
+      background-color: var(--surface-muted);
+      color: var(--color);
+    }
+  }
+}
+
+:global([data-theme='terminal']) {
+  .search {
+    --search-bg: #12301c;
+  }
+
+  .card {
+    &__visit {
+      background-color: var(--surface-muted);
+      color: var(--color);
+    }
   }
 }

@@ -53,8 +53,8 @@ export default function AppsPage() {
     <>
       <PageTitle name="Apps" />
       <div className={clsx(styles.page, 'animate', 'fade')}>
-          <div className={`__container`} data-width="medium">
-                      <header className={styles.page__header}>
+        <div className={`__container`} data-width="medium">
+          <header className={styles.page__header}>
             <label className={clsx(styles.search, 'rounded-full')}>
               <Search size={18} aria-hidden="true" />
               <input
@@ -67,10 +67,8 @@ export default function AppsPage() {
               />
             </label>
           </header>
-          </div>
+        </div>
         <div className={`__container ${styles.page__container}`} data-width="medium">
-
-
           <div className={styles.filterbar}>
             <nav className={styles.filters} aria-label="App categories">
               <button
@@ -171,31 +169,9 @@ function AppCard({ app }) {
       )}
 
       <div className={styles.card__footer}>
-        <div className={styles.card__links}>
-          {app.repo && (
-            <a href={app.repo} target="_blank" rel="noopener noreferrer" title="Repository" aria-label={`${app.name} repository`}>
-              <Code2 size={16} />
-            </a>
-          )}
-          {app.links.map((link) => (
-            <a
-              key={`${link.name}-${link.url}`}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={link.name}
-              aria-label={`${app.name} on ${link.name}`}
-            >
-              <Link2 size={16} />
-            </a>
-          ))}
-        </div>
-
         {app.url && (
-          <a className={styles.card__visit} href={app.url} target="_blank" rel="noopener noreferrer">
-            <Globe size={14} aria-hidden="true" />
-            <span>Visit</span>
-            <ExternalLink size={13} aria-hidden="true" />
+          <a className={clsx(styles.card__visit, 'rounded-full')} href={app.url} target="_blank" rel="noopener noreferrer">
+            <span>Open</span>
           </a>
         )}
       </div>
