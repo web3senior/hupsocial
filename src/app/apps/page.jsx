@@ -43,10 +43,7 @@ export default function AppsPage() {
       if (networkId !== 'all' && app.network.id !== networkId) return false
       if (!search) return true
 
-      const haystack = [app.name, app.description, app.category.name, app.network.name, ...app.tags]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
+      const haystack = [app.name, app.description, app.category.name, app.network.name, ...app.tags].filter(Boolean).join(' ').toLowerCase()
 
       return haystack.includes(search)
     })
@@ -56,24 +53,23 @@ export default function AppsPage() {
     <>
       <PageTitle name="Apps" />
       <div className={clsx(styles.page, 'animate', 'fade')}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
-          <header className={styles.page__header}>
-            <div className={styles.page__heading}>
-              <h1>Apps</h1>
-              <p>{total > 0 ? `Discover ${compactFormatter.format(total)} apps building across the ecosystem` : 'Discover apps building across the ecosystem'}</p>
-            </div>
-
-            <label className={styles.search}>
-              <Search size={16} aria-hidden="true" />
+          <div className={`__container`} data-width="medium">
+                      <header className={styles.page__header}>
+            <label className={clsx(styles.search, 'rounded-full')}>
+              <Search size={18} aria-hidden="true" />
               <input
                 type="search"
+                className={styles.search__input}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search apps, tags, networks..."
+                placeholder="Search"
                 aria-label="Search apps"
               />
             </label>
           </header>
+          </div>
+        <div className={`__container ${styles.page__container}`} data-width="medium">
+
 
           <div className={styles.filterbar}>
             <nav className={styles.filters} aria-label="App categories">
@@ -182,7 +178,14 @@ function AppCard({ app }) {
             </a>
           )}
           {app.links.map((link) => (
-            <a key={`${link.name}-${link.url}`} href={link.url} target="_blank" rel="noopener noreferrer" title={link.name} aria-label={`${app.name} on ${link.name}`}>
+            <a
+              key={`${link.name}-${link.url}`}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={link.name}
+              aria-label={`${app.name} on ${link.name}`}
+            >
               <Link2 size={16} />
             </a>
           ))}

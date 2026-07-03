@@ -17,25 +17,7 @@
   }
 
   &__header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
     margin-bottom: 1rem;
-  }
-
-  &__heading {
-    h1 {
-      font-size: 1.4rem;
-      line-height: 1.2;
-    }
-
-    p {
-      margin-top: 0.25rem;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
   }
 }
 
@@ -43,31 +25,51 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background-color: var(--background);
+  padding: .7rem 1.2rem;
+  background-color: var(--search-bg, var(--surface-muted));
   border: 1px solid var(--border);
-  border-radius: var(--global-border-radius);
   color: var(--text-muted);
+  width: 100%;
+  
 
-  input {
+  &__input {
     min-width: 220px;
+    width: 100%;
     border: none;
     outline: none;
     background: transparent;
-    font-size: 0.85rem;
+
     color: inherit;
 
     @media (max-width: 600px) {
       min-width: 0;
-      width: 100%;
     }
-  }
-
-  @media (max-width: 600px) {
-    width: 100%;
   }
 }
 
+// Global Theme Hooks
+:global([data-theme='light']) {
+  .search {
+    --search-bg: var(--gray-050); 
+    --border: var(--gray-200);
+
+    svg {
+      color: var(--gray-400)
+    }
+  }
+}
+
+:global([data-theme='dark']) {
+  .search {
+    --search-bg: #20232a;
+  }
+}
+
+:global([data-theme='terminal']) {
+  .search {
+    --search-bg: #12301c;
+  }
+}
 .filterbar {
   display: flex;
   flex-direction: column;
@@ -91,7 +93,9 @@
     border-radius: 999px;
     font-size: 0.8rem;
     cursor: pointer;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease;
 
     small {
       font-size: 0.7rem;
@@ -132,7 +136,18 @@
   background-color: var(--background);
   border: 1px solid var(--border);
   border-radius: var(--global-border-radius);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+
+    :global([data-theme='dark']) .post {
+  --post-button-bg: #20232a;
+}
+
+:global([data-theme='terminal']) .post {
+  --post-button-bg: #12301c;
+}
+
 
   &:hover {
     border-color: var(--network-color-primary);
@@ -251,7 +266,9 @@
       height: 30px;
       border-radius: 8px;
       color: var(--text-muted);
-      transition: background-color 0.15s ease, color 0.15s ease;
+      transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
 
       &:hover {
         background-color: var(--surface-muted);
@@ -278,6 +295,8 @@
     }
   }
 }
+
+
 
 .state {
   display: grid;
