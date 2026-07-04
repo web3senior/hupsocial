@@ -104,9 +104,9 @@ export const CONTRACTS = {
     name: 'arbitrum',
     forwarder: '0x41e6D71623FD02633C568342852154D2Cd7DBD0e',
     hup: '0x1EC0B3b802aFE596929a038f40F832EA01eCc281',
-    status: '',
+    status: '0x2269Fb436d594902e3c38085CBB3f350532531B3',
     community: '',
-    nft: '', // GenesisHup
+    nft: '',
     store: '',
   },
 }
