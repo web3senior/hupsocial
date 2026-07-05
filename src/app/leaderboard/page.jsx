@@ -105,13 +105,6 @@ export default function LeaderboardPage() {
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="large">
           <header className={styles.header}>
-            <div>
-              <div className={styles.eyebrow}>
-                <Trophy size={16} />
-                <span>Hup Rankings</span>
-              </div>
-              <h2>Leaderboard</h2>
-            </div>
 
             <div className={styles.filters} aria-label="Leaderboard filters">
               <div className={styles.segmented} role="group" aria-label="Time range">
