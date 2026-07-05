@@ -307,7 +307,7 @@
   }
 
   @media (max-width: 960px) {
-    grid-template-columns: 36px 42px minmax(0, 1fr) minmax(70px, auto);
+    grid-template-columns: 36px 42px minmax(0, 1fr);
 
     .metric {
       display: none;
