@@ -36,12 +36,26 @@ export async function GET() {
       ORDER BY ac.name ASC
     `)
 
+    const [networkRows] = await pool.execute(`
+      SELECT n.id, n.name, COUNT(a.id) AS app_count
+      FROM networks n
+      LEFT JOIN apps a ON a.network_id = n.id AND a.status = '1'
+      GROUP BY n.id, n.name
+      HAVING app_count > 0
+      ORDER BY n.name ASC
+    `)
+
     return NextResponse.json({
       success: true,
       data: appRows.map(serializeApp),
       meta: {
         total: appRows.length,
         categories: categoryRows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          app_count: Number(row.app_count || 0),
+        })),
+        networks: networkRows.map((row) => ({
           id: row.id,
           name: row.name,
           app_count: Number(row.app_count || 0),

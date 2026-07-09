@@ -1,16 +1,20 @@
 .galleryWrapper {
-
 }
 
 .mediaItem {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-width: fit-content;
+  width: fit-content;
+  will-change: transform;
   transition: transform 0.2s ease;
-z-index:0;
+  z-index: 0;
+  cursor: pointer;
   &:hover .controls {
     opacity: 1;
+  }
+  &:active {
+    transform: scale(0.95);
   }
 }
 
@@ -18,7 +22,9 @@ z-index:0;
   position: relative;
   width: 100%;
   height: 100%;
-
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .controls {
@@ -44,7 +50,9 @@ z-index:0;
   justify-content: center;
   cursor: pointer;
   backdrop-filter: blur(4px);
-  &:hover { background: rgba(0, 0, 0, 0.8); }
+  &:hover {
+    background: rgba(0, 0, 0, 0.8);
+  }
 }
 
 .spoilerOverlay {
@@ -68,7 +76,8 @@ z-index:0;
 }
 
 /* Base Media Styles */
-.videoPlayer, .displayImage {
+.videoPlayer,
+.displayImage {
   display: block;
   width: auto;
   height: 100%;
@@ -97,17 +106,58 @@ z-index:0;
   }
 }
 
-/* Main Gallery Carousel */
+/* Main Gallery Carousel (embla) */
 .embla {
   overflow: hidden;
   .mediaItem {
     height: 340px;
     width: auto;
-    img, video { aspect-ratio: 3/4; }
+    img,
+    video {
+      aspect-ratio: 3/4;
+    }
   }
 }
-.embla__container { display: flex; margin-left: -12px; }
-.embla__slide { flex: 0 0 auto; padding-left: 12px; }
+.embla__container {
+  display: flex;
+  margin-left: -12px;
+}
+.embla__slide {
+  flex: 0 0 auto;
+  padding-left: 12px;
+}
+
+/* Single-media post (reserves space via aspect-ratio to prevent layout shift) */
+.singleView {
+  width: 100%;
+}
+.singleContainer {
+  display: flex;
+}
+.singleSlide {
+  width: 100%;
+}
+.singleView .mediaItem {
+  width: fit-content;
+  max-width: 100%;
+
+  .mediaContainer {
+    width: auto;
+    height: auto;
+    display: block;
+  }
+
+  .videoPlayer,
+  .displayImage {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 550px;
+    aspect-ratio: var(--media-ratio, 1);
+    object-fit: contain;
+  }
+}
 
 /* Lightbox Styles */
 .lightbox {
@@ -120,31 +170,40 @@ z-index:0;
   justify-content: center;
 }
 
-.lightboxEmbla {
+.lightboxScroll {
   width: 100%;
   height: 100%;
-  overflow: hidden;
-}
-
-.lightboxContainer {
   display: flex;
-  height: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-y;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .lightboxSlide {
   flex: 0 0 100%;
   height: 100%;
+  scroll-snap-align: start;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 40px;
 }
 
-.fullscreenImage, .fullscreenVideo {
+.fullscreenImage,
+.fullscreenVideo {
   max-width: 90vw;
   max-height: 90vh;
   object-fit: contain;
-  box-shadow: 0 0 30px rgba(0,0,0,0.5);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
 }
 
 .closeBtn {
@@ -157,7 +216,9 @@ z-index:0;
   cursor: pointer;
   z-index: 10001;
   opacity: 0.7;
-  &:hover { opacity: 1; }
+  &:hover {
+    opacity: 1;
+  }
 }
 
 .navBtn {
@@ -172,7 +233,13 @@ z-index:0;
   padding: 20px;
   opacity: 0.5;
   transition: opacity 0.2s;
-  &:hover { opacity: 1; }
-  &.prev { left: 10px; }
-  &.next { right: 10px; }
+  &:hover {
+    opacity: 1;
+  }
+  &.prev {
+    left: 10px;
+  }
+  &.next {
+    right: 10px;
+  }
 }

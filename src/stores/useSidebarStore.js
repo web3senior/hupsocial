@@ -2,25 +2,42 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { Bookmark, Bell, Briefcase, Calendar, MessageCircle, Heart, House, LayoutGrid, Plus, Search, Trophy, Users } from 'lucide-react'
+import {
+  BellIcon,
+  BookmarkSimpleIcon,
+  BriefcaseIcon,
+  CalendarBlankIcon,
+  ChartBarIcon,
+  ChatCircleIcon,
+  HeartIcon,
+  HouseIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  SquaresFourIcon,
+  TagIcon,
+  TrophyIcon,
+  UsersIcon,
+} from '@phosphor-icons/react'
 
 // Static navigation schema with icons.
 // Keeps components out of localStorage to prevent serialization crashes.
 export const NAV_ITEMS_SCHEMA = [
-  { id: 'foryou', name: 'For you', path: '/', icon: House },
-  { id: 'new-post', name: 'New post', component: 'new-post', icon: Plus },
-  { id: 'search', name: 'Search', path: '/search', icon: Search },
+  { id: 'foryou', name: 'For you', path: '/', icon: HouseIcon },
+  { id: 'new-post', name: 'New post', component: 'new-post', icon: PlusIcon },
+  { id: 'search', name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
   { id: 'divider-primary', type: 'divider' },
-  { id: 'communities', name: 'Communities', path: '/communities', icon: Users },
-  { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
-  { id: 'events', name: 'Events', path: '/events', icon: Calendar },
-  { id: 'jobs', name: 'Jobs', path: '/jobs', icon: Briefcase },
-  { id: 'apps', name: 'Apps', path: '/apps', icon: LayoutGrid },
+  { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
+  { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
+  { id: 'bazzar', name: 'Bazzar', path: '/bazzar', icon: TagIcon },
+  { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
+  { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },
+  { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
-  { id: 'chat', name: 'Chat', path: '/chat', icon: MessageCircle },
-  { id: 'notifications', name: 'Notifications', path: '/notifications', icon: Bell, hasBadge: true },
-  { id: 'batch-like', name: 'Like', path: '/batch-like', icon: Heart, hasBadge: true },
-  { id: 'saved', name: 'Saved', path: '/saved', icon: Bookmark },
+  { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon },
+  { id: 'notifications', name: 'Notifications', path: '/notifications', icon: BellIcon, hasBadge: true },
+  { id: 'batch-like', name: 'Like', path: '/batch-like', icon: HeartIcon, hasBadge: true },
+  { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
+  { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
 ]
 
 export const useSidebarStore = create(
@@ -35,43 +52,46 @@ export const useSidebarStore = create(
       likedPostIds: {},
 
       // Actions for Batch Like queue management split by network id
-      addToBatch: (networkId, postId) => set((state) => {
-        const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
+      addToBatch: (networkId, postId) =>
+        set((state) => {
+          const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
 
-        // Prevent duplicate queuing inside the specific network sub-array
-        if (currentNetworkQueue.includes(postId)) return state
+          // Prevent duplicate queuing inside the specific network sub-array
+          if (currentNetworkQueue.includes(postId)) return state
 
-        return {
-          likedPostIds: {
-            ...state.likedPostIds,
-            [networkId]: [...currentNetworkQueue, postId],
-          },
-        }
-      }),
-
-      removeFromBatch: (networkId, postId) => set((state) => {
-        const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
-
-        return {
-          likedPostIds: {
-            ...state.likedPostIds,
-            [networkId]: currentNetworkQueue.filter((id) => id !== postId),
-          },
-        }
-      }),
-
-      // Clear the queue for a single chain or clear everything entirely if no parameter provided
-      clearBatch: (networkId) => set((state) => {
-        if (networkId !== undefined) {
           return {
             likedPostIds: {
               ...state.likedPostIds,
-              [networkId]: [],
+              [networkId]: [...currentNetworkQueue, postId],
             },
           }
-        }
-        return { likedPostIds: {} }
-      }),
+        }),
+
+      removeFromBatch: (networkId, postId) =>
+        set((state) => {
+          const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
+
+          return {
+            likedPostIds: {
+              ...state.likedPostIds,
+              [networkId]: currentNetworkQueue.filter((id) => id !== postId),
+            },
+          }
+        }),
+
+      // Clear the queue for a single chain or clear everything entirely if no parameter provided
+      clearBatch: (networkId) =>
+        set((state) => {
+          if (networkId !== undefined) {
+            return {
+              likedPostIds: {
+                ...state.likedPostIds,
+                [networkId]: [],
+              },
+            }
+          }
+          return { likedPostIds: {} }
+        }),
 
       // UI Actions
       setIsComponentOpen: () => set((state) => ({ isComponentOpen: !state.isComponentOpen })),
@@ -115,7 +135,8 @@ export const useSidebarStore = create(
       partialize: (state) => ({
         isMenuOpen: state.isMenuOpen,
         likedPostIds: state.likedPostIds,
+        isComponentOpen: state.isComponentOpen,
       }),
-    },
-  ),
+    }
+  )
 )

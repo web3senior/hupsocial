@@ -335,6 +335,55 @@ const postContent = {
   ],
 }
 ```
+# Community Encryption (Private / Request-Based)
+
+Gated community posts are end-to-end encrypted. Neither the server, the indexer, nor the chain can read them — only current members.
+
+## The model in one line
+
+Posts are locked with **one shared master key per community**; that master key travels between members as **chat-style sealed envelopes stored on-chain** instead of sent.
+
+- **Master key** — a random AES-256 key. Every post in the community is encrypted once, with this key. It belongs to the community, not to any person.
+- **Identity keypair** — each member derives an encryption keypair from ONE wallet signature + their Hup security PIN (`src/lib/securityVault.js` → `src/lib/communityVault.js`). Same wallet + same PIN reproduces it on any device. This exists only so the master key can be *delivered* to them — wallets can sign but not decrypt.
+- **Wrapped key (envelope)** — the master key ECIES-encrypted to one member's public key, stored publicly in `HupCommunity.wrappedKeys[communityId][member][version]`. Visible to everyone, openable only by that member. This is exactly Chat's encrypt-to-pubkey operation, reused — the "message" is the master key, the "inbox" is the contract.
+
+## Flow (Request-Based community)
+
+1. **Create** — creator unlocks the security vault (signature + PIN), the browser generates the master key, wraps it to the creator's own pubkey, and `createCommunity(...)` stores community + envelope + `keyVersion = 1` in a single tx.
+2. **Request** — Bob calls `join()` (sets `isPending`, no event) and the app records the request off-chain so moderators can discover it. Bob's vault unlock registers his pubkey on-chain — required before he can receive a key.
+3. **Approve** — a moderator clicks Approve: `approveRequest` tx, then automatically in the browser — unwrap own envelope → re-wrap the *same* master key to Bob's pubkey → `grantKey` tx. Join is O(1): one envelope. Bob can now also read the history back to the last rotation (those posts used this same key) — but nothing before it: `grantKey` only ever grants the current version, so pre-rotation epochs stay locked to newcomers permanently.
+4. **Post** — unwrap own envelope → AES-encrypt content → upload `{encrypted: true, keyVersion, iv, ciphertext, communityId}` to IPFS → ordinary `Hup.create(cid)`.
+5. **Read** — each post says which `keyVersion` encrypted it. Fetch your envelope for that version, unwrap, decrypt. No envelope (`0x`) → 🔒 locked placeholder.
+6. **Leave / ban → rotation (lazy)** — a moderator calls `bumpKeyVersion`, generates a *fresh* master key, and immediately re-grants **only the moderators** (one `grantKeyBatch` tx). Security is achieved at that instant — new posts use a key the departed member will never receive. Every other member picks the key up on demand: their client files a `grant` key request when it notices the missing envelope, and a moderator batch-clears the queue (`grantKeyBatch`, up to 100 per tx) from the members panel. Rotation cost is O(moderators) up front, then proportional to *active* members over time — dead accounts never cost anything. Voluntary leave can't rotate by itself (`bumpKeyVersion` is moderator-only), so it files a `rotation` request that moderators see as a pending banner. Envelopes are append-only: the departed member keeps opening old-version posts they legitimately had, but never receives the new version.
+
+## History visibility (per-community policy)
+
+By default every rotation is an epoch wall: new members receive only the current key, so posts from before the last rotation stay locked for them. Communities whose value *is* the archive can flip this: a moderator toggles **"New members can read history"**, and from then on each rotation also publishes a `keyBacklink` — the retiring key encrypted under the new one. Holding the current key plus an unbroken chain of backlinks yields every *older* key, but never a newer one, so a departed member still can't read anything after their removal. The links are write-once and can be **backfilled retroactively** (moderators hold envelopes for all versions), and toggling the policy off only affects future rotations — links already published are on-chain forever, and any member could have cached old keys anyway.
+
+## Why only some membership types are encrypted
+
+Encryption needs a moderator-approval moment to hook the key handover onto (`addMember`/`approveRequest`) — only someone who *holds* the master key can hand it out, and that requires their unlocked browser. Request-Based, Private, NFT/Token/NFT+Token-Gated, and Follower-Gated have that moment. Public, Whitelisted, and Pay-to-Join self-admit via `join()` with no moderator in the loop, so they stay plaintext.
+
+## Honest limits at scale
+
+E2EE in a huge community is security theater regardless of scheme — any one of 500k members can leak everything, and "request-based" at that scale is functionally public. Encryption genuinely protects small/medium groups. Rotation cost reflects this too: removals are inherently O(n) across all group-encryption designs (every remaining member needs fresh secret material the leaver can't compute) — batching and lazy on-demand re-grants compress the cost, but very large communities belong in the plaintext gated types.
+
+## Cryptography: where it stands
+
+An honest grading of the encryption stack, so future maintainers know what's a deliberate choice versus a TODO:
+
+- **AES-256-GCM** (post content) — industry gold standard (TLS, Signal). No upgrade exists worth taking.
+- **ECIES over secp256k1** (key envelopes, via `eciesjs`) — sound; secp256k1 chosen over the academically nicer X25519 because it's the wallet ecosystem's native curve.
+- **PBKDF2-SHA256, 100k iterations** (PIN → vault master) — the dated piece. The vault's real protection is the wallet signature used as salt; if a signature ever leaks, PBKDF2 is what stands between it and a brute-forced 6-char PIN, and against GPUs it's a speed bump. Planned upgrade: **Argon2id** (memory-hard). Contained change in `cryptoHelper.js`, but it re-keys vaults — same coordination cost as a PIN change.
+- **Not post-quantum** — the frontier is hybrid PQC (X25519+ML-KEM; Signal and iMessage adopted it in 2023–24). Our ECIES envelopes are classical-only: a future quantum computer could open recorded envelopes. But so is every wallet signature on every chain — the entire underlying blockchain breaks before community posts do. Not worth solving ahead of the ecosystem.
+- **Group protocol** — envelope-per-member with lazy rotation, not MLS (RFC 9420). MLS offers O(log n) rotations and forward secrecy but assumes a delivery service and continuous sessions; adapting it to on-chain, offline-member, wallet-identity communities would be a research project. For small/medium private groups this design is the honest, auditable choice (see "Honest limits at scale").
+
+In practice the weakest link is none of the above: it's a member leaking plaintext, which no cipher fixes.
+
+## Member-list privacy
+
+Member rosters are hidden from non-moderators: `getMembers`/`memberCount` (and the whitelist getters) are moderator-gated on the contract, the cidex-backed members API only serves the moderator list, and the Members panel in the UI is moderator-only. This is **best-effort hiding, not cryptographic privacy** — view-function gating can be bypassed by spoofing `from` in `eth_call`, contract storage is publicly readable, and every member's `join()` transaction and `MemberStatusUpdated` event is on-chain forever. It raises the bar from "one click" to "deliberate chain analysis." Genuinely hidden membership (ZK commitments in a Merkle tree, Semaphore-style, with relayed joins) is planned as a separate contract; per-address checks (`registry`, `canPost`) stay public because content gating and indexing depend on them.
+
 ## 🏷️ Version Management (SemVer)
 
 This project strictly adheres to [Semantic Versioning (SemVer)](https://semver.org/) via the `MAJOR.MINOR.PATCH` format to ensure predictable deployments and reliable cross-chain indexing.

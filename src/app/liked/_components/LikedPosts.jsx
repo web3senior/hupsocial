@@ -2,15 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Activity,
-  Heart,
-  LucideLoader2,
-  LucideRefreshCcw,
-  ExternalLink,
-  Clock,
-  User,
-} from 'lucide-react'
+import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, ClockIcon, HeartIcon, PulseIcon, SpinnerIcon, UserIcon } from '@phosphor-icons/react'
 import { useConnection } from 'wagmi'
 import Profile from '@/components/Profile'
 import { toRelativeTime } from '@/lib/dateHelper'
@@ -98,7 +90,7 @@ export default function LikedPosts() {
     return (
       <div className={styles.container}>
         <div className={styles.status}>
-          <User size={20} />
+          <UserIcon size={20} />
           Please connect your wallet to view liked posts.
         </div>
       </div>
@@ -109,7 +101,7 @@ export default function LikedPosts() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h4>
-          <Heart size={18} fill="currentColor" />
+          <HeartIcon size={18} weight="fill" />
           {headerLabel}
         </h4>
         <button
@@ -120,21 +112,21 @@ export default function LikedPosts() {
           aria-label="Refresh liked posts"
           title="Refresh liked posts"
         >
-          <LucideRefreshCcw className={isLoading ? styles.spin : undefined} size={16} />
+          <ArrowsCounterClockwiseIcon className={isLoading ? styles.spin : undefined} size={16} />
         </button>
       </div>
 
       <div className={styles.feed}>
         {!hasItems && isLoading ? (
           <div className={styles.status}>
-            <LucideLoader2 className={styles.spin} size={16} />
+            <SpinnerIcon className={styles.spin} size={16} />
             Loading liked items...
           </div>
         ) : null}
 
         {!hasItems && !isLoading ? (
           <div className={styles.status}>
-            <Heart size={18} />
+            <HeartIcon size={18} />
             No liked posts found.
           </div>
         ) : null}
@@ -158,7 +150,7 @@ export default function LikedPosts() {
           >
             {isLoading ? (
               <>
-                <LucideLoader2 className={styles.spin} size={16} />
+                <SpinnerIcon className={styles.spin} size={16} />
                 Loading...
               </>
             ) : (
@@ -168,7 +160,7 @@ export default function LikedPosts() {
         ) : (
           hasItems && (
             <div className={styles.status}>
-              <Clock size={14} />
+              <ClockIcon size={14} />
               End of list
             </div>
           )
@@ -229,7 +221,7 @@ function LikedPostRow({ item, currentAddress }) {
   return (
     <article className={styles.activityRow}>
       <div className={`${styles.iconBox} ${styles.likedIcon}`}>
-        <Heart size={18} fill="currentColor" style={{color: `var(--liked-color)`}} />
+        <HeartIcon size={18} weight="fill" style={{color: `var(--liked-color)`}} />
       </div>
 
       <div className={styles.rowBody}>
@@ -242,7 +234,7 @@ function LikedPostRow({ item, currentAddress }) {
           
           {isLoadingPost && (
             <div className={styles.postPreviewLoader}>
-              <LucideLoader2 className={styles.spin} size={12} />
+              <SpinnerIcon className={styles.spin} size={12} />
               <span>Loading content...</span>
             </div>
           )}
@@ -262,7 +254,7 @@ function LikedPostRow({ item, currentAddress }) {
 
       {href && (
         <Link href={href} className={styles.openLink} aria-label="View original post">
-          <ExternalLink size={16} />
+          <ArrowSquareOutIcon size={16} />
         </Link>
       )}
     </article>

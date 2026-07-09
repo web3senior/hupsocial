@@ -5,7 +5,6 @@
 }
 
 .profile {
-  cursor: pointer;
   width: max-content; /* Let it size to its contents naturally */
   flex-shrink: 0;     /* Prevent the compose input from squishing this block */
   gap: 0.7rem;
@@ -13,13 +12,27 @@
   code {
     color: var(--gray-400);
     font-size: var(--system-12-font-size);
+    line-height: var(--system-12-line-height);
   }
 }
 
+.address {
+  line-height: var(--system-12-line-height);
+}
+
 .imageWrapper {
+  all: unset;
   position: relative;
+  display: block;
   will-change: transform;
   cursor: pointer;
+
+  &__avatar {
+    display: block;
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+  }
 
   &__fingerprint {
     border: 2px solid var(--fingerprint-border);
@@ -50,13 +63,20 @@
   font-weight: 600;
   line-height: 1;
   font-family: var(--font-family-monospace);
+  color: inherit;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .badge {
   width: 14px;
   height: 14px;
 
-  svg {
+  svg,
+  img {
     width: inherit;
     height: inherit;
   }
@@ -68,4 +88,53 @@
   line-height: 1;
   font-size: var(--system-13-font-size);
   color: var(--gray-400);
+}
+
+.hoverCard {
+  width: 260px;
+
+  &__avatar {
+    all: unset;
+    cursor: pointer;
+    border-radius: 50%;
+    overflow: hidden;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__bio {
+    margin: 0;
+    font-size: var(--system-13-font-size);
+    color: var(--text-secondary, var(--gray-400));
+  }
+
+  &__followers {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--system-13-font-size);
+    color: var(--gray-400);
+  }
+
+  &__followBtn {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--global-border-radius);
+    background-color: var(--network-color-primary, var(--gray-900, #000));
+    color: var(--network-color-text, var(--white, #fff));
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
 }

@@ -7,16 +7,17 @@
   right: 0;
   height: 50px;
   z-index: 0;
-  // Frosted glass tint using color-mix (85% theme surface, 15% transparent)
-  background-color: color-mix(in srgb, var(--surface) 85%, transparent);
+  // Light smoked glass: a subtle translucent black so the blurred content
+  // shows through the frosted effect
+  background-color: rgba(0, 0, 0, 0.35);
 
   display: flex;
   align-items: center;
   justify-content: space-around;
 
   // The glass blur effect
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px); // Safari support
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px); // Safari support
 
   border-top: 1px solid var(--border);
   color: var(--text);

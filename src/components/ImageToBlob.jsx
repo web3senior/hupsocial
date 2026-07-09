@@ -2,8 +2,7 @@
  * @component MerchantLogo
  * @description Resolves a 0G Storage rootHash into a viewable image.
  */
-import { Loader2 } from 'lucide-react'
-import { Store } from 'lucide-react'
+import { SpinnerIcon, StorefrontIcon } from '@phosphor-icons/react'
 import { useEffect, useState, useMemo } from 'react'
 
 const ImageToBlob = ({ rootHash, className = '' }) => {
@@ -56,7 +55,7 @@ const ImageToBlob = ({ rootHash, className = '' }) => {
   if (loading) {
     return (
       <div className={`flex items-center justify-center bg-gray-100 ${className}`}>
-        <Loader2 className="animate-spin text-gray-400" size={20} />
+        <SpinnerIcon className="animate-spin text-gray-400" size={20} />
       </div>
     )
   }
@@ -64,7 +63,7 @@ const ImageToBlob = ({ rootHash, className = '' }) => {
   if (error || !previewUrl) {
     return (
       <div className={`flex items-center justify-center bg-gray-100 text-gray-400 ${className}`}>
-        <Store size={24} />
+        <StorefrontIcon size={24} />
       </div>
     )
   }

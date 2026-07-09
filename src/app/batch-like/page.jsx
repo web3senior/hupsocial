@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useConfig, useSwitchChain, useWriteContract, usePublicClient, useConnection } from 'wagmi'
-import { Trash2, Layers, ArrowRight, Heart, Loader2 } from 'lucide-react'
+import { ArrowRightIcon, HeartIcon, SpinnerIcon, StackIcon, TrashIcon } from '@phosphor-icons/react'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import PageTitle from '@/components/PageTitle'
 import { getNetworkDisplayName } from '@/lib/chains'
@@ -22,7 +22,7 @@ export default function Page() {
   // Extract account authentication, chain utility, and transaction hooks
   const { isConnected, address } = useConnection()
   const { switchChainAsync } = useSwitchChain()
-  const { writeContractAsync } = useWriteContract()
+  const { mutateAsync: writeContractAsync } = useWriteContract()
   const publicClient = usePublicClient()
   const activeChain = getActiveChain()[0]
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
@@ -134,7 +134,7 @@ export default function Page() {
         <div className={`__container ${styles.page__container}`} data-width="medium">
           {networkIds.length === 0 ? (
             <div className={styles.emptyState}>
-              <Heart size={48} className={styles.emptyIcon} strokeWidth={1.2} />
+              <HeartIcon size={48} className={styles.emptyIcon} />
               <h3>Your basket is empty</h3>
               <p>Explore your feed and toggle heart items to queue batch interactions across chains seamlessly.</p>
               <button type="button" className="btn btn--primary" onClick={() => router.push('/')}>
@@ -145,7 +145,7 @@ export default function Page() {
             <div className={styles.batchLayout}>
               <div className={styles.networkTabs}>
                 <span className={styles.tabsLabel}>
-                  <Layers size={14} />
+                  <StackIcon size={14} />
                   <span>Active Networks</span>
                 </span>
                 <div className={styles.tabsList}>
@@ -180,7 +180,7 @@ export default function Page() {
                       className={styles.clearAllButton}
                       onClick={() => clearBatch(activeNetworkId)}
                     >
-                      <Trash2 size={15} />
+                      <TrashIcon size={15} />
                       <span>Clear All</span>
                     </button>
                   </div>
@@ -196,7 +196,7 @@ export default function Page() {
                       <div className={styles.itemActionControls}>
                         <Link href={`/networks/${activeNetworkId}/${postId}`} className={styles.viewLinkItem}>
                           <span>View Source</span>
-                          <ArrowRight size={14} />
+                          <ArrowRightIcon size={14} />
                         </Link>
                         <button
                           type="button"
@@ -204,7 +204,7 @@ export default function Page() {
                           className={styles.deleteRowButton}
                           onClick={() => removeFromBatch(activeNetworkId, postId)}
                         >
-                          <Trash2 size={16} />
+                          <TrashIcon size={16} />
                         </button>
                       </div>
                     </li>
@@ -216,13 +216,13 @@ export default function Page() {
                     <button type="button" className="btn btn--primary btn--full" disabled={isProcessing} onClick={handleExecuteBatchLike}>
                       {isProcessing ? (
                         <>
-                          <Loader2 size={16} className="animate spin" />
+                          <SpinnerIcon size={16} className="animate spin" />
                           <span>Processing...</span>
                         </>
                       ) : (
                         <>
                           <span>Sign Batch Like</span>
-                          <ArrowRight size={16} />
+                          <ArrowRightIcon size={16} />
                         </>
                       )}
                     </button>

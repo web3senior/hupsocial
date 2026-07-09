@@ -2,6 +2,16 @@
   --shadow: 0px 9px 4px rgba(63, 93, 116, 0.01), 0px 5px 3px rgba(63, 93, 116, 0.04), 0px 2px 2px rgba(63, 93, 116, 0.07), 0px 1px 1px rgba(63, 93, 116, 0.08), 0px 0px 0px rgba(63, 93, 116, 0.08);
   --border-radius: 4px;
 
+  // Reset the UA [popover] defaults (border, fit-content sizing, margin: auto,
+  // Canvas colors) so the top-layer promotion doesn't change the layout.
+  margin: 0;
+  border: none;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
+
   position: fixed;
   inset: .5rem;
 
@@ -29,20 +39,84 @@
   right: 0;
   bottom: 0;
   z-index: 9999;
-  padding: .9rem 2rem;
+  padding: .75rem 1.25rem;
   font-weight: bolder;
+
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 
   border: 1px solid transparent;
 
   margin-left: auto;
+  max-width: 24rem;
 
-  > div {
-    column-gap: 0.5rem;
+  pointer-events: auto;
+
+  &:hover {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.toast__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+
+  svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+}
+
+.toast__message {
+  flex: 1;
+  text-align: left;
+  word-break: break-word;
+}
+
+.toast__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  padding: 0.2rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  border-radius: 50%;
+
+  transition: opacity 150ms ease, background-color 150ms ease;
+
+  svg {
+    width: 0.85rem;
+    height: 0.85rem;
   }
 
-  button {
-    padding: 0.1rem 0.5rem;
-    font-size: 0.7rem;
+  &:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.08);
+  }
+}
+
+.toast--exit {
+  animation-name: toast-exit;
+  animation-duration: 150ms;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+@keyframes toast-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1, 1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.9, 0.9);
   }
 }
 

@@ -3,15 +3,16 @@
 .header {
   position: fixed;
   inset: 0 0 auto;
-  // padding: 0.7rem 1rem;
+  padding: 0.7rem 1rem;
   user-select: none;
   z-index: 2;
+  background-color: var(--background);
 }
 
 .menuButton {
-  position: fixed;
-  left: 0.7rem;
-  top: .9rem;
+  // position: fixed;
+  // left: 0.7rem;
+  // top: .9rem;
 
   display: flex;
   align-items: center;
@@ -22,10 +23,35 @@
   width: 38px;
   height: 38px;
   border-radius: 1000px;
-  background-color: var(--surface-muted);
 
+svg {
+
+  color: var(--text-muted);
+
+}
   &:hover {
     background-color: var(--hover);
+  }
+}
+
+.header__title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(50vw, 420px);
+  margin: 0;
+  color: var(--foreground);
+  font-weight: 500;
+  font-size: var(--font-size-15);
+  text-align: center;
+  user-select: none;
+
+  span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

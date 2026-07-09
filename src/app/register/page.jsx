@@ -10,7 +10,7 @@ import abiChat from '@/abis/Chat.json'
 import { unlockAppKeyFromStorage, unlockAppKeyWithPassword, lockAppPrivateKey, APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, clearVaultIfWalletChanged } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
-import { EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, CheckIcon, CopyIcon, UploadIcon, DatabaseIcon } from 'lucide-react'
+import { CheckIcon, CopyIcon, DatabaseIcon, EyeIcon, EyeSlashIcon, KeyIcon, ShieldWarningIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import styles from './page.module.scss'
 
 import {
@@ -489,7 +489,7 @@ export default function Register() {
         {/* ■■■ Error Banner ■■■ */}
         {errorMsg && (
           <div className={clsx(styles.register__alertError)}>
-            <ShieldAlertIcon size={16} />
+            <ShieldWarningIcon size={16} />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -527,7 +527,7 @@ export default function Register() {
             )}
           >
             <div className={clsx(styles.register__icon)}>
-              <KeyRoundIcon size={20} />
+              <KeyIcon size={20} />
             </div>
             <div className="flex-grow-1">
               <strong>2. Join Chat</strong>
@@ -583,7 +583,7 @@ export default function Register() {
                     className={clsx(styles.register__inputEye)}
                     tabIndex={-1}
                   >
-                    {showVaultPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
+                    {showVaultPlainPassword ? <EyeSlashIcon size={14} /> : <EyeIcon size={14} />}
                   </button>
                 </div>
                 <input
@@ -610,7 +610,7 @@ export default function Register() {
           {showPinEntry && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <KeyRoundIcon size={16} /> Re-enter Your PIN
+                <KeyIcon size={16} /> Re-enter Your PIN
               </h5>
               <p>Enter your vault PIN to activate your identity.</p>
               <div className={clsx(styles.register__formGroup)}>
@@ -624,7 +624,7 @@ export default function Register() {
               </div>
               <div className="flex gap-05 justify-between align-items-center mt-10">
                 <button type="button" onClick={() => setShowPinEntryPlain(!showPinEntryPlain)} className={clsx(styles.register__btnLink)}>
-                  {showPinEntryPlain ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPinEntryPlain ? 'Hide' : 'Show'}
+                  {showPinEntryPlain ? <EyeSlashIcon size={14} /> : <EyeIcon size={14} />} {showPinEntryPlain ? 'Hide' : 'Show'}
                 </button>
                 <div className="flex gap-05">
                   <button onClick={() => { setShowPinEntry(false); setPinEntry('') }} className={clsx(styles.register__btnSecondary)}>
@@ -646,7 +646,7 @@ export default function Register() {
           {showDecryptPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <KeyRoundIcon size={16} /> Unlock Session Key
+                <KeyIcon size={16} /> Unlock Session Key
               </h5>
               <p>Enter the password used when this session was created.</p>
               <input
@@ -671,7 +671,7 @@ export default function Register() {
           {showImportPrompt && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
-                <UploadIcon size={16} /> Use Another Device's Session
+                <UploadSimpleIcon size={16} /> Use Another Device's Session
               </h5>
               <p>Paste your session key from another device and set a new password for it.</p>
               <div className={clsx(styles.register__formGroup)}>

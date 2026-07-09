@@ -1,37 +1,43 @@
 'use client'
 
 import { useEffect, memo } from 'react'
+import { usePageTitleStore } from '@/stores/usePageTitleStore'
 import styles from './PageTitle.module.scss'
 
 /**
  * PageTitle Component
- * Sets the document title and renders a sticky header.
+ * Pushes the page name into usePageTitleStore so the fixed Header can render
+ * it centered, and optionally syncs document.title. Kept as a component (not
+ * a hook) so server-component pages can still declare their title. Renders a
+ * spacer so page content clears the fixed header.
  */
 const PageTitle = ({ name = '', changeDocumentTitle = true }) => {
+  const setTitle = usePageTitleStore((state) => state.setTitle)
+  const clearTitle = usePageTitleStore((state) => state.clearTitle)
+
   useEffect(() => {
-    // Avoid running logic if name is empty
+    if (!name) return
+
+    setTitle(name)
+
+    // Clear on unmount so a route without a PageTitle shows an empty center
+    return () => clearTitle()
+  }, [name, setTitle, clearTitle])
+
+  useEffect(() => {
     if (!name || !changeDocumentTitle) return
 
     const siteName = process.env.NEXT_PUBLIC_NAME
     document.title = `${siteName} | ${name}`
 
-    // Optional: Cleanup function to reset title when component unmounts
     return () => {
       document.title = siteName
     }
   }, [name, changeDocumentTitle])
 
-  // Early return pattern: keeps the main return block clean
   if (!name) return null
 
-  return (
-    <header className={styles.stickyHeader}>
-      <h1 className={styles.pageTitle}>
-        <span>{name}</span>
-      </h1>
-    </header>
-  )
+  return <div aria-hidden="true" className={styles['pageTitle__spacer']} />
 }
 
-// Exporting with memo to prevent re-renders unless 'name' changes
 export default memo(PageTitle)

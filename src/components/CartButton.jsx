@@ -102,7 +102,11 @@ const Profile = ({ addr }) => {
       <figure className={`${styles.pfp} d-f-c flex-column grid--gap-050`}>
         <img
           alt={data.data.search_profiles[0].fullName}
-          src={`${data.data.search_profiles[0].profileImages.length > 0 ? data.data.search_profiles[0].profileImages[0].src : 'https://ipfs.io/ipfs/bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm'}`}
+          src={
+            data.data.search_profiles[0].profileImages.length > 0
+              ? data.data.search_profiles[0].profileImages[0].src
+              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`
+          }
           className={`rounded`}
         />
         {/* <figcaption>@{data.data.search_profiles[0].name}</figcaption> */}

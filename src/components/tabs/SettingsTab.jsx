@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import hupABI from '@/abi/hup.json'
-import { RefreshCwIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, CheckIcon, CopyIcon, UploadIcon } from 'lucide-react'
+import { ArrowsClockwiseIcon, CheckIcon, CopyIcon, EyeIcon, EyeSlashIcon, KeyIcon, ShieldWarningIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { ethers } from 'ethers'
 import Balance from '@/app/(user)/[wallet]/_components/balance'
 import { toRelativeTime } from '@/lib/dateHelper'
@@ -47,7 +47,7 @@ export default function SettingsTab() {
   const [showPlainPassword, setShowPlainPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  const { data: hash, writeContract } = useWriteContract()
+  const { data: hash, mutate: writeContract } = useWriteContract()
 
   const checkStatus = useCallback(async () => {
     try {
@@ -222,7 +222,7 @@ export default function SettingsTab() {
             <div className="flex justify-between align-items-center">
               <h4>In app wallet</h4>
               <button onClick={checkStatus} className={styles.btnIcon}>
-                <RefreshCwIcon size={18} />
+                <ArrowsClockwiseIcon size={18} />
               </button>
             </div>
             <small>Send a small amount of native token to the burner address to sign transactions automatically in the background.</small>
@@ -254,7 +254,7 @@ export default function SettingsTab() {
 
             {errorMsg && (
               <div className={styles.alertError}>
-                <ShieldAlertIcon size={16} />
+                <ShieldWarningIcon size={16} />
                 <span>{errorMsg}</span>
               </div>
             )}
@@ -263,7 +263,7 @@ export default function SettingsTab() {
             {showPasswordSetup && (
               <div className={styles.secureSetup}>
                 <h5>
-                  <KeyRoundIcon size={16} /> Secure Your Session Key
+                  <KeyIcon size={16} /> Secure Your Session Key
                 </h5>
                 <p>Choose a PIN or Password. It will be used to encrypt the burner private key before storing it on this device.</p>
                 <div className={styles.formGroup}>
@@ -284,7 +284,7 @@ export default function SettingsTab() {
                 </div>
                 <div className="flex gap-05 justify-between align-items-center">
                   <button type="button" onClick={() => setShowPlainPassword(!showPlainPassword)} className={styles.btnLink}>
-                    {showPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPlainPassword ? 'Hide' : 'Show'}
+                    {showPlainPassword ? <EyeSlashIcon size={14} /> : <EyeIcon size={14} />} {showPlainPassword ? 'Hide' : 'Show'}
                   </button>
                   <div className="flex gap-05">
                     <button onClick={() => setShowPasswordSetup(false)} className={styles.btnSecondary}>
@@ -312,7 +312,7 @@ export default function SettingsTab() {
             {showDecryptPrompt && (
               <div className={styles.secureSetup}>
                 <h5>
-                  <KeyRoundIcon size={16} /> Enter Password to Unlock
+                  <KeyIcon size={16} /> Enter Password to Unlock
                 </h5>
                 <p>Provide your password to securely decrypt the key from localStorage.</p>
                 <input
@@ -337,7 +337,7 @@ export default function SettingsTab() {
             {showImportPrompt && (
               <div className={styles.secureSetup}>
                 <h5>
-                  <UploadIcon size={16} /> Import Session Key
+                  <UploadSimpleIcon size={16} /> Import Session Key
                 </h5>
                 <p>Paste the private key from your other device and choose a new password for local encryption.</p>
                 <div className={styles.formGroup}>

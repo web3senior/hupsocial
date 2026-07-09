@@ -3,13 +3,12 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWRInfinite from 'swr/infinite'
-import { ArrowDown, Eye, Flame, Hash, Heart, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
+import { ArrowDownIcon, ChatCircleIcon, EyeIcon, FlameIcon, HashIcon, HeartIcon, PackageIcon, RepeatIcon, TrophyIcon, UsersIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
 import { useProfile } from '@/hooks/useProfile'
-import { Box } from 'lucide-react'
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
 
@@ -103,7 +102,7 @@ export default function LeaderboardPage() {
     <>
       <PageTitle name="Leaderboard" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width="medium">
           <header className={styles.header}>
 
             <div className={styles.filters} aria-label="Leaderboard filters">
@@ -146,11 +145,11 @@ export default function LeaderboardPage() {
           </header>
 
           <section className={styles.summaryGrid} aria-label="Leaderboard summary">
-            <StatCard icon={Users} label="Users" value={stats.active_users} />
-            <StatCard icon={Flame} label="Posts" value={stats.root_posts} />
-            <StatCard icon={MessageCircle} label="Comments" value={stats.comments} />
-            <StatCard icon={Heart} label="Likes" value={stats.likes} />
-            <StatCard icon={Eye} label="Views" value={stats.views} />
+            <StatCard icon={UsersIcon} label="Users" value={stats.active_users} />
+            <StatCard icon={FlameIcon} label="Posts" value={stats.root_posts} />
+            <StatCard icon={ChatCircleIcon} label="Comments" value={stats.comments} />
+            <StatCard icon={HeartIcon} label="Likes" value={stats.likes} />
+            <StatCard icon={EyeIcon} label="Views" value={stats.views} />
           </section>
 
           {error && <p className={styles.errorState}>{error.message}</p>}
@@ -190,12 +189,12 @@ export default function LeaderboardPage() {
                     <span className={styles.rankNumber}>{leader.rank}</span>
                     <Profile creator={leader.wallet_address} className={styles.avatar} variant="fullWithoutTime" />
                   
-                    <Metric icon={Flame} label="Posts" value={leader.root_posts} />
-                    <Metric icon={MessageCircle} label="Comments" value={leader.comments_made} />
-                    <Metric icon={Heart} label="Likes" value={leader.likes_received} />
-                    <Metric icon={Repeat2} label="Reposts" value={leader.reposts_made} />
-                    <Metric icon={Eye} label="Views" value={leader.views_received} />
-                    <Metric icon={Box} label="Transactions" value={leader.tx_count} />
+                    <Metric icon={FlameIcon} label="Posts" value={leader.root_posts} />
+                    <Metric icon={ChatCircleIcon} label="Comments" value={leader.comments_made} />
+                    <Metric icon={HeartIcon} label="Likes" value={leader.likes_received} />
+                    <Metric icon={RepeatIcon} label="Reposts" value={leader.reposts_made} />
+                    <Metric icon={EyeIcon} label="Views" value={leader.views_received} />
+                    <Metric icon={PackageIcon} label="Transactions" value={leader.tx_count} />
                     <span className={styles.rowScore}>{compactFormatter.format(leader.score)}</span>
                   </button>
                 ))}
@@ -204,7 +203,7 @@ export default function LeaderboardPage() {
               {hasMore && (
                 <div className={styles.loadMoreWrap}>
                   <button type="button" className={styles.loadMore} onClick={() => setSize(size + 1)} disabled={isLoadingMore}>
-                    <ArrowDown size={16} />
+                    <ArrowDownIcon size={16} />
                     <span>{isLoadingMore ? 'Loading' : 'Load more'}</span>
                   </button>
                 </div>

@@ -1,16 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { 
-  HelpCircle, 
-  ChevronDown, 
-  MessageSquare, 
-  Send, 
-  LucideLoader2, 
-  CheckCircle2, 
-  AlertCircle,
-  HelpCircle as GuestIcon
-} from 'lucide-react'
+import { CaretDownIcon, ChatIcon, CheckCircleIcon, PaperPlaneTiltIcon, QuestionIcon, QuestionIcon as GuestIcon, SpinnerIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useConnection } from 'wagmi'
 import { getViewerId } from '@/lib/viewer'
 import styles from './HelpCenter.module.scss'
@@ -106,7 +97,7 @@ export default function HelpCenter() {
 
       <section className={styles.section}>
         <h2>
-          <HelpCircle size={22} />
+          <QuestionIcon size={22} />
           Frequently Asked Questions
         </h2>
         <div className={styles.faqList}>
@@ -122,7 +113,7 @@ export default function HelpCenter() {
                   aria-controls={faq.id}
                 >
                   <span>{faq.question}</span>
-                  <ChevronDown size={18} />
+                  <CaretDownIcon size={18} />
                 </button>
                 {isOpen && (
                   <div id={faq.id} className={styles.faqAnswer}>
@@ -137,7 +128,7 @@ export default function HelpCenter() {
 
       <section className={styles.section}>
         <h2>
-          <MessageSquare size={22} />
+          <ChatIcon size={22} />
           Submit a Support Ticket
         </h2>
         
@@ -213,14 +204,14 @@ export default function HelpCenter() {
 
           {submitStatus === 'success' && (
             <div className={`${styles.statusMessage} ${styles.success}`}>
-              <CheckCircle2 size={18} />
+              <CheckCircleIcon size={18} />
               <span>Ticket successfully received. The team will analyze the telemetry.</span>
             </div>
           )}
 
           {submitStatus === 'error' && (
             <div className={`${styles.statusMessage} ${styles.error}`}>
-              <AlertCircle size={18} />
+              <WarningCircleIcon size={18} />
               <span>{errorMessage}</span>
             </div>
           )}
@@ -232,12 +223,12 @@ export default function HelpCenter() {
           >
             {isSubmitting ? (
               <>
-                <LucideLoader2 className={styles.spin} size={18} />
+                <SpinnerIcon className={styles.spin} size={18} />
                 Submitting Ticket...
               </>
             ) : (
               <>
-                <Send size={16} />
+                <PaperPlaneTiltIcon size={16} />
                 Send Ticket
               </>
             )}

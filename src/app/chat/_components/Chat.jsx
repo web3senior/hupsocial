@@ -8,7 +8,7 @@ import ecies from 'eciesjs'
 import { useChainId, useConnection, usePublicClient } from 'wagmi'
 import { getIPFS, uploadFileToIPFS } from '@/lib/ipfs'
 import clsx from 'clsx'
-import { ArrowUp, EllipsisVertical, MessageSquarePlus, Image as ImageIcon, SquarePlay, X, ChevronLeft, Smile, MoreHorizontal, Pencil, Trash2, Check } from 'lucide-react'
+import { ArrowUpIcon, CaretLeftIcon, CheckCircleIcon, CheckIcon, DotsThreeIcon, DotsThreeVerticalIcon, ImageIcon, MonitorPlayIcon, NotePencilIcon, PencilSimpleIcon, SmileyIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { bytesToHex, encodeFunctionData } from 'viem'
 import { ContentSpinner, MessageLoader } from '@/components/Loading'
@@ -25,8 +25,6 @@ import { Buffer } from 'buffer'
 import { useChatHistory } from '@/hooks/useChatHistory'
 import { useProfile } from '@/hooks/useProfile'
 import { useSWRConfig } from 'swr'
-import { CheckCircle2 } from 'lucide-react'
-
 const CHAT_PAGE_SIZE = 200
 
 // IPFS content is immutable — same CID always returns the same bytes.
@@ -1348,12 +1346,12 @@ export default function Chat() {
           <ul className="flex align-items-center justify-content-between">
             <li>
               <button onClick={() => setIsAddingContact((prev) => !prev)}>
-                <MessageSquarePlus width={18} height={18} strokeWidth={1.5} />
+                <NotePencilIcon width={18} height={18} />
               </button>
             </li>
             <li>
               <button>
-                <EllipsisVertical width={18} height={18} strokeWidth={1.5} />
+                <DotsThreeVerticalIcon width={18} height={18} />
               </button>
             </li>
           </ul>
@@ -1383,7 +1381,7 @@ export default function Chat() {
         {receiverAddress && (
           <div className={styles['main__header']}>
             <button className={styles['back-button']} onClick={handleBack} aria-label="Back to conversations">
-              <ChevronLeft size={20} />
+              <CaretLeftIcon size={20} />
             </button>
             <div className={styles['main__header-profile']}>
               {receiverProfile?.name && (
@@ -1414,7 +1412,7 @@ export default function Chat() {
                           onClick={(e) => handleToggleReactionPicker(e, msg.id)}
                           disabled={msg.messageId == null || pendingReactionId === msg.messageId}
                         >
-                          <Smile size={14} />
+                          <SmileyIcon size={14} />
                         </button>
                         {reactionPickerMessageId === msg.id && (
                           <div
@@ -1436,13 +1434,13 @@ export default function Chat() {
                           className={styles['chat-message__action-btn']}
                           onClick={(e) => handleToggleMenu(e, msg.id)}
                         >
-                          <MoreHorizontal size={14} />
+                          <DotsThreeIcon size={14} />
                         </button>
                         {activeMessageMenu === msg.id && (
                           <ul className={styles['chat-message__menu']} onClick={(e) => e.stopPropagation()}>
                             <li>
                               <button onClick={() => handleStartEdit(msg)}>
-                                <Pencil size={12} /> Edit
+                                <PencilSimpleIcon size={12} /> Edit
                               </button>
                             </li>
                             <li>
@@ -1451,7 +1449,7 @@ export default function Chat() {
                                 onClick={() => handleDeleteMessage(msg)}
                                 disabled={deletingMessageId === msg.id}
                               >
-                                <Trash2 size={12} /> Delete
+                                <TrashIcon size={12} /> Delete
                               </button>
                             </li>
                           </ul>
@@ -1472,8 +1470,8 @@ export default function Chat() {
                           }}
                         />
                         <div className={styles['chat-message__edit__actions']}>
-                          <button className={styles['chat-message__edit__btn']} onClick={handleCancelEdit}><X size={12} /></button>
-                          <button className={styles['chat-message__edit__btn']} onClick={handleSaveEdit}><Check size={12} /></button>
+                          <button className={styles['chat-message__edit__btn']} onClick={handleCancelEdit}><XIcon size={12} /></button>
+                          <button className={styles['chat-message__edit__btn']} onClick={handleSaveEdit}><CheckIcon size={12} /></button>
                         </div>
                       </div>
                     ) : (
@@ -1485,7 +1483,7 @@ export default function Chat() {
                     <div className={styles['chat-message__timestamp']} title={msg.timestamp}>
                       <span className={'flex gap-025'}>
                         {msg.timestamp.split(',')[1]?.trim() || msg.timestamp}
-                        <CheckCircle2 strokeWidth={2} size={12} />
+                        <CheckCircleIcon size={12} />
                       </span>
                     </div>
                     {myReactions[String(msg.messageId)] && (
@@ -1502,7 +1500,7 @@ export default function Chat() {
                   <div className={styles['chat-message__content']}>{renderMessageElements(msg.content?.elements, null)}</div>
                   <div className={styles['chat-message__timestamp']}></div>
                   <span className={styles['chat-message__sending']}>
-                    {msg.status === 'sent' ? <Check size={12} /> : <MessageLoader />}
+                    {msg.status === 'sent' ? <CheckIcon size={12} /> : <MessageLoader />}
                   </span>
                 </div>
               ))}
@@ -1525,7 +1523,7 @@ export default function Chat() {
                           <video src={item.localUrl} />
                         )}
                         <button type="button" className={styles['footer__media-remove']} onClick={() => handleRemoveMedia(index)}>
-                          <X size={10} />
+                          <XIcon size={10} />
                         </button>
                       </figure>
                     ))}
@@ -1545,10 +1543,10 @@ export default function Chat() {
                       <ImageIcon size={18} />
                     </button>
                     <button type="button" className={styles['footer__action-btn']} onClick={() => triggerFileInput('video')}>
-                      <SquarePlay size={18} />
+                      <MonitorPlayIcon size={18} />
                     </button>
                     <button type="submit" className={styles['footer__send-btn']} disabled={!messageText.trim() && mediaItems.length === 0}>
-                      <ArrowUp size={18} />
+                      <ArrowUpIcon size={18} />
                     </button>
                   </div>
                 </div>

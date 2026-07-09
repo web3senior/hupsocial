@@ -1,11 +1,38 @@
 'use client'
 
-import React, { cloneElement, isValidElement, useEffect, useId, useRef, useCallback } from 'react'
+import React, { cloneElement, isValidElement, useEffect, useId, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import clsx from 'clsx'
 import styles from './NativePopover.module.scss'
 
 const GAP = 6
 const MARGIN = 8
+
+// A trigger inside fixed/sticky UI (sidebar, tab bar) doesn't move when the page
+// scrolls, so its panel must stay viewport-fixed. In-flow triggers scroll with the
+// content, so their panels are absolutely positioned in page coordinates instead —
+// the compositor then moves panel and trigger together, with no per-frame JS chasing
+// the scroll (which lags a frame behind and shakes).
+function isViewportAnchored(el) {
+  let node = el
+  while (node && node !== document.body) {
+    const position = getComputedStyle(node).position
+    if (position === 'fixed' || position === 'sticky') return true
+    node = node.parentElement
+  }
+  return false
+}
+
+// Opposite side per anchored placement, used when the preferred side doesn't fit
+const FLIP = {
+  'bottom-start': 'top-start',
+  'bottom-end': 'top-end',
+  'top-start': 'bottom-start',
+  'top-end': 'bottom-end',
+  'right-start': 'left-start',
+  'right-end': 'left-end',
+  'left-start': 'right-start',
+  'left-end': 'right-end',
+}
 
 function computePosition(triggerRect, pw, ph, placement) {
   const vw = window.innerWidth
@@ -14,40 +41,62 @@ function computePosition(triggerRect, pw, ph, placement) {
 
   switch (placement) {
     case 'center':
-      return { top: '50%', left: '50%', transform: '' }
+      return { top: '50%', left: '50%', transform: '', placement }
     case 'bottom-right-corner':
-      return { top: 'auto', left: 'auto', bottom: MARGIN + 'px', right: MARGIN + 'px' }
+      return { top: 'auto', left: 'auto', bottom: MARGIN + 'px', right: MARGIN + 'px', placement }
     case 'bottom-left-corner':
-      return { top: 'auto', right: 'auto', bottom: MARGIN + 'px', left: MARGIN + 'px' }
+      return { top: 'auto', right: 'auto', bottom: MARGIN + 'px', left: MARGIN + 'px', placement }
     case 'top-right-corner':
-      return { bottom: 'auto', left: 'auto', top: MARGIN + 'px', right: MARGIN + 'px' }
+      return { bottom: 'auto', left: 'auto', top: MARGIN + 'px', right: MARGIN + 'px', placement }
     case 'top-left-corner':
-      return { bottom: 'auto', right: 'auto', top: MARGIN + 'px', left: MARGIN + 'px' }
+      return { bottom: 'auto', right: 'auto', top: MARGIN + 'px', left: MARGIN + 'px', placement }
     default: break
   }
 
-  let top, left
+  const coordsFor = (side) => {
+    switch (side) {
+      case 'bottom-end':   return { top: ty + th + GAP, left: tx + tw - pw }
+      case 'top-start':    return { top: ty - ph - GAP, left: tx }
+      case 'top-end':      return { top: ty - ph - GAP, left: tx + tw - pw }
+      case 'right-start':  return { top: ty,            left: tx + tw + GAP }
+      case 'right-end':    return { top: ty + th - ph,  left: tx + tw + GAP }
+      case 'left-start':   return { top: ty,            left: tx - pw - GAP }
+      case 'left-end':     return { top: ty + th - ph,  left: tx - pw - GAP }
+      case 'bottom-start':
+      default:             return { top: ty + th + GAP, left: tx }
+    }
+  }
 
-  switch (placement) {
-    case 'bottom-end':   top = ty + th + GAP; left = tx + tw - pw; break
-    case 'top-start':    top = ty - ph - GAP; left = tx;            break
-    case 'top-end':      top = ty - ph - GAP; left = tx + tw - pw;  break
-    case 'right-start':  top = ty;            left = tx + tw + GAP; break
-    case 'right-end':    top = ty + th - ph;  left = tx + tw + GAP; break
-    case 'left-start':   top = ty;            left = tx - pw - GAP; break
-    case 'left-end':     top = ty + th - ph;  left = tx - pw - GAP; break
-    case 'bottom-start':
-    default:             top = ty + th + GAP; left = tx;            break
+  // Flip to the opposite side when the preferred side overflows the viewport on its
+  // primary axis and the opposite side fully fits (macOS-menu behavior); the clamp
+  // below stays as the fallback when neither side fits
+  let resolved = placement
+  let { top, left } = coordsFor(placement)
+  const isVertical = placement.startsWith('top') || placement.startsWith('bottom')
+  const overflowsPrimary = isVertical
+    ? top < MARGIN || top + ph > vh - MARGIN
+    : left < MARGIN || left + pw > vw - MARGIN
+  if (overflowsPrimary) {
+    const flipped = FLIP[placement]
+    const alt = coordsFor(flipped)
+    const altFits = isVertical
+      ? alt.top >= MARGIN && alt.top + ph <= vh - MARGIN
+      : alt.left >= MARGIN && alt.left + pw <= vw - MARGIN
+    if (altFits) {
+      resolved = flipped
+      top = alt.top
+      left = alt.left
+    }
   }
 
   // Clamp to viewport
   left = Math.max(MARGIN, Math.min(left, vw - pw - MARGIN))
   top  = Math.max(MARGIN, Math.min(top,  vh - ph - MARGIN))
 
-  return { top: top + 'px', left: left + 'px', bottom: 'auto', right: 'auto', transform: '' }
+  return { top: top + 'px', left: left + 'px', bottom: 'auto', right: 'auto', transform: '', placement: resolved }
 }
 
-export default function NativePopover({
+const NativePopover = forwardRef(function NativePopover({
   trigger,
   children,
   type = 'auto',
@@ -56,41 +105,51 @@ export default function NativePopover({
   onBeforeToggle,
   onToggle,
   className,
-}) {
+}, ref) {
   const rawId = useId()
   const popoverId = `popover-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const popoverRef = useRef(null)
   const triggerRef = useRef(null)
-  const measuringRef = useRef(false)
 
-  const applyPosition = useCallback(() => {
-    if (measuringRef.current) return
+  // Measure the (already laid out) popover against its trigger and set its coords —
+  // page coordinates (absolute) for in-flow triggers, viewport coordinates (fixed)
+  // for triggers living in fixed/sticky UI and for trigger-independent placements
+  const reposition = useCallback(() => {
     const triggerEl = triggerRef.current
     const popoverEl = popoverRef.current
     if (!triggerEl || !popoverEl) return
-
-    // offsetWidth/offsetHeight are 0 while the popover is hidden.
-    // Move it off-screen, make it visible just long enough to measure, then position.
-    const wasHidden = !popoverEl.matches(':popover-open')
-    if (wasHidden) {
-      measuringRef.current = true
-      Object.assign(popoverEl.style, { position: 'fixed', top: '-9999px', left: '-9999px', visibility: 'hidden' })
-      popoverEl.showPopover()
-    }
-
     const rect = triggerEl.getBoundingClientRect()
-    const pw = popoverEl.offsetWidth
-    const ph = popoverEl.offsetHeight
-
-    if (wasHidden) {
-      popoverEl.hidePopover()
-      popoverEl.style.visibility = ''
-      measuringRef.current = false
+    const anchored = placement !== 'center' && !placement.endsWith('-corner')
+    const { placement: resolvedPlacement, ...pos } = computePosition(rect, popoverEl.offsetWidth, popoverEl.offsetHeight, placement)
+    // Keep the transform-origin of the open animation on the side actually used
+    popoverEl.dataset.placement = resolvedPlacement
+    if (anchored && !isViewportAnchored(triggerEl)) {
+      popoverEl.style.position = 'absolute'
+      pos.top = `${parseFloat(pos.top) + window.scrollY}px`
+      pos.left = `${parseFloat(pos.left) + window.scrollX}px`
+    } else {
+      popoverEl.style.position = 'fixed'
     }
-
-    const pos = computePosition(rect, pw, ph, placement)
     Object.assign(popoverEl.style, pos)
   }, [placement])
+
+  const applyPosition = useCallback(() => {
+    const popoverEl = popoverRef.current
+    if (!triggerRef.current || !popoverEl) return
+
+    // At `beforetoggle` time the browser hasn't opened the popover yet
+    // (display is still none), so offsetWidth/offsetHeight aren't
+    // available until the next frame. Calling showPopover() ourselves
+    // here would throw, since the browser's own show operation for
+    // this popover is already in progress. Hide it, then measure and
+    // position once it's actually laid out.
+    popoverEl.style.visibility = 'hidden'
+
+    requestAnimationFrame(() => {
+      reposition()
+      popoverEl.style.visibility = ''
+    })
+  }, [reposition])
 
   useEffect(() => {
     const node = popoverRef.current
@@ -107,16 +166,49 @@ export default function NativePopover({
       }
     }
 
+    // Scroll never re-anchors an open panel: absolute panels ride the page natively,
+    // and re-running the viewport-clamped math mid-scroll makes a clamped panel creep
+    // back toward its unclamped spot. Scrolling only closes the panel once its trigger
+    // leaves the viewport (standard menu behavior); resizing re-anchors it.
+    // Center/corner placements don't depend on the trigger, so they need neither.
+    const isAnchored = placement !== 'center' && !placement.endsWith('-corner')
+    let frameId = null
+    const schedule = (task) => {
+      if (frameId) return
+      frameId = requestAnimationFrame(() => {
+        frameId = null
+        if (node.matches(':popover-open')) task()
+      })
+    }
+    const handleScroll = () =>
+      schedule(() => {
+        const rect = triggerRef.current?.getBoundingClientRect()
+        if (!rect) return
+        const outOfView = rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth
+        if (outOfView) node.hidePopover()
+      })
+    const handleResize = () => schedule(reposition)
+
     node.addEventListener('beforetoggle', handleBeforeToggle)
     if (onToggle) node.addEventListener('toggle', onToggle)
     window.addEventListener('keydown', handleKeyDown, true)
+    if (isAnchored) {
+      // Capture phase so scrolls inside nested scroll containers count too
+      window.addEventListener('scroll', handleScroll, true)
+      window.addEventListener('resize', handleResize)
+    }
 
     return () => {
       node.removeEventListener('beforetoggle', handleBeforeToggle)
       if (onToggle) node.removeEventListener('toggle', onToggle)
       window.removeEventListener('keydown', handleKeyDown, true)
+      if (isAnchored) {
+        window.removeEventListener('scroll', handleScroll, true)
+        window.removeEventListener('resize', handleResize)
+      }
+      if (frameId) cancelAnimationFrame(frameId)
     }
-  }, [applyPosition, onBeforeToggle, onToggle])
+  }, [applyPosition, placement, reposition, onBeforeToggle, onToggle])
 
   const close = () => {
     popoverRef.current?.hidePopover()
@@ -125,9 +217,10 @@ export default function NativePopover({
   const open = () => {
     const el = popoverRef.current
     if (!el || el.matches(':popover-open')) return
-    applyPosition()
     el.showPopover()
   }
+
+  useImperativeHandle(ref, () => ({ open, close }), [open, close])
 
   const triggerProps = {
     popoverTarget: popoverId,
@@ -162,4 +255,6 @@ export default function NativePopover({
       </div>
     </>
   )
-}
+})
+
+export default NativePopover

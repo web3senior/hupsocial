@@ -4,7 +4,7 @@ import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import { Heart, UserRound, Search, House, Plus } from 'lucide-react'
+import { HeartIcon, HouseIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -41,11 +41,11 @@ export default function Footer() {
     const profilePath = isConnected && address ? `/${address}` : '/connect'
 
     return [
-      { name: 'Home', path: '/', icon: House },
-      { name: 'Search', path: '/search', icon: Search },
-      { name: 'New', action: () => setIsComponentOpen(true), icon: Plus },
-      { name: 'Notifications', path: '/batch-like', icon: Heart, isBatch: true },
-      { name: 'Profile', path: profilePath, icon: UserRound },
+      { name: 'Home', path: '/', icon: HouseIcon },
+      { name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
+      { name: 'New', action: () => setIsComponentOpen(true), icon: PlusIcon },
+      { name: 'Notifications', path: '/batch-like', icon: HeartIcon, isBatch: true },
+      { name: 'Profile', path: profilePath, icon: UserIcon },
     ]
   }, [address, isConnected, setIsComponentOpen])
 
@@ -61,7 +61,7 @@ export default function Footer() {
 
             const iconContent = (
               <div className={styles.iconWrapper} data-icon={item.name}>
-                <Icon size={24} strokeWidth={isActive ? 2 : 1.7} fill={isActive && item.name !== 'Search' ? 'currentColor' : 'none'} />
+                <Icon size={24} weight={isActive && item.name !== 'Search' ? 'fill' : 'regular'} />
                 {/* Dynamically append badge if item is tracking batch counts */}
                 {item.isBatch && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
               </div>

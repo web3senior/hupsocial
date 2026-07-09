@@ -1,0 +1,205 @@
+.insights {
+  position: relative;
+  margin: 1rem 0;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke,
+    opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+
+  &__container {
+    position: relative;
+    flex: 1 1 auto;
+    border-radius: inherit;
+    padding: 1.25rem 1.5rem;
+    background-color: var(--background);
+  }
+
+  &__close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text);
+    opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+
+    &:hover {
+      opacity: 1;
+      background-color: rgba(var(--network-color-primary-rgb), 0.08);
+    }
+  }
+
+  &__header {
+    margin-bottom: 1rem;
+    padding-right: 2rem;
+  }
+
+  &__title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+  }
+
+  &__title {
+    font-size: var(--system-15-font-size, 1rem);
+    font-weight: 700;
+    margin: 0;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    font-size: var(--system-11-font-size, 0.6875rem);
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--orange-600, #ea580c);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    text-transform: capitalize;
+  }
+
+  &__subtitle {
+    font-size: var(--system-12-font-size);
+    font-weight: 500;
+    color: var(--text);
+    opacity: 0.7;
+    text-wrap: balance;
+    line-height: 1.4;
+    max-width: 400px;
+    margin: 0;
+  }
+
+  &__body {
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.75rem 1rem;
+    background-color: rgba(var(--network-color-primary-rgb), 0.03);
+  }
+
+  &__action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--global-border-radius);
+    color: var(--white);
+    font-size: var(--system-13-font-size);
+    background: linear-gradient(270deg, #069370 0%, #2366e3 100%);
+    cursor: pointer;
+    will-change: transform;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.015);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    &[disabled],
+    &--loading {
+      opacity: 0.4;
+    }
+  }
+
+  &__regenerate {
+    display: block;
+    padding: 0.5rem 1rem;
+    margin: 0.75rem auto 0 auto;
+    border: none;
+    color: var(--white);
+    font-size: var(--system-13-font-size);
+    background: linear-gradient(270deg, #069370 0%, #2366e3 100%);
+    cursor: pointer;
+    will-change: transform;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.025);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    &[disabled] {
+      opacity: 0.4;
+    }
+  }
+
+  &__loading {
+    position: absolute;
+    right: 2.5rem;
+    top: 0.85rem;
+    width: 16px;
+    height: 16px;
+  }
+
+  &__error {
+    font-size: var(--system-13-font-size);
+    color: var(--red-600);
+    font-weight: 500;
+    margin: 0;
+  }
+
+  &__summary {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text);
+
+    p {
+      margin: 0 0 0.5rem 0;
+    }
+
+    ul {
+      li {
+        box-shadow: var(--shadow-xs, 0 0 #0000);
+        border: 1px solid var(--border);
+        border-radius: var(--global-border-radius);
+        margin-bottom: 0.5rem;
+        background-color: var(--background);
+        padding: 0.5em;
+
+        > div {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.5rem;
+        }
+
+        progress {
+          width: 100%;
+          height: 8px;
+          border-radius: 4px;
+          appearance: none;
+          background-color: var(--gray-50);
+
+          &::-webkit-progress-value {
+            background-color: var(--network-color-primary);
+            border-radius: 4px;
+          }
+
+          &::-webkit-progress-bar {
+            background-color: var(--gray-50);
+            border-radius: 4px;
+          }
+        }
+      }
+    }
+  }
+}

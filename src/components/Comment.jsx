@@ -30,8 +30,7 @@ import { marked } from 'marked'
 import { getIPFS } from '@/lib/ipfs'
 import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
-import { Ellipsis } from 'lucide-react'
-
+import { DotsThreeIcon } from '@phosphor-icons/react'
 moment.defineLocale('en-short', {
   relativeTime: {
     future: 'in %s',
@@ -99,7 +98,7 @@ export default function Comment({ item, showContent, actions, chainId }) {
   const { address, isConnected } = useConnection()
   const router = useRouter()
   const [viewCount, setViewCount] = useState(0)
-  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
@@ -263,7 +262,7 @@ const Nav = ({ item }) => {
           setShowPostDropdown(!showPostDropdown)
         }}
       >
-        <Ellipsis fill="currentColor" strokeWidth={1} width={18} height={18} />
+        <DotsThreeIcon width={18} height={18} />
       </button>
 
       {showPostDropdown && (
@@ -289,7 +288,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
   const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   const {
     isLoading: isConfirming,
     isSuccess: isConfirmed,
@@ -481,7 +480,7 @@ const Like = ({ item }) => {
   const [error, setError] = useState(null)
   const activeChain = getActiveChain()
   const { address, isConnected } = useConnection()
-  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
@@ -577,7 +576,7 @@ const ConnectedProfile = ({ addr }) => {
           profileImage:
             res.data.Profile[0].profileImages.length > 0
               ? res.data.Profile[0].profileImages[0].src
-              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`,
+              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`,
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
@@ -590,7 +589,7 @@ const ConnectedProfile = ({ addr }) => {
             const profileImage =
               res.profileImage !== ''
                 ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`
             res.profileImage = profileImage
             setProfile(res)
           }
@@ -628,11 +627,9 @@ const ConnectedProfile = ({ addr }) => {
         <div className={`flex align-items-center gap-025`}>
           <b>{profile.name ?? defaultUsername}</b>
           <BlueCheckMarkIcon />
-          <div
-            className={`${styles.badge}`}
-            title={activeChain && activeChain[0].name}
-            dangerouslySetInnerHTML={{ __html: `${activeChain && activeChain[0].icon}` }}
-          ></div>
+          <div className={`${styles.badge}`} title={activeChain && activeChain[0].name}>
+            {activeChain?.[0]?.iconUrl && <img src={activeChain[0].iconUrl} alt="" />}
+          </div>
         </div>
         <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
       </figcaption>

@@ -10,10 +10,21 @@ export const usePostStore = create((set, get) => ({
   hasInitialized: false,
   currentPost: null,
 
+  // Bumped by the Aside home link when the page is already scrolled to top;
+  // the active feed tab watches this and re-fetches page 1.
+  feedRefreshNonce: 0,
+  requestFeedRefresh: () => set((state) => ({ feedRefreshNonce: state.feedRefreshNonce + 1 })),
+
   setCurrentPost: (post) => set({ currentPost: post }),
 
   setInitialData: (apps, postsResponse) => {
-    const initialPosts = postsResponse?.data || []
+    const rawPosts = postsResponse?.data || []
+    const seenIds = new Set()
+    const initialPosts = rawPosts.filter((p) => {
+      if (seenIds.has(p.id)) return false
+      seenIds.add(p.id)
+      return true
+    })
     set({
       totalPosts: postsResponse?.meta?.total || initialPosts.length,
       TABS_DATA: [

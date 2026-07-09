@@ -8,44 +8,26 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
-import {
-  Book,
-  Bug,
-  Circle,
-  Equal,
-  Heart,
-  HelpCircle,
-  MessageSquareWarning,
-  Download,
-  Boxes,
-  Moon,
-  Settings2,
-  Palette,
-  PanelRightClose,
-  PanelRightOpen,
-  Settings,
-  TerminalSquare,
-  Sun,
-  UserRound,
-  Plus,
-} from 'lucide-react'
+import { BookIcon, BugIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GearIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { usePostStore } from '@/stores/usePostStore'
 import NativePopover from './ui/NativePopover'
-import styles from './Aside.module.scss'
 import { GitHub } from './Icons'
+import styles from './Aside.module.scss'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
 }
 
 const themeOptions = [
-  { id: 'system', icon: <Settings2 size={16} /> },
-  { id: 'dark', icon: <Moon size={16} /> },
-  { id: 'light', icon: <Sun size={16} /> },
-  { id: 'terminal', icon: <TerminalSquare size={16} /> },
+  { id: 'system', icon: <FadersHorizontalIcon size={16} /> },
+  { id: 'dark', icon: <MoonIcon size={16} /> },
+  { id: 'light', icon: <SunIcon size={16} /> },
+  { id: 'terminal', icon: <TerminalWindowIcon size={16} /> },
 ]
 
 const isActivePath = (pathname, path) => {
@@ -71,7 +53,7 @@ const normalizeNavItem = (item) => {
   }
 }
 
-const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCount, onNavigate }) => {
+const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCount, onNavigate, onLinkClick }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
 
@@ -79,7 +61,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCou
     return <hr className={styles.divider} aria-hidden="true" />
   }
 
-  const Icon = item.icon ?? Circle
+  const Icon = item.icon ?? CircleIcon
   const Component = typeof item.component === 'string' ? NAV_COMPONENTS[item.component] : item.component
 
   // Match target item flags against common dynamic identifier properties
@@ -90,7 +72,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCou
   const content = (
     <>
       <div className={styles.iconWrapper} data-icon={item.name}>
-        <Icon size={20} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.8} />
+        <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
         {isBatchLikeItem && isCompact && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
@@ -102,7 +84,9 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCou
 
       {/* Render full numeric indicator tag layout when sidebar is wide/expanded */}
       {isBatchLikeItem && !isCompact && batchCount > 0 && <span className={styles.badgeCounter}>{batchCount}</span>}
-      {isNotificationItem && !isCompact && unreadCount > 0 && <span className={styles.notificationBadgeCounter}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+      {isNotificationItem && !isCompact && unreadCount > 0 && (
+        <span className={styles.notificationBadgeCounter}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+      )}
     </>
   )
 
@@ -134,7 +118,10 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCou
       aria-label={item.name}
       data-tooltip={showTooltip ? item.name : undefined}
       aria-current={isActive ? 'page' : undefined}
-      onClick={onNavigate}
+      onClick={(event) => {
+        onLinkClick?.(event)
+        onNavigate?.()
+      }}
     >
       {content}
     </Link>
@@ -201,7 +188,7 @@ export default function Aside() {
         id: 'profile',
         name: 'Profile',
         path: profilePath,
-        icon: UserRound,
+        icon: UserIcon,
       },
     ]
   }, [address, isConnected, navItems])
@@ -229,6 +216,21 @@ export default function Aside() {
       toggleMobileMenu()
     } else {
       toggleMenu()
+    }
+  }
+
+  const requestFeedRefresh = usePostStore((state) => state.requestFeedRefresh)
+
+  // Home link double-duty: scrolled down -> back to top, already at top -> pull fresh posts
+  const handleHomeLinkClick = (event) => {
+    if (pathname !== '/') return
+
+    event.preventDefault()
+
+    if (document.documentElement.scrollTop > 0) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      requestFeedRefresh()
     }
   }
 
@@ -262,7 +264,7 @@ export default function Aside() {
               aria-label="Collapse sidebar"
               aria-expanded={isExpanded}
             >
-              <PanelRightOpen size={18} strokeWidth={1.5} />
+              <CaretDoubleLeftIcon size={18} />
             </button>
           )}
 
@@ -273,7 +275,7 @@ export default function Aside() {
             aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
             aria-expanded={isExpanded}
           >
-            {isExpanded ? <PanelRightOpen size={18} strokeWidth={1.5} /> : <PanelRightClose size={18} strokeWidth={1.5} />}
+            {isExpanded ? <CaretDoubleLeftIcon size={18} /> : <CaretDoubleRightIcon size={18} />}
           </button>
         </header>
 
@@ -288,6 +290,7 @@ export default function Aside() {
                 batchCount={batchCount}
                 unreadCount={unreadCount}
                 onNavigate={isMobileLayout ? closeSidebar : undefined}
+                onLinkClick={item.id === 'foryou' ? handleHomeLinkClick : undefined}
               />
             </li>
           ))}
@@ -303,7 +306,7 @@ export default function Aside() {
                 data-tooltip={isCompact ? 'More' : undefined}
               >
                 <div className={styles.iconWrapper}>
-                  <Equal size={24} />
+                  <EqualsIcon size={24} />
                 </div>
                 {!isCompact && <span className={styles.linkText}>More</span>}
               </button>
@@ -316,20 +319,20 @@ export default function Aside() {
                 <ul className="flex flex-column gap-050">
                   <li>
                     <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
-                      <Settings size={16} />
+                      <GearIcon size={16} />
                       <span>Settings</span>
                     </Link>
                   </li>
                   <li>
                     <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
-                      <Heart size={16} />
+                      <HeartIcon size={16} />
                       <span>Liked</span>
                     </Link>
                   </li>
                   <li>
                     <div className={styles.themeWrapper}>
                       <div className="flex align-items-center gap-050">
-                        <Palette size={16} />
+                        <PaletteIcon size={16} />
                         <span>Theme</span>
                       </div>
                       <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
@@ -355,25 +358,25 @@ export default function Aside() {
                       onClick={close}
                       className="flex align-items-center gap-050"
                     >
-                      <Book size={16} />
+                      <BookIcon size={16} />
                       <span>Documentation</span>
                     </a>
                   </li>
                   <li>
                     <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                      <MessageSquareWarning size={16} />
+                      <ChatCenteredDotsIcon size={16} />
                       <span>Send feedback</span>
                     </Link>
                   </li>
                   <li>
                     <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                      <Bug size={16} />
+                      <BugIcon size={16} />
                       <span>Report a problem</span>
                     </Link>
                   </li>
                   <li>
                     <Link href="/install" onClick={close} className="flex align-items-center gap-050">
-                      <Download size={16} />
+                      <DownloadSimpleIcon size={16} />
                       <span>Install {process.env.NEXT_PUBLIC_NAME}</span>
                     </Link>
                   </li>
@@ -391,7 +394,7 @@ export default function Aside() {
                   </li>
                   <li>
                     <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                      <HelpCircle size={16} />
+                      <QuestionIcon size={16} />
                       <span>Help</span>
                     </Link>
                   </li>
@@ -409,11 +412,7 @@ export default function Aside() {
             onClick={closeSidebar}
           >
             <div className={styles.iconWrapper}>
-              <Boxes
-                size={20}
-                fill={isActivePath(pathname, '/networks') ? 'currentColor' : 'none'}
-                strokeWidth={isActivePath(pathname, '/networks') ? 2 : 1.7}
-              />
+              <StackIcon size={20} weight={isActivePath(pathname, '/networks') ? 'fill' : 'regular'} />
             </div>
             {!isCompact && <span className={styles.linkText}>Networks</span>}
           </Link>
@@ -428,7 +427,7 @@ export default function Aside() {
               className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])}
               aria-label={`View batch queue with ${batchCount} operations`}
             >
-              <Heart size={20} fill="var(--batch-like-color, #facc15)" stroke="var(--batch-like-color, #facc15)" />
+              <HeartIcon size={20} weight="fill" color="var(--batch-like-color, #facc15)" />
               <span className={styles.floatingActions__badge}>{batchCount}</span>
             </Link>
           )}
@@ -438,7 +437,7 @@ export default function Aside() {
             onClick={() => setIsComponentOpen(true)}
             aria-label="Create new post"
           >
-            <Plus />
+            <PlusIcon />
           </button>
         </div>
       )}

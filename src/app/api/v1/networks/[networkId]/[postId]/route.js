@@ -17,26 +17,31 @@ export async function GET(request, { params }) {
 
     let queryParams = [postId, networkId]
     if (viewerAddress) {
-      // Prepend the viewer address to align with the dynamic has_liked subquery position
-      queryParams.unshift(viewerAddress)
+      // Prepend the viewer address for each dynamic has_liked/has_bookmarked/folder_id subquery position
+      queryParams.unshift(viewerAddress, viewerAddress, viewerAddress)
     }
 
     // Select unified row structures using indexed relational bindings and direct aggregations
     const query = `
-      SELECT 
+      SELECT
         p.*,
         n.name as network_name,
         n.id as network_id,
         u.name as display_name,
         u.profileImage as profile_image,
+        comm.name as community_name,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
         (SELECT COUNT(*) FROM posts WHERE is_comment = p.id AND network_id = p.network_id) as total_comments,
         (SELECT COUNT(*) FROM post_views WHERE post_id = p.id AND network_id = p.network_id) as total_views,
+        (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
         (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,
-        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ?))` : '0'} as has_liked
+        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ?))` : '0'} as has_liked,
+        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?))` : '0'} as has_bookmarked,
+        ${viewerAddress ? `(SELECT folder_id FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?)` : 'NULL'} as folder_id
       FROM posts p
       JOIN networks n ON p.network_id = n.id
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
+      LEFT JOIN communities comm ON comm.network_id = p.network_id AND comm.id = p.community_id
       WHERE p.id = ? AND n.id = ?
       LIMIT 1
     `
@@ -57,7 +62,9 @@ export async function GET(request, { params }) {
       data: {
         ...post,
         content: parseContent(post.content),
-        has_liked: !!post.has_liked
+        has_liked: !!post.has_liked,
+        is_bookmarked: !!post.has_bookmarked,
+        folder_id: post.folder_id ?? null
       }
     })
   } catch (error) {

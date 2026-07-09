@@ -49,7 +49,7 @@ export async function ensureProfile(address) {
 
   return res.json()
 }
-export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null) => {
+export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null, communityId = null) => {
   /* Construct the URL with query parameters */
   let url = `/api/v1/networks/posts?page=${page}&limit=${limit}`
 
@@ -65,8 +65,51 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
     url += `&viewer_address=${viewerAddress}`
   }
 
+  if (communityId) {
+    url += `&community_id=${communityId}`
+  }
+
   const response = await fetch(url)
   if (!response.ok) throw new Error('Failed to fetch posts')
+
+  return response.json()
+}
+
+export const getFollowingPosts = async (networkId, viewerAddress, page = 1, limit = 20) => {
+  const url = `/api/v1/networks/posts?feed_type=following&page=${page}&limit=${limit}&network_id=${networkId}&viewer_address=${viewerAddress}`
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Failed to fetch following posts')
+
+  return response.json()
+}
+
+export const getTrendingPosts = async (page = 1, limit = 20, networkId = null, viewerAddress = null) => {
+  let url = `/api/v1/networks/posts?feed_type=trending&page=${page}&limit=${limit}`
+
+  if (networkId) {
+    url += `&network_id=${networkId}`
+  }
+
+  if (viewerAddress) {
+    url += `&viewer_address=${viewerAddress}`
+  }
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Failed to fetch trending posts')
+
+  return response.json()
+}
+
+export const getStatuses = async (page = 1, limit = 20, networkId = null) => {
+  let url = `/api/v1/networks/statuses?page=${page}&limit=${limit}`
+
+  if (networkId) {
+    url += `&network_id=${networkId}`
+  }
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Failed to fetch statuses')
 
   return response.json()
 }
@@ -87,6 +130,18 @@ export const getPostById = async (networkId, postId, viewerAddress = null) => {
   const data = await response.json()
   return data
 }
+export const getCommunityById = async (networkId, communityId) => {
+  // Determine the base URL based on the environment
+  const isServer = typeof window === 'undefined'
+  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000' : ''
+
+  const url = `${baseUrl}/api/v1/networks/communities/${communityId}?network_id=${networkId}`
+
+  const response = await fetch(url, { next: { revalidate: 30 } })
+  if (!response.ok) throw new Error('Community fetch failed')
+  return response.json()
+}
+
 export const recordProfileView = async (address, walletAddress = null) => {
   try {
     const viewerId = getViewerId(walletAddress)

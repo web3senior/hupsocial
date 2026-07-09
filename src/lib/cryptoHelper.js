@@ -32,6 +32,31 @@ async function deriveKey(password, salt) {
 }
 
 /**
+ * Derives raw key material (not a non-extractable CryptoKey) from a password and salt using the
+ * same PBKDF2 parameters as deriveKey. Used where the caller needs the actual bytes — e.g. to
+ * build an ECIES private key — rather than an opaque AES-GCM CryptoKey.
+ */
+export async function deriveRawBits(password, salt, lengthBits = 256) {
+  const enc = new TextEncoder()
+  const keyMaterial = await window.crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, [
+    'deriveBits',
+  ])
+
+  const bits = await window.crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    lengthBits,
+  )
+
+  return new Uint8Array(bits)
+}
+
+/**
  * Encrypts a plaintext string (private key) using a password.
  * Returns a self-contained Base64 encoded string: salt (16 bytes) + iv (12 bytes) + ciphertext.
  */

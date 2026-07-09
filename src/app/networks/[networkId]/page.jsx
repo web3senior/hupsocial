@@ -40,7 +40,9 @@ const NetworkDetails = ({ id }) => {
                   style={{ '--bg-color': `${item.primaryColor}` }}
                 >
                   <div className={`flex flex-column align-items-center justify-content-start gap-050 flex-1`}>
-                    <div className={`${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
+                    <div className={`${styles.network__icon}`}>
+                      <img src={item.iconUrl} alt="" />
+                    </div>
                     <h3>{item.name}</h3>
 
                     <table className={`mt-10 mb-10`}>

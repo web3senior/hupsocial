@@ -1,16 +1,22 @@
 ﻿'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { Bold, Image as ImageIcon, Italic, MapPin, Mic, SlidersHorizontal, SquarePlay, Trash2, X } from 'lucide-react'
-
+import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import HupCommunityABI from '@/abis/HupCommunity'
+import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
+import { FadersHorizontalIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { getActiveChain } from '@/lib/communication'
+import { CONTRACTS } from '@/config/wagmi'
+import { ContentType } from '@/lib/content'
+import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
+import NativeDialog from '@/components/ui/NativeDialog'
 import Profile from './Profile'
+import MediaGallery from './Gallery'
 import clsx from 'clsx'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
@@ -48,6 +54,22 @@ const getContentPayload = (existingPost) => {
 const getContentElement = (content, type) =>
   content?.elements?.find((element) => element?.type === type)
 
+const getDraftStorageKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`
+
+// Media items are already uploaded to IPFS by the time they land in state, so a saved
+// draft's cids stay resolvable even after a refresh drops the in-memory blob URLs.
+const loadDraftContent = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(getDraftStorageKey())
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed?.elements) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 const getInitialPostContent = (text, url, actionType, existingPost) => {
   if (actionType === 'edit' && existingPost) {
     const content = getContentPayload(existingPost)
@@ -55,8 +77,24 @@ const getInitialPostContent = (text, url, actionType, existingPost) => {
     const existingMedia = getContentElement(content, 'media')?.data?.items || []
     return createPostContent(existingText, existingMedia)
   }
+
+  const hasPrefill = Boolean(normalizePrefillValue(text) || normalizePrefillValue(url))
+  const draft = !hasPrefill && actionType === 'post' ? loadDraftContent() : null
+  if (draft) return draft
+
   return createPostContent([normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n'))
 }
+
+// Extract the text/media of the post being replied to, matching Post.jsx's content-shape handling
+const getReplyTargetText = (target) => {
+  if (!target) return ''
+  if (target?.content?.encrypted) return '🔒 Encrypted community post — open the community to view'
+  if (target?.content?.elements?.length > 1) return target.content.elements[0]?.data?.text || ''
+  return `${target?.content || ''}`
+}
+
+const getReplyTargetMedia = (target) =>
+  target?.content?.elements?.length > 1 ? target.content.elements[1]?.data?.items || [] : []
 
 const getMediaPreviewSrc = (item) => item.localUrl || resolveIPFSUrl(item.cid)
 
@@ -112,7 +150,7 @@ const editorHtmlToMarkdown = (html) => {
 
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({ text = '', url = '', close, onClose, existingPost = null, actionType = 'post' }) {
+export default function NewPost({ text = '', url = '', close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed }) {
   const mounted = useClientMounted()
 
   const initialPostContent = useMemo(
@@ -120,29 +158,110 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     [text, url, actionType, existingPost]
   )
 
+  const isComment = actionType === 'comment'
+  const isQuote = actionType === 'quote' && Boolean(quoteTarget)
+  // Both replies and quotes preview the post they target with the same card
+  const previewTarget = isComment ? replyTarget : isQuote ? quoteTarget : null
+  const previewTargetText = useMemo(() => getReplyTargetText(previewTarget), [previewTarget])
+  const previewTargetMedia = useMemo(() => getReplyTargetMedia(previewTarget), [previewTarget])
+  const previewTargetHandle = previewTarget?.wallet_address
+    ? `${previewTarget.wallet_address.slice(0, 6)}…${previewTarget.wallet_address.slice(-4)}`
+    : ''
+
   const [postContent, setPostContent] = useState(() => initialPostContent)
   const [allowComments, setAllowComments] = useState(true)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedMediaType, setSelectedMediaType] = useState(null)
   const editorRef = useRef(null)
+  const dialogRef = useRef(null)
   const composerRef = useRef(null)
   const fileInputRef = useRef(null)
   const mediaItemsRef = useRef([])
 
   const { address, isConnected } = useConnection()
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
+
+  // Which community this submission belongs to, if any: an explicit community composer target
+  // (posting from a community page), the replied-to post's community, or the quoted post's
+  // community — quotes and replies inherit the community so they stay inside it instead of
+  // leaking to the public feed.
+  const communityContext = communityTarget
+    ? { communityId: communityTarget.communityId, networkId: communityTarget.networkId }
+    : replyTarget?.community_id
+    ? { communityId: replyTarget.community_id, networkId: replyTarget.network_id }
+    : quoteTarget?.community_id
+    ? { communityId: quoteTarget.community_id, networkId: quoteTarget.network_id }
+    : null
+
+  // Read client on the community's network — replies/quotes land on the parent's chain, and the
+  // encryption checks below must query that chain's community contract, not the wallet's chain.
+  const communityPublicClient = usePublicClient({
+    chainId: communityContext?.networkId ? Number(communityContext.networkId) : undefined,
+  })
+
+  // Everything inside an encrypted community stays encrypted — posts, replies, and quotes alike.
+  // Encrypted-type community with an initialized key → seal with the community content key;
+  // plaintext community → tag the content with communityId so cidex can verify + surface it in
+  // the community feed. No key or locked vault → block rather than publish a plaintext leak.
+  const sealForCommunity = async (plainContent) => {
+    const communityId = communityContext?.communityId
+    const communityContract = CONTRACTS[`chain${communityContext?.networkId}`]?.community
+    if (!communityId || !communityContract || !communityPublicClient) return plainContent
+
+    const read = (functionName, args) =>
+      communityPublicClient.readContract({ address: communityContract, abi: HupCommunityABI, functionName, args })
+
+    let membershipType
+    let currentKeyVersion
+    try {
+      const communityRow = await read('communities', [BigInt(communityId)])
+      membershipType = Number(communityRow[2])
+      currentKeyVersion = Number(await read('keyVersion', [BigInt(communityId)]))
+    } catch (err) {
+      console.error('Failed to resolve the community encryption state for this reply:', err)
+      toast('Could not verify the community encryption settings. Try again.', 'error')
+      return null
+    }
+
+    // Encrypted membership types (Request-Based, Private, NFT/Token/NFT+Token/Follower-Gated)
+    // with an initialized key get sealed; plaintext communities just carry the tag.
+    const isEncryptedType = [1, 2, 3, 4, 5, 8].includes(membershipType)
+    if (!isEncryptedType || currentKeyVersion === 0) {
+      return { ...plainContent, communityId: Number(communityId) }
+    }
+
+    const privKeyHex = getCachedIdentityPrivKeyHex()
+    if (!privKeyHex) {
+      toast('This community is encrypted — unlock your Security Vault in Settings → Security first', 'error')
+      return null
+    }
+
+    const envelope = await read('wrappedKeys', [BigInt(communityId), address, BigInt(currentKeyVersion)])
+    if (!envelope || envelope === '0x') {
+      toast("You don't have this community's encryption key — only members can post here", 'error')
+      return null
+    }
+
+    const rawContentKey = unwrapContentKey(envelope, privKeyHex)
+    const { iv, ciphertext } = await encryptPostContent(rawContentKey, plainContent)
+
+    return { version: '1', encrypted: true, keyVersion: currentKeyVersion, iv, ciphertext, communityId: Number(communityId) }
+  }
 
   const postText = postContent.elements[0].data.text
   const mediaItems = postContent.elements[1].data.items
-  const isBusy = isSigning || isConfirming || isUploading
+  const isBusy = isSigning || isConfirming || isUploading || isSubmitting
   const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
-  // Initialize editor with formatted HTML once the component mounts
+  // Show the modal dialog and initialize the editor once the component mounts —
+  // callers keep the mount = open / unmount = close contract
   useEffect(() => {
     if (!mounted || !editorRef.current) return
+    dialogRef.current?.open()
     editorRef.current.innerHTML = markdownToEditorHtml(postText)
     editorRef.current.focus()
     // Move cursor to end
@@ -502,32 +621,87 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       return
     }
 
+    setIsSubmitting(true)
     try {
-      const resultIPFS = await uploadObjectToIPFS(getSerializablePostContent(postContent))
+      const serializableContent = getSerializablePostContent(postContent)
+
+      // Quotes are regular posts carrying a `quoteOf` key in their content JSON —
+      // the contract rejects metadata on reposts and parent ids on posts, so the
+      // reference can only travel inside the content payload (see isQuotePost in lib/content)
+      if (isQuote) serializableContent.quoteOf = String(quoteTarget.id)
+
+      const moderationRes = await fetch('/api/moderation/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: serializableContent }),
+      })
+      const moderation = await moderationRes.json().catch(() => ({}))
+      if (moderation?.flagged) {
+        const categories = moderation.categories?.length ? ` (${moderation.categories.join(', ')})` : ''
+        toast(`Flagged as harmful${categories}. Please revise.`, 'error')
+        return
+      }
+
+      // Community submissions (posts, replies, quotes) are sealed/tagged after moderation
+      // (moderation must see plaintext) and before upload. null = blocked (toast already shown).
+      let contentForUpload = serializableContent
+      if (communityContext && actionType !== 'edit') {
+        contentForUpload = await sealForCommunity(serializableContent)
+        if (contentForUpload === null) return
+      }
+
+      const resultIPFS = await uploadObjectToIPFS(contentForUpload)
       const metadata = resultIPFS.cid
       if (!metadata) throw new Error('CID not found')
 
-      const activeChain = getActiveChain()
-      const postContractAddress = activeChain?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
-
       if (actionType === 'edit') {
+        const activeChain = getActiveChain()
+        const postContractAddress = activeChain?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
         writeContract({
           abi,
           address: postContractAddress,
           functionName: 'update',
           args: [address, existingPost.id, metadata, allowComments],
         })
+      } else if (isComment) {
+        // Replies must land on the same network as the post they target, not whatever chain the wallet happens to be on
+        const targetContractAddress = CONTRACTS[`chain${replyTarget?.network_id}`]?.hup
+        if (!targetContractAddress) throw new Error('Contract configuration missing for network')
+        writeContract({
+          abi,
+          address: targetContractAddress,
+          functionName: 'create',
+          args: [address, ContentType.Comment, metadata, replyTarget.id, allowComments],
+        })
+      } else if (isQuote) {
+        // Quotes must land on the same network as the post they quote, so the id stays resolvable
+        const targetContractAddress = CONTRACTS[`chain${quoteTarget?.network_id}`]?.hup
+        if (!targetContractAddress) throw new Error('Contract configuration missing for network')
+        writeContract({
+          abi,
+          address: targetContractAddress,
+          functionName: 'create',
+          args: [address, ContentType.Post, metadata, 0, allowComments],
+        })
       } else {
+        // Community posts must land on the community's chain (like replies/quotes do), not
+        // whatever chain the wallet happens to be on
+        const postContractAddress = communityTarget
+          ? CONTRACTS[`chain${communityTarget.networkId}`]?.hup
+          : getActiveChain()?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
+        if (!postContractAddress) throw new Error('Contract configuration missing for network')
         writeContract({
           abi,
           address: postContractAddress,
           functionName: 'create',
-          args: [address, 0, metadata, 0, allowComments],
+          args: [address, ContentType.Post, metadata, 0, allowComments],
         })
       }
     } catch (error) {
       console.error(error)
       toast(error.message || 'Unable to create post', 'error')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -540,12 +714,23 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     mediaItemsRef.current = mediaItems
   }, [mediaItems])
 
+  // Persist the draft so an accidental refresh doesn't lose it — restored via loadDraftContent()
+  useEffect(() => {
+    if (!mounted || actionType !== 'post') return
+    try {
+      localStorage.setItem(getDraftStorageKey(), JSON.stringify(getSerializablePostContent(postContent)))
+    } catch (error) {
+      console.error('Failed to save post draft:', error)
+    }
+  }, [mounted, actionType, postContent])
+
   useEffect(() => {
     if (!isConfirmed) return
-    localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`, '')
-    toast('Your post will appear once the transaction is confirmed.', 'success')
+    if (actionType === 'post') localStorage.removeItem(getDraftStorageKey())
+    toast(isComment ? 'Your reply will appear once the transaction is confirmed.' : 'Your post will appear once the transaction is confirmed.', 'success')
+    onConfirmed?.()
     handleClose()
-  }, [handleClose, isConfirmed])
+  }, [handleClose, isConfirmed, actionType, isComment, onConfirmed])
 
   useEffect(() => {
     return () => {
@@ -555,29 +740,48 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     }
   }, [])
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && !isBusy) handleClose()
-    }
-    window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [handleClose, isBusy])
-
   if (!mounted) return null
 
   return (
-    <section className={styles.newPost} aria-label="New thread composer" onClick={(e) => e.stopPropagation()}>
+    <NativeDialog
+      ref={dialogRef}
+      className={styles.newPost}
+      aria-label={isComment ? 'Reply composer' : isQuote ? 'Quote composer' : 'New thread composer'}
+      onClick={(e) => e.stopPropagation()}
+      onCancel={(e) => {
+        // Esc must not discard the composer while media uploads or the transaction is in flight
+        if (isBusy) e.preventDefault()
+      }}
+      onClose={handleClose}
+    >
       <header className={styles.header}>
         <button type="button" className={styles.cancelButton} onClick={(e) => handleClose(e)}>
           Cancel
         </button>
-        <h2>{actionType === 'edit' ? 'Edit post' : 'New post'}</h2>
+        <h2>{actionType === 'edit' ? 'Edit post' : isComment ? 'Reply' : isQuote ? 'Quote post' : communityTarget ? `Post to ${communityTarget.name || 'community'}` : 'New post'}</h2>
       </header>
 
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} />
 
         <div ref={composerRef} className={styles.composer}>
+          {previewTarget && (
+            <div className={styles.replyContext}>
+              <Profile variant="fullWithoutTime" creator={previewTarget.wallet_address} networkId={previewTarget.network_id} />
+              {previewTargetText && (
+                <div className={styles.replyContext__text} dangerouslySetInnerHTML={{ __html: renderMarkdown(previewTargetText) }} />
+              )}
+              {previewTargetMedia.length > 0 && (
+                <div className={styles.replyContext__media}>
+                  <MediaGallery data={previewTargetMedia} />
+                </div>
+              )}
+              <p className={styles.replyContext__label}>
+                {isQuote ? 'Quoting' : 'Replying to'} <b>{previewTargetHandle}</b>
+              </p>
+            </div>
+          )}
+
           <Profile variant="full" creator={address} />
 
           <div className={styles.composerBody}>
@@ -585,10 +789,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
               ref={editorRef}
               contentEditable
               suppressContentEditableWarning
-              className={styles.editor}
+              className={clsx(styles.editor, { [styles.editor_comment]: isComment })}
               onInput={handleEditorInput}
               onPaste={handlePaste}
-              data-placeholder="What's happening?"
+              data-placeholder={isComment ? 'Post your reply' : isQuote ? 'Add a comment' : "What's happening?"}
             />
 
             <div className={styles.toolbar} aria-label="Post tools">
@@ -599,7 +803,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Add image"
                 disabled={isBusy}
               >
-                <ImageIcon size={22} strokeWidth={1.8} />
+                <ImageIcon size={22} />
               </button>
               <button
                 type="button"
@@ -608,7 +812,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Add video"
                 disabled={isBusy}
               >
-                <SquarePlay size={22} strokeWidth={1.8} />
+                <MonitorPlayIcon size={22} />
               </button>
               <button
                 type="button"
@@ -617,7 +821,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Add audio"
                 disabled={isBusy}
               >
-                <Mic size={22} strokeWidth={1.8} />
+                <MicrophoneIcon size={22} />
               </button>
               <button
                 type="button"
@@ -626,7 +830,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Bold"
                 disabled={isBusy}
               >
-                <Bold size={20} strokeWidth={1.8} />
+                <TextBIcon size={20} />
               </button>
               <button
                 type="button"
@@ -635,10 +839,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Italic"
                 disabled={isBusy}
               >
-                <Italic size={20} strokeWidth={1.8} />
+                <TextItalicIcon size={20} />
               </button>
               <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
-                <MapPin size={22} strokeWidth={1.8} />
+                <MapPinIcon size={22} />
               </button>
             </div>
 
@@ -663,11 +867,11 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                       )}
                       <figcaption>
                         <button type="button" onClick={() => toggleSpoiler(index)}>
-                          <X size={14} />
+                          <XIcon size={14} />
                           <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
                         </button>
                         <button type="button" onClick={() => handleRemoveMedia(index)}>
-                          <Trash2 size={14} />
+                          <TrashIcon size={14} />
                           <span>Remove</span>
                         </button>
                       </figcaption>
@@ -686,7 +890,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                     <div key={`${item.cid || item.localUrl || index}`} className={styles.audioListItem}>
                       <audio src={mediaSrc} controls />
                       <button type="button" className={styles.audioRemoveButton} onClick={() => handleRemoveMedia(index)}>
-                        <Trash2 size={14} />
+                        <TrashIcon size={14} />
                       </button>
                     </div>
                   )
@@ -705,42 +909,46 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
 
         <footer className={styles.footer}>
           <div className={styles.postOptions}>
-            <button
-              type="button"
-              className={styles.postOptionsButton}
-              onClick={() => setIsOptionsOpen((value) => !value)}
-              aria-expanded={isOptionsOpen}
-              aria-controls="new-post-options-panel"
-            >
-              <SlidersHorizontal size={22} strokeWidth={1.8} />
-              <span>Post Options</span>
-            </button>
-
-            {isOptionsOpen && (
-              <div id="new-post-options-panel" className={styles.optionsPanel}>
-                <label htmlFor="allowComments">Allow comments</label>
-                <select
-                  id="allowComments"
-                  name="allowComments"
-                  value={allowComments ? 'true' : 'false'}
-                  onChange={(event) => setAllowComments(event.target.value === 'true')}
+            {!isComment && (
+              <>
+                <button
+                  type="button"
+                  className={styles.postOptionsButton}
+                  onClick={() => setIsOptionsOpen((value) => !value)}
+                  aria-expanded={isOptionsOpen}
+                  aria-controls="new-post-options-panel"
                 >
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
+                  <FadersHorizontalIcon size={22} />
+                  <span>Post Options</span>
+                </button>
+
+                {isOptionsOpen && (
+                  <div id="new-post-options-panel" className={styles.optionsPanel}>
+                    <label htmlFor="allowComments">Allow comments</label>
+                    <select
+                      id="allowComments"
+                      name="allowComments"
+                      value={allowComments ? 'true' : 'false'}
+                      onChange={(event) => setAllowComments(event.target.value === 'true')}
+                    >
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit}>
             {isConfirming
-              ? actionType === 'edit' ? 'Updating...' : 'Posting...'
+              ? actionType === 'edit' ? 'Updating...' : isComment ? 'Replying...' : 'Posting...'
               : isSigning
                 ? 'Signing...'
-                : actionType === 'edit' ? 'Update' : 'Post'}
+                : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : 'Post'}
           </button>
         </footer>
       </form>
-    </section>
+    </NativeDialog>
   )
 }

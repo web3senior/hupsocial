@@ -5,7 +5,8 @@ $padding: 2px;
 $circle-diameter: $height - ($padding * 2);
 
 // Explicitly define global selectors individually to maintain CSS Module purity
-:global(:root), :global([data-theme='light']) {
+:global(:root),
+:global([data-theme='light']) {
   --toggle-inactive: #e5e5ea;
   --toggle-active: #4cd964;
 }
@@ -53,20 +54,10 @@ $circle-diameter: $height - ($padding * 2);
   border-radius: 16px;
   padding: 20px;
   margin-top: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: var(--border);
-  }
 
   h5 {
     font-size: 1.05rem;

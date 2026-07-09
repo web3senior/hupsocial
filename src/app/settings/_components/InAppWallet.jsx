@@ -1,20 +1,25 @@
 'use client'
 
+// PIN-free by design: the session key is a child of the app-wide Security Vault (Settings →
+// Security), which is the ONLY place the PIN is ever asked. When the vault is locked, this
+// component shows a pointer there instead of running its own password prompts.
+
 import { useCallback, useEffect, useState } from 'react'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import hupABI from '@/abi/hup.json'
-import { RefreshCwIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, ShieldAlertIcon, CheckIcon, CopyIcon, UploadIcon } from 'lucide-react'
+import { ArrowsClockwiseIcon, CheckIcon, CopyIcon, KeyIcon, ShieldWarningIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { ethers } from 'ethers'
 import Balance from '@/app/(user)/[wallet]/_components/balance'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { isSessionActive, localStorageBurnerAddress,localStorageBurnerKey, localStorageBatchLikeKey, sessionStorageUnlockedKey} from '@/lib/burnerSession'
-import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
+import { encryptData, decryptData } from '@/lib/cryptoHelper'
+import { getCachedMasterHex, deriveChildKeyBytes, CHILD_KEY_LABELS } from '@/lib/securityVault'
 import { isHexString, Wallet } from 'ethers'
 import styles from './InAppWallet.module.scss'
 import clsx from 'clsx'
 
-export default function InAppWallet() {
+export default function InAppWallet({ onOpenSecurity }) {
   // Establish state to track whether the switch is turned on or off
   const [isOn, setIsOn] = useState(true)
 
@@ -28,26 +33,20 @@ export default function InAppWallet() {
   const [burnerAddress, setBurnerAddress] = useState(null)
   const [expiresAt, setExpiresAt] = useState(null)
 
-  // Password / Security States
-  const [showPasswordSetup, setShowPasswordSetup] = useState(false)
-  const [showDecryptPrompt, setShowDecryptPrompt] = useState(false)
+  // Security states — no passwords here, only "is the shared vault unlocked"
+  const [needsVault, setNeedsVault] = useState(false)
   const [showImportPrompt, setShowImportPrompt] = useState(false)
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [decryptPassword, setDecryptPassword] = useState('')
   const [revealKeyMode, setRevealKeyMode] = useState(false)
   const [revealedPrivateKey, setRevealedPrivateKey] = useState(null)
   const [copied, setCopied] = useState(false)
 
   // Import custom key states
   const [importPrivateKeyInput, setImportPrivateKeyInput] = useState('')
-  const [importPassword, setImportPassword] = useState('')
 
   // UI helpers
-  const [showPlainPassword, setShowPlainPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  const { data: hash, writeContract } = useWriteContract()
+  const { data: hash, mutate: writeContract } = useWriteContract()
 
   // Load the initial toggle preference from localStorage on mount
   useEffect(() => {
@@ -86,42 +85,60 @@ export default function InAppWallet() {
     return () => clearInterval(interval)
   }, [checkStatus])
 
-  const triggerAuthorizeFlow = () => {
-    setErrorMsg('')
-    setPassword('')
-    setConfirmPassword('')
+  // Recovers the burner's plaintext private key using the unlocked vault master. Handles the
+  // legacy case (key at rest encrypted with the old per-feature PIN, which we no longer ask
+  // for): if the stored blob won't open with the master but the wallet is vault-derived, the
+  // exact same key is simply re-derived from the master and re-encrypted. Only a foreign
+  // (imported) key encrypted under the old scheme is unrecoverable without a re-import.
+  const unlockBurnerPrivateKey = async (masterHex) => {
+    const encryptedKey = localStorage.getItem(localStorageBurnerKey)
+    const storedAddress = localStorage.getItem(localStorageBurnerAddress)
+    if (!encryptedKey) return null
 
-    const existingKey = localStorage.getItem(localStorageBurnerKey)
-    if (existingKey && isPrivateKeyEncrypted(existingKey)) {
-      handleAuthorizeSession(null)
-    } else {
-      setShowPasswordSetup(true)
+    try {
+      return await decryptData(encryptedKey, masterHex)
+    } catch {
+      const seedBytes = await deriveChildKeyBytes(masterHex, CHILD_KEY_LABELS.inAppWallet)
+      const derived = new ethers.Wallet(ethers.hexlify(seedBytes))
+      if (storedAddress && derived.address.toLowerCase() === storedAddress.toLowerCase()) {
+        localStorage.setItem(localStorageBurnerKey, await encryptData(derived.privateKey, masterHex))
+        return derived.privateKey
+      }
+      throw new Error('This session key was imported under an old password. Re-import it to use it again.')
     }
   }
 
-  const handleAuthorizeSession = async (customPassword = null) => {
+  const handleAuthorizeSession = async () => {
     try {
       setIsLoading(true)
       setErrorMsg('')
+      setNeedsVault(false)
 
-      let targetBurnerAddress
-      let currentKey = localStorage.getItem(localStorageBurnerKey)
+      if (!address) {
+        throw new Error('Connect your wallet first.')
+      }
 
-      if (!currentKey || !localStorage.getItem(localStorageBurnerAddress)) {
-        if (!customPassword || customPassword.length < 6) {
-          throw new Error('Please enter a secure password (at least 6 characters).')
+      let targetBurnerAddress = localStorage.getItem(localStorageBurnerAddress)
+
+      if (!localStorage.getItem(localStorageBurnerKey) || !targetBurnerAddress) {
+        // Child key of the app-wide security vault. Same wallet + same PIN always reproduces
+        // the same burner key on any device — the vault (Settings → Security) is where that
+        // PIN lives; this component never asks for it.
+        const masterHex = getCachedMasterHex()
+        if (!masterHex) {
+          setNeedsVault(true)
+          return
         }
 
-        const burner = ethers.Wallet.createRandom()
-        const encryptedKey = await encryptData(burner.privateKey, customPassword)
+        const seedBytes = await deriveChildKeyBytes(masterHex, CHILD_KEY_LABELS.inAppWallet)
+        const burner = new ethers.Wallet(ethers.hexlify(seedBytes))
+        const encryptedKey = await encryptData(burner.privateKey, masterHex)
 
         localStorage.setItem(localStorageBurnerKey, encryptedKey)
         localStorage.setItem(localStorageBurnerAddress, burner.address)
         sessionStorage.setItem(sessionStorageUnlockedKey, burner.privateKey)
 
         targetBurnerAddress = burner.address
-      } else {
-        targetBurnerAddress = localStorage.getItem(localStorageBurnerAddress)
       }
 
       const duration = 3600 * 24 * 30 // 30 days
@@ -132,8 +149,6 @@ export default function InAppWallet() {
         functionName: 'authorizeSession',
         args: [targetBurnerAddress, duration],
       })
-
-      setShowPasswordSetup(false)
     } catch (err) {
       console.error('Session authorization failed:', err)
       setErrorMsg(err.message || 'Authorization failed. Please try again.')
@@ -142,32 +157,27 @@ export default function InAppWallet() {
     }
   }
 
-  const handleDecryptAndReveal = async () => {
+  const handleReveal = async () => {
     try {
       setIsLoading(true)
       setErrorMsg('')
-      const encryptedKey = localStorage.getItem(localStorageBurnerKey)
 
-      if (!encryptedKey) {
-        throw new Error('No session key found on this device.')
-      }
-
-      if (!isPrivateKeyEncrypted(encryptedKey)) {
-        setRevealedPrivateKey(encryptedKey)
-        setRevealKeyMode(true)
-        setShowDecryptPrompt(false)
+      const masterHex = getCachedMasterHex()
+      if (!masterHex) {
+        setNeedsVault(true)
         return
       }
 
-      const decrypted = await decryptData(encryptedKey, decryptPassword)
-      setRevealedPrivateKey(decrypted)
-      sessionStorage.setItem(sessionStorageUnlockedKey, decrypted)
+      const decrypted = await unlockBurnerPrivateKey(masterHex)
+      if (!decrypted) {
+        throw new Error('No session key found on this device.')
+      }
 
+      sessionStorage.setItem(sessionStorageUnlockedKey, decrypted)
+      setRevealedPrivateKey(decrypted)
       setRevealKeyMode(true)
-      setShowDecryptPrompt(false)
-      setDecryptPassword('')
     } catch (err) {
-      setErrorMsg(err.message || 'Decryption failed. Incorrect password.')
+      setErrorMsg(err.message || 'Failed to unlock the session key.')
     } finally {
       setIsLoading(false)
     }
@@ -183,13 +193,16 @@ export default function InAppWallet() {
         throw new Error('Invalid private key format. Must be a 66-character hex string (starting with 0x).')
       }
 
-      if (importPassword.length < 6) {
-        throw new Error('Password must be at least 6 characters.')
+      // At-rest encryption uses the vault master — no separate password to remember
+      const masterHex = getCachedMasterHex()
+      if (!masterHex) {
+        setNeedsVault(true)
+        return
       }
 
       // Instantiation using the updated v6 class syntax
       const importedWallet = new Wallet(importPrivateKeyInput)
-      const encryptedKey = await encryptData(importPrivateKeyInput, importPassword)
+      const encryptedKey = await encryptData(importPrivateKeyInput, masterHex)
 
       localStorage.setItem(localStorageBurnerKey, encryptedKey)
       localStorage.setItem(localStorageBurnerAddress, importedWallet.address)
@@ -198,7 +211,6 @@ export default function InAppWallet() {
       await checkStatus()
       setShowImportPrompt(false)
       setImportPrivateKeyInput('')
-      setImportPassword('')
     } catch (err) {
       setErrorMsg(err.message || 'Import failed. Check private key format.')
     } finally {
@@ -236,7 +248,7 @@ export default function InAppWallet() {
             <div className="flex justify-between align-items-center">
               <h4>In app wallet</h4>
               <button onClick={checkStatus} className={styles.btnIcon}>
-                <RefreshCwIcon size={18} />
+                <ArrowsClockwiseIcon size={18} />
               </button>
             </div>
             <small style={{ color: 'var(--text-muted)' }}>
@@ -270,80 +282,24 @@ export default function InAppWallet() {
 
             {errorMsg && (
               <div className={styles.alertError}>
-                <ShieldAlertIcon size={16} />
+                <ShieldWarningIcon size={16} />
                 <span>{errorMsg}</span>
               </div>
             )}
 
-            {/* PASSWORD SETUP FORM */}
-            {showPasswordSetup && (
+            {/* VAULT LOCKED NOTICE — the Security tab is the app's only PIN entry point */}
+            {needsVault && (
               <div className={styles.secureSetup}>
                 <h5>
-                  <KeyRoundIcon size={16} /> Secure Your Session Key
+                  <KeyIcon size={16} /> Security Vault locked
                 </h5>
-                <p>Choose a PIN or Password. It will be used to encrypt the burner private key before storing it on this device.</p>
-                <div className={styles.formGroup}>
-                  <input
-                    type={showPlainPassword ? 'text' : 'password'}
-                    placeholder="Enter password (min 6 characters)"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={styles.formControl}
-                  />
-                  <input
-                    type={showPlainPassword ? 'text' : 'password'}
-                    placeholder="Confirm password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className={styles.formControl}
-                  />
-                </div>
-                <div className="flex gap-05 justify-between align-items-center">
-                  <button type="button" onClick={() => setShowPlainPassword(!showPlainPassword)} className={styles.btnLink}>
-                    {showPlainPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />} {showPlainPassword ? 'Hide' : 'Show'}
-                  </button>
-                  <div className="flex gap-05">
-                    <button onClick={() => setShowPasswordSetup(false)} className={styles.btnSecondary}>
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (password !== confirmPassword) {
-                          setErrorMsg('Passwords do not match.')
-                          return
-                        }
-                        handleAuthorizeSession(password)
-                      }}
-                      className={styles.btnPrimary}
-                      disabled={isLoading}
-                    >
-                      Encrypt & Authorize
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* DECRYPT / REVEAL PASSWORD PROMPT */}
-            {showDecryptPrompt && (
-              <div className={styles.secureSetup}>
-                <h5>
-                  <KeyRoundIcon size={16} /> Enter Password to Unlock
-                </h5>
-                <p>Provide your password to securely decrypt the key from localStorage.</p>
-                <input
-                  type="password"
-                  placeholder="Enter session password"
-                  value={decryptPassword}
-                  onChange={(e) => setDecryptPassword(e.target.value)}
-                  className={styles.formControl}
-                />
-                <div className="flex justify-end gap-050 mt-15">
-                  <button onClick={() => setShowDecryptPrompt(false)} className={styles.btnSecondary}>
-                    Cancel
-                  </button>
-                  <button onClick={handleDecryptAndReveal} className={styles.btnPrimary} disabled={isLoading}>
-                    Unlock Key
+                <p>
+                  Your session key is derived from the app-wide Security Vault (one signature + one PIN, shared with
+                  private communities). Unlock it once and come back — no separate wallet password to remember.
+                </p>
+                <div className="flex justify-end">
+                  <button onClick={onOpenSecurity} className={styles.btnPrimary} disabled={!onOpenSecurity}>
+                    Open Security Vault
                   </button>
                 </div>
               </div>
@@ -353,22 +309,15 @@ export default function InAppWallet() {
             {showImportPrompt && (
               <div className={styles.secureSetup}>
                 <h5>
-                  <UploadIcon size={16} /> Import Session Key
+                  <UploadSimpleIcon size={16} /> Import Session Key
                 </h5>
-                <p>Paste the private key from your other device and choose a new password for local encryption.</p>
+                <p>Paste the private key from your other device — it's stored encrypted under your Security Vault.</p>
                 <div className={styles.formGroup}>
                   <input
                     type="text"
                     placeholder="Enter Private Key (starts with 0x)"
                     value={importPrivateKeyInput}
                     onChange={(e) => setImportPrivateKeyInput(e.target.value)}
-                    className={styles.formControl}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Create a Password for local encryption"
-                    value={importPassword}
-                    onChange={(e) => setImportPassword(e.target.value)}
                     className={styles.formControl}
                   />
                 </div>
@@ -413,8 +362,8 @@ export default function InAppWallet() {
             {/* ACTION BUTTONS GROUP */}
             <div className="flex flex-wrap gap-10 mt-20 gap-1">
               <button
-                onClick={triggerAuthorizeFlow}
-                disabled={sessionActive || isLoading || showPasswordSetup}
+                onClick={handleAuthorizeSession}
+                disabled={sessionActive || isLoading}
                 className={styles.btnPrimary}
               >
                 Authorize Session
@@ -428,9 +377,8 @@ export default function InAppWallet() {
                 <button
                   onClick={() => {
                     setErrorMsg('')
-                    setShowDecryptPrompt(true)
-                    setShowPasswordSetup(false)
                     setShowImportPrompt(false)
+                    handleReveal()
                   }}
                   className={styles.btnSecondary}
                   disabled={isLoading}
@@ -442,9 +390,8 @@ export default function InAppWallet() {
               <button
                 onClick={() => {
                   setErrorMsg('')
+                  setNeedsVault(false)
                   setShowImportPrompt(true)
-                  setShowPasswordSetup(false)
-                  setShowDecryptPrompt(false)
                 }}
                 className={styles.btnSecondary}
                 disabled={isLoading}

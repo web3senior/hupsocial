@@ -3,12 +3,6 @@
 .page {
   --tag-bg: var(--gray-200);
   height: 100%;
-  &__title {
-    font-weight: 600;
-    color: var(--black-900);
-    margin: 1rem 0;
-    z-index: 1000;
-  }
 
   &__container {
     position: relative;
@@ -17,7 +11,7 @@
     background-color: var(--surface);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-md);
-    border-radius: 24px;
+    border-radius: var(--page-border-radius);
     overflow: hidden;
 
     @media (max-width: 600px) {
@@ -335,6 +329,10 @@
 .profileWrapper {
   position: relative;
   padding: 2rem;
+
+  @include responsive.md-down {
+    padding: 1rem;
+  }
 
   .gift {
     padding: 0.4rem;

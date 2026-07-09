@@ -1,9 +1,9 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import useSWR from 'swr'
 import QRCode from 'qrcode'
 import clsx from 'clsx'
-import { QrCode } from 'lucide-react'
-import NativePopover from '@/components/ui/NativePopover'
+import { QrCodeIcon } from '@phosphor-icons/react'
+import NativeDialog from '@/components/ui/NativeDialog'
 import styles from './ProfileQRCode.module.scss'
 
 const qrCodeFetcher = async ([_, profileUrl]) => {
@@ -20,6 +20,8 @@ const qrCodeFetcher = async ([_, profileUrl]) => {
 }
 
 export function ProfileQRCode({ profileUrl }) {
+  const dialogRef = useRef(null)
+
   // Execute async QR canvas calculation inside cached hook pipeline
   const { data: qrCodeDataUri, isValidating } = useSWR(profileUrl ? ['profile-qrcode', profileUrl] : null, qrCodeFetcher, {
     revalidateOnFocus: false,
@@ -28,18 +30,19 @@ export function ProfileQRCode({ profileUrl }) {
   })
 
   return (
-    <NativePopover
-      trigger={
-        <button type="button" className={clsx(styles.link, styles.qrButton)} aria-label="QR Code">
-          <div className={styles.iconWrapper}>
-            <QrCode size={14} />
-          </div>
-        </button>
-      }
-      placement="center"
-      type="auto"
-    >
-      {({ close }) => (
+    <>
+      <button
+        type="button"
+        className={clsx(styles.link, styles.qrButton)}
+        aria-label="QR Code"
+        onClick={() => dialogRef.current?.open()}
+      >
+        <div className={styles.iconWrapper}>
+          <QrCodeIcon size={14} />
+        </div>
+      </button>
+
+      <NativeDialog ref={dialogRef} lightDismiss className={styles.qrDialog} aria-label="Profile QR code">
         <div className={styles.popoverContent}>
           <div className={styles.qrContainer}>
             {isValidating && !qrCodeDataUri && <div className={styles.qrContainer__skeleton} aria-hidden="true" />}
@@ -51,7 +54,7 @@ export function ProfileQRCode({ profileUrl }) {
             )}
           </div>
         </div>
-      )}
-    </NativePopover>
+      </NativeDialog>
+    </>
   )
 }

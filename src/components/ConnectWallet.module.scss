@@ -43,7 +43,7 @@ button.btnConnect {
 }
 
 button.btnNetwork {
-  --r: 24px;
+  --r: 18px;
   all: unset;
   display: flex;
   align-items: center;
@@ -68,7 +68,8 @@ button.btnNetwork {
     overflow: hidden;
   }
 
-  svg {
+  svg,
+  img {
     width: var(--r);
     height: var(--r);
   }
@@ -140,115 +141,6 @@ figure.pfp {
       &:last-child {
         span {
           display: none;
-        }
-      }
-    }
-  }
-}
-
-
-.networkDialogInner {
-  max-width: 460px;
-  padding: 1.5rem;
-  background: var(--background);
-max-height: 100svh;
-overflow-y: auto;
-  .link {
-    color: var(--blue-400);
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-    cursor: pointer;
-  }
-
-  h2 {
-    color: var(--color);
-    margin-bottom: 0.5rem;
-    @media (max-width: 300px) {
-      font-size: 12px;
-    }
-  }
-
-  p {
-    color: var(--color);
-    text-wrap: balance;
-    margin-bottom: 1rem;
-  
-    @media (max-width: 300px) {
-      font-size: 9px;
-      line-height: 1.2;
-    }
-  }
-
-  .networks {
-    margin-top: 1rem;
-
-    button {
-      all: unset;
-      background-color: var(--background);
-      color: var(--color);
-      border: 1px solid transparent;
-      padding: 1.1rem 1rem;
-      border-radius: 1rem;
-      outline: none;
-      user-select: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.2rem;
-      cursor: pointer;
-      will-change: transform;
-      position: relative; // Retained position rule for alignment marks
-      transition:
-        background-color 1s step-end,
-        border 0.3s allow-discrete,
-        transform 0.1s allow-discrete;
-
-      @media (max-width: 300px) {
-        padding: 0.5rem 0.2rem;
-      }
-
-      &:hover {
-        border: 1px solid var(--border);
-        transform: scale(1.04);
-      }
-
-      &:active {
-        transform: scale(0.95);
-      }
-
-      &[data-current='true'] {
-        border: 1px solid var(--border);
-
-        &:after {
-          content: '✓ Current';
-          font-size: 9px;
-          padding: 0.05rem 0.3rem;
-          border-radius: 1000px;
-          position: absolute;
-          left: 0.7rem;
-          top: 0.7rem;
-          background-color: var(--black-900);
-          border-bottom: 1px double var(--black-600);
-          color: var(--white);
-          @media (max-width: 300px) {
-            zoom: 0.9;
-          }
-        }
-      }
-
-      svg {
-        --r: 32px;
-        width: var(--r);
-        height: var(--r);
-      }
-
-      span {
-        color: var(--color);
-        font-size: 0.9em;
-        text-align: center;
-        @media (max-width: 300px) {
-          font-size: 0.6rem;
         }
       }
     }

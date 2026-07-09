@@ -3,13 +3,16 @@
 
 import { useState, useEffect } from 'react'
 import { useConnection, useWriteContract } from 'wagmi' // Hook added here
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, isAddress, keccak256, stringToHex } from 'viem'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { config, CONTRACTS } from '@/config/wagmi'
+import storeAbi from '@/abis/HupStore.json'
 import styles from './page.module.scss'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
+
+const OPERATOR_ROLE = keccak256(stringToHex('OPERATOR_ROLE'))
 
 const EIP712_DOMAIN_ABI = [
   {
@@ -58,12 +61,20 @@ const CHAT_UPDATE_FORWARDER_ABI = [
 
 export default function Page() {
   const { address, isConnected } = useConnection()
-  const { writeContractAsync, isPending: isWritePending } = useWriteContract()
+  const { mutateAsync: writeContractAsync, isPending: isWritePending } = useWriteContract()
 
   const [overrides, setOverrides] = useState({})
   const [inputs, setInputs] = useState({})
   const [verifications, setVerifications] = useState({})
   const [txStates, setTxStates] = useState({}) // Keep track of pending transactions per chain
+  const [operatorInputs, setOperatorInputs] = useState({})
+  const [roleChecks, setRoleChecks] = useState({})
+  const [roleTxStates, setRoleTxStates] = useState({})
+  const [receiverInputs, setReceiverInputs] = useState({})
+  const [tokenInputs, setTokenInputs] = useState({})
+  const [tokenIsLsp7, setTokenIsLsp7] = useState({})
+  const [nativeWithdrawStates, setNativeWithdrawStates] = useState({})
+  const [tokenWithdrawStates, setTokenWithdrawStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
 
@@ -209,6 +220,131 @@ export default function Page() {
     setInputs((prev) => ({ ...prev, [chainId]: defaultName }))
   }
 
+  // Check whether an address currently holds OPERATOR_ROLE on the chain's HupStore
+  const handleCheckOperator = async (chain, storeAddress) => {
+    const operator = operatorInputs[chain.id]?.trim()
+    if (!isAddress(operator)) {
+      setRoleChecks((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid address' } }))
+      return
+    }
+
+    setRoleChecks((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const hasRole = await client.readContract({
+        address: storeAddress,
+        abi: storeAbi,
+        functionName: 'hasRole',
+        args: [OPERATOR_ROLE, operator],
+      })
+
+      setRoleChecks((prev) => ({ ...prev, [chain.id]: { loading: false, checked: operator, hasRole } }))
+    } catch (err) {
+      console.error(`Role check error for chain ${chain.id}:`, err)
+      setRoleChecks((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read role' },
+      }))
+    }
+  }
+
+  // Grant or revoke OPERATOR_ROLE on the chain's HupStore (admin wallet signs)
+  const handleOperatorRole = async (chain, storeAddress, grant) => {
+    const operator = operatorInputs[chain.id]?.trim()
+    if (!isAddress(operator)) {
+      setRoleTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid address' } }))
+      return
+    }
+
+    setRoleTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: storeAddress,
+        abi: storeAbi,
+        functionName: grant ? 'grantRole' : 'revokeRole',
+        args: [OPERATOR_ROLE, operator],
+        chainId: chain.id,
+      })
+
+      setRoleTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, success: true, hash: txHash, action: grant ? 'granted' : 'revoked' },
+      }))
+
+      // Refresh the role check shortly after so the result reflects the new state
+      setTimeout(() => handleCheckOperator(chain, storeAddress), 3000)
+    } catch (err) {
+      console.error(`Role ${grant ? 'grant' : 'revoke'} error on chain ${chain.id}:`, err)
+      setRoleTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Withdraw the store's full native token balance to an address
+  const handleWithdrawNative = async (chain, storeAddress) => {
+    const receiver = receiverInputs[chain.id]?.trim()
+    if (!isAddress(receiver)) {
+      setNativeWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver address' } }))
+      return
+    }
+
+    setNativeWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: storeAddress,
+        abi: storeAbi,
+        functionName: 'withdrawAll',
+        args: [receiver],
+        chainId: chain.id,
+      })
+
+      setNativeWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+    } catch (err) {
+      console.error(`Native withdrawal error on chain ${chain.id}:`, err)
+      setNativeWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Withdraw the store's full ERC20/LSP7 token balance to an address
+  const handleWithdrawToken = async (chain, storeAddress) => {
+    const receiver = receiverInputs[chain.id]?.trim()
+    const token = tokenInputs[chain.id]?.trim()
+    const isLsp7 = Boolean(tokenIsLsp7[chain.id])
+
+    if (!isAddress(receiver) || !isAddress(token)) {
+      setTokenWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid token and receiver address' } }))
+      return
+    }
+
+    setTokenWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: storeAddress,
+        abi: storeAbi,
+        functionName: 'withdrawAllToken',
+        args: [token, receiver, isLsp7],
+        chainId: chain.id,
+      })
+
+      setTokenWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+    } catch (err) {
+      console.error(`Token withdrawal error on chain ${chain.id}:`, err)
+      setTokenWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
   if (!isConnected) {
     return (
       <>
@@ -270,7 +406,9 @@ export default function Page() {
                 >
                   <div className={styles['admin-contracts__card-header']}>
                     <div className={styles['admin-contracts__network-info']}>
-                      <div className={styles['admin-contracts__card-icon']} dangerouslySetInnerHTML={{ __html: chain.icon }} />
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
                       <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
                     </div>
                     {hasOverride ? (
@@ -349,7 +487,7 @@ export default function Page() {
                       <div className={styles['admin-contracts__detail-row']}>
                         <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
                         <div className={styles['admin-contracts__detail-value']}>
-                          {txState.loading && <span style={{ color: '#f59e0b' }}>Signing & broadcasting tx...</span>}
+                          {txState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
                           {txState.error && <span style={{ color: '#ef4444' }}>❌ {txState.error}</span>}
                           {txState.success && <span style={{ color: '#10b981' }}>🚀 Success! TX sent.</span>}
                         </div>
@@ -401,6 +539,288 @@ export default function Page() {
                         className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
                       >
                         {verification?.loading ? 'Verifying...' : 'Verify On-Chain'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupStore Operator Role</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Grant or revoke OPERATOR_ROLE on HupStore deployments — required for the x402 settlement wallet to call grantPurchase.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.store) return null
+
+              const operatorDraft = operatorInputs[chain.id] ?? ''
+              const roleCheck = roleChecks[chain.id]
+              const roleTx = roleTxStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+
+              return (
+                <div
+                  key={`store-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPSTORE</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Store Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.store}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.store}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.store}</code>
+                        )}
+                      </span>
+                    </div>
+
+                    {roleCheck && !roleCheck.loading && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Role Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {roleCheck.error && (
+                            <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                              {roleCheck.error}
+                            </div>
+                          )}
+                          {roleCheck.checked && roleCheck.hasRole && (
+                            <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
+                              ✓ {roleCheck.checked.slice(0, 6)}...{roleCheck.checked.slice(-4)} holds OPERATOR_ROLE
+                            </div>
+                          )}
+                          {roleCheck.checked && !roleCheck.hasRole && (
+                            <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                              {roleCheck.checked.slice(0, 6)}...{roleCheck.checked.slice(-4)} does not hold OPERATOR_ROLE
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {roleTx && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {roleTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {roleTx.error && <span style={{ color: '#ef4444' }}>❌ {roleTx.error}</span>}
+                          {roleTx.success && <span style={{ color: '#10b981' }}>🚀 Role {roleTx.action}.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleOperatorRole(chain, deployment.store, true)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Operator Wallet Address</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={operatorDraft}
+                        onChange={(e) => setOperatorInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!operatorDraft.trim() || roleTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {roleTx?.loading ? 'Writing...' : 'Grant OPERATOR_ROLE'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOperatorRole(chain, deployment.store, false)}
+                        disabled={!operatorDraft.trim() || roleTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        Revoke
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCheckOperator(chain, deployment.store)}
+                        disabled={!operatorDraft.trim() || roleCheck?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        {roleCheck?.loading ? 'Checking...' : 'Check Role'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupStore Treasury</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Withdraw accumulated listing/buy fees from HupStore — native token balance, or any ERC20/LSP7 token balance.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.store) return null
+
+              const receiverDraft = receiverInputs[chain.id] ?? ''
+              const tokenDraft = tokenInputs[chain.id] ?? ''
+              const isLsp7 = Boolean(tokenIsLsp7[chain.id])
+              const nativeState = nativeWithdrawStates[chain.id]
+              const tokenState = tokenWithdrawStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+
+              return (
+                <div
+                  key={`treasury-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPSTORE</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Store Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.store}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.store}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.store}</code>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={styles['admin-contracts__input-group']}>
+                    <label className={styles['admin-contracts__detail-label']}>Receiver Address</label>
+                    <input
+                      type="text"
+                      className={styles['admin-contracts__input']}
+                      value={receiverDraft}
+                      onChange={(e) => setReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                      placeholder="0x..."
+                    />
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleWithdrawNative(chain, deployment.store)
+                    }}
+                  >
+                    {nativeState && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Native Withdrawal</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {nativeState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {nativeState.error && <span style={{ color: '#ef4444' }}>❌ {nativeState.error}</span>}
+                          {nativeState.success && <span style={{ color: '#10b981' }}>🚀 Withdrawn.</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!receiverDraft.trim() || nativeState?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {nativeState?.loading ? 'Withdrawing...' : 'Withdraw Native Balance'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleWithdrawToken(chain, deployment.store)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Token Address</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={tokenDraft}
+                        onChange={(e) => setTokenInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    <label className={styles['admin-contracts__detail-label']} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={isLsp7}
+                        onChange={(e) => setTokenIsLsp7((prev) => ({ ...prev, [chain.id]: e.target.checked }))}
+                      />
+                      This token is an LSP7 Digital Asset (LUKSO), not an ERC20
+                    </label>
+
+                    {tokenState && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Token Withdrawal</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {tokenState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {tokenState.error && <span style={{ color: '#ef4444' }}>❌ {tokenState.error}</span>}
+                          {tokenState.success && <span style={{ color: '#10b981' }}>🚀 Withdrawn.</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!receiverDraft.trim() || !tokenDraft.trim() || tokenState?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {tokenState?.loading ? 'Withdrawing...' : 'Withdraw Token Balance'}
                       </button>
                     </div>
                   </form>

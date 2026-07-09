@@ -45,6 +45,8 @@ export default function Comments({ networkId, postId, viewerAddress }) {
         comments.map((comment, i) => (
           <section key={comment.id} className={styles.commentsList__item}
            onClick={() => router.push(`/networks/${networkId}/${comment.id}`)}
+           onMouseEnter={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
+           onTouchStart={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
           >
             <Post
               item={comment}
@@ -56,6 +58,7 @@ export default function Comments({ networkId, postId, viewerAddress }) {
                 'view',
                 'share',
                 'tip',
+                'bookmark',
               ]} // Simplified actions matrix for reply nodes
             />
             {i < comments.length - 1 && <hr className={styles.commentsList__divider} />}

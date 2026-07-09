@@ -1,27 +1,6 @@
-.stickyHeader {
-  position: sticky;
-  top: 0;
-  padding: 1.4rem;
-  width: fit-content;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--foreground);
-  // z-index: 1;
-}
-
-.pageTitle {
-  margin: 0;
-  color: var(--foreground);
-  font-weight: 500;
-  font-size: var(--font-size-15);
-  user-select: none;
-
-  span {
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+// The title itself renders inside the fixed Header (via usePageTitleStore);
+// this spacer keeps page content from sliding under it. Height covers the
+// fixed header: 0.7rem padding x2 + 38px controls, rounded up.
+.pageTitle__spacer {
+  height: 4rem;
 }

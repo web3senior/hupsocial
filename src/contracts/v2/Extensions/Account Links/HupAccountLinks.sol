@@ -49,6 +49,10 @@ contract HupAccountLinks is Pausable, AccessControl, ERC2771Context {
         _grantRole(ADMIN_ROLE, admin);
     }
 
+    function version() external pure returns (string memory) {
+        return "1.0.0";
+    }
+
     /**
      * @notice Requests a wallet continuity link from the caller to a successor wallet.
      * @dev The successor wallet must accept the request before the link becomes active.

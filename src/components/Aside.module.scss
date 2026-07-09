@@ -14,13 +14,11 @@
 
   padding: 1rem 0.5rem;
   user-select: none;
-  // overflow: hidden;
   width: 200px;
   border-top-right-radius: var(--global-border-radius);
   border-bottom-right-radius: var(--global-border-radius);
 
   @include md-down() {
-    //width: 0 !important;
     left: -100%;
   }
 
@@ -68,6 +66,7 @@
 
   .navList {
     overflow-y: auto;
+    overflow-x: hidden; // Keep nowrap rows and tooltip pseudo-elements from flashing a horizontal scrollbar mid-transition
   }
 
   .link {
@@ -174,7 +173,6 @@
   justify-content: center;
   align-items: center;
   color: var(--black);
-
 }
 
 .linkText {
@@ -353,8 +351,7 @@
 .link:hover,
 .linkActive,
 .menuButton:hover,
-.popoverContent a:hover,
-.themeItems button:hover {
+.popoverContent a:hover {
   background-color: var(--hover);
 }
 

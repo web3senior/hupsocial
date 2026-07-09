@@ -13,9 +13,10 @@ import Post from '@/components/Post'
 import Balance from './balance'
 import { getActiveChain } from '@/lib/communication'
 import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
+import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
 import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
-import AISummary from '@/components/AISummary'
+import ProfileInsights from '@/components/ProfileInsights'
 import UPlogo from '@/../public/up.png'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS } from '@/lib/ipfs'
@@ -158,6 +159,10 @@ export default function UserProfile() {
     })
   }, [])
 
+  const handlePostPrefetch = (postId, chainId) => {
+    router.prefetch(`/networks/${chainId}/${postId}`)
+  }
+
   const handlePostClick = (postId, chainId) => {
     const selection = window.getSelection()
     if (selection && selection.toString().length > 0) return
@@ -177,7 +182,7 @@ export default function UserProfile() {
             <Profile addr={params.wallet} />
 
             {/* Ensure posts, the list, and POAPs exist before mounting */}
-            {posts?.list?.length > 0 && POAPs && <AISummary addr={params.wallet} posts={posts} poaps={POAPs} />}
+            {posts?.list?.length > 0 && POAPs && <ProfileInsights addr={params.wallet} posts={posts} poaps={POAPs} />}
 
             <details className="mt-10">
               <summary>View POAPs</summary>
@@ -231,8 +236,14 @@ export default function UserProfile() {
                 {posts.list.length > 0 &&
                   posts.list.map((item, i) => {
                     return (
-                      <section key={i} className={`${styles.post} animate fade`} onClick={() => handlePostClick(item.id, item.network_id)}>
-                        <Post item={item} actions={[`like`, `comment`, `repost`, `view`, `share`]} />
+                      <section
+                        key={i}
+                        className={`${styles.post} animate fade`}
+                        onClick={() => handlePostClick(item.id, item.network_id)}
+                        onMouseEnter={() => handlePostPrefetch(item.id, item.network_id)}
+                        onTouchStart={() => handlePostPrefetch(item.id, item.network_id)}
+                      >
+                        <Post item={item} actions={[`like`, `comment`, `repost`, `view`, `share`, `bookmark`]} />
                         {i < posts.list.length - 1 && <hr />}
                       </section>
                     )
@@ -328,7 +339,7 @@ const Profile = ({ addr }) => {
   const activeChain = getActiveChain()
   const { profile, isLoading, mutate } = useProfile(addr)
   /* Error during submission (e.g., user rejected)  */
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   /* Error after mining (e.g., transaction reverted) */
   const {
     isLoading: isConfirming,
@@ -345,7 +356,65 @@ const Profile = ({ addr }) => {
       .catch(() => {})
   }, [addr])
 
-  const follow = async () => toast(`Coming soon`, `warning`)
+  // LSP26-compatible follow/unfollow. followerSystem is deployed identically on every chain, so
+  // follower count / isFollowing are read from cidex's cross-network aggregate (the `follows`
+  // table) rather than a live on-chain read — a direct read would only ever reflect whichever
+  // chain the *viewer's* wallet happens to be connected to, not a true cross-chain total.
+  // followerSystem itself is still only used for the actual follow()/unfollow() transaction,
+  // which always targets whatever chain the wallet is currently on.
+  const followerSystemAddress = activeChain?.[1]?.followerSystem
+
+  const [followerCount, setFollowerCount] = useState(0)
+  const [isFollowingTarget, setIsFollowingTarget] = useState(false)
+
+  const refetchFollowStats = () => {
+    if (!addr) return
+    const qs = address ? `?viewer_address=${address}` : ''
+    fetch(`/api/v1/users/${addr}/followers${qs}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (!res.success) return
+        setFollowerCount(res.meta.total)
+        if (res.isFollowing !== null) setIsFollowingTarget(Boolean(res.isFollowing))
+      })
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    refetchFollowStats()
+  }, [addr, address])
+
+  // cidex needs a few seconds to catch the event, so the confirmed-tx refetch below is a
+  // reconciliation pass — the follow() handler already updates isFollowingTarget/followerCount
+  // optimistically for instant feedback.
+  useEffect(() => {
+    if (isConfirmed) refetchFollowStats()
+  }, [isConfirmed])
+
+  const follow = () => {
+    if (!followerSystemAddress) {
+      toast(`Follow system isn't deployed on this network yet`, `warning`)
+      return
+    }
+    const wasFollowing = isFollowingTarget
+    setIsFollowingTarget(!wasFollowing)
+    setFollowerCount((prev) => Math.max(0, prev + (wasFollowing ? -1 : 1)))
+
+    writeContract({
+      address: followerSystemAddress,
+      abi: followerSystemAbi,
+      functionName: wasFollowing ? 'unfollow' : 'follow',
+      args: [addr],
+    })
+  }
+
+  useEffect(() => {
+    const error = submitError || receiptError
+    if (!error) return
+    toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
+    // The optimistic flip in follow() didn't happen — revert it now that the tx actually failed.
+    refetchFollowStats()
+  }, [submitError, receiptError])
 
   const handleDisconnect = async () => {
     disconnect()
@@ -457,7 +526,9 @@ const Profile = ({ addr }) => {
              
               <div className={clsx(styles.profile__stats, 'flex flex-row align-items-center justify-content-start gap-025')}>
                 <button className={styles.btnFollowers} type="button">
-                  <span>0 followers</span>
+                  <span>
+                    {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(followerCount)} followers
+                  </span>
                 </button>
                 {viewCount !== null && (
                   <>
@@ -506,8 +577,13 @@ const Profile = ({ addr }) => {
 
             {isConnected && address.toString().toLowerCase() !== targetWallet.toString().toLowerCase() && (
               <li className="w-100 grid grid--fit gap-1" style={{ '--data-width': '200px' }}>
-                <button className={`${styles.profile__btnFollow} w-100`} type="button" onClick={follow}>
-                  Follow
+                <button
+                  className={`${styles.profile__btnFollow} w-100`}
+                  type="button"
+                  onClick={follow}
+                  disabled={isSigning || isConfirming}
+                >
+                  {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
                 </button>
               </li>
             )}
@@ -622,7 +698,7 @@ const Status = ({ addr, profile, selfView }) => {
   const statusRef = useRef(``)
 
   /* Error during submission (e.g., user rejected)  */
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   /* Error after mining (e.g., transaction reverted) */
   const {
     isLoading: isConfirming,
@@ -682,12 +758,18 @@ const Status = ({ addr, profile, selfView }) => {
 
   useEffect(() => {
     getStatus(addr).then((res) => {
-      console.log(res)
+      if (res?.error) {
+        console.error('Failed to fetch status:', res.error)
+        return
+      }
       setStatus(res)
     })
 
     getMaxLength().then((res) => {
-      console.log(res)
+      if (res?.error) {
+        console.error('Failed to fetch max length:', res.error)
+        return
+      }
       setMaxLength(web3.utils.toNumber(res))
     })
   }, [showModal])

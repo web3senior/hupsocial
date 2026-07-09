@@ -50,7 +50,7 @@ export default function PostDetails({ networkId, postId }) {
                 item={post}
                 showContent={true}
                 chainId={resolvedNetworkId}
-                actions={['like', 'comment', 'hash', 'repost', 'view', 'share']}
+                actions={['like', 'comment', 'repost', 'view', 'share', 'bookmark']}
               />
               <hr />
             </article>

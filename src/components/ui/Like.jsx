@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react'
 import clsx from 'clsx'
-import { Heart } from 'lucide-react'
+import { HeartIcon } from '@phosphor-icons/react'
 import useSWR from 'swr'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
@@ -84,7 +84,7 @@ export const Like = ({ post, onUpdate }) => {
   const isQueued = currentNetworkQueue.includes(post.id)
 
   // Web3 Hooks
-  const { data: hash, isPending: isWalletPending, writeContractAsync } = useWriteContract()
+  const { data: hash, isPending: isWalletPending, mutateAsync: writeContractAsync } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
@@ -243,13 +243,14 @@ export const Like = ({ post, onUpdate }) => {
   // ■■■ UI Style Layout Variables ■■■
   const isLoading = interactionState.isProcessing || isWalletPending || isConfirming
   const heartColor = interactionState.isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
-  const heartFill = interactionState.isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'none'
+  const heartWeight = interactionState.isLiked || isQueued ? 'fill' : 'regular'
 
   if (!isMounted) return null
 
   return (
     <div className={clsx('flex', 'align-items-center', 'gap-050')}>
       <button
+        data-action="like"
         disabled={isLoading}
         className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
         onClick={handleLikeInteraction}
@@ -260,7 +261,7 @@ export const Like = ({ post, onUpdate }) => {
             <AnimatedHeart />
           </div>
         ) : (
-          <Heart strokeWidth={1.5} width={18} height={18} color={heartColor} fill={heartFill} />
+          <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
         )}
 
         {interactionState.likeCount > 0 && !isLoading && (

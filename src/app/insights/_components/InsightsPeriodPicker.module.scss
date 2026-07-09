@@ -1,0 +1,63 @@
+.picker {
+  &__trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+
+  &__chevron {
+    color: var(--text-muted);
+  }
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 240px;
+  }
+
+  &__option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.5rem;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--hover);
+    }
+
+    &--active {
+      color: var(--network-color-primary, var(--text));
+    }
+  }
+
+  &__optionLabel {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  &__optionRange {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+}

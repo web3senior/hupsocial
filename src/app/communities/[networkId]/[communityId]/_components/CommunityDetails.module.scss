@@ -1,0 +1,171 @@
+.details {
+  display: flex;
+  flex-direction: column;
+  
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    isolation: isolate;
+    padding: 1.25rem;
+
+    @media (max-width: 600px) {
+      border: none;
+      border-radius: 0;
+      padding: 1rem;
+    }
+  }
+
+  &__shimmer {
+    height: 180px;
+    border-radius: 16px;
+  }
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none;
+    width: fit-content;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+
+    @media (max-width: 600px) {
+      padding: 1.25rem;
+    }
+  }
+
+  &__cover {
+    display: block;
+    width: calc(100% + 4rem);
+    height: 200px;
+    object-fit: cover;
+    background: var(--surface-muted);
+    margin: -2rem -2rem 0;
+    border-radius: 16px 16px 0 0;
+
+    @media (max-width: 600px) {
+      width: calc(100% + 2.5rem);
+      height: 140px;
+      margin: -1.25rem -1.25rem 0;
+    }
+  }
+
+  &__logo {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    object-fit: cover;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+
+    // No logo uploaded — light block showing the community's initial instead
+    &--placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+  }
+
+  &__creatorLink {
+    color: inherit;
+    font-family: monospace;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__titleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  &__title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.25;
+  }
+
+  &__summary {
+    font-size: 1rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  &__description {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--tag);
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+
+    &--muted {
+      color: var(--text-muted);
+    }
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    width: 100%;
+  }
+
+  &__metaItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+}

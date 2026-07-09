@@ -1,6 +1,12 @@
 .page {
   min-height: 85svh;
 
+  hr {
+    border: none;
+    border-top: 0.5px solid var(--border);
+    opacity: 0.6;
+  }
+
   &__container {
     position: relative;
     min-height: 100svh;
@@ -9,12 +15,217 @@
     border-radius: 24px;
     overflow: hidden;
     isolation: isolate;
-    padding: 1.25rem;
 
     @media (max-width: 600px) {
       border: none;
       border-radius: 0;
       padding: 1rem;
     }
+  }
+}
+
+.post {
+  cursor: pointer;
+}
+
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  margin-top: 1rem;
+  background-color: var(--search-bg, var(--surface-muted));
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 100%;
+
+  &__input {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: inherit;
+  }
+}
+
+:global([data-theme='dark']) {
+  .search {
+    --search-bg: #20232a;
+  }
+}
+
+.page__folders {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 1rem 0;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.page__folder {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--black-600);
+  font-size: var(--font-size-13, 0.8125rem);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--surface-muted);
+  }
+
+  &--active {
+    background: var(--network-color-primary);
+    border-color: var(--network-color-primary);
+    color: oklch(from var(--network-color-primary) clamp(0, calc((0.623 - l) * infinity), 1) 0 0);
+  }
+}
+
+.page__folder__count {
+  opacity: 0.7;
+  font-size: var(--font-size-11, 0.6875rem);
+}
+
+.page__folder__menu {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 50%;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.1);
+  }
+}
+
+.page__folderAdd {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--black-400);
+  font-size: var(--font-size-13, 0.8125rem);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--surface-muted);
+  }
+
+  input {
+    border: none;
+    background: transparent;
+    outline: none;
+    color: inherit;
+    font: inherit;
+    width: 100px;
+  }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 1.5rem;
+  min-height: 50svh;
+  gap: 1rem;
+  color: var(--black-400);
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin: 0;
+  }
+
+  p {
+    max-width: 32ch;
+    margin: 0;
+  }
+}
+
+.loadMore {
+  display: block;
+  text-align: center;
+  margin: 0 auto;
+  width: 100%;
+  color: oklch(from var(--network-color-primary) clamp(0, calc((0.623 - l) * infinity), 1) 0 0);
+  background-color: var(--network-color-primary);
+  font-weight: 600;
+  border-radius: 999px;
+  border: unset;
+  padding: 0.5rem 1rem;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+
+  span {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--border);
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    p {
+      margin: 0;
+      height: 12px;
+      border-radius: 6px;
+      background: var(--border);
+      animation: shimmer 1.4s ease-in-out infinite;
+
+      &:first-child {
+        width: 40%;
+      }
+
+      &:last-child {
+        width: 75%;
+      }
+    }
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
   }
 }

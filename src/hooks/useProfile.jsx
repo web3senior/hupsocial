@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { getProfile } from '@/lib/api'
 
 const DEFAULT_USERNAME = 'new-user'
-const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}bafkreiatl2iuudjiq354ic567bxd7jzhrixf5fh5e6x6uhdvl7xfrwxwzm`
+const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`
 
 /**
  * Shared fetcher logic that queries LUKSO Universal Profiles first,

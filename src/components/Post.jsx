@@ -10,6 +10,7 @@ import { getPostById, recordPostView } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { isPollActive } from '@/lib/utils'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useProfile } from '@/hooks/useProfile'
 import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import commentAbi from '@/abi/post-comment.json'
@@ -17,41 +18,91 @@ import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon, TipIcon, ViewIcon } from '@/components/Icons'
 import MediaGallery from './Gallery'
-import { Ellipsis, Flag, Pen, Repeat2, MessageCircle, Box, SendHorizonal, MessageSquareQuote } from 'lucide-react'
+import {
+  ChartBarIcon,
+  ChartLineDownIcon,
+  ChatCircleIcon,
+  DotsThreeIcon,
+  EyeIcon,
+  FlagIcon,
+  NotePencilIcon,
+  PackageIcon,
+  PaperPlaneRightIcon,
+  PenIcon,
+  QuotesIcon,
+  RepeatIcon,
+  TagIcon,
+  TrashSimpleIcon,
+  UsersIcon,
+} from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import useSWR from 'swr'
 import NativePopover from './ui/NativePopover'
-import clsx from 'clsx'
-import styles from './Post.module.scss'
+import SellItemPopover from './SellItemPopover'
+import BuyButton from './BuyButton'
 import NewPost from './NewPost'
 import { checkIsEnglish } from '@/lib/languageHelper'
 import Like from './ui/Like'
-import Comment from './ui/Comment'
-import { Edit } from 'lucide-react'
-import { Trash } from 'lucide-react'
-import { Eye } from 'lucide-react'
+import Bookmark from './ui/Bookmark'
+import Share from './ui/Share'
+import clsx from 'clsx'
+import styles from './Post.module.scss'
+// Encrypted community content (posts, comments, quoted cards — everything inside encrypted
+// communities is sealed with the community key): attempts in-place decryption using the
+// session's unlocked identity. Promptless and best-effort — viewers without the key keep the
+// locked placeholder. Returns the item with content swapped for the decrypted version when
+// possible, otherwise the item untouched.
+function useDecryptedCommunityItem(item) {
+  const { address } = useConnection()
+  const [decryptedContent, setDecryptedContent] = useState(null)
+  const decryptClient = usePublicClient({
+    chainId: item?.network_id ? Number(item.network_id) : undefined,
+  })
 
-// import React, { useState, useEffect } from 'react'
-// import clsx from 'clsx'
-// import { PostText } from './PostText'
+  useEffect(() => {
+    const content = item?.content
+    if (!content?.encrypted || !address) {
+      setDecryptedContent(null)
+      return
+    }
+
+    let cancelled = false
+    const communityContract = CONTRACTS[`chain${item.network_id}`]?.community
+    import('@/lib/communityVault')
+      .then(({ tryDecryptCommunityContent }) => tryDecryptCommunityContent(decryptClient, communityContract, address, content))
+      .then((decrypted) => {
+        if (!cancelled && decrypted) setDecryptedContent(decrypted)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [item?.id, item?.network_id, item?.content?.encrypted, address])
+
+  return useMemo(() => {
+    if (!item || !item.content?.encrypted || !decryptedContent) return item
+    return { ...item, content: decryptedContent }
+  }, [item, decryptedContent])
+}
 
 export default function Post({ item, showContent, actions, chainId, hasCommentBelow = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
-  const [showShareModal, setShowShareModal] = useState()
+  const [showQuoteModal, setShowQuoteModal] = useState(null)
   const { web3, contract } = initHupContract()
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
-  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
-  const isActioned = Number(item.actioned_reports || 0) >= 3
+  const isActioned = Number(item.actioned_reports || 0) >= 3 || Number(item.moderation_flagged || 0) === 1
   const repostedPostId = isRepost ? Number(item.is_repost) : null
   const [showEditModal, setShowEditModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(null)
@@ -89,10 +140,15 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
     }
   }, [isRepost, repostedPostId, item.network_id, address])
 
-  const displayItem = isRepost ? repostedPost : item
+  const baseDisplayItem = isRepost ? repostedPost : item
+  const displayItem = useDecryptedCommunityItem(baseDisplayItem)
   const commentTarget = displayItem || item
 
-  // Fire view recording only when the post scrolls into the viewport
+  // Fire view recording only when the post scrolls into the viewport.
+  // `repostReady` is included so the observer re-attaches once the loading
+  // skeleton/fallback (which render without the ref'd <section>) give way
+  // to the real markup — otherwise the ref never gets observed for reposts.
+  const repostReady = !isRepost || !!repostedPost
   useEffect(() => {
     const el = sectionRef.current
     if (!el) return
@@ -103,14 +159,20 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
           io.disconnect()
         }
       },
-      { threshold: 0.5 },
+      { threshold: 0.5 }
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [item.network_id, item.id, address])
+  }, [item.network_id, item.id, address, repostReady])
 
   // Extract raw source content string contextually based on data schema structure
   const getRawContentText = () => {
+    // Encrypted community content (posts and replies) — a ciphertext envelope that decrypts in
+    // place above when the viewer holds the community key; this placeholder is what non-members
+    // (or locked-vault sessions) see instead.
+    if (displayItem?.content?.encrypted) {
+      return '🔒 Encrypted community content — only members can view'
+    }
     if (displayItem?.content?.elements?.length > 1) {
       return displayItem?.content?.elements?.[0]?.data?.text || ''
     }
@@ -136,23 +198,13 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
   return (
     <>
-      {showCommentModal && item && <Comment item={showCommentModal} setShowCommentModal={setShowCommentModal} />}
-
+      {showCommentModal && <NewPost actionType="comment" replyTarget={showCommentModal} onClose={() => setShowCommentModal()} />}
+      {showQuoteModal && <NewPost actionType="quote" quoteTarget={showQuoteModal} onClose={() => setShowQuoteModal(null)} />}
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
-
-      {showShareModal && <ShareModal item={showShareModal} setShowShareModal={setShowShareModal} />}
-
       {showReportModal && <ReportModal item={showReportModal} setShowReportModal={setShowReportModal} />}
 
       {showEditModal && (
-        <>
-          <NewPost
-            actionType="edit"
-            onClose={() => setShowEditModal(false)}
-            existingPost={displayItem}
-            setShowEditModal={setShowEditModal}
-          />
-        </>
+        <NewPost actionType="edit" onClose={() => setShowEditModal(false)} existingPost={displayItem} setShowEditModal={setShowEditModal} />
       )}
 
       <section
@@ -162,14 +214,16 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         data-commentable={item.allow_comment ? true : false}
         data-has-comments={hasCommentBelow ? true : false}
       >
-        {isRepost && (
-          <div className={styles.post__repostLabel}>
-            <Repeat2 strokeWidth={1.3} width={20} height={20} />
-            {isRepost
-              ? `${item.wallet_address.slice(0, 4)}...${item.wallet_address.slice(-4)}`
-              : `${repostedPost?.wallet_address?.slice(0, 6)}...${repostedPost?.wallet_address?.slice(-4)}`}
-            {` Reposted`}
-          </div>
+        {isRepost && <RepostLabel walletAddress={item.wallet_address} />}
+        {displayItem?.community_name && (
+          <Link
+            href={`/communities/${displayItem.network_id}/${displayItem.community_id}`}
+            className={styles.post__communityBadge}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <UsersIcon size={13} />
+            {`Posted in ${displayItem.community_name}`}
+          </Link>
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile creator={displayItem?.wallet_address} createdAt={displayItem?.created_at} networkId={displayItem?.network_id} />
@@ -186,8 +240,9 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
                       onClick={(e) => e.stopPropagation()}
                       className={clsx(styles.post__navTrigger, 'pointer', 'rounded-full')}
                       data-tooltip="Edited"
+                      aria-label="Post has been edited"
                     >
-                      <Pen strokeWidth={1.5} size={10} />
+                      <PenIcon size={10} />
                     </button>
                   }
                   placement="bottom-end"
@@ -209,7 +264,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         <main className={clsx(styles.post__main, 'w-100')}>
           {isActioned ? (
             <div className={styles.post__flagBanner}>
-              <Flag size={14} fill="currentColor" strokeWidth={0} />
+              <FlagIcon size={14} weight="fill" />
               This post has been flagged for violations.
             </div>
           ) : displayItem?.content?.elements?.length > 1 ? (
@@ -237,78 +292,111 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               baseClassName={styles.post__content}
             />
           )}
+
+          {!isActioned && displayItem?.content?.quoteOf && (
+            <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} />
+          )}
+
+          <BuyButton item={displayItem || item} />
         </main>
 
         <footer className={`${styles.post__footer}`}>
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`${styles.post__actions} flex flex-row align-items-center justify-content-start`}
+            className={`${styles.post__actions} flex flex-row align-items-center justify-content-between`}
           >
-            {actionsSet.has('like') && <Like post={displayItem || item} />}
+            <div className="flex flex-row align-items-center justify-content-start`" style={{ gap: `4px` }}>
+              {actionsSet.has('like') && <Like post={displayItem || item} />}
 
-            {actionsSet.has('comment') && (
-              <>
-                {commentTarget.allow_comment && (
-                  <button
-                    onClick={() => {
-                      isConnected ? setShowCommentModal(commentTarget) : toast(`Please connect wallet`, `error`)
-                    }}
-                  >
-                    <MessageCircle strokeWidth={1.5} width={17} height={17} />
-                    {commentTarget.total_comments === 0 ? '' : <span>{commentTarget.total_comments}</span>}
-                  </button>
-                )}
-              </>
-            )}
+              {actionsSet.has('comment') && (
+                <>
+                  {commentTarget.allow_comment && (
+                    <button
+                      data-action="comment"
+                      aria-label="Comment on post"
+                      onClick={() => {
+                        isConnected ? setShowCommentModal(commentTarget) : toast(`Please connect wallet`, `error`)
+                      }}
+                    >
+                      <ChatCircleIcon width={17} height={17} />
+                      {commentTarget.total_comments === 0 ? '' : <span>{commentTarget.total_comments}</span>}
+                    </button>
+                  )}
+                </>
+              )}
 
-            {actionsSet.has('repost') && <Repost item={displayItem || item} />}
+              {actionsSet.has('repost') && <Repost item={displayItem || item} onQuote={() => setShowQuoteModal(displayItem || item)} />}
 
-            {actionsSet.has('tip') && (
-              <button
-                onClick={() => {
-                  isConnected ? setShowTipModal(item) : toast(`Please connect wallet`, `error`)
-                }}
-              >
-                <TipIcon />
-              </button>
-            )}
+              {actionsSet.has('tip') && (
+                <button
+                  data-action="tip"
+                  aria-label="Tip the author"
+                  onClick={() => {
+                    isConnected ? setShowTipModal(item) : toast(`Please connect wallet`, `error`)
+                  }}
+                >
+                  <TipIcon />
+                </button>
+              )}
 
-            {actionsSet.has('view') && (
-              <button>
-                <ViewIcon />
-                {item.total_views > 0 && (
-                  <span>
-                    {new Intl.NumberFormat('en', {
-                      notation: 'compact',
-                      maximumFractionDigits: 1,
-                    }).format(item.total_views)}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {actionsSet.has('hash') && (
-              <a href={`${item.explorer_url}/tx/${item.tx_hash}`} target="_blank" rel="noopener noreferrer">
-                <Box strokeWidth={1.5} width={17} height={17} />
-              </a>
-            )}
-
-            {actionsSet.has('share') && (
-              <button
-                onClick={() => {
-                  isConnected ? setShowShareModal(displayItem) : toast(`Please connect wallet`, `error`)
-                }}
-              >
-                <SendHorizonal strokeWidth={1.5} width={17} height={17} />
-              </button>
-            )}
+              {actionsSet.has('view') && (
+                <button data-action="view" aria-label="Post views">
+                  <ChartBarIcon width={17} height={17} />
+                  {item.total_views > 0 && (
+                    <span>
+                      {new Intl.NumberFormat('en', {
+                        notation: 'compact',
+                        maximumFractionDigits: 1,
+                      }).format(item.total_views)}
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+            <div className="flex align-items-center gap-025">
+              {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
+              {actionsSet.has('share') && <Share item={displayItem || item} />}
+            </div>
           </div>
         </footer>
-
       </section>
     </>
   )
 }
+
+const RepostLabel = ({ walletAddress }) => {
+  const { profile } = useProfile(walletAddress)
+  const truncatedAddress = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : ''
+  const displayName = profile?.name || truncatedAddress
+
+  return (
+    <Link href={`/${walletAddress}`} className={styles.post__repostLabel} onClick={(e) => e.stopPropagation()}>
+      <RepeatIcon width={16} height={16} />
+      <span className={styles.post__repostLabel__name}>{displayName}</span>
+      {` Reposted`}
+    </Link>
+  )
+}
+
+const PostSkeleton = () => (
+  <div style={{ padding: '20px 20px 0.5rem 20px' }}>
+    <div className="flex align-items-start gap-050">
+      <div className="shimmer rounded" style={{ width: 36, height: 36, flexShrink: 0 }} />
+      <div className="flex flex-column gap-025" style={{ flex: 1 }}>
+        <div className="shimmer rounded" style={{ width: '25%', height: 12 }} />
+        <div className="shimmer rounded" style={{ width: '60%', height: 12, marginTop: 4 }} />
+        <div className="shimmer rounded" style={{ width: '45%', height: 12, marginTop: 2 }} />
+      </div>
+    </div>
+  </div>
+)
+
+const LastCommentShimmer = () => (
+  <aside className={styles.post__lastCommentShimmer} onClick={(e) => e.stopPropagation()}>
+    <div className="shimmer" style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0 }} />
+    <div className="shimmer rounded" style={{ width: '65%', height: 12 }} />
+  </aside>
+)
 
 const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const [loading, setLoading] = useState(true)
@@ -317,11 +405,12 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const router = useRouter()
   const { setCurrentPost } = usePostStore()
   const { address, isConnected } = useConnection()
-  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
   const publicClient = usePublicClient()
+  const sellPopoverRef = useRef(null)
 
   const deletePost = async (e, id) => {
     e.stopPropagation()
@@ -372,14 +461,19 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
     <>
       <NativePopover
         trigger={
-          <button onClick={(e) => e.stopPropagation()} className={clsx(styles.post__navTrigger, 'pointer rounded-full')}>
-            <Ellipsis fill="currentColor" strokeWidth={1} width={18} height={18} />
+          <button
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={() => router.prefetch(`/networks/${item.network_id}/${item.id}`)}
+            className={clsx(styles.post__navTrigger, 'pointer rounded-full')}
+            aria-label="Post options"
+          >
+            <DotsThreeIcon width={20} height={20} />
           </button>
         }
         placement="bottom-end"
       >
         {({ close }) => (
-          <div className={`${styles.postDropdown} flex flex-column align-items-center justify-content-start gap-050`}>
+          <div className={`${styles.post__dropdown} flex flex-column align-items-center justify-content-start gap-050`}>
             <ul>
               <li>
                 <button
@@ -388,12 +482,39 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                     setCurrentPost(item)
                     router.push(`/networks/${item.network_id}/${item.id}`)
                   }}
-                  style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}
                 >
                   <span>View</span>
-                  <Eye size={16} />
+                  <EyeIcon size={18} />
                 </button>
               </li>
+              {item.tx_hash && (
+                <li>
+                  <a
+                    href={`${item.explorer_url}/tx/${item.tx_hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="View transaction proof on block explorer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span>Proof</span>
+                    <PackageIcon size={18} />
+                  </a>
+                </li>
+              )}
+              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
+                <li>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      sellPopoverRef.current?.open()
+                      close()
+                    }}
+                  >
+                    <span>Sell</span>
+                    <TagIcon size={18} />
+                  </button>
+                </li>
+              )}
               {address?.toLowerCase() === item.wallet_address?.toLowerCase() && item.is_repost < 1 && (
                 <li>
                   <button
@@ -404,7 +525,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                     }}
                   >
                     <span>Edit</span>
-                    <Edit size={16} />
+                    <NotePencilIcon size={18} />
                   </button>
                 </li>
               )}
@@ -412,7 +533,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                 <li>
                   <button onClick={(e) => deletePost(e, item.id)}>
                     <span>Delete</span>
-                    <Trash size={16} />
+                    <TrashSimpleIcon size={18} />
                   </button>
                 </li>
               )}
@@ -425,8 +546,8 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                       close()
                     }}
                   >
-                  <span>Report</span>
-                    <Flag size={16} />
+                    <span>Report</span>
+                    <FlagIcon size={16} />
                   </button>
                 </li>
               )}
@@ -434,30 +555,10 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
           </div>
         )}
       </NativePopover>
+      <SellItemPopover ref={sellPopoverRef} item={item} />
     </>
   )
 }
-
-
-const PostSkeleton = () => (
-  <div style={{ padding: '20px 20px 0.5rem 20px' }}>
-    <div className="flex align-items-start gap-050">
-      <div className="shimmer rounded" style={{ width: 36, height: 36, flexShrink: 0 }} />
-      <div className="flex flex-column gap-025" style={{ flex: 1 }}>
-        <div className="shimmer rounded" style={{ width: '25%', height: 12 }} />
-        <div className="shimmer rounded" style={{ width: '60%', height: 12, marginTop: 4 }} />
-        <div className="shimmer rounded" style={{ width: '45%', height: 12, marginTop: 2 }} />
-      </div>
-    </div>
-  </div>
-)
-
-const LastCommentShimmer = () => (
-  <aside className={styles.post__lastCommentShimmer} onClick={(e) => e.stopPropagation()}>
-    <div className="shimmer" style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0 }} />
-    <div className="shimmer rounded" style={{ width: '65%', height: 12 }} />
-  </aside>
-)
 
 export function PostCard({ item, actions, chainId, networkName }) {
   const [lastComment, setLastComment] = useState(null)
@@ -495,9 +596,13 @@ export function PostCard({ item, actions, chainId, networkName }) {
           setLastComment(null)
         }
       })
-      .finally(() => { if (!cancelled) setIsLastCommentLoading(false) })
+      .finally(() => {
+        if (!cancelled) setIsLastCommentLoading(false)
+      })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [item?.id, item?.network_id, item?.total_comments, address, shouldFetch])
 
   const hasCommentBelow = shouldFetch && (isLastCommentLoading || !!lastComment)
@@ -505,17 +610,15 @@ export function PostCard({ item, actions, chainId, networkName }) {
   return (
     <>
       <Post item={item} actions={actions} chainId={chainId} networkName={networkName} hasCommentBelow={hasCommentBelow} />
-      {shouldFetch && (
-        isLastCommentLoading
-          ? <LastCommentShimmer />
-          : lastComment
-            ? <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'hash']} chainId={chainId} />
-            : null
-      )}
+      {shouldFetch &&
+        (isLastCommentLoading ? (
+          <LastCommentShimmer />
+        ) : lastComment ? (
+          <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'bookmark']} chainId={chainId} />
+        ) : null)}
     </>
   )
 }
-
 
 const ReportModal = ({ item, setShowReportModal }) => {
   const { address } = useConnection()
@@ -528,7 +631,9 @@ const ReportModal = ({ item, setShowReportModal }) => {
   useEffect(() => {
     fetch('/api/v1/reports/categories')
       .then((r) => r.json())
-      .then((body) => { if (body.success) setCategories(body.data) })
+      .then((body) => {
+        if (body.success) setCategories(body.data)
+      })
       .catch(() => {})
   }, [])
 
@@ -556,12 +661,19 @@ const ReportModal = ({ item, setShowReportModal }) => {
   return (
     <div
       className={`${styles.modal} animate fade`}
-      onClick={(e) => { e.stopPropagation(); setShowReportModal(null) }}
+      onClick={(e) => {
+        e.stopPropagation()
+        setShowReportModal(null)
+      }}
     >
       <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
         <header>
-          <div className="pointer" onClick={() => setShowReportModal(null)}>Cancel</div>
-          <div className="flex-1"><h3>Report post</h3></div>
+          <div className="pointer" onClick={() => setShowReportModal(null)}>
+            Cancel
+          </div>
+          <div className="flex-1">
+            <h3>Report post</h3>
+          </div>
           <div />
         </header>
         <main className="flex flex-column align-items-start justify-content-between gap-050">
@@ -574,7 +686,9 @@ const ReportModal = ({ item, setShowReportModal }) => {
                 <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-100">
                   <option value="">Select a category</option>
                   {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.category_name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.category_name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -614,7 +728,7 @@ const TipModal = ({ item, setShowTipModal }) => {
   const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
   const { web3, contract } = initPostCommentContract()
-  const { data: hash, isPending: isSigning, error: submitError, writeContract } = useWriteContract()
+  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   const {
     isLoading: isConfirming,
     isSuccess: isConfirmed,
@@ -733,66 +847,13 @@ const TipModal = ({ item, setShowTipModal }) => {
   )
 }
 
-const ShareModal = ({ item, setShowShareModal }) => {
-  const [error, setError] = useState(null)
-  const activeChain = getActiveChain()
-
-  // --- Dynamic Content ---
-  const postUrl = `${location.protocol}//${window.location.host}/networks/${item.network_id}/${item.id}`
-  const postTitle = item?.content?.elements?.[0]?.data?.text || item?.content || ''
-  const hupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
-  const postContent = `${postTitle}\n\n Creator: ${item.wallet_address} \n\n`
-  // --- Constructing the Share Link ---
-  const shareLink =
-    `https://x.com/intent/tweet?` + `text=${encodeURIComponent(postContent)}` + `&url=${encodeURIComponent(postUrl)}` + `&via=${hupHandle}` // <-- The recommended parameter for the handle
-
-  useEffect(() => {}, [item])
-
-  // if (loading) {
-  //   return <InlineLoading />
-  // }
-
-  if (error) {
-    return <span>{error}</span>
-  }
-
-  return (
-    <div
-      className={`${styles.modal} ${styles.shareModal} animate fade`}
-      onClick={(e) => {
-        e.stopPropagation()
-        setShowShareModal()
-      }}
-    >
-      <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
-        <header>
-          <div className={``} aria-label="Close" onClick={() => setShowShareModal()}>
-            Cancel
-          </div>
-          <div className={`flex-1`}>
-            <h3>Share post</h3>
-          </div>
-        </header>
-
-        <main className={`flex flex-column align-items-start justify-content-between gap-050`}>
-          <a href={`${shareLink}`} target={`_blank`} className="">
-            Share on 𝕏
-          </a>
-        </main>
-
-        <footer className={``}></footer>
-      </div>
-    </div>
-  )
-}
-
-const Repost = ({ item }) => {
+const Repost = ({ item, onQuote }) => {
   const { web3, contract } = initHupContract()
   const { address, isConnected } = useConnection()
   const [isReposted, setIsReposted] = useState(false)
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
@@ -858,101 +919,124 @@ const Repost = ({ item }) => {
   if (loading) return null
 
   return (
-    <button
-      onClick={(e) => {
-        if (isConnected) {
-          isReposted ? removeRepost(e, item.id) : repost(e, item.id)
-        } else toast(`Please connect wallet`, `error`)
-      }}
+    <NativePopover
+      placement="bottom-start"
+      trigger={
+        <button data-action="repost" aria-label="Repost" onClick={(e) => e.stopPropagation()}>
+          <RepeatIcon width={20} height={20} />
+          {item.repost_count === 0 ? '' : <span>{item.repost_count}</span>}
+        </button>
+      }
     >
-      <Repeat2 strokeWidth={1.3} width={20} height={20} />
-      {item.repost_count === 0 ? '' : <span>{item.repost_count}</span>}
-    </button>
+      {({ close }) => (
+        <div className={styles.post__repostMenu}>
+          <button
+            className={styles.post__repostMenu__option}
+            onClick={(e) => {
+              e.stopPropagation()
+              close()
+              if (!isConnected) {
+                toast(`Please connect wallet`, `error`)
+                return
+              }
+              isReposted ? removeRepost(e, item.id) : repost(e, item.id)
+            }}
+          >
+            <span>{isReposted ? `Undo repost` : `Repost`}</span>
+            <RepeatIcon width={17} height={17} />
+          </button>
+          <button
+            className={styles.post__repostMenu__option}
+            onClick={(e) => {
+              e.stopPropagation()
+              close()
+              if (!isConnected) {
+                toast(`Please connect wallet`, `error`)
+                return
+              }
+              onQuote?.()
+            }}
+          >
+            <span>{`Quote`}</span>
+            <QuotesIcon width={17} height={17} />
+          </button>
+        </div>
+      )}
+    </NativePopover>
   )
 }
 
-const Quote = ({ item }) => {
-  const { web3, contract } = initHupContract()
-  const { address, isConnected } = useConnection()
-  const [isReposted, setIsReposted] = useState(false)
-  const [error, setError] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const { data: hash, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  })
+// Compact embedded card for quote posts — `quoteOf` lives inside the post's
+// content JSON (the contract forces parentId = 0 for regular posts), so the
+// quoted post has to be fetched by id from the same network.
+const QuotedPost = ({ networkId, quoteId }) => {
+  const router = useRouter()
+  const { address } = useConnection()
+  const [fetchedQuotedPost, setFetchedQuotedPost] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // useEffect(() => {
-  //   getRepostStatus(item.id)
-  //     .then((result) => {
-  //       console.log({ result })
-  //       setIsReposted(result.reposted)
-  //       setLoading(false)
-  //     })
-  //     .catch((err) => {
-  //       console.log(err)
-  //       setLoading(false)
-  //     })
-  // }, [])
+  useEffect(() => {
+    let cancelled = false
 
-  const repost = async (e, id) => {
-    e.stopPropagation()
+    getPostById(networkId, quoteId, address)
+      .then((res) => {
+        if (cancelled) return
+        const post = Array.isArray(res?.data) ? res.data[0] : res?.data
+        setFetchedQuotedPost(post || null)
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedQuotedPost(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
 
-    if (!isConnected) {
-      console.log('Please connect your wallet first', 'error')
-      return
+    return () => {
+      cancelled = true
     }
+  }, [networkId, quoteId, address])
 
-    const targetChain = CONTRACTS[`chain${item.network_id}`]
+  // Same in-place decryption the main card gets — a quoted encrypted post renders readable for
+  // members instead of the locked placeholder. Called before the early returns (hook rules).
+  const quotedPost = useDecryptedCommunityItem(fetchedQuotedPost)
 
-    if (!targetChain?.hup) {
-      console.log('Contract configuration missing for network', 'error')
-      return
-    }
+  if (isLoading) return null
 
-    writeContract({
-      abi,
-      address: targetChain.hup,
-      functionName: 'create',
-      args: [
-        ZERO_ADDRESS, // direct wallet call, not session owner
-        ContentType.Repost,
-        '', // repost metadata can be empty
-        BigInt(id), // parent post id
-        true, // allowedComments, mostly irrelevant for reposts
-      ],
-    })
+  if (!quotedPost) {
+    return <div className={clsx(styles.post__quoteCard, styles.post__quoteCard_unavailable)}>Original post unavailable</div>
   }
 
-  const removeRepost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: activeChain[1].post,
-      functionName: 'removeRepost',
-      args: [id],
-    })
-  }
-
-  if (loading) return null
+  const quotedText = quotedPost?.content?.encrypted
+    ? '🔒 Encrypted community content — only members can view'
+    : quotedPost?.content?.elements?.length > 1
+      ? quotedPost.content.elements[0]?.data?.text || ''
+      : `${quotedPost?.content || ''}`
+  const quotedMedia = quotedPost?.content?.elements?.length > 1 ? quotedPost.content.elements[1]?.data?.items || [] : []
 
   return (
-    <button
+    <div
+      className={styles.post__quoteCard}
       onClick={(e) => {
-        if (isConnected) {
-          isReposted ? removeRepost(e, item.id) : repost(e, item.id)
-        } else toast(`Please connect wallet`, `error`)
+        e.stopPropagation()
+        router.push(`/networks/${networkId}/${quoteId}`)
       }}
     >
-      <MessageSquareQuote strokeWidth={1.3} width={17} height={17} />
-      {item.repost_count === 0 ? '' : <span>{item.repost_count}</span>}
-    </button>
+      <Profile variant="fullWithoutTime" creator={quotedPost.wallet_address} networkId={quotedPost.network_id} />
+      {quotedText && (
+        <div
+          className={styles.post__quoteCard__text}
+          onClick={(e) => {
+            if (e.target.closest('a')) e.stopPropagation()
+          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(quotedText) }}
+        />
+      )}
+      {quotedMedia.length > 0 && (
+        <div className={styles.post__quoteCard__media}>
+          <MediaGallery data={quotedMedia} />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -963,7 +1047,12 @@ const Poll = ({ polls }) => {
         polls.list.length > 0 &&
         polls.list.map((item, i) => {
           return (
-            <article key={i} className={`${styles.poll} animate fade`} onClick={() => router.push(`p/${item.pollId}`)}>
+            <article
+              key={i}
+              className={`${styles.poll} animate fade`}
+              onClick={() => router.push(`p/${item.pollId}`)}
+              onMouseEnter={() => router.prefetch(`p/${item.pollId}`)}
+            >
               <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                 <header className={`${styles.poll__header}`}>
                   <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
@@ -995,20 +1084,20 @@ const Poll = ({ polls }) => {
                     {<LikeCount pollId={item.pollId} />}
 
                     {item.allowedComments && (
-                      <button>
+                      <button aria-label="Comment on poll">
                         <CommentIcon />
 
                         <span>{0}</span>
                       </button>
                     )}
 
-                    <button></button>
+                    <button aria-label="Repost poll"></button>
 
-                    <button>
+                    <button aria-label="Share poll">
                       <ShareIcon />
                     </button>
 
-                    <button>
+                    <button aria-label="Tip the author">
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path
                           d="M12 8.16338C12.1836 8.16338 12.3401 8.09875 12.4695 7.9695C12.5988 7.84012 12.6634 7.68363 12.6634 7.5C12.6634 7.31638 12.5988 7.15988 12.4695 7.0305C12.3401 6.90125 12.1836 6.83663 12 6.83663C11.8164 6.83663 11.6599 6.90125 11.5305 7.0305C11.4013 7.15988 11.3366 7.31638 11.3366 7.5C11.3366 7.68363 11.4013 7.84012 11.5305 7.9695C11.6599 8.09875 11.8164 8.16338 12 8.16338ZM6 6.5625H9.75V5.4375H6V6.5625ZM3.65625 15.375C3.26013 14.0076 2.86425 12.6471 2.46863 11.2933C2.07288 9.93944 1.875 8.55 1.875 7.125C1.875 6.08075 2.23894 5.19469 2.96681 4.46681C3.69469 3.73894 4.58075 3.375 5.625 3.375H9.5625C9.90575 2.924 10.3176 2.56125 10.7979 2.28675C11.2782 2.01225 11.8039 1.875 12.375 1.875C12.5818 1.875 12.7584 1.94831 12.9051 2.09494C13.0517 2.24156 13.125 2.41825 13.125 2.625C13.125 2.676 13.118 2.72694 13.104 2.77781C13.0901 2.82881 13.0755 2.87594 13.0601 2.91919C12.9909 3.09994 12.9319 3.28506 12.8833 3.47456C12.8348 3.66394 12.7933 3.85525 12.7586 4.0485L14.7101 6H16.125V10.5821L14.0783 11.2543L12.8438 15.375H9.375V13.875H7.125V15.375H3.65625ZM4.5 14.25H6V12.75H10.5V14.25H12L13.1625 10.3875L15 9.76875V7.125H14.25L11.625 4.5C11.625 4.25 11.6406 4.00938 11.6719 3.77813C11.7031 3.54688 11.7548 3.31488 11.8269 3.08213C11.4644 3.18213 11.1481 3.35644 10.8778 3.60506C10.6077 3.85356 10.4005 4.15188 10.2563 4.5H5.625C4.9 4.5 4.28125 4.75625 3.76875 5.26875C3.25625 5.78125 3 6.4 3 7.125C3 8.35 3.16875 9.54688 3.50625 10.7156C3.84375 11.8844 4.175 13.0625 4.5 14.25Z"
@@ -1039,7 +1128,7 @@ const Options = ({ item }) => {
   const [totalVotes, setTotalVotes] = useState(0)
   const { web3, contract: readOnlyContract } = initHupContract()
   const { address, isConnected } = useConnection()
-  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
@@ -1184,7 +1273,7 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       dedupingInterval: 600000,
-    },
+    }
   )
 
   useEffect(() => {
@@ -1215,9 +1304,14 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
         ref={isCollapsible ? contentRef : null}
         className={clsx(
           baseClassName,
-          isCollapsible && (isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed),
+          isCollapsible && (isExpanded ? styles.post__main__content_expanded : styles.post__main__content_collapsed)
         )}
         id={`post${postId}`}
+        dir="auto"
+        onClick={(e) => {
+          // Links inside dangerouslySetInnerHTML have no React handler; keep their clicks from opening post details
+          if (e.target.closest('a')) e.stopPropagation()
+        }}
         dangerouslySetInnerHTML={{
           __html: renderMarkdown(renderedContentText || ''),
         }}

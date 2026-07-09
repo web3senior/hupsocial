@@ -40,7 +40,10 @@ Once the plan is stated, adhere strictly to the following coding guidelines:
     // --- Logic ---
     ```
 
-### 4. Git & Internationalization
+### 4. Terminology
+* **"onchain", never "on-chain":** Always write **onchain** (one word, no hyphen) in all code, comments, UI copy, and documentation. Apply the same to "offchain".
+
+### 5. Git & Internationalization
 * **Commits:** Prefix all architectural or structural intentions with Conventional Commit standards (`feat:`, `fix:`, `chore:`, `refactor:`).
 * **Data Formatting:** Use native JavaScript **`Intl`** utilities for compact ticker numbers and localized relative time strings.
 * **String Normalization:** Ensure slug/URL generation processes properly preserve and normalize Unicode characters, including Zero Width Non-Joiners (ZWNJ).

@@ -1,0 +1,47 @@
+.share {
+  &__menu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+
+  &__list {
+    width: 100%;
+
+    li {
+      &:hover {
+        background-color: var(--surface);
+      }
+
+      &:not(:first-child) {
+        margin-top: 0.4em;
+      }
+    }
+  }
+
+  &__link {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    padding: 0.25rem 0.7rem;
+    font-weight: 500;
+    font-size: var(--font-size-12);
+    text-align: center;
+    white-space: nowrap;
+    border-radius: var(--global-border-radius);
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}

@@ -21,7 +21,7 @@
     color: var(--page-text);
     border: 1px solid var(--page-border);
     box-shadow: var(--page-shadow);
-    border-radius: var(--global-border-radius);
+    border-radius: var(--page-border-radius);
     overflow: hidden;
 
     @media (max-width: 640px) {

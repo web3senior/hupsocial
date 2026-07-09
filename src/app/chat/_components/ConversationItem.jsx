@@ -2,7 +2,7 @@ import { useProfile } from '@/hooks/useProfile'
 import clsx from 'clsx'
 import styles from './Chat.module.scss'
 import { useLastMessage } from '@/hooks/useLastMessage'
-import { Trash2 } from 'lucide-react'
+import { TrashIcon } from '@phosphor-icons/react'
 import { ContentSpinner } from '@/components/Loading'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -72,7 +72,7 @@ export const ConversationItem = ({ chat, isActive, onSelect, onDelete, isDeletin
           disabled={isDeleting}
           title="Remove contact"
         >
-          {isDeleting ? <ContentSpinner size="14px" /> : <Trash2 size={14} strokeWidth={1.5} />}
+          {isDeleting ? <ContentSpinner size="14px" /> : <TrashIcon size={14} />}
         </button>
       </div>
 

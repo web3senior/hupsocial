@@ -70,7 +70,7 @@ export default function Page() {
   const params = useParams()
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const { address, isConnected } = useConnections()
-  const { data: hash, isPending, writeContract } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })

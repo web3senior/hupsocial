@@ -23,7 +23,9 @@ export async function GET(request) {
         const actionableTypes = [
             'post_received_comment',
             'post_received_like',
-            'post_received_repost'
+            'post_received_repost',
+            'post_received_quote',
+            'user_received_follow'
         ];
 
         // Process only valid actions originating from other users

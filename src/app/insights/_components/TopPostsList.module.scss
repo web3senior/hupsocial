@@ -1,0 +1,61 @@
+.topPosts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rank;
+
+  &__item {
+    counter-increment: rank;
+  }
+
+  &__link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      background: var(--hover);
+    }
+
+    &::before {
+      content: counter(rank);
+      flex: none;
+      width: 1.5rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+  }
+
+  &__excerpt {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+
+  &__stats {
+    display: flex;
+    gap: 0.75rem;
+    flex: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__empty {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+}

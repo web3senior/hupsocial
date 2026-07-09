@@ -1,0 +1,47 @@
+.dialog {
+  // UA styles center a modal dialog via inset: 0 + margin: auto, but the app's global
+  // `* { margin: 0 }` reset wipes the margin — restate it. Everything else here is the
+  // enter/exit animation and backdrop; content chrome is the consumer's.
+  margin: auto;
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    overlay 0.18s ease allow-discrete,
+    display 0.18s ease allow-discrete;
+
+  &[open] {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  &::backdrop {
+    background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0);
+    transition:
+      background 0.18s ease,
+      backdrop-filter 0.18s ease,
+      overlay 0.18s ease allow-discrete,
+      display 0.18s ease allow-discrete;
+  }
+
+  &[open]::backdrop {
+    background: rgba(0, 0, 0, 0.36);
+    backdrop-filter: blur(2px);
+  }
+}
+
+@supports (transition-behavior: allow-discrete) {
+  @starting-style {
+    .dialog[open] {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+
+    .dialog[open]::backdrop {
+      background: rgba(0, 0, 0, 0);
+      backdrop-filter: blur(0);
+    }
+  }
+}

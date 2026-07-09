@@ -1,20 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { config, setNetworkColor } from '@/config/wagmi'
-import { useDisconnect, useConnect, useSwitchChain, useConnection } from 'wagmi'
+import { useConnect, useConnection } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
 import NativePopover from '@/components/ui/NativePopover'
+import NetworkSwitcher from '@/components/NetworkSwitcher'
 import styles from './ConnectWallet.module.scss'
 
 export const ConnectWallet = () => {
   const [showModal, setShowModal] = useState(false)
-  const { disconnect } = useDisconnect()
   const mounted = useClientMounted()
 
   const { address, isConnected, chain: walletChain } = useConnection()
@@ -50,15 +49,17 @@ export const ConnectWallet = () => {
       {effectiveChainData && (
         <div className={`${styles.networks}`}>
           <NativePopover
-            placement="center"
+            placement="bottom-end"
             type="auto"
             trigger={
               <button type="button" className={`${styles.btnNetwork}`} title={`${effectiveChainData.name}`}>
-                <span className={`rounded`} dangerouslySetInnerHTML={{ __html: effectiveChainData.icon }} />
+                <span className={`rounded`}>
+                  <img src={effectiveChainData.iconUrl} alt="" />
+                </span>
               </button>
             }
           >
-            <DefaultNetwork currentNetwork={effectiveChainId} onChainChange={setActiveChainId} />
+            {({ close }) => <NetworkSwitcher currentNetwork={effectiveChainId} onChainChange={setActiveChainId} onSelect={close} />}
           </NativePopover>
         </div>
       )}
@@ -95,56 +96,6 @@ export function WalletOptions() {
       {connector.name}
     </button>
   ))
-}
-
-export function DefaultNetwork({ currentNetwork, onChainChange }) {
-  const { isConnected } = useConnection()
-  const switchChain = useSwitchChain({ config })
-  const router = useRouter()
-
-  const handleSwitchChain = (chain) => {
-    const chainId = chain.id
-
-    if (isConnected) {
-      switchChain.mutate(
-        { chainId },
-        {
-          onSuccess: () => {
-            localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
-            setNetworkColor(chain)
-          },
-          onError: (error) => {
-            console.error('Switch chain failed:', error)
-          },
-        }
-      )
-    } else {
-      localStorage.setItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`, chainId)
-      onChainChange?.(chainId)
-    }
-  }
-
-  return (
-    <div className={`${styles.networkDialogInner}`}>
-      <div className={`${styles.networks} grid grid--fit gap-050`} style={{ '--data-width': `150px` }}>
-        {config.chains.map((chain, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => handleSwitchChain(chain)}
-            data-current={chain.id.toString() === currentNetwork.toString()}
-          >
-            <div dangerouslySetInnerHTML={{ __html: chain.icon }} />
-            <span>{chain.name}</span>
-          </button>
-        ))}
-      </div>
-
-      <p className={`text-center mt-10 ${styles.link}`} onClick={() => router.push(`/networks`)}>
-        View networks
-      </p>
-    </div>
-  )
 }
 
 export function Profile({ addr }) {

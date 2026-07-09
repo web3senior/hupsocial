@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWRInfinite from 'swr/infinite'
-import { ArrowDown, Eye, Flame, Heart, Medal, MessageCircle, Repeat2, Trophy, Users } from 'lucide-react'
+import { ArrowDownIcon, ChatCircleIcon, EyeIcon, FlameIcon, HeartIcon, MedalIcon, RepeatIcon, TrophyIcon, UsersIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
@@ -125,7 +125,7 @@ function Metric({ icon: Icon, label, value }) {
 function RankBadge({ rank }) {
   return (
     <span className={styles.rankBadge}>
-      {rank <= 3 ? <Medal size={16} /> : null}
+      {rank <= 3 ? <MedalIcon size={16} /> : null}
       <span>#{rank}</span>
     </span>
   )

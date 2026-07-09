@@ -1,16 +1,15 @@
 import OpenAI from "openai";
 import { NextResponse } from 'next/server'
 
-// Initialize the client.
-// It automatically picks up GEMINI_API_KEY from your .env file.
-const openai = new OpenAI({
-        baseURL: 'https://api.deepseek.com',
-        apiKey: process.env.DEEPSEEK_API_KEY,
-});
-
-
 export async function POST(req) {
   try {
+    // Instantiated per-request: the SDK throws when the key is missing, and a
+    // module-scope client would make `next build` fail without DEEPSEEK_API_KEY.
+    const openai = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: process.env.DEEPSEEK_API_KEY,
+    })
+
     // 1. Extract prompt from the request body
     const { profile, posts } = await req.json()
 

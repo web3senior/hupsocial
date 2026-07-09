@@ -6,9 +6,9 @@ import styles from './page.module.scss'
 export default function Page() {
   return (
     <>
-      <PageTitle name={`networks`} />
-      <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
+      <PageTitle name={`Networks`} />
+      <div className={`${styles.page}`}>
+        <div className={`__container ${styles.page__container}`} data-width={`small`}>
           <div className={`grid grid--fill gap-1`} style={{ '--data-width': `150px` }}>
             {config.chains &&
               config.chains.map((item, i) => {
@@ -17,7 +17,9 @@ export default function Page() {
                     <div className={`${styles.network}`} title={`View details`}>
                       <div className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}>
                         <div className={`flex flex-column align-items-center justify-content-start gap-050 flex-1`}>
-                          <div className={`${styles.network__icon}`} dangerouslySetInnerHTML={{ __html: item.icon }} />
+                          <div className={`${styles.network__icon}`}>
+                            <img src={item.iconUrl} alt="" />
+                          </div>
                           <span>{item.name}</span>
                         </div>
                       </div>

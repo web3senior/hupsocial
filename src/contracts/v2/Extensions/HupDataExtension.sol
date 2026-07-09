@@ -19,6 +19,10 @@ contract HupDataExtension {
         hupContract = IHup(_hupAddress);
     }
 
+    function version() external pure returns (string memory) {
+        return "1.0.0";
+    }
+
     /**
      * @notice Allows only the original content creator to attach data fields.
      */

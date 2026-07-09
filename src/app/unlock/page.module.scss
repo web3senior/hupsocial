@@ -5,7 +5,7 @@
     position: relative;
     padding: 4rem 0;
     border: 1px solid var(--gray-300);
-    border-radius: var(--global-border-radius);
+    border-radius: var(--page-border-radius);
     isolation: isolate;
 
     @media (max-width: 600px) {

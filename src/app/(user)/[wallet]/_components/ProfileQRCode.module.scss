@@ -24,6 +24,15 @@
 
 // ■■■ Popover Container Layout Modules ■■■
 
+/* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+.qrDialog {
+  padding: var(--native-popover-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+}
+
 .popoverContent {
 }
 

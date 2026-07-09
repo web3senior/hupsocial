@@ -21,6 +21,22 @@ export async function uploadFileToIPFS(file) {
 }
 
 /**
+ * Uploads a plain JSON object through the server-side /api/ipfs/object route and returns the
+ * CID string — used for post/community metadata payloads (small, so no presign needed).
+ */
+export async function uploadObjectToIPFS(contentObj) {
+  const res = await fetch('/api/ipfs/object', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(contentObj),
+  })
+  if (!res.ok) throw new Error('Failed to upload content to IPFS')
+  const { cid } = await res.json()
+  if (!cid) throw new Error('CID not found')
+  return cid
+}
+
+/**
  * Fetches and parses JSON content from a specified IPFS gateway URL using the CID.
  */
 export const getIPFS = async (CID) => {

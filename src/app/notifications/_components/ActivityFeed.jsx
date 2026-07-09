@@ -2,18 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Bell,
-  CheckCheck,
-  Clock,
-  ExternalLink,
-  Heart,
-  LucideLoader2,
-  LucideRefreshCcw,
-  MessageCircle,
-  CirclePlus,
-  User,
-} from 'lucide-react'
+import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, BellIcon, ChatCircleIcon, ChecksIcon, ClockIcon, HeartIcon, PlusCircleIcon, QuotesIcon, SpinnerIcon, UserIcon, UserPlusIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
 import Profile from '@/components/Profile'
 import { toRelativeTime } from '@/lib/dateHelper'
@@ -24,24 +13,32 @@ const PAGE_SIZE = 20
 
 const ACTION_META = {
   post_created: {
-    icon: CirclePlus,
+    icon: PlusCircleIcon,
     label: 'Post created',
   },
   comment_created: {
-    icon: MessageCircle,
+    icon: ChatCircleIcon,
     label: 'Comment created',
   },
   post_received_comment: {
-    icon: MessageCircle,
+    icon: ChatCircleIcon,
     label: 'New comment',
   },
+  post_received_quote: {
+    icon: QuotesIcon,
+    label: 'New quote',
+  },
   post_liked: {
-    icon: Heart,
+    icon: HeartIcon,
     label: 'New like',
   },
   content_liked: {
-    icon: Heart,
+    icon: HeartIcon,
     label: 'New like',
+  },
+  user_received_follow: {
+    icon: UserPlusIcon,
+    label: 'New follower',
   },
 }
 
@@ -185,7 +182,7 @@ export default function ActivityFeed() {
     return (
       <div className={styles.container}>
         <div className={styles.status}>
-          <User size={20} />
+          <UserIcon size={20} />
           Please connect your wallet to view activity.
         </div>
       </div>
@@ -196,7 +193,7 @@ export default function ActivityFeed() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h4>
-          <Bell size={18} />
+          <BellIcon size={18} />
           {headerLabel}
         </h4>
         <div className={styles.headerActions}>
@@ -208,7 +205,7 @@ export default function ActivityFeed() {
               aria-label="Mark all as read"
               title="Mark all as read"
             >
-              <CheckCheck size={14} />
+              <ChecksIcon size={14} />
               Mark all read
             </button>
           )}
@@ -220,7 +217,7 @@ export default function ActivityFeed() {
             aria-label="Refresh notifications"
             title="Refresh notifications"
           >
-            <LucideRefreshCcw className={isLoading ? styles.spin : undefined} size={16} />
+            <ArrowsCounterClockwiseIcon className={isLoading ? styles.spin : undefined} size={16} />
           </button>
         </div>
       </div>
@@ -228,14 +225,14 @@ export default function ActivityFeed() {
       <div className={styles.feed}>
         {!hasNotifications && isLoading ? (
           <div className={styles.status}>
-            <LucideLoader2 className={styles.spin} size={16} />
+            <SpinnerIcon className={styles.spin} size={16} />
             Loading notifications...
           </div>
         ) : null}
 
         {!hasNotifications && !isLoading ? (
           <div className={styles.status}>
-            <Bell size={18} />
+            <BellIcon size={18} />
             No notifications yet.
           </div>
         ) : null}
@@ -260,7 +257,7 @@ export default function ActivityFeed() {
           >
             {isLoading ? (
               <>
-                <LucideLoader2 className={styles.spin} size={16} />
+                <SpinnerIcon className={styles.spin} size={16} />
                 Loading...
               </>
             ) : (
@@ -270,7 +267,7 @@ export default function ActivityFeed() {
         ) : (
           hasNotifications && (
             <div className={styles.status}>
-              <Clock size={14} />
+              <ClockIcon size={14} />
               You are all caught up
             </div>
           )
@@ -285,7 +282,7 @@ function NotificationRow({ notification, currentAddress, onRead }) {
   const actor = notification.actor_wallet_address || notification.recipient_wallet_address
   const href = getNotificationHref(notification)
   const { icon: Icon, label } = ACTION_META[notification.action_type] || {
-    icon: Bell,
+    icon: BellIcon,
     label: formatActionType(notification.action_type),
   }
 
@@ -331,9 +328,12 @@ function NotificationRow({ notification, currentAddress, onRead }) {
   // Extract variables safely using top level parameters or data attributes
   const entityId = notification.data?.parent_post_id || notification.entity_id || notification.data?.post_id
   const networkId = notification.network_id || notification.data?.network_id
+  // Follow (entity_type 'user') and community notifications carry a non-post entity_id —
+  // never feed those into the post preview fetch.
+  const isPostEntity = !notification.entity_type || notification.entity_type === 'post'
 
   useEffect(() => {
-    if (!networkId || !entityId) return
+    if (!isPostEntity || !networkId || !entityId) return
 
     let cancelled = false
     setIsLoadingPost(true)
@@ -357,7 +357,7 @@ function NotificationRow({ notification, currentAddress, onRead }) {
     return () => {
       cancelled = true
     }
-  }, [networkId, entityId, currentAddress])
+  }, [isPostEntity, networkId, entityId, currentAddress])
 
   // Mirror the text resolution structure from your Post component
   const postTextPreview = useMemo(() => {
@@ -383,11 +383,11 @@ function NotificationRow({ notification, currentAddress, onRead }) {
 
         <div className={styles.messageGroup}>
           <strong>{notification.title || label}</strong>
-          {notification.message && <p>{notification.message}</p>}
+          {notification.message && <p>{linkActorInMessage(notification.message, actor)}</p>}
           
           {isLoadingPost && (
             <div className={styles.postPreviewLoader}>
-              <LucideLoader2 className={styles.spin} size={12} />
+              <SpinnerIcon className={styles.spin} size={12} />
               <span>Loading post content...</span>
             </div>
           )}
@@ -400,7 +400,7 @@ function NotificationRow({ notification, currentAddress, onRead }) {
 
           <div className={styles.meta}>
             <span>{label}</span>
-            {notification.entity_id && <span>Post #{notification.entity_id}</span>}
+            {isPostEntity && notification.entity_id && <span>Post #{notification.entity_id}</span>}
             {notification.created_at && <time>{toRelativeTime(notification.created_at)}</time>}
           </div>
         </div>
@@ -408,7 +408,7 @@ function NotificationRow({ notification, currentAddress, onRead }) {
 
       {href && (
         <Link href={href} className={styles.openLink} aria-label="Open notification">
-          <ExternalLink size={16} />
+          <ArrowSquareOutIcon size={16} />
         </Link>
       )}
     </article>
@@ -436,6 +436,34 @@ function getNotificationHref(notification) {
   }
 
   return notification.action_url
+}
+
+// Messages like `0x0644...Bc32 requested to join "xxx"` carry the actor only as a truncated
+// string — turn that snippet into a link to the actor's profile page. Guarded: the snippet's
+// hex prefix/suffix must actually match the actor address, so an address-looking fragment that
+// belongs to someone else is never mislinked.
+function linkActorInMessage(message, actor) {
+  if (!actor) return message
+
+  const match = message.match(/0x[a-fA-F0-9]{2,8}\.{3}[a-fA-F0-9]{2,8}/)
+  if (!match) return message
+
+  const [snippet] = match
+  const [prefix, suffix] = snippet.split('...')
+  const actorLower = actor.toLowerCase()
+  if (!actorLower.startsWith(prefix.toLowerCase()) || !actorLower.endsWith(suffix.toLowerCase())) {
+    return message
+  }
+
+  return (
+    <>
+      {message.slice(0, match.index)}
+      <Link href={`/${actor}`} className={styles.actorLink}>
+        {snippet}
+      </Link>
+      {message.slice(match.index + snippet.length)}
+    </>
+  )
 }
 
 function formatActionType(actionType = 'notification') {

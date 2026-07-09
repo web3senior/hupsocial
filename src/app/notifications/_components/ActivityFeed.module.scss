@@ -158,6 +158,17 @@
   }
 }
 
+.actorLink {
+  color: var(--text-color);
+  font-family: monospace;
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .meta {
   display: flex;
   flex-wrap: wrap;

@@ -57,7 +57,8 @@
   }
 
   &__icon {
-    svg {
+    svg,
+    img {
       --r: 32px;
       width: var(--r);
       height: var(--r);

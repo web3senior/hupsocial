@@ -1,18 +1,19 @@
 import { createConfig, http, webSocket } from 'wagmi'
 import {
-  lukso,
-  celo,
-  sepolia,
-  base,
-  monad,
-  bsc,
-  monadTestnet,
+  arbitrum,
   arbitrumSepolia,
+  base,
+  bsc,
+  celo,
+  linea,
+  lukso,
+  mainnet,
+  monad,
+  monadTestnet,
+  optimismSepolia,
+  sepolia,
   somniaTestnet,
   unichainSepolia,
-  optimismSepolia,
-  linea,
-  arbitrum
 } from 'wagmi/chains'
 import { injected, safe, walletConnect } from 'wagmi/connectors'
 import { defineChain } from 'viem'
@@ -43,6 +44,15 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 // }
 
 export const CONTRACTS = {
+  chain1: {
+    name: 'ethereum',
+    forwarder: '',
+    forwarderName: 'HupChatForwarder',
+    hup: '',
+    status: '',
+    chat: '',
+    store: '',
+  },
   chain42: {
     name: 'lukso',
     forwarder: '0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972',
@@ -50,7 +60,7 @@ export const CONTRACTS = {
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
-    store: '0x637a9B5B0b0c9424C74bd218e5e2BC9aD9b0045c',
+    store: '',
   },
   chain143: {
     name: 'monad',
@@ -93,14 +103,14 @@ export const CONTRACTS = {
   },
   chain10143: {
     name: 'monad-testnet',
-    forwarder: '0x7C71e48C3916EdBBeFB84918A48e0b26FecC5D9c',
-    hup: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
-    status: '',
-    community: '0x021Ee55BaA5058A38A4BF3AAbd90f5c1b31068CD',
-    nft: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F', // GenesisHup
+    forwarder: '0x46a3dfCb1F4ec29dB7F96C0D3962DF20E6EdB259',
+    hup: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
+    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    community: '0x5D7ebD8ae5A439204A1F1f5f168c7C48AA25d88c',
+    followerSystem: '0xA8231e213a85BA0FBEB42F319175f10E2D849352',
     store: '',
   },
-   chain42161: {
+  chain42161: {
     name: 'arbitrum',
     forwarder: '0x41e6D71623FD02633C568342852154D2Cd7DBD0e',
     hup: '0x1EC0B3b802aFE596929a038f40F832EA01eCc281',
@@ -138,7 +148,7 @@ monad.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
 monad.primaryColor = `#836EF9`
 monad.textColor = `#fff`
 
-monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" fill="white"/><path d="M8.99996 3C7.26731 3 3 7.2672 3 8.99996C3 10.7327 7.26731 15 8.99996 15C10.7326 15 15 10.7326 15 8.99996C15 7.26727 10.7327 3 8.99996 3ZM8.06498 12.431C7.33433 12.2319 5.36993 8.79563 5.56906 8.06498C5.76819 7.33429 9.20437 5.36992 9.93499 5.56905C10.6657 5.76815 12.6301 9.20434 12.431 9.93503C12.2318 10.6657 8.79563 12.6301 8.06498 12.431Z" fill="#836EF9"/></svg>`
+monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10745_2838)"><path d="M8.99994 0C6.40097 0 0 6.4008 0 8.99994C0 11.5991 6.40097 18 8.99994 18C11.5989 18 18 11.599 18 8.99994C18 6.40091 11.599 0 8.99994 0ZM7.59746 14.1464C6.50149 13.8478 3.55489 8.69344 3.85359 7.59746C4.15229 6.50143 9.30656 3.55488 10.4025 3.85358C11.4985 4.15222 14.4451 9.30651 14.1464 10.4025C13.8477 11.4985 8.69344 14.4451 7.59746 14.1464Z" fill="#836EF9"/></g><defs><clipPath id="clip0_10745_2838"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
 monadTestnet.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
 monadTestnet.primaryColor = `#836EF9`
 monadTestnet.textColor = `#fff`
@@ -174,9 +184,14 @@ robinhood.primaryColor = `#00C805`
 robinhood.textColor = `#fff`
 
 // BNB
-bsc.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10769_2638)"><rect width="18" height="18" fill="#0E0F13"/><path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10769_2638)"/><path d="M4.57333 3.45333L8.66667 1L12.76 3.45333L11.2533 4.36L8.66667 2.81333L6.08 4.36L4.57333 3.45333ZM12.76 6.54667L11.2533 5.64L8.66667 7.18667L6.08 5.64L4.57333 6.54667V8.33333L7.16 9.88V13L8.66667 13.9067L10.1733 13V9.89333L12.76 8.34667V6.54667ZM12.76 11.44V9.62667L11.2533 10.5333V12.3467L12.76 11.44ZM13.8267 12.08L11.24 13.6267V15.44L15.3333 12.9867V8.09333L13.8267 8.98667V12.08ZM12.32 5L13.8267 5.90667V7.70667L15.3333 6.81333V5L13.8267 4.09333L12.32 5ZM7.16 14.28V16.0933L8.66667 17L10.1733 16.0933V14.28L8.66667 15.1867L7.16 14.28ZM4.57333 11.44L6.08 12.3467V10.5333L4.57333 9.62667V11.44ZM7.16 5L8.66667 5.90667L10.1733 5L8.66667 4.09333L7.16 5ZM3.50667 5.90667L5.01333 5L3.50667 4.09333L2 5V6.81333L3.50667 7.70667V5.90667ZM3.50667 8.98667L2 8.09333V12.9867L6.09333 15.44V13.6267L3.50667 12.08V9V8.98667Z" fill="#F0B90B"/></g><defs><linearGradient id="paint0_linear_10769_2638" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"><stop stop-color="#1A1E21"/><stop offset="1" stop-color="#06060A"/></linearGradient><clipPath id="clip0_10769_2638"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+bsc.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12399_3563)"><path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_12399_3563)"/><path d="M5.93 4.84L9 3L12.07 4.84L10.94 5.52L9 4.36L7.06 5.52L5.93 4.84ZM12.07 7.16L10.94 6.48L9 7.64L7.06 6.48L5.93 7.16V8.5L7.87 9.66V12L9 12.68L10.13 12V9.67L12.07 8.51V7.16ZM12.07 10.83V9.47L10.94 10.15V11.51L12.07 10.83ZM12.87 11.31L10.93 12.47V13.83L14 11.99V8.32L12.87 8.99V11.31ZM11.74 6L12.87 6.68V8.03L14 7.36V6L12.87 5.32L11.74 6ZM7.87 12.96V14.32L9 15L10.13 14.32V12.96L9 13.64L7.87 12.96ZM5.93 10.83L7.06 11.51V10.15L5.93 9.47V10.83ZM7.87 6L9 6.68L10.13 6L9 5.32L7.87 6ZM5.13 6.68L6.26 6L5.13 5.32L4 6V7.36L5.13 8.03V6.68ZM5.13 8.99L4 8.32V11.99L7.07 13.83V12.47L5.13 11.31V9V8.99Z" fill="#F0B90B"/></g><defs><linearGradient id="paint0_linear_12399_3563" x1="3.35" y1="3.12" x2="21.9" y2="24.43" gradientUnits="userSpaceOnUse"><stop stop-color="#1A1E21"/><stop offset="1" stop-color="#06060A"/></linearGradient><clipPath id="clip0_12399_3563"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
 bsc.primaryColor = `#F0B90B`
 bsc.textColor = `#fff`
+
+// Ethereum
+mainnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10876_3431)"><path d="M0 0H18V18H0V0Z" fill="url(#paint0_linear_10876_3431)"/><path d="M8.96986 3.14062V7.20062L5.10986 9.10063L8.96986 3.14062Z" fill="#E7F0FF"/><path d="M5.09984 9.09922L5.08984 9.13922L8.97984 11.3492V7.19922L5.09984 9.09922Z" fill="#A5B9EE"/><path d="M8.97021 3.13961V7.19961L12.9102 9.14961L9.00021 3.09961L8.98021 3.12961L8.97021 3.13961Z" fill="#A5B8F0"/><path d="M12.9002 9.13969L9.00021 11.3597H8.97021V7.17969L12.9102 9.12969L12.9002 9.13969Z" fill="#687FCB"/><path fill-rule="evenodd" clip-rule="evenodd" d="M9 3L13 9.15L9 11.43L5 9.15L9 3ZM8.93 3.32L5.26 8.98L8.93 7.14V3.32ZM8.93 7.26L5.21 9.14L8.93 11.26V7.26ZM9.06 11.26V7.26L12.79 9.14L9.06 11.26ZM12.74 8.99L9.06 7.14V3.32L12.74 9V8.99Z" fill="white"/><path d="M8.9998 14.8998L5.0498 9.75977L8.9998 11.9198L12.9498 9.75977L8.9998 14.8998Z" fill="#A8B9EF"/><path d="M8.9998 11.9198L5.0498 9.75977L8.9998 14.8998V11.9198Z" fill="#E8F1FF"/><path fill-rule="evenodd" clip-rule="evenodd" d="M5 9.8007L5.09 9.7207L9 11.8607L12.91 9.7207L13 9.8007L9 15.0007L5 9.8007ZM8.94 11.9507L5.27 9.9507L8.94 14.7207V11.9507ZM9.06 14.7207V11.9507L12.73 9.9507L9.06 14.7207Z" fill="white"/></g><defs><linearGradient id="paint0_linear_10876_3431" x1="9" y1="0" x2="9" y2="18" gradientUnits="userSpaceOnUse"><stop stop-color="#465191"/><stop offset="0.36" stop-color="#32498F"/><stop offset="0.7" stop-color="#555E99"/><stop offset="1" stop-color="#4F5795"/></linearGradient><clipPath id="clip0_10876_3431"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
+mainnet.primaryColor = `#627EEA`
+mainnet.textColor = `#fff`
 
 // Sepolia
 sepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10996_4352)"><path d="M18 0H0V18H18V0Z" fill="#627EEA"/><mask id="mask0_10996_4352" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="1" width="16" height="16"><path d="M16.5 1.5H1.5V16.5H16.5V1.5Z" fill="white"/></mask><g mask="url(#mask0_10996_4352)"><path d="M9 16.5C13.1421 16.5 16.5 13.1421 16.5 9C16.5 4.85787 13.1421 1.5 9 1.5C4.85787 1.5 1.5 4.85787 1.5 9C1.5 13.1421 4.85787 16.5 9 16.5Z" fill="#627EEA"/><path d="M9.2334 3.375V7.5328L12.7476 9.1031L9.2334 3.375Z" fill="white" fill-opacity="0.602"/><path d="M9.23345 3.375L5.71875 9.1031L9.23345 7.5328V3.375Z" fill="white"/><path d="M9.2334 11.7978V14.623L12.7499 9.75781L9.2334 11.7978Z" fill="white" fill-opacity="0.602"/><path d="M9.23345 14.623V11.7974L5.71875 9.75781L9.23345 14.623Z" fill="white"/><path d="M9.2334 11.1431L12.7476 9.10255L9.2334 7.5332V11.1431Z" fill="white" fill-opacity="0.2"/><path d="M5.71875 9.10255L9.23345 11.1431V7.5332L5.71875 9.10255Z" fill="white" fill-opacity="0.602"/></g></g><defs><clipPath id="clip0_10996_4352"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
@@ -190,19 +205,46 @@ arbitrum.textColor = `#fff`
 // Polygon
 //<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
 
+// Chain icons render in several places at once (header popover, pages), and
+// inline <svg> defs (gradients, clipPaths) collide on duplicate ids across
+// instances — a hidden copy breaks visible ones. Expose each icon as a
+// data-URI so <img> renders it in its own isolated SVG document.
+const iconChains = [
+  mainnet,
+  sepolia,
+  lukso,
+  celo,
+  base,
+  monad,
+  monadTestnet,
+  linea,
+  optimismSepolia,
+  unichainSepolia,
+  arbitrum,
+  arbitrumSepolia,
+  somniaTestnet,
+  robinhood,
+  bsc,
+]
+iconChains.forEach((chain) => {
+  chain.iconUrl = `data:image/svg+xml,${encodeURIComponent(chain.icon)}`
+})
+
 export const config = createConfig({
-  chains: [lukso, celo, base, monad, bsc, robinhood,arbitrum, monadTestnet], //somniaTestnet
+  // L1s first, then L2s
+  chains: [mainnet, lukso, bsc, monad, monadTestnet, arbitrum, base, celo, robinhood], //somniaTestnet
   connectors: [injected(), walletConnect({ projectId }), safe()],
   transports: {
+    [mainnet.id]: http(),
     [lukso.id]: http(),
-    [celo.id]: http(),
-    [base.id]: http(),
-    [monad.id]: http(),
     [bsc.id]: http(),
-    [robinhood.id]: http(),
+    [monad.id]: http(),
     [monadTestnet.id]: http(),
-    [linea.id]: http(),
     [arbitrum.id]: http(),
+    [base.id]: http(),
+    [celo.id]: http(),
+    [linea.id]: http(),
+    [robinhood.id]: http(),
   },
   ssr: true,
   // storage: createStorage({

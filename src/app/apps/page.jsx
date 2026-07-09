@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { Code2, ExternalLink, Globe, LayoutGrid, Link2, Search } from 'lucide-react'
+import { ArrowSquareOutIcon, CodeIcon, GlobeIcon, LinkSimpleIcon, MagnifyingGlassIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import clsx from 'clsx'
 import styles from './page.module.scss'
@@ -56,7 +56,7 @@ export default function AppsPage() {
         <div className={`__container`} data-width="medium">
           <header className={styles.page__header}>
             <label className={clsx(styles.search, 'rounded-full')}>
-              <Search size={18} aria-hidden="true" />
+              <MagnifyingGlassIcon size={18} aria-hidden="true" />
               <input
                 type="search"
                 className={styles.search__input}
@@ -76,7 +76,7 @@ export default function AppsPage() {
                 className={clsx(styles.filters__chip, categoryId === 'all' && styles['filters__chip--active'])}
                 onClick={() => setCategoryId('all')}
               >
-                <LayoutGrid size={14} aria-hidden="true" />
+                <SquaresFourIcon size={14} aria-hidden="true" />
                 <span>All</span>
                 <small>{total}</small>
               </button>
@@ -101,7 +101,7 @@ export default function AppsPage() {
                   className={clsx(styles.filters__chip, networkId === 'all' && styles['filters__chip--active'])}
                   onClick={() => setNetworkId('all')}
                 >
-                  <Globe size={14} aria-hidden="true" />
+                  <GlobeIcon size={14} aria-hidden="true" />
                   <span>All networks</span>
                 </button>
 
