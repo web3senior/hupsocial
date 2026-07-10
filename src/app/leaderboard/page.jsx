@@ -102,7 +102,7 @@ export default function LeaderboardPage() {
     <>
       <PageTitle name="Leaderboard" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="large">
           <header className={styles.header}>
 
             <div className={styles.filters} aria-label="Leaderboard filters">
