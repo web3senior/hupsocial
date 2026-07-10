@@ -74,7 +74,7 @@ export async function GET(request) {
     let whereClause = ` WHERE p.is_comment IS NULL AND p.is_deleted = 0`
     const whereParams = []
 
-    // "Premium" (bazzar) = posts with an active HupStore listing. Listings live onchain keyed
+    // "Premium" (bazzar) = posts with an active HupBazzar listing. Listings live onchain keyed
     // by postId with no enumeration, so this reads the server-verified store_listings
     // discovery index (see lib/storeListingsIndex.js). Everything else — ordering, visibility
     // rules, pagination — rides the same chronological pipeline as the home feed.

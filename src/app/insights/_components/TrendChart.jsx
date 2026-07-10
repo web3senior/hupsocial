@@ -1,6 +1,6 @@
 'use client'
 
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import styles from './TrendChart.module.scss'
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
@@ -39,7 +39,19 @@ function CustomTooltip({ active, payload, label, series }) {
 export default function TrendChart({ title, data, series }) {
   return (
     <div className={styles.trendChart}>
-      <h3 className={styles.trendChart__title}>{title}</h3>
+      <div className={styles.trendChart__header}>
+        <h3 className={styles.trendChart__title}>{title}</h3>
+        {series.length > 1 && (
+          <ul className={styles.trendChart__legend}>
+            {series.map((s) => (
+              <li key={s.key} className={styles.trendChart__legendPill} style={{ '--series-color': s.color }}>
+                <span className={styles.trendChart__legendDot} aria-hidden="true" />
+                {s.label}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -60,7 +72,6 @@ export default function TrendChart({ title, data, series }) {
             width={36}
           />
           <Tooltip content={<CustomTooltip series={series} />} />
-          {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-muted)' }} />}
           {series.map((s) => (
             <Line
               key={s.key}
@@ -69,8 +80,8 @@ export default function TrendChart({ title, data, series }) {
               name={s.label}
               stroke={s.color}
               strokeWidth={2}
-              dot={{ r: 4, fill: s.color, stroke: 'var(--surface)', strokeWidth: 2 }}
-              activeDot={{ r: 5, fill: s.color, stroke: 'var(--surface)', strokeWidth: 2 }}
+              dot={{ r: 4, fill: s.color, stroke: 'var(--surface-muted)', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: s.color, stroke: 'var(--surface-muted)', strokeWidth: 2 }}
             />
           ))}
         </LineChart>

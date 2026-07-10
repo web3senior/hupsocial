@@ -37,11 +37,6 @@ export const robinhood = defineChain({
 })
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
-// const noopStorage = {
-//   getItem: () => null,
-//   setItem: () => {},
-//   removeItem: () => {},
-// }
 
 export const CONTRACTS = {
   chain1: {

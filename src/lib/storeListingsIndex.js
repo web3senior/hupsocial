@@ -1,7 +1,7 @@
 /**
  * @file lib/storeListingsIndex.js
- * @description Discovery index for HupStore listings ("premium" posts). The chain is the
- * source of truth — HupStore keys listings by postId with no enumeration getter, so the
+ * @description Discovery index for HupBazzar listings ("premium" posts). The chain is the
+ * source of truth — HupBazzar keys listings by postId with no enumeration getter, so the
  * bazzar/premium feed can't be answered from chain data alone. Mirroring the
  * community_join_requests pattern, the client pings the sync endpoint right after a listing
  * or purchase tx confirms, and the server re-reads getListing() onchain before writing, so
@@ -12,7 +12,7 @@ import Web3 from 'web3'
 import pool from '@/lib/db'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { STORE_ADDRESSES } from '@/lib/tokens'
-import storeAbi from '@/abis/HupStore.json'
+import storeAbi from '@/abis/HupBazzar.json'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 

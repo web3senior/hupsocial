@@ -1,7 +1,6 @@
 .breakdownChart {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--global-border-radius);
+  background: var(--surface-muted);
+  border-radius: 20px;
   padding: 1rem;
 
   &__title {

@@ -7,7 +7,7 @@ import { useConnection, usePublicClient, useReadContract, useSignMessage, useSwi
 import { CONTRACTS, config } from '@/config/wagmi'
 import { USDC } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import storeAbi from '@/abis/HupStore.json'
+import storeAbi from '@/abis/HupBazzar.json'
 import { toast } from '@/components/NextToast'
 import { normalizeEnvelope } from '@/lib/gatedContent'
 import { CaretLeftIcon, CaretRightIcon, LockIcon, PlusIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
@@ -20,7 +20,7 @@ const MAX_FILE_SIZE_MB = 10
 const MAX_FILES = 5
 const MAX_LINKS = 5
 const BUYERS_PAGE_SIZE = 5
-const FEE_DENOMINATOR = 10_000 // matches HupStore.sol's FEE_DENOMINATOR constant (buyFeeBps is in basis points)
+const FEE_DENOMINATOR = 10_000 // matches HupBazzar.sol's FEE_DENOMINATOR constant (buyFeeBps is in basis points)
 const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia]
 const LUKSO_CHAIN_IDS = [42, 4201]
 

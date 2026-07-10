@@ -3,7 +3,7 @@
 import useSWR from 'swr'
 import { useState } from 'react'
 import { useConnection } from 'wagmi'
-import { ChartBarIcon, WalletIcon } from '@phosphor-icons/react'
+import { ChartBarIcon, EyeIcon, HeartIcon, UsersIcon, WalletIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import { ContentSpinner } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -48,6 +48,18 @@ export default function InsightsPage() {
 
   const networkColors = data ? buildNetworkColors(data.posts_by_network || [], data.engagement_by_network || []) : null
 
+  /* Metric colors mirror the post-action hues (view → purple, like → --liked-color,
+   * comment → indigo, bookmark-blue for followers) at the -500 step, which passes the
+   * palette validator on both card surfaces where the -400 hover tints do not. */
+  const statTiles = data
+    ? [
+        { label: 'Followers', value: data.follower_count, Icon: UsersIcon, color: 'var(--blue-500, #3b82f6)' },
+        { label: 'Profile views', value: sumSeries(data.profile_views, 'count'), Icon: EyeIcon, color: 'var(--purple-500, #a855f7)' },
+        { label: 'Post views', value: sumSeries(data.reach, 'views'), Icon: ChartBarIcon, color: 'var(--purple-500, #a855f7)' },
+        { label: 'Likes received', value: sumSeries(data.reach, 'likes'), Icon: HeartIcon, color: 'var(--liked-color, #ff007a)' },
+      ]
+    : []
+
   return (
     <>
       <PageTitle name="Insights" />
@@ -77,42 +89,38 @@ export default function InsightsPage() {
               </div>
 
               <div className={styles.page__stats}>
-                <div className={styles.statTile}>
-                  <span className={styles.statTile__label}>Followers</span>
-                  <span className={styles.statTile__value}>{numberFormatter.format(data.follower_count)}</span>
-                </div>
-                <div className={styles.statTile}>
-                  <span className={styles.statTile__label}>Profile views</span>
-                  <span className={styles.statTile__value}>{numberFormatter.format(sumSeries(data.profile_views, 'count'))}</span>
-                </div>
-                <div className={styles.statTile}>
-                  <span className={styles.statTile__label}>Post views</span>
-                  <span className={styles.statTile__value}>{numberFormatter.format(sumSeries(data.reach, 'views'))}</span>
-                </div>
-                <div className={styles.statTile}>
-                  <span className={styles.statTile__label}>Likes received</span>
-                  <span className={styles.statTile__value}>{numberFormatter.format(sumSeries(data.reach, 'likes'))}</span>
-                </div>
+                {statTiles.map(({ label, value, Icon, color }) => (
+                  <div key={label} className={styles.statTile} style={{ '--stat-tile-color': color }}>
+                    <div className={styles.statTile__header}>
+                      <span className={styles.statTile__label}>{label}</span>
+                      <span className={styles.statTile__badge} aria-hidden="true">
+                        <Icon size={18} weight="fill" />
+                      </span>
+                    </div>
+                    <span className={styles.statTile__value}>{numberFormatter.format(value)}</span>
+                  </div>
+                ))}
               </div>
 
+              <h3 className={styles.page__sectionTitle}>Performance over time</h3>
               <div className={styles.page__charts}>
                 <TrendChart
                   title="Follower growth"
                   data={data.follower_growth}
-                  series={[{ key: 'count', label: 'Followers', color: 'var(--network-color-primary, #2a78d6)' }]}
+                  series={[{ key: 'count', label: 'Followers', color: 'var(--blue-500, #3b82f6)' }]}
                 />
                 <TrendChart
                   title="Profile views"
                   data={data.profile_views}
-                  series={[{ key: 'count', label: 'Profile views', color: 'var(--network-color-primary, #2a78d6)' }]}
+                  series={[{ key: 'count', label: 'Profile views', color: 'var(--purple-500, #a855f7)' }]}
                 />
                 <TrendChart
                   title="Post reach"
                   data={data.reach}
                   series={[
-                    { key: 'views', label: 'Views', color: '#2a78d6' },
-                    { key: 'likes', label: 'Likes', color: '#1baf7a' },
-                    { key: 'comments', label: 'Comments', color: '#eda100' },
+                    { key: 'views', label: 'Views', color: 'var(--purple-500, #a855f7)' },
+                    { key: 'likes', label: 'Likes', color: 'var(--liked-color, #ff007a)' },
+                    { key: 'comments', label: 'Comments', color: 'var(--indigo-500, #6366f1)' },
                   ]}
                 />
               </div>

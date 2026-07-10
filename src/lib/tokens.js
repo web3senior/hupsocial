@@ -1,7 +1,7 @@
 // Plain shared config (importable from both client components and server routes — no wagmi/window
-// dependencies). Single source of truth for HupStore deployments and per-chain USDC.
+// dependencies). Single source of truth for HupBazzar deployments and per-chain USDC.
 
-// HupStore deployment per chainId. Server routes (decrypt, x402) resolve the contract from here
+// HupBazzar deployment per chainId. Server routes (decrypt, x402) resolve the contract from here
 // instead of trusting a client-supplied address. Keep in sync with CONTRACTS in config/wagmi.js.
 export const STORE_ADDRESSES = {
   42: '0x377ECa68C0E1654d8c0B74135F187250A1702eDC', // lukso

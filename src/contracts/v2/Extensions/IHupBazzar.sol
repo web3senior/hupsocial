@@ -4,18 +4,18 @@ pragma solidity ^0.8.35;
 import "./../IHup.sol";
 
 /**
- * @title IHupStore
+ * @title IHupBazzar
  * @author Hup Labs
- * @notice Shared interface for the Hup Store protocol.
+ * @notice Shared interface for the Hup Bazzar protocol.
  * @dev Defines the protocol's public structs, events, custom errors, and public interface used
- *      by HupStore-compatible contracts, clients, and offchain indexers.
+ *      by HupBazzar-compatible contracts, clients, and offchain indexers.
  * @custom:version 1.0.0
  * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
  * @custom:emoji 🛍️
  */
-interface IHupStore {
+interface IHupBazzar {
     // --- SHARED STRUCTS ---
 
     /// @dev Defines the structure for a single item listing tied to a Hup post.
@@ -182,7 +182,7 @@ interface IHupStore {
     /**
      * @notice Purchases a specified quantity of items from a listing.
      * @dev For native listings, msg.value must exactly match price * quantityBought. For token
-     *      listings, msg.value must be zero and the buyer must have pre-authorized the store for
+     *      listings, msg.value must be zero and the buyer must have pre-authorized the bazzar for
      *      the total — via `approve` (ERC20) or `authorizeOperator` (LSP7).
      * @param _buyer The primary wallet address of the buyer (or address(0) if caller is primary).
      * @param _postId The ID of the listed post.
@@ -196,7 +196,7 @@ interface IHupStore {
      * @notice Records a purchase that was settled outside this contract (e.g. an x402 USDC payment
      *         submitted via EIP-3009 transferWithAuthorization directly to the seller).
      * @dev Callable only by OPERATOR_ROLE. Decrements stock and credits `amountPurchased` exactly
-     *      like buyItem, but moves no funds — settlement is verified by the operator off-chain.
+     *      like buyItem, but moves no funds — settlement is verified by the operator offchain.
      * @param _postId The ID of the listed post.
      * @param _buyer The buyer to credit the purchase to.
      * @param _quantity The number of items purchased.

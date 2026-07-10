@@ -19,7 +19,7 @@ const POSTS_PAGE_SIZE = 20
 /**
  * Renders a single feed of posts: the unscoped "For you" feed, one locked to a
  * specific network (chainId), or the cross-network "premium" feed (posts with
- * an active HupStore listing — the bazzar page). Extracted from app/page.jsx so
+ * an active HupBazzar listing — the bazzar page). Extracted from app/page.jsx so
  * it can be mounted per-tab from HomeTabStrip's tab dispatch.
  *
  * Feed state (posts/pagination) is kept LOCAL to this instance rather than in

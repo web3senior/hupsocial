@@ -1,14 +1,50 @@
 .trendChart {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--global-border-radius);
+  background: var(--surface-muted);
+  border-radius: 20px;
   padding: 1rem 1rem 0.5rem;
 
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 0.85rem;
+  }
+
   &__title {
-    margin: 0 0 0.75rem;
+    margin: 0;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--text);
+  }
+
+  &__legend {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  // Identity rides the dot, per dataviz rules: pill text stays in ink tokens.
+  &__legendPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    background: color-mix(in srgb, var(--series-color) 14%, var(--surface));
+  }
+
+  &__legendDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--series-color);
+    flex: none;
   }
 }
 
