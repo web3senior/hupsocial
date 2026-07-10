@@ -56,12 +56,6 @@ export default function InsightsPage() {
               <h3>Couldn&apos;t load Insights</h3>
               <p>{error.message}</p>
             </div>
-          ) : !data.meets_threshold ? (
-            <div className={styles.emptyState}>
-              <ChartBarIcon size={48} />
-              <h3>Insights await</h3>
-              <p>Check back once you&apos;ve reached 2 followers to see your insights.</p>
-            </div>
           ) : (
             <>
               <div className={styles.page__header}>

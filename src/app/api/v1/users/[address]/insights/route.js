@@ -1,17 +1,15 @@
 /**
  * @file api/v1/users/[address]/insights/route.js
  * @description Aggregate insights for a wallet's own profile: follower growth, profile views,
- * post reach/engagement, and top posts, bucketed over a selectable date range. Gated behind a
- * 2-follower threshold, mirroring the follower aggregate already trusted by the followers list
- * endpoint (users.follower_count is never written anywhere in this codebase, so it isn't used here).
+ * post reach/engagement, and top posts, bucketed over a selectable date range. The follower
+ * count mirrors the aggregate already trusted by the followers list endpoint
+ * (users.follower_count is never written anywhere in this codebase, so it isn't used here).
  */
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
-
-const FOLLOWER_THRESHOLD = 2
 
 const PERIOD_DAYS = {
   '7d': 7,
@@ -43,18 +41,6 @@ export async function GET(request, { params }) {
       [wallet],
     )
 
-    const meetsThreshold = followerCount >= FOLLOWER_THRESHOLD
-
-    if (!meetsThreshold) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          follower_count: followerCount,
-          meets_threshold: false,
-        },
-      })
-    }
-
     const [followerGrowth, profileViews, reach, topPosts] = await Promise.all([
       getFollowerGrowth(wallet, since, today, days),
       getDailySeries('profile_views', 'viewed_at', 'wallet_address', wallet, since, today, days),
@@ -66,7 +52,6 @@ export async function GET(request, { params }) {
       success: true,
       data: {
         follower_count: followerCount,
-        meets_threshold: true,
         follower_growth: followerGrowth,
         profile_views: profileViews,
         reach,
