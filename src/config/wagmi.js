@@ -51,7 +51,7 @@ export const CONTRACTS = {
     hup: '',
     status: '',
     chat: '',
-    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem:'',
     store: '',
   },
   chain42: {
@@ -61,6 +61,7 @@ export const CONTRACTS = {
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain143: {
