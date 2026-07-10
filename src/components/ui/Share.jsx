@@ -1,8 +1,6 @@
 'use client'
 
-import { useConnection } from 'wagmi'
 import { ArrowSquareOutIcon, EnvelopeSimpleIcon, UploadSimpleIcon } from '@phosphor-icons/react'
-import { toast } from '@/components/NextToast'
 import NativePopover from './NativePopover'
 import styles from './Share.module.scss'
 
@@ -12,8 +10,6 @@ import styles from './Share.module.scss'
  * @param {Object} props.item Core content model with network metadata.
  */
 export const Share = ({ item }) => {
-  const { isConnected } = useConnection()
-
   const shareUrl = `${location.protocol}//${window.location.host}/networks/${item.network_id}/${item.id}`
   const sharePostTitle = item?.content?.elements?.[0]?.data?.text || item?.content || ''
   const shareHupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
@@ -54,12 +50,6 @@ export const Share = ({ item }) => {
     <NativePopover
       placement="bottom-end"
       type="auto"
-      onBeforeToggle={(e) => {
-        if (e.newState === 'open' && !isConnected) {
-          e.preventDefault()
-          toast(`Please connect wallet`, `error`)
-        }
-      }}
       trigger={
         <button data-action="share" aria-label="Share post">
           <UploadSimpleIcon width={17} height={17} />
