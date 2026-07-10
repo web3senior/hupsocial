@@ -209,7 +209,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
       <section
         ref={sectionRef}
-        className={`${styles.post} flex flex-column align-items-start justify-content-between`}
+        className={`${styles.post} flex flex-column justify-content-between`}
         data-content={showContent ? true : false}
         data-commentable={item.allow_comment ? true : false}
         data-has-comments={hasCommentBelow ? true : false}

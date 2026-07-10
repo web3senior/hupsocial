@@ -75,6 +75,10 @@
     }
   }
 
+  &__footer {
+    width: 100%;
+  }
+
   &__translateTrigger {
     border: 0;
     background: transparent;
@@ -142,7 +146,7 @@
     overflow: hidden;
 
     &:hover {
-      background-color: var(--gray-100, rgba(0, 0, 0, 0.03));
+      background-color: var(--hover, rgba(0, 0, 0, 0.03));
     }
 
     &__text {
@@ -297,7 +301,6 @@
     font-weight: 400;
     gap: 4px;
     cursor: default;
-    width: fit-content;
     user-select: none;
     width: 100%;
 
