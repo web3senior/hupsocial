@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { getPosts } from '@/lib/api'
@@ -10,6 +10,7 @@ import { PostCard } from '@/components/Post'
 import PageTitle from '@/components/PageTitle'
 import styles from '@/app/page.module.scss'
 import { usePostStore } from '@/stores/usePostStore'
+import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 
 // Must stay consistent across all getPosts() calls: the API's offset is (page - 1) * limit,
 // so mixing page sizes shifts the offset and re-fetches an already-loaded window.
@@ -29,23 +30,48 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
 
-  const [posts, setPosts] = useState({ list: [] })
-  const [postsLoaded, setPostsLoaded] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
-  const [hasInitialized, setHasInitialized] = useState(false)
-  const [isFetching, setIsFetching] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [page, setPage] = useState(1)
-  const [newPostsQueue, setNewPostsQueue] = useState([])
-
   const mounted = useClientMounted()
   const { address } = useConnection()
   const router = useRouter()
 
+  const scopedNetworkId = feedMode === 'network' ? networkId : null
+  const feedCacheKey = feedMode === 'network' ? `network-${networkId}` : 'foryou'
+  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
+
+  // Feed snapshot from an earlier visit this session, if any. Safe to read in
+  // an initializer: the store is in-memory, so it's always empty during SSR
+  // hydration, and cache hits only ever happen on client-side remounts.
+  const [initialCache] = useState(() => useFeedCacheStore.getState().readFeedCache(feedCacheKey, address ?? null))
+
+  const [posts, setPosts] = useState(() => ({ list: initialCache?.list ?? [] }))
+  const [postsLoaded, setPostsLoaded] = useState(initialCache ? initialCache.list.length : 0)
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
+  const [hasInitialized, setHasInitialized] = useState(Boolean(initialCache))
+  const [isFetching, setIsFetching] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [page, setPage] = useState(initialCache?.page ?? 1)
+  const [newPostsQueue, setNewPostsQueue] = useState([])
+
   const isFetchingRef = useRef(false)
   const hasMoreRef = useRef(false)
 
-  const scopedNetworkId = feedMode === 'network' ? networkId : null
+  // Params of the feed data currently applied ("address|networkId"); the init
+  // effect only fetches when they differ, so a cache hydration skips the mount
+  // fetch while later address changes still refetch. Set on data application
+  // (not fetch start) to stay correct under StrictMode's double-run.
+  const appliedParamsRef = useRef(initialCache ? `${address ?? null}|${scopedNetworkId}` : null)
+  // Last user scroll position, tracked live: reading window.scrollY inside the
+  // unmount cleanup is too late — Next may have already reset scroll for the
+  // incoming route by then.
+  const lastScrollYRef = useRef(0)
+  // Cached scroll position to restore; consumed once the posts render.
+  const pendingScrollRestoreRef = useRef(initialCache ? initialCache.scrollY ?? 0 : null)
+  const cacheSnapshotRef = useRef(null)
+
+  // Snapshot the cacheable state every render for the save-on-exit cleanup below.
+  useEffect(() => {
+    cacheSnapshotRef.current = { list: posts.list, page, hasMore, address: address ?? null }
+  })
 
   useEffect(() => {
     isFetchingRef.current = isFetching
@@ -59,6 +85,8 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
 
       const { scrollTop, clientHeight, scrollHeight } = scrollElement
       const SCROLL_THRESHOLD = 300
+
+      lastScrollYRef.current = scrollTop
 
       if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
         if (hasMoreRef.current && !isFetchingRef.current) {
@@ -100,21 +128,66 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     setHasMore(postsResponse?.meta?.hasMore || false)
   }, [])
 
+  // Snapshot this feed's state when it goes away — unmount (navigation to
+  // another route, tab switch) or scope change (React reuses the instance when
+  // jumping between two network tabs, so cleanup, not unmount, is the exit).
+  useEffect(() => {
+    return () => {
+      const snapshot = cacheSnapshotRef.current
+      if (!snapshot || snapshot.list.length === 0) return
+      saveFeedCache(feedCacheKey, { ...snapshot, scrollY: lastScrollYRef.current })
+    }
+  }, [feedCacheKey, saveFeedCache])
+
+  // Restore the cached scroll position once the hydrated posts have rendered.
+  // Media may still be loading, leaving the document too short for the target
+  // on the first frames (the browser clamps scrollTo), so keep re-applying
+  // briefly until the position sticks. The pending ref is only cleared on
+  // success/deadline, so a StrictMode remount restarts the loop cleanly.
+  useLayoutEffect(() => {
+    const target = pendingScrollRestoreRef.current
+    if (target === null || posts.list.length === 0) return
+
+    const deadline = performance.now() + 1500
+    let frame = 0
+    const apply = () => {
+      window.scrollTo(0, target)
+      if (Math.abs(window.scrollY - target) < 2 || performance.now() > deadline) {
+        pendingScrollRestoreRef.current = null
+        return
+      }
+      frame = requestAnimationFrame(apply)
+    }
+    apply()
+
+    return () => cancelAnimationFrame(frame)
+  }, [posts])
+
   useEffect(() => {
     let cancelled = false
+    const params = `${address ?? null}|${scopedNetworkId}`
 
     const initializeData = async () => {
       if (isFetchingRef.current) return
 
       try {
         const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address)
-        if (!cancelled) setInitialData(postsRes)
+        if (!cancelled) {
+          setInitialData(postsRes)
+          appliedParamsRef.current = params
+        }
       } catch (error) {
         console.error('Initialization error:', error)
       }
     }
 
-    if (mounted) initializeData()
+    // Skip when data for these params is already applied — either hydrated
+    // from the session cache (posts + scroll position restored, so no page-1
+    // refetch behind a shimmer; the 30s polling below surfaces anything new)
+    // or fetched by a previous run of this effect.
+    if (mounted && appliedParamsRef.current !== params) {
+      initializeData()
+    }
 
     return () => {
       cancelled = true

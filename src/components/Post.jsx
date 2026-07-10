@@ -16,12 +16,10 @@ import { getActiveChain } from '@/lib/communication'
 import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, TipIcon, ViewIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon } from '@/components/Icons'
 import MediaGallery from './Gallery'
 import {
-  ChartBarIcon,
   ChartLineDownIcon,
-  ChatCircleIcon,
   DotsThreeIcon,
   EyeIcon,
   FlagIcon,
@@ -29,14 +27,12 @@ import {
   PackageIcon,
   PaperPlaneRightIcon,
   PenIcon,
-  QuotesIcon,
   RepeatIcon,
   TagIcon,
   TrashSimpleIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
-import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import useSWR from 'swr'
 import NativePopover from './ui/NativePopover'
@@ -45,6 +41,10 @@ import BuyButton from './BuyButton'
 import NewPost from './NewPost'
 import { checkIsEnglish } from '@/lib/languageHelper'
 import Like from './ui/Like'
+import CommentAction from './ui/CommentAction'
+import Repost from './ui/Repost'
+import Tip from './ui/Tip'
+import View from './ui/View'
 import Bookmark from './ui/Bookmark'
 import Share from './ui/Share'
 import clsx from 'clsx'
@@ -94,7 +94,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const [showQuoteModal, setShowQuoteModal] = useState(null)
   const { web3, contract } = initHupContract()
   const mounted = useClientMounted()
-  const { address, isConnected } = useConnection()
+  const { address } = useConnection()
   const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -308,50 +308,13 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             <div className="flex flex-row align-items-center justify-content-start`" style={{ gap: `4px` }}>
               {actionsSet.has('like') && <Like post={displayItem || item} />}
 
-              {actionsSet.has('comment') && (
-                <>
-                  {commentTarget.allow_comment && (
-                    <button
-                      data-action="comment"
-                      aria-label="Comment on post"
-                      onClick={() => {
-                        isConnected ? setShowCommentModal(commentTarget) : toast(`Please connect wallet`, `error`)
-                      }}
-                    >
-                      <ChatCircleIcon width={17} height={17} />
-                      {commentTarget.total_comments === 0 ? '' : <span>{commentTarget.total_comments}</span>}
-                    </button>
-                  )}
-                </>
-              )}
+              {actionsSet.has('comment') && <CommentAction post={commentTarget} onComment={setShowCommentModal} />}
 
-              {actionsSet.has('repost') && <Repost item={displayItem || item} onQuote={() => setShowQuoteModal(displayItem || item)} />}
+              {actionsSet.has('repost') && <Repost post={displayItem || item} onQuote={() => setShowQuoteModal(displayItem || item)} />}
 
-              {actionsSet.has('tip') && (
-                <button
-                  data-action="tip"
-                  aria-label="Tip the author"
-                  onClick={() => {
-                    isConnected ? setShowTipModal(item) : toast(`Please connect wallet`, `error`)
-                  }}
-                >
-                  <TipIcon />
-                </button>
-              )}
+              {actionsSet.has('tip') && <Tip post={item} onTip={setShowTipModal} />}
 
-              {actionsSet.has('view') && (
-                <button data-action="view" aria-label="Post views">
-                  <ChartBarIcon width={17} height={17} />
-                  {item.total_views > 0 && (
-                    <span>
-                      {new Intl.NumberFormat('en', {
-                        notation: 'compact',
-                        maximumFractionDigits: 1,
-                      }).format(item.total_views)}
-                    </span>
-                  )}
-                </button>
-              )}
+              {actionsSet.has('view') && <View post={item} />}
             </div>
             <div className="flex align-items-center gap-025">
               {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
@@ -844,125 +807,6 @@ const TipModal = ({ item, setShowTipModal }) => {
         </footer>
       </div>
     </div>
-  )
-}
-
-const Repost = ({ item, onQuote }) => {
-  const { web3, contract } = initHupContract()
-  const { address, isConnected } = useConnection()
-  const [isReposted, setIsReposted] = useState(false)
-  const [error, setError] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  })
-
-  // useEffect(() => {
-  //   getRepostStatus(item.id)
-  //     .then((result) => {
-  //       console.log({ result })
-  //       setIsReposted(result.reposted)
-  //       setLoading(false)
-  //     })
-  //     .catch((err) => {
-  //       console.log(err)
-  //       setLoading(false)
-  //     })
-  // }, [])
-
-  const repost = async (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log('Please connect your wallet first', 'error')
-      return
-    }
-
-    const targetChain = CONTRACTS[`chain${item.network_id}`]
-
-    if (!targetChain?.hup) {
-      console.log('Contract configuration missing for network', 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: targetChain.hup,
-      functionName: 'create',
-      args: [
-        ZERO_ADDRESS, // direct wallet call, not session owner
-        ContentType.Repost,
-        '', // repost metadata can be empty
-        BigInt(id), // parent post id
-        false, //false for all reposts
-      ],
-    })
-  }
-
-  const removeRepost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: activeChain[1].post,
-      functionName: 'removeRepost',
-      args: [id],
-    })
-  }
-
-  if (loading) return null
-
-  return (
-    <NativePopover
-      placement="bottom-start"
-      trigger={
-        <button data-action="repost" aria-label="Repost" onClick={(e) => e.stopPropagation()}>
-          <RepeatIcon width={20} height={20} />
-          {item.repost_count === 0 ? '' : <span>{item.repost_count}</span>}
-        </button>
-      }
-    >
-      {({ close }) => (
-        <div className={styles.post__repostMenu}>
-          <button
-            className={styles.post__repostMenu__option}
-            onClick={(e) => {
-              e.stopPropagation()
-              close()
-              if (!isConnected) {
-                toast(`Please connect wallet`, `error`)
-                return
-              }
-              isReposted ? removeRepost(e, item.id) : repost(e, item.id)
-            }}
-          >
-            <span>{isReposted ? `Undo repost` : `Repost`}</span>
-            <RepeatIcon width={17} height={17} />
-          </button>
-          <button
-            className={styles.post__repostMenu__option}
-            onClick={(e) => {
-              e.stopPropagation()
-              close()
-              if (!isConnected) {
-                toast(`Please connect wallet`, `error`)
-                return
-              }
-              onQuote?.()
-            }}
-          >
-            <span>{`Quote`}</span>
-            <QuotesIcon width={17} height={17} />
-          </button>
-        </div>
-      )}
-    </NativePopover>
   )
 }
 

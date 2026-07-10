@@ -58,6 +58,13 @@ export async function GET(request, { params }) {
         ) as total_comments,
         (
           SELECT COUNT(*)
+          FROM posts reposter
+          WHERE reposter.network_id = p.network_id
+            AND reposter.is_deleted = 0
+            AND reposter.is_repost = p.id
+        ) as total_reposts,
+        (
+          SELECT COUNT(*)
           FROM post_views pv
           WHERE pv.post_id = p.id
             AND pv.network_id = p.network_id

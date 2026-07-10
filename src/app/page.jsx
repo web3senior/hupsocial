@@ -26,8 +26,11 @@ export default function Page() {
     <div className={styles.page}>
       <HomeTabStrip />
 
-      {activeTab?.type === 'foryou' && <HomeFeedTab feedMode="foryou" title="For you" />}
-      {activeTab?.type === 'network' && <HomeFeedTab feedMode="network" networkId={activeTab.chainId} title={activeTab.label} />}
+      {/* Keyed per tab: switching between two network tabs must remount the
+          feed (not reuse the instance) so each one hydrates its own session
+          cache and snapshots its own state on exit. */}
+      {activeTab?.type === 'foryou' && <HomeFeedTab key={activeTab.id} feedMode="foryou" title="For you" />}
+      {activeTab?.type === 'network' && <HomeFeedTab key={activeTab.id} feedMode="network" networkId={activeTab.chainId} title={activeTab.label} />}
       {activeTab?.type === 'following' && <FollowingFeedTab />}
       {activeTab?.type === 'trending' && <TrendingFeedTab />}
       {activeTab?.type === 'status' && <StatusFeedTab />}
