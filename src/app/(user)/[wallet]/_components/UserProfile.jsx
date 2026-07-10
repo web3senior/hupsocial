@@ -26,6 +26,7 @@ import { useProfile } from '@/hooks/useProfile'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
+import FollowListDialog from './FollowListDialog'
 import styles from './UserProfile.module.scss'
 
 // import SettingsTab from '@/components/tabs/SettingsTab'
@@ -348,6 +349,7 @@ const Profile = ({ addr }) => {
   const [isItUp, setIsItUp] = useState(false)
   const [resolved0gUrl, setResolved0gUrl] = useState(null)
   const [viewCount, setViewCount] = useState(null)
+  const followListDialogRef = useRef(null)
 
   const params = useParams()
   const { address, isConnected } = useConnection()
@@ -496,6 +498,8 @@ const Profile = ({ addr }) => {
         <ProfileModal getActiveChain={getActiveChain} profile={profile} setShowProfileModal={setShowProfileModal} mutate={mutate} />
       )}
 
+      <FollowListDialog ref={followListDialogRef} addr={addr} />
+
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
         <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
@@ -541,7 +545,7 @@ const Profile = ({ addr }) => {
             <li className="flex flex-row align-items-center justify-content-between gap-025 w-100">
              
               <div className={clsx(styles.profile__stats, 'flex flex-row align-items-center justify-content-start gap-025')}>
-                <button className={styles.btnFollowers} type="button">
+                <button className={styles.btnFollowers} type="button" onClick={() => followListDialogRef.current?.open('followers')}>
                   <span>
                     {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(followerCount)} followers
                   </span>

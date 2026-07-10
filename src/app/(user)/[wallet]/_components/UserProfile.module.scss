@@ -63,6 +63,18 @@
   }
 }
 
+.btnFollowers {
+  all: unset;
+  cursor: pointer;
+
+  transition: color 0.2s ease-in-out;
+
+  &:hover {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+  }
+}
+
 // Shimmer
 .shimmer {
   height: 200px;
