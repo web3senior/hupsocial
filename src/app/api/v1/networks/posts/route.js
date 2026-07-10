@@ -68,47 +68,90 @@ export async function GET(request) {
       followingAddresses = addresses
     }
 
-    let queryParams = []
-
-    // Push the viewer address parameter first (twice) if it exists to match the conditional subquery placements
-    if (viewerAddress) {
-      queryParams.push(viewerAddress, viewerAddress)
-    }
-
-    // Build the Base Query with User Profile, Network Joins, and unified Metric calculations
-    let query = `${buildPostSelect(viewerAddress)}
-      WHERE p.is_comment IS NULL AND p.is_deleted = 0
-    `
+    // WHERE clause and its params are built separately from the SELECT so the same filters can
+    // drive both the page query and the profile total-count query below.
+    let whereClause = ` WHERE p.is_comment IS NULL AND p.is_deleted = 0`
+    const whereParams = []
 
     // Apply dynamic filters using the direct performance indexes set on the posts table
     if (networkId) {
-      query += ` AND p.network_id = ?`
-      queryParams.push(networkId)
+      whereClause += ` AND p.network_id = ?`
+      whereParams.push(networkId)
     }
     if (followingAddresses) {
-      query += ` AND p.wallet_address IN (${followingAddresses.map(() => '?').join(',')})`
-      queryParams.push(...followingAddresses)
+      whereClause += ` AND p.wallet_address IN (${followingAddresses.map(() => '?').join(',')})`
+      whereParams.push(...followingAddresses)
     } else if (walletAddress) {
-      query += ` AND p.wallet_address = ?`
-      queryParams.push(walletAddress)
+      whereClause += ` AND p.wallet_address = ?`
+      whereParams.push(walletAddress)
     }
     if (communityId) {
-      query += ` AND p.community_id = ?`
-      queryParams.push(communityId)
+      whereClause += ` AND p.community_id = ?`
+      whereParams.push(communityId)
+    } else if (viewerAddress) {
+      // Outside a community's own feed (home, profile, following), PUBLIC community posts (0)
+      // surface for everyone. Posts in ENCRYPTED membership types (1-5, 8 — see
+      // isEncryptedMembershipType in communityVault.js) are listed only for viewers who can
+      // actually read them: the post author or an active member of that community. Everyone
+      // else doesn't see them at all — even a sealed envelope leaks author + existence
+      // metadata if listed. Plaintext gated types (whitelist 6, paid 7) and unresolvable
+      // communities (comm row not indexed yet) stay hidden for all viewers. LOWER() on both
+      // sides because cidex stores checksummed addresses in binary-collated columns.
+      whereClause += ` AND (
+        p.community_id IS NULL
+        OR comm.membership_type = 0
+        OR (
+          comm.membership_type IN (1, 2, 3, 4, 5, 8)
+          AND (
+            LOWER(p.wallet_address) = LOWER(?)
+            OR EXISTS (
+              SELECT 1 FROM community_members cm
+              WHERE cm.network_id = p.network_id
+                AND cm.community_id = p.community_id
+                AND LOWER(cm.wallet_address) = LOWER(?)
+                AND cm.is_member = 1
+                AND cm.is_banned = 0
+            )
+          )
+        )
+      )`
+      whereParams.push(viewerAddress, viewerAddress)
     } else {
-      // Outside a community's own feed (home, profile, following), only posts from PUBLIC
-      // communities surface. Gated/request-based community posts stay inside their community —
-      // even encrypted ones leak author + existence metadata if listed. Unresolvable communities
-      // (comm row not indexed yet) are hidden too rather than risking a leak.
-      query += ` AND (p.community_id IS NULL OR comm.membership_type = 0)`
+      // Anonymous viewers (no connected wallet) only ever see public-community posts.
+      whereClause += ` AND (p.community_id IS NULL OR comm.membership_type = 0)`
     }
 
-    // Sorting and Pagination
-    query += ` ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
+    // Push the viewer address parameter first (twice) if it exists to match the conditional subquery placements
+    const queryParams = []
+    if (viewerAddress) {
+      queryParams.push(viewerAddress, viewerAddress)
+    }
+    queryParams.push(...whereParams)
+
+    // Build the Base Query with User Profile, Network Joins, and unified Metric calculations,
+    // then apply sorting and pagination
+    const query = `${buildPostSelect(viewerAddress)}
+      ${whereClause}
+      ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
     queryParams.push(limit + 1, offset)
 
     /* Execute using standardized pool */
     const [rows] = await pool.execute(query, queryParams)
+
+    // Profile feeds show a total post count next to the Posts tab, so a wallet-scoped request
+    // also gets the full filtered count (page-independent) in meta.total.
+    let total = null
+    if (walletAddress && !followingAddresses) {
+      const [countRows] = await pool.execute(
+        `SELECT COUNT(*) AS total
+         FROM posts p
+         JOIN networks n ON p.network_id = n.id
+         LEFT JOIN communities comm ON comm.network_id = p.network_id AND comm.id = p.community_id
+         ${whereClause}`,
+        whereParams,
+      )
+      total = Number(countRows[0]?.total ?? 0)
+    }
 
     // Handle "Has More" for infinite scroll
     const hasMore = rows.length > limit
@@ -132,6 +175,7 @@ export async function GET(request) {
       meta: {
         page,
         count: postsToSend.length,
+        total,
         hasMore,
         filter_chain_id: networkId || 'all',
         filter_community_id: communityId || null

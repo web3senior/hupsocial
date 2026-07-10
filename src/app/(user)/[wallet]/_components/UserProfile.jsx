@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, lazy, useRef } from 'react'
+import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView } from '@/lib/api'
-import { initHupContract, initStatusContract, getStatus, getMaxLength, getPostsByCreator } from '@/lib/communication'
+import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
@@ -32,12 +32,16 @@ import styles from './UserProfile.module.scss'
 // const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 // todo: this cause to handle loading.jsx again
 
+// Must stay consistent across all getPosts() calls: the API's offset is (page - 1) * limit,
+// so mixing page sizes shifts the offset and re-fetches an already-loaded window.
+const POSTS_PAGE_SIZE = 20
+
 export default function UserProfile() {
   const [posts, setPosts] = useState({ list: [] })
-  const [postsLoaded, setPostsLoaded] = useState(0)
-  const [isLoadedPoll, setIsLoadedPoll] = useState(false)
   const [totalPosts, setTotalPosts] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [isFetching, setIsFetching] = useState(false)
   const [POAPs, setPOAPs] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
@@ -48,6 +52,17 @@ export default function UserProfile() {
   const balance = useBalance({
     address: address,
   })
+
+  // Refs mirror the pagination state so the scroll handler never acts on a stale closure.
+  const isFetchingRef = useRef(false)
+  const hasMoreRef = useRef(false)
+  const pageRef = useRef(1)
+
+  useEffect(() => {
+    isFetchingRef.current = isFetching
+    hasMoreRef.current = hasMore
+    pageRef.current = page
+  }, [isFetching, hasMore, page])
   const TABS_DATA = [
     { id: 'posts', label: 'Posts', count: totalPosts },
     { id: 'assets', label: 'Assets' },
@@ -61,66 +76,52 @@ export default function UserProfile() {
     // feed: FeedTab,
   }
   const ActiveComponent = TabContentMap[activeTab]
-  // Assumes:
-  // - totalPosts is the contract's total post count (e.g., 100)
-  // - postsLoaded is the current count displayed on the UI (e.g., 0, 10, 20)
-  // - getPosts(startIndex, count, address) expects startIndex to be 1-based (e.g., 1, 11, 21)
 
-  const loadMorePosts = async (totalPosts) => {
-    // Use a sensible page size (10 is better than 1 for performance)
-    const POSTS_PER_PAGE = 30
+  const loadMorePosts = useCallback(async () => {
+    if (isFetchingRef.current || !hasMoreRef.current) return
 
-    // 1. Add a guard clause to prevent re-entry (scroll events firing too quickly)
-    if (isLoadedPoll) return
-
-    // 2. Set to true *before* starting the async operation
-    setIsLoadedPoll(true)
-
-    // Check if we have loaded everything
-    if (postsLoaded >= totalPosts) {
-      console.log('All posts loaded (Guard Check).')
-      setIsLoadedPoll(false)
-      return
-    }
+    setIsFetching(true)
+    const nextPage = pageRef.current + 1
 
     try {
-      // The correct 1-based index for the *first* post of the next batch.
-      // If 0 posts are loaded, start index is 1. If 10 posts are loaded, start index is 11.
-      const startIndex = postsLoaded
+      const response = await getPosts(nextPage, POSTS_PAGE_SIZE, null, params.wallet, address)
 
-      // Calculate the actual number of posts remaining and limit to POSTS_PER_PAGE.
-      const remainingPosts = totalPosts - postsLoaded
-      const postsToFetch = Math.min(POSTS_PER_PAGE, remainingPosts)
-
-      // Safety check (should be redundant if the initial guard passes)
-      if (postsToFetch <= 0) {
-        console.log('No posts to fetch after calculation.')
-        return
+      if (response.success && response.data.length > 0) {
+        setPosts((prev) => {
+          // Posts are keyed per network, so dedupe on the (network_id, id) tuple
+          const existingKeys = new Set(prev.list.map((p) => `${p.network_id}:${p.id}`))
+          const uniqueNewPosts = response.data.filter((p) => !existingKeys.has(`${p.network_id}:${p.id}`))
+          return { list: [...prev.list, ...uniqueNewPosts] }
+        })
+        setPage(nextPage)
       }
-
-      console.log(`Fetching batch: Start Index ${startIndex}, Count ${postsToFetch}`)
-
-      // 3. Fetch the next batch of posts (the contract handles reverse order internally)
-      // Note: startIndex is passed as the 1-based chronological position.
-      const newPosts = await getPostsByCreator(params.wallet, startIndex, postsToFetch, address)
-
-      if (Array.isArray(newPosts) && newPosts.length > 0) {
-        // Append new posts and update the loaded count
-        setPosts((prevPosts) => ({ list: [...prevPosts.list, ...newPosts] }))
-        setPostsLoaded((prevLoaded) => prevLoaded + newPosts.length)
-      } else if (postsToFetch > 0) {
-        // Handle cases where the contract returns an empty array (e.g., all posts in the batch were soft-deleted).
-        // To prevent infinite loop, update postsLoaded to totalPosts.
-        console.log('Fetched an empty batch; marking all as loaded for safety.')
-        setPostsLoaded(totalPosts)
-      }
+      setHasMore(response?.meta?.hasMore || false)
     } catch (error) {
       console.error('Error loading more posts:', error)
     } finally {
-      // 4. Crucial: Set to false in finally block
-      setIsLoadedPoll(false)
+      setIsFetching(false)
     }
-  }
+  }, [params.wallet, address])
+
+  // Same infinite-scroll trigger as the home feed: load the next page when the
+  // viewport nears the bottom of the document.
+  useEffect(() => {
+    if (activeTab !== 'posts') return
+
+    const handleScroll = () => {
+      const { scrollTop, clientHeight, scrollHeight } = document.documentElement
+      const SCROLL_THRESHOLD = 300
+
+      if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
+        if (hasMoreRef.current && !isFetchingRef.current) {
+          loadMorePosts()
+        }
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [activeTab, loadMorePosts])
 
   // Example of how a component fetches data from your new API route
   async function getPoapsForAddress(address) {
@@ -141,23 +142,30 @@ export default function UserProfile() {
     recordProfileView(params.wallet, address || null)
 
     getPoapsForAddress(params.wallet).then((res) => {
-      console.log(res)
       setPOAPs(res)
     })
+  }, [params.wallet])
 
-    // getCreatorPostCount(params.wallet).then((count) => {
-    //   const totalPosts = web3.utils.toNumber(count)
-    //   setTotalPosts(totalPosts)
+  // Re-runs when the viewer connects so has_liked/has_bookmarked flags reflect their wallet.
+  useEffect(() => {
+    let cancelled = false
 
-    // })
-    getPosts(1, 40, null, params.wallet).then((res) => {
-      setTotalPosts(res.meta.count)
-      setPosts({ list: res.data })
-      if (postsLoaded === 0 && !isLoadedPoll) {
-        loadMorePosts(totalPosts)
-      }
-    })
-  }, [])
+    getPosts(1, POSTS_PAGE_SIZE, null, params.wallet, address)
+      .then((res) => {
+        if (cancelled) return
+        setTotalPosts(res.meta?.total ?? res.meta?.count ?? 0)
+        setPosts({ list: res.data })
+        setPage(1)
+        setHasMore(res.meta?.hasMore || false)
+      })
+      .catch((error) => {
+        console.error('Error loading posts:', error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [params.wallet, address])
 
   const handlePostPrefetch = (postId, chainId) => {
     router.prefetch(`/networks/${chainId}/${postId}`)
@@ -237,7 +245,7 @@ export default function UserProfile() {
                   posts.list.map((item, i) => {
                     return (
                       <section
-                        key={i}
+                        key={`${item.network_id}:${item.id}`}
                         className={`${styles.post} animate fade`}
                         onClick={() => handlePostClick(item.id, item.network_id)}
                         onMouseEnter={() => handlePostPrefetch(item.id, item.network_id)}
@@ -249,6 +257,14 @@ export default function UserProfile() {
                     )
                   })}
               </div>
+
+              {hasMore && (
+                <div className="flex justify-content-center p-100">
+                  <button className={styles.loadMore} onClick={loadMorePosts} disabled={isFetching}>
+                    {isFetching ? 'Loading...' : 'Load More'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

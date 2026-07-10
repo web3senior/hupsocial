@@ -163,7 +163,18 @@ export async function decryptPostContent(rawContentKeyBytes, ivBase64, ciphertex
 export async function tryDecryptCommunityContent(publicClient, contractAddress, viewerAddress, contentObj) {
   if (!contentObj?.encrypted || !publicClient || !contractAddress || !viewerAddress) return null
 
-  const privKeyHex = getCachedIdentityPrivKeyHex()
+  let privKeyHex = getCachedIdentityPrivKeyHex()
+  if (!privKeyHex) {
+    // The identity may not be cached yet even though the security vault is unlocked (e.g. the
+    // vault was unlocked via the in-app wallet, or an encrypted post renders on a profile/home
+    // feed before the communities page — which normally seeds the cache — has run this session).
+    // Derive it promptlessly from the cached master and seed the cache so sibling cards reuse it.
+    const derived = await deriveIdentityFromCachedMaster()
+    if (derived) {
+      cacheUnlockedIdentity(derived.privKeyHex)
+      privKeyHex = derived.privKeyHex
+    }
+  }
   const communityId = contentObj.communityId
   const targetVersion = Number(contentObj.keyVersion)
   if (!privKeyHex || !communityId || !targetVersion) return null
