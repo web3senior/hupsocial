@@ -51,6 +51,7 @@ export const CONTRACTS = {
     hup: '',
     status: '',
     chat: '',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain42: {
