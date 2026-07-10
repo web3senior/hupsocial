@@ -121,7 +121,7 @@ export default function Page() {
       clearBatch(activeNetworkId)
     } catch (err) {
       console.error('Batch evaluation transaction failed:', err)
-      toast(err.message || 'Transaction rejected or encountered a processing failure.', 'error')
+      toast(err.shortMessage || 'Transaction failed', 'error')
     } finally {
       setIsProcessing(false)
     }
