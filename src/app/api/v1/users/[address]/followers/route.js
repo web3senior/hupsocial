@@ -47,20 +47,35 @@ export async function GET(request, { params }) {
     const data = (hasMore ? rows.slice(0, limit) : rows).map((row) => row.follower_address);
 
     let isFollowing = null;
+    // Which of the listed addresses the viewer follows, so list rows can render
+    // Follow vs Following from the same cross-network aggregate as the counts.
+    let viewerFollowing = [];
     if (viewerAddress) {
+      const viewer = viewerAddress.toLowerCase();
       const [[{ match_found: matchFound }]] = await pool.execute(
         `SELECT EXISTS(
            SELECT 1 FROM follows WHERE follower_address = ? AND followed_address = ? AND is_following = 1
          ) AS match_found`,
-        [viewerAddress.toLowerCase(), target],
+        [viewer, target],
       );
       isFollowing = Boolean(matchFound);
+
+      if (data.length > 0) {
+        const placeholders = data.map(() => '?').join(',');
+        const [followedRows] = await pool.execute(
+          `SELECT DISTINCT followed_address FROM follows
+           WHERE follower_address = ? AND is_following = 1 AND followed_address IN (${placeholders})`,
+          [viewer, ...data],
+        );
+        viewerFollowing = followedRows.map((row) => row.followed_address);
+      }
     }
 
     return NextResponse.json({
       success: true,
       data,
       isFollowing,
+      viewerFollowing,
       meta: { page, count: data.length, hasMore, total: Number(total) },
     });
   } catch (error) {

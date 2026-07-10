@@ -22,6 +22,7 @@ export async function GET(request, { params }) {
     const page = parseInt(searchParams.get('page')) || 1;
     const limit = Math.min(parseInt(searchParams.get('limit')) || 20, 50);
     const offset = (page - 1) * limit;
+    const viewerAddress = searchParams.get('viewer_address');
 
     const source = address.toLowerCase();
 
@@ -43,9 +44,22 @@ export async function GET(request, { params }) {
     const hasMore = rows.length > limit;
     const data = (hasMore ? rows.slice(0, limit) : rows).map((row) => row.followed_address);
 
+    // Which of the listed addresses the viewer follows — see followers/route.js.
+    let viewerFollowing = [];
+    if (viewerAddress && data.length > 0) {
+      const placeholders = data.map(() => '?').join(',');
+      const [followedRows] = await pool.execute(
+        `SELECT DISTINCT followed_address FROM follows
+         WHERE follower_address = ? AND is_following = 1 AND followed_address IN (${placeholders})`,
+        [viewerAddress.toLowerCase(), ...data],
+      );
+      viewerFollowing = followedRows.map((row) => row.followed_address);
+    }
+
     return NextResponse.json({
       success: true,
       data,
+      viewerFollowing,
       meta: { page, count: data.length, hasMore, total: Number(total) },
     });
   } catch (error) {

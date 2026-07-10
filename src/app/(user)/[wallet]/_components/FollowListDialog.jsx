@@ -9,7 +9,7 @@
 
 import Link from 'next/link'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import clsx from 'clsx'
 import NativeDialog from '@/components/ui/NativeDialog'
 import { toast } from '@/components/NextToast'
@@ -31,8 +31,12 @@ const emptyTabState = () => ({ list: [], page: 0, total: null, hasMore: true, lo
 const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
   const dialogRef = useRef(null)
   const listRef = useRef(null)
+  const { address } = useConnection()
   const [activeTab, setActiveTab] = useState('followers')
   const [tabs, setTabs] = useState({ followers: emptyTabState(), following: emptyTabState() })
+  // Cross-network "does the viewer follow this address" flags, keyed by lowercase
+  // address — seeds each row's Follow/Following state (same aggregate the counts use).
+  const [viewerFollowing, setViewerFollowing] = useState({})
 
   // Guards against double-fetching the same page (scroll events fire faster than state settles)
   const loadingRef = useRef({ followers: false, following: false })
@@ -44,9 +48,16 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
       setTabs((prev) => ({ ...prev, [tabId]: { ...prev[tabId], loading: true } }))
 
       try {
-        const res = await fetch(`/api/v1/users/${addr}/${tabId}?page=${page}&limit=${PAGE_SIZE}`)
+        const qs = address ? `&viewer_address=${address}` : ''
+        const res = await fetch(`/api/v1/users/${addr}/${tabId}?page=${page}&limit=${PAGE_SIZE}${qs}`)
         const json = await res.json()
         if (!json.success) throw new Error(json.error || 'Request failed')
+
+        setViewerFollowing((prev) => {
+          const next = { ...prev }
+          for (const followed of json.viewerFollowing || []) next[followed.toLowerCase()] = true
+          return next
+        })
 
         setTabs((prev) => {
           const existing = page === 1 ? [] : prev[tabId].list
@@ -70,7 +81,7 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
         loadingRef.current[tabId] = false
       }
     },
-    [addr]
+    [addr, address]
   )
 
   useImperativeHandle(
@@ -125,7 +136,12 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
 
       <div ref={listRef} className={styles.dialog__list} onScroll={handleScroll}>
         {activeList.list.map((profileAddress) => (
-          <ProfileRow key={profileAddress} profileAddress={profileAddress} onNavigate={() => dialogRef.current?.close()} />
+          <ProfileRow
+            key={profileAddress}
+            profileAddress={profileAddress}
+            initialFollowing={Boolean(viewerFollowing[profileAddress.toLowerCase()])}
+            onNavigate={() => dialogRef.current?.close()}
+          />
         ))}
 
         {activeList.loading && (
@@ -144,31 +160,35 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
 })
 
 /**
- * Single list entry: SWR-cached profile lookup plus the same live onchain
- * follow toggle the post hover card uses.
+ * Single list entry: SWR-cached profile lookup plus a follow toggle. Follow state
+ * is seeded from the cross-network aggregate (a live onchain read would only
+ * reflect the viewer's current chain — same reasoning as the profile header) and
+ * flipped optimistically while the tx goes through the active chain's contract.
  */
-const ProfileRow = ({ profileAddress, onNavigate }) => {
+const ProfileRow = ({ profileAddress, initialFollowing, onNavigate }) => {
   const { profile, isLoading } = useProfile(profileAddress)
   const { address, isConnected } = useConnection()
   const activeChain = getActiveChain()
   const followerSystemAddress = activeChain?.[1]?.followerSystem
   const isSelf = address && address.toLowerCase() === profileAddress.toLowerCase()
 
-  const { data: isFollowingData, refetch: refetchIsFollowing } = useReadContract({
-    address: followerSystemAddress,
-    abi: followerSystemAbi,
-    functionName: 'isFollowing',
-    args: [address, profileAddress],
-    query: { enabled: !!followerSystemAddress && !!address && !isSelf },
-  })
-  const isFollowingTarget = Boolean(isFollowingData)
+  const [isFollowingTarget, setIsFollowingTarget] = useState(initialFollowing)
 
-  const { data: hash, isPending: isSigning, mutate: writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
+  // The aggregate answer can arrive after first render (viewer connects late, page merge)
+  useEffect(() => {
+    setIsFollowingTarget(initialFollowing)
+  }, [initialFollowing])
+
+  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
+  const { isLoading: isConfirming, error: receiptError } = useWaitForTransactionReceipt({ hash })
 
   useEffect(() => {
-    if (isConfirmed) refetchIsFollowing()
-  }, [isConfirmed, refetchIsFollowing])
+    const error = submitError || receiptError
+    if (!error) return
+    toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
+    // Revert the optimistic flip from handleFollow — the tx didn't go through.
+    setIsFollowingTarget((prev) => !prev)
+  }, [submitError, receiptError])
 
   const handleFollow = () => {
     if (!isConnected) {
@@ -179,10 +199,12 @@ const ProfileRow = ({ profileAddress, onNavigate }) => {
       toast(`Follow system isn't deployed on this network yet`, `warning`)
       return
     }
+    const wasFollowing = isFollowingTarget
+    setIsFollowingTarget(!wasFollowing)
     writeContract({
       address: followerSystemAddress,
       abi: followerSystemAbi,
-      functionName: isFollowingTarget ? 'unfollow' : 'follow',
+      functionName: wasFollowing ? 'unfollow' : 'follow',
       args: [profileAddress],
     })
   }

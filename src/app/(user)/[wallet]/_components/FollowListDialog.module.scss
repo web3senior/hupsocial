@@ -31,11 +31,11 @@
     gap: 0.15rem;
     padding: 0.85rem 0.5rem;
     cursor: pointer;
-    color: var(--gray-400);
+    color: var(--text-muted, var(--gray-400));
     transition: color 0.2s ease;
 
     &--active {
-      color: var(--foreground, inherit);
+      color: var(--text, inherit);
 
       .dialog__tabLabel {
         font-weight: var(--font-weight-bold, 700);
@@ -60,7 +60,7 @@
   &__empty {
     padding: 2rem 1rem;
     text-align: center;
-    color: var(--gray-400);
+    color: var(--text-muted, var(--gray-400));
   }
 }
 
@@ -90,7 +90,7 @@
     height: 44px;
     border-radius: 50%;
     overflow: hidden;
-    background-color: var(--gray-200);
+    background-color: var(--surface-muted, var(--gray-200));
 
     img {
       width: 100%;
@@ -114,7 +114,7 @@
 
   &__handle {
     font-size: var(--font-size-9, 0.8rem);
-    color: var(--gray-400);
+    color: var(--text-muted, var(--gray-400));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -125,8 +125,10 @@
     padding: 0.45rem 1.5rem;
     border: none;
     border-radius: var(--global-border-radius);
-    background-color: var(--gray-900, #000);
-    color: var(--white, #fff);
+    // Same network-branded pill as the profile page follow button — the fixed
+    // black pill of the first pass disappears against the dark theme's surface.
+    background-color: var(--network-color-primary, var(--gray-900, #000));
+    color: var(--network-color-text, var(--white, #fff));
     font-weight: var(--font-weight-semibold, 600);
     cursor: pointer;
     will-change: transform;
@@ -142,8 +144,8 @@
     }
 
     &--following {
-      background-color: var(--gray-100);
-      color: inherit;
+      background-color: var(--hover, var(--gray-100));
+      color: var(--text, inherit);
     }
   }
 
