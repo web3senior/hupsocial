@@ -229,14 +229,31 @@ export default function MediaGallery({ data = [] }) {
     setRevealedItems((prev) => ({ ...prev, [index]: true }))
   }
 
+  // Lock the page scroller while the lightbox is open. The page scrolls on
+  // <html> (Globals.scss sets `overflow: hidden scroll`), so body overflow has
+  // no effect. Padding compensates for the hidden scrollbar to avoid layout
+  // shift, and restore uses behavior:'instant' to bypass the global
+  // scroll-behavior:smooth so the position snaps back exactly where it was.
+  useEffect(() => {
+    if (!isLightboxOpen) return
+    const html = document.documentElement
+    const scrollY = window.scrollY
+    const scrollbarWidth = window.innerWidth - html.clientWidth
+    html.style.overflowY = 'hidden'
+    html.style.paddingRight = `${scrollbarWidth}px`
+    return () => {
+      html.style.overflowY = ''
+      html.style.paddingRight = ''
+      window.scrollTo({ top: scrollY, left: 0, behavior: 'instant' })
+    }
+  }, [isLightboxOpen])
+
   const openLightbox = (index) => {
     setSelectedIndex(index)
-    document.body.style.overflow = 'hidden' // Prevent scroll
   }
 
   const closeLightbox = () => {
     setSelectedIndex(null)
-    document.body.style.overflow = ''
   }
 
   if (!data.length) return null
