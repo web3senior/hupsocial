@@ -148,6 +148,16 @@ export default function BuyButton({ item }) {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
   const lastActionRef = useRef(null)
 
+  // A purchase that sells out the listing auto-deactivates it onchain, so ping the
+  // store_listings discovery index (bazzar/premium feed) to re-read the chain state.
+  const syncListingIndex = () => {
+    fetch('/api/store/listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId: Number(item.id), networkId: Number(item.network_id) }),
+    }).catch(() => {})
+  }
+
   useEffect(() => {
     if (!submitError) return
     toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
@@ -161,6 +171,7 @@ export default function BuyButton({ item }) {
     } else {
       toast('Purchase complete', 'success')
       refetchPurchased()
+      syncListingIndex()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
@@ -247,6 +258,7 @@ export default function BuyButton({ item }) {
 
         toast('Purchase complete', 'success')
         refetchPurchased()
+        syncListingIndex()
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
       } finally {

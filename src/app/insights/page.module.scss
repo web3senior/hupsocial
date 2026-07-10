@@ -46,6 +46,13 @@
     margin-bottom: 1.5rem;
   }
 
+  &__breakdowns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
   &__topPosts {
     margin-bottom: 1rem;
   }

@@ -1,7 +1,7 @@
 /**
  * @file api/v1/users/[address]/insights/route.js
  * @description Aggregate insights for a wallet's own profile: follower growth, profile views,
- * post reach/engagement, and top posts, bucketed over a selectable date range. The follower
+ * post reach/engagement, top posts, and per-network breakdowns, bucketed over a selectable date range. The follower
  * count mirrors the aggregate already trusted by the followers list endpoint
  * (users.follower_count is never written anywhere in this codebase, so it isn't used here).
  */
@@ -41,11 +41,12 @@ export async function GET(request, { params }) {
       [wallet],
     )
 
-    const [followerGrowth, profileViews, reach, topPosts] = await Promise.all([
+    const [followerGrowth, profileViews, reach, topPosts, networkBreakdown] = await Promise.all([
       getFollowerGrowth(wallet, since, today, days),
       getDailySeries('profile_views', 'viewed_at', 'wallet_address', wallet, since, today, days),
       getReach(wallet, since, today, days),
       getTopPosts(wallet, since),
+      getNetworkBreakdown(wallet, since),
     ])
 
     return NextResponse.json({
@@ -56,6 +57,8 @@ export async function GET(request, { params }) {
         profile_views: profileViews,
         reach,
         top_posts: topPosts,
+        posts_by_network: networkBreakdown.postsByNetwork,
+        engagement_by_network: networkBreakdown.engagementByNetwork,
       },
     })
   } catch (error) {
@@ -169,6 +172,55 @@ async function getTopPosts(wallet, since) {
     likes: Number(row.likes),
     comments: Number(row.comments),
   }))
+}
+
+/* Groups the wallet's original posts and the engagement they received (active likes + comments on
+ * those posts) by network, for the breakdown pies. Likes and comments live in different tables, so
+ * engagement is merged per network in JS after the grouped queries. */
+async function getNetworkBreakdown(wallet, since) {
+  const [postRows, likeRows, commentRows] = await Promise.all([
+    pool.execute(
+      `SELECT p.network_id, n.name, COUNT(*) AS total
+       FROM posts p
+       JOIN networks n ON p.network_id = n.id
+       WHERE p.wallet_address = ? AND p.is_comment IS NULL AND p.is_deleted = 0 AND p.created_at >= ?
+       GROUP BY p.network_id, n.name`,
+      [wallet, since],
+    ),
+    pool.execute(
+      `SELECT p.network_id, n.name, COUNT(*) AS total
+       FROM post_likes pl
+       JOIN posts p ON pl.post_id = p.id AND pl.network_id = p.network_id
+       JOIN networks n ON p.network_id = n.id
+       WHERE p.wallet_address = ? AND p.is_comment IS NULL AND p.is_deleted = 0
+         AND pl.is_active = 1 AND pl.liked_at >= ?
+       GROUP BY p.network_id, n.name`,
+      [wallet, since],
+    ),
+    pool.execute(
+      `SELECT p.network_id, n.name, COUNT(*) AS total
+       FROM posts c
+       JOIN posts p ON c.is_comment = p.id AND c.network_id = p.network_id
+       JOIN networks n ON p.network_id = n.id
+       WHERE p.wallet_address = ? AND p.is_comment IS NULL AND p.is_deleted = 0 AND c.created_at >= ?
+       GROUP BY p.network_id, n.name`,
+      [wallet, since],
+    ),
+  ])
+
+  const postsByNetwork = postRows[0]
+    .map((row) => ({ network_id: row.network_id, name: row.name, count: Number(row.total) }))
+    .sort((a, b) => b.count - a.count)
+
+  const engagementByNetworkId = new Map()
+  for (const row of [...likeRows[0], ...commentRows[0]]) {
+    const entry = engagementByNetworkId.get(row.network_id) || { network_id: row.network_id, name: row.name, count: 0 }
+    entry.count += Number(row.total)
+    engagementByNetworkId.set(row.network_id, entry)
+  }
+  const engagementByNetwork = [...engagementByNetworkId.values()].sort((a, b) => b.count - a.count)
+
+  return { postsByNetwork, engagementByNetwork }
 }
 
 // `today` is the DB's own DATE_FORMAT(NOW(), '%Y-%m-%d') string — treating it as UTC midnight here

@@ -49,9 +49,13 @@ export async function ensureProfile(address) {
 
   return res.json()
 }
-export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null, communityId = null) => {
+export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null, communityId = null, feedType = null) => {
   /* Construct the URL with query parameters */
   let url = `/api/v1/networks/posts?page=${page}&limit=${limit}`
+
+  if (feedType) {
+    url += `&feed_type=${feedType}`
+  }
 
   if (networkId) {
     url += `&network_id=${networkId}`

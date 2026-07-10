@@ -192,6 +192,16 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
+  // Fire-and-forget ping so the store_listings discovery index behind the bazzar/premium
+  // feed tracks this listing — the server re-reads the chain, so no listing data is sent.
+  const syncListingIndex = () => {
+    fetch('/api/store/listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId: Number(item.id), networkId: Number(item.network_id) }),
+    }).catch(() => {})
+  }
+
   const isBusy = isPending || isConfirming || isUploadingContent || isSubmittingBurner
   // Not-yet-listed posts go straight to the create form; existing listings show a summary
   // first and only reveal the (pre-filled) form once the seller explicitly chooses to edit.
@@ -234,6 +244,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     refetchListing()
     refetchBuyers()
     refetchTokensUsed()
+    syncListingIndex()
     setIsEditing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
@@ -420,6 +431,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         refetchListing()
         refetchBuyers()
         refetchTokensUsed()
+        syncListingIndex()
         setIsEditing(false)
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -470,6 +482,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         refetchListing()
         refetchBuyers()
         refetchTokensUsed()
+        syncListingIndex()
         setIsEditing(false)
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')

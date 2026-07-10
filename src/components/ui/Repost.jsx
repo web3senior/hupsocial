@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { QuotesIcon, RepeatIcon } from '@phosphor-icons/react'
 import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -22,78 +22,116 @@ import styles from './Counter.module.scss'
 export const Repost = ({ post, onQuote }) => {
   const isMounted = useClientMounted()
   const { isConnected } = useConnection()
-  const [isReposted, setIsReposted] = useState(false)
   const { stats, mutate } = usePostStats(post)
-  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
+  const lastActionRef = useRef(null)
+  const { data: hash, isPending, mutateAsync: writeContractAsync } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
 
   const repostCount = Number(stats?.total_reposts ?? stats?.repost_count) || 0
+  const isReposted = stats?.has_reposted === 1 || stats?.has_reposted === true
 
   useEffect(() => {
     if (isConfirmed) {
+      // No revalidation here: the click-time optimistic mutate already holds the right
+      // numbers, and the indexer lags the receipt — an immediate refetch would return
+      // the stale pre-repost row and wipe them.
+      toast(lastActionRef.current === 'undo' ? 'Repost removed onchain!' : 'Repost saved onchain!', 'success')
+    }
+  }, [isConfirmed])
+
+  const resolveHupAddress = () => {
+    const targetChain = CONTRACTS[`chain${post.network_id}`]
+
+    if (!targetChain?.hup) {
+      toast('Contract configuration missing for network', 'error')
+      return null
+    }
+
+    return targetChain.hup
+  }
+
+  const repost = async (id) => {
+    const hupAddress = resolveHupAddress()
+    if (!hupAddress) return
+
+    const previousData = stats
+
+    try {
+      lastActionRef.current = 'repost'
       mutate(
         (prev) => ({
           ...prev,
           total_reposts: (Number(prev?.total_reposts) || 0) + 1,
+          has_reposted: 1,
         }),
-        { revalidate: true },
+        { revalidate: false },
       )
-      toast('Repost saved onchain!', 'success')
+
+      await writeContractAsync({
+        abi,
+        address: hupAddress,
+        functionName: 'create',
+        args: [
+          ZERO_ADDRESS, // direct wallet call, not session owner
+          ContentType.Repost,
+          '', // reposts carry no metadata
+          BigInt(id), // parent post id
+          false, // reposts never allow comments
+        ],
+      })
+
+      toast('Confirming block execution...', 'success')
+    } catch (err) {
+      console.error('Repost failed:', err)
+      toast(err.shortMessage || err.message || 'Transaction rejected or encountered an error.', 'error')
+      mutate(previousData, { revalidate: false })
     }
-  }, [isConfirmed])
-
-  const repost = (e, id) => {
-    e.stopPropagation()
-
-    if (!isConnected) {
-      toast('Please connect your wallet first', 'error')
-      return
-    }
-
-    const targetChain = CONTRACTS[`chain${post.network_id}`]
-
-    if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error')
-      return
-    }
-
-    writeContract({
-      abi,
-      address: targetChain.hup,
-      functionName: 'create',
-      args: [
-        ZERO_ADDRESS, // direct wallet call, not session owner
-        ContentType.Repost,
-        '', // repost metadata can be empty
-        BigInt(id), // parent post id
-        false, //false for all reposts
-      ],
-    })
   }
 
-  const removeRepost = (e, id) => {
-    e.stopPropagation()
+  const removeRepost = async () => {
+    const hupAddress = resolveHupAddress()
+    if (!hupAddress) return
 
-    if (!isConnected) {
-      toast('Please connect your wallet first', 'error')
+    // Undoing means deleting the viewer's own repost row onchain, so its content id
+    // must already be resolvable through the indexer.
+    const repostRowId = stats?.viewer_repost_id
+    if (!repostRowId) {
+      toast('Repost is still confirming — try again shortly', 'error')
       return
     }
 
-    const targetChain = CONTRACTS[`chain${post.network_id}`]
+    const previousData = stats
 
-    if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error')
-      return
+    try {
+      lastActionRef.current = 'undo'
+      mutate(
+        (prev) => ({
+          ...prev,
+          total_reposts: Math.max(0, (Number(prev?.total_reposts) || 0) - 1),
+          has_reposted: 0,
+          viewer_repost_id: null,
+        }),
+        { revalidate: false },
+      )
+
+      await writeContractAsync({
+        abi,
+        address: hupAddress,
+        functionName: 'deleteContent',
+        args: [
+          ZERO_ADDRESS, // direct wallet call, not session owner
+          BigInt(repostRowId),
+        ],
+      })
+
+      toast('Confirming block execution...', 'success')
+    } catch (err) {
+      console.error('Undo repost failed:', err)
+      toast(err.shortMessage || err.message || 'Transaction rejected or encountered an error.', 'error')
+      mutate(previousData, { revalidate: false })
     }
-
-    writeContract({
-      abi,
-      address: targetChain.hup,
-      functionName: 'removeRepost',
-      args: [id],
-    })
   }
 
   if (!isMounted) return null
@@ -125,7 +163,7 @@ export const Repost = ({ post, onQuote }) => {
                 toast(`Please connect wallet`, `error`)
                 return
               }
-              isReposted ? removeRepost(e, post.id) : repost(e, post.id)
+              isReposted ? removeRepost() : repost(post.id)
             }}
           >
             <span>{isReposted ? `Undo repost` : `Repost`}</span>

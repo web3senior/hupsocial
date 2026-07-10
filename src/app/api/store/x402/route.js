@@ -20,6 +20,7 @@ import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, 
 import storeAbi from '@/abis/HupStore.json'
 import { STORE_ADDRESSES, USDC, X402_NETWORKS } from '@/lib/tokens'
 import { decryptContent, isConfigured } from '@/lib/storeCrypto'
+import { syncListingFromChain } from '@/lib/storeListingsIndex'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -179,6 +180,10 @@ export async function GET(request) {
     })
     const grantHash = await walletClient.writeContract(grantRequest)
     await publicClient.waitForTransactionReceipt({ hash: grantHash })
+
+    // This purchase may have sold out (and auto-deactivated) the listing — keep the
+    // store_listings discovery index behind the bazzar feed in step. Never blocks delivery.
+    syncListingFromChain(chainId, Number(postId)).catch(() => {})
 
     const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
     const ipfsRes = await fetch(`${gatewayUrl}${listing.metadata.replace('ipfs://', '')}`)

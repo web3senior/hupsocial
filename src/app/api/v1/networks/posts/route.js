@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { getFollowingAddresses } from '@/lib/followSystem'
+import { ensureStoreListingsTable } from '@/lib/storeListingsIndex'
 
 export const runtime = 'nodejs'
 
@@ -72,6 +73,18 @@ export async function GET(request) {
     // drive both the page query and the profile total-count query below.
     let whereClause = ` WHERE p.is_comment IS NULL AND p.is_deleted = 0`
     const whereParams = []
+
+    // "Premium" (bazzar) = posts with an active HupStore listing. Listings live onchain keyed
+    // by postId with no enumeration, so this reads the server-verified store_listings
+    // discovery index (see lib/storeListingsIndex.js). Everything else — ordering, visibility
+    // rules, pagination — rides the same chronological pipeline as the home feed.
+    if (feedType === 'premium') {
+      await ensureStoreListingsTable()
+      whereClause += ` AND EXISTS (
+        SELECT 1 FROM store_listings sl
+        WHERE sl.network_id = p.network_id AND sl.post_id = p.id AND sl.is_active = 1
+      )`
+    }
 
     // Apply dynamic filters using the direct performance indexes set on the posts table
     if (networkId) {
@@ -219,7 +232,7 @@ function buildPostSelect(viewerAddress) {
         comm.name as community_name,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
         (SELECT COUNT(*) FROM posts WHERE is_comment = p.id AND network_id = p.network_id) as total_comments,
-        (SELECT COUNT(*) FROM posts WHERE is_repost = p.id AND network_id = p.network_id) as total_reposts,
+        (SELECT COUNT(*) FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND is_deleted = 0) as total_reposts,
         (SELECT COUNT(*) FROM post_views WHERE post_id = p.id AND network_id = p.network_id) as total_views,
         (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
         (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,

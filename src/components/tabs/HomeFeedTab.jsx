@@ -17,16 +17,17 @@ import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 const POSTS_PAGE_SIZE = 20
 
 /**
- * Renders a single feed of posts, either the unscoped "For you" feed or one
- * locked to a specific network (chainId). Extracted from app/page.jsx so it
- * can be mounted per-tab from HomeTabStrip's tab dispatch.
+ * Renders a single feed of posts: the unscoped "For you" feed, one locked to a
+ * specific network (chainId), or the cross-network "premium" feed (posts with
+ * an active HupStore listing — the bazzar page). Extracted from app/page.jsx so
+ * it can be mounted per-tab from HomeTabStrip's tab dispatch.
  *
  * Feed state (posts/pagination) is kept LOCAL to this instance rather than in
  * the shared usePostStore - multiple tabs (For you, several network tabs) can
  * exist at once, and a single global "hasInitialized" flag would make every
  * tab after the first skip fetching and show the wrong feed's posts.
  */
-export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, title = 'For you' }) {
+export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, title = 'For you', changeDocumentTitle = false }) {
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
 
@@ -35,7 +36,8 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   const router = useRouter()
 
   const scopedNetworkId = feedMode === 'network' ? networkId : null
-  const feedCacheKey = feedMode === 'network' ? `network-${networkId}` : 'foryou'
+  const feedType = feedMode === 'premium' ? 'premium' : null
+  const feedCacheKey = feedMode === 'network' ? `network-${networkId}` : feedMode === 'premium' ? 'premium' : 'foryou'
   const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
 
   // Feed snapshot from an earlier visit this session, if any. Safe to read in
@@ -171,7 +173,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       if (isFetchingRef.current) return
 
       try {
-        const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address)
+        const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
         if (!cancelled) {
           setInitialData(postsRes)
           appliedParamsRef.current = params
@@ -203,7 +205,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     const pollingInterval = setInterval(async () => {
       try {
         const latestKnownId = posts.list[0]?.id
-        const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address)
+        const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
 
         if (response.success && response.data.length > 0) {
           const newItemsIndex = response.data.findIndex((item) => item.id === latestKnownId)
@@ -220,7 +222,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     }, 30000)
 
     return () => clearInterval(pollingInterval)
-  }, [mounted, hasInitialized, posts.list, address, scopedNetworkId])
+  }, [mounted, hasInitialized, posts.list, address, scopedNetworkId, feedType])
 
   const handlePostPrefetch = (item) => {
     router.prefetch(`/networks/${item.network_id}/${item.id}`)
@@ -245,7 +247,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     const nextPage = page + 1
 
     try {
-      const response = await getPosts(nextPage, POSTS_PAGE_SIZE, scopedNetworkId, null, address)
+      const response = await getPosts(nextPage, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
 
       if (response.success && response.data.length > 0) {
         appendPosts(response)
@@ -256,7 +258,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     } finally {
       setIsFetching(false)
     }
-  }, [page, appendPosts, address, scopedNetworkId])
+  }, [page, appendPosts, address, scopedNetworkId, feedType])
 
   const handleMergeNewPosts = useCallback(() => {
     if (newPostsQueue.length === 0) return
@@ -276,7 +278,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     setIsRefreshing(true)
     setIsFetching(true)
     try {
-      const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address)
+      const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
       setInitialData(postsRes)
       setPage(1)
       setNewPostsQueue([])
@@ -287,7 +289,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       setIsFetching(false)
       setIsRefreshing(false)
     }
-  }, [newPostsQueue, handleMergeNewPosts, address, scopedNetworkId, setInitialData])
+  }, [newPostsQueue, handleMergeNewPosts, address, scopedNetworkId, feedType, setInitialData])
 
   // Refresh requested from outside (Aside home link while already at top).
   // Nonce ref guard: only fire on an actual bump, not on callback identity changes.
@@ -301,7 +303,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   return (
     <div className={styles.page}>
       <div className={clsx(styles.page__header)}>
-        <PageTitle name={title} changeDocumentTitle={false} />
+        <PageTitle name={title} changeDocumentTitle={changeDocumentTitle} />
       </div>
 
       <div className={clsx('__container')} data-width="small">

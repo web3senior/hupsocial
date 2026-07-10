@@ -9,10 +9,21 @@ import { ContentSpinner } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
 import InsightsPeriodPicker from './_components/InsightsPeriodPicker'
 import TrendChart from './_components/TrendChart'
+import BreakdownPieChart from './_components/BreakdownPieChart'
 import TopPostsList from './_components/TopPostsList'
 import styles from './page.module.scss'
 
 const numberFormatter = new Intl.NumberFormat(undefined, { notation: 'compact' })
+
+// Validated categorical palette (dataviz reference instance), in its fixed CVD-safe slot order.
+const CATEGORICAL_COLORS = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834']
+
+/* Assigns one hue per network across every breakdown on the page, in stable network_id order,
+ * so the same network wears the same color in both pies regardless of its share in either. */
+function buildNetworkColors(...breakdowns) {
+  const ids = [...new Set(breakdowns.flat().map((slice) => slice.network_id))].sort((a, b) => (a > b ? 1 : -1))
+  return new Map(ids.map((id, index) => [id, CATEGORICAL_COLORS[index]]))
+}
 
 const fetcher = async (url) => {
   const response = await fetch(url)
@@ -34,6 +45,8 @@ export default function InsightsPage() {
     isConnected && address ? `/api/v1/users/${address}/insights?period=${period}` : null,
     fetcher,
   )
+
+  const networkColors = data ? buildNetworkColors(data.posts_by_network || [], data.engagement_by_network || []) : null
 
   return (
     <>
@@ -101,6 +114,23 @@ export default function InsightsPage() {
                     { key: 'likes', label: 'Likes', color: '#1baf7a' },
                     { key: 'comments', label: 'Comments', color: '#eda100' },
                   ]}
+                />
+              </div>
+
+              <div className={styles.page__breakdowns}>
+                <BreakdownPieChart
+                  title="Posts by network"
+                  data={data.posts_by_network}
+                  colorByNetwork={networkColors}
+                  totalLabel="posts"
+                  emptyLabel="No posts in this period."
+                />
+                <BreakdownPieChart
+                  title="Engagement by network"
+                  data={data.engagement_by_network}
+                  colorByNetwork={networkColors}
+                  totalLabel="interactions"
+                  emptyLabel="No likes or comments in this period."
                 />
               </div>
 
