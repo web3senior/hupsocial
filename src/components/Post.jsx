@@ -34,7 +34,8 @@ import {
 } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
 import { renderMarkdown } from '@/lib/markdown'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
+import { getPostStatsKey } from '@/hooks/usePostStats'
 import NativePopover from './ui/NativePopover'
 import SellItemPopover from './SellItemPopover'
 import BuyButton from './BuyButton'
@@ -95,6 +96,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const { web3, contract } = initHupContract()
   const mounted = useClientMounted()
   const { address } = useConnection()
+  const { mutate: mutateStats } = useSWRConfig()
   const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -199,7 +201,26 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   return (
     <>
       {showCommentModal && <NewPost actionType="comment" replyTarget={showCommentModal} onClose={() => setShowCommentModal()} />}
-      {showQuoteModal && <NewPost actionType="quote" quoteTarget={showQuoteModal} onClose={() => setShowQuoteModal(null)} />}
+      {showQuoteModal && (
+        <NewPost
+          actionType="quote"
+          quoteTarget={showQuoteModal}
+          onClose={() => setShowQuoteModal(null)}
+          onConfirmed={() => {
+            // Quotes count into the merged repost metric (X-style). Bump the quoted post's
+            // shared stats entry without revalidating — the indexer lags the receipt, so an
+            // immediate refetch would return the pre-quote count and wipe the bump.
+            mutateStats(
+              getPostStatsKey(showQuoteModal, address),
+              (prev) => {
+                const base = prev || showQuoteModal
+                return { ...base, total_reposts: (Number(base.total_reposts) || 0) + 1 }
+              },
+              { revalidate: false },
+            )
+          }}
+        />
+      )}
       {showTipModal && <TipModal item={showTipModal} setShowTipModal={setShowTipModal} />}
       {showReportModal && <ReportModal item={showReportModal} setShowReportModal={setShowReportModal} />}
 

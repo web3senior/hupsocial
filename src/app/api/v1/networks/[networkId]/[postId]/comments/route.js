@@ -62,6 +62,12 @@ export async function GET(request, { params }) {
           WHERE reposter.network_id = p.network_id
             AND reposter.is_deleted = 0
             AND reposter.is_repost = p.id
+        ) + (
+          SELECT COUNT(*)
+          FROM posts q
+          WHERE q.network_id = p.network_id
+            AND q.is_deleted = 0
+            AND CASE WHEN JSON_VALID(q.content) THEN JSON_UNQUOTE(JSON_EXTRACT(q.content, '$.quoteOf')) = CAST(p.id AS CHAR) ELSE 0 END
         ) as total_reposts,
         (
           SELECT COUNT(*)

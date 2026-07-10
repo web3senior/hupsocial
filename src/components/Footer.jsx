@@ -9,6 +9,7 @@ import clsx from 'clsx'
 
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { usePostStore } from '@/stores/usePostStore'
 import styles from './Footer.module.scss'
 
 // Helper function synced with Aside to track active sub-routes accurately
@@ -26,6 +27,20 @@ export default function Footer() {
   // Pull global sidebar states to match functional action layers
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
+  const requestFeedRefresh = usePostStore((state) => state.requestFeedRefresh)
+
+  // Home link double-duty: scrolled down -> back to top, already at top -> pull fresh posts
+  const handleHomeLinkClick = (event) => {
+    if (pathname !== '/') return
+
+    event.preventDefault()
+
+    if (document.documentElement.scrollTop > 0) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      requestFeedRefresh()
+    }
+  }
 
   // Sync batch calculation exactly with the Aside metric tracking
   const batchCount = useMemo(() => {
@@ -86,6 +101,7 @@ export default function Footer() {
                   className={clsx(styles.link, isActive && styles.linkActive)}
                   aria-label={item.name}
                   aria-current={isActive ? 'page' : undefined}
+                  onClick={item.path === '/' ? handleHomeLinkClick : undefined}
                 >
                   {iconContent}
                 </Link>
