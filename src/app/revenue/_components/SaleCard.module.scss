@@ -1,0 +1,110 @@
+.saleCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--success) 14%, transparent);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &--tiltLeft {
+    transform: rotate(-1.4deg);
+  }
+
+  &--tiltRight {
+    transform: rotate(1.4deg);
+  }
+
+  &:hover {
+    transform: rotate(0deg) translateY(-2px);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--success) 22%, transparent);
+  }
+
+  &__amount {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    flex: none;
+    font-size: clamp(1.5rem, 4vw, 1.9rem);
+    line-height: 1.1;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--success);
+  }
+
+  &__symbol {
+    font-size: 0.5em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  &__details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    min-width: 0;
+    text-align: right;
+  }
+
+  &__post {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__meta {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  &__quantity {
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  &__network {
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: color-mix(in srgb, var(--success) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--success) 25%, var(--border));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saleCard {
+    transition: none;
+
+    &--tiltLeft,
+    &--tiltRight {
+      transform: none;
+    }
+
+    &:hover {
+      transform: none;
+    }
+  }
+}

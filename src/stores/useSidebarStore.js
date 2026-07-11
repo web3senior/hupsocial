@@ -9,6 +9,7 @@ import {
   CalendarBlankIcon,
   ChartBarIcon,
   ChatCircleIcon,
+  CoinsIcon,
   HeartIcon,
   HouseIcon,
   MagnifyingGlassIcon,
@@ -38,6 +39,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'batch-like', name: 'Like', path: '/batch-like', icon: HeartIcon, hasBadge: true },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
+  { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
 ]
 
 export const useSidebarStore = create(

@@ -12,6 +12,17 @@ export const STORE_ADDRESSES = {
   10143: '', // monad-testnet
 }
 
+// HupBazzar deployment block per chainId — where event scans start (contract creation block,
+// so no ItemListed/ItemBought log can predate it). Keep keys in sync with STORE_ADDRESSES.
+export const STORE_DEPLOY_BLOCKS = {
+  42: 7889655, // lukso
+  143: 0, // monad
+  42220: 0, // celo
+  8453: 0, // base
+  56: 0, // bnb
+  10143: 0, // monad-testnet
+}
+
 // Canonical USDC per chainId. `eip3009: true` means the token supports EIP-3009
 // transferWithAuthorization and can therefore settle x402 payments. `lsp7: true` means the
 // token is an LSP7 Digital Asset (LUKSO) — paid via authorizeOperator, not approve.
