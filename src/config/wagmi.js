@@ -41,12 +41,12 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 export const CONTRACTS = {
   chain1: {
     name: 'ethereum',
-    forwarder: '',
-    forwarderName: 'HupChatForwarder',
-    hup: '',
-    status: '',
+    forwarder: '0xA8231e213a85BA0FBEB42F319175f10E2D849352',
+    forwarderName: 'HupForwarder',
+    hup: '0xd1aEc7Bb7679FA30E74Ab30877FbdF96d51333D4',
+    status: '0x130BD13f5A7AcA97cfF4Ed32ac2EbF94197Be88f',
     chat: '',
-    followerSystem:'',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain42: {
@@ -66,6 +66,7 @@ export const CONTRACTS = {
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
     chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain42220: {
@@ -74,6 +75,7 @@ export const CONTRACTS = {
     hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
     status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
     chat: '',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain8453: {
@@ -81,6 +83,7 @@ export const CONTRACTS = {
     forwarder: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain56: {
@@ -88,6 +91,7 @@ export const CONTRACTS = {
     forwarder: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
     status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain4663: {
@@ -95,6 +99,7 @@ export const CONTRACTS = {
     forwarder: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
     hup: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     chat: '',
     store: '',
   },
@@ -104,7 +109,7 @@ export const CONTRACTS = {
     hup: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     community: '0x5D7ebD8ae5A439204A1F1f5f168c7C48AA25d88c',
-    followerSystem: '0xA8231e213a85BA0FBEB42F319175f10E2D849352',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
   },
   chain42161: {
@@ -112,6 +117,7 @@ export const CONTRACTS = {
     forwarder: '0x41e6D71623FD02633C568342852154D2Cd7DBD0e',
     hup: '0x1EC0B3b802aFE596929a038f40F832EA01eCc281',
     status: '0x2269Fb436d594902e3c38085CBB3f350532531B3',
+    followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     community: '',
     nft: '',
     store: '',
