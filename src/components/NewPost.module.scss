@@ -5,6 +5,8 @@
   width: min(900px, calc(100vw - 28px));
   max-width: none;
   max-height: calc(100vh - 40px);
+  /* iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport */
+  max-height: calc(100dvh - 40px);
   padding: 0;
   border: 0;
   overflow: hidden;
@@ -84,10 +86,12 @@
 .form {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  /* flex-basis must stay `auto`: the dialog has no definite height, and Safari sizes
+     a `flex: 1` (basis 0%) child to zero in that case, collapsing the composer */
+  flex: 1 1 auto;
   /* Crucial: prevents the form from expanding past the flexbox container allocation */
-  min-height: 0; 
-  overflow: hidden; 
+  min-height: 0;
+  overflow: hidden;
 }
 
 .composer {
@@ -96,10 +100,11 @@
   flex-direction: column;
   gap: 16px;
   padding: 32px 36px 0;
-  
-  /* Crucial: Allows the content area to scroll independently */
-  flex: 1;
-  overflow-y: auto; 
+
+  /* Crucial: Allows the content area to scroll independently; basis `auto` (not 0%)
+     so Safari keeps the content-driven height — see .form */
+  flex: 1 1 auto;
+  overflow-y: auto;
   min-height: 0;
 }
 
@@ -478,6 +483,7 @@
   .newPost {
     width: calc(100vw - 20px);
     max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
     border-radius: 18px;
   }
 
