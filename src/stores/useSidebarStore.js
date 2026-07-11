@@ -30,6 +30,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   { id: 'bazzar', name: 'Bazzar', path: '/bazzar', icon: TagIcon },
+  { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
@@ -39,7 +40,6 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'batch-like', name: 'Like', path: '/batch-like', icon: HeartIcon, hasBadge: true },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
-  { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
 ]
 
 export const useSidebarStore = create(
