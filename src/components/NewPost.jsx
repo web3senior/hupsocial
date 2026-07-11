@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { FadersHorizontalIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -15,6 +15,7 @@ import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
+import GifPicker from '@/components/GifPicker'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
@@ -178,6 +179,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const dialogRef = useRef(null)
   const composerRef = useRef(null)
   const fileInputRef = useRef(null)
+  const gifPickerRef = useRef(null)
   const mediaItemsRef = useRef([])
 
   const { address, isConnected } = useConnection()
@@ -571,6 +573,71 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     })
   }
 
+  const openGifPicker = () => {
+    if (mediaItems.length >= MAX_MEDIA_ITEMS) {
+      toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
+      return
+    }
+    gifPickerRef.current?.open()
+  }
+
+  // A picked GIF flows through the same IPFS pipeline as uploaded files, so the
+  // feed renders it like any other image and the post never depends on Giphy's CDN
+  const handleGifSelect = async (gif) => {
+    if (mediaItems.length >= MAX_MEDIA_ITEMS) {
+      toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const response = await fetch(gif.full.url)
+      if (!response.ok) throw new Error('GIF download failed')
+      const blob = await response.blob()
+      const sizeInMB = blob.size / (1024 * 1024)
+      if (sizeInMB > MAX_MEDIA_SIZE_MB) {
+        toast(`GIF exceeds the ${MAX_MEDIA_SIZE_MB}MB limit`, 'error')
+        return
+      }
+
+      const file = new File([blob], `giphy-${gif.id}.gif`, { type: 'image/gif' })
+      const cid = await uploadFileToIPFS(file)
+      if (!cid) return
+
+      const localUrl = URL.createObjectURL(file)
+      setPostContent((prevContent) => {
+        const nextElements = [...prevContent.elements]
+        const mediaElement = nextElements[1]
+        nextElements[1] = {
+          ...mediaElement,
+          data: {
+            ...mediaElement.data,
+            items: [
+              ...mediaElement.data.items,
+              {
+                type: 'image',
+                cid,
+                alt: gif.title || 'GIF',
+                storage: 'IPFS',
+                mimeType: 'image/gif',
+                localUrl,
+                width: gif.full.width || undefined,
+                height: gif.full.height || undefined,
+                spoiler: false,
+              },
+            ],
+          },
+        }
+        return { ...prevContent, elements: nextElements }
+      })
+    } catch (error) {
+      console.error('Trouble adding GIF:', error)
+      toast('Error adding GIF', 'error')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const handleRemoveMedia = (itemIndex) => {
     const item = mediaItems[itemIndex]
     if (item?.localUrl) URL.revokeObjectURL(item.localUrl)
@@ -817,6 +884,15 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
+                onClick={openGifPicker}
+                aria-label="Add GIF"
+                disabled={isBusy}
+              >
+                <GifIcon size={22} />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => triggerFileInput('audio')}
                 aria-label="Add audio"
                 disabled={isBusy}
@@ -949,6 +1025,9 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
           </button>
         </footer>
       </form>
+
+      {/* Outside the <form>: the picker's search input must never submit the post */}
+      <GifPicker ref={gifPickerRef} onSelect={handleGifSelect} />
     </NativeDialog>
   )
 }
