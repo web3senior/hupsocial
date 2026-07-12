@@ -545,6 +545,8 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
 }
 
 export function PostCard({ item, actions, chainId, networkName }) {
+  const router = useRouter()
+  const { setCurrentPost } = usePostStore()
   const [lastComment, setLastComment] = useState(null)
   const [isLastCommentLoading, setIsLastCommentLoading] = useState(false)
   const { address } = useConnection()
@@ -591,6 +593,14 @@ export function PostCard({ item, actions, chainId, networkName }) {
 
   const hasCommentBelow = shouldFetch && (isLastCommentLoading || !!lastComment)
 
+  const openLastComment = (e) => {
+    e.stopPropagation()
+    const selection = window.getSelection()
+    if (selection && selection.toString().length > 0) return
+    setCurrentPost(lastComment)
+    router.push(`/networks/${lastComment.network_id}/${lastComment.id}`)
+  }
+
   return (
     <>
       <Post item={item} actions={actions} chainId={chainId} networkName={networkName} hasCommentBelow={hasCommentBelow} />
@@ -598,7 +608,13 @@ export function PostCard({ item, actions, chainId, networkName }) {
         (isLastCommentLoading ? (
           <LastCommentShimmer />
         ) : lastComment ? (
-          <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'bookmark']} chainId={chainId} />
+          <div
+            className={styles.post__commentLink}
+            onClick={openLastComment}
+            onMouseEnter={() => router.prefetch(`/networks/${lastComment.network_id}/${lastComment.id}`)}
+          >
+            <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'bookmark']} chainId={chainId} />
+          </div>
         ) : null)}
     </>
   )

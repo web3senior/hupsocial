@@ -206,6 +206,14 @@
     user-select: none;
   }
 
+  // display: contents so the wrapper catches clicks on the last-comment preview
+  // without adding a box that would break the feed card's layout and the
+  // thread-connector positioning; cursor still inherits to the children.
+  &__commentLink {
+    display: contents;
+    cursor: pointer;
+  }
+
   &[data-has-comments='true'] {
     .post {
       &__main {
@@ -214,7 +222,7 @@
           position: absolute;
           left: 1rem;
           top: 0.5rem;
-          bottom: -3.7rem;
+          bottom: -3.5rem;
           width: 2px;
           background-color: var(--border);
           z-index: 0;
