@@ -48,9 +48,12 @@ interface IHupBazzar {
     event MaxMetadataBytesUpdated(uint256 oldValue, uint256 newValue);
 
     /// @notice Emitted when a buyer successfully purchases from a listing.
-    /// @dev `memo` is never stored — it exists only in this event, for optional future use
-    ///      (e.g. an order reference) without adding storage cost to every purchase.
-    event ItemBought(uint256 indexed postId, address indexed buyer, address indexed seller, uint256 price, uint256 quantityBought, bytes memo);
+    /// @dev `paymentToken` and `feeAmount` are included so indexers can attribute each sale to a
+    ///      settlement token and fee without replaying listing state. `feeAmount` is 0 for
+    ///      operator-granted purchases (settled outside the contract). `memo` is never stored —
+    ///      it exists only in this event, for optional future use (e.g. an order reference)
+    ///      without adding storage cost to every purchase.
+    event ItemBought(uint256 indexed postId, address indexed buyer, address indexed seller, uint256 price, uint256 quantityBought, address paymentToken, uint256 feeAmount, bytes memo);
 
     /// @notice Emitted when a trusted forwarder's status is updated.
     event TrustedForwarderUpdated(address indexed forwarder, bool trusted);
@@ -72,6 +75,9 @@ interface IHupBazzar {
     error InvalidAddress();
     error ContentDeleted();
     error NotCreator();
+    error AlreadyListed();
+    /// @notice The listing's price or payment token no longer matches what the buyer committed to.
+    error ListingChanged(uint256 currentPrice, address currentToken);
     error InvalidPrice();
     error InvalidQuantity();
     error ListingNotActive();
@@ -129,7 +135,9 @@ interface IHupBazzar {
 
     /**
      * @notice Lists a new item for sale associated with a Hup post.
-     * @dev Only the original post creator can list it for sale.
+     * @dev Only the original post creator can list it for sale. Reverts with AlreadyListed if the
+     *      post already has a listing — edits (including reactivation) must use updateListing so
+     *      purchase history (totalSold, buyers, revenue) is never silently reset.
      * @param _owner The primary wallet address (or address(0) if caller is primary).
      * @param _postId The ID of the post in Hup.
      * @param _price The price per unit, in wei (native) or the payment token's base units.
@@ -183,20 +191,35 @@ interface IHupBazzar {
      * @notice Purchases a specified quantity of items from a listing.
      * @dev For native listings, msg.value must exactly match price * quantityBought. For token
      *      listings, msg.value must be zero and the buyer must have pre-authorized the bazzar for
-     *      the total — via `approve` (ERC20) or `authorizeOperator` (LSP7).
+     *      the total — via `approve` (ERC20) or `authorizeOperator` (LSP7). Reverts with
+     *      ListingChanged if the listing's price or payment token differs from what the buyer
+     *      committed to, so a seller-side updateListing can never drain a standing allowance.
+     *      Fee-on-transfer/deflationary payment tokens are unsupported.
      * @param _buyer The primary wallet address of the buyer (or address(0) if caller is primary).
      * @param _postId The ID of the listed post.
      * @param _quantityBought The number of items to purchase.
+     * @param _expectedPrice The per-unit price the buyer saw when signing — must match the listing.
+     * @param _expectedToken The payment token the buyer saw when signing — must match the listing.
      * @param _memo Optional opaque data emitted with ItemBought (e.g. a future order reference).
      *        Never stored — capped at maxMetadataBytes since it's only ever calldata + a log.
      */
-    function buyItem(address _buyer, uint256 _postId, uint256 _quantityBought, bytes calldata _memo) external payable;
+    function buyItem(
+        address _buyer,
+        uint256 _postId,
+        uint256 _quantityBought,
+        uint256 _expectedPrice,
+        address _expectedToken,
+        bytes calldata _memo
+    ) external payable;
 
     /**
      * @notice Records a purchase that was settled outside this contract (e.g. an x402 USDC payment
      *         submitted via EIP-3009 transferWithAuthorization directly to the seller).
      * @dev Callable only by OPERATOR_ROLE. Decrements stock and credits `amountPurchased` exactly
      *      like buyItem, but moves no funds — settlement is verified by the operator offchain.
+     *      Revenue is credited in the listing's current payment token at the listing price, so
+     *      the operator MUST only grant purchases that actually settled in that token at (or
+     *      above) that price — otherwise revenue stats are inflated.
      * @param _postId The ID of the listed post.
      * @param _buyer The buyer to credit the purchase to.
      * @param _quantity The number of items purchased.

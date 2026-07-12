@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./IHupBazzar.sol";
 import "./ILSP7Minimal.sol";
 
@@ -26,6 +27,7 @@ import "./ILSP7Minimal.sol";
  */
 contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     // --- STATE VARIABLES ---
 
@@ -66,19 +68,14 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
     /// @notice The maximum allowed byte length for a listing's metadata field
     uint256 public maxMetadataBytes = 256;
 
-    /// @notice Append-only list of unique buyer addresses per postId, for paginated on-chain reads
-    mapping(uint256 => address[]) internal _buyersOf;
+    /// @notice Unique buyer addresses per postId, insertion-ordered (never removed from), for
+    ///         paginated onchain reads via getBuyers
+    mapping(uint256 => EnumerableSet.AddressSet) private _buyersOf;
 
-    /// @dev Tracks whether an address has already been recorded in _buyersOf for a given postId
-    mapping(uint256 => mapping(address => bool)) internal _hasBoughtBefore;
-
-    /// @notice Append-only list of distinct payment tokens ever used by a listing. Bounded by how
-    ///         many times a seller changes a listing's payment token (not by buyer/purchase count),
-    ///         so it's read in full with no pagination needed.
-    mapping(uint256 => address[]) internal _tokensOf;
-
-    /// @dev Tracks whether a token has already been recorded in _tokensOf for a given postId
-    mapping(uint256 => mapping(address => bool)) internal _hasUsedToken;
+    /// @notice Distinct payment tokens ever used by a listing. Bounded by how many times a seller
+    ///         changes a listing's payment token (not by buyer/purchase count), so it's read in
+    ///         full with no pagination needed.
+    mapping(uint256 => EnumerableSet.AddressSet) private _tokensOf;
 
     // --- MODIFIERS ---
 
@@ -128,7 +125,11 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
 
         address seller = _resolveActor(_owner);
 
-        if (listingFee > 0 && msg.value != listingFee) revert InsufficientFee();
+        if (msg.value != listingFee) revert InsufficientFee();
+
+        // A postId can only be listed once — edits (including reactivation) must go through
+        // updateListing so purchase history (totalSold, buyers, revenue) is never silently reset
+        if (listings[_postId].seller != address(0)) revert AlreadyListed();
 
         // Query the core Hup contract to verify post status and ownership
         IHup.ContentView memory content = hupContract.getContent(_postId, address(0));
@@ -195,6 +196,8 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         address _buyer,
         uint256 _postId,
         uint256 _quantityBought,
+        uint256 _expectedPrice,
+        address _expectedToken,
         bytes calldata _memo
     ) external payable whenNotPaused nonReentrant {
         if (_quantityBought == 0) revert InvalidQuantity();
@@ -206,8 +209,21 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         if (!listing.isActive) revert ListingNotActive();
         if (listing.quantity < _quantityBought) revert OutOfStock();
 
-        uint256 requiredPayment = listing.price * _quantityBought;
+        // Cached before any external call: the transfers below can hand control to the seller
+        // (native call / LSP7 hooks), who could reenter updateListing — cached values keep the
+        // payout and the ItemBought log tied to the terms this purchase actually executed under
+        uint256 price = listing.price;
+        address seller = listing.seller;
         address paymentToken = listing.paymentToken;
+        bool isLsp7 = listing.isLsp7;
+
+        // Front-run guard: the buyer commits to the price/token they saw at signing time, so a
+        // seller can't slip in an updateListing that drains a standing token allowance
+        if (price != _expectedPrice || paymentToken != _expectedToken) {
+            revert ListingChanged(price, paymentToken);
+        }
+
+        uint256 requiredPayment = price * _quantityBought;
 
         if (paymentToken == address(0)) {
             if (msg.value != requiredPayment) revert InsufficientPayment(msg.value, requiredPayment);
@@ -223,38 +239,43 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         listing.totalSold += _quantityBought;
         revenueByToken[_postId][paymentToken] += requiredPayment;
         buyerAmountByToken[_postId][buyer][paymentToken] += _quantityBought;
-        _recordBuyer(_postId, buyer);
-        _recordToken(_postId, paymentToken);
+        _buyersOf[_postId].add(buyer);
+        _tokensOf[_postId].add(paymentToken);
 
         // If out of stock, automatically set listing to inactive
         if (listing.quantity == 0) {
             listing.isActive = false;
         }
 
-        // Split payment: platform fee stays in the contract, remainder goes to the seller
+        // Split payment: platform fee stays in the contract, remainder goes to the seller.
+        // Fee-on-transfer/deflationary ERC20s are unsupported: the contract pulls the gross
+        // amount and pushes sellerAmount, so a transfer tax would eat into accumulated fees.
         uint256 feeAmount = (requiredPayment * buyFeeBps) / FEE_DENOMINATOR;
         uint256 sellerAmount = requiredPayment - feeAmount;
 
         if (paymentToken == address(0)) {
-            (bool success, ) = listing.seller.call{value: sellerAmount}("");
+            (bool success, ) = seller.call{value: sellerAmount}("");
             if (!success) revert TransferFailed();
-        } else if (listing.isLsp7) {
+        } else if (isLsp7) {
             // LSP7 (LUKSO): buyer must have called authorizeOperator(bazzar, total) beforehand
             ILSP7Minimal token = ILSP7Minimal(paymentToken);
             token.transfer(buyer, address(this), requiredPayment, true, "");
-            token.transfer(address(this), listing.seller, sellerAmount, true, "");
+            token.transfer(address(this), seller, sellerAmount, true, "");
         } else {
             IERC20 token = IERC20(paymentToken);
             token.safeTransferFrom(buyer, address(this), requiredPayment);
-            token.safeTransfer(listing.seller, sellerAmount);
+            token.safeTransfer(seller, sellerAmount);
         }
 
-        emit ItemBought(_postId, buyer, listing.seller, listing.price, _quantityBought, _memo);
+        emit ItemBought(_postId, buyer, seller, price, _quantityBought, paymentToken, feeAmount, _memo);
     }
 
     /**
      * @notice Records a purchase settled outside this contract (e.g. an x402 USDC payment).
-     * @dev Callable only by OPERATOR_ROLE. Moves no funds — the operator verifies settlement offchain.
+     * @dev Callable only by OPERATOR_ROLE. Moves no funds — the operator verifies settlement
+     *      offchain. Credits revenueByToken/buyerAmountByToken in the listing's current payment
+     *      token at the listing price, so the operator MUST only grant purchases that actually
+     *      settled in that token at (or above) that price — otherwise revenue stats are inflated.
      */
     function grantPurchase(uint256 _postId, address _buyer, uint256 _quantity, bytes calldata _memo) external whenNotPaused {
         if (!hasRole(OPERATOR_ROLE, msg.sender)) revert Unauthorized();
@@ -271,14 +292,15 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         listing.totalSold += _quantity;
         revenueByToken[_postId][listing.paymentToken] += listing.price * _quantity;
         buyerAmountByToken[_postId][_buyer][listing.paymentToken] += _quantity;
-        _recordBuyer(_postId, _buyer);
-        _recordToken(_postId, listing.paymentToken);
+        _buyersOf[_postId].add(_buyer);
+        _tokensOf[_postId].add(listing.paymentToken);
 
         if (listing.quantity == 0) {
             listing.isActive = false;
         }
 
-        emit ItemBought(_postId, _buyer, listing.seller, listing.price, _quantity, _memo);
+        // feeAmount is 0: settlement happened outside this contract, no platform fee was taken
+        emit ItemBought(_postId, _buyer, listing.seller, listing.price, _quantity, listing.paymentToken, 0, _memo);
         emit PurchaseGranted(_postId, _buyer, msg.sender, _quantity);
     }
 
@@ -293,7 +315,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
     }
 
     function getBuyerCount(uint256 _postId) external view returns (uint256) {
-        return _buyersOf[_postId].length;
+        return _buyersOf[_postId].length();
     }
 
     function getBuyers(
@@ -301,8 +323,8 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         uint256 _offset,
         uint256 _limit
     ) external view returns (address[] memory buyers, uint256[] memory amounts, uint256 total) {
-        address[] storage all = _buyersOf[_postId];
-        total = all.length;
+        EnumerableSet.AddressSet storage all = _buyersOf[_postId];
+        total = all.length();
 
         if (_offset >= total) {
             return (new address[](0), new uint256[](0), total);
@@ -317,7 +339,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         amounts = new uint256[](resultLength);
 
         for (uint256 i = 0; i < resultLength; i++) {
-            address buyer = all[_offset + i];
+            address buyer = all.at(_offset + i);
             buyers[i] = buyer;
             amounts[i] = amountPurchased[_postId][buyer];
         }
@@ -329,7 +351,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
      *      token, not by buyer or purchase count, so it can't grow unbounded like buyers can.
      */
     function getTokensUsed(uint256 _postId) external view returns (address[] memory) {
-        return _tokensOf[_postId];
+        return _tokensOf[_postId].values();
     }
 
     // --- ADMIN CONFIGURATION ---
@@ -425,28 +447,6 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
     }
 
     // --- INTERNAL & OVERRIDE HELPERS ---
-
-    /**
-     * @dev Appends a buyer to a listing's buyer list the first time they purchase, so getBuyers
-     *      can paginate over unique buyers without ever growing unbounded per address.
-     */
-    function _recordBuyer(uint256 _postId, address _buyer) internal {
-        if (_hasBoughtBefore[_postId][_buyer]) return;
-
-        _hasBoughtBefore[_postId][_buyer] = true;
-        _buyersOf[_postId].push(_buyer);
-    }
-
-    /**
-     * @dev Appends a payment token to a listing's used-tokens list the first time it's used, so
-     *      getTokensUsed can return every distinct token a listing has ever been bought under.
-     */
-    function _recordToken(uint256 _postId, address _token) internal {
-        if (_hasUsedToken[_postId][_token]) return;
-
-        _hasUsedToken[_postId][_token] = true;
-        _tokensOf[_postId].push(_token);
-    }
 
     /**
      * @dev Resolves the primary owner address based on burner session rules.

@@ -17,6 +17,16 @@
         "type": "uint256"
       },
       {
+        "internalType": "uint256",
+        "name": "_expectedPrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_expectedToken",
+        "type": "address"
+      },
+      {
         "internalType": "bytes",
         "name": "_memo",
         "type": "bytes"
@@ -67,6 +77,40 @@
       }
     ],
     "name": "AccessControlUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "AlreadyListed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "currentPrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "currentToken",
+        "type": "address"
+      }
+    ],
+    "name": "ListingChanged",
     "type": "error"
   },
   {
@@ -316,6 +360,18 @@
         "indexed": false,
         "internalType": "uint256",
         "name": "quantityBought",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "paymentToken",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "feeAmount",
         "type": "uint256"
       },
       {

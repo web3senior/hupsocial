@@ -238,7 +238,10 @@ export default function BuyButton({ item }) {
       return
     }
 
-    const args = [address, BigInt(item.id), 1n, '0x']
+    // Committing the displayed price/token onchain: buyItem reverts with ListingChanged if the
+    // seller updates the listing between render and inclusion, so a stale UI (or a seller
+    // front-run) can never charge more than the price shown on this button
+    const args = [address, BigInt(item.id), 1n, listing.price, listing.paymentToken, '0x']
 
     // Route through the burner session key if one's active — same convenience the rest of the
     // app already gets (e.g. Like), skipping the wallet popup. Approve/authorizeOperator stays
