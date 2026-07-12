@@ -387,7 +387,13 @@ export default function MediaGallery({ data = [] }) {
           <div
             className={styles.lightboxScroll}
             ref={lightboxScrollRef}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Close on backdrop clicks; the slides fill the viewport, so
+              // anything that isn't the media itself counts as backdrop.
+              const tag = e.target.tagName
+              if (tag !== 'IMG' && tag !== 'VIDEO') closeLightbox()
+            }}
           >
             {visualData.map((item, i) => (
               <div
