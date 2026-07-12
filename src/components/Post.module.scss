@@ -445,6 +445,9 @@
 
   button,
   a {
+    // .post__actions button applies `all: unset` (icon-ripple reset), which drops
+    // box-sizing back to content-box — restore it or width:100% + padding overflows
+    box-sizing: border-box;
     background-color: inherit;
     border: none;
     display: flex;
