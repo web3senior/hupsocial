@@ -26,6 +26,11 @@ const TX_COUNT_SQL = `
   COALESCE(given.likes_given, 0)
 `
 
+/*
+ * Follower score uses sqrt scaling instead of a linear weight so bulk follow
+ * farming yields diminishing returns; follower_count itself is already limited
+ * to "qualified" followers (wallets with at least one post or like).
+ */
 const SCORE_SQL = `
   (COALESCE(activity.root_posts, 0) * 10) +
   (COALESCE(activity.comments_made, 0) * 4) +
@@ -33,7 +38,7 @@ const SCORE_SQL = `
   (COALESCE(received.likes_received, 0) * 8) +
   (COALESCE(given.likes_given, 0) * 1) +
   (COALESCE(views.views_received, 0) * 1) +
-  (COALESCE(followers.follower_count, 0) * 12) +
+  FLOOR(SQRT(COALESCE(followers.follower_count, 0)) * 40) +
   (${TX_COUNT_SQL}) * 2
 `
 
@@ -78,6 +83,20 @@ export async function GET(request) {
       timeColumn: 'viewed_at',
       networkId,
       since,
+    })
+
+    /*
+     * Follows are indexed from the onchain LSP26 contract, which is permissionless,
+     * so the follows table can contain Sybil wallets. Period-scope the rows here;
+     * networkId is intentionally omitted because follower counts are cross-network
+     * by design (same contract address on every chain).
+     */
+    const followFilter = buildWhere({
+      alias: 'f',
+      timeColumn: 'updated_at',
+      networkId: null,
+      since,
+      baseConditions: ['f.is_following = 1'],
     })
 
     /* Construct base query fields to execute dynamic window rank sequencing */
@@ -155,7 +174,14 @@ export async function GET(request) {
             CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
             COUNT(DISTINCT f.follower_address) AS follower_count
           FROM follows f
-          WHERE f.is_following = 1
+          JOIN (
+            SELECT DISTINCT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address
+            FROM posts WHERE wallet_address IS NOT NULL
+            UNION
+            SELECT DISTINCT CONVERT(liker_address USING utf8mb4) COLLATE utf8mb4_general_ci
+            FROM post_likes WHERE liker_address IS NOT NULL
+          ) qualified ON qualified.wallet_address = CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci
+          ${followFilter.where}
           GROUP BY CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci
         ) followers ON followers.wallet_address = wallets.wallet_address
         LEFT JOIN (
@@ -188,6 +214,7 @@ export async function GET(request) {
         ...receivedFilter.params,
         ...givenFilter.params,
         ...viewsFilter.params,
+        ...followFilter.params,
         walletAddressParam,
       ]
 
@@ -210,6 +237,7 @@ export async function GET(request) {
         ...receivedFilter.params,
         ...givenFilter.params,
         ...viewsFilter.params,
+        ...followFilter.params,
         limit + 1,
         offset,
       ]
