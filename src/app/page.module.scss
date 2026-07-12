@@ -7,11 +7,10 @@
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
-  padding-bottom: 4rem;
+  // Clear the fixed app header (0.7rem padding x2 + 38px controls) so the
+  // in-flow tab strip isn't painted underneath it.
 
-  &__header {
-    -webkit-tap-highlight-color: transparent;
-  }
+
 
   &__container {
     position: relative;

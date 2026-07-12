@@ -1,17 +1,11 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import clsx from 'clsx'
 import { XIcon } from '@phosphor-icons/react'
-import { useRouter } from 'next/navigation'
-import { useConnection } from 'wagmi'
 import { useHomeTabsStore, resolveTabs } from '@/stores/useHomeTabsStore'
 import AddTabMenu from './AddTabMenu'
 import styles from './HomeTabStrip.module.scss'
-
-// These render icon-only in the strip (matches Threads: utility tabs are icon
-// buttons, feed tabs carry a text label).
-const ICON_ONLY_TYPES = ['search', 'notifications', 'profile']
 
 export default function HomeTabStrip() {
   const tabs = useHomeTabsStore((state) => state.tabs)
@@ -19,33 +13,106 @@ export default function HomeTabStrip() {
   const activeTabId = useHomeTabsStore((state) => state.activeTabId)
   const setActiveTab = useHomeTabsStore((state) => state.setActiveTab)
   const removeTab = useHomeTabsStore((state) => state.removeTab)
-  const router = useRouter()
-  const { address, isConnected } = useConnection()
+  const scrollRef = useRef(null)
 
-  // Profile has no inline content in this pass - it navigates to the existing
-  // wallet route instead of becoming the active tab (see plan's MVP decision).
-  const handleTabClick = (tab) => {
-    if (tab.type === 'profile') {
-      router.push(isConnected && address ? `/${address}` : '/connect')
-      return
+  // Mouse wheels only emit vertical deltas, and the strip hides its scrollbar,
+  // so on desktop the row is unreachable without this: route deltaY into
+  // scrollLeft. Native listener (not React onWheel) because preventDefault
+  // needs passive: false.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const onWheel = (e) => {
+      if (el.scrollWidth <= el.clientWidth) return
+      if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return
+
+      el.scrollLeft += e.deltaY
+      e.preventDefault()
     }
-    setActiveTab(tab.id)
-  }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  // Mouse drag-to-scroll (touch swiping is native). Pointer capture starts only
+  // past a 5px threshold so plain clicks still reach the tab buttons; after a
+  // real drag the trailing click is swallowed so it can't activate a tab.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    let pointerId = null
+    let startX = 0
+    let startLeft = 0
+    let dragged = false
+    let suppressClick = false
+
+    const onPointerDown = (e) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return
+      if (el.scrollWidth <= el.clientWidth) return
+
+      pointerId = e.pointerId
+      startX = e.clientX
+      startLeft = el.scrollLeft
+      dragged = false
+    }
+
+    const onPointerMove = (e) => {
+      if (pointerId === null || e.pointerId !== pointerId) return
+
+      const dx = e.clientX - startX
+      if (!dragged) {
+        if (Math.abs(dx) < 5) return
+        dragged = true
+        el.setPointerCapture(pointerId)
+      }
+      el.scrollLeft = startLeft - dx
+    }
+
+    const onPointerUp = (e) => {
+      if (pointerId === null || e.pointerId !== pointerId) return
+
+      if (dragged) suppressClick = true
+      pointerId = null
+      dragged = false
+    }
+
+    const onClickCapture = (e) => {
+      if (!suppressClick) return
+      suppressClick = false
+      e.stopPropagation()
+      e.preventDefault()
+    }
+
+    el.addEventListener('pointerdown', onPointerDown)
+    el.addEventListener('pointermove', onPointerMove)
+    el.addEventListener('pointerup', onPointerUp)
+    el.addEventListener('pointercancel', onPointerUp)
+    el.addEventListener('click', onClickCapture, true)
+
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('pointermove', onPointerMove)
+      el.removeEventListener('pointerup', onPointerUp)
+      el.removeEventListener('pointercancel', onPointerUp)
+      el.removeEventListener('click', onClickCapture, true)
+    }
+  }, [])
 
   return (
     <div className={styles['tab-strip']}>
-      <div className={styles['tab-strip__scroll']}>
+      <div ref={scrollRef} className={styles['tab-strip__scroll']}>
         {resolvedTabs.map((tab) => {
           const Icon = tab.icon
           const isActive = tab.id === activeTabId
-          const iconOnly = ICON_ONLY_TYPES.includes(tab.type)
 
           return (
             <button
               key={tab.id}
               type="button"
               className={clsx(styles['tab-strip__tab'], isActive && styles['tab-strip__tab--active'])}
-              onClick={() => handleTabClick(tab)}
+              onClick={() => setActiveTab(tab.id)}
               aria-current={isActive ? 'true' : undefined}
             >
               {tab.type === 'network' && tab.chainIcon && (
@@ -54,7 +121,7 @@ export default function HomeTabStrip() {
                 </span>
               )}
               {Icon && <Icon size={18} />}
-              {!iconOnly && <span className={styles['tab-strip__label']}>{tab.label}</span>}
+              <span className={styles['tab-strip__label']}>{tab.label}</span>
 
               {tab.id !== 'foryou' && (
                 <span

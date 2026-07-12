@@ -7,10 +7,10 @@ import clsx from 'clsx'
 import { getPosts } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
-import PageTitle from '@/components/PageTitle'
-import styles from '@/app/page.module.scss'
 import { usePostStore } from '@/stores/usePostStore'
 import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
+import PageTitle from '@/components/PageTitle'
+import styles from '@/app/page.module.scss'
 
 // Must stay consistent across all getPosts() calls: the API's offset is (page - 1) * limit,
 // so mixing page sizes shifts the offset and re-fetches an already-loaded window.
@@ -302,9 +302,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
 
   return (
     <div className={styles.page}>
-      <div className={clsx(styles.page__header)}>
-        <PageTitle name={title} changeDocumentTitle={changeDocumentTitle} />
-      </div>
+      <PageTitle name={title} changeDocumentTitle={changeDocumentTitle} spacer={false} showInHeader={false} />
 
       <div className={clsx('__container')} data-width="small">
         {newPostsQueue.length > 0 && (

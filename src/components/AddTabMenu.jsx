@@ -1,25 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { BellIcon, BroadcastIcon, CaretLeftIcon, CaretRightIcon, CheckIcon, FlameIcon, MagnifyingGlassIcon, NotePencilIcon, PlusIcon, UserCheckIcon, UserIcon } from '@phosphor-icons/react'
+import { BroadcastIcon, CaretLeftIcon, CaretRightIcon, CheckIcon, FlameIcon, PlusIcon, UserCheckIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
-import NewPost from '@/components/NewPost'
 import { useHomeTabsStore } from '@/stores/useHomeTabsStore'
 import { config } from '@/config/wagmi'
 import styles from './AddTabMenu.module.scss'
 
 /**
- * Threads-style "Add Tab" popover: root menu (Search/Notifications/Profile/Feeds),
- * a Feeds submenu (Following/Status posts/Networks), and a Networks submenu
- * (one entry per configured chain). Built on the single NativePopover primitive -
- * `view` swaps the rendered menu level instead of nesting native popovers.
+ * Threads-style "Add Tab" popover: root menu (Following/Trending/Pulses/Networks)
+ * and a Networks submenu (one entry per configured chain). Built on the single
+ * NativePopover primitive - `view` swaps the rendered menu level instead of
+ * nesting native popovers.
  */
 export default function AddTabMenu() {
   const tabs = useHomeTabsStore((state) => state.tabs)
   const addTab = useHomeTabsStore((state) => state.addTab)
   const [view, setView] = useState('root')
-  const [showComposer, setShowComposer] = useState(false)
 
   const hasTab = (id) => tabs.some((tab) => tab.id === id)
   const hasNetworkTab = (chainId) => tabs.some((tab) => tab.type === 'network' && tab.chainId === chainId)
@@ -30,7 +28,6 @@ export default function AddTabMenu() {
   }
 
   return (
-    <>
     <NativePopover
       placement="bottom-end"
       trigger={
@@ -46,34 +43,16 @@ export default function AddTabMenu() {
         <div className={styles['add-tab']}>
           {view === 'root' && (
             <>
-              <MenuItem
-                icon={NotePencilIcon}
-                label="New post"
-                onClick={() => {
-                  close()
-                  setShowComposer(true)
-                }}
-              />
-              {!hasTab('search') && <MenuItem icon={MagnifyingGlassIcon} label="Search" onClick={() => handleSelect(close, 'search')} />}
-              {!hasTab('notifications') && <MenuItem icon={BellIcon} label="Notifications" onClick={() => handleSelect(close, 'notifications')} />}
-              {!hasTab('profile') && <MenuItem icon={UserIcon} label="Profile" onClick={() => handleSelect(close, 'profile')} />}
-              <MenuItem label="Feeds" onClick={() => setView('feeds')} trailing={<CaretRightIcon size={16} />} />
-            </>
-          )}
-
-          {view === 'feeds' && (
-            <>
-              <MenuItem label="Back" leading={<CaretLeftIcon size={16} />} onClick={() => setView('root')} muted />
               {!hasTab('following') && <MenuItem icon={UserCheckIcon} label="Following" onClick={() => handleSelect(close, 'following')} />}
               {!hasTab('trending') && <MenuItem icon={FlameIcon} label="Trending" onClick={() => handleSelect(close, 'trending')} />}
-              {!hasTab('status') && <MenuItem icon={BroadcastIcon} label="Status posts" onClick={() => handleSelect(close, 'status')} />}
+              {!hasTab('status') && <MenuItem icon={BroadcastIcon} label="Pulses" onClick={() => handleSelect(close, 'status')} />}
               <MenuItem label="Networks" onClick={() => setView('networks')} trailing={<CaretRightIcon size={16} />} />
             </>
           )}
 
           {view === 'networks' && (
             <>
-              <MenuItem label="Back" leading={<CaretLeftIcon size={16} />} onClick={() => setView('feeds')} muted />
+              <MenuItem label="Back" leading={<CaretLeftIcon size={16} />} onClick={() => setView('root')} muted />
               {config.chains.map((chain) => {
                 const added = hasNetworkTab(chain.id)
                 return (
@@ -96,10 +75,6 @@ export default function AddTabMenu() {
         </div>
       )}
     </NativePopover>
-
-    {/* Composer mounts outside the popover so it survives the popover closing */}
-    {showComposer && <NewPost actionType="post" onClose={() => setShowComposer(false)} />}
-    </>
   )
 }
 

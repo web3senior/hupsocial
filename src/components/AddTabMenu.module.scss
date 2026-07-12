@@ -10,6 +10,8 @@
     justify-content: center;
     width: 32px;
     height: 32px;
+    // Sits beside the scrollable tab row; must not get squeezed when tabs overflow
+    flex-shrink: 0;
     border: none;
     border-radius: 50%;
     background: var(--color-surface-muted, rgba(0, 0, 0, 0.05));

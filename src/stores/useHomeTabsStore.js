@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { BellIcon, BroadcastIcon, FlameIcon, HouseIcon, MagnifyingGlassIcon, UserCheckIcon, UserIcon } from '@phosphor-icons/react'
+import { BroadcastIcon, FlameIcon, HouseIcon, UserCheckIcon } from '@phosphor-icons/react'
 import { config } from '@/config/wagmi'
 
 // Static schema for non-network tab types. Icons/labels stay out of localStorage
@@ -11,10 +11,7 @@ export const TAB_TYPE_SCHEMA = {
   foryou: { label: 'For you', icon: HouseIcon },
   following: { label: 'Following', icon: UserCheckIcon },
   trending: { label: 'Trending', icon: FlameIcon },
-  status: { label: 'Status posts', icon: BroadcastIcon },
-  search: { label: 'Search', icon: MagnifyingGlassIcon },
-  notifications: { label: 'Notifications', icon: BellIcon },
-  profile: { label: 'Profile', icon: UserIcon },
+  status: { label: 'Pulses', icon: BroadcastIcon },
 }
 
 const DEFAULT_TABS = [{ id: 'foryou', type: 'foryou' }]
@@ -70,6 +67,14 @@ export const useHomeTabsStore = create(
       name: 'hup-home-tabs-state',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ tabs: state.tabs, activeTabId: state.activeTabId }),
+      // v1 drops the retired search/notifications/profile tab types that
+      // earlier sessions may have persisted.
+      version: 1,
+      migrate: (persisted) => {
+        const tabs = (persisted?.tabs ?? DEFAULT_TABS).filter((tab) => tab.type === 'network' || TAB_TYPE_SCHEMA[tab.type])
+        const activeTabId = tabs.some((tab) => tab.id === persisted?.activeTabId) ? persisted.activeTabId : 'foryou'
+        return { ...persisted, tabs, activeTabId }
+      },
     },
   ),
 )

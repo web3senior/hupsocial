@@ -12,8 +12,6 @@ import styles from './page.module.scss'
 const FollowingFeedTab = dynamic(() => import('@/components/tabs/FollowingFeedTab'))
 const TrendingFeedTab = dynamic(() => import('@/components/tabs/TrendingFeedTab'))
 const StatusFeedTab = dynamic(() => import('@/components/tabs/StatusFeedTab'))
-const SearchPanel = dynamic(() => import('@/app/search/_components/SearchPanel'))
-const ActivityFeed = dynamic(() => import('@/app/notifications/_components/ActivityFeed'))
 
 export default function Page() {
   const tabs = useHomeTabsStore((state) => state.tabs)
@@ -24,7 +22,9 @@ export default function Page() {
 
   return (
     <div className={styles.page}>
-      <HomeTabStrip />
+      <div className={`__container`} data-width={`small`}>
+        <HomeTabStrip />
+      </div>
 
       {/* Keyed per tab: switching between two network tabs must remount the
           feed (not reuse the instance) so each one hydrates its own session
@@ -34,8 +34,6 @@ export default function Page() {
       {activeTab?.type === 'following' && <FollowingFeedTab />}
       {activeTab?.type === 'trending' && <TrendingFeedTab />}
       {activeTab?.type === 'status' && <StatusFeedTab />}
-      {activeTab?.type === 'search' && <SearchPanel />}
-      {activeTab?.type === 'notifications' && <ActivityFeed />}
     </div>
   )
 }
