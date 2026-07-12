@@ -31,7 +31,9 @@ export async function GET(request) {
         n.id as network_id,
         n.explorer_url,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
-        (SELECT COUNT(*) FROM posts WHERE is_comment = p.id AND network_id = p.network_id) as total_comments,
+        (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id AND child.contract_address <=> p.contract_address
+          AND child.is_deleted = 0 AND (child.content_type = 1 OR child.is_comment IS NOT NULL)
+          AND (NULLIF(child.parent_id, 0) = p.id OR child.is_comment = p.id)) as total_comments,
         (SELECT COUNT(*) FROM post_views WHERE post_id = p.id AND network_id = p.network_id) as total_views,
         ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker = ?))` : '0'} as has_liked
       FROM posts p
