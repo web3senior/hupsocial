@@ -63,7 +63,7 @@ export default function StatusFeedTab() {
   if (isLoaded && statuses.length === 0) {
     return (
       <div className={clsx('__container')} data-width="small">
-        <p className={clsx('text-center', 'p-100')}>No pulses right now. Pulses fade after 24 hours.</p>
+        <p className={clsx('text-center', 'p-100')}>No pulses right now. Pulses last as long as their creators choose.</p>
       </div>
     )
   }
