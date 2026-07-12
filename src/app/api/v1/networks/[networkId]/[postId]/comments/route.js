@@ -48,13 +48,13 @@ export async function GET(request, { params }) {
             AND pl.is_active = 1
         ) as total_likes,
         (
-          SELECT COUNT(*)
-          FROM posts child
-          WHERE child.network_id = p.network_id
-            AND child.contract_address <=> p.contract_address
-            AND child.is_deleted = 0
-            AND (child.content_type = 1 OR child.is_comment IS NOT NULL)
-            AND (NULLIF(child.parent_id, 0) = p.id OR child.is_comment = p.id)
+          (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
+          + (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.parent_id = p.id
+            AND child.parent_id <> 0 AND child.is_deleted = 0
+            AND NOT (child.is_comment <=> p.id)
+            AND (child.content_type = 1 OR child.is_comment IS NOT NULL))
         ) as total_comments,
         (
           SELECT COUNT(*)

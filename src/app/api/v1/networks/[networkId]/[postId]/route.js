@@ -33,9 +33,15 @@ export async function GET(request, { params }) {
         u.profileImage as profile_image,
         comm.name as community_name,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
-        (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id AND child.contract_address <=> p.contract_address
-          AND child.is_deleted = 0 AND (child.content_type = 1 OR child.is_comment IS NOT NULL)
-          AND (NULLIF(child.parent_id, 0) = p.id OR child.is_comment = p.id)) as total_comments,
+        (
+          (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
+          + (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.parent_id = p.id
+            AND child.parent_id <> 0 AND child.is_deleted = 0
+            AND NOT (child.is_comment <=> p.id)
+            AND (child.content_type = 1 OR child.is_comment IS NOT NULL))
+        ) as total_comments,
         (SELECT COUNT(*) FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND is_deleted = 0)
         + (SELECT COUNT(*) FROM posts q WHERE q.network_id = p.network_id AND q.is_deleted = 0
            AND CASE WHEN JSON_VALID(q.content) THEN JSON_UNQUOTE(JSON_EXTRACT(q.content, '$.quoteOf')) = CAST(p.id AS CHAR) ELSE 0 END) as total_reposts,
