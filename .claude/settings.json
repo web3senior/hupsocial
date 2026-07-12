@@ -46,7 +46,9 @@
       "Read(//c/xampp/htdocs/hupsocial/**)",
       "Bash(python3 -c ' *)",
       "Bash(npm -v)",
-      "PowerShell(pnpm add @phosphor-icons/react)"
+      "PowerShell(pnpm add @phosphor-icons/react)",
+      "PowerShell(\\(Test-NetConnection -ComputerName localhost -Port 3000 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "PowerShell(\\(Get-Content package.json | ConvertFrom-Json\\).dependencies.next; ls node_modules/next/dist/docs | Select-Object -ExpandProperty Name)"
     ],
     "additionalDirectories": [
       "c:\\xampp\\htdocs\\cidex"
