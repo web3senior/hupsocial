@@ -1,4 +1,4 @@
-const { keccak256, solidityPacked, getAddress } = require("ethers");
+const { keccak256, solidityPacked, getAddress, JsonRpcProvider } = require("ethers");
 
 const factoryAddress = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 const targetAddress  = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
@@ -21,3 +21,57 @@ const predicted = getAddress("0x" + keccak256(inputs).slice(26));
 console.log("Predicted:", predicted);
 console.log("Expected: ", getAddress(targetAddress));
 console.log("Match Status:", predicted === getAddress(targetAddress) ? "✅ VALID" : "❌ MISMATCH");
+
+// Mainnets from src/config/wagmi.js, each with a public RPC endpoint
+const mainnetChains = [
+  { chainId: 1, name: "ethereum", rpcUrl: "https://ethereum-rpc.publicnode.com" },
+  { chainId: 42, name: "lukso", rpcUrl: "https://42.rpc.thirdweb.com" },
+  { chainId: 56, name: "bnb", rpcUrl: "https://bsc-dataseed.bnbchain.org" },
+  { chainId: 143, name: "monad", rpcUrl: "https://rpc.monad.xyz" },
+  { chainId: 42161, name: "arbitrum", rpcUrl: "https://arbitrum-one-rpc.publicnode.com" },
+  { chainId: 8453, name: "base", rpcUrl: "https://base.drpc.org" },
+  { chainId: 42220, name: "celo", rpcUrl: "https://celo-rpc.publicnode.com" },
+  { chainId: 4663, name: "robinhood", rpcUrl: "https://rpc.mainnet.chain.robinhood.com" },
+];
+
+async function checkFactoryOnMainnets() {
+  console.log(`\nChecking CREATE2 factory ${factoryAddress} on ${mainnetChains.length} mainnets...\n`);
+
+  const results = await Promise.all(
+    mainnetChains.map(async ({ chainId, name, rpcUrl }) => {
+      const provider = new JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true });
+      try {
+        const [factoryCode, followerSystemCode] = await Promise.all([
+          provider.getCode(factoryAddress),
+          provider.getCode(targetAddress),
+        ]);
+        return {
+          name,
+          chainId,
+          hasFactory: factoryCode !== "0x",
+          hasFollowerSystem: followerSystemCode !== "0x",
+        };
+      } catch (error) {
+        return { name, chainId, error: error.shortMessage || error.message };
+      } finally {
+        provider.destroy();
+      }
+    })
+  );
+
+  for (const result of results) {
+    if (result.error) {
+      console.log(`⚠️  ${result.name} (${result.chainId}): RPC error — ${result.error}`);
+      continue;
+    }
+    const factoryStatus = result.hasFactory ? "✅ factory deployed" : "❌ factory MISSING";
+    const followerStatus = result.hasFollowerSystem
+      ? "LSP26 already at target address"
+      : "LSP26 not deployed yet";
+    console.log(`${factoryStatus} — ${result.name} (${result.chainId}) — ${followerStatus}`);
+  }
+
+  return results;
+}
+
+checkFactoryOnMainnets();
