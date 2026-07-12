@@ -7,7 +7,7 @@
  */
 
 import Web3 from 'web3'
-import { config, CONTRACTS } from '@/config/wagmi'
+import { appChains, CONTRACTS } from '@/config/contracts'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem.json'
 
 /**
@@ -15,7 +15,7 @@ import followerSystemAbi from '@/abis/LSP26FollowerSystem.json'
  * Returns `supported: false` when the chain has no followerSystem contract configured.
  */
 export async function getFollowingAddresses(chainId, viewerAddress) {
-  const chain = config.chains.find((c) => c.id === Number(chainId))
+  const chain = appChains.find((c) => c.id === Number(chainId))
   const contracts = CONTRACTS[`chain${chainId}`]
 
   if (!chain || !contracts?.followerSystem) {

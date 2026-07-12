@@ -10,7 +10,7 @@
 
 import Web3 from 'web3'
 import pool from '@/lib/db'
-import { config, CONTRACTS } from '@/config/wagmi'
+import { appChains, CONTRACTS } from '@/config/contracts'
 import { STORE_ADDRESSES } from '@/lib/tokens'
 import storeAbi from '@/abis/HupBazzar.json'
 
@@ -40,7 +40,7 @@ export function ensureStoreListingsTable() {
  * no store contract configured.
  */
 export async function syncListingFromChain(networkId, postId) {
-  const chain = config.chains.find((c) => c.id === Number(networkId))
+  const chain = appChains.find((c) => c.id === Number(networkId))
   // STORE_ADDRESSES (lib/tokens) is the server-side source of truth for store deployments;
   // CONTRACTS is the client config and can lag behind it — accept whichever is set.
   const storeAddress = STORE_ADDRESSES[Number(networkId)] || CONTRACTS[`chain${networkId}`]?.store

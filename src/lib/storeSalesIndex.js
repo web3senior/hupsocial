@@ -13,7 +13,7 @@
 
 import Web3 from 'web3'
 import pool from '@/lib/db'
-import { config, CONTRACTS } from '@/config/wagmi'
+import { appChains, CONTRACTS } from '@/config/contracts'
 import { STORE_ADDRESSES, STORE_DEPLOY_BLOCKS, USDC } from '@/lib/tokens'
 import storeAbi from '@/abis/HupBazzar.json'
 
@@ -326,7 +326,7 @@ async function processLogs(networkId, chain, web3, storeAddress, logs, tokenByPo
 }
 
 async function syncNetwork(networkId) {
-  const chain = config.chains.find((c) => c.id === Number(networkId))
+  const chain = appChains.find((c) => c.id === Number(networkId))
   const storeAddress = STORE_ADDRESSES[Number(networkId)] || CONTRACTS[`chain${networkId}`]?.store
   if (!chain || !storeAddress) return { networkId, supported: false }
 
