@@ -65,7 +65,11 @@
   border-radius: 1rem;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.06);
 
-  transform: translateY(calc(var(--stack-index, 0) * var(--shift, -0.75rem))) scale(calc(1 - var(--stack-index, 0) * 0.05));
+  // --y/--s are the toast's resting transform; the expanded modifier below and
+  // the exit keyframe both read them so every mode animates from its own spot.
+  --y: calc(var(--stack-index, 0) * var(--shift, -0.75rem));
+  --s: calc(1 - var(--stack-index, 0) * 0.05);
+  transform: translateY(var(--y)) scale(var(--s));
   transform-origin: var(--origin, center bottom);
   transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1), opacity 250ms cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -130,6 +134,29 @@
   pointer-events: none;
 }
 
+// Hovered stack fans out into a list: every toast slides to its measured row
+// offset at full scale, and buried layers become visible again.
+.next-toast--expanded {
+  .toast {
+    --y: var(--expand-offset, 0px);
+    --s: 1;
+
+    // Invisible hit-area bridging the gap between rows, so moving the pointer
+    // from one toast to the next never counts as leaving the stack (which
+    // would collapse it mid-hover).
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -0.75rem 0;
+    }
+  }
+
+  .toast--buried {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .toast--exit {
   animation: toast-out 200ms ease-in forwards;
   pointer-events: none;
@@ -178,16 +205,17 @@
   }
 }
 
-// Custom properties resolve per-element inside keyframes, so a toast dismissed
-// while sitting behind the front card exits from its own stacked transform.
+// Custom properties resolve per-element inside keyframes, so a toast exits
+// from wherever it currently rests — stacked behind the front card or fanned
+// out in the expanded list.
 @keyframes toast-out {
   from {
     opacity: 1;
-    transform: translateY(calc(var(--stack-index, 0) * var(--shift, -0.75rem))) scale(calc(1 - var(--stack-index, 0) * 0.05));
+    transform: translateY(var(--y, 0px)) scale(var(--s, 1));
   }
 
   to {
     opacity: 0;
-    transform: translateY(calc(var(--stack-index, 0) * var(--shift, -0.75rem))) scale(calc(0.9 - var(--stack-index, 0) * 0.05));
+    transform: translateY(var(--y, 0px)) scale(calc(var(--s, 1) - 0.1));
   }
 }

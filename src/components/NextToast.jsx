@@ -22,17 +22,27 @@ const ICONS = {
 
 const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`
 
+// Gap between rows when the stack is fanned out on hover.
+const EXPAND_GAP_PX = 12
+
 // Newest toast (last child) is the front card at --stack-index 0; each older
 // toast sits one layer deeper, peeking out behind it Sonner-style. Layers past
-// MAX_VISIBLE are faded out entirely.
+// MAX_VISIBLE are faded out entirely. Each toast also gets --expand-offset —
+// its row position (cumulative heights of newer toasts + gaps, pointing away
+// from the anchored edge) used when the hovered stack fans out into a list.
 const restack = (container) => {
   const items = [...container.children]
-  items.forEach((el, i) => {
+  const direction = container.dataset.position?.startsWith(`bottom`) ? -1 : 1
+  let offset = 0
+  for (let i = items.length - 1; i >= 0; i--) {
+    const el = items[i]
     const depth = items.length - 1 - i
     el.style.setProperty(`--stack-index`, depth)
+    el.style.setProperty(`--expand-offset`, `${direction * offset}px`)
     el.style.zIndex = String(items.length - depth)
     el.classList.toggle(styles['toast--buried'], depth >= MAX_VISIBLE)
-  })
+    offset += el.offsetHeight + EXPAND_GAP_PX
+  }
 }
 
 export const toast = (message = `Default message`, type, options) => {
@@ -47,6 +57,15 @@ export const toast = (message = `Default message`, type, options) => {
   // order, so toasts stay above any NativePopover already open.
   if (container.matches(`:popover-open`)) container.hidePopover()
   container.showPopover()
+
+  // Hovering anywhere on the stack fans it out row by row; enter/leave fire on
+  // the container via its hit-testable children even though the container
+  // itself is pointer-events: none.
+  if (!container.dataset.expandBound) {
+    container.dataset.expandBound = `true`
+    container.addEventListener(`mouseenter`, () => container.classList.add(styles['next-toast--expanded']))
+    container.addEventListener(`mouseleave`, () => container.classList.remove(styles['next-toast--expanded']))
+  }
 
   const resolvedType = TYPE_ALIASES[type] ?? type
 
@@ -77,8 +96,16 @@ export const toast = (message = `Default message`, type, options) => {
 
   let timer
 
+  const pause = () => window.clearTimeout(timer)
+
+  const arm = () => {
+    timer = window.setTimeout(dismiss, duration)
+  }
+
   const dismiss = () => {
     window.clearTimeout(timer)
+    container.removeEventListener(`mouseenter`, pause)
+    container.removeEventListener(`mouseleave`, arm)
     div.classList.add(styles['toast--exit'])
     div.addEventListener(
       `animationend`,
@@ -90,13 +117,11 @@ export const toast = (message = `Default message`, type, options) => {
     )
   }
 
-  const arm = () => {
-    timer = window.setTimeout(dismiss, duration)
-  }
-
   close.addEventListener(`click`, dismiss)
-  div.addEventListener(`mouseenter`, () => window.clearTimeout(timer))
-  div.addEventListener(`mouseleave`, arm)
+  // Hovering the (possibly expanded) stack pauses every toast's timer, not
+  // just the hovered card, so nothing expires mid-read.
+  container.addEventListener(`mouseenter`, pause)
+  container.addEventListener(`mouseleave`, arm)
 
   arm()
 }
