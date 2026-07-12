@@ -67,6 +67,10 @@ export const Bookmark = ({ post }) => {
       folderId: post.folder_id ?? null,
       isProcessing: false,
     },
+    // The feed row already carries is_bookmarked/total_bookmarks; without this
+    // flag every mounted card refetches its own post row on page load.
+    // Bookmark actions revalidate explicitly via mutate().
+    revalidateOnMount: false,
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
   })

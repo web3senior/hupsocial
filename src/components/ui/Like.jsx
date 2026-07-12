@@ -71,6 +71,10 @@ export const Like = ({ post, onUpdate }) => {
       likeCount: Number(post.total_likes) || 0,
       isProcessing: false,
     },
+    // The feed row already carries is_liked/total_likes; without this flag
+    // every mounted card refetches its own post row on page load. Like
+    // actions revalidate explicitly via mutate().
+    revalidateOnMount: false,
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
   })

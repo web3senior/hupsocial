@@ -41,6 +41,10 @@ export function usePostStats(post) {
 
   const { data: stats, mutate } = useSWR(cacheKey, fetcher, {
     fallbackData: post,
+    // The feed row already carries every counter this hook reads; without this
+    // flag every mounted card refetches its own post row on page load (~3
+    // requests x 20 posts). Action handlers revalidate explicitly via mutate().
+    revalidateOnMount: false,
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
   })
