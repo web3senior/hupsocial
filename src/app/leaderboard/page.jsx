@@ -30,6 +30,7 @@ const SORT_OPTIONS = [
   { value: 'posts', label: 'Posts' },
   { value: 'views', label: 'Views' },
   { value: 'transactions', label: 'Transactions' },
+  { value: 'followers', label: 'Followers' },
 ]
 
 const numberFormatter = new Intl.NumberFormat('en-US')
@@ -195,6 +196,7 @@ export default function LeaderboardPage() {
                     <Metric icon={RepeatIcon} label="Reposts" value={leader.reposts_made} />
                     <Metric icon={EyeIcon} label="Views" value={leader.views_received} />
                     <Metric icon={PackageIcon} label="Transactions" value={leader.tx_count} />
+                    <Metric icon={UsersIcon} label="Followers" value={leader.follower_count} />
                     <span className={styles.rowScore}>{compactFormatter.format(leader.score)}</span>
                   </button>
                 ))}
