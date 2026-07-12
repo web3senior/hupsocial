@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import clsx from 'clsx'
 import { getStatuses } from '@/lib/api'
-import { config } from '@/config/wagmi'
-import { toRelativeTime } from '@/lib/dateHelper'
+import Profile from '@/components/Profile'
 import styles from './StatusFeedTab.module.scss'
 
 const STATUSES_PAGE_SIZE = 20
 
 /**
- * Multichain feed of every wallet's latest on-chain Status broadcast, backed
- * by the `statuses` table synced in src/lib/statusChain.js. Distinct from the
- * single-status widget in UserProfile.jsx - this is a many-users list.
+ * Multichain feed of every wallet's latest onchain Status broadcast, backed
+ * by the `statuses` table synced by the cidex indexer's HupStatus sync.
+ * Distinct from the single-status widget in UserProfile.jsx - this is a
+ * many-users list.
  */
 export default function StatusFeedTab() {
   const [statuses, setStatuses] = useState([])
@@ -63,7 +63,7 @@ export default function StatusFeedTab() {
   if (isLoaded && statuses.length === 0) {
     return (
       <div className={clsx('__container')} data-width="small">
-        <p className={clsx('text-center', 'p-100')}>No active statuses right now.</p>
+        <p className={clsx('text-center', 'p-100')}>No pulses right now. Pulses fade after 24 hours.</p>
       </div>
     )
   }
@@ -71,31 +71,12 @@ export default function StatusFeedTab() {
   return (
     <div className={clsx('__container')} data-width="small">
       <div className={styles['status-feed']}>
-        {statuses.map((item) => {
-          const chain = config.chains.find((c) => c.id === Number(item.network_id))
-
-          return (
-            <article key={`${item.network_id}-${item.id}`} className={styles['status-feed__item']}>
-              <img
-                className={styles['status-feed__avatar']}
-                src={item.profile_image || '/icons/default-avatar.svg'}
-                alt=""
-              />
-              <div className={styles['status-feed__body']}>
-                <div className={styles['status-feed__meta']}>
-                  <span className={styles['status-feed__name']}>{item.display_name || item.wallet_address}</span>
-                  {chain?.iconUrl && (
-                    <span className={styles['status-feed__chain']} title={chain.name}>
-                      <img src={chain.iconUrl} alt="" />
-                    </span>
-                  )}
-                  <span className={styles['status-feed__time']}>{toRelativeTime(item.event_timestamp)}</span>
-                </div>
-                <p className={styles['status-feed__content']}>{item.content}</p>
-              </div>
-            </article>
-          )
-        })}
+        {statuses.map((item) => (
+          <article key={`${item.network_id}-${item.id}`} className={styles['status-feed__item']}>
+            <Profile creator={item.wallet_address} createdAt={item.event_timestamp} networkId={Number(item.network_id)} />
+            <p className={styles['status-feed__content']}>{item.content}</p>
+          </article>
+        ))}
       </div>
 
       {hasMore && (

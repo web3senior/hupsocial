@@ -1,8 +1,8 @@
 /**
  * @file api/v1/networks/statuses/route.js
- * @description Reads the latest non-cleared, non-expired on-chain Status per wallet
- * from the `statuses` table (populated by src/lib/statusChain.js), optionally
- * filtered by network_id. Backs the home page's "Status posts" tab.
+ * @description Reads the latest non-cleared, non-expired onchain Status per wallet
+ * from the `statuses` table (populated by the cidex indexer's HupStatus sync),
+ * optionally filtered by network_id. Backs the home page's "Pulses" tab.
  */
 
 import { NextResponse } from 'next/server'

@@ -107,7 +107,7 @@ export const CONTRACTS = {
     name: 'monad-testnet',
     forwarder: '0x46a3dfCb1F4ec29dB7F96C0D3962DF20E6EdB259',
     hup: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
-    status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    status: '0xd5f02276c28E1F134BfA0b423381CE740ccb644E',
     community: '0x5D7ebD8ae5A439204A1F1f5f168c7C48AA25d88c',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',

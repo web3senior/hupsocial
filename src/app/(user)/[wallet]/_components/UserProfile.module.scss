@@ -417,6 +417,9 @@
     }
 
     .status {
+      border: none;
+      font-family: inherit;
+      cursor: pointer;
       position: absolute;
       left: 50%;
       top: -1.7em;
@@ -564,103 +567,33 @@
   }
 }
 
-.statusModal {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  row-gap: 1rem;
-  background-color: rgba(0, 0, 0, 0.6);
-  z-index: 1000;
+.statusPopover {
+  width: min(400px, calc(100vw - 2rem));
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0.5rem 1.5rem;
   user-select: none;
-  isolation: isolate;
 
-  &__card {
-    font-size: 14px;
-    font-weight: 600;
-    column-gap: 0.5rem;
-    width: 100%;
-    max-width: 400px;
-    background-color: var(--background);
-    border-radius: var(--global-border-radius);
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-    padding: 0.5rem 1.5rem;
+  &__header {
+    padding: 1rem 0;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
 
-    header {
-      padding: 1rem 0;
-      display: flex;
-      flex-direction: row;
-      align-items: flex-start;
-
-      > div {
-        text-align: center;
-        padding: 0.5rem 0;
-        align-self: stretch;
-        will-change: transform;
-
-        &:first-child {
-          cursor: pointer;
-
-          svg {
-            &:hover {
-              transform: scale(1.025);
-              transition: all 0.3s ease-in-out;
-            }
-
-            &:active {
-              transform: scale(0.95);
-              transition: all 0.3s ease;
-            }
-          }
-        }
-
-        &:last-child {
-          text-align: right;
-          color: var(--color-primary);
-        }
-      }
-
-      &:hover {
-        svg {
-          fill: var(--gray-500);
-        }
-      }
+    > * {
+      text-align: center;
+      padding: 0.5rem 0;
+      align-self: stretch;
+      will-change: transform;
     }
 
-    main {
-      padding: 2rem 0;
-      align-items: stretch;
-      align-content: stretch;
-      place-self: center;
+    > button {
+      border: none;
+      background: none;
+      color: inherit;
+      cursor: pointer;
 
-      figure {
-        border: 1px solid var(--gray-100);
-        background-color: var(--gray-50);
-        margin: 0 auto;
-
-        --r: 8rem;
-        width: var(--r);
-        height: var(--r);
-        img {
-          width: inherit;
-          height: inherit;
-          border-radius: inherit;
-          aspect-ratio: 1/1;
-        }
-      }
-
-      > div {
-        text-align: center;
-      }
-
-      button {
-        width: 100%;
-        padding: 0.5rem 0.7rem;
-        background-color: var(--color-primary);
-        color: var(--white, #fff);
-        will-change: transform;
-
+      svg {
         &:hover {
           transform: scale(1.025);
           transition: all 0.3s ease-in-out;
@@ -671,8 +604,67 @@
           transition: all 0.3s ease;
         }
       }
+    }
 
-      .statusModal__pfp {
+    > div {
+      &:last-child {
+        text-align: right;
+        color: var(--color-primary);
+      }
+    }
+
+    &:hover {
+      svg {
+        fill: var(--gray-500);
+      }
+    }
+  }
+
+  main {
+    padding: 2rem 0;
+    align-items: stretch;
+    align-content: stretch;
+    place-self: center;
+
+    figure {
+      border: 1px solid var(--gray-100);
+      background-color: var(--gray-50);
+      margin: 0 auto;
+
+      --r: 8rem;
+      width: var(--r);
+      height: var(--r);
+      img {
+        width: inherit;
+        height: inherit;
+        border-radius: inherit;
+        aspect-ratio: 1/1;
+      }
+    }
+
+    > div {
+      text-align: center;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.5rem 0.7rem;
+      background-color: var(--color-primary);
+      color: var(--white, #fff);
+      will-change: transform;
+
+      &:hover {
+        transform: scale(1.025);
+        transition: all 0.3s ease-in-out;
+      }
+
+      &:active {
+        transform: scale(0.95);
+        transition: all 0.3s ease;
+      }
+    }
+
+    .statusPopover__pfp {
         isolation: isolate;
 
         > div {
@@ -759,7 +751,7 @@
         }
       }
 
-      .statusModal__expirationTimestamp {
+      .statusPopover__expirationTimestamp {
         font-size: 12px;
 
         select {
@@ -771,7 +763,6 @@
           }
         }
       }
-    }
   }
 }
 

@@ -684,7 +684,7 @@ const ProfileLink = ({ targetWallet, displayWalletString }) => {
  */
 const Status = ({ addr, profile, selfView }) => {
   const placeholders = [
-    'Share a short status',
+    'Share a short pulse',
     "What's on your mind?",
     'Working on a new idea...',
     'The best thing I saw today was...',
@@ -707,9 +707,10 @@ const Status = ({ addr, profile, selfView }) => {
     'Tell us about your crush...',
     'What makes a perfect date?',
   ]
-  const [showModal, setShowModal] = useState(false)
+  const [panelOpened, setPanelOpened] = useState(false)
   const [status, setStatus] = useState()
   const [statusContent, setStatusContent] = useState('')
+  // Duration in hours, matching HupStatus.updateStatus(_periodHours); 0 = permanent
   const [expirationTimestamp, setExpirationTimestamp] = useState(24)
   const [maxLength, setMaxLength] = useState()
   const { web3, contract } = initHupContract()
@@ -759,7 +760,7 @@ const Status = ({ addr, profile, selfView }) => {
       abi: statusAbi,
       address: activeChain[1].status,
       functionName: 'updateStatus',
-      args: [statusContent, 'public', '', 24],
+      args: [statusContent, 'public', '', Number(expirationTimestamp)],
     })
   }
 
@@ -792,113 +793,93 @@ const Status = ({ addr, profile, selfView }) => {
       }
       setMaxLength(web3.utils.toNumber(res))
     })
-  }, [showModal])
+  }, [panelOpened])
+
+  const handleToggle = useCallback((e) => setPanelOpened(e.newState === 'open'), [])
   return (
-    <>
-      {showModal && (
-        <div className={`${styles.statusModal} animate fade`} onClick={() => setShowModal(false)}>
-          <div className={`${styles.statusModal__card}`} onClick={(e) => e.stopPropagation()}>
-            <header className={``}>
-              <div className={``} aria-label="Close" onClick={() => setShowModal(false)}>
-                <svg class="x1lliihq x1n2onr6 x5n08af" fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
-                  <title>Close</title>
-                  <line
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    x1="21"
-                    x2="3"
-                    y1="3"
-                    y2="21"
-                  ></line>
-                  <line
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    x1="21"
-                    x2="3"
-                    y1="21"
-                    y2="3"
-                  ></line>
-                </svg>
-              </div>
-              <div className={`flex-1`}>
-                <h3>Set your status</h3>
-              </div>
-              <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-                {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
-              </div>
-            </header>
+    <NativePopover
+      placement="center"
+      className={styles.statusPopover}
+      onToggle={handleToggle}
+      trigger={
+        <button className={`${styles.status} animate pointer`}>
+          {status && (
+            <p
+              title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment
+                .unix(web3.utils.toNumber(status.expirationTimestamp))
+                .utc()
+                .fromNow()}`}
+            >
+              {status.content !== '' ? <>{status.content}</> : <> Pulse...</>}
+            </p>
+          )}
+        </button>
+      }
+    >
+      {({ close }) => (
+        <>
+          <header className={styles.statusPopover__header}>
+            <button type="button" aria-label="Close" onClick={close}>
+              <svg fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
+                <title>Close</title>
+                <line fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" x1="21" x2="3" y1="3" y2="21"></line>
+                <line fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" x1="21" x2="3" y1="21" y2="3"></line>
+              </svg>
+            </button>
+            <div className={`flex-1`}>
+              <h3>Set your pulse</h3>
+            </div>
+            <div className={`pointer`} onClick={(e) => updateStatus(e)}>
+              {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
+            </div>
+          </header>
 
-            <main className={`flex flex-column align-items-center gap-1 `}>
-              <div className={`${styles.statusModal__pfp} rounded relative`}>
-                <figure className={`rounded`}>
-                  <img src={`${profile.profileImage}`} />
-                </figure>
+          <main className={`flex flex-column align-items-center gap-1 `}>
+            <div className={`${styles.statusPopover__pfp} rounded relative`}>
+              <figure className={`rounded`}>
+                <img src={`${profile.profileImage}`} />
+              </figure>
 
-                <div
-                  className={`d-f-c`}
-                  title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}
-                >
-                  <textarea
-                    autoFocus
-                    defaultValue={status && status !== '' ? status.content : statusContent}
-                    onInput={(e) => setStatusContent(e.target.value)}
-                    placeholder={`${getRandomPlaceholder()}`}
-                    maxLength={maxLength ? maxLength : 60}
-                  />
-                </div>
+              <div
+                className={`d-f-c`}
+                title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}
+              >
+                <textarea
+                  autoFocus
+                  defaultValue={status && status !== '' ? status.content : statusContent}
+                  onInput={(e) => setStatusContent(e.target.value)}
+                  placeholder={`${getRandomPlaceholder()}`}
+                  maxLength={maxLength ? maxLength : 60}
+                />
               </div>
+            </div>
 
-              <div className={`${styles.statusModal__expirationTimestamp} relative`}>
-                <label htmlFor="">Clear after </label>
-                <select name="" id="" onChange={(e) => setexpirationTimestamp(e.target.value)}>
-                  <option value={24}>24h</option>
-                  <option value={8}>8h</option>
-                  <option value={6}>6h</option>
-                  <option value={4}>4h</option>
-                  <option value={1}>1h</option>
-                  <option value={0}>∞</option>
-                </select>
-              </div>
+            <div className={`${styles.statusPopover__expirationTimestamp} relative`}>
+              <label htmlFor="">Clear after </label>
+              <select name="" id="" onChange={(e) => setExpirationTimestamp(e.target.value)}>
+                <option value={24}>24h</option>
+                <option value={8}>8h</option>
+                <option value={6}>6h</option>
+                <option value={4}>4h</option>
+                <option value={1}>1h</option>
+                <option value={0}>∞</option>
+              </select>
+            </div>
 
-              {isConfirmed && <p className="text-center badge badge-success">Done</p>}
+            {isConfirmed && <p className="text-center badge badge-success">Done</p>}
 
-              <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
-                {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}
-              </div>
+            <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
+              {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete pulse</button>}
+            </div>
 
-              <div className={`flex flex-row align-items-center gap-025`}>
-                <InfoIcon />
-                <small>Your status is viewable by all users.</small>
-              </div>
-            </main>
-          </div>
-        </div>
+            <div className={`flex flex-row align-items-center gap-025`}>
+              <InfoIcon />
+              <small>Your pulse is viewable by all users.</small>
+            </div>
+          </main>
+        </>
       )}
-
-      <div
-        className={`${styles.status} animate pointer`}
-        onClick={() => {
-          setShowModal(true)
-        }}
-      >
-        {status && (
-          <p
-            title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment
-              .unix(web3.utils.toNumber(status.expirationTimestamp))
-              .utc()
-              .fromNow()}`}
-          >
-            {status.content !== '' ? <>{status.content}</> : <> Status...</>}
-          </p>
-        )}
-      </div>
-    </>
+    </NativePopover>
   )
 }
 
