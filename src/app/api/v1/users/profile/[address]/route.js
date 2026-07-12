@@ -19,43 +19,39 @@ export async function GET(request, { params }) {
     let leaderboardScore = 0
     let leaderboardTotalPosts = 0
 
-    /* Fetch the user's leaderboard ranking metadata from your updated leaderboard endpoint */
-    try {
-      const lbResponse = await fetch(leaderboardUrl)
-      if (lbResponse.ok) {
-        const lbData = await lbResponse.json()
-        if (lbData.success && lbData.data) {
-          leaderboardRank = lbData.data.rank || null
-          leaderboardScore = lbData.data.score || 0
-          leaderboardTotalPosts = lbData.data.total_posts || 0
-        }
-      }
-    } catch (lbError) {
-      /* Log internally but continue so the endpoint remains resilient */
-      console.error('Internal Leaderboard look up failed:', lbError.message)
+    /* The leaderboard and Universal Profile lookups are independent upstream calls,
+       so run them in parallel instead of paying their latencies back to back.
+       Each resolves to null on failure so the endpoint remains resilient. */
+    const [lbData, upData] = await Promise.all([
+      fetch(leaderboardUrl)
+        .then((res) => (res.ok ? res.json() : null))
+        .catch((lbError) => {
+          console.error('Internal Leaderboard look up failed:', lbError.message)
+          return null
+        }),
+      fetch(upProxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          addr: address.toLowerCase(), // Preserve original casing in payload to match working query state
+        }),
+        redirect: 'follow',
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .catch((upError) => {
+          console.error('Internal Universal Profile lookup failed:', upError.message)
+          return null
+        }),
+    ])
+
+    if (lbData?.success && lbData.data) {
+      leaderboardRank = lbData.data.rank || null
+      leaderboardScore = lbData.data.score || 0
+      leaderboardTotalPosts = lbData.data.total_posts || 0
     }
 
     try {
-      /* Hit your internal Universal Profile endpoint */
-      const myHeaders = new Headers()
-      myHeaders.append('Content-Type', 'application/json')
-
-      const raw = JSON.stringify({
-        addr: address.toLowerCase(), // Preserve original casing in payload to match working query state
-      })
-
-      const requestOptions = {
-        method: 'POST',
-        headers: myHeaders,
-        body: raw,
-        redirect: 'follow',
-      }
-
-      const upResponse = await fetch(upProxyUrl, requestOptions)
-
-      if (upResponse.ok) {
-        const upData = await upResponse.json()
-
+      if (upData) {
         /* Check if the profile data exists and has valid metadata */
         const profile = upData?.data?.Profile?.[0]
 

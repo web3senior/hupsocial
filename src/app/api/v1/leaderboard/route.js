@@ -19,6 +19,14 @@ const SORTS = {
   followers: 'ranked.follower_count DESC, ranked.score DESC, ranked.latest_post_at DESC',
 }
 
+// The ranking is identical for every viewer, and computing it means scanning
+// every follows/likes/views row through CONVERT ... COLLATE joins (~2s+ on
+// production). Cache the full ranked list per (period, sort, network) scope,
+// same pattern as the posts route's trending cache; profile pages hit the
+// single-wallet branch on every load, so they read this cache too.
+const LEADERBOARD_CACHE_TTL_MS = 60_000
+const leaderboardCache = new Map()
+
 const TX_COUNT_SQL = `
   COALESCE(activity.root_posts, 0) +
   COALESCE(activity.comments_made, 0) +
@@ -55,218 +63,51 @@ export async function GET(request) {
     const networkId = normalizeNetworkId(searchParams.get('network_id'))
     const since = getSinceDate(period)
 
-    const activityFilter = buildWhere({
-      alias: 'p',
-      timeColumn: 'created_at',
-      networkId,
-      since,
-      baseConditions: ['p.wallet_address IS NOT NULL'],
-    })
-
-    const receivedFilter = buildWhere({
-      alias: 'pl',
-      timeColumn: 'inserted_at',
-      networkId,
-      since,
-    })
-
-    const givenFilter = buildWhere({
-      alias: 'pl',
-      timeColumn: 'inserted_at',
-      networkId,
-      since,
-      baseConditions: ['pl.liker_address IS NOT NULL'],
-    })
-
-    const viewsFilter = buildWhere({
-      alias: 'pv',
-      timeColumn: 'viewed_at',
-      networkId,
-      since,
-    })
-
-    /*
-     * Follows are indexed from the onchain LSP26 contract, which is permissionless,
-     * so the follows table can contain Sybil wallets. Period-scope the rows here;
-     * networkId is intentionally omitted because follower counts are cross-network
-     * by design (same contract address on every chain).
-     */
-    const followFilter = buildWhere({
-      alias: 'f',
-      timeColumn: 'updated_at',
-      networkId: null,
-      since,
-      baseConditions: ['f.is_following = 1'],
-    })
-
-    /* Construct base query fields to execute dynamic window rank sequencing */
-    const queryBase = `
-      SELECT 
-        ranked.*,
-        ROW_NUMBER() OVER (ORDER BY ${SORTS[sort]}) AS global_rank
-      FROM (
-        SELECT
-          wallets.wallet_address,
-          NULLIF(u.name, '') AS display_name,
-          u.description,
-          u.profileImage AS profile_image,
-          COALESCE(followers.follower_count, 0) AS follower_count,
-          COALESCE(following.following_count, 0) AS following_count,
-          u.created_at,
-          COALESCE(activity.total_posts, 0) AS total_posts,
-          COALESCE(activity.root_posts, 0) AS root_posts,
-          COALESCE(activity.comments_made, 0) AS comments_made,
-          COALESCE(activity.reposts_made, 0) AS reposts_made,
-          COALESCE(activity.latest_post_at, NULL) AS latest_post_at,
-          COALESCE(received.likes_received, 0) AS likes_received,
-          COALESCE(given.likes_given, 0) AS likes_given,
-          COALESCE(views.views_received, 0) AS views_received,
-          (${TX_COUNT_SQL}) AS tx_count,
-          ${SCORE_SQL} AS score
-        FROM (
-          SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM users
-          UNION
-          SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM posts WHERE wallet_address IS NOT NULL
-          UNION
-          SELECT CONVERT(liker_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM post_likes WHERE liker_address IS NOT NULL
-        ) wallets
-        LEFT JOIN users u ON u.wallet_address = wallets.wallet_address
-        LEFT JOIN (
-          SELECT
-            CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
-            SUM(CASE WHEN p.content_type = 0 THEN 1 ELSE 0 END) AS total_posts,
-            SUM(CASE WHEN p.is_comment IS NULL AND p.is_repost IS NULL THEN 1 ELSE 0 END) AS root_posts,
-            SUM(CASE WHEN p.is_comment IS NOT NULL THEN 1 ELSE 0 END) AS comments_made,
-            SUM(CASE WHEN p.is_repost IS NOT NULL THEN 1 ELSE 0 END) AS reposts_made,
-            MAX(p.created_at) AS latest_post_at
-          FROM posts p
-          ${activityFilter.where}
-          GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
-        ) activity ON activity.wallet_address = wallets.wallet_address
-        LEFT JOIN (
-          SELECT
-            CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
-            COUNT(pl.id) AS likes_received
-          FROM post_likes pl
-          JOIN posts p ON pl.post_id = p.id AND pl.network_id = p.network_id
-          ${receivedFilter.where}
-          GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
-        ) received ON received.wallet_address = wallets.wallet_address
-        LEFT JOIN (
-          SELECT
-            CONVERT(pl.liker_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
-            COUNT(*) AS likes_given
-          FROM post_likes pl
-          ${givenFilter.where}
-          GROUP BY CONVERT(pl.liker_address USING utf8mb4) COLLATE utf8mb4_general_ci
-        ) given ON given.wallet_address = wallets.wallet_address
-        LEFT JOIN (
-          SELECT
-            CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
-            COUNT(pv.id) AS views_received
-          FROM post_views pv
-          JOIN posts p ON pv.post_id = p.id AND pv.network_id = p.network_id
-          ${viewsFilter.where}
-          GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
-        ) views ON views.wallet_address = wallets.wallet_address
-        LEFT JOIN (
-          SELECT
-            CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
-            COUNT(DISTINCT f.follower_address) AS follower_count
-          FROM follows f
-          JOIN (
-            SELECT DISTINCT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address
-            FROM posts WHERE wallet_address IS NOT NULL
-            UNION
-            SELECT DISTINCT CONVERT(liker_address USING utf8mb4) COLLATE utf8mb4_general_ci
-            FROM post_likes WHERE liker_address IS NOT NULL
-          ) qualified ON qualified.wallet_address = CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci
-          ${followFilter.where}
-          GROUP BY CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci
-        ) followers ON followers.wallet_address = wallets.wallet_address
-        LEFT JOIN (
-          SELECT
-            CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
-            COUNT(DISTINCT f.followed_address) AS following_count
-          FROM follows f
-          WHERE f.is_following = 1
-          GROUP BY CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci
-        ) following ON following.wallet_address = wallets.wallet_address
-      ) ranked
-      WHERE ranked.score > 0
-    `
-
-    let rows = []
-    let hasMore = false
-    let leaders = []
-    let nextPage = null
+    const snapshot = await getLeaderboardSnapshot({ period, sort, networkId, since })
 
     /* Handle execution branch when requesting single user leaderboard state vs paginated records list */
     if (walletAddressParam) {
-      const singleUserQuery = `
-        SELECT wrapper.* FROM (
-          ${queryBase}
-        ) wrapper 
-        WHERE wrapper.wallet_address = ?
-      `
-      const params = [
-        ...activityFilter.params,
-        ...receivedFilter.params,
-        ...givenFilter.params,
-        ...viewsFilter.params,
-        ...followFilter.params,
-        walletAddressParam,
-      ]
+      const target = walletAddressParam.toLowerCase()
+      /* The old SQL match ran under utf8mb4_general_ci, so keep the lookup case-insensitive */
+      const leader = snapshot.rows.find((row) => String(row.wallet_address).toLowerCase() === target)
 
-      const [queryRows] = await pool.execute(singleUserQuery, params)
-      rows = queryRows
-
-      if (rows.length === 0) {
+      if (!leader) {
         return NextResponse.json({ error: 'Wallet address profile score record not found on leaderboard' }, { status: 404 })
       }
 
-      leaders = rows
-    } else {
-      const genericLeaderboardQuery = `
-        ${queryBase}
-        ORDER BY global_rank ASC
-        LIMIT ? OFFSET ?
-      `
-      const params = [
-        ...activityFilter.params,
-        ...receivedFilter.params,
-        ...givenFilter.params,
-        ...viewsFilter.params,
-        ...followFilter.params,
-        limit + 1,
-        offset,
-      ]
-
-      const [queryRows] = await pool.execute(genericLeaderboardQuery, params)
-      rows = queryRows
-      hasMore = rows.length > limit
-      leaders = hasMore ? rows.slice(0, limit) : rows
-      nextPage = hasMore ? page + 1 : null
+      return NextResponse.json({
+        success: true,
+        data: serializeLeader(leader, leader.global_rank),
+        nextPage: null,
+        meta: {
+          page: 1,
+          count: 1,
+          hasMore: false,
+          period,
+          sort,
+          network_id: networkId,
+          stats: snapshot.stats,
+          networks: snapshot.networks,
+        },
+      })
     }
 
-    const [statsRows] = await pool.execute(buildStatsQuery(networkId, since), buildStatsParams(networkId, since))
-    const [networks] = await pool.execute('SELECT id, name FROM networks ORDER BY name ASC')
+    const leaders = snapshot.rows.slice(offset, offset + limit)
+    const hasMore = offset + limit < snapshot.rows.length
 
     return NextResponse.json({
       success: true,
-      data: walletAddressParam 
-        ? serializeLeader(leaders[0], leaders[0].global_rank)
-        : leaders.map((row) => serializeLeader(row, row.global_rank)),
-      nextPage,
+      data: leaders.map((row) => serializeLeader(row, row.global_rank)),
+      nextPage: hasMore ? page + 1 : null,
       meta: {
-        page: walletAddressParam ? 1 : page,
+        page,
         count: leaders.length,
         hasMore,
         period,
         sort,
         network_id: networkId,
-        stats: serializeStats(statsRows[0]),
-        networks,
+        stats: snapshot.stats,
+        networks: snapshot.networks,
       },
     })
   } catch (error) {
@@ -279,6 +120,186 @@ export async function GET(request) {
       },
       { status: 500 },
     )
+  }
+}
+
+/**
+ * Returns the cached { rows, stats, networks } snapshot for a leaderboard
+ * scope, recomputing at most once per LEADERBOARD_CACHE_TTL_MS. `since` is
+ * derived from `period`, so the key only carries the period label.
+ */
+async function getLeaderboardSnapshot({ period, sort, networkId, since }) {
+  const cacheKey = `${period}:${sort}:${networkId || 'all'}`
+  const cached = leaderboardCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.value
+
+  const value = await computeLeaderboardSnapshot({ sort, networkId, since })
+  leaderboardCache.set(cacheKey, { value, expiresAt: Date.now() + LEADERBOARD_CACHE_TTL_MS })
+  return value
+}
+
+async function computeLeaderboardSnapshot({ sort, networkId, since }) {
+  const activityFilter = buildWhere({
+    alias: 'p',
+    timeColumn: 'created_at',
+    networkId,
+    since,
+    baseConditions: ['p.wallet_address IS NOT NULL'],
+  })
+
+  const receivedFilter = buildWhere({
+    alias: 'pl',
+    timeColumn: 'inserted_at',
+    networkId,
+    since,
+  })
+
+  const givenFilter = buildWhere({
+    alias: 'pl',
+    timeColumn: 'inserted_at',
+    networkId,
+    since,
+    baseConditions: ['pl.liker_address IS NOT NULL'],
+  })
+
+  const viewsFilter = buildWhere({
+    alias: 'pv',
+    timeColumn: 'viewed_at',
+    networkId,
+    since,
+  })
+
+  /*
+   * Follows are indexed from the onchain LSP26 contract, which is permissionless,
+   * so the follows table can contain Sybil wallets. Period-scope the rows here;
+   * networkId is intentionally omitted because follower counts are cross-network
+   * by design (same contract address on every chain).
+   */
+  const followFilter = buildWhere({
+    alias: 'f',
+    timeColumn: 'updated_at',
+    networkId: null,
+    since,
+    baseConditions: ['f.is_following = 1'],
+  })
+
+  /* Construct base query fields to execute dynamic window rank sequencing */
+  const queryBase = `
+    SELECT 
+      ranked.*,
+      ROW_NUMBER() OVER (ORDER BY ${SORTS[sort]}) AS global_rank
+    FROM (
+      SELECT
+        wallets.wallet_address,
+        NULLIF(u.name, '') AS display_name,
+        u.description,
+        u.profileImage AS profile_image,
+        COALESCE(followers.follower_count, 0) AS follower_count,
+        COALESCE(following.following_count, 0) AS following_count,
+        u.created_at,
+        COALESCE(activity.total_posts, 0) AS total_posts,
+        COALESCE(activity.root_posts, 0) AS root_posts,
+        COALESCE(activity.comments_made, 0) AS comments_made,
+        COALESCE(activity.reposts_made, 0) AS reposts_made,
+        COALESCE(activity.latest_post_at, NULL) AS latest_post_at,
+        COALESCE(received.likes_received, 0) AS likes_received,
+        COALESCE(given.likes_given, 0) AS likes_given,
+        COALESCE(views.views_received, 0) AS views_received,
+        (${TX_COUNT_SQL}) AS tx_count,
+        ${SCORE_SQL} AS score
+      FROM (
+        SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM users
+        UNION
+        SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM posts WHERE wallet_address IS NOT NULL
+        UNION
+        SELECT CONVERT(liker_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM post_likes WHERE liker_address IS NOT NULL
+      ) wallets
+      LEFT JOIN users u ON u.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          SUM(CASE WHEN p.content_type = 0 THEN 1 ELSE 0 END) AS total_posts,
+          SUM(CASE WHEN p.is_comment IS NULL AND p.is_repost IS NULL THEN 1 ELSE 0 END) AS root_posts,
+          SUM(CASE WHEN p.is_comment IS NOT NULL THEN 1 ELSE 0 END) AS comments_made,
+          SUM(CASE WHEN p.is_repost IS NOT NULL THEN 1 ELSE 0 END) AS reposts_made,
+          MAX(p.created_at) AS latest_post_at
+        FROM posts p
+        ${activityFilter.where}
+        GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) activity ON activity.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          COUNT(pl.id) AS likes_received
+        FROM post_likes pl
+        JOIN posts p ON pl.post_id = p.id AND pl.network_id = p.network_id
+        ${receivedFilter.where}
+        GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) received ON received.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(pl.liker_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          COUNT(*) AS likes_given
+        FROM post_likes pl
+        ${givenFilter.where}
+        GROUP BY CONVERT(pl.liker_address USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) given ON given.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          COUNT(pv.id) AS views_received
+        FROM post_views pv
+        JOIN posts p ON pv.post_id = p.id AND pv.network_id = p.network_id
+        ${viewsFilter.where}
+        GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) views ON views.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          COUNT(DISTINCT f.follower_address) AS follower_count
+        FROM follows f
+        JOIN (
+          SELECT DISTINCT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address
+          FROM posts WHERE wallet_address IS NOT NULL
+          UNION
+          SELECT DISTINCT CONVERT(liker_address USING utf8mb4) COLLATE utf8mb4_general_ci
+          FROM post_likes WHERE liker_address IS NOT NULL
+        ) qualified ON qualified.wallet_address = CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci
+        ${followFilter.where}
+        GROUP BY CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) followers ON followers.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          COUNT(DISTINCT f.followed_address) AS following_count
+        FROM follows f
+        WHERE f.is_following = 1
+        GROUP BY CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) following ON following.wallet_address = wallets.wallet_address
+    ) ranked
+    WHERE ranked.score > 0
+  `
+
+  const fullListQuery = `
+    ${queryBase}
+    ORDER BY global_rank ASC
+  `
+  const params = [
+    ...activityFilter.params,
+    ...receivedFilter.params,
+    ...givenFilter.params,
+    ...viewsFilter.params,
+    ...followFilter.params,
+  ]
+
+  const [rows] = await pool.execute(fullListQuery, params)
+  const [statsRows] = await pool.execute(buildStatsQuery(networkId, since), buildStatsParams(networkId, since))
+  const [networks] = await pool.execute('SELECT id, name FROM networks ORDER BY name ASC')
+
+  return {
+    rows,
+    stats: serializeStats(statsRows[0]),
+    networks,
   }
 }
 
