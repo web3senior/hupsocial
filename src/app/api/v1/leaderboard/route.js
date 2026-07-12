@@ -33,7 +33,7 @@ const SCORE_SQL = `
   (COALESCE(received.likes_received, 0) * 8) +
   (COALESCE(given.likes_given, 0) * 1) +
   (COALESCE(views.views_received, 0) * 1) +
-  (COALESCE(u.follower_count, 0) * 12) +
+  (COALESCE(followers.follower_count, 0) * 12) +
   (${TX_COUNT_SQL}) * 2
 `
 
@@ -91,8 +91,8 @@ export async function GET(request) {
           NULLIF(u.name, '') AS display_name,
           u.description,
           u.profileImage AS profile_image,
-          COALESCE(u.follower_count, 0) AS follower_count,
-          COALESCE(u.following_count, 0) AS following_count,
+          COALESCE(followers.follower_count, 0) AS follower_count,
+          COALESCE(following.following_count, 0) AS following_count,
           u.created_at,
           COALESCE(activity.total_posts, 0) AS total_posts,
           COALESCE(activity.root_posts, 0) AS root_posts,
@@ -150,6 +150,22 @@ export async function GET(request) {
           ${viewsFilter.where}
           GROUP BY CONVERT(p.wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci
         ) views ON views.wallet_address = wallets.wallet_address
+        LEFT JOIN (
+          SELECT
+            CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+            COUNT(DISTINCT f.follower_address) AS follower_count
+          FROM follows f
+          WHERE f.is_following = 1
+          GROUP BY CONVERT(f.followed_address USING utf8mb4) COLLATE utf8mb4_general_ci
+        ) followers ON followers.wallet_address = wallets.wallet_address
+        LEFT JOIN (
+          SELECT
+            CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+            COUNT(DISTINCT f.followed_address) AS following_count
+          FROM follows f
+          WHERE f.is_following = 1
+          GROUP BY CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci
+        ) following ON following.wallet_address = wallets.wallet_address
       ) ranked
       WHERE ranked.score > 0
     `
