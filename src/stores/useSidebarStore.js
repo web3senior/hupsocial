@@ -46,7 +46,7 @@ export const useSidebarStore = create(
   persist(
     (set, get) => ({
       // State configurations
-      isMenuOpen: false,
+      isMenuOpen: true,
       isMobileMenuOpen: false,
       isComponentOpen: false,
 
@@ -133,6 +133,12 @@ export const useSidebarStore = create(
     {
       name: 'hup-sidebar-state',
       storage: createJSONStorage(() => localStorage),
+      version: 1,
+      // One-time reset so browsers holding the old collapsed default open expanded
+      migrate: (persistedState) => ({
+        ...persistedState,
+        isMenuOpen: true,
+      }),
       // Only persist specific variables to localStorage to keep things fast
       partialize: (state) => ({
         isMenuOpen: state.isMenuOpen,

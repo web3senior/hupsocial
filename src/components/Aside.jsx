@@ -235,7 +235,7 @@ export default function Aside() {
   }
 
   if (!mounted) {
-    return <aside className={styles.aside} style={{ width: '68px' }} />
+    return <aside className={styles.aside} style={{ width: '250px' }} />
   }
 
   return (
