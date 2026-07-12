@@ -5,12 +5,14 @@ import Post from '@/components/Post'
 import styles from './comments.module.scss'
 import { getActiveChain } from '@/lib/communication'
 import { useRouter } from 'next/navigation'
+import { usePostStore } from '@/stores/usePostStore'
 
 export default function Comments({ networkId, postId, viewerAddress }) {
   const [comments, setComments] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const activeChain = getActiveChain()
-    const router = useRouter()
+  const router = useRouter()
+  const setCurrentPost = usePostStore((state) => state.setCurrentPost)
 
   useEffect(() => {
     async function loadComments() {
@@ -44,7 +46,11 @@ export default function Comments({ networkId, postId, viewerAddress }) {
       ) : (
         comments.map((comment, i) => (
           <section key={comment.id} className={styles.commentsList__item}
-           onClick={() => router.push(`/networks/${networkId}/${comment.id}`)}
+           onClick={() => {
+             // Seed the store so the detail route paints this comment instantly
+             setCurrentPost(comment)
+             router.push(`/networks/${networkId}/${comment.id}`)
+           }}
            onMouseEnter={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
            onTouchStart={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
           >

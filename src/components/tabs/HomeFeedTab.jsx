@@ -237,7 +237,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     }
 
     setCurrentPost(item)
-    router.push(`networks/${item.network_id}/${item.id}`)
+    router.push(`/networks/${item.network_id}/${item.id}`)
   }
 
   const loadMorePosts = useCallback(async () => {
