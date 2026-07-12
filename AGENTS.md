@@ -31,7 +31,13 @@ Once the plan is stated, adhere strictly to the following coding guidelines:
 * **Methodology:** Follow strict **BEM (Block Element Modifier)** naming conventions for class names.
 * **Class Management:** Always use the **`clsx`** library for conditional or combined class utilities.
 
-### 3. Smart Contracts (Solidity)
+### 3. Top-Layer UI (Modals & Popovers)
+* **One modal primitive:** Every modal or centered popup MUST use the shared **`NativeDialog`** component (`src/components/ui/NativeDialog.jsx`, `<dialog>.showModal()`). Never hand-roll `<dialog>` elements, overlay `<div>`s, or add third-party modal libraries.
+* **Anchored, non-modal UI** (menus, dropdowns, tooltips) uses **`NativePopover`** (`src/components/ui/NativePopover.jsx`). Popover backdrops can never block clicks by spec — if the UI must block the page behind it, it is a modal: use `NativeDialog`.
+* **Chrome via className:** The primitives handle centering, animation, backdrop, and modality only. Size, padding, background, and radius come from the consumer's SCSS module — style the open state as `&[open] { display: flex }`, never a bare `display` on the closed dialog.
+* **Nesting gotcha:** React's synthetic `close`/`cancel` events propagate up the component tree (native ones don't bubble). A `NativeDialog` rendered inside another MUST call `event.stopPropagation()` in its own `onClose`/`onCancel`, or closing it also closes the parent.
+
+### 4. Smart Contracts (Solidity)
 * **Organization:** Structure contract files layout cleanly using designated section dividers:
     ```solidity
     // --- Storage ---
@@ -40,10 +46,10 @@ Once the plan is stated, adhere strictly to the following coding guidelines:
     // --- Logic ---
     ```
 
-### 4. Terminology
+### 5. Terminology
 * **"onchain", never "on-chain":** Always write **onchain** (one word, no hyphen) in all code, comments, UI copy, and documentation. Apply the same to "offchain".
 
-### 5. Git & Internationalization
+### 6. Git & Internationalization
 * **Commits:** Prefix all architectural or structural intentions with Conventional Commit standards (`feat:`, `fix:`, `chore:`, `refactor:`).
 * **Data Formatting:** Use native JavaScript **`Intl`** utilities for compact ticker numbers and localized relative time strings.
 * **String Normalization:** Ensure slug/URL generation processes properly preserve and normalize Unicode characters, including Zero Width Non-Joiners (ZWNJ).
