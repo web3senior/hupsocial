@@ -1,8 +1,18 @@
-// Upload a File/Blob directly to Pinata via a presigned URL, bypassing the
-// Vercel 4.5 MB function payload limit. Returns the CID as "ipfs://<hash>".
-export async function uploadFileToIPFS(file) {
-  const filename = file.name ?? 'upload'
+// Upload through the server-side /api/ipfs/file route (Filebase primary, Pinata fallback).
+// Subject to the Vercel 4.5 MB function payload limit.
+async function uploadViaServer(file, filename) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await fetch('/api/ipfs/file', { method: 'POST', body: form })
+  if (!res.ok) throw new Error(`Server upload failed: ${res.status}`)
+  const { cid } = await res.json()
+  if (!cid) throw new Error('CID not found in server upload response')
+  return cid
+}
 
+// Upload directly to Pinata via a presigned URL, bypassing the Vercel 4.5 MB
+// function payload limit.
+async function uploadViaPinataPresign(file, filename) {
   const presignRes = await fetch('/api/ipfs/presign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -18,6 +28,18 @@ export async function uploadFileToIPFS(file) {
 
   const { data } = await uploadRes.json()
   return `ipfs://${data.cid}`
+}
+
+// Upload a File/Blob to IPFS. Returns the CID as "ipfs://<hash>".
+export async function uploadFileToIPFS(file) {
+  const filename = file.name ?? 'upload'
+
+  try {
+    return await uploadViaServer(file, filename)
+  } catch (e) {
+    console.warn('[ipfs] server upload failed, falling back to Pinata presign:', e.message)
+    return await uploadViaPinataPresign(file, filename)
+  }
 }
 
 /**
