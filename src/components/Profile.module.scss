@@ -1,5 +1,9 @@
 .profileShimmer {
   height: 36px;
+
+  &__item {
+  background-color: var(--shimmer-bg);
+  }
 }
 
 .profile {

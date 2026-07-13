@@ -46,16 +46,16 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   if (isLoading || !profile) {
     return (
       <div className={clsx(styles.profileShimmer, 'flex align-items-center gap-025', className)}>
-        <div className="shimmer rounded-full" style={{ width: 36, height: 36, flexShrink: 0 }} />
+        <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 36, height: 36, flexShrink: 0 }} />
         {variant !== 'imageOnly' && (
           <div className="flex flex-column gap-025">
             <div className="flex flex-row gap-025">
-              <div className="shimmer rounded" style={{ width: 80, height: 20 }} />
-              <div className="shimmer rounded" style={{ width: 20, height: 20 }} />
-              <div className="shimmer rounded" style={{ width: 20, height: 20 }} />
-              <div className="shimmer rounded" style={{ width: 20, height: 20 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 20 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 20, height: 20 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 20, height: 20 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 20, height: 20 }} />
             </div>
-            {isFullLike && <div className="shimmer rounded" style={{ width: 80, height: 12 }} />}
+            {isFullLike && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 12 }} />}
           </div>
         )}
       </div>
