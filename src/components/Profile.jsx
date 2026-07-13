@@ -45,12 +45,17 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   // Render placeholder skeletal visual states during active metadata fetches
   if (isLoading || !profile) {
     return (
-      <div className={clsx(styles.profileShimmer, 'flex align-items-center', className)} style={{ gap: '0.7rem' }}>
+      <div className={clsx(styles.profileShimmer, 'flex align-items-center gap-025', className)}>
         <div className="shimmer rounded-full" style={{ width: 36, height: 36, flexShrink: 0 }} />
         {variant !== 'imageOnly' && (
           <div className="flex flex-column gap-025">
-            <div className="shimmer rounded" style={{ width: 80, height: 16 }} />
-            {isFullLike && <div className="shimmer rounded" style={{ width: 120, height: 16 }} />}
+            <div className="flex flex-row gap-025">
+              <div className="shimmer rounded" style={{ width: 80, height: 20 }} />
+              <div className="shimmer rounded" style={{ width: 20, height: 20 }} />
+              <div className="shimmer rounded" style={{ width: 20, height: 20 }} />
+              <div className="shimmer rounded" style={{ width: 20, height: 20 }} />
+            </div>
+            {isFullLike && <div className="shimmer rounded" style={{ width: 80, height: 12 }} />}
           </div>
         )}
       </div>

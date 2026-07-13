@@ -23,12 +23,13 @@ export async function GET(request, { params }) {
        so run them in parallel instead of paying their latencies back to back.
        Each resolves to null on failure so the endpoint remains resilient. */
     const [lbData, upData] = await Promise.all([
-      fetch(leaderboardUrl)
-        .then((res) => (res.ok ? res.json() : null))
-        .catch((lbError) => {
-          console.error('Internal Leaderboard look up failed:', lbError.message)
-          return null
-        }),
+      // fetch(leaderboardUrl)
+      //   .then((res) => (res.ok ? res.json() : null))
+      //   .catch((lbError) => {
+      //     console.error('Internal Leaderboard look up failed:', lbError.message)
+      //     return null
+      //   }),
+      [],
       fetch(upProxyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

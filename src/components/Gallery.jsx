@@ -54,7 +54,7 @@ export default function MediaGallery({ data = [] }) {
   const [selectedIndex, setSelectedIndex] = useState(null)
 
   const videoRefs = useRef([])
-  const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs/'
+  const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
 
   const visualData = data.filter((item) => item.type !== 'audio')
   const audioData = data.filter((item) => item.type === 'audio')

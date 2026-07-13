@@ -1,12 +1,10 @@
-.shimmer {
-  width: 548px;
-  height: 48px;
-  border-radius: 999px;
+.profileShimmer {
+  height: 36px;
 }
 
 .profile {
   width: max-content; /* Let it size to its contents naturally */
-  flex-shrink: 0;     /* Prevent the compose input from squishing this block */
+  flex-shrink: 0; /* Prevent the compose input from squishing this block */
   gap: 0.7rem;
 
   code {
