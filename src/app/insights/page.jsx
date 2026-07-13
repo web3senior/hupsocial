@@ -8,6 +8,7 @@ import PageTitle from '@/components/PageTitle'
 import { ContentSpinner } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
 import InsightsPeriodPicker from './_components/InsightsPeriodPicker'
+import Sparkline from './_components/Sparkline'
 import TrendChart from './_components/TrendChart'
 import BreakdownPieChart from './_components/BreakdownPieChart'
 import TopPostsList from './_components/TopPostsList'
@@ -36,6 +37,29 @@ function sumSeries(series, key) {
   return series?.reduce((total, point) => total + point[key], 0) || 0
 }
 
+const SPARK_POINTS = 12
+
+/* Condenses a daily series into ~12 sparkline points: mean per bucket for per-day counts
+ * (sum would zigzag on the uneven 2/3-day buckets a 30d period produces), last value per
+ * bucket for the cumulative follower count. Short periods render as-is. */
+function bucketSeries(series, key, mode) {
+  if (!series?.length) return []
+  if (series.length <= SPARK_POINTS) return series.map((point) => point[key])
+
+  const values = []
+  for (let i = 0; i < SPARK_POINTS; i++) {
+    const start = Math.floor((i * series.length) / SPARK_POINTS)
+    const end = Math.max(Math.floor(((i + 1) * series.length) / SPARK_POINTS), start + 1)
+    const slice = series.slice(start, end)
+    values.push(
+      mode === 'last'
+        ? slice[slice.length - 1][key]
+        : slice.reduce((total, point) => total + point[key], 0) / slice.length,
+    )
+  }
+  return values
+}
+
 export default function InsightsPage() {
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
@@ -50,13 +74,43 @@ export default function InsightsPage() {
 
   /* Metric colors mirror the post-action hues (view → purple, like → --liked-color,
    * comment → indigo, bookmark-blue for followers) at the -500 step, which passes the
-   * palette validator on both card surfaces where the -400 hover tints do not. */
+   * palette validator on both card surfaces where the -400 hover tints do not. Each
+   * sparkline gradient starts at the metric hue and ends at a stop validated (six-checks
+   * script) against both card surfaces, light and dark. */
   const statTiles = data
     ? [
-        { label: 'Followers', value: data.follower_count, Icon: UsersIcon, color: 'var(--blue-500, #3b82f6)' },
-        { label: 'Profile views', value: sumSeries(data.profile_views, 'count'), Icon: EyeIcon, color: 'var(--purple-500, #a855f7)' },
-        { label: 'Post views', value: sumSeries(data.reach, 'views'), Icon: ChartBarIcon, color: 'var(--purple-500, #a855f7)' },
-        { label: 'Likes received', value: sumSeries(data.reach, 'likes'), Icon: HeartIcon, color: 'var(--liked-color, #ff007a)' },
+        {
+          label: 'Followers',
+          value: data.follower_count,
+          Icon: UsersIcon,
+          color: 'var(--blue-500, #3b82f6)',
+          spark: bucketSeries(data.follower_growth, 'count', 'last'),
+          gradient: ['#3b82f6', '#0891b2'],
+        },
+        {
+          label: 'Profile views',
+          value: sumSeries(data.profile_views, 'count'),
+          Icon: EyeIcon,
+          color: 'var(--purple-500, #a855f7)',
+          spark: bucketSeries(data.profile_views, 'count', 'mean'),
+          gradient: ['#a855f7', '#ec4899'],
+        },
+        {
+          label: 'Post views',
+          value: sumSeries(data.reach, 'views'),
+          Icon: ChartBarIcon,
+          color: 'var(--purple-500, #a855f7)',
+          spark: bucketSeries(data.reach, 'views', 'mean'),
+          gradient: ['#6366f1', '#a855f7'],
+        },
+        {
+          label: 'Likes received',
+          value: sumSeries(data.reach, 'likes'),
+          Icon: HeartIcon,
+          color: 'var(--liked-color, #ff007a)',
+          spark: bucketSeries(data.reach, 'likes', 'mean'),
+          gradient: ['#ff007a', '#ea580c'],
+        },
       ]
     : []
 
@@ -89,14 +143,15 @@ export default function InsightsPage() {
               </div>
 
               <div className={styles.page__stats}>
-                {statTiles.map(({ label, value, Icon, color }) => (
+                {statTiles.map(({ label, value, Icon, color, spark, gradient }) => (
                   <div key={label} className={styles.statTile} style={{ '--stat-tile-color': color }}>
                     <div className={styles.statTile__header}>
-                      <span className={styles.statTile__label}>{label}</span>
                       <span className={styles.statTile__badge} aria-hidden="true">
-                        <Icon size={18} weight="fill" />
+                        <Icon size={22} weight="fill" />
                       </span>
+                      <Sparkline className={styles.statTile__spark} values={spark} from={gradient[0]} to={gradient[1]} />
                     </div>
+                    <span className={styles.statTile__label}>{label}</span>
                     <span className={styles.statTile__value}>{numberFormatter.format(value)}</span>
                   </div>
                 ))}
