@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { CaretLeftIcon, CaretRightIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowLeftIcon, ArrowRightIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
 
@@ -371,16 +371,17 @@ export default function MediaGallery({ data = [] }) {
       {/* Lightbox Overlay */}
       {selectedIndex !== null && (
         <div className={styles.lightbox} onClick={(e) => { e.stopPropagation(); closeLightbox() }}>
-          <button className={styles.closeBtn} onClick={(e) => { e.stopPropagation(); closeLightbox() }}>
-            <XIcon size={32} />
+          <button className={styles.closeBtn} onClick={(e) => { e.stopPropagation(); closeLightbox() }} aria-label={`Close fullscreen view`}>
+            <XIcon size={20} />
           </button>
 
           {visualData.length > 1 && (
             <button
               className={`${styles.navBtn} ${styles.prev}`}
               onClick={handlePrev}
+              aria-label={`Previous media`}
             >
-              <CaretLeftIcon size={40} />
+              <ArrowLeftIcon size={24} />
             </button>
           )}
 
@@ -411,8 +412,9 @@ export default function MediaGallery({ data = [] }) {
             <button
               className={`${styles.navBtn} ${styles.next}`}
               onClick={handleNext}
+              aria-label={`Next media`}
             >
-              <CaretRightIcon size={40} />
+              <ArrowRightIcon size={24} />
             </button>
           )}
         </div>
