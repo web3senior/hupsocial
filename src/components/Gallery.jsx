@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { ArrowLeftIcon, ArrowRightIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
-import { resolveIPFSUrl } from '@/lib/storageHelper'
+import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 
 // Clamp to Twitter/Instagram-style bounds so a single very tall or very wide
 // asset can't blow out the feed layout while still reserving accurate space.
@@ -260,8 +260,16 @@ export default function MediaGallery({ data = [] }) {
 
   const resolveUrl = (item) => {
     if (item?.storage === '0G') return `/api/0g/file?hash=${item.cid}`
-    if (item?.storage === 'IPFS') return resolveIPFSUrl(item.cid)
-    if (item.cid) return item.cid.startsWith('http') ? item.cid : `${GATEWAY_URL}${item.cid}`
+    if (item?.storage === 'IPFS') {
+      /* Images go through the sharp compression proxy; video/audio keep native gateway streaming */
+      if (item.type === 'video' || item.type === 'audio') return resolveIPFSUrl(item.cid)
+      return resolveIPFSImageUrl(item.cid)
+    }
+    if (item.cid) {
+      if (item.cid.startsWith('http')) return item.cid
+      if (item.type === 'video' || item.type === 'audio') return `${GATEWAY_URL}${item.cid}`
+      return resolveIPFSImageUrl(item.cid)
+    }
     return ''
   }
 

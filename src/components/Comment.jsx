@@ -28,6 +28,7 @@ import {
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { getIPFS } from '@/lib/ipfs'
+import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
 import { DotsThreeIcon } from '@phosphor-icons/react'
@@ -576,7 +577,7 @@ const ConnectedProfile = ({ addr }) => {
           profileImage:
             res.data.Profile[0].profileImages.length > 0
               ? res.data.Profile[0].profileImages[0].src
-              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`,
+              : resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 }),
           profileHeader: '',
           tags: JSON.stringify(res.data.tags),
           links: JSON.stringify(res.data.links_),
@@ -589,7 +590,7 @@ const ConnectedProfile = ({ addr }) => {
             const profileImage =
               res.profileImage !== ''
                 ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-                : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`
+                : resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
             res.profileImage = profileImage
             setProfile(res)
           }

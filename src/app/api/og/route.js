@@ -160,6 +160,10 @@ export async function GET(request) {
 
     /* Process the profile image to make sure GIFs do not break Satori layout generation */
     let finalProfileImage = profile.profileImage
+    if (finalProfileImage && finalProfileImage.startsWith('/')) {
+      /* Profile API returns app-relative compression proxy URLs — absolutize for server-side fetch */
+      finalProfileImage = `${origin}${finalProfileImage}`
+    }
     if (finalProfileImage) {
       finalProfileImage = await getStaticImageUri(finalProfileImage)
     }

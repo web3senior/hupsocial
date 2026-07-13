@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import { resolveStorageUrl } from '@/lib/storageHelper' /* Adjust this import path to match your helper file location */
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 
 export async function GET(request, { params }) {
   try {
@@ -39,7 +39,9 @@ export async function GET(request, { params }) {
         if (profile && (profile.name || profile.fullName)) {
           /* Fallback to profileImages array elements if they exist as per incoming payload */
           profile.profileImage =
-            profile.profileImages && profile.profileImages.length > 0 ? resolveStorageUrl(profile.profileImages[0].src) : null
+            profile.profileImages && profile.profileImages.length > 0
+              ? resolveStorageImageUrl(profile.profileImages[0].src, { width: 512 })
+              : null
 
           profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
 
@@ -71,7 +73,7 @@ export async function GET(request, { params }) {
     const dbProfile = rows[0]
 
     /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
-    dbProfile.profileImage = resolveStorageUrl(dbProfile.profileImage)
+    dbProfile.profileImage = resolveStorageImageUrl(dbProfile.profileImage, { width: 512 })
 
     return NextResponse.json({
       source: 'database',

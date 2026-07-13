@@ -38,7 +38,7 @@ import { getActiveChain } from '@/lib/communication'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { getPosts } from '@/lib/api'
 import { getIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
-import { resolveStorageUrl } from '@/lib/storageHelper'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
 import styles from './page.module.scss'
@@ -1748,14 +1748,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
             <>
               <Link href={`/communities/${chainId}/${id}`} className={styles.card__link}>
                 {metadata['cover url'] ? (
-                  <img src={resolveStorageUrl(metadata['cover url']) || metadata['cover url']} alt="" className={styles.card__cover} />
+                  <img src={resolveStorageImageUrl(metadata['cover url'], { width: 800 }) || metadata['cover url']} alt="" className={styles.card__cover} />
                 ) : (
                   <div className={styles.card__cover} aria-hidden="true" />
                 )}
                 <div className={styles.card__header}>
                   {metadata['logo url'] ? (
                     <img
-                      src={resolveStorageUrl(metadata['logo url']) || metadata['logo url']}
+                      src={resolveStorageImageUrl(metadata['logo url'], { width: 200 }) || metadata['logo url']}
                       alt={metadata.name}
                       className={styles.card__logo}
                     />

@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Web3 from 'web3'
 import Icon from '../helper/MaterialIcon'
 import Shimmer from './ui/Shimmer'
+import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import styles from './CartButton.module.scss'
 
 export default function CartButton() {
@@ -105,7 +106,7 @@ const Profile = ({ addr }) => {
           src={
             data.data.search_profiles[0].profileImages.length > 0
               ? data.data.search_profiles[0].profileImages[0].src
-              : `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`
+              : resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
           }
           className={`rounded`}
         />

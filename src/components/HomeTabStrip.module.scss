@@ -5,6 +5,7 @@
   align-items: center;
   gap: 0.5rem;
   margin: 1rem 0 1rem 0;
+
   // The container spans edge to edge on small screens, so the pills need
   // their own side inset there.
   @media (max-width: 640px) {

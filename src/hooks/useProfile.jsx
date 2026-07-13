@@ -2,9 +2,10 @@
 
 import useSWR from 'swr'
 import { getProfile } from '@/lib/api'
+import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 
 const DEFAULT_USERNAME = 'new-user'
-const DEFAULT_PFP = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${process.env.NEXT_PUBLIC_DEFAULT_PFP_CID}`
+const DEFAULT_PFP = resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
 
 /**
  * Shared fetcher logic that queries LUKSO Universal Profiles first,

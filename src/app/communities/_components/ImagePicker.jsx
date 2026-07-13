@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { uploadFileToIPFS } from '@/lib/ipfs'
-import { resolveStorageUrl } from '@/lib/storageHelper'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import styles from '../page.module.scss'
 
 // Device-file picker for community images — uploads to IPFS exactly like NewPost's media flow
@@ -44,7 +44,7 @@ export default function ImagePicker({ label, value, onChange, fieldClassName, la
       <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleSelect} />
       {value && (
         <img
-          src={resolveStorageUrl(value) || value}
+          src={resolveStorageImageUrl(value, { width: 400 }) || value}
           alt=""
           style={{ maxHeight: 120, maxWidth: '100%', borderRadius: 8, objectFit: 'cover', alignSelf: 'flex-start' }}
         />

@@ -3,7 +3,7 @@ import { getPostById } from '@/lib/api'
 import PageTitle from '@/components/PageTitle'
 import PostDetails from './_components/PostDetails'
 import styles from './page.module.scss'
-import { resolveStorageUrl } from '@/lib/storageHelper'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 
 // Deduplicate the fetch so generateMetadata and Page share one request per render
 const fetchPost = cache((networkId, postId) => getPostById(networkId, postId, null))
@@ -27,7 +27,8 @@ export async function generateMetadata({ params }, parent) {
     if (mediaElement?.data?.items?.length > 0) {
       mediaElement.data.items.forEach((mediaItem) => {
         if (mediaItem.type === 'image') {
-          const url = mediaItem.cid.startsWith('http') ? mediaItem.cid : resolveStorageUrl(mediaItem.cid)
+          /* Relative proxy URLs are absolutized by metadataBase for crawlers */
+          const url = mediaItem.cid.startsWith('http') ? mediaItem.cid : resolveStorageImageUrl(mediaItem.cid, { width: 1200 })
           if (url) {
             images.push({
               url,

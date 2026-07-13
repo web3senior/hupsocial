@@ -7,7 +7,7 @@ import { ArrowLeftIcon, CalendarBlankIcon, UserIcon, UsersIcon } from '@phosphor
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { toRelativeTime } from '@/lib/dateHelper'
-import { resolveStorageUrl } from '@/lib/storageHelper'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { CommunityCard } from '../../../page'
 import styles from './CommunityDetails.module.scss'
 
@@ -47,14 +47,14 @@ export default function CommunityDetails({ networkId, communityId, initialName }
         {community && (
           <div className={`${styles.details__header} animate fade`}>
             {community.cover_url ? (
-              <img src={resolveStorageUrl(community.cover_url)} alt="" className={styles.details__cover} />
+              <img src={resolveStorageImageUrl(community.cover_url, { width: 1200 })} alt="" className={styles.details__cover} />
             ) : (
               <div className={styles.details__cover} aria-hidden="true" />
             )}
 
             {community.logo_url ? (
               <img
-                src={resolveStorageUrl(community.logo_url)}
+                src={resolveStorageImageUrl(community.logo_url, { width: 400 })}
                 alt={community.name}
                 className={styles.details__logo}
               />

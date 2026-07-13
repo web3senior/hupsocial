@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
+import sharp from 'sharp'
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
@@ -57,11 +58,83 @@ export async function POST(request) {
     }
 
     const cid = `ipfs://${rawCID}`
-    const url = `${process.env.NEXT_PUBLIC_GATEWAY_URL}${rawCID}`
+    const url = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${rawCID}`
     console.log('Upload complete. CID:', cid)
     return NextResponse.json({ url, cid }, { status: 200 })
   } catch (e) {
     console.error('File upload error:', e)
     return NextResponse.json({ error: 'Internal Server Error during upload' }, { status: 500 })
+  }
+}
+
+function intParam(value, fallback, min, max) {
+  const parsed = Number.parseInt(value ?? '', 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(Math.max(parsed, min), max)
+}
+
+export async function GET(req) {
+  const { searchParams } = new URL(req.url)
+  const cid = searchParams.get('cid')
+
+  const width = intParam(searchParams.get('w'), null, 1, 4096)
+  const quality = intParam(searchParams.get('q'), 80, 1, 100)
+
+  if (!cid) {
+    return NextResponse.json({ error: 'CID is required' }, { status: 400 })
+  }
+
+  const gatewayUrl = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${cid}`
+
+  try {
+    const upstream = await fetch(gatewayUrl)
+
+    if (!upstream.ok) {
+      throw new Error(`IPFS Gateway Error: ${upstream.status}`)
+    }
+
+    const contentType = upstream.headers.get('content-type') || ''
+
+    /* Only images go through sharp — video/audio stream straight from the gateway */
+    if (!contentType.startsWith('image/')) {
+      return NextResponse.redirect(gatewayUrl, 302)
+    }
+
+    const arrayBuffer = await upstream.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    const metadata = await sharp(buffer, { animated: true }).metadata()
+    const isAnimated = (metadata.pages ?? 1) > 1
+
+    let pipeline = sharp(buffer, { animated: true })
+
+    if (width) {
+      pipeline = pipeline.resize({
+        width,
+        withoutEnlargement: true,
+      })
+    }
+
+    const optimizedBuffer = await pipeline
+      .webp({
+        quality,
+        ...(isAnimated
+          ? {
+              loop: metadata.loop ?? 0,
+              ...(metadata.delay ? { delay: metadata.delay } : {}),
+            }
+          : {}),
+      })
+      .toBuffer()
+
+    return new Response(optimizedBuffer, {
+      headers: {
+        'Content-Type': 'image/webp',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    })
+  } catch (error) {
+    console.error('IPFS_API_ROUTE_ERROR:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

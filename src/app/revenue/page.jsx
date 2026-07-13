@@ -8,6 +8,7 @@ import PageTitle from '@/components/PageTitle'
 import { ContentSpinner } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
 import RevenueHero from './_components/RevenueHero'
+import EarnSteps from './_components/EarnSteps'
 import SaleCard from './_components/SaleCard'
 import styles from './page.module.scss'
 
@@ -76,10 +77,12 @@ export default function RevenuePage() {
                 salesCount={overview.sales_count}
               />
 
+              <EarnSteps />
+
               <h3 className={styles.page__sectionTitle}>Sales</h3>
               <ol className={styles.page__list}>
-                {sales.map((sale, index) => (
-                  <SaleCard key={sale.id} sale={sale} tilt={index % 2 ? 'right' : 'left'} />
+                {sales.map((sale) => (
+                  <SaleCard key={sale.id} sale={sale} />
                 ))}
               </ol>
 

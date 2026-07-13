@@ -51,6 +51,28 @@ export const resolveIPFSUrl = (ipfsUrl) => {
 }
 
 /**
+ * Resolves an IPFS image to the server-side compression proxy (sharp → WebP).
+ * Only use for images — video/audio should resolve via resolveIPFSUrl to keep
+ * native gateway streaming.
+ * @param {string} ipfsUrl - The IPFS URL or raw CID.
+ * @param {{ width?: number, quality?: number }} [options] - Optional resize width and WebP quality (1-100).
+ * @returns {string|null} The API proxy endpoint URL, or null if invalid.
+ */
+export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
+  if (!ipfsUrl || typeof ipfsUrl !== 'string') return null
+
+  /* Accept both ipfs:// URIs and raw CIDs */
+  const hash = ipfsUrl.replace(/^ipfs:\/\//, '')
+  if (!hash) return null
+
+  const params = new URLSearchParams({ cid: hash })
+  if (options.width) params.set('w', String(options.width))
+  if (options.quality) params.set('q', String(options.quality))
+
+  return `/api/ipfs/file?${params.toString()}`
+}
+
+/**
  * Checks if a given string matches your custom protocol.
  * @param {string} src - The asset path or URI string.
  * @returns {boolean}
@@ -99,4 +121,35 @@ export const resolveStorageUrl = (src) => {
 
   /* Fallback: If it's already a regular web URL (http://, https://) or absolute asset path, return it as-is */
   return src
+}
+
+/**
+ * Universal resolver for IMAGE assets — routes decentralized storage through the
+ * server-side sharp compression proxies (WebP output, optional resize).
+ * Only use for images; video/audio must resolve via resolveStorageUrl to keep
+ * native gateway streaming.
+ * @param {string} src - The raw input string (IPFS CID, 0G Hash, Custom URI, or HTTP URL).
+ * @param {{ width?: number, quality?: number }} [options] - Optional resize width and WebP quality (1-100).
+ * @returns {string|null} The fully resolved target URL string.
+ */
+export const resolveStorageImageUrl = (src, options = {}) => {
+  if (!src || typeof src !== 'string') return null
+
+  /* Route IPFS images through the compression proxy */
+  if (isIPFSHash(src)) {
+    return resolveIPFSImageUrl(src, options)
+  }
+
+  /* 0G images already stream through /api/0g/file — append resize/quality params */
+  if (is0GHash(src)) {
+    const base = resolve0GUrl(src)
+    if (!base) return null
+    const params = []
+    if (options.width) params.push(`w=${options.width}`)
+    if (options.quality) params.push(`q=${options.quality}`)
+    return params.length ? `${base}&${params.join('&')}` : base
+  }
+
+  /* Everything else (custom protocol, http, asset paths) resolves as before */
+  return resolveStorageUrl(src)
 }

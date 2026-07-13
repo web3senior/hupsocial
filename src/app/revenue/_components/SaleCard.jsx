@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import clsx from 'clsx'
 import { toRelativeTimestamp } from '@/lib/dateHelper'
 import { formatTokenAmount } from './formatTokenAmount'
 import styles from './SaleCard.module.scss'
@@ -16,11 +15,11 @@ function shortAddress(address) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }
 
-export default function SaleCard({ sale, tilt }) {
+export default function SaleCard({ sale }) {
   const excerpt = excerptOf(sale.content)
 
   return (
-    <li className={clsx(styles.saleCard, tilt === 'right' ? styles['saleCard--tiltRight'] : styles['saleCard--tiltLeft'])}>
+    <li className={styles.saleCard}>
       <span className={styles.saleCard__amount}>
         +{formatTokenAmount(sale.amount, sale.decimals)}
         <span className={styles.saleCard__symbol}>{sale.symbol}</span>

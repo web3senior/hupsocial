@@ -19,7 +19,7 @@ import GifPicker from '@/components/GifPicker'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
-import { resolveIPFSUrl } from '@/lib/storageHelper'
+import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
 
 const MAX_MEDIA_ITEMS = 8
@@ -97,7 +97,8 @@ const getReplyTargetText = (target) => {
 const getReplyTargetMedia = (target) =>
   target?.content?.elements?.length > 1 ? target.content.elements[1]?.data?.items || [] : []
 
-const getMediaPreviewSrc = (item) => item.localUrl || resolveIPFSUrl(item.cid)
+const getMediaPreviewSrc = (item) =>
+  item.localUrl || (item.type === 'image' ? resolveIPFSImageUrl(item.cid, { width: 800 }) : resolveIPFSUrl(item.cid))
 
 const getSerializablePostContent = (content) => ({
   ...content,
