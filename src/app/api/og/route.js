@@ -125,13 +125,30 @@ async function getStaticImageUri(imageUrl) {
   }
 }
 
+/* The share card's Posts/Followers/Score/Rank come from the leaderboard endpoint,
+   which serves a 60s snapshot cache. The profile endpoint deliberately no longer
+   carries these (they made every profile load pay the leaderboard cost); this OG
+   card is their only consumer. Unranked wallets 404 here and render as zeros. */
+async function getLeaderboardStats(origin, wallet) {
+  try {
+    const res = await fetch(`${origin}/api/v1/leaderboard?wallet_address=${encodeURIComponent(wallet)}`)
+    if (!res.ok) return null
+    const json = await res.json()
+    return json?.success ? json.data : null
+  } catch (error) {
+    console.error('OG leaderboard lookup failed:', error.message)
+    return null
+  }
+}
+
 export async function GET(request) {
   /* Extract parameters from the incoming URL string */
   const { searchParams } = new URL(request.url)
   const wallet = searchParams.get('wallet')
 
   try {
-    const rawProfile = await getProfile(wallet)
+    const origin = new URL(request.url).origin
+    const [rawProfile, lbStats] = await Promise.all([getProfile(wallet), getLeaderboardStats(origin, wallet)])
     const profile = rawProfile?.data ? rawProfile?.data : null
 
     if (!profile || !profile.wallet_address) {
@@ -173,11 +190,11 @@ export async function GET(request) {
         <h1 style={styles.title}>{profile.name}</h1>
         <p style={styles.subtitle}>{`@${profile.wallet_address.slice(0, 6)}...${profile.wallet_address.slice(-4)}`}</p>
         <ul style={styles.infoList}>
-          <li>{`Posts: ${profile.total_posts || 0}`}</li>
-          <li>{`Followers: ${profile.followers || 0}`}</li>
-          <li>{`Following: ${profile.following || 0}`}</li>
-          <li>{`Score: ${profile.leaderboard_score || 0}`}</li>
-          <li>{`Rank: ${profile.leaderboard_rank || 0}`}</li>
+          <li>{`Posts: ${lbStats?.total_posts || 0}`}</li>
+          <li>{`Followers: ${lbStats?.follower_count || 0}`}</li>
+          <li>{`Following: ${lbStats?.following_count || 0}`}</li>
+          <li>{`Score: ${lbStats?.score || 0}`}</li>
+          <li>{`Rank: ${lbStats?.rank || 0}`}</li>
         </ul>
 
         <small style={styles.copyright}>

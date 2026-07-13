@@ -10,46 +10,26 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
 
-    /* Construct the internal URL for your proxy route and leaderboard endpoint */
+    /* Construct the internal URL for your proxy route */
     const origin = new URL(request.url).origin
     const upProxyUrl = `${origin}/api/universal-profile`
-    const leaderboardUrl = `${origin}/api/v1/leaderboard?wallet_address=${encodeURIComponent(address)}`
 
-    let leaderboardRank = null
-    let leaderboardScore = 0
-    let leaderboardTotalPosts = 0
-
-    /* The leaderboard and Universal Profile lookups are independent upstream calls,
-       so run them in parallel instead of paying their latencies back to back.
-       Each resolves to null on failure so the endpoint remains resilient. */
-    const [lbData, upData] = await Promise.all([
-      // fetch(leaderboardUrl)
-      //   .then((res) => (res.ok ? res.json() : null))
-      //   .catch((lbError) => {
-      //     console.error('Internal Leaderboard look up failed:', lbError.message)
-      //     return null
-      //   }),
-      [],
-      fetch(upProxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          addr: address.toLowerCase(), // Preserve original casing in payload to match working query state
-        }),
-        redirect: 'follow',
+    /* Leaderboard rank/score are intentionally NOT part of this response — computing
+       them is far heavier than a profile read, and their only consumer (the OG share
+       card) queries /api/v1/leaderboard itself. */
+    const upData = await fetch(upProxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        addr: address.toLowerCase(), // Preserve original casing in payload to match working query state
+      }),
+      redirect: 'follow',
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch((upError) => {
+        console.error('Internal Universal Profile lookup failed:', upError.message)
+        return null
       })
-        .then((res) => (res.ok ? res.json() : null))
-        .catch((upError) => {
-          console.error('Internal Universal Profile lookup failed:', upError.message)
-          return null
-        }),
-    ])
-
-    if (lbData?.success && lbData.data) {
-      leaderboardRank = lbData.data.rank || null
-      leaderboardScore = lbData.data.score || 0
-      leaderboardTotalPosts = lbData.data.total_posts || 0
-    }
 
     try {
       if (upData) {
@@ -62,11 +42,6 @@ export async function GET(request, { params }) {
             profile.profileImages && profile.profileImages.length > 0 ? resolveStorageUrl(profile.profileImages[0].src) : null
 
           profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
-
-          /* Append leaderboard tracking data fields */
-          profile.leaderboard_rank = leaderboardRank
-          profile.leaderboard_score = leaderboardScore
-          profile.total_posts = leaderboardTotalPosts
 
           return NextResponse.json({
             source: 'universal_profile',
@@ -97,11 +72,6 @@ export async function GET(request, { params }) {
 
     /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
     dbProfile.profileImage = resolveStorageUrl(dbProfile.profileImage)
-
-    /* Append leaderboard tracking data fields to database fallback too */
-    dbProfile.leaderboard_rank = leaderboardRank
-    dbProfile.leaderboard_score = leaderboardScore
-    dbProfile.total_posts = leaderboardTotalPosts
 
     return NextResponse.json({
       source: 'database',
