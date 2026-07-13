@@ -8,7 +8,7 @@ import { HeartIcon, HouseIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@
 import clsx from 'clsx'
 
 import { useClientMounted } from '@/hooks/useClientMount'
-import { useSidebarStore } from '@/stores/useSidebarStore'
+import { useSidebarStore, getWalletBatchMap, countBatchItems } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import styles from './Footer.module.scss'
 
@@ -44,13 +44,8 @@ export default function Footer() {
 
   // Sync batch calculation exactly with the Aside metric tracking
   const batchCount = useMemo(() => {
-    if (Array.isArray(likedPostIdsMap)) {
-      return likedPostIdsMap.length
-    }
-    return Object.values(likedPostIdsMap).reduce((acc, currentArray) => {
-      return acc + (Array.isArray(currentArray) ? currentArray.length : 0)
-    }, 0)
-  }, [likedPostIdsMap])
+    return countBatchItems(getWalletBatchMap(likedPostIdsMap, address))
+  }, [likedPostIdsMap, address])
 
   const navLinks = useMemo(() => {
     const profilePath = isConnected && address ? `/${address}` : '/connect'

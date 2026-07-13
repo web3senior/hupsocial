@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useConfig, useSwitchChain, useWriteContract, usePublicClient, useConnection } from 'wagmi'
 import { ArrowRightIcon, HeartIcon, SpinnerIcon, StackIcon, TrashIcon } from '@phosphor-icons/react'
-import { useSidebarStore } from '@/stores/useSidebarStore'
+import { useSidebarStore, getWalletBatchMap } from '@/stores/useSidebarStore'
 import PageTitle from '@/components/PageTitle'
 import { getNetworkDisplayName } from '@/lib/chains'
 import { CONTRACTS } from '@/config/wagmi'
@@ -32,16 +32,14 @@ export default function Page() {
   // Track transaction execution state overlays locally
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const networkIds = useMemo(() => {
-    if (Array.isArray(likedPostIdsMap)) return []
-    return Object.keys(likedPostIdsMap).filter((netId) => likedPostIdsMap[netId]?.length > 0)
-  }, [likedPostIdsMap])
+  // Only the connected wallet's own basket is visible on this page
+  const walletQueueMap = useMemo(() => getWalletBatchMap(likedPostIdsMap, address), [likedPostIdsMap, address])
 
-  const [activeNetworkId, setActiveNetworkId] = useState(() => {
-    if (Array.isArray(likedPostIdsMap)) return ''
-    const keys = Object.keys(likedPostIdsMap).filter((netId) => likedPostIdsMap[netId]?.length > 0)
-    return keys[0] || ''
-  })
+  const networkIds = useMemo(() => {
+    return Object.keys(walletQueueMap).filter((netId) => walletQueueMap[netId]?.length > 0)
+  }, [walletQueueMap])
+
+  const [activeNetworkId, setActiveNetworkId] = useState('')
 
   useMemo(() => {
     if (networkIds.length > 0 && !networkIds.includes(activeNetworkId)) {
@@ -50,9 +48,9 @@ export default function Page() {
   }, [networkIds, activeNetworkId])
 
   const currentNetworkPosts = useMemo(() => {
-    if (Array.isArray(likedPostIdsMap) || !activeNetworkId) return []
-    return likedPostIdsMap[activeNetworkId] ?? []
-  }, [likedPostIdsMap, activeNetworkId])
+    if (!activeNetworkId) return []
+    return walletQueueMap[activeNetworkId] ?? []
+  }, [walletQueueMap, activeNetworkId])
 
   // Process the staged list for the active network using multi-call pipelines
   const handleExecuteBatchLike = async () => {
@@ -101,7 +99,7 @@ export default function Page() {
         })
 
         toast('Successfully batched interaction items via session keys!', 'success')
-        clearBatch(activeNetworkId)
+        clearBatch(address, activeNetworkId)
         setIsProcessing(false)
         return
       }
@@ -118,7 +116,7 @@ export default function Page() {
       })
 
       toast('Transaction sent! Clearing localized buffer parameters...', 'success')
-      clearBatch(activeNetworkId)
+      clearBatch(address, activeNetworkId)
     } catch (err) {
       console.error('Batch evaluation transaction failed:', err)
       toast(err.shortMessage || 'Transaction failed', 'error')
@@ -150,7 +148,7 @@ export default function Page() {
                 </span>
                 <div className={styles.tabsList}>
                   {networkIds.map((netId) => {
-                    const count = likedPostIdsMap[netId]?.length ?? 0
+                    const count = walletQueueMap[netId]?.length ?? 0
                     return (
                       <button
                         key={netId}
@@ -178,7 +176,7 @@ export default function Page() {
                       type="button"
                       disabled={isProcessing}
                       className={styles.clearAllButton}
-                      onClick={() => clearBatch(activeNetworkId)}
+                      onClick={() => clearBatch(address, activeNetworkId)}
                     >
                       <TrashIcon size={15} />
                       <span>Clear All</span>
@@ -202,7 +200,7 @@ export default function Page() {
                           type="button"
                           disabled={isProcessing}
                           className={styles.deleteRowButton}
-                          onClick={() => removeFromBatch(activeNetworkId, postId)}
+                          onClick={() => removeFromBatch(address, activeNetworkId, postId)}
                         >
                           <TrashIcon size={16} />
                         </button>

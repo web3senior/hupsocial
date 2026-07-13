@@ -13,7 +13,7 @@ import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { useSidebarStore } from '@/stores/useSidebarStore'
+import { useSidebarStore, getWalletBatchMap, countBatchItems } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import NativePopover from './ui/NativePopover'
 import { GitHub } from './Icons'
@@ -135,9 +135,10 @@ export default function Aside() {
   const { theme, setTheme } = useTheme()
 
   const getNavItems = useSidebarStore((state) => state.getNavItems)
+  const claimLegacyBatch = useSidebarStore((state) => state.claimLegacyBatch)
 
   // Safe item fallback array structure avoids runtime evaluation crash errors
-  const navItems = getNavItems() ?? []
+  const navItems = getNavItems(address) ?? []
   const isMenuOpen = useSidebarStore((state) => state.isMenuOpen)
   const toggleMenu = useSidebarStore((state) => state.toggleMenu)
   const toggleMobileMenu = useSidebarStore((state) => state.toggleMobileMenu)
@@ -149,15 +150,15 @@ export default function Aside() {
   // Extract network-mapped queue states to calculate aggregated metrics safely
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
 
-  // Safely accumulate the total item count across all active chain networks
+  // Count only the connected wallet's own basket across all chain networks
   const batchCount = useMemo(() => {
-    if (Array.isArray(likedPostIdsMap)) {
-      return likedPostIdsMap.length
-    }
-    return Object.values(likedPostIdsMap).reduce((acc, currentArray) => {
-      return acc + (Array.isArray(currentArray) ? currentArray.length : 0)
-    }, 0)
-  }, [likedPostIdsMap])
+    return countBatchItems(getWalletBatchMap(likedPostIdsMap, address))
+  }, [likedPostIdsMap, address])
+
+  // Hand any pre-wallet basket over to the first wallet that connects
+  useEffect(() => {
+    if (isConnected && address) claimLegacyBatch(address)
+  }, [isConnected, address, claimLegacyBatch])
 
   const { data: notifData } = useSWR(
     isConnected && address ? `/api/v1/notifications?wallet_address=${address}&limit=1` : null,

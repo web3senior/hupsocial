@@ -42,6 +42,29 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
 ]
 
+// Baskets migrated from the pre-wallet era live under this key until the
+// next wallet that connects claims them via claimLegacyBatch
+const LEGACY_BATCH_KEY = '__legacy'
+
+// Normalize a wallet address into a stable storage bucket key
+export const walletBatchKey = (address) => (typeof address === 'string' && address !== '' ? address.toLowerCase() : '__guest')
+
+// Resolve the per-network queue map that belongs to one wallet
+export const getWalletBatchMap = (likedPostIds, address) => {
+  const buckets = likedPostIds ?? {}
+  if (Array.isArray(buckets)) return {}
+
+  const bucket = buckets[walletBatchKey(address)]
+  return bucket && !Array.isArray(bucket) ? bucket : {}
+}
+
+// Aggregate the total queued items across every network in one wallet bucket
+export const countBatchItems = (networkMap) => {
+  return Object.values(networkMap ?? {}).reduce((acc, currentArray) => {
+    return acc + (Array.isArray(currentArray) ? currentArray.length : 0)
+  }, 0)
+}
+
 export const useSidebarStore = create(
   persist(
     (set, get) => ({
@@ -50,13 +73,15 @@ export const useSidebarStore = create(
       isMobileMenuOpen: false,
       isComponentOpen: false,
 
-      // Dictionary mapping network ids to array of post ids
+      // Dictionary mapping wallet address keys to network-id keyed post id arrays
       likedPostIds: {},
 
-      // Actions for Batch Like queue management split by network id
-      addToBatch: (networkId, postId) =>
+      // Actions for Batch Like queue management split by wallet then network id
+      addToBatch: (wallet, networkId, postId) =>
         set((state) => {
-          const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
+          const walletKey = walletBatchKey(wallet)
+          const walletQueues = getWalletBatchMap(state.likedPostIds, wallet)
+          const currentNetworkQueue = walletQueues[networkId] ?? []
 
           // Prevent duplicate queuing inside the specific network sub-array
           if (currentNetworkQueue.includes(postId)) return state
@@ -64,35 +89,79 @@ export const useSidebarStore = create(
           return {
             likedPostIds: {
               ...state.likedPostIds,
-              [networkId]: [...currentNetworkQueue, postId],
+              [walletKey]: {
+                ...walletQueues,
+                [networkId]: [...currentNetworkQueue, postId],
+              },
             },
           }
         }),
 
-      removeFromBatch: (networkId, postId) =>
+      removeFromBatch: (wallet, networkId, postId) =>
         set((state) => {
-          const currentNetworkQueue = state.likedPostIds?.[networkId] ?? []
+          const walletKey = walletBatchKey(wallet)
+          const walletQueues = getWalletBatchMap(state.likedPostIds, wallet)
+          const currentNetworkQueue = walletQueues[networkId] ?? []
 
           return {
             likedPostIds: {
               ...state.likedPostIds,
-              [networkId]: currentNetworkQueue.filter((id) => id !== postId),
+              [walletKey]: {
+                ...walletQueues,
+                [networkId]: currentNetworkQueue.filter((id) => id !== postId),
+              },
             },
           }
         }),
 
-      // Clear the queue for a single chain or clear everything entirely if no parameter provided
-      clearBatch: (networkId) =>
+      // Clear one chain queue for the wallet, or the wallet's whole basket if no network given
+      clearBatch: (wallet, networkId) =>
         set((state) => {
+          const walletKey = walletBatchKey(wallet)
+
           if (networkId !== undefined) {
             return {
               likedPostIds: {
                 ...state.likedPostIds,
-                [networkId]: [],
+                [walletKey]: {
+                  ...getWalletBatchMap(state.likedPostIds, wallet),
+                  [networkId]: [],
+                },
               },
             }
           }
-          return { likedPostIds: {} }
+
+          return {
+            likedPostIds: {
+              ...state.likedPostIds,
+              [walletKey]: {},
+            },
+          }
+        }),
+
+      // Hand the pre-wallet legacy basket to the first wallet that connects
+      claimLegacyBatch: (wallet) =>
+        set((state) => {
+          const legacyQueues = state.likedPostIds?.[LEGACY_BATCH_KEY]
+          if (!wallet || !legacyQueues || Array.isArray(legacyQueues)) return state
+
+          const walletKey = walletBatchKey(wallet)
+          const mergedQueues = { ...getWalletBatchMap(state.likedPostIds, wallet) }
+
+          for (const [networkId, legacyIds] of Object.entries(legacyQueues)) {
+            if (!Array.isArray(legacyIds)) continue
+            const existingIds = mergedQueues[networkId] ?? []
+            mergedQueues[networkId] = [...existingIds, ...legacyIds.filter((id) => !existingIds.includes(id))]
+          }
+
+          const { [LEGACY_BATCH_KEY]: _claimed, ...remainingBuckets } = state.likedPostIds
+
+          return {
+            likedPostIds: {
+              ...remainingBuckets,
+              [walletKey]: mergedQueues,
+            },
+          }
         }),
 
       // UI Actions
@@ -108,19 +177,9 @@ export const useSidebarStore = create(
       toggleMobileMenu: () => set((state) => ({ isMobileMenuOpen: !state.isMobileMenuOpen })),
 
       // Computed layout helper that appends dynamic badges natively
-      getNavItems: () => {
-        const likedState = get().likedPostIds ?? {}
-
-        // Calculate the aggregate total length across all networks safely
-        let queueCount = 0
-        if (Array.isArray(likedState)) {
-          // Backward compatibility fallback handler for legacy local storage records
-          queueCount = likedState.length
-        } else {
-          queueCount = Object.values(likedState).reduce((acc, currentArray) => {
-            return acc + (Array.isArray(currentArray) ? currentArray.length : 0)
-          }, 0)
-        }
+      getNavItems: (wallet) => {
+        // Badge only reflects the connected wallet's own basket
+        const queueCount = countBatchItems(getWalletBatchMap(get().likedPostIds, wallet))
 
         return NAV_ITEMS_SCHEMA.map((item) => {
           if (item.id === 'batch-like') {
@@ -133,12 +192,26 @@ export const useSidebarStore = create(
     {
       name: 'hup-sidebar-state',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
-      // One-time reset so browsers holding the old collapsed default open expanded
-      migrate: (persistedState) => ({
-        ...persistedState,
-        isMenuOpen: true,
-      }),
+      version: 2,
+      migrate: (persistedState, version) => {
+        const migrated = { ...persistedState }
+
+        // v1: one-time reset so browsers holding the old collapsed default open expanded
+        if (version < 1) {
+          migrated.isMenuOpen = true
+        }
+
+        // v2: baskets became wallet-keyed; park the old network-keyed map under the
+        // legacy bucket so the next connecting wallet can claim it
+        if (version < 2) {
+          const legacyMap = migrated.likedPostIds
+          const hasLegacyEntries = legacyMap && typeof legacyMap === 'object' && !Array.isArray(legacyMap) && Object.keys(legacyMap).length > 0
+
+          migrated.likedPostIds = hasLegacyEntries ? { [LEGACY_BATCH_KEY]: legacyMap } : {}
+        }
+
+        return migrated
+      },
       // Only persist specific variables to localStorage to keep things fast
       partialize: (state) => ({
         isMenuOpen: state.isMenuOpen,

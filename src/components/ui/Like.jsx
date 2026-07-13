@@ -9,7 +9,7 @@ import { getActiveChain } from '@/lib/communication'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { CONTRACTS } from '@/config/wagmi'
 import abi from '@/abi/post.json'
-import { useSidebarStore } from '@/stores/useSidebarStore'
+import { useSidebarStore, getWalletBatchMap } from '@/stores/useSidebarStore'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import { AnimatedHeart } from '@/components/Icons'
@@ -81,9 +81,8 @@ export const Like = ({ post, onUpdate }) => {
 
   // State & Memo Hooks
   const currentNetworkQueue = useMemo(() => {
-    if (Array.isArray(likedPostIdsMap)) return likedPostIdsMap
-    return likedPostIdsMap[post.network_id] ?? []
-  }, [likedPostIdsMap, post.network_id])
+    return getWalletBatchMap(likedPostIdsMap, address)[post.network_id] ?? []
+  }, [likedPostIdsMap, address, post.network_id])
 
   const isQueued = currentNetworkQueue.includes(post.id)
 
@@ -231,13 +230,13 @@ export const Like = ({ post, onUpdate }) => {
     if (interactionState.isLiked) {
       unlikePost(post.id)
     } else if (isQueued) {
-      removeFromBatch(post.network_id, post.id)
+      removeFromBatch(address, post.network_id, post.id)
     } else {
       const batchLikePref = localStorage.getItem(localStorageBatchLikeKey)
       const isBatchLikeEnabled = batchLikePref !== 'false'
 
       if (isBatchLikeEnabled) {
-        addToBatch(post.network_id, post.id)
+        addToBatch(address, post.network_id, post.id)
       } else {
         likePost(post.id)
       }
