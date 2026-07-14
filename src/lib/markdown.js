@@ -17,8 +17,8 @@ export function renderMarkdown(markdown) {
   renderer.text = (token) => {
     const rawText = typeof token === 'string' ? token : token?.text || ''
 
-    return rawText.replace(/\$([A-Z0-9]{1,10})\b/g, (match, symbol) => {
-      return `<span class="ticker-trigger" data-symbol="${symbol}">${match}</span>`
+    return rawText.replace(/\$([A-Za-z0-9]{1,10})\b/g, (match, symbol) => {
+      return `<span class="ticker-trigger" data-symbol="${symbol.toUpperCase()}">${match}</span>`
     })
   }
 
