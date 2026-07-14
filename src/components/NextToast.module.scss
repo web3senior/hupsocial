@@ -143,11 +143,14 @@
 
     // Invisible hit-area bridging the gap between rows, so moving the pointer
     // from one toast to the next never counts as leaving the stack (which
-    // would collapse it mid-hover).
+    // would collapse it mid-hover). Negative z-index keeps it below the card's
+    // content (the transform makes .toast a stacking context) so it can't
+    // swallow clicks on the close button.
     &::after {
       content: '';
       position: absolute;
       inset: -0.75rem 0;
+      z-index: -1;
     }
   }
 
