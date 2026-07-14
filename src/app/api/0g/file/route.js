@@ -96,7 +96,7 @@ export async function GET(req) {
     const metadata = await sharp(buffer, { animated: true }).metadata()
     const isAnimated = (metadata.pages ?? 1) > 1
 
-    let pipeline = sharp(buffer, { animated: true })
+    let pipeline = sharp(buffer, { animated: true, autoOrient: true })
 
     if (width) {
       pipeline = pipeline.resize({
