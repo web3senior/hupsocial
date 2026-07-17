@@ -29,12 +29,15 @@ export default function Loading() {
           <div className={detailStyles.post}>
             <div className={clsx('__container', detailStyles.page__container)} data-width={`small`}>
               <div className={clsx(detailStyles.grid, 'flex flex-column')}>
-                <article className={clsx(detailStyles.post, 'animate fade')}>
+                {/* No entry animation: PostDetails renders this same article without one
+                    after the Suspense swap, and a restarted `animate fade` (backwards
+                    fill + delay) blanks the already-visible post — a visible flash. */}
+                <article className={detailStyles.post}>
                   <Post
                     item={currentPost}
                     showContent={true}
                     chainId={currentPost.network_id || params?.networkId}
-                    actions={['like', 'comment', 'repost', 'view', 'share', 'bookmark']}
+                    actions={['like', 'comment', 'repost', 'tip', 'view', 'share', 'bookmark']}
                   />
                   <hr />
                 </article>

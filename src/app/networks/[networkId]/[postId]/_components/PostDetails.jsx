@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnection } from 'wagmi'
+import clsx from 'clsx'
 import { recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
@@ -20,10 +21,13 @@ export default function PostDetails({ networkId, postId }) {
   const { address } = useConnection()
   const mounted = useClientMounted()
 
-  // Show cached post from the feed immediately; background fetch keeps data fresh
-  const [post, setPost] = useState(() => {
+  // Show cached post from the feed immediately; background fetch keeps data fresh.
+  // fromCache posts were already painted by loading.jsx, so they must not re-run
+  // the entry animation — restarting `animate fade` blanks the visible post.
+  const [{ post, fromCache }, setPostState] = useState(() => {
     const id = currentPost?.id
-    return id === resolvedPostId || id === Number(resolvedPostId) ? currentPost : null
+    const cached = id === resolvedPostId || id === Number(resolvedPostId) ? currentPost : null
+    return { post: cached, fromCache: !!cached }
   })
 
   useEffect(() => {
@@ -31,15 +35,18 @@ export default function PostDetails({ networkId, postId }) {
     // In-page navigation (comment → parent) keeps this component mounted, so drop
     // the stale post before fetching; the store snapshot avoids a currentPost dep
     // that would refetch on every setCurrentPost.
-    setPost((prev) => {
-      if (prev && (prev.id === resolvedPostId || prev.id === Number(resolvedPostId))) return prev
+    setPostState((prev) => {
+      if (prev.post && (prev.post.id === resolvedPostId || prev.post.id === Number(resolvedPostId))) return prev
       const cached = usePostStore.getState().currentPost
       const cachedId = cached?.id
-      return cachedId === resolvedPostId || cachedId === Number(resolvedPostId) ? cached : null
+      const match = cachedId === resolvedPostId || cachedId === Number(resolvedPostId) ? cached : null
+      return { post: match, fromCache: !!match }
     })
     fetch(`/api/v1/networks/${resolvedNetworkId}/${resolvedPostId}`)
       .then((r) => r.json())
-      .then((body) => { if (!cancelled && body?.data) setPost(body.data) })
+      .then((body) => {
+        if (!cancelled && body?.data) setPostState((prev) => ({ post: body.data, fromCache: !!prev.post && prev.fromCache }))
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [resolvedNetworkId, resolvedPostId])
@@ -85,17 +92,17 @@ export default function PostDetails({ networkId, postId }) {
                 <Post
                   item={parentPost}
                   chainId={resolvedNetworkId}
-                  actions={['like', 'comment', 'repost', 'view', 'share', 'bookmark']}
+                  actions={['like', 'comment', 'repost', 'tip', 'view', 'share', 'bookmark']}
                   hasCommentBelow={true}
                 />
               </article>
             )}
-            <article className={`${styles.post} animate fade`}>
+            <article className={clsx(styles.post, !fromCache && 'animate fade')}>
               <Post
                 item={post}
                 showContent={true}
                 chainId={resolvedNetworkId}
-                actions={['like', 'comment', 'repost', 'view', 'share', 'bookmark']}
+                actions={['like', 'comment', 'repost', 'tip', 'view', 'share', 'bookmark']}
               />
               <hr />
             </article>
