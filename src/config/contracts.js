@@ -54,7 +54,7 @@ export const CONTRACTS = {
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
-    tipper: '',
+    tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
   },
   chain143: {
     name: 'monad',
@@ -65,7 +65,7 @@ export const CONTRACTS = {
     chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
-    tipper: '',
+    tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
   },
   chain42220: {
     name: 'celo',
@@ -75,7 +75,7 @@ export const CONTRACTS = {
     chat: '',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
-    tipper: '',
+    tipper: '0xbc487be674065E39FeFF468856ce614E0Dec48fb',
   },
   chain8453: {
     name: 'base',
@@ -84,7 +84,7 @@ export const CONTRACTS = {
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
-    tipper: '',
+    tipper: '0x01F725975b17dB66DBF26ebAa02bc74F8a433A18',
   },
   chain56: {
     name: 'bnb',
@@ -93,7 +93,7 @@ export const CONTRACTS = {
     status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
-    tipper: '',
+    tipper: '0x74AC93C4A4a67f56af9d1Bd3153910D90F802632',
   },
   chain4663: {
     name: 'robinhood',
@@ -103,7 +103,7 @@ export const CONTRACTS = {
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     chat: '',
     store: '',
-    tipper: '',
+    tipper: '0x3EF07D888e4B4d91e5b6c889E6Bdb7A37BE76CDE',
   },
   chain10143: {
     name: 'monad-testnet',
@@ -122,8 +122,7 @@ export const CONTRACTS = {
     status: '0x2269Fb436d594902e3c38085CBB3f350532531B3',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     community: '',
-    nft: '',
     store: '',
-    tipper: '',
+    tipper: '0x0Fc1223079367ADC73F9960E48d786705e992e14',
   },
 }
