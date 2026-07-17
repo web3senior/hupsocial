@@ -43,7 +43,7 @@ export const CONTRACTS = {
     chat: '',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
-    tipper: '',
+    tipper: '0x9a8Daf359280eb03D734530992691888fA33D476',
   },
   chain42: {
     name: 'lukso',
