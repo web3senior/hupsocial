@@ -21,7 +21,14 @@
     }
   }
 
-  &__link {
+  // Nested under &__menu for specificity: the popover renders inside .post__actions,
+  // whose `button, a` rule (all: unset + padding) outranks a single class
+  &__menu &__link {
+    background: none;
+    border: 0;
+    box-sizing: border-box;
+    color: inherit;
+    cursor: pointer;
     display: flex;
     flex-direction: row;
     align-items: center;

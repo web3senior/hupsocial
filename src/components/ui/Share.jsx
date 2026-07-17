@@ -1,6 +1,7 @@
 'use client'
 
-import { ArrowSquareOutIcon, EnvelopeSimpleIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, EnvelopeSimpleIcon, LinkSimpleIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { toast } from '@/components/NextToast'
 import NativePopover from './NativePopover'
 import styles from './Share.module.scss'
 
@@ -14,6 +15,16 @@ export const Share = ({ item }) => {
   const sharePostTitle = item?.content?.elements?.[0]?.data?.text || item?.content || ''
   const shareHupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const shareContent = `${sharePostTitle}\n\n Creator: ${item.wallet_address} \n\n`
+
+  const handleCopyLink = async (close) => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast('Post link copied', 'success')
+    } catch {
+      toast('Failed to copy', 'error')
+    }
+    close()
+  }
 
   const shareTargets = [
     {
@@ -59,6 +70,12 @@ export const Share = ({ item }) => {
       {({ close }) => (
         <div className={styles.share__menu}>
           <ul className={styles.share__list}>
+            <li>
+              <button type="button" className={styles.share__link} onClick={() => handleCopyLink(close)}>
+                <span>Copy post link</span>
+                <LinkSimpleIcon size={16} />
+              </button>
+            </li>
             {shareTargets.map((target) => {
               const isExternal = target.href.startsWith('http')
 
