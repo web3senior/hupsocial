@@ -109,6 +109,54 @@
     }
   }
 
+  &__tokenSearch {
+    position: relative;
+  }
+
+  &__tokenResults {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--surface);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+
+    li button {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--hover);
+      }
+    }
+  }
+
+  &__tokenResultSymbol {
+    font-weight: 700;
+  }
+
+  &__tokenResultName {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   &__amount {
     display: flex;
     align-items: center;

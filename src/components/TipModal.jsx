@@ -8,6 +8,7 @@ import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
+import { searchTokens } from '@/lib/tokenSearch'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import tipperAbi from '@/abis/HupTipper.json'
 import { toast } from '@/components/NextToast'
@@ -71,6 +72,7 @@ const TipModal = ({ item, setShowTipModal }) => {
   const [amount, setAmount] = useState('1')
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
+  const [tokenSearchResults, setTokenSearchResults] = useState([])
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const { address } = useConnection()
   const { mutate: mutateStats } = useSWRConfig()
@@ -104,11 +106,42 @@ const TipModal = ({ item, setShowTipModal }) => {
   const listedToken = paymentChoice.startsWith('token:')
     ? tipTokens.find((t) => t.address === paymentChoice.slice('token:'.length))
     : null
+  // Trimmed once so a pasted-with-whitespace address and a typed search query are both
+  // read consistently below (isAddress has no whitespace tolerance)
+  const trimmedCustomToken = customToken.trim()
   // Invalid/incomplete custom addresses resolve to null — every downstream read stays
-  // disabled and the send button locked until a real address is pasted
-  const tokenAddress = listedToken ? listedToken.address : isCustomToken && isAddress(customToken) ? customToken : null
+  // disabled and the send button locked until a real address is pasted or picked from search
+  const tokenAddress = listedToken ? listedToken.address : isCustomToken && isAddress(trimmedCustomToken) ? trimmedCustomToken : null
   const isLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
   const isSelf = address?.toLowerCase() === creator?.toLowerCase()
+
+  // Debounced name search for the custom-token field — a pasted address never triggers a
+  // search (isAddress short-circuits it), so picking from TIP_TOKENS or pasting stays
+  // exactly as fast as before. Only the "search by name" path waits on the network.
+  useEffect(() => {
+    if (!isCustomToken || isAddress(trimmedCustomToken) || trimmedCustomToken.length < 2) {
+      setTokenSearchResults([])
+      return
+    }
+
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      searchTokens(chainId, trimmedCustomToken).then((results) => {
+        if (!cancelled) setTokenSearchResults(results)
+      })
+    }, 350)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [isCustomToken, trimmedCustomToken, chainId])
+
+  const handleSelectSearchResult = (result) => {
+    setPaymentChoice(result.isLsp7 ? 'custom-lsp7' : 'custom-erc20')
+    setCustomToken(result.address)
+    setTokenSearchResults([])
+  }
 
   // decimals() shares the same selector on ERC20 and LSP7 — one read covers both
   const { data: tokenDecimals } = useReadContract({
@@ -322,17 +355,29 @@ const TipModal = ({ item, setShowTipModal }) => {
         </div>
 
         {isCustomToken && (
-          <div className={styles.tipModal__field}>
-            <label htmlFor="tipModalCustomToken">Token address</label>
+          <div className={clsx(styles.tipModal__field, styles.tipModal__tokenSearch)}>
+            <label htmlFor="tipModalCustomToken">Search token or paste address</label>
             <input
               type="text"
               id="tipModalCustomToken"
               value={customToken}
-              onChange={(e) => setCustomToken(e.target.value.trim())}
-              placeholder="0x..."
+              onChange={(e) => setCustomToken(e.target.value)}
+              placeholder="Token name or 0x..."
               autoComplete="off"
               spellCheck={false}
             />
+            {tokenSearchResults.length > 0 && (
+              <ul className={styles.tipModal__tokenResults}>
+                {tokenSearchResults.map((result) => (
+                  <li key={result.address}>
+                    <button type="button" onClick={() => handleSelectSearchResult(result)}>
+                      <span className={styles.tipModal__tokenResultSymbol}>{result.symbol}</span>
+                      {result.name && <span className={styles.tipModal__tokenResultName}>{result.name}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
