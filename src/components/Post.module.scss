@@ -385,10 +385,17 @@
         }
       }
 
-      &[data-action='tip']:hover {
-        color: color-mix(in srgb, var(--orange-400) 60%, transparent);
-        &:before {
-          background-color: color-mix(in srgb, var(--orange-400) 10%, transparent);
+      // Icon inherits currentColor: themed base color (Globals.scss per-theme var),
+      // orange tint across icon + counter on hover
+      &[data-action='tip'] {
+        color: var(--color-icon-muted, var(--black-600));
+
+        &:hover {
+          color: color-mix(in srgb, var(--orange-400) 60%, transparent);
+
+          &:before {
+            background-color: color-mix(in srgb, var(--orange-400) 10%, transparent);
+          }
         }
       }
 
@@ -701,209 +708,6 @@ button.btnPostMenu {
       line-height: 1.4;
       padding: 0.2rem 0;
       cursor: text;
-    }
-  }
-}
-
-.modalTip {
-  width: min(420px, calc(100vw - 28px));
-  max-height: calc(100vh - 40px);
-  // iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport
-  max-height: calc(100dvh - 40px);
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  color: var(--text);
-  background: var(--background);
-  border-radius: 22px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
-  flex-direction: column;
-
-  // Only style the open state's display — a bare `display: flex` would override the
-  // UA's `display: none` on the closed dialog and flash it before showModal() runs
-  &[open] {
-    display: flex;
-  }
-
-  &__header {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    min-height: 60px;
-    padding: 0 1.25rem;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-
-    h3 {
-      flex: 1;
-      margin: 0;
-      text-align: center;
-      // offset the cancel button's width so the title stays optically centered
-      padding-inline-end: 2.75rem;
-    }
-  }
-
-  &__cancel {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font: inherit;
-    color: var(--text-muted);
-    cursor: pointer;
-
-    &:hover {
-      color: var(--text);
-    }
-  }
-
-  &__body {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-    padding: 1.25rem;
-    overflow-y: auto;
-  }
-
-  &__recipient {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 12px;
-    background-color: var(--gray-50);
-  }
-
-  &__recipientNote {
-    margin: 0;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-  }
-
-  &__field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    width: 100%;
-
-    label {
-      font-weight: bold;
-      font-size: 0.9rem;
-    }
-
-    select {
-      width: 100%;
-      height: 44px;
-      padding: 0 0.75rem;
-      border: 1px solid var(--gray-300);
-      border-radius: 10px;
-      background-color: var(--background);
-      color: var(--text);
-      font: inherit;
-    }
-  }
-
-  &__amount {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    height: 52px;
-    padding: 0 0.75rem;
-    border: 1px solid var(--gray-300);
-    border-radius: 10px;
-
-    &:focus-within {
-      border-color: var(--color-primary);
-    }
-
-    input {
-      flex: 1;
-      min-width: 0;
-      border: 0;
-      outline: none;
-      background: transparent;
-      color: var(--text);
-      font-size: 1.4rem;
-      font-weight: 700;
-
-      // the preset chips already cover common values; spinners just crowd the field
-      appearance: textfield;
-      -moz-appearance: textfield;
-
-      &::-webkit-outer-spin-button,
-      &::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-      }
-    }
-  }
-
-  &__amountSymbol {
-    font-weight: 700;
-    color: var(--text-muted);
-  }
-
-  &__presets {
-    display: flex;
-    gap: 0.5rem;
-    width: 100%;
-  }
-
-  &__preset {
-    flex: 1;
-    height: 36px;
-    border: 1px solid var(--gray-300);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: 0.85rem;
-    cursor: pointer;
-
-    &:hover {
-      border-color: var(--color-primary);
-    }
-
-    &--active {
-      border-color: var(--color-primary);
-      background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-      color: var(--color-primary);
-    }
-  }
-
-  &__footer {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0 1.25rem 1.25rem;
-    flex-shrink: 0;
-  }
-
-  &__hint {
-    margin: 0;
-    font-size: 0.85rem;
-    text-align: center;
-    color: var(--text-muted);
-  }
-
-  &__send {
-    width: 100%;
-    padding: 1rem;
-    border: 0;
-    border-radius: var(--global-border-radius);
-    background-color: var(--color-primary);
-    color: var(--white);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-
-    &[disabled] {
-      opacity: 0.7;
-      cursor: default;
     }
   }
 }

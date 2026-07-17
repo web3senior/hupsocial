@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, BellIcon, ChatCircleIcon, ChecksIcon, ClockIcon, HeartIcon, PlusCircleIcon, QuotesIcon, SpinnerIcon, UserIcon, UserPlusIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, BellIcon, ChatCircleIcon, ChecksIcon, ClockIcon, HeartIcon, PiggyBankIcon, PlusCircleIcon, QuotesIcon, SpinnerIcon, UserIcon, UserPlusIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
 import Profile from '@/components/Profile'
 import { toRelativeTime } from '@/lib/dateHelper'
@@ -39,6 +39,14 @@ const ACTION_META = {
   user_received_follow: {
     icon: UserPlusIcon,
     label: 'New follower',
+  },
+  post_received_tip: {
+    icon: PiggyBankIcon,
+    label: 'New tip',
+  },
+  post_sent_tip: {
+    icon: PiggyBankIcon,
+    label: 'Tip sent',
   },
 }
 

@@ -10,14 +10,18 @@ export default function RevenueHero({ totals, buyerCount, unitsSold, salesCount 
     <section className={styles.hero} aria-label="Revenue summary">
       <span className={styles.hero__eyebrow}>Total earned</span>
 
-      <div className={styles.hero__amounts}>
+      <ul className={styles.hero__grid}>
         {totals.map((total) => (
-          <span key={`${total.network_id}-${total.token}`} className={styles.hero__amount}>
-            {formatTokenAmount(total.total, total.decimals)}
+          <li key={`${total.network_id}-${total.token}`} className={styles.hero__card}>
             <span className={styles.hero__symbol}>{total.symbol}</span>
-          </span>
+            <span className={styles.hero__amount}>{formatTokenAmount(total.total, total.decimals)}</span>
+            <span className={styles.hero__cardMeta}>
+              {compactFormatter.format(total.units)} sold · {compactFormatter.format(total.sales)}{' '}
+              {total.sales === 1 ? 'sale' : 'sales'}
+            </span>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <p className={styles.hero__meta}>
         {compactFormatter.format(unitsSold)} sold · {compactFormatter.format(salesCount)} sales ·{' '}
