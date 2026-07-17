@@ -11,7 +11,7 @@ export const TAB_TYPE_SCHEMA = {
   foryou: { label: 'For you', icon: HouseIcon },
   following: { label: 'Following', icon: UserCheckIcon },
   trending: { label: 'Trending', icon: FlameIcon },
-  status: { label: 'Pulses', icon: BroadcastIcon },
+  status: { label: 'Status', icon: BroadcastIcon },
 }
 
 const DEFAULT_TABS = [{ id: 'foryou', type: 'foryou' }]

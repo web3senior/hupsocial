@@ -9,7 +9,7 @@ import { config } from '@/config/wagmi'
 import styles from './AddTabMenu.module.scss'
 
 /**
- * Threads-style "Add Tab" popover: root menu (Following/Trending/Pulses/Networks)
+ * Threads-style "Add Tab" popover: root menu (Following/Trending/Status/Networks)
  * and a Networks submenu (one entry per configured chain). Built on the single
  * NativePopover primitive - `view` swaps the rendered menu level instead of
  * nesting native popovers.
@@ -45,7 +45,7 @@ export default function AddTabMenu() {
             <>
               {!hasTab('following') && <MenuItem icon={UserCheckIcon} label="Following" onClick={() => handleSelect(close, 'following')} />}
               {!hasTab('trending') && <MenuItem icon={FlameIcon} label="Trending" onClick={() => handleSelect(close, 'trending')} />}
-              {!hasTab('status') && <MenuItem icon={BroadcastIcon} label="Pulses" onClick={() => handleSelect(close, 'status')} />}
+              {!hasTab('status') && <MenuItem icon={BroadcastIcon} label="Status" onClick={() => handleSelect(close, 'status')} />}
               <MenuItem label="Networks" onClick={() => setView('networks')} trailing={<CaretRightIcon size={16} />} />
             </>
           )}

@@ -684,7 +684,7 @@ const ProfileLink = ({ targetWallet, displayWalletString }) => {
  */
 const Status = ({ addr, profile, selfView }) => {
   const placeholders = [
-    'Share a short pulse',
+    'Share a short status',
     "What's on your mind?",
     'Working on a new idea...',
     'The best thing I saw today was...',
@@ -810,7 +810,7 @@ const Status = ({ addr, profile, selfView }) => {
                 .utc()
                 .fromNow()}`}
             >
-              {status.content !== '' ? <>{status.content}</> : <> Pulse...</>}
+              {status.content !== '' ? <>{status.content}</> : <> Status...</>}
             </p>
           )}
         </button>
@@ -827,7 +827,7 @@ const Status = ({ addr, profile, selfView }) => {
               </svg>
             </button>
             <div className={`flex-1`}>
-              <h3>Set your pulse</h3>
+              <h3>Set your status</h3>
             </div>
             <div className={`pointer`} onClick={(e) => updateStatus(e)}>
               {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
@@ -869,12 +869,12 @@ const Status = ({ addr, profile, selfView }) => {
             {isConfirmed && <p className="text-center badge badge-success">Done</p>}
 
             <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
-              {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete pulse</button>}
+              {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}
             </div>
 
             <div className={`flex flex-row align-items-center gap-025`}>
               <InfoIcon />
-              <small>Your pulse is viewable by all users.</small>
+              <small>Your status is viewable by all users.</small>
             </div>
           </main>
         </>
