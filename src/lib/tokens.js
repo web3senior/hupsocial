@@ -64,6 +64,7 @@ export const TIP_TOKENS = {
   42220: [
     { symbol: 'USDC', address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C' }, // native Circle USDC
     { symbol: 'USDm', address: '0x765DE816845861e75A25fCA122bb6898B8B1282a' }, // ex-cUSD (Mento)
+    { symbol: 'G$', address: '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A' }, // GoodDollar
   ],
   // 143 (monad), 4663 (robinhood): no curated tokens yet
 }
