@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { erc20Abi, isAddress, parseUnits, zeroAddress } from 'viem'
+import { erc20Abi, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
 import { useSWRConfig } from 'swr'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
@@ -19,6 +19,19 @@ import styles from './TipModal.module.scss'
 const TIP_PRESETS = [1, 2, 5, 10]
 
 const LUKSO_CHAIN_IDS = [42, 4201]
+
+// LSP7 has no symbol() — LSP4 metadata lives in ERC725Y storage, read via getData
+// with the keccak256('LSP4TokenSymbol') data key
+const LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756'
+const erc725yAbi = [
+  {
+    type: 'function',
+    name: 'getData',
+    stateMutability: 'view',
+    inputs: [{ name: 'dataKey', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'bytes' }],
+  },
+]
 
 // LSP7 Digital Asset (LUKSO) — operator-based equivalents of allowance/approve
 const lsp7Abi = [
@@ -106,16 +119,40 @@ const TipModal = ({ item, setShowTipModal }) => {
     query: { enabled: Boolean(isTokenTip && tokenAddress) },
   })
 
-  // LSP7 has no symbol() (LSP4 metadata instead) — the read fails there and the
-  // generic label below covers it
+  // Custom ERC20s expose symbol(); custom LSP7s don't — their symbol comes from LSP4
+  // metadata in ERC725Y storage instead, so each custom mode reads its own source
   const { data: customSymbol } = useReadContract({
     abi: erc20Abi,
     address: tokenAddress,
     functionName: 'symbol',
     chainId,
-    query: { enabled: Boolean(isCustomToken && tokenAddress) },
+    query: { enabled: Boolean(paymentChoice === 'custom-erc20' && tokenAddress) },
   })
-  const symbol = !isTokenTip ? nativeCurrency?.symbol || '' : listedToken ? listedToken.symbol : customSymbol || 'tokens'
+
+  const { data: lsp4SymbolBytes } = useReadContract({
+    abi: erc725yAbi,
+    address: tokenAddress,
+    functionName: 'getData',
+    args: [LSP4_TOKEN_SYMBOL_KEY],
+    chainId,
+    query: { enabled: Boolean(paymentChoice === 'custom-lsp7' && tokenAddress) },
+  })
+  let lsp4Symbol = null
+  if (lsp4SymbolBytes && lsp4SymbolBytes !== '0x') {
+    try {
+      lsp4Symbol = hexToString(lsp4SymbolBytes).trim() || null
+    } catch {
+      lsp4Symbol = null
+    }
+  }
+
+  const symbol = !isTokenTip
+    ? nativeCurrency?.symbol || ''
+    : listedToken
+    ? listedToken.symbol
+    : paymentChoice === 'custom-lsp7'
+    ? lsp4Symbol || 'tokens'
+    : customSymbol || 'tokens'
   const decimals = isTokenTip ? tokenDecimals : nativeCurrency?.decimals ?? 18
 
   const parsedAmount = Number(amount)
