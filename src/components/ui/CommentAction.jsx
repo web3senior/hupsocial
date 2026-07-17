@@ -5,7 +5,7 @@ import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
-import styles from './Counter.module.scss'
+import Counter from './Counter'
 
 /**
  * Comment Interaction Component
@@ -38,13 +38,7 @@ export const CommentAction = ({ post, onComment }) => {
   return (
     <button data-action="comment" aria-label="Comment on post" onClick={handleComment}>
       <ChatCircleIcon width={17} height={17} />
-      {commentCount > 0 && (
-        <div className={styles.counterWrapper}>
-          <span key={commentCount} className={styles.counterNumber}>
-            {commentCount}
-          </span>
-        </div>
-      )}
+      {commentCount > 0 && <Counter value={commentCount} />}
     </button>
   )
 }

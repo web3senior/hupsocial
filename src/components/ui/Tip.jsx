@@ -5,7 +5,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
 import { TipIcon } from '@/components/Icons'
-import styles from './Counter.module.scss'
+import Counter from './Counter'
 
 /**
  * Tip Interaction Component
@@ -39,14 +39,12 @@ export const Tip = ({ post, onTip }) => {
     <button data-action="tip" aria-label="Tip the author" onClick={handleTip}>
       <TipIcon />
       {tipCount > 0 && (
-        <div className={styles.counterWrapper}>
-          <span key={tipCount} className={styles.counterNumber}>
-            {new Intl.NumberFormat('en', {
-              notation: 'compact',
-              maximumFractionDigits: 1,
-            }).format(tipCount)}
-          </span>
-        </div>
+        <Counter value={tipCount}>
+          {new Intl.NumberFormat('en', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+          }).format(tipCount)}
+        </Counter>
       )}
     </button>
   )

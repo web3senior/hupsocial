@@ -3,7 +3,7 @@
 import { ChartBarIcon } from '@phosphor-icons/react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
-import styles from './Counter.module.scss'
+import Counter from './Counter'
 
 /**
  * View Metrics Component
@@ -24,14 +24,12 @@ export const View = ({ post }) => {
     <button data-action="view" aria-label="Post views">
       <ChartBarIcon width={17} height={17} />
       {viewCount > 0 && (
-        <div className={styles.counterWrapper}>
-          <span key={viewCount} className={styles.counterNumber}>
-            {new Intl.NumberFormat('en', {
-              notation: 'compact',
-              maximumFractionDigits: 1,
-            }).format(viewCount)}
-          </span>
-        </div>
+        <Counter value={viewCount}>
+          {new Intl.NumberFormat('en', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+          }).format(viewCount)}
+        </Counter>
       )}
     </button>
   )

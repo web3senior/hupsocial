@@ -14,6 +14,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import { AnimatedHeart } from '@/components/Icons'
 import { getPostById } from '@/lib/api'
+import Counter from './Counter'
 import styles from './Like.module.scss'
 
 const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
@@ -267,13 +268,7 @@ export const Like = ({ post, onUpdate }) => {
           <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
         )}
 
-        {interactionState.likeCount > 0 && !isLoading && (
-          <div className={styles.counterWrapper}>
-            <span key={interactionState.likeCount} className={styles.counterNumber}>
-              {interactionState.likeCount}
-            </span>
-          </div>
-        )}
+        {interactionState.likeCount > 0 && !isLoading && <Counter value={interactionState.likeCount} />}
       </button>
     </div>
   )

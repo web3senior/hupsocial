@@ -13,6 +13,10 @@
   display: inline-block;
   font-size: 14px;
   line-height: 20px;
+}
+
+/* Applied only when the value changes after mount — initial paint stays static */
+.counterNumberEnter {
   animation: slideUpFade 0.2s ease-out forwards;
 }
 

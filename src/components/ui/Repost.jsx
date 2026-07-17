@@ -10,8 +10,8 @@ import { CONTRACTS } from '@/config/wagmi'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import abi from '@/abi/post.json'
 import NativePopover from './NativePopover'
+import Counter from './Counter'
 import postStyles from '../Post.module.scss'
-import styles from './Counter.module.scss'
 
 /**
  * Repost Interaction Component
@@ -142,13 +142,7 @@ export const Repost = ({ post, onQuote }) => {
       trigger={
         <button data-action="repost" aria-label="Repost" disabled={isPending || isConfirming} onClick={(e) => e.stopPropagation()}>
           <RepeatIcon width={20} height={20} />
-          {repostCount > 0 && (
-            <div className={styles.counterWrapper}>
-              <span key={repostCount} className={styles.counterNumber}>
-                {repostCount}
-              </span>
-            </div>
-          )}
+          {repostCount > 0 && <Counter value={repostCount} />}
         </button>
       }
     >
