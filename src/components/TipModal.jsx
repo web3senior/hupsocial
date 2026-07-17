@@ -7,7 +7,7 @@ import { useSWRConfig } from 'swr'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
-import { USDC } from '@/lib/tokens'
+import { TIP_TOKENS } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import tipperAbi from '@/abis/HupTipper.json'
 import { toast } from '@/components/NextToast'
@@ -47,8 +47,9 @@ const lsp7Abi = [
 
 /**
  * Tip Modal
- * Sends a tip for a post through HupTipper in the native coin, USDC, or a custom
- * ERC20/LSP7 token. The recipient is resolved onchain from the post's creator.
+ * Sends a tip for a post through HupTipper in the native coin, a curated popular token
+ * (TIP_TOKENS, listed by name so no address pasting), or a custom ERC20/LSP7 address.
+ * The recipient is resolved onchain from the post's creator.
  * @param {Object} props
  * @param {Object} props.item Core content model with network metadata.
  * @param {Function} props.setShowTipModal Clears the open-modal state on close.
@@ -80,16 +81,20 @@ const TipModal = ({ item, setShowTipModal }) => {
   const chainInfo = appChains.find((c) => c.id === chainId)
   const tipperAddress = CONTRACTS[`chain${chainId}`]?.tipper || null
   const nativeCurrency = chainInfo?.nativeCurrency
-  const usdcConfig = USDC[chainId]
+  const tipTokens = TIP_TOKENS[chainId] ?? []
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
 
   const isTokenTip = paymentChoice !== 'native'
   const isCustomToken = paymentChoice === 'custom-erc20' || paymentChoice === 'custom-lsp7'
+  // Curated entries are selected by address ("token:0x..."), so the option value alone
+  // pins the exact contract the user saw in the list
+  const listedToken = paymentChoice.startsWith('token:')
+    ? tipTokens.find((t) => t.address === paymentChoice.slice('token:'.length))
+    : null
   // Invalid/incomplete custom addresses resolve to null — every downstream read stays
   // disabled and the send button locked until a real address is pasted
-  const tokenAddress =
-    paymentChoice === 'usdc' ? usdcConfig?.address || null : isCustomToken && isAddress(customToken) ? customToken : null
-  const isLsp7 = paymentChoice === 'custom-lsp7' || Boolean(paymentChoice === 'usdc' && usdcConfig?.lsp7)
+  const tokenAddress = listedToken ? listedToken.address : isCustomToken && isAddress(customToken) ? customToken : null
+  const isLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
   const isSelf = address?.toLowerCase() === creator?.toLowerCase()
 
   // decimals() shares the same selector on ERC20 and LSP7 — one read covers both
@@ -110,7 +115,7 @@ const TipModal = ({ item, setShowTipModal }) => {
     chainId,
     query: { enabled: Boolean(isCustomToken && tokenAddress) },
   })
-  const symbol = !isTokenTip ? nativeCurrency?.symbol || '' : paymentChoice === 'usdc' ? 'USDC' : customSymbol || 'tokens'
+  const symbol = !isTokenTip ? nativeCurrency?.symbol || '' : listedToken ? listedToken.symbol : customSymbol || 'tokens'
   const decimals = isTokenTip ? tokenDecimals : nativeCurrency?.decimals ?? 18
 
   const parsedAmount = Number(amount)
@@ -269,7 +274,11 @@ const TipModal = ({ item, setShowTipModal }) => {
           <label htmlFor="tipModalToken">Token</label>
           <select id="tipModalToken" value={paymentChoice} onChange={(e) => setPaymentChoice(e.target.value)}>
             <option value="native">{`${nativeCurrency?.name || 'Native'} (${nativeCurrency?.symbol || ''})`}</option>
-            {usdcConfig?.address && <option value="usdc">USDC</option>}
+            {tipTokens.map((token) => (
+              <option key={token.address} value={`token:${token.address}`}>
+                {token.symbol}
+              </option>
+            ))}
             <option value="custom-erc20">Custom ERC20</option>
             {isLukso && <option value="custom-lsp7">Custom LSP7</option>}
           </select>
