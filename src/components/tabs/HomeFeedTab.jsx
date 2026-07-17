@@ -56,6 +56,11 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
 
   const isFetchingRef = useRef(false)
   const hasMoreRef = useRef(false)
+  // Latest loadMorePosts, re-synced every render: the scroll listener below is
+  // registered once (on mount), so calling the callback directly would freeze
+  // its closure — `address` still undefined pre-wagmi-reconnect (appended pages
+  // then fetch without viewer_address and lose is_liked) and `page` stuck at 1.
+  const loadMorePostsRef = useRef(() => {})
 
   // Params of the feed data currently applied ("address|networkId"); the init
   // effect only fetches when they differ, so a cache hydration skips the mount
@@ -92,7 +97,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
 
       if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
         if (hasMoreRef.current && !isFetchingRef.current) {
-          loadMorePosts()
+          loadMorePostsRef.current()
         }
       }
     }
@@ -101,7 +106,6 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       window.addEventListener('scroll', handleScroll, { passive: true })
       return () => window.removeEventListener('scroll', handleScroll)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted])
 
   const setInitialData = useCallback((postsResponse) => {
@@ -259,6 +263,10 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       setIsFetching(false)
     }
   }, [page, appendPosts, address, scopedNetworkId, feedType])
+
+  useEffect(() => {
+    loadMorePostsRef.current = loadMorePosts
+  }, [loadMorePosts])
 
   const handleMergeNewPosts = useCallback(() => {
     if (newPostsQueue.length === 0) return
