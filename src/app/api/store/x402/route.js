@@ -14,13 +14,12 @@
 // Only listings priced in the chain's canonical USDC can be bought over x402.
 
 import { NextResponse } from 'next/server'
-import { createPublicClient, createWalletClient, http, isAddress, isAddressEqual, parseSignature, erc20Abi } from 'viem'
+import { createPublicClient, createWalletClient, http, isAddress, isAddressEqual, parseSignature, erc20Abi, zeroAddress } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia } from 'wagmi/chains'
 import storeAbi from '@/abis/HupBazzar.json'
 import { STORE_ADDRESSES, USDC, X402_NETWORKS } from '@/lib/tokens'
 import { decryptContent, isConfigured } from '@/lib/storeCrypto'
-import { syncListingFromChain } from '@/lib/storeListingsIndex'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -98,6 +97,9 @@ export async function GET(request) {
 
     const tokenName = await publicClient.readContract({ address: usdc.address, abi: erc20Abi, functionName: 'name' })
 
+    // Same payout routing as buyItem onchain: the listing's vault when set, else the seller
+    const payoutAddress = listing.vault && !isAddressEqual(listing.vault, zeroAddress) ? listing.vault : listing.seller
+
     const requirements = {
       scheme: 'exact',
       network,
@@ -105,7 +107,7 @@ export async function GET(request) {
       resource: request.url,
       description: `Unlock gated content for Hup post ${postId}`,
       mimeType: 'application/json',
-      payTo: listing.seller,
+      payTo: payoutAddress,
       maxTimeoutSeconds: 300,
       asset: usdc.address,
       extra: { name: tokenName, version: '2' },
@@ -130,8 +132,8 @@ export async function GET(request) {
     if (payment?.scheme !== 'exact' || !auth || !signature) {
       return json402([requirements], 'Unsupported payment scheme or missing payload')
     }
-    if (!isAddress(auth.from) || !isAddressEqual(auth.to, listing.seller)) {
-      return json402([requirements], 'Payment must be addressed to the seller')
+    if (!isAddress(auth.from) || !isAddressEqual(auth.to, payoutAddress)) {
+      return json402([requirements], "Payment must be addressed to the seller's payout wallet")
     }
     if (BigInt(auth.value) < listing.price) {
       return json402([requirements], 'Payment amount is below the listing price')
@@ -181,9 +183,8 @@ export async function GET(request) {
     const grantHash = await walletClient.writeContract(grantRequest)
     await publicClient.waitForTransactionReceipt({ hash: grantHash })
 
-    // This purchase may have sold out (and auto-deactivated) the listing — keep the
-    // store_listings discovery index behind the bazzar feed in step. Never blocks delivery.
-    syncListingFromChain(chainId, Number(postId)).catch(() => {})
+    // A sell-out (auto-deactivation) needs no handling here: grantPurchase emits ItemBought,
+    // and the cidex indexer derives remaining stock/active state into store_listings from it.
 
     const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
     const ipfsRes = await fetch(`${gatewayUrl}${listing.metadata.replace('ipfs://', '')}`)

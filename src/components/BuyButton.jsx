@@ -15,6 +15,11 @@ import styles from './BuyButton.module.scss'
 
 const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia]
 
+// Compact ("1.2K") for large amounts, but sub-1 amounts keep their significant digits —
+// compact's 2-fraction-digit rounding would collapse e.g. 0.00005 ETH raised to "0 ETH".
+const formatTokenAmount = (n) =>
+  new Intl.NumberFormat(undefined, n > 0 && n < 1 ? { maximumSignificantDigits: 4 } : { notation: 'compact', maximumFractionDigits: 2 }).format(n)
+
 // LSP7 Digital Asset (LUKSO) — operator-based equivalents of allowance/approve
 const lsp7Abi = [
   {
@@ -148,16 +153,6 @@ export default function BuyButton({ item }) {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
   const lastActionRef = useRef(null)
 
-  // A purchase that sells out the listing auto-deactivates it onchain, so ping the
-  // store_listings discovery index (bazzar/premium feed) to re-read the chain state.
-  const syncListingIndex = () => {
-    fetch('/api/store/listings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId: Number(item.id), networkId: Number(item.network_id) }),
-    }).catch(() => {})
-  }
-
   useEffect(() => {
     if (!submitError) return
     toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
@@ -171,7 +166,6 @@ export default function BuyButton({ item }) {
     } else {
       toast('Purchase complete', 'success')
       refetchPurchased()
-      syncListingIndex()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
@@ -198,9 +192,9 @@ export default function BuyButton({ item }) {
     !hasMultipleTokens &&
     (isTokenListing
       ? tokenDecimals !== undefined
-        ? `${new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 2 }).format(Number(formatUnits(revenueInCurrentToken, tokenDecimals)))} ${tokenSymbol || ''}`.trim()
+        ? `${formatTokenAmount(Number(formatUnits(revenueInCurrentToken, tokenDecimals)))} ${tokenSymbol || ''}`.trim()
         : null
-      : `${new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 2 }).format(Number(formatEther(revenueInCurrentToken)))} ${currencySymbol}`.trim())
+      : `${formatTokenAmount(Number(formatEther(revenueInCurrentToken)))} ${currencySymbol}`.trim())
 
   const handleApprove = (e) => {
     e.stopPropagation()
@@ -238,10 +232,10 @@ export default function BuyButton({ item }) {
       return
     }
 
-    // Committing the displayed price/token onchain: buyItem reverts with ListingChanged if the
-    // seller updates the listing between render and inclusion, so a stale UI (or a seller
+    // Committing the displayed price/token/standard onchain: buyItem reverts with ListingChanged
+    // if the seller updates the listing between render and inclusion, so a stale UI (or a seller
     // front-run) can never charge more than the price shown on this button
-    const args = [address, BigInt(item.id), 1n, listing.price, listing.paymentToken, '0x']
+    const args = [address, BigInt(item.id), 1n, listing.price, listing.paymentToken, isLsp7, '0x']
 
     // Route through the burner session key if one's active — same convenience the rest of the
     // app already gets (e.g. Like), skipping the wallet popup. Approve/authorizeOperator stays
@@ -261,7 +255,6 @@ export default function BuyButton({ item }) {
 
         toast('Purchase complete', 'success')
         refetchPurchased()
-        syncListingIndex()
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
       } finally {

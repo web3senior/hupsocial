@@ -51,6 +51,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
 
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
+  const [vaultAddress, setVaultAddress] = useState('')
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
   const [contentName, setContentName] = useState('')
@@ -192,16 +193,6 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
-  // Fire-and-forget ping so the store_listings discovery index behind the bazzar/premium
-  // feed tracks this listing — the server re-reads the chain, so no listing data is sent.
-  const syncListingIndex = () => {
-    fetch('/api/store/listings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId: Number(item.id), networkId: Number(item.network_id) }),
-    }).catch(() => {})
-  }
-
   const isBusy = isPending || isConfirming || isUploadingContent || isSubmittingBurner
   // Not-yet-listed posts go straight to the create form; existing listings show a summary
   // first and only reveal the (pre-filled) form once the seller explicitly chooses to edit.
@@ -230,6 +221,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     }
 
     setQuantity(listing.quantity.toString())
+    setVaultAddress(listing.vault && listing.vault.toLowerCase() !== zeroAddress ? listing.vault : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasListing, listing])
 
@@ -244,7 +236,6 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     refetchListing()
     refetchBuyers()
     refetchTokensUsed()
-    syncListingIndex()
     setIsEditing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
@@ -387,6 +378,14 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
       return
     }
 
+    // Optional payout vault — proceeds go to the seller's wallet when left empty
+    const trimmedVault = vaultAddress.trim()
+    if (trimmedVault && !isAddress(trimmedVault)) {
+      toast('Enter a valid payout wallet address', 'error')
+      return
+    }
+    const vault = trimmedVault || zeroAddress
+
     // Keep the existing gated content pointer unless the seller uploaded something new
     let metadata = listing?.metadata || ''
     setIsUploadingContent(true)
@@ -415,7 +414,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
             contractAddress: storeAddress,
             abi: storeAbi,
             functionName: 'updateListing',
-            args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, metadata],
+            args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, vault, metadata],
           })
         } else {
           await writeWithBurnerSession({
@@ -423,7 +422,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
             contractAddress: storeAddress,
             abi: storeAbi,
             functionName: 'listItem',
-            args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, metadata, { value: listingFeeValue ?? 0n }],
+            args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, vault, metadata, { value: listingFeeValue ?? 0n }],
           })
         }
 
@@ -431,7 +430,6 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         refetchListing()
         refetchBuyers()
         refetchTokensUsed()
-        syncListingIndex()
         setIsEditing(false)
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -446,7 +444,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         abi: storeAbi,
         address: storeAddress,
         functionName: 'updateListing',
-        args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, metadata],
+        args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, vault, metadata],
         chainId,
       })
     } else {
@@ -454,7 +452,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         abi: storeAbi,
         address: storeAddress,
         functionName: 'listItem',
-        args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, metadata],
+        args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, vault, metadata],
         value: listingFeeValue ?? 0n,
         chainId,
       })
@@ -482,7 +480,6 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         refetchListing()
         refetchBuyers()
         refetchTokensUsed()
-        syncListingIndex()
         setIsEditing(false)
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -569,6 +566,12 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                 <span>Status</span>
                 <strong>{listing.isActive ? 'Active' : 'Inactive'}</strong>
               </div>
+              {vaultAddress && (
+                <div className={styles.summaryRow}>
+                  <span>Payout wallet</span>
+                  <strong>{`${vaultAddress.slice(0, 6)}…${vaultAddress.slice(-4)}`}</strong>
+                </div>
+              )}
 
               <div className={styles.actions}>
                 <button type="button" onClick={handleEdit} disabled={isLoadingContent} className={styles.loadContentButton}>
@@ -650,6 +653,17 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                 onChange={(e) => setQuantity(e.target.value)}
                 disabled={isBusy || !storeAddress}
                 required
+              />
+            </label>
+
+            <label>
+              <span>Payout wallet (optional) — sale proceeds go here instead of your wallet</span>
+              <input
+                type="text"
+                placeholder="0x... (leave empty to receive funds yourself)"
+                value={vaultAddress}
+                onChange={(e) => setVaultAddress(e.target.value)}
+                disabled={isBusy || !storeAddress}
               />
             </label>
 

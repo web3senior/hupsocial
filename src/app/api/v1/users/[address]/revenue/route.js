@@ -1,14 +1,13 @@
 /**
  * @file api/v1/users/[address]/revenue/route.js
  * @description A seller's HupBazzar sales history: per-token totals plus paginated per-sale
- * rows joined with post content. Backed by the store_sales index (lib/storeSalesIndex), which
- * is lazily synced from chain on each hit — a sync failure degrades to serving cached rows.
+ * rows joined with post content. Backed by the store_sales table, which the cidex indexer
+ * populates continuously from ItemBought events — this route only reads.
  * Amounts travel as raw-unit strings (BigInt-safe); sold_at is unix seconds.
  */
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import { ensureStoreSalesTables, syncStoreSales } from '@/lib/storeSalesIndex'
 
 export const runtime = 'nodejs'
 
@@ -27,13 +26,6 @@ export async function GET(request, { params }) {
     const wallet = address.toLowerCase()
     const limit = Math.min(Math.max(Number(searchParams.get('limit')) || DEFAULT_LIMIT, 1), MAX_LIMIT)
     const before = Number(searchParams.get('before')) || null
-
-    try {
-      await syncStoreSales()
-    } catch (error) {
-      console.warn('[REVENUE_SYNC_WARN]:', error.message)
-    }
-    await ensureStoreSalesTables()
 
     const [totalsResult, overviewResult, rowsResult] = await Promise.all([
       pool.execute(
@@ -54,7 +46,7 @@ export async function GET(request, { params }) {
       ),
       pool.execute(
         // Keyset pagination on id (insert order tracks chain order) — offset pages would drift
-        // when the lazy sync inserts new rows between fetches. limit + 1 detects the next page.
+        // when the indexer inserts new rows between fetches. limit + 1 detects the next page.
         `SELECT s.id, s.network_id, n.name AS network_name, s.post_id, p.content, s.buyer,
                 s.quantity, s.payment_token AS token, t.symbol, t.decimals,
                 CAST(s.amount AS CHAR) AS amount, s.tx_hash, s.sold_at

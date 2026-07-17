@@ -7,7 +7,6 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { getFollowingAddresses } from '@/lib/followSystem'
-import { ensureStoreListingsTable } from '@/lib/storeListingsIndex'
 
 export const runtime = 'nodejs'
 
@@ -75,11 +74,10 @@ export async function GET(request) {
     const whereParams = []
 
     // "Premium" (bazzar) = posts with an active HupBazzar listing. Listings live onchain keyed
-    // by postId with no enumeration, so this reads the server-verified store_listings
-    // discovery index (see lib/storeListingsIndex.js). Everything else — ordering, visibility
-    // rules, pagination — rides the same chronological pipeline as the home feed.
+    // by postId with no enumeration, so this reads the store_listings discovery index, which
+    // the cidex indexer maintains from ItemListed/ItemUpdated/ItemBought events. Everything
+    // else — ordering, visibility rules, pagination — rides the same pipeline as the home feed.
     if (feedType === 'premium') {
-      await ensureStoreListingsTable()
       whereClause += ` AND EXISTS (
         SELECT 1 FROM store_listings sl
         WHERE sl.network_id = p.network_id AND sl.post_id = p.id AND sl.is_active = 1

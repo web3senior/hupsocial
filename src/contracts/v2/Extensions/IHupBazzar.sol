@@ -23,7 +23,8 @@ interface IHupBazzar {
         uint256 price; // Price per item, in wei (native) or the payment token's base units
         uint256 quantity; // Remaining stock available for purchase
         bool isActive; // Flag indicating if listing is active
-        address seller; // Address of the item seller (receives payment)
+        address seller; // Address of the item seller (receives payment when no vault is set)
+        address vault; // Optional payout address — receives sale proceeds when set, address(0) pays the seller
         string metadata; // Optional pointer (e.g. an IPFS CID of server-encrypted content) unlocked on purchase
         address paymentToken; // Token the listing is priced in, or address(0) for the native token
         bool isLsp7; // True if paymentToken is an LSP7 Digital Asset (LUKSO) instead of an ERC20
@@ -33,10 +34,10 @@ interface IHupBazzar {
     // --- SHARED EVENTS ---
 
     /// @notice Emitted when a post creator lists a new item for sale.
-    event ItemListed(uint256 indexed postId, address indexed seller, uint256 price, uint256 quantity, address paymentToken, bool isLsp7, string metadata);
+    event ItemListed(uint256 indexed postId, address indexed seller, uint256 price, uint256 quantity, address paymentToken, bool isLsp7, address vault, string metadata);
 
-    /// @notice Emitted when a seller updates a listing's price, stock, active status, payment token, or metadata.
-    event ItemUpdated(uint256 indexed postId, uint256 price, uint256 quantity, bool isActive, address paymentToken, bool isLsp7, string metadata);
+    /// @notice Emitted when a seller updates a listing's price, stock, active status, payment token, vault, or metadata.
+    event ItemUpdated(uint256 indexed postId, uint256 price, uint256 quantity, bool isActive, address paymentToken, bool isLsp7, address vault, string metadata);
 
     /// @notice Emitted when an operator records an externally settled purchase (e.g. an x402 payment).
     event PurchaseGranted(uint256 indexed postId, address indexed buyer, address indexed operator, uint256 quantity);
@@ -76,8 +77,9 @@ interface IHupBazzar {
     error ContentDeleted();
     error NotCreator();
     error AlreadyListed();
-    /// @notice The listing's price or payment token no longer matches what the buyer committed to.
-    error ListingChanged(uint256 currentPrice, address currentToken);
+    /// @notice The listing's price, payment token, or token standard no longer matches what the
+    ///         buyer committed to.
+    error ListingChanged(uint256 currentPrice, address currentToken, bool currentIsLsp7);
     error InvalidPrice();
     error InvalidQuantity();
     error ListingNotActive();
@@ -105,6 +107,7 @@ interface IHupBazzar {
             uint256 quantity,
             bool isActive,
             address seller,
+            address vault,
             string memory metadata,
             address paymentToken,
             bool isLsp7,
@@ -144,6 +147,7 @@ interface IHupBazzar {
      * @param _quantity The initial stock quantity available.
      * @param _paymentToken The token the listing is priced in, or address(0) for the native token.
      * @param _isLsp7 True if `_paymentToken` is an LSP7 Digital Asset instead of an ERC20.
+     * @param _vault Optional payout address for sale proceeds, or address(0) to pay the seller.
      * @param _metadata Optional pointer (e.g. an IPFS CID of server-encrypted content) unlocked on purchase.
      */
     function listItem(
@@ -153,11 +157,12 @@ interface IHupBazzar {
         uint256 _quantity,
         address _paymentToken,
         bool _isLsp7,
+        address _vault,
         string calldata _metadata
     ) external payable;
 
     /**
-     * @notice Updates the pricing, quantity, active status, payment token, and/or metadata of a listing.
+     * @notice Updates the pricing, quantity, active status, payment token, vault, and/or metadata of a listing.
      * @dev Only the seller of the listing can execute this.
      * @param _owner The primary wallet address (or address(0) if caller is primary).
      * @param _postId The ID of the listed post.
@@ -166,6 +171,7 @@ interface IHupBazzar {
      * @param _isActive True to enable sales, false to temporarily deactivate listings.
      * @param _paymentToken The new payment token, or address(0) for the native token.
      * @param _isLsp7 True if `_paymentToken` is an LSP7 Digital Asset instead of an ERC20.
+     * @param _vault Optional payout address for sale proceeds, or address(0) to pay the seller.
      * @param _metadata The updated content pointer.
      */
     function updateListing(
@@ -176,6 +182,7 @@ interface IHupBazzar {
         bool _isActive,
         address _paymentToken,
         bool _isLsp7,
+        address _vault,
         string calldata _metadata
     ) external;
 
@@ -192,14 +199,16 @@ interface IHupBazzar {
      * @dev For native listings, msg.value must exactly match price * quantityBought. For token
      *      listings, msg.value must be zero and the buyer must have pre-authorized the bazzar for
      *      the total — via `approve` (ERC20) or `authorizeOperator` (LSP7). Reverts with
-     *      ListingChanged if the listing's price or payment token differs from what the buyer
-     *      committed to, so a seller-side updateListing can never drain a standing allowance.
+     *      ListingChanged if the listing's price, payment token, or token standard differs from
+     *      what the buyer committed to, so a seller-side updateListing can never drain a standing
+     *      allowance or re-route the transfer through mismatched LSP7/ERC20 call semantics.
      *      Fee-on-transfer/deflationary payment tokens are unsupported.
      * @param _buyer The primary wallet address of the buyer (or address(0) if caller is primary).
      * @param _postId The ID of the listed post.
      * @param _quantityBought The number of items to purchase.
      * @param _expectedPrice The per-unit price the buyer saw when signing — must match the listing.
      * @param _expectedToken The payment token the buyer saw when signing — must match the listing.
+     * @param _expectedIsLsp7 The token standard the buyer saw when signing — must match the listing.
      * @param _memo Optional opaque data emitted with ItemBought (e.g. a future order reference).
      *        Never stored — capped at maxMetadataBytes since it's only ever calldata + a log.
      */
@@ -209,6 +218,7 @@ interface IHupBazzar {
         uint256 _quantityBought,
         uint256 _expectedPrice,
         address _expectedToken,
+        bool _expectedIsLsp7,
         bytes calldata _memo
     ) external payable;
 

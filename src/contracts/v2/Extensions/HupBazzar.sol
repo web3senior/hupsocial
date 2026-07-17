@@ -115,6 +115,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         uint256 _quantity,
         address _paymentToken,
         bool _isLsp7,
+        address _vault,
         string calldata _metadata
     ) external payable whenNotPaused {
         if (_price == 0) revert InvalidPrice();
@@ -142,13 +143,14 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
             quantity: _quantity,
             isActive: true,
             seller: seller,
+            vault: _vault,
             metadata: _metadata,
             paymentToken: _paymentToken,
             isLsp7: _paymentToken != address(0) && _isLsp7,
             totalSold: 0
         });
 
-        emit ItemListed(_postId, seller, _price, _quantity, _paymentToken, _paymentToken != address(0) && _isLsp7, _metadata);
+        emit ItemListed(_postId, seller, _price, _quantity, _paymentToken, _paymentToken != address(0) && _isLsp7, _vault, _metadata);
     }
 
     function updateListing(
@@ -159,6 +161,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         bool _isActive,
         address _paymentToken,
         bool _isLsp7,
+        address _vault,
         string calldata _metadata
     ) external whenNotPaused {
         if (bytes(_metadata).length > maxMetadataBytes) {
@@ -177,9 +180,10 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         listing.isActive = _isActive;
         listing.paymentToken = _paymentToken;
         listing.isLsp7 = isLsp7;
+        listing.vault = _vault;
         listing.metadata = _metadata;
 
-        emit ItemUpdated(_postId, _price, _quantity, _isActive, _paymentToken, isLsp7, _metadata);
+        emit ItemUpdated(_postId, _price, _quantity, _isActive, _paymentToken, isLsp7, _vault, _metadata);
     }
 
     function cancelListing(address _owner, uint256 _postId) external whenNotPaused {
@@ -189,7 +193,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
 
         listing.isActive = false;
 
-        emit ItemUpdated(_postId, listing.price, listing.quantity, false, listing.paymentToken, listing.isLsp7, listing.metadata);
+        emit ItemUpdated(_postId, listing.price, listing.quantity, false, listing.paymentToken, listing.isLsp7, listing.vault, listing.metadata);
     }
 
     function buyItem(
@@ -198,6 +202,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         uint256 _quantityBought,
         uint256 _expectedPrice,
         address _expectedToken,
+        bool _expectedIsLsp7,
         bytes calldata _memo
     ) external payable whenNotPaused nonReentrant {
         if (_quantityBought == 0) revert InvalidQuantity();
@@ -209,23 +214,26 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         if (!listing.isActive) revert ListingNotActive();
         if (listing.quantity < _quantityBought) revert OutOfStock();
 
-        // Cached before any external call: the transfers below can hand control to the seller
-        // (native call / LSP7 hooks), who could reenter updateListing — cached values keep the
-        // payout and the ItemBought log tied to the terms this purchase actually executed under
-        uint256 price = listing.price;
-        address seller = listing.seller;
-        address paymentToken = listing.paymentToken;
-        bool isLsp7 = listing.isLsp7;
-
-        // Front-run guard: the buyer commits to the price/token they saw at signing time, so a
-        // seller can't slip in an updateListing that drains a standing token allowance
-        if (price != _expectedPrice || paymentToken != _expectedToken) {
-            revert ListingChanged(price, paymentToken);
+        // Front-run guard: the buyer commits to the price/token/standard they saw at signing
+        // time, so a seller can't slip in an updateListing that drains a standing token
+        // allowance or re-routes the transfer through mismatched LSP7/ERC20 call semantics
+        if (listing.price != _expectedPrice || listing.paymentToken != _expectedToken || listing.isLsp7 != _expectedIsLsp7) {
+            revert ListingChanged(listing.price, listing.paymentToken, listing.isLsp7);
         }
 
-        uint256 requiredPayment = price * _quantityBought;
+        // From here on _expectedPrice/_expectedToken/_expectedIsLsp7 ARE the listing's terms —
+        // the guard pinned them, and as calldata they can't be moved by reentrancy. That matters
+        // because the transfers below hand control to the payout recipient (native call / LSP7
+        // hooks), who could reenter updateListing. The payout target is snapshotted now for the
+        // same reason (the vault is seller-editable); listing.seller is written once in listItem
+        // and never again, so reading it from storage stays safe even after the external calls.
+        // Keeping the pinned terms out of new locals also keeps buyItem inside the legacy
+        // codegen's stack limit (this compiles without viaIR).
+        address payoutRecipient = listing.vault == address(0) ? listing.seller : listing.vault;
 
-        if (paymentToken == address(0)) {
+        uint256 requiredPayment = _expectedPrice * _quantityBought;
+
+        if (_expectedToken == address(0)) {
             if (msg.value != requiredPayment) revert InsufficientPayment(msg.value, requiredPayment);
         } else {
             if (msg.value != 0) revert UnexpectedNativePayment();
@@ -237,37 +245,39 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
         // Record purchase
         amountPurchased[_postId][buyer] += _quantityBought;
         listing.totalSold += _quantityBought;
-        revenueByToken[_postId][paymentToken] += requiredPayment;
-        buyerAmountByToken[_postId][buyer][paymentToken] += _quantityBought;
+        revenueByToken[_postId][_expectedToken] += requiredPayment;
+        buyerAmountByToken[_postId][buyer][_expectedToken] += _quantityBought;
         _buyersOf[_postId].add(buyer);
-        _tokensOf[_postId].add(paymentToken);
+        _tokensOf[_postId].add(_expectedToken);
 
         // If out of stock, automatically set listing to inactive
         if (listing.quantity == 0) {
             listing.isActive = false;
         }
 
-        // Split payment: platform fee stays in the contract, remainder goes to the seller.
+        // Split payment: platform fee stays in the contract, remainder (requiredPayment -
+        // feeAmount, computed inline at each payout site to stay inside the legacy codegen's
+        // stack limit) goes to the payout recipient (the listing's vault when set, otherwise
+        // the seller).
         // Fee-on-transfer/deflationary ERC20s are unsupported: the contract pulls the gross
-        // amount and pushes sellerAmount, so a transfer tax would eat into accumulated fees.
+        // amount and pushes the seller's share, so a transfer tax would eat into accumulated fees.
         uint256 feeAmount = (requiredPayment * buyFeeBps) / FEE_DENOMINATOR;
-        uint256 sellerAmount = requiredPayment - feeAmount;
 
-        if (paymentToken == address(0)) {
-            (bool success, ) = seller.call{value: sellerAmount}("");
+        if (_expectedToken == address(0)) {
+            (bool success, ) = payoutRecipient.call{value: requiredPayment - feeAmount}("");
             if (!success) revert TransferFailed();
-        } else if (isLsp7) {
+        } else if (_expectedIsLsp7) {
             // LSP7 (LUKSO): buyer must have called authorizeOperator(bazzar, total) beforehand
-            ILSP7Minimal token = ILSP7Minimal(paymentToken);
+            ILSP7Minimal token = ILSP7Minimal(_expectedToken);
             token.transfer(buyer, address(this), requiredPayment, true, "");
-            token.transfer(address(this), seller, sellerAmount, true, "");
+            token.transfer(address(this), payoutRecipient, requiredPayment - feeAmount, true, "");
         } else {
-            IERC20 token = IERC20(paymentToken);
+            IERC20 token = IERC20(_expectedToken);
             token.safeTransferFrom(buyer, address(this), requiredPayment);
-            token.safeTransfer(seller, sellerAmount);
+            token.safeTransfer(payoutRecipient, requiredPayment - feeAmount);
         }
 
-        emit ItemBought(_postId, buyer, seller, price, _quantityBought, paymentToken, feeAmount, _memo);
+        emit ItemBought(_postId, buyer, listing.seller, _expectedPrice, _quantityBought, _expectedToken, feeAmount, _memo);
     }
 
     /**
