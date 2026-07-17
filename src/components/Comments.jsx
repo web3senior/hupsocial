@@ -37,7 +37,7 @@ export default function Comments({ networkId, postId, viewerAddress }) {
     loadComments()
   }, [networkId, postId, viewerAddress])
 
-  if (isLoading) return <div>Loading discussion thread...</div>
+  if (isLoading) return <div className={styles.commentsList__empty}>Loading discussion thread...</div>
 
   return (
     <div className={styles.commentsList}>
