@@ -78,6 +78,9 @@ export async function GET(request, { params }) {
         ...post,
         content: parseContent(post.content),
         has_liked: !!post.has_liked,
+        // Feed rows expose the viewer flag as is_liked; consumers (e.g. the Like
+        // button's initial state) read that name, so the detail row must match.
+        is_liked: !!post.has_liked,
         is_bookmarked: !!post.has_bookmarked,
         folder_id: post.folder_id ?? null,
         has_reposted: !!post.has_reposted,

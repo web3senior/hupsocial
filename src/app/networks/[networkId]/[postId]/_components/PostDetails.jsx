@@ -42,14 +42,18 @@ export default function PostDetails({ networkId, postId }) {
       const match = cachedId === resolvedPostId || cachedId === Number(resolvedPostId) ? cached : null
       return { post: match, fromCache: !!match }
     })
-    fetch(`/api/v1/networks/${resolvedNetworkId}/${resolvedPostId}`)
+    // viewer_address makes the server compute is_liked/is_bookmarked for this
+    // wallet; address in the deps refetches once wagmi finishes reconnecting,
+    // since the first run usually fires before the connection is restored.
+    const viewerQuery = address ? `?viewer_address=${address}` : ''
+    fetch(`/api/v1/networks/${resolvedNetworkId}/${resolvedPostId}${viewerQuery}`)
       .then((r) => r.json())
       .then((body) => {
         if (!cancelled && body?.data) setPostState((prev) => ({ post: body.data, fromCache: !!prev.post && prev.fromCache }))
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [resolvedNetworkId, resolvedPostId])
+  }, [resolvedNetworkId, resolvedPostId, address])
 
   // A comment carries its parent's id — parent_id on current rows, is_comment on
   // legacy rows. Zero means "not a comment" onchain, so it must not count.
@@ -62,12 +66,12 @@ export default function PostDetails({ networkId, postId }) {
       return
     }
     let cancelled = false
-    fetch(`/api/v1/networks/${resolvedNetworkId}/${parentId}`)
+    fetch(`/api/v1/networks/${resolvedNetworkId}/${parentId}${address ? `?viewer_address=${address}` : ''}`)
       .then((r) => r.json())
       .then((body) => { if (!cancelled && body?.data) setParentPost(body.data) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [resolvedNetworkId, parentId])
+  }, [resolvedNetworkId, parentId, address])
 
   useEffect(() => {
     if (mounted) recordPostView(resolvedNetworkId, resolvedPostId, address)
