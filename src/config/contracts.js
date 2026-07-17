@@ -43,6 +43,7 @@ export const CONTRACTS = {
     chat: '',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
+    tipper: '',
   },
   chain42: {
     name: 'lukso',
@@ -53,6 +54,7 @@ export const CONTRACTS = {
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
+    tipper: '',
   },
   chain143: {
     name: 'monad',
@@ -63,6 +65,7 @@ export const CONTRACTS = {
     chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
+    tipper: '',
   },
   chain42220: {
     name: 'celo',
@@ -72,6 +75,7 @@ export const CONTRACTS = {
     chat: '',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
+    tipper: '',
   },
   chain8453: {
     name: 'base',
@@ -80,6 +84,7 @@ export const CONTRACTS = {
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
+    tipper: '',
   },
   chain56: {
     name: 'bnb',
@@ -88,6 +93,7 @@ export const CONTRACTS = {
     status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
+    tipper: '',
   },
   chain4663: {
     name: 'robinhood',
@@ -97,6 +103,7 @@ export const CONTRACTS = {
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     chat: '',
     store: '',
+    tipper: '',
   },
   chain10143: {
     name: 'monad-testnet',
@@ -105,7 +112,8 @@ export const CONTRACTS = {
     status: '0xd5f02276c28E1F134BfA0b423381CE740ccb644E',
     community: '0x5D7ebD8ae5A439204A1F1f5f168c7C48AA25d88c',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
-    store: '',
+    store: '0x85765350FF07802155a35fFf261DFfaAb0ffA366',
+    tipper: '0x487aE425f90425a3376F3bC8A016aA1Fb6bec96f',
   },
   chain42161: {
     name: 'arbitrum',
@@ -116,5 +124,6 @@ export const CONTRACTS = {
     community: '',
     nft: '',
     store: '',
+    tipper: '',
   },
 }

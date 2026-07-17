@@ -65,7 +65,7 @@ export default function SearchPanel() {
             onMouseEnter={() => handlePostPrefetch(item.network_id, item.id)}
             onTouchStart={() => handlePostPrefetch(item.network_id, item.id)}
           >
-            <Post item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'bookmark']} />
+            <Post item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'bookmark']} />
             {i < results.length - 1 && <hr className={styles.divider} />}
           </section>
         ))}

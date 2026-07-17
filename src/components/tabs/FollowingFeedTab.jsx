@@ -95,7 +95,7 @@ export default function FollowingFeedTab() {
       <div className={clsx('__container', styles.page__container)} data-width="medium">
         {posts.list.map((item, i) => (
           <section key={item.id} className={clsx(styles.post, 'animate', 'fade')} onClick={() => handlePostClick(item)}>
-            <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'bookmark']} />
+            <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
             {i < posts.list.length - 1 && <hr />}
           </section>
         ))}

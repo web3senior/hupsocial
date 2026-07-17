@@ -4,8 +4,9 @@ import { useState, useEffect, useId, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { usePostStore } from '@/stores/usePostStore'
-import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
-import { initHupContract, initPostCommentContract, getHasLikedPost, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
+import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient, useReadContract } from 'wagmi'
+import { erc20Abi, parseUnits, zeroAddress } from 'viem'
+import { initHupContract, getVoteCountsForPoll, getVoterChoices } from '@/lib/communication'
 import { getPostById, recordPostView } from '@/lib/api'
 import PollTimer from '@/components/PollTimer'
 import { isPollActive } from '@/lib/utils'
@@ -13,7 +14,6 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile } from '@/hooks/useProfile'
 import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
-import commentAbi from '@/abi/post-comment.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon } from '@/components/Icons'
@@ -33,10 +33,15 @@ import {
   UsersIcon,
 } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
+import { appChains } from '@/config/contracts'
+import { USDC } from '@/lib/tokens'
+import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import tipperAbi from '@/abis/HupTipper.json'
 import { renderMarkdown } from '@/lib/markdown'
 import useSWR, { useSWRConfig } from 'swr'
 import { getPostStatsKey } from '@/hooks/usePostStats'
 import NativePopover from './ui/NativePopover'
+import NativeDialog from './ui/NativeDialog'
 import SellItemPopover from './SellItemPopover'
 import BuyButton from './BuyButton'
 import NewPost from './NewPost'
@@ -216,7 +221,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
                 const base = prev || showQuoteModal
                 return { ...base, total_reposts: (Number(base.total_reposts) || 0) + 1 }
               },
-              { revalidate: false },
+              { revalidate: false }
             )
           }}
         />
@@ -333,7 +338,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
               {actionsSet.has('repost') && <Repost post={displayItem || item} onQuote={() => setShowQuoteModal(displayItem || item)} />}
 
-              {actionsSet.has('tip') && <Tip post={item} onTip={setShowTipModal} />}
+              {actionsSet.has('tip') && <Tip post={displayItem || item} onTip={setShowTipModal} />}
 
               {actionsSet.has('view') && <View post={item} />}
             </div>
@@ -613,7 +618,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
             onClick={openLastComment}
             onMouseEnter={() => router.prefetch(`/networks/${lastComment.network_id}/${lastComment.id}`)}
           >
-            <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'bookmark']} chainId={chainId} />
+            <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} chainId={chainId} />
           </div>
         ) : null)}
     </>
@@ -718,132 +723,288 @@ const ReportModal = ({ item, setShowReportModal }) => {
   )
 }
 
-const TipModal = ({ item, setShowTipModal }) => {
-  const [hasLiked, setHasLiked] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [amount, setAmount] = useState(1)
-  const isMounted = useClientMounted()
-  const [commentContent, setCommentContent] = useState('')
-  const { address, isConnected } = useConnection()
-  const activeChain = getActiveChain()
-  const { web3, contract } = initPostCommentContract()
-  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: receiptError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  })
+const TIP_PRESETS = [1, 2, 5, 10]
 
-  const getHasLiked = async () => {
-    return isConnected ? await getHasLikedPost(id, address) : false
+// LSP7 Digital Asset (LUKSO) — operator-based equivalents of allowance/approve
+const lsp7Abi = [
+  {
+    type: 'function',
+    name: 'authorizedAmountFor',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'operator', type: 'address' },
+      { name: 'tokenOwner', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'authorizeOperator',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'operator', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'operatorNotificationData', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+]
+
+const TipModal = ({ item, setShowTipModal }) => {
+  const [amount, setAmount] = useState('1')
+  const [selectedToken, setSelectedToken] = useState('')
+  const [isBurnerBusy, setIsBurnerBusy] = useState(false)
+  const { address } = useConnection()
+  const { mutate: mutateStats } = useSWRConfig()
+  const dialogRef = useRef(null)
+  const lastActionRef = useRef(null)
+  const creator = item.wallet_address
+
+  // Optimistic counter bump — the indexer lands the Tipped event a few seconds after the
+  // receipt, so revalidating immediately would race it and snap the counter back
+  const bumpTipCount = () => {
+    mutateStats(
+      getPostStatsKey(item, address),
+      (current) => ({ ...(current || item), total_tips: Number((current || item)?.total_tips || 0) + 1 }),
+      { revalidate: false },
+    )
   }
 
-  const handleTip = (e, id) => {
+  // Tips settle on the post's own chain, not whichever chain is currently active
+  const chainId = Number(item.network_id)
+  const publicClient = usePublicClient({ chainId })
+  const chainInfo = appChains.find((c) => c.id === chainId)
+  const tipperAddress = CONTRACTS[`chain${chainId}`]?.tipper || null
+  const nativeCurrency = chainInfo?.nativeCurrency
+  const usdcConfig = USDC[chainId]
+
+  const isTokenTip = selectedToken !== ''
+  const isLsp7 = Boolean(isTokenTip && usdcConfig?.lsp7)
+  const symbol = isTokenTip ? 'USDC' : nativeCurrency?.symbol || ''
+  const isSelf = address?.toLowerCase() === creator?.toLowerCase()
+
+  // decimals() shares the same selector on ERC20 and LSP7 — one read covers both
+  const { data: tokenDecimals } = useReadContract({
+    abi: erc20Abi,
+    address: selectedToken,
+    functionName: 'decimals',
+    chainId,
+    query: { enabled: isTokenTip },
+  })
+  const decimals = isTokenTip ? tokenDecimals : nativeCurrency?.decimals ?? 18
+
+  const parsedAmount = Number(amount)
+  const isValidAmount = Number.isFinite(parsedAmount) && parsedAmount > 0
+  let amountUnits = null
+  if (isValidAmount && decimals !== undefined) {
+    try {
+      amountUnits = parseUnits(amount, decimals)
+    } catch {
+      amountUnits = null
+    }
+  }
+
+  const { data: erc20Allowance, refetch: refetchErc20Allowance } = useReadContract({
+    abi: erc20Abi,
+    address: selectedToken,
+    functionName: 'allowance',
+    args: [address, tipperAddress],
+    chainId,
+    query: { enabled: Boolean(isTokenTip && !isLsp7 && address && tipperAddress) },
+  })
+
+  const { data: lsp7Allowance, refetch: refetchLsp7Allowance } = useReadContract({
+    abi: lsp7Abi,
+    address: selectedToken,
+    functionName: 'authorizedAmountFor',
+    args: [tipperAddress, address],
+    chainId,
+    query: { enabled: Boolean(isLsp7 && address && tipperAddress) },
+  })
+
+  const allowance = isLsp7 ? lsp7Allowance : erc20Allowance
+  const refetchAllowance = isLsp7 ? refetchLsp7Allowance : refetchErc20Allowance
+  const needsApproval = isTokenTip && allowance !== undefined && amountUnits !== null && allowance < amountUnits
+
+  const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
+  const isBusy = isPending || isConfirming || isBurnerBusy
+
+  // Mount = open / unmount = close, matching the NewPost dialog contract
+  useEffect(() => {
+    dialogRef.current?.open()
+  }, [])
+
+  useEffect(() => {
+    if (!submitError) return
+    toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
+  }, [submitError])
+
+  useEffect(() => {
+    if (!isConfirmed) return
+    if (lastActionRef.current === 'approve') {
+      toast('Token approved — you can send your tip now', 'success')
+      refetchAllowance()
+    } else {
+      toast('Tip sent', 'success')
+      bumpTipCount()
+      dialogRef.current?.close()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfirmed])
+
+  const handleApprove = (e) => {
     e.stopPropagation()
+    if (amountUnits === null) return
 
-    toast(`Coming soon`)
-    return
+    lastActionRef.current = 'approve'
+    if (isLsp7) {
+      writeContract({
+        abi: lsp7Abi,
+        address: selectedToken,
+        functionName: 'authorizeOperator',
+        args: [tipperAddress, amountUnits, '0x'],
+        chainId,
+      })
+    } else {
+      writeContract({
+        abi: erc20Abi,
+        address: selectedToken,
+        functionName: 'approve',
+        args: [tipperAddress, amountUnits],
+        chainId,
+      })
+    }
+  }
 
-    if (!isConnected) {
-      console.log(`Please connect your wallet first`, 'error')
+  const handleTip = async (e) => {
+    e.stopPropagation()
+    if (amountUnits === null || !tipperAddress) return
+
+    // The recipient is resolved onchain by HupTipper from the post's creator — the client
+    // only commits the post id, amount, and token
+    const args = [address, BigInt(item.id), amountUnits, selectedToken || zeroAddress, isLsp7, '0x']
+
+    // Route through the burner session key if one's active — same convenience BuyButton gets,
+    // skipping the wallet popup. Approve/authorizeOperator stays wagmi-only regardless.
+    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+
+    if (session.active) {
+      setIsBurnerBusy(true)
+      try {
+        await writeWithBurnerSession({
+          chain: chainInfo,
+          contractAddress: tipperAddress,
+          abi: tipperAbi,
+          functionName: 'tip',
+          args: isTokenTip ? args : [...args, { value: amountUnits }],
+        })
+
+        toast('Tip sent', 'success')
+        bumpTipCount()
+        dialogRef.current?.close()
+      } catch (err) {
+        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
+      } finally {
+        setIsBurnerBusy(false)
+      }
       return
     }
 
+    lastActionRef.current = 'tip'
     writeContract({
-      abi: commentAbi,
-      address: activeChain[1].comment,
-      functionName: 'addComment',
-      args: [web3.utils.toNumber(id), 0, commentContent, ''],
+      abi: tipperAbi,
+      address: tipperAddress,
+      functionName: 'tip',
+      args,
+      chainId,
+      ...(isTokenTip ? {} : { value: amountUnits }),
     })
   }
 
-  useEffect(() => {
-    // getHasLiked()
-    //   .then((result) => {
-    //     setHasLiked(result)
-    //     setLoading(false)
-    //   })
-    //   .catch((err) => {
-    //     console.log(err)
-    //     setError(`⚠️`)
-    //     setLoading(false)
-    //   })
-  }, [item])
-
-  // if (loading) {
-  //   return <InlineLoading />
-  // }
-
-  if (error) {
-    return <span>{error}</span>
-  }
-
   return (
-    <div
-      className={`${styles.modal} ${styles.modalTip} animate fade`}
-      onClick={(e) => {
-        e.stopPropagation()
-        setShowTipModal()
-      }}
+    <NativeDialog
+      ref={dialogRef}
+      className={styles.modalTip}
+      aria-label="Support creator"
+      onClick={(e) => e.stopPropagation()}
+      onClose={() => setShowTipModal()}
     >
-      <div className={`${styles.modal__container}`} onClick={(e) => e.stopPropagation()}>
-        <header>
-          <div className={``} aria-label="Close" onClick={() => setShowTipModal()}>
-            Cancel
-          </div>
-          <div className={`flex-1`}>
-            <h3>Support creator</h3>
-          </div>
-          <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-            {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : ``}
-          </div>
-        </header>
+      <header className={styles.modalTip__header}>
+        <button type="button" className={styles.modalTip__cancel} onClick={() => dialogRef.current?.close()}>
+          Cancel
+        </button>
+        <h3>Support creator</h3>
+      </header>
 
-        <main className={`flex flex-column align-items-start justify-content-between gap-050`}>
-          <div className={`flex flex-column align-items-start justify-content-between`}>
-            <label htmlFor="">Post ID</label>
-            <input type="text" name="" id="" value={`${item.postId}`} placeholder={``} disabled />
+      <main className={styles.modalTip__body}>
+        <div className={styles.modalTip__recipient}>
+          <Profile variant="fullWithoutTime" creator={creator} networkId={item.network_id} />
+          <p className={styles.modalTip__recipientNote}>
+            {isSelf ? `This is your own post` : `Your tip goes directly to the creator's wallet`}
+          </p>
+        </div>
+
+        <div className={styles.modalTip__field}>
+          <label htmlFor="tipModalToken">Token</label>
+          <select id="tipModalToken" value={selectedToken} onChange={(e) => setSelectedToken(e.target.value)}>
+            <option value="">{`${nativeCurrency?.name || 'Native'} (${nativeCurrency?.symbol || ''})`}</option>
+            {usdcConfig?.address && <option value={usdcConfig.address}>USDC</option>}
+          </select>
+        </div>
+
+        <div className={styles.modalTip__field}>
+          <label htmlFor="tipModalAmount">Amount</label>
+          <div className={styles.modalTip__amount}>
+            <input
+              type="number"
+              id="tipModalAmount"
+              value={amount}
+              min={0}
+              step="any"
+              inputMode="decimal"
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+            />
+            <span className={styles.modalTip__amountSymbol}>{symbol}</span>
           </div>
-
-          <div className={`flex flex-column align-items-start justify-content-between`}>
-            <label htmlFor="">From</label>
-            <input type="text" name="" id="" value={`${address}`} placeholder={``} disabled />
+          <div className={styles.modalTip__presets}>
+            {TIP_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={clsx(styles.modalTip__preset, parsedAmount === preset && styles['modalTip__preset--active'])}
+                onClick={() => setAmount(`${preset}`)}
+              >
+                {preset} {symbol}
+              </button>
+            ))}
           </div>
+        </div>
+      </main>
 
-          <div className={`flex flex-column align-items-start justify-content-between`}>
-            <label htmlFor="">To {address.toLowerCase() === item.creator.toLowerCase() && `(Yourself)`}</label>
-            <input type="text" name="" id="" value={`${item.creator}`} placeholder={``} disabled />
-          </div>
-
-          <div className={`flex flex-column align-items-start justify-content-between`}>
-            <label htmlFor="">Token</label>
-            <select name="" id="">
-              <option value="">{`${activeChain[0].nativeCurrency.name} (${activeChain[0].nativeCurrency.symbol})`}</option>
-            </select>
-          </div>
-
-          <div className={`flex flex-column align-items-start justify-content-between`}>
-            <label htmlFor="">Amount</label>
-
-            <div className={`${styles.tipAmount} w-100 flex flex-row align-items-start justify-content-between gap-025`}>
-              <input type="number" name="" id="" value={amount} min={1} onChange={(e) => setAmount(e.target.value)} placeholder={`0`} />
-              <button onClick={() => setAmount(2)}>2</button>
-              <button onClick={() => setAmount(5)}>5</button>
-              <button onClick={() => setAmount(10)}>10</button>
-            </div>
-          </div>
-        </main>
-
-        <footer className={``}>
-          <button className="" onClick={(e) => handleTip(e, item.postId)} disabled={amount < 1}>
-            Send
+      <footer className={styles.modalTip__footer}>
+        {!tipperAddress && <p className={styles.modalTip__hint}>Tipping isn't available on this network yet</p>}
+        {needsApproval ? (
+          <button type="button" className={styles.modalTip__send} onClick={handleApprove} disabled={isBusy || amountUnits === null}>
+            {isBusy ? 'Confirming...' : `Approve ${new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(parsedAmount)} ${symbol}`}
           </button>
-        </footer>
-      </div>
-    </div>
+        ) : (
+          <button
+            type="button"
+            className={styles.modalTip__send}
+            onClick={handleTip}
+            disabled={isBusy || amountUnits === null || isSelf || !tipperAddress}
+          >
+            {isBusy
+              ? 'Confirming...'
+              : isValidAmount
+              ? `Send ${new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(parsedAmount)} ${symbol}`
+              : `Send`}
+          </button>
+        )}
+      </footer>
+    </NativeDialog>
   )
 }
 

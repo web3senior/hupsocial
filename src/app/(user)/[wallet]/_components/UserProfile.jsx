@@ -252,7 +252,7 @@ export default function UserProfile() {
                         onMouseEnter={() => handlePostPrefetch(item.id, item.network_id)}
                         onTouchStart={() => handlePostPrefetch(item.id, item.network_id)}
                       >
-                        <Post item={item} actions={[`like`, `comment`, `repost`, `view`, `share`, `bookmark`]} />
+                        <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`, `bookmark`]} />
                         {i < posts.list.length - 1 && <hr />}
                       </section>
                     )

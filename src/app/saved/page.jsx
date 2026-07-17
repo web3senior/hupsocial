@@ -306,7 +306,7 @@ export default function SavedPage() {
                       onMouseEnter={() => handlePostPrefetch(item)}
                       onTouchStart={() => handlePostPrefetch(item)}
                     >
-                      <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'view', 'bookmark']} />
+                      <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'bookmark']} />
                       {i < posts.length - 1 && <hr />}
                     </section>
                   ))}

@@ -1852,7 +1852,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                 <div className={styles.feed__list}>
                   {communityPosts.map((post, i) => (
                     <div key={post.id} className="animate fade">
-                      <PostCard item={post} chainId={chainId} actions={['like', 'comment', 'share', 'repost', 'view', 'bookmark']} />
+                      <PostCard item={post} chainId={chainId} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'bookmark']} />
                       {i < communityPosts.length - 1 && <hr />}
                     </div>
                   ))}

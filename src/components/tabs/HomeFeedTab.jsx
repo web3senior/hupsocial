@@ -358,7 +358,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
                 onMouseEnter={() => handlePostPrefetch(item)}
                 onTouchStart={() => handlePostPrefetch(item)}
               >
-                <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'view', 'quote', 'bookmark']} />
+                <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
                 {i < posts.list.length - 1 && <hr />}
               </section>
             ))}

@@ -1,0 +1,46 @@
+.tippers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+
+  &__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+
+    h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+  }
+
+  &__total {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__amount {
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--color-primary);
+  }
+}

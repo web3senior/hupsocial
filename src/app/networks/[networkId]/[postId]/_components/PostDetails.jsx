@@ -8,6 +8,7 @@ import { recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import Comments from '@/components/Comments'
+import PostTippers from './PostTippers'
 import { usePostStore } from '@/stores/usePostStore'
 import styles from './PostDetails.module.scss'
 
@@ -112,6 +113,8 @@ export default function PostDetails({ networkId, postId }) {
             </article>
           </div>
         )}
+
+        {post && <PostTippers networkId={resolvedNetworkId} postId={post.is_repost > 0 ? post.is_repost : resolvedPostId} />}
 
         {post && (
           <Comments
