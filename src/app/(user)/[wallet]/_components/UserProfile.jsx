@@ -457,11 +457,9 @@ const Profile = ({ addr }) => {
     disconnect()
   }
 
+  // UP-sourced profiles are managed on universaleverything.io, but birthday is a
+  // Hup-native field — so the modal still opens for them, in birthday-only mode.
   const editProfile = () => {
-    if (profile.source === `universal_profile`) {
-      toast(`Please update your profile through Universal Profile`, `error`)
-      return
-    }
     setShowProfileModal(true)
   }
 
@@ -516,7 +514,13 @@ const Profile = ({ addr }) => {
   return (
     <>
       {showProfileModal && profile && (
-        <ProfileModal getActiveChain={getActiveChain} profile={profile} setShowProfileModal={setShowProfileModal} mutate={mutate} />
+        <ProfileModal
+          getActiveChain={getActiveChain}
+          profile={profile}
+          isUP={profile.source === 'universal_profile'}
+          setShowProfileModal={setShowProfileModal}
+          mutate={mutate}
+        />
       )}
 
       <FollowListDialog ref={followListDialogRef} addr={addr} />
@@ -932,7 +936,7 @@ const Status = ({ addr, profile, selfView }) => {
  * @param {Function} props.getActiveChain - Helper to get the current active blockchain network.
  * @returns {JSX.Element}
  */
-const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) => {
+const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, isUP = false }) => {
   // Safe helper to parse structural lists from DB and strip away malformed or empty data structures
   const parseSafeList = (data, isLinkList = false) => {
     try {
@@ -978,34 +982,39 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
     setError(null)
 
     const formData = new FormData(e.target)
-    const fileInput = formData.get('profileImage')
 
-    // Fallback to existing image name/hash
-    let profileImageHash = formData.get('profileImage_hidden')
+    // UP-sourced profiles only edit Hup-native fields here (birthday); name, bio,
+    // image, tags and links stay managed by the Universal Profile itself.
+    if (!isUP) {
+      const fileInput = formData.get('profileImage')
 
-    // Check if the user actually picked a new file
-    if (fileInput && fileInput.size > 0) {
-      try {
-        toast('Uploading image ...', 'info')
-        const rootHash = await uploadFileToIPFS(fileInput)
+      // Fallback to existing image name/hash
+      let profileImageHash = formData.get('profileImage_hidden')
 
-        if (!rootHash) {
-          throw new Error('Failed to upload')
+      // Check if the user actually picked a new file
+      if (fileInput && fileInput.size > 0) {
+        try {
+          toast('Uploading image ...', 'info')
+          const rootHash = await uploadFileToIPFS(fileInput)
+
+          if (!rootHash) {
+            throw new Error('Failed to upload')
+          }
+
+          profileImageHash = rootHash
+        } catch (uploadErr) {
+          console.error('0G Storage Error:', uploadErr)
+          setError('Failed to upload image to decentralized storage.')
+          setIsPending(false)
+          return
         }
-
-        profileImageHash = rootHash
-      } catch (uploadErr) {
-        console.error('0G Storage Error:', uploadErr)
-        setError('Failed to upload image to decentralized storage.')
-        setIsPending(false)
-        return
       }
-    }
 
-    // Explicitly overwrite or append the finalized values to the FormData instance
-    formData.set('profileImage', profileImageHash)
-    formData.set('tags', JSON.stringify(tags.list))
-    formData.set('links', JSON.stringify(links.list))
+      // Explicitly overwrite or append the finalized values to the FormData instance
+      formData.set('profileImage', profileImageHash)
+      formData.set('tags', JSON.stringify(tags.list))
+      formData.set('links', JSON.stringify(links.list))
+    }
 
     try {
       const res = await updateProfile(formData, address)
@@ -1096,54 +1105,74 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-          <h3 className={styles.profileModal__title}>Edit Profile</h3>
+          <h3 className={styles.profileModal__title}>{isUP ? 'Edit Birthday' : 'Edit Profile'}</h3>
           <div className={styles.profileModal__headerSpacer} />
         </header>
 
         <form className={styles.profileModal__form} onSubmit={handleSubmit} encType="multipart/form-data">
           <main className={styles.profileModal__body}>
-            {/* Avatar */}
-            <div className={styles.profileModal__avatarWrap}>
-              <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
-                <figure className={styles.profileModal__avatar}>
-                  <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" />
-                  <div className={styles.profileModal__avatarOverlay}>
-                    <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">
-                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                      <circle cx="12" cy="13" r="4" />
-                    </svg>
-                  </div>
-                </figure>
-              </label>
-              <input
-                id="pm-profileImage"
-                type="file"
-                name="profileImage"
-                accept="image/*"
-                onChange={showPFP}
-                className={styles.profileModal__fileInput}
-              />
-              <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
-              <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
-            </div>
+            {isUP && (
+              <p className={styles.profileModal__upHint}>
+                Your name, bio, image and links are managed by your{' '}
+                <a href={`https://universaleverything.io/${profile?.wallet_address}`} target="_blank" rel="noopener noreferrer">
+                  Universal Profile
+                </a>
+                . Your birthday is stored on Hup.
+              </p>
+            )}
 
-            {/* Name */}
-            <div className={styles.profileModal__field}>
-              <label className={styles.profileModal__label}>Name</label>
-              <input className={styles.profileModal__input} type="text" name="name" defaultValue={profile?.name} placeholder="Your name" />
-            </div>
+            {!isUP && (
+              <>
+                {/* Avatar */}
+                <div className={styles.profileModal__avatarWrap}>
+                  <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
+                    <figure className={styles.profileModal__avatar}>
+                      <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" />
+                      <div className={styles.profileModal__avatarOverlay}>
+                        <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                      </div>
+                    </figure>
+                  </label>
+                  <input
+                    id="pm-profileImage"
+                    type="file"
+                    name="profileImage"
+                    accept="image/*"
+                    onChange={showPFP}
+                    className={styles.profileModal__fileInput}
+                  />
+                  <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
+                  <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
+                </div>
 
-            {/* Bio */}
-            <div className={styles.profileModal__field}>
-              <label className={styles.profileModal__label}>Bio</label>
-              <textarea
-                className={styles.profileModal__textarea}
-                name="description"
-                defaultValue={profile?.description}
-                placeholder="Tell us about yourself..."
-                rows={3}
-              />
-            </div>
+                {/* Name */}
+                <div className={styles.profileModal__field}>
+                  <label className={styles.profileModal__label}>Name</label>
+                  <input
+                    className={styles.profileModal__input}
+                    type="text"
+                    name="name"
+                    defaultValue={profile?.name}
+                    placeholder="Your name"
+                  />
+                </div>
+
+                {/* Bio */}
+                <div className={styles.profileModal__field}>
+                  <label className={styles.profileModal__label}>Bio</label>
+                  <textarea
+                    className={styles.profileModal__textarea}
+                    name="description"
+                    defaultValue={profile?.description}
+                    placeholder="Tell us about yourself..."
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
 
             {/* Birthday */}
             <div className={styles.profileModal__field}>
@@ -1157,71 +1186,75 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
               />
             </div>
 
-            {/* Tags */}
-            <div className={styles.profileModal__field}>
-              <label className={styles.profileModal__label}>Tags</label>
-              {tags.list.length > 0 && (
-                <div className={styles.profileModal__chips}>
-                  {tags.list.map((tag, i) => (
-                    <span key={`tag-${i}`} className={styles.profileModal__chip}>
-                      #{tag}
-                      <button type="button" onClick={(e) => removeTag(e, tag)} aria-label={`Remove ${tag}`}>
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div className={styles.profileModal__addRow}>
-                <input
-                  ref={tagRef}
-                  type="text"
-                  placeholder="Add a tag…"
-                  className={styles.profileModal__input}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      addTag()
-                    }
-                  }}
-                />
-                <button type="button" onClick={addTag} className={styles.profileModal__addBtn}>
-                  Add
-                </button>
-              </div>
-            </div>
-
-            {/* Links */}
-            <div className={styles.profileModal__field}>
-              <label className={styles.profileModal__label}>Links</label>
-              {links.list.length > 0 && (
-                <div className={styles.profileModal__linkList}>
-                  {links.list.map((link, i) => (
-                    <div key={`link-${i}`} className={styles.profileModal__linkItem}>
-                      <div className={styles.profileModal__linkInfo}>
-                        <span className={styles.profileModal__linkName}>{link.name}</span>
-                        <span className={styles.profileModal__linkUrl}>{link.url}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => removeLink(e, link)}
-                        aria-label={`Remove ${link.name}`}
-                        className={styles.profileModal__linkRemove}
-                      >
-                        ×
-                      </button>
+            {!isUP && (
+              <>
+                {/* Tags */}
+                <div className={styles.profileModal__field}>
+                  <label className={styles.profileModal__label}>Tags</label>
+                  {tags.list.length > 0 && (
+                    <div className={styles.profileModal__chips}>
+                      {tags.list.map((tag, i) => (
+                        <span key={`tag-${i}`} className={styles.profileModal__chip}>
+                          #{tag}
+                          <button type="button" onClick={(e) => removeTag(e, tag)} aria-label={`Remove ${tag}`}>
+                            ×
+                          </button>
+                        </span>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  <div className={styles.profileModal__addRow}>
+                    <input
+                      ref={tagRef}
+                      type="text"
+                      placeholder="Add a tag…"
+                      className={styles.profileModal__input}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addTag()
+                        }
+                      }}
+                    />
+                    <button type="button" onClick={addTag} className={styles.profileModal__addBtn}>
+                      Add
+                    </button>
+                  </div>
                 </div>
-              )}
-              <div className={styles.profileModal__addRow}>
-                <input ref={linkNameRef} type="text" placeholder="Label" className={styles.profileModal__input} />
-                <input ref={linkURLRef} type="text" placeholder="https://…" className={styles.profileModal__input} />
-                <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>
-                  Add
-                </button>
-              </div>
-            </div>
+
+                {/* Links */}
+                <div className={styles.profileModal__field}>
+                  <label className={styles.profileModal__label}>Links</label>
+                  {links.list.length > 0 && (
+                    <div className={styles.profileModal__linkList}>
+                      {links.list.map((link, i) => (
+                        <div key={`link-${i}`} className={styles.profileModal__linkItem}>
+                          <div className={styles.profileModal__linkInfo}>
+                            <span className={styles.profileModal__linkName}>{link.name}</span>
+                            <span className={styles.profileModal__linkUrl}>{link.url}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => removeLink(e, link)}
+                            aria-label={`Remove ${link.name}`}
+                            className={styles.profileModal__linkRemove}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className={styles.profileModal__addRow}>
+                    <input ref={linkNameRef} type="text" placeholder="Label" className={styles.profileModal__input} />
+                    <input ref={linkURLRef} type="text" placeholder="https://…" className={styles.profileModal__input} />
+                    <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {error && <p className={styles.profileModal__error}>{error}</p>}
           </main>

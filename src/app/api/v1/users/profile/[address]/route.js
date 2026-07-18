@@ -42,6 +42,10 @@ export async function GET(request, { params }) {
 
       profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
 
+      // Birthday is a Hup-native field with no UP metadata equivalent — always
+      // sourced from our own users row, even when the profile itself is a UP.
+      profile.birthday = rows[0]?.birthday ?? null
+
       return NextResponse.json({
         source: 'universal_profile',
         data: profile,
