@@ -25,6 +25,8 @@ import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
 const MAX_MEDIA_ITEMS = 8
 const MAX_MEDIA_SIZE_MB = 10
 const MAX_POST_LENGTH = 5000
+const MAX_HISTORY_ENTRIES = 100
+const HISTORY_DEBOUNCE_MS = 300
 
 // ■■■ [Utility Helpers] ■■■
 
@@ -150,6 +152,48 @@ const editorHtmlToMarkdown = (html) => {
     .trim()
 }
 
+// Caret position as a child-index path from the editor root — plain node references
+// would go stale when an undo/redo restore replaces the editor's innerHTML
+const getCaretState = (editor) => {
+  const selection = window.getSelection()
+  if (!editor || !selection || !selection.rangeCount) return null
+  const range = selection.getRangeAt(0)
+  if (!editor.contains(range.startContainer)) return null
+  const path = []
+  let node = range.startContainer
+  while (node && node !== editor) {
+    path.unshift(Array.prototype.indexOf.call(node.parentNode.childNodes, node))
+    node = node.parentNode
+  }
+  return { path, offset: range.startOffset }
+}
+
+const restoreCaretState = (editor, caret) => {
+  let node = editor
+  let valid = Boolean(caret)
+  if (valid) {
+    for (const index of caret.path) {
+      if (!node.childNodes[index]) {
+        valid = false
+        break
+      }
+      node = node.childNodes[index]
+    }
+  }
+  const range = document.createRange()
+  if (valid) {
+    const maxOffset = node.nodeType === Node.TEXT_NODE ? node.length : node.childNodes.length
+    range.setStart(node, Math.min(caret.offset, maxOffset))
+    range.collapse(true)
+  } else {
+    range.selectNodeContents(editor)
+    range.collapse(false)
+  }
+  const selection = window.getSelection()
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
 // ■■■ [Main Component] ■■■
 
 export default function NewPost({ text = '', url = '', close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed }) {
@@ -182,6 +226,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const fileInputRef = useRef(null)
   const gifPickerRef = useRef(null)
   const mediaItemsRef = useRef([])
+  // Undo/redo history for the contenteditable editor. The paste handler and applyFormat
+  // mutate the DOM programmatically (no execCommand), which the browser's native undo
+  // stack can't track — so Ctrl+Z is backed by these snapshots instead.
+  const historyRef = useRef({ stack: [], index: -1, timer: null, restoring: false })
 
   const { address, isConnected } = useConnection()
   const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
@@ -260,24 +308,6 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
-  // Show the modal dialog and initialize the editor once the component mounts —
-  // callers keep the mount = open / unmount = close contract
-  useEffect(() => {
-    if (!mounted || !editorRef.current) return
-    dialogRef.current?.open()
-    editorRef.current.innerHTML = markdownToEditorHtml(postText)
-    editorRef.current.focus()
-    // Move cursor to end
-    const range = document.createRange()
-    const sel = window.getSelection()
-    range.selectNodeContents(editorRef.current)
-    range.collapse(false)
-    sel.removeAllRanges()
-    sel.addRange(range)
-  // Only run on mount — postText intentionally excluded
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted])
-
   const handleClose = useCallback(
     (e) => {
       if (e) e.stopPropagation()
@@ -301,7 +331,117 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const handleEditorInput = () => {
     const html = editorRef.current?.innerHTML || ''
     updateTextContent(editorHtmlToMarkdown(html))
+    if (!historyRef.current.restoring) scheduleHistorySnapshot()
   }
+
+  const pushHistorySnapshot = () => {
+    const history = historyRef.current
+    history.timer = null
+    if (!editorRef.current) return
+    const snapshot = { html: editorRef.current.innerHTML, caret: getCaretState(editorRef.current) }
+    // Content unchanged (e.g. a formatting toggle that resolved to the same markup) —
+    // refresh the caret without truncating the redo branch
+    if (history.stack[history.index]?.html === snapshot.html) {
+      history.stack[history.index] = snapshot
+      return
+    }
+    history.stack = [...history.stack.slice(0, history.index + 1), snapshot].slice(-MAX_HISTORY_ENTRIES)
+    history.index = history.stack.length - 1
+  }
+
+  // Debounced so a burst of typing collapses into a single undo step
+  const scheduleHistorySnapshot = () => {
+    const history = historyRef.current
+    if (history.timer) clearTimeout(history.timer)
+    history.timer = setTimeout(pushHistorySnapshot, HISTORY_DEBOUNCE_MS)
+  }
+
+  const applyHistorySnapshot = (snapshot) => {
+    const editor = editorRef.current
+    const history = historyRef.current
+    if (!editor || !snapshot) return
+    history.restoring = true
+    editor.innerHTML = snapshot.html
+    restoreCaretState(editor, snapshot.caret)
+    handleEditorInput()
+    history.restoring = false
+  }
+
+  const undoEdit = () => {
+    const history = historyRef.current
+    // Capture any still-debouncing keystrokes first so undo steps back from the latest state
+    if (history.timer) {
+      clearTimeout(history.timer)
+      pushHistorySnapshot()
+    }
+    if (history.index <= 0) return
+    history.index -= 1
+    applyHistorySnapshot(history.stack[history.index])
+  }
+
+  const redoEdit = () => {
+    const history = historyRef.current
+    if (history.index >= history.stack.length - 1) return
+    history.index += 1
+    applyHistorySnapshot(history.stack[history.index])
+  }
+
+  // The browser's native undo stack can't see our programmatic edits, so Ctrl+Z /
+  // Ctrl+Shift+Z / Ctrl+Y are intercepted and served from the snapshot history
+  const handleEditorKeyDown = (event) => {
+    if (!(event.ctrlKey || event.metaKey)) return
+    const key = event.key.toLowerCase()
+    if (key === 'z') {
+      event.preventDefault()
+      if (event.shiftKey) redoEdit()
+      else undoEdit()
+    } else if (key === 'y') {
+      event.preventDefault()
+      redoEdit()
+    }
+  }
+
+  // Show the modal dialog and initialize the editor once the component mounts —
+  // callers keep the mount = open / unmount = close contract
+  useEffect(() => {
+    if (!mounted || !editorRef.current) return
+    dialogRef.current?.open()
+    editorRef.current.innerHTML = markdownToEditorHtml(postText)
+    editorRef.current.focus()
+    // Move cursor to end
+    const range = document.createRange()
+    const sel = window.getSelection()
+    range.selectNodeContents(editorRef.current)
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+
+    // Seed the undo history with the initial content and catch context-menu
+    // undo/redo, which arrives as beforeinput instead of a keydown
+    const editor = editorRef.current
+    historyRef.current = {
+      stack: [{ html: editor.innerHTML, caret: getCaretState(editor) }],
+      index: 0,
+      timer: null,
+      restoring: false,
+    }
+    const handleBeforeInput = (event) => {
+      if (event.inputType === 'historyUndo') {
+        event.preventDefault()
+        undoEdit()
+      } else if (event.inputType === 'historyRedo') {
+        event.preventDefault()
+        redoEdit()
+      }
+    }
+    editor.addEventListener('beforeinput', handleBeforeInput)
+    return () => {
+      editor.removeEventListener('beforeinput', handleBeforeInput)
+      if (historyRef.current.timer) clearTimeout(historyRef.current.timer)
+    }
+  // Only run on mount — postText intentionally excluded
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted])
 
   // Handle paste: upload clipboard images to IPFS or insert plain text
   const handlePaste = async (event) => {
@@ -859,6 +999,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
               suppressContentEditableWarning
               className={clsx(styles.editor, { [styles.editor_comment]: isComment })}
               onInput={handleEditorInput}
+              onKeyDown={handleEditorKeyDown}
               onPaste={handlePaste}
               data-placeholder={isComment ? 'Post your reply' : isQuote ? 'Add a comment' : "What's happening?"}
             />
