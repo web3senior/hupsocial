@@ -518,6 +518,29 @@
     min-height: 40px;
   }
 
+  &__birthday {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--system-12-font-size);
+    color: var(--gray-500);
+
+    &--today {
+      all: unset;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--system-12-font-size);
+      color: var(--liked-color, #ff6b6b);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:active {
+        transform: scale(0.97);
+      }
+    }
+  }
+
   &__tags {
     small {
       background-color: var(--tag);

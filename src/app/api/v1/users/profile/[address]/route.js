@@ -97,6 +97,7 @@ export async function PUT(request, { params }) {
 
     const name = formData.get('name')
     const description = formData.get('description')
+    const birthday = formData.get('birthday')
     const profileImage = formData.get('profileImage')
     const tags = formData.get('tags')
     const links = formData.get('links')
@@ -119,6 +120,10 @@ export async function PUT(request, { params }) {
     if (description !== null) {
       updateFields.push('`description` = ?')
       queryValues.push(description)
+    }
+    if (birthday !== null) {
+      updateFields.push('`birthday` = ?')
+      queryValues.push(birthday.trim() === '' ? null : birthday)
     }
 
     // FIXED: Better string validation for the 0G root hash.

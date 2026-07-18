@@ -16,6 +16,10 @@ const pool = mysql.createPool({
   queueLimit: 0,
   // This is often required for modern MySQL/MariaDB versions
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  // DATE columns (no time component) must stay as plain 'YYYY-MM-DD' strings —
+  // parsing them into JS Date objects applies local-timezone midnight, which
+  // can shift the calendar date by a day once serialized back to JSON/UTC.
+  dateStrings: ['DATE'],
 })
 
 export default pool

@@ -27,7 +27,25 @@ import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
+import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
+import { CakeIcon } from '@phosphor-icons/react'
 import styles from './UserProfile.module.scss'
+
+// Compares month/day only — the stored year is irrelevant to "is it their birthday today".
+const isBirthdayToday = (birthday) => {
+  if (!birthday) return false
+  const bday = new Date(birthday)
+  if (Number.isNaN(bday.getTime())) return false
+  const today = new Date()
+  return bday.getUTCMonth() === today.getMonth() && bday.getUTCDate() === today.getDate()
+}
+
+const formatBirthday = (birthday) => {
+  if (!birthday) return null
+  const bday = new Date(birthday)
+  if (Number.isNaN(bday.getTime())) return null
+  return new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(bday)
+}
 
 // import SettingsTab from '@/components/tabs/SettingsTab'
 // const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
@@ -349,6 +367,7 @@ const Profile = ({ addr }) => {
   const [isItUp, setIsItUp] = useState(false)
   const [resolved0gUrl, setResolved0gUrl] = useState(null)
   const [viewCount, setViewCount] = useState(null)
+  const [birthdayBurstKey, setBirthdayBurstKey] = useState(0) // bumped to replay the confetti burst on tap
   const followListDialogRef = useRef(null)
 
   const params = useParams()
@@ -491,6 +510,8 @@ const Profile = ({ addr }) => {
   const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 6)}…${targetWallet.slice(-4)}` : targetWallet
 
   const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
+  const birthdayLabel = formatBirthday(profile.birthday)
+  const isCelebratingBirthday = isBirthdayToday(profile.birthday)
 
   return (
     <>
@@ -501,6 +522,8 @@ const Profile = ({ addr }) => {
       <FollowListDialog ref={followListDialogRef} addr={addr} />
 
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
+        {isCelebratingBirthday && <BirthdayConfetti burst={birthdayBurstKey} />}
+
         <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
             <div className={styles.profile__header}>
@@ -519,6 +542,24 @@ const Profile = ({ addr }) => {
                 {displayWalletString}
               </Link>
             </code>
+
+            {birthdayLabel &&
+              (isCelebratingBirthday ? (
+                <button
+                  type="button"
+                  className={clsx(styles.profile__birthday, styles['profile__birthday--today'])}
+                  onClick={() => setBirthdayBurstKey((k) => k + 1)}
+                  aria-label="Replay birthday celebration"
+                >
+                  <CakeIcon size={14} weight="fill" />
+                  {`Birthday today · ${birthdayLabel}`}
+                </button>
+              ) : (
+                <span className={styles.profile__birthday}>
+                  <CakeIcon size={14} />
+                  {birthdayLabel}
+                </span>
+              ))}
 
             <p className={`${styles.profile__description} mt-20`}>{profile.description || 'This user has not set up a bio yet.'}</p>
 
@@ -1101,6 +1142,18 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate }) 
                 defaultValue={profile?.description}
                 placeholder="Tell us about yourself..."
                 rows={3}
+              />
+            </div>
+
+            {/* Birthday */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Birthday</label>
+              <input
+                className={styles.profileModal__input}
+                type="date"
+                name="birthday"
+                defaultValue={profile?.birthday || ''}
+                max={new Date().toISOString().slice(0, 10)}
               />
             </div>
 

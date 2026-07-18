@@ -1,0 +1,14 @@
+.birthdayConfetti {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 5;
+
+  &__particle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 1px;
+  }
+}
