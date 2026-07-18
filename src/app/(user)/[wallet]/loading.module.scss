@@ -1,0 +1,40 @@
+/* Route-level fallback skeleton for the profile page.
+   Mirrors .page/.page__container from page.module.scss so the swap to the real
+   page doesn't cause a layout jump. */
+.loading {
+  height: 100%;
+
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    padding: 2rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    border-radius: 24px;
+    overflow: hidden;
+
+    @media (max-width: 600px) {
+      border: none;
+      filter: none;
+      border-radius: unset;
+    }
+  }
+
+  &__profile {
+    height: 200px;
+    border-radius: 16px;
+  }
+
+  &__tabs {
+    height: 42px;
+    margin-top: 1.5rem;
+    border-radius: 12px;
+  }
+
+  &__post {
+    height: 140px;
+    margin-top: 1.5rem;
+    border-radius: 16px;
+  }
+}

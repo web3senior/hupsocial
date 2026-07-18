@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { queryUniversalProfile } from '@/lib/lukso'
 
 export async function GET(request, { params }) {
   try {
@@ -10,61 +11,44 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
 
-    /* Construct the internal URL for your proxy route */
-    const origin = new URL(request.url).origin
-    const upProxyUrl = `${origin}/api/universal-profile`
-
     /* Leaderboard rank/score are intentionally NOT part of this response — computing
        them is far heavier than a profile read, and their only consumer (the OG share
        card) queries /api/v1/leaderboard itself. */
-    const upData = await fetch(upProxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        addr: address.toLowerCase(), // Preserve original casing in payload to match working query state
-      }),
-      redirect: 'follow',
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .catch((upError) => {
-        console.error('Internal Universal Profile lookup failed:', upError.message)
-        return null
+
+    /* The UP lookup and the DB fallback run in parallel: the local query is cheap,
+       and paying for it upfront means a UP miss (or a slow/hung upstream, bounded
+       by the helper's timeout) adds zero extra latency before the fallback. */
+    const [upData, [rows]] = await Promise.all([
+      queryUniversalProfile(address),
+      pool.execute(
+        `SELECT
+          u.*,
+          (SELECT COUNT(*) FROM posts p WHERE p.wallet_address = u.wallet_address) as total_posts
+        FROM users u
+        WHERE u.wallet_address = ?`,
+        [address],
+      ),
+    ])
+
+    /* Check if the profile data exists and has valid metadata */
+    const profile = upData?.data?.Profile?.[0]
+
+    if (profile && (profile.name || profile.fullName)) {
+      /* Fallback to profileImages array elements if they exist as per incoming payload */
+      profile.profileImage =
+        profile.profileImages && profile.profileImages.length > 0
+          ? resolveStorageImageUrl(profile.profileImages[0].src, { width: 512 })
+          : null
+
+      profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
+
+      return NextResponse.json({
+        source: 'universal_profile',
+        data: profile,
       })
-
-    try {
-      if (upData) {
-        /* Check if the profile data exists and has valid metadata */
-        const profile = upData?.data?.Profile?.[0]
-
-        if (profile && (profile.name || profile.fullName)) {
-          /* Fallback to profileImages array elements if they exist as per incoming payload */
-          profile.profileImage =
-            profile.profileImages && profile.profileImages.length > 0
-              ? resolveStorageImageUrl(profile.profileImages[0].src, { width: 512 })
-              : null
-
-          profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
-
-          return NextResponse.json({
-            source: 'universal_profile',
-            data: profile,
-          })
-        }
-      }
-    } catch (upError) {
-      /* Quietly catch internal fetch errors to ensure fallback execution succeeds */
-      console.error('Internal Universal Profile lookup failed:', upError.message)
     }
 
     /* Fallback to Database if the UP endpoint fails or returns no profile */
-    const [rows] = await pool.execute(
-      `SELECT 
-        u.*, 
-        (SELECT COUNT(*) FROM posts p WHERE p.wallet_address = u.wallet_address) as total_posts
-      FROM users u
-      WHERE u.wallet_address = ?`,
-      [address],
-    )
 
     if (rows.length === 0) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })

@@ -6,7 +6,9 @@ export const getProfile= async (address) => {
   const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' : ''
   const url = `${baseUrl}/api/v1/users/profile/${address.toLowerCase()}`
 
-  const response = await fetch(url)
+  // Server-side (generateMetadata) hits the Next data cache so repeat navigations
+  // to the same profile skip the DB + LUKSO round-trip; browsers ignore `next`.
+  const response = await fetch(url, { next: { revalidate: 60 } })
   if (response.status === 404) return null
   if (!response.ok) throw new Error('Profile fetch failed')
   const data = await response.json()
