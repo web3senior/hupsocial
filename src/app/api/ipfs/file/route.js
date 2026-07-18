@@ -100,6 +100,12 @@ export async function GET(req) {
       return NextResponse.redirect(gatewayUrl, 302)
     }
 
+    /* HEIC/HEIF decoding needs a libheif build with HEVC support, which prebuilt
+       sharp binaries omit for licensing reasons — stream the original instead */
+    if (/^image\/hei[cf](-sequence)?$/i.test(contentType)) {
+      return NextResponse.redirect(gatewayUrl, 302)
+    }
+
     const arrayBuffer = await upstream.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
