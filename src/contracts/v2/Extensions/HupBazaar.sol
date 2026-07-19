@@ -35,6 +35,8 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     uint256 public constant FEE_DENOMINATOR = 10_000;
     uint256 public constant ABSOLUTE_MAX_BUY_FEE_BPS = 5_000;
+    // Referral cap + fee cap sum to exactly FEE_DENOMINATOR, so the seller's share can never underflow
+    uint256 public constant MAX_REFERRAL_BPS = 5_000;
     uint256 public constant ABSOLUTE_MAX_METADATA_BYTES = 2_048;
     uint256 public constant MAX_BUYERS_BATCH_READ_COUNT = 50;
 
@@ -116,10 +118,12 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
         address _paymentToken,
         bool _isLsp7,
         address _vault,
+        uint256 _referralBps,
         string calldata _metadata
     ) external payable whenNotPaused {
         if (_price == 0) revert InvalidPrice();
         if (_quantity == 0) revert InvalidQuantity();
+        if (_referralBps > MAX_REFERRAL_BPS) revert InvalidFeeBps();
         if (bytes(_metadata).length > maxMetadataBytes) {
             revert MetadataTooLarge(bytes(_metadata).length, maxMetadataBytes);
         }
@@ -147,10 +151,11 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
             metadata: _metadata,
             paymentToken: _paymentToken,
             isLsp7: _paymentToken != address(0) && _isLsp7,
-            totalSold: 0
+            totalSold: 0,
+            referralBps: _referralBps
         });
 
-        emit ItemListed(_postId, seller, _price, _quantity, _paymentToken, _paymentToken != address(0) && _isLsp7, _vault, _metadata);
+        emit ItemListed(_postId, seller, _price, _quantity, _paymentToken, _paymentToken != address(0) && _isLsp7, _vault, _referralBps, _metadata);
     }
 
     function updateListing(
@@ -162,11 +167,13 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
         address _paymentToken,
         bool _isLsp7,
         address _vault,
+        uint256 _referralBps,
         string calldata _metadata
     ) external whenNotPaused {
         if (bytes(_metadata).length > maxMetadataBytes) {
             revert MetadataTooLarge(bytes(_metadata).length, maxMetadataBytes);
         }
+        if (_referralBps > MAX_REFERRAL_BPS) revert InvalidFeeBps();
 
         address seller = _resolveActor(_owner);
         Listing storage listing = listings[_postId];
@@ -182,8 +189,9 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
         listing.isLsp7 = isLsp7;
         listing.vault = _vault;
         listing.metadata = _metadata;
+        listing.referralBps = _referralBps;
 
-        emit ItemUpdated(_postId, _price, _quantity, _isActive, _paymentToken, isLsp7, _vault, _metadata);
+        emit ItemUpdated(_postId, _price, _quantity, _isActive, _paymentToken, isLsp7, _vault, _referralBps, _metadata);
     }
 
     function cancelListing(address _owner, uint256 _postId) external whenNotPaused {
@@ -193,7 +201,7 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
 
         listing.isActive = false;
 
-        emit ItemUpdated(_postId, listing.price, listing.quantity, false, listing.paymentToken, listing.isLsp7, listing.vault, listing.metadata);
+        emit ItemUpdated(_postId, listing.price, listing.quantity, false, listing.paymentToken, listing.isLsp7, listing.vault, listing.referralBps, listing.metadata);
     }
 
     function buyItem(
@@ -203,6 +211,7 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
         uint256 _expectedPrice,
         address _expectedToken,
         bool _expectedIsLsp7,
+        address _referral,
         bytes calldata _memo
     ) external payable whenNotPaused nonReentrant {
         if (_quantityBought == 0) revert InvalidQuantity();
@@ -213,6 +222,10 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
         Listing storage listing = listings[_postId];
         if (!listing.isActive) revert ListingNotActive();
         if (listing.quantity < _quantityBought) revert OutOfStock();
+
+        // Referral self-dealing guard: buyers can't discount their own purchase and sellers
+        // can't collect their own referral share
+        if (_referral != address(0) && (_referral == buyer || _referral == listing.seller)) revert InvalidReferral();
 
         // Front-run guard: the buyer commits to the price/token/standard they saw at signing
         // time, so a seller can't slip in an updateListing that drains a standing token
@@ -255,29 +268,63 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
             listing.isActive = false;
         }
 
-        // Split payment: platform fee stays in the contract, remainder (requiredPayment -
-        // feeAmount, computed inline at each payout site to stay inside the legacy codegen's
-        // stack limit) goes to the payout recipient (the listing's vault when set, otherwise
-        // the seller).
+        // Split payment: platform fee stays in the contract, the referral share (a slice of
+        // the seller's proceeds, like HupTrade) goes to whoever's repost/quote drove the sale,
+        // and the remainder goes to the payout recipient (the listing's vault when set,
+        // otherwise the seller). Settlement lives in _settle so the referral locals get their
+        // own frame and buyItem stays inside the legacy codegen's stack limit.
         // Fee-on-transfer/deflationary ERC20s are unsupported: the contract pulls the gross
         // amount and pushes the seller's share, so a transfer tax would eat into accumulated fees.
         uint256 feeAmount = (requiredPayment * buyFeeBps) / FEE_DENOMINATOR;
+        uint256 referralAmount = _referral == address(0) ? 0 : (requiredPayment * listing.referralBps) / FEE_DENOMINATOR;
 
-        if (_expectedToken == address(0)) {
-            (bool success, ) = payoutRecipient.call{value: requiredPayment - feeAmount}("");
+        _settle(buyer, payoutRecipient, _referral, _expectedToken, _expectedIsLsp7, requiredPayment, feeAmount, referralAmount);
+
+        emit ItemBought(_postId, buyer, listing.seller, _expectedPrice, _quantityBought, _expectedToken, feeAmount, _referral, referralAmount, _memo);
+    }
+
+    /**
+     * @dev Executes a purchase's payment split: platform fee stays in the contract, the
+     *      referral share goes to the referrer, and the remainder goes to the payout
+     *      recipient. `_referralAmount` is nonzero only when `_referral` is set (buyItem
+     *      computes it that way), so the referral transfer can key off the amount alone.
+     */
+    function _settle(
+        address _buyerAddress,
+        address _payoutRecipient,
+        address _referral,
+        address _token,
+        bool _isLsp7,
+        uint256 _grossAmount,
+        uint256 _feeAmount,
+        uint256 _referralAmount
+    ) private {
+        if (_token == address(0)) {
+            (bool success, ) = _payoutRecipient.call{value: _grossAmount - _feeAmount - _referralAmount}("");
             if (!success) revert TransferFailed();
-        } else if (_expectedIsLsp7) {
-            // LSP7 (LUKSO): buyer must have called authorizeOperator(bazaar, total) beforehand
-            ILSP7Minimal token = ILSP7Minimal(_expectedToken);
-            token.transfer(buyer, address(this), requiredPayment, true, "");
-            token.transfer(address(this), payoutRecipient, requiredPayment - feeAmount, true, "");
-        } else {
-            IERC20 token = IERC20(_expectedToken);
-            token.safeTransferFrom(buyer, address(this), requiredPayment);
-            token.safeTransfer(payoutRecipient, requiredPayment - feeAmount);
-        }
 
-        emit ItemBought(_postId, buyer, listing.seller, _expectedPrice, _quantityBought, _expectedToken, feeAmount, _memo);
+            if (_referralAmount > 0) {
+                (bool referralSuccess, ) = _referral.call{value: _referralAmount}("");
+                if (!referralSuccess) revert TransferFailed();
+            }
+        } else if (_isLsp7) {
+            // LSP7 (LUKSO): buyer must have called authorizeOperator(bazaar, total) beforehand
+            ILSP7Minimal token = ILSP7Minimal(_token);
+            token.transfer(_buyerAddress, address(this), _grossAmount, true, "");
+            token.transfer(address(this), _payoutRecipient, _grossAmount - _feeAmount - _referralAmount, true, "");
+
+            if (_referralAmount > 0) {
+                token.transfer(address(this), _referral, _referralAmount, true, "");
+            }
+        } else {
+            IERC20 token = IERC20(_token);
+            token.safeTransferFrom(_buyerAddress, address(this), _grossAmount);
+            token.safeTransfer(_payoutRecipient, _grossAmount - _feeAmount - _referralAmount);
+
+            if (_referralAmount > 0) {
+                token.safeTransfer(_referral, _referralAmount);
+            }
+        }
     }
 
     /**
@@ -309,8 +356,9 @@ contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2
             listing.isActive = false;
         }
 
-        // feeAmount is 0: settlement happened outside this contract, no platform fee was taken
-        emit ItemBought(_postId, _buyer, listing.seller, listing.price, _quantity, listing.paymentToken, 0, _memo);
+        // feeAmount and referral are 0: settlement happened outside this contract — no
+        // platform fee was taken and no referral share can be attributed
+        emit ItemBought(_postId, _buyer, listing.seller, listing.price, _quantity, listing.paymentToken, 0, address(0), 0, _memo);
         emit PurchaseGranted(_postId, _buyer, msg.sender, _quantity);
     }
 

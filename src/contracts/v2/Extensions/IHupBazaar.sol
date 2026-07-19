@@ -29,15 +29,16 @@ interface IHupBazaar {
         address paymentToken; // Token the listing is priced in, or address(0) for the native token
         bool isLsp7; // True if paymentToken is an LSP7 Digital Asset (LUKSO) instead of an ERC20
         uint256 totalSold; // Cumulative units sold, never reset by price/quantity edits (currency-agnostic)
+        uint256 referralBps; // Seller-set share of each sale paid to the buy's referrer, in basis points (capped at MAX_REFERRAL_BPS)
     }
 
     // --- SHARED EVENTS ---
 
     /// @notice Emitted when a post creator lists a new item for sale.
-    event ItemListed(uint256 indexed postId, address indexed seller, uint256 price, uint256 quantity, address paymentToken, bool isLsp7, address vault, string metadata);
+    event ItemListed(uint256 indexed postId, address indexed seller, uint256 price, uint256 quantity, address paymentToken, bool isLsp7, address vault, uint256 referralBps, string metadata);
 
-    /// @notice Emitted when a seller updates a listing's price, stock, active status, payment token, vault, or metadata.
-    event ItemUpdated(uint256 indexed postId, uint256 price, uint256 quantity, bool isActive, address paymentToken, bool isLsp7, address vault, string metadata);
+    /// @notice Emitted when a seller updates a listing's price, stock, active status, payment token, vault, referral share, or metadata.
+    event ItemUpdated(uint256 indexed postId, uint256 price, uint256 quantity, bool isActive, address paymentToken, bool isLsp7, address vault, uint256 referralBps, string metadata);
 
     /// @notice Emitted when an operator records an externally settled purchase (e.g. an x402 payment).
     event PurchaseGranted(uint256 indexed postId, address indexed buyer, address indexed operator, uint256 quantity);
@@ -50,11 +51,12 @@ interface IHupBazaar {
 
     /// @notice Emitted when a buyer successfully purchases from a listing.
     /// @dev `paymentToken` and `feeAmount` are included so indexers can attribute each sale to a
-    ///      settlement token and fee without replaying listing state. `feeAmount` is 0 for
-    ///      operator-granted purchases (settled outside the contract). `memo` is never stored —
-    ///      it exists only in this event, for optional future use (e.g. an order reference)
-    ///      without adding storage cost to every purchase.
-    event ItemBought(uint256 indexed postId, address indexed buyer, address indexed seller, uint256 price, uint256 quantityBought, address paymentToken, uint256 feeAmount, bytes memo);
+    ///      settlement token and fee without replaying listing state. `referral`/`referralAmount`
+    ///      record the referrer credited with the sale (address(0)/0 when none). `feeAmount` and
+    ///      the referral fields are 0 for operator-granted purchases (settled outside the
+    ///      contract). `memo` is never stored — it exists only in this event, for optional
+    ///      future use (e.g. an order reference) without adding storage cost to every purchase.
+    event ItemBought(uint256 indexed postId, address indexed buyer, address indexed seller, uint256 price, uint256 quantityBought, address paymentToken, uint256 feeAmount, address referral, uint256 referralAmount, bytes memo);
 
     /// @notice Emitted when a trusted forwarder's status is updated.
     event TrustedForwarderUpdated(address indexed forwarder, bool trusted);
@@ -89,6 +91,8 @@ interface IHupBazaar {
     error MetadataTooLarge(uint256 length, uint256 maxLength);
     error InvalidMetadataLimit();
     error UnexpectedNativePayment();
+    /// @notice The buy's referral address is the buyer or the seller — self-referrals are rejected.
+    error InvalidReferral();
     error OutOfStock();
     error TransferFailed();
     error NotSeller();
@@ -111,7 +115,8 @@ interface IHupBazaar {
             string memory metadata,
             address paymentToken,
             bool isLsp7,
-            uint256 totalSold
+            uint256 totalSold,
+            uint256 referralBps
         );
     function amountPurchased(uint256 postId, address buyer) external view returns (uint256);
     /// @notice Cumulative gross revenue (pre-fee) a listing has earned in a specific payment token.
@@ -130,6 +135,7 @@ interface IHupBazaar {
     function buyFeeBps() external view returns (uint256);
     function FEE_DENOMINATOR() external view returns (uint256);
     function ABSOLUTE_MAX_BUY_FEE_BPS() external view returns (uint256);
+    function MAX_REFERRAL_BPS() external view returns (uint256);
     function maxMetadataBytes() external view returns (uint256);
     function ABSOLUTE_MAX_METADATA_BYTES() external view returns (uint256);
     function MAX_BUYERS_BATCH_READ_COUNT() external view returns (uint256);
@@ -148,6 +154,7 @@ interface IHupBazaar {
      * @param _paymentToken The token the listing is priced in, or address(0) for the native token.
      * @param _isLsp7 True if `_paymentToken` is an LSP7 Digital Asset instead of an ERC20.
      * @param _vault Optional payout address for sale proceeds, or address(0) to pay the seller.
+     * @param _referralBps Share of each sale paid to the buy's referrer, in basis points (capped at MAX_REFERRAL_BPS).
      * @param _metadata Optional pointer (e.g. an IPFS CID of server-encrypted content) unlocked on purchase.
      */
     function listItem(
@@ -158,6 +165,7 @@ interface IHupBazaar {
         address _paymentToken,
         bool _isLsp7,
         address _vault,
+        uint256 _referralBps,
         string calldata _metadata
     ) external payable;
 
@@ -172,6 +180,7 @@ interface IHupBazaar {
      * @param _paymentToken The new payment token, or address(0) for the native token.
      * @param _isLsp7 True if `_paymentToken` is an LSP7 Digital Asset instead of an ERC20.
      * @param _vault Optional payout address for sale proceeds, or address(0) to pay the seller.
+     * @param _referralBps The updated referral share, in basis points (capped at MAX_REFERRAL_BPS).
      * @param _metadata The updated content pointer.
      */
     function updateListing(
@@ -183,6 +192,7 @@ interface IHupBazaar {
         address _paymentToken,
         bool _isLsp7,
         address _vault,
+        uint256 _referralBps,
         string calldata _metadata
     ) external;
 
@@ -209,6 +219,9 @@ interface IHupBazaar {
      * @param _expectedPrice The per-unit price the buyer saw when signing — must match the listing.
      * @param _expectedToken The payment token the buyer saw when signing — must match the listing.
      * @param _expectedIsLsp7 The token standard the buyer saw when signing — must match the listing.
+     * @param _referral Address credited with the listing's referral share (e.g. whoever's
+     *        repost/quote led to this buy), or address(0) for none. Must not be the buyer or
+     *        the seller.
      * @param _memo Optional opaque data emitted with ItemBought (e.g. a future order reference).
      *        Never stored — capped at maxMetadataBytes since it's only ever calldata + a log.
      */
@@ -219,6 +232,7 @@ interface IHupBazaar {
         uint256 _expectedPrice,
         address _expectedToken,
         bool _expectedIsLsp7,
+        address _referral,
         bytes calldata _memo
     ) external payable;
 
