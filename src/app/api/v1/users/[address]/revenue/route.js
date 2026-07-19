@@ -1,6 +1,6 @@
 /**
  * @file api/v1/users/[address]/revenue/route.js
- * @description A seller's HupBazzar sales history: per-token totals plus paginated per-sale
+ * @description A seller's HupBazaar sales history: per-token totals plus paginated per-sale
  * rows joined with post content. Backed by the store_sales table, which the cidex indexer
  * populates continuously from ItemBought events — this route only reads.
  * Amounts travel as raw-unit strings (BigInt-safe); sold_at is unix seconds.

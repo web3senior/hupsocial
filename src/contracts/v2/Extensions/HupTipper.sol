@@ -85,7 +85,7 @@ contract HupTipper is IHupTipper, Pausable, ReentrancyGuard, AccessControl, ERC2
     mapping(address => EnumerableSet.AddressSet) private _supportersOf;
 
     /// @notice Distinct tokens a post has ever been tipped in. Tipper-controlled (any tipper can
-    ///         tip in any token) so — unlike a Bazzar listing's payment tokens — it can grow
+    ///         tip in any token) so — unlike a Bazaar listing's payment tokens — it can grow
     ///         unbounded and is only ever read paginated via getTokensUsed.
     mapping(uint256 => EnumerableSet.AddressSet) private _tokensOf;
 
@@ -151,7 +151,7 @@ contract HupTipper is IHupTipper, Pausable, ReentrancyGuard, AccessControl, ERC2
             if (msg.value != 0) revert UnexpectedNativePayment();
         }
 
-        // Record the tip (gross, pre-fee — same convention as Bazzar's revenueByToken)
+        // Record the tip (gross, pre-fee — same convention as Bazaar's revenueByToken)
         tipCount[_postId] += 1;
         tippedByToken[_postId][_token] += _amount;
         tipsFrom[_postId][tipper] += 1;

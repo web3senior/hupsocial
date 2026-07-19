@@ -73,7 +73,7 @@ export async function GET(request) {
     let whereClause = ` WHERE p.is_comment IS NULL AND p.is_deleted = 0`
     const whereParams = []
 
-    // "Premium" (bazzar) = posts with an active HupBazzar listing. Listings live onchain keyed
+    // "Premium" (bazaar) = posts with an active HupBazaar listing. Listings live onchain keyed
     // by postId with no enumeration, so this reads the store_listings discovery index, which
     // the cidex indexer maintains from ItemListed/ItemUpdated/ItemBought events. Everything
     // else — ordering, visibility rules, pagination — rides the same pipeline as the home feed.

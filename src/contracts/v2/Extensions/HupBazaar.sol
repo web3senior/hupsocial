@@ -8,14 +8,14 @@ import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./IHupBazzar.sol";
+import "./IHupBazaar.sol";
 import "./ILSP7Minimal.sol";
 
 /**
- * @title Hup Bazzar
+ * @title Hup Bazaar
  * @author Hup Labs
  * @notice Extension contract enabling users to list and sell items on Hup.
- * @dev Uses IHupBazzar for shared events, errors, structs, and view structs. Integrates with
+ * @dev Uses IHupBazaar for shared events, errors, structs, and view structs. Integrates with
  *      Hup Core via IHup. Supports rotatable ERC2771 trusted forwarders for meta-transactions,
  *      AccessControl for admin permissions, Pausable for emergency controls, and ReentrancyGuard for
  *      protected purchase distribution. Resolves burner session keys to primary wallets.
@@ -25,7 +25,7 @@ import "./ILSP7Minimal.sol";
  * @custom:security-contact security@hup.social
  * @custom:emoji 🛍️
  */
-contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
+contract HupBazaar is IHupBazaar, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -87,7 +87,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
     // --- CONSTRUCTOR ---
 
     /**
-     * @notice Initializes the bazzar contract.
+     * @notice Initializes the bazaar contract.
      * @param _hupAddress Address of the deployed core Hup contract.
      * @param _trustedForwarder Address of the initial EIP-2771 trusted forwarder (or address(0) to skip).
      * @param _admin Address granted DEFAULT_ADMIN_ROLE and ADMIN_ROLE.
@@ -267,7 +267,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
             (bool success, ) = payoutRecipient.call{value: requiredPayment - feeAmount}("");
             if (!success) revert TransferFailed();
         } else if (_expectedIsLsp7) {
-            // LSP7 (LUKSO): buyer must have called authorizeOperator(bazzar, total) beforehand
+            // LSP7 (LUKSO): buyer must have called authorizeOperator(bazaar, total) beforehand
             ILSP7Minimal token = ILSP7Minimal(_expectedToken);
             token.transfer(buyer, address(this), requiredPayment, true, "");
             token.transfer(address(this), payoutRecipient, requiredPayment - feeAmount, true, "");
@@ -480,7 +480,7 @@ contract HupBazzar is IHupBazzar, Pausable, ReentrancyGuard, AccessControl, ERC2
     /**
      * @dev See EIP-2771. Returns true if the address is a trusted forwarder.
      */
-    function isTrustedForwarder(address forwarder) public view override(ERC2771Context, IHupBazzar) returns (bool) {
+    function isTrustedForwarder(address forwarder) public view override(ERC2771Context, IHupBazaar) returns (bool) {
         return trustedForwarders[forwarder];
     }
 

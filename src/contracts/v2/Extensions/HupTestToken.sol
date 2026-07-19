@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 /**
  * @title Hup Test Token
  * @author Hup Labs
- * @notice Throwaway ERC20 used to test HupBazzar token-priced listings and purchases on testnets.
+ * @notice Throwaway ERC20 used to test HupBazaar token-priced listings and purchases on testnets.
  * @dev Name, symbol, and decimals are constructor-configurable so it can mimic real payment tokens
  *      (e.g. 6-decimal USDC). Anyone can pull tokens from the open faucet; the owner can mint
  *      arbitrary amounts. Not for production use — no supply cap, no access control on faucet.

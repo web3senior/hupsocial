@@ -7,7 +7,7 @@ import { createPublicClient, http, isAddress, keccak256, stringToHex } from 'vie
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { config, CONTRACTS } from '@/config/wagmi'
-import storeAbi from '@/abis/HupBazzar.json'
+import storeAbi from '@/abis/HupBazaar.json'
 import styles from './page.module.scss'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
@@ -220,7 +220,7 @@ export default function Page() {
     setInputs((prev) => ({ ...prev, [chainId]: defaultName }))
   }
 
-  // Check whether an address currently holds OPERATOR_ROLE on the chain's HupBazzar
+  // Check whether an address currently holds OPERATOR_ROLE on the chain's HupBazaar
   const handleCheckOperator = async (chain, storeAddress) => {
     const operator = operatorInputs[chain.id]?.trim()
     if (!isAddress(operator)) {
@@ -249,7 +249,7 @@ export default function Page() {
     }
   }
 
-  // Grant or revoke OPERATOR_ROLE on the chain's HupBazzar (admin wallet signs)
+  // Grant or revoke OPERATOR_ROLE on the chain's HupBazaar (admin wallet signs)
   const handleOperatorRole = async (chain, storeAddress, grant) => {
     const operator = operatorInputs[chain.id]?.trim()
     if (!isAddress(operator)) {
@@ -548,9 +548,9 @@ export default function Page() {
           </div>
 
           <header className={styles['admin-contracts__header']}>
-            <h1 className={styles['admin-contracts__title']}>HupBazzar Operator Role</h1>
+            <h1 className={styles['admin-contracts__title']}>HupBazaar Operator Role</h1>
             <p className={styles['admin-contracts__subtitle']}>
-              Grant or revoke OPERATOR_ROLE on HupBazzar deployments — required for the x402 settlement wallet to call grantPurchase.
+              Grant or revoke OPERATOR_ROLE on HupBazaar deployments — required for the x402 settlement wallet to call grantPurchase.
             </p>
           </header>
 
@@ -580,7 +580,7 @@ export default function Page() {
                       </div>
                       <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
                     </div>
-                    <span className={styles['admin-contracts__badge']}>HUPBAZZAR</span>
+                    <span className={styles['admin-contracts__badge']}>HUPBAZAAR</span>
                   </div>
 
                   <div className={styles['admin-contracts__details']}>
@@ -684,9 +684,9 @@ export default function Page() {
           </div>
 
           <header className={styles['admin-contracts__header']}>
-            <h1 className={styles['admin-contracts__title']}>HupBazzar Treasury</h1>
+            <h1 className={styles['admin-contracts__title']}>HupBazaar Treasury</h1>
             <p className={styles['admin-contracts__subtitle']}>
-              Withdraw accumulated listing/buy fees from HupBazzar — native token balance, or any ERC20/LSP7 token balance.
+              Withdraw accumulated listing/buy fees from HupBazaar — native token balance, or any ERC20/LSP7 token balance.
             </p>
           </header>
 
@@ -718,7 +718,7 @@ export default function Page() {
                       </div>
                       <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
                     </div>
-                    <span className={styles['admin-contracts__badge']}>HUPBAZZAR</span>
+                    <span className={styles['admin-contracts__badge']}>HUPBAZAAR</span>
                   </div>
 
                   <div className={styles['admin-contracts__details']}>

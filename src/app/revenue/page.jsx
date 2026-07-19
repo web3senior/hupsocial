@@ -65,7 +65,7 @@ export default function RevenuePage() {
               <h3>No sales yet</h3>
               <p>
                 When someone buys one of your listed items, every sale lands here.{' '}
-                <Link href="/bazzar">Browse the Bazzar</Link> to see what selling looks like.
+                <Link href="/bazaar">Browse the Bazaar</Link> to see what selling looks like.
               </p>
             </div>
           ) : (

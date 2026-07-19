@@ -4,18 +4,18 @@ pragma solidity ^0.8.35;
 import "./../IHup.sol";
 
 /**
- * @title IHupBazzar
+ * @title IHupBazaar
  * @author Hup Labs
- * @notice Shared interface for the Hup Bazzar protocol.
+ * @notice Shared interface for the Hup Bazaar protocol.
  * @dev Defines the protocol's public structs, events, custom errors, and public interface used
- *      by HupBazzar-compatible contracts, clients, and offchain indexers.
+ *      by HupBazaar-compatible contracts, clients, and offchain indexers.
  * @custom:version 1.0.0
  * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
  * @custom:emoji 🛍️
  */
-interface IHupBazzar {
+interface IHupBazaar {
     // --- SHARED STRUCTS ---
 
     /// @dev Defines the structure for a single item listing tied to a Hup post.
@@ -197,7 +197,7 @@ interface IHupBazzar {
     /**
      * @notice Purchases a specified quantity of items from a listing.
      * @dev For native listings, msg.value must exactly match price * quantityBought. For token
-     *      listings, msg.value must be zero and the buyer must have pre-authorized the bazzar for
+     *      listings, msg.value must be zero and the buyer must have pre-authorized the bazaar for
      *      the total — via `approve` (ERC20) or `authorizeOperator` (LSP7). Reverts with
      *      ListingChanged if the listing's price, payment token, or token standard differs from
      *      what the buyer committed to, so a seller-side updateListing can never drain a standing

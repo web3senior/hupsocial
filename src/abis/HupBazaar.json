@@ -1251,7 +1251,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct IHupBazzar.Listing",
+        "internalType": "struct IHupBazaar.Listing",
         "name": "",
         "type": "tuple"
       }

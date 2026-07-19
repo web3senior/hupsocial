@@ -156,7 +156,7 @@ interface IHupTipper {
     /**
      * @notice Returns a page of the distinct tokens a post has ever been tipped in, alongside the
      *         cumulative gross amount tipped in each.
-     * @dev Paginated — unlike a Bazzar listing's payment tokens, this set is tipper-controlled
+     * @dev Paginated — unlike a Bazaar listing's payment tokens, this set is tipper-controlled
      *      (any tipper can tip in any token), so it can grow unbounded and must not be read in
      *      full onchain.
      * @param _postId The ID of the post.

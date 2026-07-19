@@ -10,14 +10,14 @@
 //
 // Self-facilitated: the operator wallet submits the buyer's signed authorization itself — the
 // token contract is what verifies the signature, so an invalid payment simply fails simulation.
-// Requires STORE_OPERATOR_PRIVATE_KEY (wallet holding OPERATOR_ROLE on HupBazzar, funded for gas).
+// Requires STORE_OPERATOR_PRIVATE_KEY (wallet holding OPERATOR_ROLE on HupBazaar, funded for gas).
 // Only listings priced in the chain's canonical USDC can be bought over x402.
 
 import { NextResponse } from 'next/server'
 import { createPublicClient, createWalletClient, http, isAddress, isAddressEqual, parseSignature, erc20Abi, zeroAddress } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia } from 'wagmi/chains'
-import storeAbi from '@/abis/HupBazzar.json'
+import storeAbi from '@/abis/HupBazaar.json'
 import { STORE_ADDRESSES, USDC, X402_NETWORKS } from '@/lib/tokens'
 import { decryptContent, isConfigured } from '@/lib/storeCrypto'
 

@@ -12,7 +12,7 @@ const STEPS = [
   {
     icon: TagIcon,
     label: 'List for sale',
-    description: 'Set your price and list it on the Bazzar',
+    description: 'Set your price and list it on the Bazaar',
   },
   {
     icon: HandCoinsIcon,

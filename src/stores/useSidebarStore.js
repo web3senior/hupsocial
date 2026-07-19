@@ -29,7 +29,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'divider-primary', type: 'divider' },
   { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
-  { id: 'bazzar', name: 'Bazzar', path: '/bazzar', icon: TagIcon },
+  { id: 'bazaar', name: 'Bazaar', path: '/bazaar', icon: TagIcon },
   { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },

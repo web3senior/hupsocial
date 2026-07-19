@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server'
 import { createPublicClient, http, hashMessage, recoverMessageAddress, isAddress, isAddressEqual, getAddress } from 'viem'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia } from 'wagmi/chains'
-import storeAbi from '@/abis/HupBazzar.json'
+import storeAbi from '@/abis/HupBazaar.json'
 import { decryptContent, isConfigured } from '@/lib/storeCrypto'
 import { STORE_ADDRESSES } from '@/lib/tokens'
 

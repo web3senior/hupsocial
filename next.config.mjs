@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  async redirects() {
+    return [
+      // Legacy misspelled route — the page moved to /bazaar
+      {
+        source: '/bazzar',
+        destination: '/bazaar',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
