@@ -18,11 +18,18 @@ async function uploadViaPinataPresign(file, filename) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: filename, mimeType: file.type }),
   })
-  if (!presignRes.ok) throw new Error('Failed to get presigned upload URL')
+  if (!presignRes.ok) {
+    const { error } = await presignRes.json().catch(() => ({}))
+    throw new Error(error || 'Failed to get presigned upload URL')
+  }
   const { url } = await presignRes.json()
 
+  /* The v3 uploads endpoint expects the same form shape the Pinata SDK sends:
+     network and name alongside the file, not the file alone */
   const form = new FormData()
   form.append('file', file, filename)
+  form.append('network', 'public')
+  form.append('name', filename)
   const uploadRes = await fetch(url, { method: 'POST', body: form })
   if (!uploadRes.ok) throw new Error(`Pinata upload failed: ${uploadRes.status}`)
 

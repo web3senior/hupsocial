@@ -24,7 +24,7 @@ import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
 
 const MAX_MEDIA_ITEMS = 8
-const MAX_MEDIA_SIZE_MB = 10
+const MAX_MEDIA_SIZE_MB = 5
 const MAX_POST_LENGTH = 5000
 const MAX_HISTORY_ENTRIES = 100
 const HISTORY_DEBOUNCE_MS = 300
