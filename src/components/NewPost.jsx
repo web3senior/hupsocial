@@ -217,7 +217,11 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
   const [allowComments, setAllowComments] = useState(true)
-  const [nftListing, setNftListing] = useState(null)
+  // Edits re-upload the whole content JSON, so the existing attachment must be carried
+  // into state or saving the edit would silently drop the listing from the post
+  const [nftListing, setNftListing] = useState(() =>
+    actionType === 'edit' ? getContentPayload(existingPost)?.nftListing ?? null : null
+  )
   const [showSellNftModal, setShowSellNftModal] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -850,6 +854,14 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       // NFT listings travel the same way — the onchain listing already exists (created in
       // SellNftModal); the content JSON only carries the reference TradeCard resolves live
       if (nftListing) serializableContent.nftListing = nftListing
+
+      // Edits rebuild the payload from the composer's text/media state, so reference keys
+      // that only exist in the stored JSON must be carried over or the edit erases them
+      if (actionType === 'edit') {
+        const existingContent = getContentPayload(existingPost)
+        if (existingContent?.quoteOf) serializableContent.quoteOf = existingContent.quoteOf
+        if (existingContent?.communityId) serializableContent.communityId = existingContent.communityId
+      }
 
       const moderationRes = await fetch('/api/moderation/check', {
         method: 'POST',
