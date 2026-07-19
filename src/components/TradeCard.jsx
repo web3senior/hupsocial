@@ -319,25 +319,25 @@ const TradeCard = ({ listing, referral }) => {
           {isCancelled && <span className={styles.tradeCard__badge}>Listing cancelled</span>}
           {isUnavailable && <span className={styles.tradeCard__badge}>No longer available</span>}
         </div>
-
-        {isActive && !isUnavailable && (
-          <div className={styles.tradeCard__actions}>
-            {isSeller ? (
-              <button type="button" className={styles.tradeCard__cancelListing} onClick={handleCancel} disabled={isBusy}>
-                {isBusy ? 'Confirming...' : 'Cancel listing'}
-              </button>
-            ) : needsApproval ? (
-              <button type="button" className={styles.tradeCard__buy} onClick={handleApprove} disabled={isBusy || !address}>
-                {isBusy ? 'Confirming...' : `Approve ${symbol}`}
-              </button>
-            ) : (
-              <button type="button" className={styles.tradeCard__buy} onClick={handleBuy} disabled={isBusy || !address}>
-                {isBusy ? 'Confirming...' : formattedPrice ? `Buy for ${formattedPrice} ${symbol}` : 'Buy'}
-              </button>
-            )}
-          </div>
-        )}
       </div>
+
+      {isActive && !isUnavailable && (
+        <div className={styles.tradeCard__actions}>
+          {isSeller ? (
+            <button type="button" className={styles.tradeCard__cancelListing} onClick={handleCancel} disabled={isBusy}>
+              {isBusy ? 'Confirming...' : 'Cancel listing'}
+            </button>
+          ) : needsApproval ? (
+            <button type="button" className={styles.tradeCard__buy} onClick={handleApprove} disabled={isBusy || !address}>
+              {isBusy ? 'Confirming...' : `Approve ${symbol}`}
+            </button>
+          ) : (
+            <button type="button" className={styles.tradeCard__buy} onClick={handleBuy} disabled={isBusy || !address}>
+              {isBusy ? 'Confirming...' : formattedPrice ? `Buy for ${formattedPrice} ${symbol}` : 'Buy'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
