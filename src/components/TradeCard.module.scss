@@ -216,6 +216,28 @@
     }
   }
 
+  // Full-width footer line under everything (the card wraps) telling reposters what a
+  // conversion pays them
+  &__referralNote {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    margin: 0;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+
+    svg {
+      flex-shrink: 0;
+    }
+
+    strong {
+      color: var(--text);
+    }
+  }
+
   // Narrow screens: the media/info row stays on top, and the aside stops competing for
   // width — it becomes a full-width bottom row with the price left and the action right
   @media (max-width: 560px) {

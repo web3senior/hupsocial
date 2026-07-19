@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
-import { StorefrontIcon } from '@phosphor-icons/react'
+import { RepeatIcon, StorefrontIcon } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
@@ -34,8 +34,11 @@ const buildAssetLinks = ({ chainId, chainInfo, collection, tokenId, isLsp8 }) =>
   if (!collection || !tokenId) return { collectionUrl: null, tokenUrl: null }
 
   if (isLsp8) {
-    const collectionUrl = `https://universaleverything.io/asset/${collection.toLowerCase()}`
-    return { collectionUrl, tokenUrl: `${collectionUrl}/tokenId/${tokenId}` }
+    // Collections and individual assets live under different UE routes
+    return {
+      collectionUrl: `https://universaleverything.io/collection/${collection.toLowerCase()}`,
+      tokenUrl: `https://universaleverything.io/asset/${collection.toLowerCase()}/tokenId/${tokenId}`,
+    }
   }
 
   const openseaBase = chainId === 10143 ? 'https://testnets.opensea.io/assets/monad_testnet' : OPENSEA_CHAIN_SLUGS[chainId] ? `https://opensea.io/assets/${OPENSEA_CHAIN_SLUGS[chainId]}` : null
@@ -245,7 +248,16 @@ const TradeCard = ({ listing, referral }) => {
 
   if (!listing?.listingId || !tradeAddress) return null
 
-  const referralArg = referral && isAddress(referral) ? referral : zeroAddress
+  // The contract reverts buys whose referral is the buyer or the seller — silently drop
+  // the attribution in those cases (seller reposting their own listing, buyer buying
+  // through their own repost) instead of failing the purchase
+  const referralArg =
+    referral &&
+    isAddress(referral) &&
+    referral.toLowerCase() !== address?.toLowerCase() &&
+    referral.toLowerCase() !== seller?.toLowerCase()
+      ? referral
+      : zeroAddress
 
   const handleApprove = (e) => {
     e.stopPropagation()
@@ -337,6 +349,15 @@ const TradeCard = ({ listing, referral }) => {
   const visibleTraits = metadata.attributes.slice(0, 5)
   const hiddenTraits = metadata.attributes.slice(5)
 
+  // Surface the seller-set referral share as a concrete number so reposters know what a
+  // conversion pays them
+  const referralBps = liveListing ? Number(liveListing.referralBps) : 0
+  const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
+  const referralShare =
+    referralBps > 0 && price !== undefined && decimals !== undefined
+      ? new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(Number(formatUnits((price * liveListing.referralBps) / 10_000n, decimals)))
+      : null
+
   return (
     <div className={styles.tradeCard} onClick={(e) => e.stopPropagation()}>
       <div className={styles.tradeCard__media}>
@@ -426,6 +447,15 @@ const TradeCard = ({ listing, referral }) => {
             </button>
           ))}
       </div>
+
+      {isActive && !isUnavailable && referralPercent && referralShare && (
+        <p className={styles.tradeCard__referralNote}>
+          <RepeatIcon size={14} />
+          <span>
+            Repost or quote this post and earn <strong>{referralPercent}%</strong> ({referralShare} {symbol}) when someone buys through you
+          </span>
+        </p>
+      )}
     </div>
   )
 }

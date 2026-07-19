@@ -316,7 +316,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
           )}
 
           {!isActioned && displayItem?.content?.quoteOf && (
-            <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} />
+            <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} quotedBy={displayItem.wallet_address} />
           )}
 
           {!isActioned && displayItem?.content?.nftListing && (
@@ -735,7 +735,7 @@ const ReportModal = ({ item, setShowReportModal }) => {
 // Compact embedded card for quote posts — `quoteOf` lives inside the post's
 // content JSON (the contract forces parentId = 0 for regular posts), so the
 // quoted post has to be fetched by id from the same network.
-const QuotedPost = ({ networkId, quoteId }) => {
+const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
   const router = useRouter()
   const { address } = useConnection()
   const [fetchedQuotedPost, setFetchedQuotedPost] = useState(null)
@@ -801,6 +801,11 @@ const QuotedPost = ({ networkId, quoteId }) => {
         <div className={styles.post__quoteCard__media}>
           <MediaGallery data={quotedMedia} />
         </div>
+      )}
+      {quotedPost?.content?.nftListing && (
+        // Quoting a listing is a referral channel like reposting: buys made from this
+        // quote credit the quote's author with the listing's referral share
+        <TradeCard listing={quotedPost.content.nftListing} referral={quotedBy} />
       )}
     </div>
   )
