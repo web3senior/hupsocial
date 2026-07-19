@@ -70,7 +70,7 @@ export const CONTRACTS = {
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
-    trade: '',
+    trade: '0x80218c06A00316687957951036bbD1326a6790C1',
     events: '0x39CB4342C425Cdc8576fa593988E5a4980db9853',
   },
   chain42220: {
