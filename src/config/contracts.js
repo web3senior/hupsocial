@@ -57,7 +57,7 @@ export const CONTRACTS = {
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
-    trade: '',
+    trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
   },
   chain143: {
