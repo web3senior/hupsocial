@@ -73,6 +73,8 @@ export default function FollowingFeedTab() {
   }, [isFetching, hasMore, page, activeChain, address])
 
   const handlePostClick = (item) => {
+    const selection = window.getSelection()
+    if (selection && selection.toString().length > 0) return
     router.push(`/networks/${item.network_id}/${item.id}`)
   }
 

@@ -47,6 +47,8 @@ export default function Comments({ networkId, postId, viewerAddress }) {
         comments.map((comment, i) => (
           <section key={comment.id} className={styles.commentsList__item}
            onClick={() => {
+             const selection = window.getSelection()
+             if (selection && selection.toString().length > 0) return
              // Seed the store so the detail route paints this comment instantly
              setCurrentPost(comment)
              router.push(`/networks/${networkId}/${comment.id}`)
