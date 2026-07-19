@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { erc20Abi, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
+import { erc20Abi, formatUnits, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
@@ -17,6 +17,18 @@ const LUKSO_CHAIN_IDS = [42, 4201]
 
 // Listing terms live onchain; HupTrade caps the referral share at 50% (MAX_REFERRAL_BPS)
 const MAX_REFERRAL_PERCENT = 50
+
+const shortAddress = (value) => `${value.slice(0, 6)}…${value.slice(-4)}`
+
+// Numeric-ish token ids read better as numbers; hash-style bytes32 ids get truncated hex
+const shortTokenId = (tokenId) => {
+  try {
+    const numeric = BigInt(tokenId)
+    return numeric < 10n ** 12n ? `#${numeric}` : `${tokenId.slice(0, 10)}…`
+  } catch {
+    return tokenId
+  }
+}
 
 const erc721Abi = [
   {
@@ -124,6 +136,10 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
   const [price, setPrice] = useState('')
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [referralPercent, setReferralPercent] = useState('0')
+  // Listings that exist onchain but may never have made it into a post (listed, then the
+  // composer was abandoned) — offered for re-attach or cancel so they're never stranded
+  const [myListings, setMyListings] = useState([])
+  const [cancellingId, setCancellingId] = useState(null)
   const { address } = useConnection()
   const dialogRef = useRef(null)
   const lastActionRef = useRef(null)
@@ -238,6 +254,22 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
   }, [])
 
   useEffect(() => {
+    if (!address || !chainId) return
+
+    let cancelled = false
+    fetch(`/api/v1/trade/listings?networkId=${chainId}&seller=${address.toLowerCase()}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled && json?.success) setMyListings(json.data || [])
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [address, chainId])
+
+  useEffect(() => {
     if (!submitError) return
     toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
   }, [submitError])
@@ -249,6 +281,12 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
       refetchApproved()
       refetchApprovedForAll()
       refetchOperator()
+      return
+    }
+    if (lastActionRef.current === 'cancel') {
+      toast('Listing cancelled', 'success')
+      setMyListings((prev) => prev.filter((row) => String(row.listing_id) !== cancellingId))
+      setCancellingId(null)
       return
     }
 
@@ -321,6 +359,35 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
 
   const needsApproval = hasToken && isOwner && !hasTransferRights
 
+  // Re-attach an onchain listing that never made it into a post — the DB row carries every
+  // field the content payload needs, no new transaction required
+  const handleAttachExisting = (row) => {
+    onAttached({
+      listingId: String(row.listing_id),
+      chainId,
+      collection: row.collection,
+      tokenId: row.token_id,
+      isLsp8: Boolean(row.is_lsp8),
+      token: row.payment_token,
+      isTokenLsp7: Boolean(row.is_lsp7),
+      price: String(row.price),
+      referralBps: Number(row.referral_bps),
+    })
+    dialogRef.current?.close()
+  }
+
+  const handleCancelExisting = (row) => {
+    lastActionRef.current = 'cancel'
+    setCancellingId(String(row.listing_id))
+    writeContract({
+      abi: tradeAbi,
+      address: tradeAddress,
+      functionName: 'cancelListing',
+      args: [BigInt(row.listing_id)],
+      chainId,
+    })
+  }
+
   return (
     <NativeDialog
       ref={dialogRef}
@@ -343,6 +410,38 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
       </header>
 
       <main className={styles.sellNftModal__body}>
+        {myListings.length > 0 && (
+          <div className={styles.sellNftModal__existing}>
+            <p className={styles.sellNftModal__existingTitle}>Your active listings</p>
+            <p className={styles.sellNftModal__hint}>
+              Already listed onchain — attach one to this post, or cancel it to release the NFT.
+            </p>
+            {myListings.map((row) => (
+              <div key={row.listing_id} className={styles.sellNftModal__existingRow}>
+                <div className={styles.sellNftModal__existingInfo}>
+                  <strong>
+                    {shortAddress(row.collection)} {shortTokenId(row.token_id)}
+                  </strong>
+                  <span>
+                    {new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(
+                      Number(formatUnits(BigInt(row.price), row.decimals ?? 18)),
+                    )}{' '}
+                    {row.symbol || (row.payment_token === zeroAddress ? nativeCurrency?.symbol : 'tokens')}
+                  </span>
+                </div>
+                <div className={styles.sellNftModal__existingActions}>
+                  <button type="button" onClick={() => handleAttachExisting(row)} disabled={isBusy}>
+                    Attach
+                  </button>
+                  <button type="button" onClick={() => handleCancelExisting(row)} disabled={isBusy}>
+                    {cancellingId === String(row.listing_id) && isBusy ? 'Confirming...' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isLukso && (
           <div className={styles.sellNftModal__field}>
             <label htmlFor="sellNftStandard">Standard</label>
