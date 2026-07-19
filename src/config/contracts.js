@@ -128,7 +128,7 @@ export const CONTRACTS = {
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '0x85765350FF07802155a35fFf261DFfaAb0ffA366',
     tipper: '0x487aE425f90425a3376F3bC8A016aA1Fb6bec96f',
-    trade: '',
+    trade: '0xC2b7f6eDecE9E5aB04C296a02bf61054487812e5',
     events: '0x4A6D88aBd0fd9049c1adD6757D382c1bb5bbC1D9',
   },
   chain42161: {

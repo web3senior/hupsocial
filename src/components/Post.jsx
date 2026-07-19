@@ -39,6 +39,7 @@ import NativePopover from './ui/NativePopover'
 import SellItemPopover from './SellItemPopover'
 import TipModal from './TipModal'
 import BuyButton from './BuyButton'
+import TradeCard from './TradeCard'
 import NewPost from './NewPost'
 import { checkIsEnglish } from '@/lib/languageHelper'
 import Like from './ui/Like'
@@ -316,6 +317,19 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
           {!isActioned && displayItem?.content?.quoteOf && (
             <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} />
+          )}
+
+          {!isActioned && displayItem?.content?.nftListing && (
+            <TradeCard
+              listing={displayItem.content.nftListing}
+              // Buying through someone's repost credits the reposter with the listing's
+              // referral share — HupTrade rejects self- and seller-referrals onchain
+              referral={
+                isRepost && item.wallet_address?.toLowerCase() !== displayItem?.wallet_address?.toLowerCase()
+                  ? item.wallet_address
+                  : null
+              }
+            />
           )}
 
           <BuyButton item={displayItem || item} />

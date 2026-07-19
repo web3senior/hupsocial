@@ -1,0 +1,233 @@
+[
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_hupAddress", "type": "address" },
+      { "internalType": "address", "name": "_trustedForwarder", "type": "address" },
+      { "internalType": "address", "name": "_admin", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  { "inputs": [{ "internalType": "uint256", "name": "existingListingId", "type": "uint256" }], "name": "DuplicateListing", "type": "error" },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "provided", "type": "uint256" },
+      { "internalType": "uint256", "name": "required", "type": "uint256" }
+    ],
+    "name": "InsufficientPayment",
+    "type": "error"
+  },
+  { "inputs": [], "name": "InvalidAddress", "type": "error" },
+  { "inputs": [], "name": "InvalidAmount", "type": "error" },
+  { "inputs": [], "name": "InvalidFeeBps", "type": "error" },
+  { "inputs": [], "name": "InvalidReferral", "type": "error" },
+  { "inputs": [], "name": "InvalidReferralBps", "type": "error" },
+  { "inputs": [], "name": "ListingNotActive", "type": "error" },
+  { "inputs": [], "name": "NotOperator", "type": "error" },
+  { "inputs": [], "name": "NotTokenOwner", "type": "error" },
+  { "inputs": [], "name": "SelfPurchase", "type": "error" },
+  { "inputs": [], "name": "SessionExpired", "type": "error" },
+  { "inputs": [], "name": "StaleListing", "type": "error" },
+  { "inputs": [], "name": "TransferFailed", "type": "error" },
+  { "inputs": [], "name": "Unauthorized", "type": "error" },
+  { "inputs": [], "name": "UnexpectedNativePayment", "type": "error" },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "listingId", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "seller", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "collection", "type": "address" },
+      { "indexed": false, "internalType": "bytes32", "name": "tokenId", "type": "bytes32" },
+      { "indexed": false, "internalType": "bool", "name": "isLsp8", "type": "bool" },
+      { "indexed": false, "internalType": "address", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "bool", "name": "isTokenLsp7", "type": "bool" },
+      { "indexed": false, "internalType": "uint256", "name": "price", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "referralBps", "type": "uint256" }
+    ],
+    "name": "Listed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "address", "name": "oldValue", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "newValue", "type": "address" }
+    ],
+    "name": "HupContractUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "listingId", "type": "uint256" },
+      { "indexed": false, "internalType": "bool", "name": "invalidated", "type": "bool" }
+    ],
+    "name": "ListingCancelled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "listingId", "type": "uint256" },
+      { "indexed": false, "internalType": "address", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "bool", "name": "isTokenLsp7", "type": "bool" },
+      { "indexed": false, "internalType": "uint256", "name": "price", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "referralBps", "type": "uint256" }
+    ],
+    "name": "ListingUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "listingId", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "buyer", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "referral", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "seller", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "collection", "type": "address" },
+      { "indexed": false, "internalType": "bytes32", "name": "tokenId", "type": "bytes32" },
+      { "indexed": false, "internalType": "address", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "bool", "name": "isTokenLsp7", "type": "bool" },
+      { "indexed": false, "internalType": "uint256", "name": "price", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "feeAmount", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "referralAmount", "type": "uint256" }
+    ],
+    "name": "Sold",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "forwarder", "type": "address" },
+      { "indexed": false, "internalType": "bool", "name": "trusted", "type": "bool" }
+    ],
+    "name": "TrustedForwarderUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "uint256", "name": "oldValue", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "newValue", "type": "uint256" }
+    ],
+    "name": "TradeFeeUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "collection", "type": "address" },
+      { "internalType": "bytes32", "name": "tokenId", "type": "bytes32" }
+    ],
+    "name": "activeListingOf",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_buyer", "type": "address" },
+      { "internalType": "uint256", "name": "_listingId", "type": "uint256" },
+      { "internalType": "address", "name": "_referral", "type": "address" }
+    ],
+    "name": "buy",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "_listingId", "type": "uint256" }],
+    "name": "cancelListing",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "_listingId", "type": "uint256" }],
+    "name": "getListing",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "address", "name": "seller", "type": "address" },
+          { "internalType": "address", "name": "collection", "type": "address" },
+          { "internalType": "bytes32", "name": "tokenId", "type": "bytes32" },
+          { "internalType": "bool", "name": "isLsp8", "type": "bool" },
+          { "internalType": "address", "name": "token", "type": "address" },
+          { "internalType": "bool", "name": "isTokenLsp7", "type": "bool" },
+          { "internalType": "uint256", "name": "price", "type": "uint256" },
+          { "internalType": "uint256", "name": "referralBps", "type": "uint256" },
+          { "internalType": "uint256", "name": "listedAt", "type": "uint256" },
+          { "internalType": "enum IHupTrade.ListingStatus", "name": "status", "type": "uint8" }
+        ],
+        "internalType": "struct IHupTrade.Listing",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "_listingId", "type": "uint256" }],
+    "name": "isPurchasable",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_seller", "type": "address" },
+      { "internalType": "address", "name": "_collection", "type": "address" },
+      { "internalType": "bytes32", "name": "_tokenId", "type": "bytes32" },
+      { "internalType": "bool", "name": "_isLsp8", "type": "bool" },
+      { "internalType": "address", "name": "_token", "type": "address" },
+      { "internalType": "bool", "name": "_isTokenLsp7", "type": "bool" },
+      { "internalType": "uint256", "name": "_price", "type": "uint256" },
+      { "internalType": "uint256", "name": "_referralBps", "type": "uint256" }
+    ],
+    "name": "list",
+    "outputs": [{ "internalType": "uint256", "name": "listingId", "type": "uint256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "listingCount",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "_hupAddress", "type": "address" }],
+    "name": "setHupContract",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "tradeFeeBps",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_listingId", "type": "uint256" },
+      { "internalType": "address", "name": "_token", "type": "address" },
+      { "internalType": "bool", "name": "_isTokenLsp7", "type": "bool" },
+      { "internalType": "uint256", "name": "_price", "type": "uint256" },
+      { "internalType": "uint256", "name": "_referralBps", "type": "uint256" }
+    ],
+    "name": "updateListing",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+    "stateMutability": "pure",
+    "type": "function"
+  }
+]

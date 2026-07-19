@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -16,6 +16,7 @@ import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
 import GifPicker from '@/components/GifPicker'
+import SellNftModal from '@/components/SellNftModal'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
@@ -216,6 +217,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
   const [allowComments, setAllowComments] = useState(true)
+  const [nftListing, setNftListing] = useState(null)
+  const [showSellNftModal, setShowSellNftModal] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -305,8 +308,14 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const postText = postContent.elements[0].data.text
   const mediaItems = postContent.elements[1].data.items
   const isBusy = isSigning || isConfirming || isUploading || isSubmitting
-  const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0
+  const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
+
+  // NFT listings ride only on plain new posts — the listing settles on the chain the post
+  // lands on (the community's chain, or the active chain otherwise)
+  const canAttachNft = actionType === 'post'
+  const nftChainId = communityTarget ? Number(communityTarget.networkId) : Number(getActiveChain()?.[0]?.id) || null
+  const nftTradeAvailable = Boolean(nftChainId && CONTRACTS[`chain${nftChainId}`]?.trade)
 
   const handleClose = useCallback(
     (e) => {
@@ -838,6 +847,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       // reference can only travel inside the content payload (see isQuotePost in lib/content)
       if (isQuote) serializableContent.quoteOf = String(quoteTarget.id)
 
+      // NFT listings travel the same way — the onchain listing already exists (created in
+      // SellNftModal); the content JSON only carries the reference TradeCard resolves live
+      if (nftListing) serializableContent.nftListing = nftListing
+
       const moderationRes = await fetch('/api/moderation/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1062,7 +1075,28 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
               <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
                 <MapPinIcon size={22} />
               </button>
+              {canAttachNft && nftTradeAvailable && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowSellNftModal(true)}
+                  aria-label="Sell an NFT"
+                  disabled={isBusy || Boolean(nftListing)}
+                >
+                  <StorefrontIcon size={22} />
+                </button>
+              )}
             </div>
+
+            {nftListing && (
+              <div className={styles.nftAttachment}>
+                <StorefrontIcon size={16} />
+                <span>NFT for sale attached (listing #{nftListing.listingId})</span>
+                <button type="button" onClick={() => setNftListing(null)} aria-label="Detach NFT listing" disabled={isBusy}>
+                  <XIcon size={14} />
+                </button>
+              </div>
+            )}
 
             <div className={styles.composerMeta}>
               <span>{mediaItems.length}/{MAX_MEDIA_ITEMS} media</span>
@@ -1170,6 +1204,17 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
 
       {/* Outside the <form>: the picker's search input must never submit the post */}
       <GifPicker ref={gifPickerRef} onSelect={handleGifSelect} />
+
+      {showSellNftModal && (
+        <SellNftModal
+          chainId={nftChainId}
+          onAttached={(listing) => {
+            setNftListing(listing)
+            setShowSellNftModal(false)
+          }}
+          onClose={() => setShowSellNftModal(false)}
+        />
+      )}
     </NativeDialog>
   )
 }
