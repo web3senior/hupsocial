@@ -3,11 +3,12 @@
 
 import { useState, useEffect } from 'react'
 import { useConnection, useWriteContract } from 'wagmi' // Hook added here
-import { createPublicClient, http, isAddress, keccak256, stringToHex } from 'viem'
+import { createPublicClient, http, isAddress, keccak256, stringToHex, formatEther, parseEther } from 'viem'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { config, CONTRACTS } from '@/config/wagmi'
 import storeAbi from '@/abis/HupBazaar.json'
+import eventsAbi from '@/abis/HupEvents.json'
 import styles from './page.module.scss'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
@@ -75,6 +76,11 @@ export default function Page() {
   const [tokenIsLsp7, setTokenIsLsp7] = useState({})
   const [nativeWithdrawStates, setNativeWithdrawStates] = useState({})
   const [tokenWithdrawStates, setTokenWithdrawStates] = useState({})
+  const [eventsFees, setEventsFees] = useState({})
+  const [eventsFeeInputs, setEventsFeeInputs] = useState({})
+  const [eventsFeeTxStates, setEventsFeeTxStates] = useState({})
+  const [eventsReceiverInputs, setEventsReceiverInputs] = useState({})
+  const [eventsWithdrawStates, setEventsWithdrawStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
 
@@ -339,6 +345,101 @@ export default function Page() {
     } catch (err) {
       console.error(`Token withdrawal error on chain ${chain.id}:`, err)
       setTokenWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Read current listing/featured fees from a chain's HupEvents deployment
+  const loadEventsFees = async (chain, eventsAddress) => {
+    setEventsFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const [listingFee, featuredFee] = await Promise.all([
+        client.readContract({ address: eventsAddress, abi: eventsAbi, functionName: 'listingFee' }),
+        client.readContract({ address: eventsAddress, abi: eventsAbi, functionName: 'featuredFee' }),
+      ])
+
+      setEventsFees((prev) => ({ ...prev, [chain.id]: { loading: false, listingFee, featuredFee } }))
+    } catch (err) {
+      console.error(`Events fee read error for chain ${chain.id}:`, err)
+      setEventsFees((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read fees' },
+      }))
+    }
+  }
+
+  // Load current fees for every chain with a HupEvents deployment once the admin is in
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const eventsAddress = CONTRACTS[`chain${chain.id}`]?.events
+      if (eventsAddress) loadEventsFees(chain, eventsAddress)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  // Set the flat listing fee or the featured surcharge on a chain's HupEvents (admin wallet signs)
+  const handleSetEventsFee = async (chain, eventsAddress, which) => {
+    const draft = eventsFeeInputs[chain.id]?.[which]?.trim()
+    let value
+    try {
+      value = parseEther(draft || '')
+    } catch {
+      setEventsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid amount in native units' } }))
+      return
+    }
+
+    setEventsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: eventsAddress,
+        abi: eventsAbi,
+        functionName: which === 'listing' ? 'setListingFee' : 'setFeaturedFee',
+        args: [value],
+        chainId: chain.id,
+      })
+
+      setEventsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: false, success: true, hash: txHash } }))
+
+      // Refresh the displayed fees shortly after so the card reflects the new values
+      setTimeout(() => loadEventsFees(chain, eventsAddress), 3000)
+    } catch (err) {
+      console.error(`Events ${which} fee update error on chain ${chain.id}:`, err)
+      setEventsFeeTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Withdraw the HupEvents contract's full native balance (accumulated listing fees)
+  const handleWithdrawEvents = async (chain, eventsAddress) => {
+    const receiver = eventsReceiverInputs[chain.id]?.trim()
+    if (!isAddress(receiver)) {
+      setEventsWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver address' } }))
+      return
+    }
+
+    setEventsWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: eventsAddress,
+        abi: eventsAbi,
+        functionName: 'withdrawAll',
+        args: [receiver],
+        chainId: chain.id,
+      })
+
+      setEventsWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+    } catch (err) {
+      console.error(`Events withdrawal error on chain ${chain.id}:`, err)
+      setEventsWithdrawStates((prev) => ({
         ...prev,
         [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
@@ -821,6 +922,199 @@ export default function Page() {
                         className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
                       >
                         {tokenState?.loading ? 'Withdrawing...' : 'Withdraw Token Balance'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupEvents Fees</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Set the flat listing fee and the featured surcharge (both in the chain&apos;s native coin) on HupEvents
+              deployments, and withdraw accumulated fees.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.events) return null
+
+              const fees = eventsFees[chain.id]
+              const feeInputs = eventsFeeInputs[chain.id] ?? {}
+              const feeTx = eventsFeeTxStates[chain.id]
+              const receiverDraft = eventsReceiverInputs[chain.id] ?? ''
+              const withdrawState = eventsWithdrawStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+              const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+
+              return (
+                <div
+                  key={`events-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPEVENTS</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Events Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.events}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.events}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.events}</code>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Current Fees</span>
+                      <div className={styles['admin-contracts__detail-value']}>
+                        {(!fees || fees.loading) && <span>Loading…</span>}
+                        {fees?.error && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                            {fees.error}
+                          </div>
+                        )}
+                        {fees && !fees.loading && !fees.error && (
+                          <strong>
+                            Listing {formatEther(fees.listingFee)} {symbol} · Featured +{formatEther(fees.featuredFee)} {symbol}
+                          </strong>
+                        )}
+                      </div>
+                    </div>
+
+                    {feeTx && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {feeTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {feeTx.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
+                          {feeTx.success && (
+                            <span style={{ color: '#10b981' }}>🚀 {feeTx.which === 'listing' ? 'Listing fee' : 'Featured fee'} updated.</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetEventsFee(chain, deployment.events, 'listing')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Listing Fee ({symbol})</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={feeInputs.listing ?? ''}
+                        onChange={(e) =>
+                          setEventsFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], listing: e.target.value } }))
+                        }
+                        placeholder="e.g. 0.5"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!feeInputs.listing?.trim() || feeTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {feeTx?.loading && feeTx.which === 'listing' ? 'Writing...' : 'Set Listing Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetEventsFee(chain, deployment.events, 'featured')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Featured Surcharge ({symbol})</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={feeInputs.featured ?? ''}
+                        onChange={(e) =>
+                          setEventsFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], featured: e.target.value } }))
+                        }
+                        placeholder="e.g. 1.0"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!feeInputs.featured?.trim() || feeTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {feeTx?.loading && feeTx.which === 'featured' ? 'Writing...' : 'Set Featured Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleWithdrawEvents(chain, deployment.events)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Withdraw Receiver</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={receiverDraft}
+                        onChange={(e) => setEventsReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    {withdrawState && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Withdrawal</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {withdrawState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {withdrawState.error && <span style={{ color: '#ef4444' }}>❌ {withdrawState.error}</span>}
+                          {withdrawState.success && <span style={{ color: '#10b981' }}>🚀 Withdrawn.</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!receiverDraft.trim() || withdrawState?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        {withdrawState?.loading ? 'Withdrawing...' : 'Withdraw Native Balance'}
                       </button>
                     </div>
                   </form>
