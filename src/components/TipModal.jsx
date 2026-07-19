@@ -19,6 +19,18 @@ import styles from './TipModal.module.scss'
 
 const TIP_PRESETS = [1, 2, 5, 10]
 
+const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+// Popularity line for a search result — the signal that separates the real token from
+// same-name copycats (LUKSO returns holder counts, GeckoTerminal pool liquidity)
+const formatTokenPopularity = (result) => {
+  if (result.holderCount !== null && result.holderCount !== undefined) {
+    return `${compactNumber.format(result.holderCount)} ${result.holderCount === 1 ? 'holder' : 'holders'}`
+  }
+  if (result.liquidityUsd) return `$${compactNumber.format(result.liquidityUsd)} liquidity`
+  return null
+}
+
 const LUKSO_CHAIN_IDS = [42, 4201]
 
 // LSP7 has no symbol() — LSP4 metadata lives in ERC725Y storage, read via getData
@@ -367,16 +379,32 @@ const TipModal = ({ item, setShowTipModal }) => {
               spellCheck={false}
             />
             {tokenSearchResults.length > 0 && (
-              <ul className={styles.tipModal__tokenResults}>
-                {tokenSearchResults.map((result) => (
-                  <li key={result.address}>
-                    <button type="button" onClick={() => handleSelectSearchResult(result)}>
-                      <span className={styles.tipModal__tokenResultSymbol}>{result.symbol}</span>
-                      {result.name && <span className={styles.tipModal__tokenResultName}>{result.name}</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className={styles.tipModal__tokenResults}>
+                  {tokenSearchResults.map((result) => {
+                    const popularity = formatTokenPopularity(result)
+                    return (
+                      <li key={result.address}>
+                        <button type="button" onClick={() => handleSelectSearchResult(result)}>
+                          <span className={styles.tipModal__tokenResultMain}>
+                            <span className={styles.tipModal__tokenResultSymbol}>{result.symbol}</span>
+                            {result.name && <span className={styles.tipModal__tokenResultName}>{result.name}</span>}
+                          </span>
+                          <span className={styles.tipModal__tokenResultMeta}>
+                            <span className={styles.tipModal__tokenResultAddress}>
+                              {result.address.slice(0, 6)}…{result.address.slice(-4)}
+                            </span>
+                            {popularity && <span className={styles.tipModal__tokenResultPopularity}>{popularity}</span>}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className={styles.tipModal__tokenWarning} role="alert">
+                  Anyone can create a token with any name — check the contract address before tipping.
+                </p>
+              </>
             )}
           </div>
         )}

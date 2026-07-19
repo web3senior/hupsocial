@@ -39,6 +39,11 @@ async function searchLuksoTokens(query) {
           id
           lsp4TokenSymbol
           lsp4TokenName
+          holders_aggregate {
+            aggregate {
+              count
+            }
+          }
         }
       }`,
       variables: { q: `%${query}%` },
@@ -54,6 +59,8 @@ async function searchLuksoTokens(query) {
       symbol: asset.lsp4TokenSymbol || 'tokens',
       name: asset.lsp4TokenName || null,
       isLsp7: true,
+      holderCount: asset.holders_aggregate?.aggregate?.count ?? null,
+      liquidityUsd: null,
     }))
 }
 
@@ -68,6 +75,17 @@ async function searchGeckoTerminalTokens(chainId, query) {
   const body = await response.json()
   const lowerQuery = query.toLowerCase()
 
+  // Sum each token's pooled liquidity across the returned pools — same-name copycat tokens
+  // have near-zero liquidity, so this is the ranking signal that floats the real one up.
+  const liquidityByTokenId = new Map()
+  for (const pool of body?.data || []) {
+    const reserve = Number(pool?.attributes?.reserve_in_usd) || 0
+    for (const side of ['base_token', 'quote_token']) {
+      const tokenId = pool?.relationships?.[side]?.data?.id
+      if (tokenId) liquidityByTokenId.set(tokenId, (liquidityByTokenId.get(tokenId) || 0) + reserve)
+    }
+  }
+
   // Pool search matches on pool name (e.g. "USDC / WETH 0.05%"), which pulls in the paired
   // token too — re-filter the included tokens against the query so an "ETH" search doesn't
   // surface every token that's ever been paired against WETH.
@@ -79,18 +97,28 @@ async function searchGeckoTerminalTokens(chainId, query) {
     if (!symbol.toLowerCase().includes(lowerQuery) && !(name || '').toLowerCase().includes(lowerQuery)) continue
 
     const key = address.toLowerCase()
-    if (!seen.has(key)) seen.set(key, { address, symbol, name: name || null, isLsp7: false })
+    if (!seen.has(key)) {
+      seen.set(key, {
+        address,
+        symbol,
+        name: name || null,
+        isLsp7: false,
+        holderCount: null,
+        liquidityUsd: liquidityByTokenId.get(item.id) || 0,
+      })
+    }
   }
 
-  return [...seen.values()].slice(0, MAX_RESULTS)
+  return [...seen.values()].sort((a, b) => b.liquidityUsd - a.liquidityUsd).slice(0, MAX_RESULTS)
 }
 
 /**
- * Searches known tokens by name/symbol on a chain. Returns [] on unsupported chains,
- * network failure, or a too-short query — callers keep a manual address field as fallback.
+ * Searches known tokens by name/symbol on a chain, most-held/most-liquid first. Returns []
+ * on unsupported chains, network failure, or a too-short query — callers keep a manual
+ * address field as fallback. holderCount is LUKSO-only; liquidityUsd is GeckoTerminal-only.
  * @param {number} chainId
  * @param {string} query
- * @returns {Promise<Array<{address: string, symbol: string, name: string|null, isLsp7: boolean}>>}
+ * @returns {Promise<Array<{address: string, symbol: string, name: string|null, isLsp7: boolean, holderCount: number|null, liquidityUsd: number|null}>>}
  */
 export async function searchTokens(chainId, query) {
   const trimmed = query.trim()

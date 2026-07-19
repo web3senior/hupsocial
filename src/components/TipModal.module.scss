@@ -127,8 +127,9 @@
 
     li button {
       display: flex;
-      align-items: baseline;
-      gap: 0.5rem;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.15rem;
       width: 100%;
       padding: 0.5rem 0.6rem;
       border: 0;
@@ -145,6 +146,13 @@
     }
   }
 
+  &__tokenResultMain {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
   &__tokenResultSymbol {
     font-weight: 700;
   }
@@ -155,6 +163,38 @@
     font-size: 0.85rem;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  &__tokenResultMeta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  &__tokenResultAddress {
+    color: var(--text-muted);
+    font-family: var(--font-family-monospace);
+    font-size: 0.75rem;
+  }
+
+  &__tokenResultPopularity {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  &__tokenWarning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--warning-500, #f59e0b);
+    border-radius: var(--global-border-radius);
+    background: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    font-size: 0.8rem;
   }
 
   &__amount {
