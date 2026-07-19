@@ -19,6 +19,37 @@ const STATUS_ACTIVE = 1
 const STATUS_SOLD = 2
 const STATUS_CANCELLED = 3
 
+// External asset pages: Universal Everything renders LSP8 assets; ERC721 goes to OpenSea
+// where a chain slug exists, falling back to the chain's block explorer elsewhere
+const OPENSEA_CHAIN_SLUGS = {
+  1: 'ethereum',
+  56: 'bnb',
+  143: 'monad',
+  8453: 'base',
+  42161: 'arbitrum',
+  42220: 'celo',
+}
+
+const buildAssetLinks = ({ chainId, chainInfo, collection, tokenId, isLsp8 }) => {
+  if (!collection || !tokenId) return { collectionUrl: null, tokenUrl: null }
+
+  if (isLsp8) {
+    const collectionUrl = `https://universaleverything.io/asset/${collection.toLowerCase()}`
+    return { collectionUrl, tokenUrl: `${collectionUrl}/tokenId/${tokenId}` }
+  }
+
+  const openseaBase = chainId === 10143 ? 'https://testnets.opensea.io/assets/monad_testnet' : OPENSEA_CHAIN_SLUGS[chainId] ? `https://opensea.io/assets/${OPENSEA_CHAIN_SLUGS[chainId]}` : null
+  if (openseaBase) {
+    const collectionUrl = `${openseaBase}/${collection.toLowerCase()}`
+    return { collectionUrl, tokenUrl: `${collectionUrl}/${BigInt(tokenId)}` }
+  }
+
+  const explorer = chainInfo?.blockExplorers?.default?.url
+  if (!explorer) return { collectionUrl: null, tokenUrl: null }
+  const collectionUrl = `${explorer.replace(/\/$/, '')}/token/${collection}`
+  return { collectionUrl, tokenUrl: collectionUrl }
+}
+
 // LSP7 has no symbol() — LSP4 metadata lives in ERC725Y storage, read via getData
 // with the keccak256('LSP4TokenSymbol') data key
 const LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756'
@@ -103,6 +134,14 @@ const TradeCard = ({ listing, referral }) => {
     tokenId: listing?.tokenId,
     isLsp8: Boolean(listing?.isLsp8),
     enabled: Boolean(listing?.collection && listing?.tokenId),
+  })
+
+  const { collectionUrl, tokenUrl } = buildAssetLinks({
+    chainId,
+    chainInfo,
+    collection: listing?.collection,
+    tokenId: listing?.tokenId,
+    isLsp8: Boolean(listing?.isLsp8),
   })
 
   const status = liveListing ? Number(liveListing.status) : null
@@ -294,36 +333,86 @@ const TradeCard = ({ listing, referral }) => {
   const isCancelled = status === STATUS_CANCELLED
   const isUnavailable = isActive && isPurchasable === false
 
+  const isMetaLoading = metadata.isLoading && !metadata.name
+  const visibleTraits = metadata.attributes.slice(0, 5)
+  const hiddenTraits = metadata.attributes.slice(5)
+
   return (
     <div className={styles.tradeCard} onClick={(e) => e.stopPropagation()}>
-      {metadata.image && (
-        <div className={styles.tradeCard__media}>
+      <div className={styles.tradeCard__media}>
+        {metadata.image ? (
           <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
-        </div>
-      )}
-
-      <div className={styles.tradeCard__details}>
-        <div className={styles.tradeCard__title}>
-          <StorefrontIcon size={16} />
-          <strong>{metadata.name || 'NFT for sale'}</strong>
-        </div>
-        {metadata.collectionName && <span className={styles.tradeCard__collection}>{metadata.collectionName}</span>}
-
-        <div className={styles.tradeCard__terms}>
-          {formattedPrice && (
-            <span className={styles.tradeCard__price}>
-              {formattedPrice} {symbol}
-            </span>
-          )}
-          {isSold && <span className={clsx(styles.tradeCard__badge, styles['tradeCard__badge--sold'])}>Sold</span>}
-          {isCancelled && <span className={styles.tradeCard__badge}>Listing cancelled</span>}
-          {isUnavailable && <span className={styles.tradeCard__badge}>No longer available</span>}
-        </div>
+        ) : (
+          <div className={clsx(styles.tradeCard__mediaFallback, { [styles['tradeCard__mediaFallback--loading']]: isMetaLoading })}>
+            <StorefrontIcon size={26} weight="duotone" />
+          </div>
+        )}
       </div>
 
-      {isActive && !isUnavailable && (
-        <div className={styles.tradeCard__actions}>
-          {isSeller ? (
+      <div className={styles.tradeCard__info}>
+        {metadata.collectionName ? (
+          collectionUrl ? (
+            <a href={collectionUrl} target="_blank" rel="noopener noreferrer" className={styles.tradeCard__eyebrow}>
+              {metadata.collectionName}
+            </a>
+          ) : (
+            <span className={styles.tradeCard__eyebrow}>{metadata.collectionName}</span>
+          )
+        ) : (
+          <span className={styles.tradeCard__eyebrow}>{isMetaLoading ? '' : 'NFT for sale'}</span>
+        )}
+
+        {isMetaLoading ? (
+          <>
+            <span className={clsx(styles.tradeCard__skeleton, styles['tradeCard__skeleton--title'])} />
+            <span className={clsx(styles.tradeCard__skeleton, styles['tradeCard__skeleton--line'])} />
+          </>
+        ) : (
+          <div className={styles.tradeCard__title}>
+            {tokenUrl ? (
+              <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
+                {metadata.name || 'Unnamed token'}
+              </a>
+            ) : (
+              metadata.name || 'Unnamed token'
+            )}
+          </div>
+        )}
+
+        {visibleTraits.length > 0 && (
+          <ul className={styles.tradeCard__traits}>
+            {visibleTraits.map((attr) => (
+              <li key={`${attr.label}:${attr.value}`}>
+                <span>{attr.label}</span>
+                <strong>{attr.value}</strong>
+              </li>
+            ))}
+            {hiddenTraits.length > 0 && (
+              <li className={styles.tradeCard__traitsMore} title={hiddenTraits.map((attr) => `${attr.label}: ${attr.value}`).join('\n')}>
+                <strong>+{hiddenTraits.length}</strong>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+
+      <div className={styles.tradeCard__aside}>
+        {formattedPrice && (isActive || isSold) && (
+          <div className={styles.tradeCard__price}>
+            <span>{isSold ? 'Sold for' : 'Price'}</span>
+            <strong>
+              {formattedPrice} {symbol}
+            </strong>
+          </div>
+        )}
+
+        {isSold && <span className={clsx(styles.tradeCard__badge, styles['tradeCard__badge--sold'])}>Sold</span>}
+        {isCancelled && <span className={styles.tradeCard__badge}>Listing cancelled</span>}
+        {isUnavailable && <span className={styles.tradeCard__badge}>No longer available</span>}
+
+        {isActive &&
+          !isUnavailable &&
+          (isSeller ? (
             <button type="button" className={styles.tradeCard__cancelListing} onClick={handleCancel} disabled={isBusy}>
               {isBusy ? 'Confirming...' : 'Cancel listing'}
             </button>
@@ -333,11 +422,10 @@ const TradeCard = ({ listing, referral }) => {
             </button>
           ) : (
             <button type="button" className={styles.tradeCard__buy} onClick={handleBuy} disabled={isBusy || !address}>
-              {isBusy ? 'Confirming...' : formattedPrice ? `Buy for ${formattedPrice} ${symbol}` : 'Buy'}
+              {isBusy ? 'Confirming...' : 'Buy now'}
             </button>
-          )}
-        </div>
-      )}
+          ))}
+      </div>
     </div>
   )
 }

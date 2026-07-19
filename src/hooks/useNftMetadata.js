@@ -69,6 +69,17 @@ const decodeVerifiableUri = (bytes) => {
 // canonical one. Icon is the square fallback.
 const pickLsp4Image = (lsp4) => lsp4?.images?.[0]?.[0]?.url || lsp4?.icon?.[0]?.url || null
 
+// Traits come in two dialects: ERC721's [{trait_type, value}] and LSP4's [{key, value, type}].
+// Normalize both to [{label, value}] strings for display.
+const normalizeAttributes = (json, lsp4) => {
+  const raw = (Array.isArray(json?.attributes) && json.attributes.length > 0 ? json.attributes : lsp4?.attributes) || []
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((attr) => ({ label: attr?.trait_type ?? attr?.key, value: attr?.value }))
+    .filter((attr) => attr.label && attr.value !== null && attr.value !== undefined && `${attr.value}`.trim() !== '')
+    .map((attr) => ({ label: String(attr.label), value: String(attr.value) }))
+}
+
 // How a bytes32 token id is appended to LSP8TokenMetadataBaseURI, per LSP8TokenIdFormat:
 // 0 = uint256 (decimal), 1 = utf8 string, 2 = address, 3/4 = raw bytes32 hex without 0x.
 // The 100+ values are the same formats with per-token overrides — same string mapping.
@@ -140,6 +151,7 @@ const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) =
       collectionName,
       description: lsp4?.description || null,
       image: pickLsp4Image(lsp4),
+      attributes: normalizeAttributes(json, lsp4),
     }
   }
 
@@ -155,6 +167,7 @@ const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) =
     collectionName,
     description: json?.description || null,
     image: json?.image || json?.image_url || null,
+    attributes: normalizeAttributes(json, null),
   }
 }
 
@@ -184,6 +197,7 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
     collectionName: data?.collectionName || null,
     description: data?.description || null,
     image: data?.image ? resolveStorageImageUrl(data.image, { width: imageWidth }) : null,
+    attributes: data?.attributes || [],
     isLoading: ready && isLoading,
     error,
   }
