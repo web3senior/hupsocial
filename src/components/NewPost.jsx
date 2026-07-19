@@ -315,10 +315,15 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
-  // NFT listings ride only on plain new posts — the listing settles on the chain the post
-  // lands on (the community's chain, or the active chain otherwise)
-  const canAttachNft = actionType === 'post'
-  const nftChainId = communityTarget ? Number(communityTarget.networkId) : Number(getActiveChain()?.[0]?.id) || null
+  // NFT listings ride on plain posts and post edits — the listing settles on the chain the
+  // post lands on (the edited post's own chain, the community's chain, or the active chain)
+  const canAttachNft = actionType === 'post' || actionType === 'edit'
+  const nftChainId =
+    actionType === 'edit'
+      ? Number(existingPost?.network_id) || null
+      : communityTarget
+      ? Number(communityTarget.networkId)
+      : Number(getActiveChain()?.[0]?.id) || null
   const nftTradeAvailable = Boolean(nftChainId && CONTRACTS[`chain${nftChainId}`]?.trade)
 
   const handleClose = useCallback(
