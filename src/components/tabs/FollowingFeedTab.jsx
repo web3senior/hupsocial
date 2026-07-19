@@ -114,6 +114,8 @@ export default function FollowingFeedTab() {
 
 const EmptyState = ({ message }) => (
   <div className={clsx('__container')} data-width="small">
-    <p className={clsx('text-center', 'p-100')}>{message}</p>
+    <div className={clsx('__container', styles.page__container)} data-width="medium">
+      <p className={clsx('text-center', 'p-100')}>{message}</p>
+    </div>
   </div>
 )

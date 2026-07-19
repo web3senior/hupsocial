@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import clsx from 'clsx'
 import { getStatuses } from '@/lib/api'
 import Profile from '@/components/Profile'
+import pageStyles from '@/app/page.module.scss'
 import styles from './StatusFeedTab.module.scss'
 
 const STATUSES_PAGE_SIZE = 20
@@ -63,20 +64,24 @@ export default function StatusFeedTab() {
   if (isLoaded && statuses.length === 0) {
     return (
       <div className={clsx('__container')} data-width="small">
-        <p className={clsx('text-center', 'p-100')}>No statuses right now. Statuses last as long as their creators choose.</p>
+        <div className={clsx('__container', pageStyles.page__container)} data-width="medium">
+          <p className={clsx('text-center', 'p-100')}>No statuses right now. Statuses last as long as their creators choose.</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className={clsx('__container')} data-width="small">
-      <div className={styles['status-feed']}>
-        {statuses.map((item) => (
-          <article key={`${item.network_id}-${item.id}`} className={styles['status-feed__item']}>
-            <Profile creator={item.wallet_address} createdAt={item.event_timestamp} networkId={Number(item.network_id)} />
-            <p className={styles['status-feed__content']}>{item.content}</p>
-          </article>
-        ))}
+      <div className={clsx('__container', pageStyles.page__container)} data-width="medium">
+        <div className={styles['status-feed']}>
+          {statuses.map((item) => (
+            <article key={`${item.network_id}-${item.id}`} className={styles['status-feed__item']}>
+              <Profile creator={item.wallet_address} createdAt={item.event_timestamp} networkId={Number(item.network_id)} />
+              <p className={styles['status-feed__content']}>{item.content}</p>
+            </article>
+          ))}
+        </div>
       </div>
 
       {hasMore && (
