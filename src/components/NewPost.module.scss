@@ -262,17 +262,24 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 18px;
+  gap: 10px;
   padding: 10px 0 18px;
 
+  // Icons alone weren't discoverable — every action carries a small text label
   button {
-    display: grid;
-    place-items: center;
-    width: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     height: 32px;
-    padding: 0;
+    padding: 0 10px;
     color: var(--text-muted);
-    border-radius: 8px;
+    border-radius: 999px;
+
+    span {
+      font-size: var(--font-size-10);
+      font-weight: 600;
+      white-space: nowrap;
+    }
 
     &:hover {
       color: var(--text);

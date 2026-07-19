@@ -1025,7 +1025,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Add image"
                 disabled={isBusy}
               >
-                <ImageIcon size={22} />
+                <ImageIcon size={20} />
+                <span>Image</span>
               </button>
               <button
                 type="button"
@@ -1034,7 +1035,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Add video"
                 disabled={isBusy}
               >
-                <MonitorPlayIcon size={22} />
+                <MonitorPlayIcon size={20} />
+                <span>Video</span>
               </button>
               <button
                 type="button"
@@ -1043,7 +1045,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Add GIF"
                 disabled={isBusy}
               >
-                <GifIcon size={22} />
+                {/* GifIcon already renders the letters "GIF" — a text label would duplicate it */}
+                <GifIcon size={20} />
               </button>
               <button
                 type="button"
@@ -1052,7 +1055,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 aria-label="Add audio"
                 disabled={isBusy}
               >
-                <MicrophoneIcon size={22} />
+                <MicrophoneIcon size={20} />
+                <span>Audio</span>
               </button>
               <button
                 type="button"
@@ -1062,6 +1066,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 disabled={isBusy}
               >
                 <TextBIcon size={20} />
+                <span>Bold</span>
               </button>
               <button
                 type="button"
@@ -1071,9 +1076,11 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 disabled={isBusy}
               >
                 <TextItalicIcon size={20} />
+                <span>Italic</span>
               </button>
               <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
-                <MapPinIcon size={22} />
+                <MapPinIcon size={20} />
+                <span>Location</span>
               </button>
               {canAttachNft && nftTradeAvailable && (
                 <button
@@ -1083,7 +1090,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                   aria-label="Sell an NFT"
                   disabled={isBusy || Boolean(nftListing)}
                 >
-                  <StorefrontIcon size={22} />
+                  <StorefrontIcon size={20} />
+                  <span>Sell NFT</span>
                 </button>
               )}
             </div>
