@@ -134,14 +134,19 @@ const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) =
 
     // Resolution order: per-token LSP4Metadata (Dracos-style), then the collection's token
     // base URI + formatted token id (Chillwhales-style), then collection-level LSP4Metadata
-    // as the last resort — that one only knows the collection, not the token.
+    // as the last resort — that one only knows the collection, not the token, so `source`
+    // records which tier answered and consumers can label collection-only data honestly.
+    let source = 'token'
     let uri = decodeVerifiableUri(tokenMetadataBytes)
     if (!uri) {
       const baseUri = decodeVerifiableUri(baseUriBytes)
       const tokenIdSegment = baseUri ? formatTokenIdForUri(tokenId, tokenIdFormatBytes) : null
       if (baseUri && tokenIdSegment !== null) uri = `${baseUri}${tokenIdSegment}`
     }
-    if (!uri) uri = decodeVerifiableUri(collectionMetadataBytes)
+    if (!uri) {
+      uri = decodeVerifiableUri(collectionMetadataBytes)
+      source = uri ? 'collection' : null
+    }
 
     const json = await fetchMetadataJson(uri).catch(() => null)
     const lsp4 = json?.LSP4Metadata || json
@@ -152,6 +157,7 @@ const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) =
       description: lsp4?.description || null,
       image: pickLsp4Image(lsp4),
       attributes: normalizeAttributes(json, lsp4),
+      source: json ? source : null,
     }
   }
 
@@ -168,6 +174,8 @@ const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) =
     description: json?.description || null,
     image: json?.image || json?.image_url || null,
     attributes: normalizeAttributes(json, null),
+    // tokenURI is inherently per-token
+    source: json ? 'token' : null,
   }
 }
 
@@ -198,6 +206,9 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
     description: data?.description || null,
     image: data?.image ? resolveStorageImageUrl(data.image, { width: imageWidth }) : null,
     attributes: data?.attributes || [],
+    // 'token' = data is specific to this token id; 'collection' = only collection-level
+    // metadata exists and the image/name describe the collection, not the token
+    source: data?.source || null,
     isLoading: ready && isLoading,
     error,
   }

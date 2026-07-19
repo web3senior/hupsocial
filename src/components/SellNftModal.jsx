@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { erc20Abi, formatUnits, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
+import { erc20Abi, formatUnits, hexToString, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
+import { searchTokens } from '@/lib/tokenSearch'
 import tradeAbi from '@/abis/HupTrade.json'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { toast } from '@/components/NextToast'
@@ -19,6 +20,31 @@ const LUKSO_CHAIN_IDS = [42, 4201]
 const MAX_REFERRAL_PERCENT = 50
 
 const shortAddress = (value) => `${value.slice(0, 6)}…${value.slice(-4)}`
+
+const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+// Popularity line for a search result — the signal that separates the real token from
+// same-name copycats (LUKSO returns holder counts, GeckoTerminal pool liquidity)
+const formatTokenPopularity = (result) => {
+  if (result.holderCount !== null && result.holderCount !== undefined) {
+    return `${compactNumber.format(result.holderCount)} ${result.holderCount === 1 ? 'holder' : 'holders'}`
+  }
+  if (result.liquidityUsd) return `$${compactNumber.format(result.liquidityUsd)} liquidity`
+  return null
+}
+
+// LSP7 has no symbol() — LSP4 metadata lives in ERC725Y storage, read via getData
+// with the keccak256('LSP4TokenSymbol') data key
+const LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756'
+const erc725yAbi = [
+  {
+    type: 'function',
+    name: 'getData',
+    stateMutability: 'view',
+    inputs: [{ name: 'dataKey', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'bytes' }],
+  },
+]
 
 // Numeric-ish token ids read better as numbers; hash-style bytes32 ids get truncated hex
 const shortTokenId = (tokenId) => {
@@ -135,6 +161,8 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
   const [standard, setStandard] = useState(isLukso ? 'lsp8' : 'erc721')
   const [price, setPrice] = useState('')
   const [paymentChoice, setPaymentChoice] = useState('native')
+  const [customToken, setCustomToken] = useState('')
+  const [tokenSearchResults, setTokenSearchResults] = useState([])
   const [referralPercent, setReferralPercent] = useState('0')
   // Listings that exist onchain but may never have made it into a post (listed, then the
   // composer was abandoned) — offered for re-attach or cancel so they're never stranded
@@ -155,11 +183,45 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
   const tokenId = normalizeTokenId(tokenIdInput)
   const hasToken = Boolean(collectionAddress && tokenId && tradeAddress)
 
+  const isCustomToken = paymentChoice === 'custom-erc20' || paymentChoice === 'custom-lsp7'
+  // Curated entries are selected by address ("token:0x..."), so the option value alone
+  // pins the exact contract the user saw in the list
   const listedToken = paymentChoice.startsWith('token:')
     ? tipTokens.find((t) => t.address === paymentChoice.slice('token:'.length))
     : null
-  const tokenAddress = listedToken ? listedToken.address : null
-  const isTokenLsp7 = Boolean(listedToken?.lsp7)
+  // Invalid/incomplete custom addresses resolve to null — every downstream read stays
+  // disabled and the list button locked until a real address is pasted or picked from search
+  const trimmedCustomToken = customToken.trim()
+  const tokenAddress = listedToken ? listedToken.address : isCustomToken && isAddress(trimmedCustomToken) ? trimmedCustomToken : null
+  const isTokenLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
+
+  // Debounced name search for the custom-token field — a pasted address never triggers a
+  // search (isAddress short-circuits it). Results arrive most-held/most-liquid first from
+  // searchTokens, so the real token outranks same-name copycats.
+  useEffect(() => {
+    if (!isCustomToken || isAddress(trimmedCustomToken) || trimmedCustomToken.length < 2) {
+      setTokenSearchResults([])
+      return
+    }
+
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      searchTokens(chainId, trimmedCustomToken).then((results) => {
+        if (!cancelled) setTokenSearchResults(results)
+      })
+    }, 350)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [isCustomToken, trimmedCustomToken, chainId])
+
+  const handleSelectSearchResult = (result) => {
+    setPaymentChoice(result.isLsp7 ? 'custom-lsp7' : 'custom-erc20')
+    setCustomToken(result.address)
+    setTokenSearchResults([])
+  }
 
   const metadata = useNftMetadata({ chainId, collection: collectionAddress, tokenId, isLsp8, enabled: hasToken })
 
@@ -218,6 +280,7 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
     ? Boolean(isOperator)
     : approvedFor?.toLowerCase() === tradeAddress?.toLowerCase() || Boolean(approvedForAll)
 
+  // decimals() shares the same selector on ERC20 and LSP7 — one read covers both
   const { data: tokenDecimals } = useReadContract({
     abi: erc20Abi,
     address: tokenAddress,
@@ -226,8 +289,42 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
     query: { enabled: Boolean(tokenAddress) },
   })
 
-  const symbol = listedToken ? listedToken.symbol : nativeCurrency?.symbol || ''
-  const decimals = listedToken ? tokenDecimals : nativeCurrency?.decimals ?? 18
+  // Custom ERC20s expose symbol(); custom LSP7s don't — their symbol comes from LSP4
+  // metadata in ERC725Y storage instead, so each custom mode reads its own source
+  const { data: customSymbol } = useReadContract({
+    abi: erc20Abi,
+    address: tokenAddress,
+    functionName: 'symbol',
+    chainId,
+    query: { enabled: Boolean(paymentChoice === 'custom-erc20' && tokenAddress) },
+  })
+
+  const { data: lsp4SymbolBytes } = useReadContract({
+    abi: erc725yAbi,
+    address: tokenAddress,
+    functionName: 'getData',
+    args: [LSP4_TOKEN_SYMBOL_KEY],
+    chainId,
+    query: { enabled: Boolean(paymentChoice === 'custom-lsp7' && tokenAddress) },
+  })
+  let lsp4Symbol = null
+  if (lsp4SymbolBytes && lsp4SymbolBytes !== '0x') {
+    try {
+      lsp4Symbol = hexToString(lsp4SymbolBytes).trim() || null
+    } catch {
+      lsp4Symbol = null
+    }
+  }
+
+  const symbol =
+    paymentChoice === 'native'
+      ? nativeCurrency?.symbol || ''
+      : listedToken
+      ? listedToken.symbol
+      : paymentChoice === 'custom-lsp7'
+      ? lsp4Symbol || 'tokens'
+      : customSymbol || 'tokens'
+  const decimals = paymentChoice === 'native' ? nativeCurrency?.decimals ?? 18 : tokenAddress ? tokenDecimals : undefined
 
   const parsedPrice = Number(price)
   const isValidPrice = Number.isFinite(parsedPrice) && parsedPrice > 0
@@ -480,12 +577,36 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
 
         {hasToken && (
           <div className={styles.sellNftModal__preview}>
-            {metadata.image && <img src={metadata.image} alt={metadata.name || 'NFT'} />}
-            <div className={styles.sellNftModal__previewText}>
-              <strong>{metadata.name || (metadata.isLoading ? 'Loading…' : 'Unknown token')}</strong>
-              {metadata.collectionName && <span>{metadata.collectionName}</span>}
-              {owner && !isOwner && <span className={styles.sellNftModal__warning}>This token belongs to another wallet</span>}
+            <div className={styles.sellNftModal__previewMain}>
+              {metadata.image && <img src={metadata.image} alt={metadata.name || 'NFT'} />}
+              <div className={styles.sellNftModal__previewText}>
+                <strong>{metadata.name || (metadata.isLoading ? 'Loading…' : 'Unknown token')}</strong>
+                {metadata.collectionName && <span>{metadata.collectionName}</span>}
+                {isOwner && <span className={styles.sellNftModal__owned}>Owned by you ✓</span>}
+                {owner && !isOwner && <span className={styles.sellNftModal__warning}>This token belongs to another wallet</span>}
+                {hasToken && !metadata.isLoading && !owner && (
+                  <span className={styles.sellNftModal__warning}>Token not found in this collection</span>
+                )}
+              </div>
             </div>
+
+            {metadata.attributes.length > 0 && (
+              <ul className={styles.sellNftModal__previewTraits}>
+                {metadata.attributes.slice(0, 4).map((attr) => (
+                  <li key={`${attr.label}:${attr.value}`}>
+                    <span>{attr.label}</span> <strong>{attr.value}</strong>
+                  </li>
+                ))}
+                {metadata.attributes.length > 4 && <li>+{metadata.attributes.length - 4}</li>}
+              </ul>
+            )}
+
+            {metadata.source === 'collection' && (
+              <p className={styles.sellNftModal__previewNote}>
+                This collection doesn&apos;t publish per-token metadata — the image and name above describe the collection, not
+                this specific token.
+              </p>
+            )}
           </div>
         )}
 
@@ -498,8 +619,51 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
                 {token.symbol}
               </option>
             ))}
+            <option value="custom-erc20">Custom ERC20</option>
+            {isLukso && <option value="custom-lsp7">Custom LSP7</option>}
           </select>
         </div>
+
+        {isCustomToken && (
+          <div className={clsx(styles.sellNftModal__field, styles.sellNftModal__tokenSearch)}>
+            <label htmlFor="sellNftCustomToken">Search token or paste address</label>
+            <input
+              type="text"
+              id="sellNftCustomToken"
+              value={customToken}
+              onChange={(e) => setCustomToken(e.target.value)}
+              placeholder="Token name or 0x..."
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {tokenSearchResults.length > 0 && (
+              <>
+                <ul className={styles.sellNftModal__tokenResults}>
+                  {tokenSearchResults.map((result) => {
+                    const popularity = formatTokenPopularity(result)
+                    return (
+                      <li key={result.address}>
+                        <button type="button" onClick={() => handleSelectSearchResult(result)}>
+                          <span className={styles.sellNftModal__tokenResultMain}>
+                            <span className={styles.sellNftModal__tokenResultSymbol}>{result.symbol}</span>
+                            {result.name && <span className={styles.sellNftModal__tokenResultName}>{result.name}</span>}
+                          </span>
+                          <span className={styles.sellNftModal__tokenResultMeta}>
+                            <span className={styles.sellNftModal__tokenResultAddress}>{shortAddress(result.address)}</span>
+                            {popularity && <span className={styles.sellNftModal__tokenResultPopularity}>{popularity}</span>}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className={styles.sellNftModal__tokenWarning} role="alert">
+                  Anyone can create a token with any name — check the contract address before pricing your NFT in it.
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         <div className={styles.sellNftModal__field}>
           <label htmlFor="sellNftPrice">Price</label>
