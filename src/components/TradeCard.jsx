@@ -432,7 +432,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true }) => {
 
         {showDetailsLink && (
           <Link href={`/nfts/${chainId}/${listing.listingId}`} className={styles.tradeCard__view}>
-            View
+            View NFT
           </Link>
         )}
 
