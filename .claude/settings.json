@@ -48,7 +48,13 @@
       "Bash(npm -v)",
       "PowerShell(pnpm add @phosphor-icons/react)",
       "PowerShell(\\(Test-NetConnection -ComputerName localhost -Port 3000 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
-      "PowerShell(\\(Get-Content package.json | ConvertFrom-Json\\).dependencies.next; ls node_modules/next/dist/docs | Select-Object -ExpandProperty Name)"
+      "PowerShell(\\(Get-Content package.json | ConvertFrom-Json\\).dependencies.next; ls node_modules/next/dist/docs | Select-Object -ExpandProperty Name)",
+      "Bash(cd /c/xampp/htdocs/hupsocial/src/contracts && ls .deps/npm 2>/dev/null; ls ../../node_modules/@openzeppelin 2>/dev/null; ls .deps/npm/@openzeppelin 2>/dev/null)",
+      "Read(//c/xampp/node_modules/**)",
+      "Bash(mkdir -p /c/Users/atenyun/AppData/Local/Temp/claude/c--xampp-htdocs-hupsocial/a7496db2-2e8f-4122-afb8-50b9594761af/scratchpad/ozroot/@openzeppelin)",
+      "Bash(cp -r /c/xampp/htdocs/hupsocial/src/contracts/.deps/npm/@openzeppelin/contracts@5.6.1 /c/Users/atenyun/AppData/Local/Temp/claude/c--xampp-htdocs-hupsocial/a7496db2-2e8f-4122-afb8-50b9594761af/scratchpad/ozroot/@openzeppelin/contracts)",
+      "Read(//c/Users/atenyun/AppData/Local/Temp/claude/c--xampp-htdocs-hupsocial/a7496db2-2e8f-4122-afb8-50b9594761af/scratchpad/ozroot/@openzeppelin/**)",
+      "WebFetch(domain:api.etherscan.io)"
     ],
     "additionalDirectories": [
       "c:\\xampp\\htdocs\\cidex"
