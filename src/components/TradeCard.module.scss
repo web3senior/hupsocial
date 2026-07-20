@@ -126,18 +126,11 @@
     color: var(--text-muted);
   }
 
-  &__detailsLink {
-    margin-top: 0.2rem;
-    align-self: flex-start;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    font-weight: 600;
+  // Link to the listing detail page (terms + sale records), dressed as a secondary
+  // pill action so it holds its own next to Buy now
+  &__view {
     text-decoration: none;
-
-    &:hover {
-      color: var(--text);
-      text-decoration: underline;
-    }
+    text-align: center;
   }
 
   // Pushed to the card's right edge; on narrow widths the wrap drops it below the
@@ -190,7 +183,8 @@
   }
 
   &__buy,
-  &__cancelListing {
+  &__cancelListing,
+  &__view {
     padding: 0.55rem 1.4rem;
     border: 0;
     border-radius: 999px;
@@ -220,7 +214,8 @@
     }
   }
 
-  &__cancelListing {
+  &__cancelListing,
+  &__view {
     border: 1px solid var(--border);
     background: transparent;
     color: var(--text);
@@ -274,7 +269,8 @@
     }
 
     &__buy,
-    &__cancelListing {
+    &__cancelListing,
+    &__view {
       padding-block: 0.65rem;
     }
 

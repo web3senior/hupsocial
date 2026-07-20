@@ -100,7 +100,7 @@ const lsp7Abi = [
  * @param {Object} props
  * @param {Object} props.listing The post's nftListing content payload (listingId, chainId, collection, tokenId, isLsp8).
  * @param {string} [props.referral] Reposter credited with the sale when the buyer arrived via a repost.
- * @param {boolean} [props.showDetailsLink] Renders the link to the listing detail page (/nfts/[networkId]/[listingId]); the detail page itself passes false.
+ * @param {boolean} [props.showDetailsLink] Renders the View button linking to the listing detail page (/nfts/[networkId]/[listingId]); the detail page itself passes false.
  */
 const TradeCard = ({ listing, referral, showDetailsLink = true }) => {
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
@@ -418,11 +418,6 @@ const TradeCard = ({ listing, referral, showDetailsLink = true }) => {
           </ul>
         )}
 
-        {showDetailsLink && (
-          <Link href={`/nfts/${chainId}/${listing.listingId}`} className={styles.tradeCard__detailsLink}>
-            Listing details &amp; sale records
-          </Link>
-        )}
       </div>
 
       <div className={styles.tradeCard__aside}>
@@ -433,6 +428,12 @@ const TradeCard = ({ listing, referral, showDetailsLink = true }) => {
               {formattedPrice} {symbol}
             </strong>
           </div>
+        )}
+
+        {showDetailsLink && (
+          <Link href={`/nfts/${chainId}/${listing.listingId}`} className={styles.tradeCard__view}>
+            View
+          </Link>
         )}
 
         {isSold && <span className={clsx(styles.tradeCard__badge, styles['tradeCard__badge--sold'])}>Sold</span>}
