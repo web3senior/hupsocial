@@ -87,6 +87,29 @@
     }
   }
 
+  &__people {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  &__peopleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    small {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: var(--font-size-10, 0.65rem);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+  }
+
   &__description {
     margin: 0;
     font-size: var(--font-size-14, 0.875rem);

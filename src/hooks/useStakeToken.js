@@ -82,15 +82,21 @@ export default function useStakeToken(chainId, token, isLsp7) {
 }
 
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 2 })
+// Sub-1 stakes (0.0003 MON, ETH dust) keep their leading zeros instead of rounding to "0" —
+// significant digits scale precision to however small the amount is
+const smallNumber = new Intl.NumberFormat('en', { maximumSignificantDigits: 4 })
 
 /**
  * Formats a raw onchain amount string (decimal(65,0) from the API, or bigint) into a compact
- * localized ticker number, e.g. "1.25K". Returns null while decimals are still loading.
+ * localized ticker number — "1.25K" for large stakes, "0.0003" for small ones. Returns null
+ * while decimals are still loading.
  */
 export function formatStake(rawAmount, decimals) {
   if (rawAmount === null || rawAmount === undefined || decimals === undefined) return null
   try {
-    return compactNumber.format(Number(formatUnits(BigInt(rawAmount), decimals)))
+    const value = Number(formatUnits(BigInt(rawAmount), decimals))
+    if (value === 0) return '0'
+    return value < 1 ? smallNumber.format(value) : compactNumber.format(value)
   } catch {
     return null
   }

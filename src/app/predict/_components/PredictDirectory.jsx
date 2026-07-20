@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
 import clsx from 'clsx'
@@ -9,7 +9,7 @@ import { CONTRACTS, appChains } from '@/config/contracts'
 import CreateMarketDialog from '@/components/CreateMarketDialog'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import { marketStatus, parseJsonArray, toRelative } from '@/lib/predict'
-import { TargetIcon, PlusIcon, ScalesIcon, UsersIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, PlusIcon, ScalesIcon, TargetIcon, UsersIcon } from '@phosphor-icons/react'
 import styles from './PredictDirectory.module.scss'
 
 const PAGE_SIZE = 25
@@ -35,6 +35,14 @@ export default function PredictDirectory() {
   const { address } = useConnection()
   const [scope, setScope] = useState('open')
   const [networkId, setNetworkId] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+
+  // Debounce the query so SWR refetches settle instead of firing per keystroke
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(searchInput.trim()), 350)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
 
   // Chains where the predict contract is live — drives the network filter options
   const predictChains = useMemo(() => appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.predict), [])
@@ -46,6 +54,7 @@ export default function PredictDirectory() {
     const params = new URLSearchParams({ scope, page: String(pageIndex + 1), limit: String(PAGE_SIZE) })
     if (networkId) params.set('networkId', networkId)
     if (scope === 'mine') params.set('participant', address)
+    if (search) params.set('q', search)
     return `/api/v1/predict?${params}`
   }
 
@@ -88,6 +97,19 @@ export default function PredictDirectory() {
           ))}
         </div>
 
+        <div className={styles.directory__search}>
+          <MagnifyingGlassIcon size={14} />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search markets"
+            aria-label="Search markets"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+
         {predictChains.length > 1 && (
           <select
             className={styles.directory__networkFilter}
@@ -115,7 +137,7 @@ export default function PredictDirectory() {
       {!isLoading && markets.length === 0 && (
         <div className={styles.directory__empty}>
           <TargetIcon size={32} />
-          <p>{emptyCopy[scope]}</p>
+          <p>{search ? `No markets match “${search}”.` : emptyCopy[scope]}</p>
         </div>
       )}
 

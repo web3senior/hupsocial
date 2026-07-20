@@ -46,12 +46,16 @@ export async function GET(request) {
       : 'open'
     const networkId = parseInt(searchParams.get('networkId')) || null
     const participant = (searchParams.get('participant') || '').toLowerCase() || null
+    const q = (searchParams.get('q') || '').trim().slice(0, 100) || null
     const page = parseInt(searchParams.get('page')) || 1
     const limit = Math.min(parseInt(searchParams.get('limit')) || 25, 50)
     const offset = (page - 1) * limit
 
     const networkFilter = networkId ? 'AND m.network_id = ?' : ''
     const networkArgs = networkId ? [networkId] : []
+
+    const searchFilter = q ? 'AND (m.title LIKE ? OR m.description LIKE ?)' : ''
+    const searchArgs = q ? [`%${q}%`, `%${q}%`] : []
 
     // State ints mirror the contract enum: 0 Open, 1 Closed, 2 Resolved, 3 Refunding.
     // "open" is still bettable (deadline in the future); "closed" awaits a judge (explicitly
@@ -77,10 +81,10 @@ export async function GET(request) {
       `SELECT ${MARKET_COLUMNS}
        FROM markets m
        LEFT JOIN users u ON u.wallet_address = m.creator
-       WHERE m.hidden = 0 AND m.metadata_fetched = 1 ${networkFilter} ${scopeFilter}
+       WHERE m.hidden = 0 AND m.metadata_fetched = 1 ${networkFilter} ${searchFilter} ${scopeFilter}
        ORDER BY m.opened_at DESC, m.market_id DESC
        LIMIT ? OFFSET ?`,
-      [...networkArgs, ...scopeArgs, limit + 1, offset],
+      [...networkArgs, ...searchArgs, ...scopeArgs, limit + 1, offset],
     )
 
     const hasMore = rows.length > limit

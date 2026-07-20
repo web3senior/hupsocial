@@ -14,7 +14,9 @@ import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import predictAbi from '@/abis/HupPredict.json'
 import { toast } from '@/components/NextToast'
+import Profile from '@/components/Profile'
 import PlaceBetModal from '@/components/PlaceBetModal'
+import Share from '@/components/ui/Share'
 import { ContentSpinner } from '@/components/Loading'
 import {
   CaretLeftIcon,
@@ -30,8 +32,6 @@ import {
 import styles from './MarketDetail.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
-
-const shortWallet = (wallet) => (wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '')
 
 export default function MarketDetail({ networkId, marketId }) {
   const router = useRouter()
@@ -154,20 +154,6 @@ export default function MarketDetail({ networkId, marketId }) {
     setResolveChoice(null)
   }
 
-  const handleShare = async () => {
-    const url = `${window.location.origin}/predict/${chainId}/${marketId}`
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: market?.title || 'Prediction market', url })
-        return
-      }
-      await navigator.clipboard.writeText(url)
-      toast('Link copied', 'success')
-    } catch {
-      // Share sheet dismissed — nothing to report
-    }
-  }
-
   if (isLoading) return <ContentSpinner />
 
   if (!market) {
@@ -210,15 +196,28 @@ export default function MarketDetail({ networkId, marketId }) {
             <TimerIcon size={14} />
             {toRelative(market.opened_at)}
           </span>
-          <span>
-            <UserIcon size={14} />
-            Creator: {market.display_name || shortWallet(market.wallet_address)}
-          </span>
-          <span>
-            <ScalesIcon size={14} />
-            {judges.length === 1 ? 'Judge' : 'Judges'}: {judges.map((judge) => shortWallet(judge)).join(', ')}
-          </span>
         </p>
+
+        {/* Creator and judges render through the shared Profile component, like posts —
+            avatar hover card, follow affordances, and the /{'{wallet}'} profile link included */}
+        <div className={styles.market__people}>
+          <div className={styles.market__peopleGroup}>
+            <small>
+              <UserIcon size={12} />
+              Creator
+            </small>
+            <Profile variant="fullWithoutTime" creator={market.wallet_address} networkId={chainId} />
+          </div>
+          <div className={styles.market__peopleGroup}>
+            <small>
+              <ScalesIcon size={12} />
+              {judges.length === 1 ? 'Judge' : 'Judges'}
+            </small>
+            {judges.map((judge) => (
+              <Profile key={judge} variant="fullWithoutTime" creator={judge} networkId={chainId} />
+            ))}
+          </div>
+        </div>
 
         {market.description && <p className={styles.market__description}>{market.description}</p>}
 
@@ -320,10 +319,20 @@ export default function MarketDetail({ networkId, marketId }) {
             </button>
           )}
 
-          <button type="button" className={styles.market__action} onClick={handleShare}>
-            <ShareNetworkIcon size={16} />
-            Share
-          </button>
+          {/* Same target menu a post's share action offers (copy link, X, Telegram, ...) */}
+          <Share
+            url={`${window.location.origin}/predict/${chainId}/${marketId}`}
+            title={market.title || 'Prediction market'}
+            creator={market.wallet_address}
+            copyLabel="Copy market link"
+            copiedToast="Market link copied"
+            trigger={
+              <button type="button" className={styles.market__action} aria-label="Share market">
+                <ShareNetworkIcon size={16} />
+                Share
+              </button>
+            }
+          />
         </div>
 
         {claim && (

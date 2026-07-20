@@ -33,8 +33,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   { id: 'bazaar', name: 'Bazaar', path: '/bazaar', icon: TagIcon },
   { id: 'nfts', name: 'NFTs', path: '/nfts', icon: StorefrontIcon },
-  // Predict stays hidden from the nav while the feature is still being worked on
-  // { id: 'predict', name: 'Predict', path: '/predict', icon: TargetIcon },
+  { id: 'predict', name: 'Predict', path: '/predict', icon: TargetIcon },
   { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },

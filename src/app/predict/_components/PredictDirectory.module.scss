@@ -33,6 +33,31 @@
     }
   }
 
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1;
+    min-width: 140px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    background: var(--background);
+    color: var(--text-muted, #888);
+
+    input {
+      all: unset;
+      flex: 1;
+      min-width: 0;
+      font-size: var(--font-size-12);
+      color: var(--text, inherit);
+
+      &::placeholder {
+        color: var(--text-muted, #888);
+      }
+    }
+  }
+
   &__networkFilter {
     margin-left: auto;
     border: 1px solid var(--border);
