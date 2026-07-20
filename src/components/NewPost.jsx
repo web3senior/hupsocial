@@ -1,10 +1,10 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { TargetIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -17,6 +17,7 @@ import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
+import AttachMarketModal from '@/components/AttachMarketModal'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
@@ -223,6 +224,11 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     actionType === 'edit' ? getContentPayload(existingPost)?.nftListing ?? null : null
   )
   const [showSellNftModal, setShowSellNftModal] = useState(false)
+  // Prediction markets travel like NFT listings: a content-JSON reference to an onchain id
+  const [predictMarket, setPredictMarket] = useState(() =>
+    actionType === 'edit' ? getContentPayload(existingPost)?.predictMarket ?? null : null
+  )
+  const [showAttachMarket, setShowAttachMarket] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -312,7 +318,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const postText = postContent.elements[0].data.text
   const mediaItems = postContent.elements[1].data.items
   const isBusy = isSigning || isConfirming || isUploading || isSubmitting
-  const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing)
+  const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing) || Boolean(predictMarket)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
   // NFT listings ride on plain posts and post edits — the listing settles on the chain the
@@ -325,6 +331,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       ? Number(communityTarget.networkId)
       : Number(getActiveChain()?.[0]?.id) || null
   const nftTradeAvailable = Boolean(nftChainId && CONTRACTS[`chain${nftChainId}`]?.trade)
+  // Prediction markets pin to the same chain the post lands on, like NFT listings
+  const predictAvailable = Boolean(nftChainId && CONTRACTS[`chain${nftChainId}`]?.predict)
 
   const handleClose = useCallback(
     (e) => {
@@ -860,6 +868,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       // SellNftModal); the content JSON only carries the reference TradeCard resolves live
       if (nftListing) serializableContent.nftListing = nftListing
 
+      // Prediction markets too — the market already exists onchain; PredictCard resolves
+      // the reference from the indexed API
+      if (predictMarket) serializableContent.predictMarket = predictMarket
+
       // Edits rebuild the payload from the composer's text/media state, so reference keys
       // that only exist in the stored JSON must be carried over or the edit erases them
       if (actionType === 'edit') {
@@ -1111,6 +1123,18 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                   <span>Sell NFT</span>
                 </button>
               )}
+              {canAttachNft && predictAvailable && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowAttachMarket(true)}
+                  aria-label="Attach a prediction market"
+                  disabled={isBusy || Boolean(predictMarket)}
+                >
+                  <TargetIcon size={20} />
+                  <span>Predict</span>
+                </button>
+              )}
             </div>
 
             {nftListing && (
@@ -1118,6 +1142,16 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 <StorefrontIcon size={16} />
                 <span>NFT for sale attached (listing #{nftListing.listingId})</span>
                 <button type="button" onClick={() => setNftListing(null)} aria-label="Detach NFT listing" disabled={isBusy}>
+                  <XIcon size={14} />
+                </button>
+              </div>
+            )}
+
+            {predictMarket && (
+              <div className={styles.nftAttachment}>
+                <TargetIcon size={16} />
+                <span>Prediction market attached (market #{predictMarket.marketId})</span>
+                <button type="button" onClick={() => setPredictMarket(null)} aria-label="Detach prediction market" disabled={isBusy}>
                   <XIcon size={14} />
                 </button>
               </div>
@@ -1238,6 +1272,17 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
             setShowSellNftModal(false)
           }}
           onClose={() => setShowSellNftModal(false)}
+        />
+      )}
+
+      {showAttachMarket && (
+        <AttachMarketModal
+          chainId={nftChainId}
+          onAttached={(marketRef) => {
+            setPredictMarket(marketRef)
+            setShowAttachMarket(false)
+          }}
+          onClose={() => setShowAttachMarket(false)}
         />
       )}
     </NativeDialog>

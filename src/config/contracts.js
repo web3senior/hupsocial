@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file config/contracts.js
  * @description Server-safe chain and contract-address data. API routes and lib/
  * readers import from here instead of config/wagmi so evaluating them never
@@ -28,7 +28,7 @@ export const robinhood = defineChain({
   },
 })
 
-// Chains the app runs on — single source of truth for the wagmi config's
+// Chains the app runs on â€” single source of truth for the wagmi config's
 // `chains` tuple and for server-side RPC lookups (chain.rpcUrls.default.http).
 // L1s first, then L2s.
 export const appChains = [mainnet, lukso, bsc, monad, monadTestnet, arbitrum, base, celo, robinhood] //somniaTestnet
@@ -44,8 +44,9 @@ export const CONTRACTS = {
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '0x9a8Daf359280eb03D734530992691888fA33D476',
-    trade: '',
+    trade: '0x7eb333Ad710d398A38c45d49A6A96568c8276b5f',
     events: '',
+    predict: '',
   },
   chain42: {
     name: 'lukso',
@@ -59,6 +60,7 @@ export const CONTRACTS = {
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
     trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
+    predict: '',
   },
   chain143: {
     name: 'monad',
@@ -72,6 +74,7 @@ export const CONTRACTS = {
     tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
     trade: '0x80218c06A00316687957951036bbD1326a6790C1',
     events: '0x39CB4342C425Cdc8576fa593988E5a4980db9853',
+    predict: '',
   },
   chain42220: {
     name: 'celo',
@@ -84,6 +87,7 @@ export const CONTRACTS = {
     tipper: '0xbc487be674065E39FeFF468856ce614E0Dec48fb',
     trade: '0x94D81b00b1e4596343e84298dD705e93E36eAb14',
     events: '0x10feacEEDDB387112f9a484EfB2df9FB197934E4',
+    predict: '',
   },
   chain8453: {
     name: 'base',
@@ -95,6 +99,7 @@ export const CONTRACTS = {
     tipper: '0x01F725975b17dB66DBF26ebAa02bc74F8a433A18',
     trade: '0x7E14bB18b370b59e0b70759C915f5E3A79599091',
     events: '0x6dB2352e9921F46F005449FcA36938e7cb5A29f5',
+    predict: '',
   },
   chain56: {
     name: 'bnb',
@@ -106,6 +111,7 @@ export const CONTRACTS = {
     tipper: '0x74AC93C4A4a67f56af9d1Bd3153910D90F802632',
     trade: '0x594d084D863446cd1618244de695d574a5DfADD5',
     events: '0xD479950963A8F87d9Cd44Ad3983C96A5A4b3c14d',
+    predict: '',
   },
   chain4663: {
     name: 'robinhood',
@@ -118,6 +124,7 @@ export const CONTRACTS = {
     tipper: '0x3EF07D888e4B4d91e5b6c889E6Bdb7A37BE76CDE',
     trade: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
     events: '0x735A8352036B953F8AC0Ae421DaEf8f2978EcC91',
+    predict: '',
   },
   chain10143: {
     name: 'monad-testnet',
@@ -130,6 +137,7 @@ export const CONTRACTS = {
     tipper: '0x487aE425f90425a3376F3bC8A016aA1Fb6bec96f',
     trade: '0xC2b7f6eDecE9E5aB04C296a02bf61054487812e5',
     events: '0x4A6D88aBd0fd9049c1adD6757D382c1bb5bbC1D9',
+    predict: '0xBBB8F5F17b6305A0aAD3F4ecebB0198B5c6728cf',
   },
   chain42161: {
     name: 'arbitrum',
@@ -142,5 +150,6 @@ export const CONTRACTS = {
     tipper: '0x0Fc1223079367ADC73F9960E48d786705e992e14',
     trade: '0x71Ce7aF80996AB5a9c265E2048c5759435131631',
     events: '0x88C0963857049368470E2851aFf5EDFc2D32346C',
+    predict: '',
   },
 }

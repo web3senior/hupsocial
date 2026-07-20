@@ -1,0 +1,127 @@
+.predictCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  padding: 0.75rem 0.85rem;
+  background: var(--background);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--primary, #ec4899);
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  &__kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--font-size-10, 0.65rem);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #888);
+  }
+
+  &__badge {
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 0.12rem 0.5rem;
+
+    &--open {
+      background: rgba(236, 72, 153, 0.14);
+      color: #ec4899;
+    }
+
+    &--awaiting {
+      background: rgba(245, 158, 11, 0.14);
+      color: #b45309;
+    }
+
+    &--resolved {
+      background: rgba(34, 197, 94, 0.14);
+      color: #15803d;
+    }
+
+    &--refunding {
+      background: rgba(100, 116, 139, 0.14);
+      color: var(--text-muted, #64748b);
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.3;
+  }
+
+  &__outcomes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  &__outcome {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-radius: calc(var(--global-border-radius) / 2);
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.6rem;
+    overflow: hidden;
+    isolation: isolate;
+    font-size: var(--font-size-12);
+  }
+
+  &__outcomeFill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: -1;
+    opacity: 0.5;
+  }
+
+  &__outcomeLabel {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__outcomeShare {
+    flex-shrink: 0;
+    color: var(--text-muted, #888);
+  }
+
+  &__more {
+    font-size: var(--font-size-10, 0.65rem);
+    color: var(--text-muted, #888);
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__cta {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--primary, #ec4899);
+  }
+}

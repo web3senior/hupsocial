@@ -40,6 +40,7 @@ import SellItemPopover from './SellItemPopover'
 import TipModal from './TipModal'
 import BuyButton from './BuyButton'
 import TradeCard from './TradeCard'
+import PredictCard from './PredictCard'
 import NewPost from './NewPost'
 import { checkIsEnglish } from '@/lib/languageHelper'
 import Like from './ui/Like'
@@ -330,6 +331,10 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
                   : null
               }
             />
+          )}
+
+          {!isActioned && displayItem?.content?.predictMarket && (
+            <PredictCard marketRef={displayItem.content.predictMarket} />
           )}
 
           <BuyButton item={displayItem || item} />
@@ -807,6 +812,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
         // quote credit the quote's author with the listing's referral share
         <TradeCard listing={quotedPost.content.nftListing} referral={quotedBy} />
       )}
+      {quotedPost?.content?.predictMarket && <PredictCard marketRef={quotedPost.content.predictMarket} />}
     </div>
   )
 }

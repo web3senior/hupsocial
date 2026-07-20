@@ -1,0 +1,244 @@
+/* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+.marketDialog {
+  padding: var(--native-popover-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    /* The native dialog caps itself at calc(100% - 6px - 2em); subtract that plus the
+       dialog's own border and padding so the body never forces horizontal scroll on
+       small screens */
+    width: min(420px, calc(100vw - 6px - 2em - 2px - 2 * var(--native-popover-padding, 1rem)));
+    max-height: 82svh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      font-size: var(--font-size-16, 1rem);
+      margin: 0;
+    }
+  }
+
+  &__close {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__network {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__notice {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    margin: 0;
+  }
+
+  &__chainWarning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    border: 1px solid var(--warning-500, #f59e0b);
+    border-radius: var(--global-border-radius);
+    padding: 0.5rem 0.75rem;
+    font-size: var(--font-size-12);
+
+    span {
+      flex: 1;
+    }
+  }
+
+  &__switchChain {
+    flex-shrink: 0;
+    border: 1px solid var(--warning-500, #f59e0b);
+    background: transparent;
+    color: inherit;
+    border-radius: var(--global-border-radius);
+    padding: 0.3rem 0.6rem;
+    font-size: var(--font-size-12);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background-color: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: var(--font-size-12);
+      min-width: 0;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.5rem 0.75rem;
+      background: var(--background);
+      font-size: var(--font-size-14, 0.875rem);
+      font-family: inherit;
+      resize: vertical;
+      color: inherit;
+    }
+
+    small {
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.6rem 0.75rem 0.75rem;
+    margin: 0;
+    min-width: 0;
+
+    legend {
+      font-size: var(--font-size-12);
+      padding: 0 0.25rem;
+    }
+
+    small {
+      font-size: var(--font-size-10, 0.65rem);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__listRow {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    input {
+      flex: 1;
+    }
+
+    button {
+      all: unset;
+      cursor: pointer;
+      display: flex;
+      padding: 0.35rem;
+      border-radius: 50%;
+      color: var(--text-muted, #888);
+
+      &:hover {
+        background-color: var(--surface-muted, rgba(0, 0, 0, 0.04));
+      }
+    }
+  }
+
+  &__listAdd {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    align-self: flex-start;
+    font-size: var(--font-size-12);
+    color: var(--primary, #0d6efd);
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__image {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: var(--font-size-12);
+
+    img {
+      max-height: 120px;
+      max-width: 100%;
+      border-radius: var(--global-border-radius);
+      object-fit: cover;
+      align-self: flex-start;
+    }
+  }
+
+  &__imageActions {
+    display: flex;
+    gap: 0.5rem;
+
+    button {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: inherit;
+      border-radius: var(--global-border-radius);
+      padding: 0.35rem 0.7rem;
+      font-size: var(--font-size-12);
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        background-color: var(--surface-muted, rgba(0, 0, 0, 0.04));
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__submit {
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+    border-radius: var(--global-border-radius);
+    padding: 0.6rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 500;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
