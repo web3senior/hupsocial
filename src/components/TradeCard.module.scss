@@ -126,6 +126,20 @@
     color: var(--text-muted);
   }
 
+  &__detailsLink {
+    margin-top: 0.2rem;
+    align-self: flex-start;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--text);
+      text-decoration: underline;
+    }
+  }
+
   // Pushed to the card's right edge; on narrow widths the wrap drops it below the
   // details and margin-inline-start keeps it right-aligned there too
   &__aside {

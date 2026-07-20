@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
@@ -99,8 +100,9 @@ const lsp7Abi = [
  * @param {Object} props
  * @param {Object} props.listing The post's nftListing content payload (listingId, chainId, collection, tokenId, isLsp8).
  * @param {string} [props.referral] Reposter credited with the sale when the buyer arrived via a repost.
+ * @param {boolean} [props.showDetailsLink] Renders the link to the listing detail page (/nfts/[networkId]/[listingId]); the detail page itself passes false.
  */
-const TradeCard = ({ listing, referral }) => {
+const TradeCard = ({ listing, referral, showDetailsLink = true }) => {
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const { address } = useConnection()
   const lastActionRef = useRef(null)
@@ -414,6 +416,12 @@ const TradeCard = ({ listing, referral }) => {
               </li>
             )}
           </ul>
+        )}
+
+        {showDetailsLink && (
+          <Link href={`/nfts/${chainId}/${listing.listingId}`} className={styles.tradeCard__detailsLink}>
+            Listing details &amp; sale records
+          </Link>
         )}
       </div>
 
