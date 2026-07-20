@@ -28,6 +28,7 @@ export default function Page() {
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
   const removeFromBatch = useSidebarStore((state) => state.removeFromBatch)
   const clearBatch = useSidebarStore((state) => state.clearBatch)
+  const markLikeOverride = useSidebarStore((state) => state.markLikeOverride)
 
   // Track transaction execution state overlays locally
   const [isProcessing, setIsProcessing] = useState(false)
@@ -99,6 +100,9 @@ export default function Page() {
         })
 
         toast('Successfully batched interaction items via session keys!', 'success')
+        // Flag every signed post as liked so feed hearts turn red immediately
+        // instead of waiting for the indexer plus a manual refresh
+        markLikeOverride(address, activeNetworkId, currentNetworkPosts, true)
         clearBatch(address, activeNetworkId)
         setIsProcessing(false)
         return
@@ -116,6 +120,7 @@ export default function Page() {
       })
 
       toast('Transaction sent! Clearing localized buffer parameters...', 'success')
+      markLikeOverride(address, activeNetworkId, currentNetworkPosts, true)
       clearBatch(address, activeNetworkId)
     } catch (err) {
       console.error('Batch evaluation transaction failed:', err)

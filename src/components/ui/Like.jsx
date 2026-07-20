@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import clsx from 'clsx'
 import { HeartIcon } from '@phosphor-icons/react'
 import useSWR from 'swr'
@@ -9,7 +9,7 @@ import { getActiveChain } from '@/lib/communication'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { CONTRACTS } from '@/config/wagmi'
 import abi from '@/abi/post.json'
-import { useSidebarStore, getWalletBatchMap } from '@/stores/useSidebarStore'
+import { useSidebarStore, getWalletBatchMap, getLikeOverride } from '@/stores/useSidebarStore'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import { AnimatedHeart } from '@/components/Icons'
@@ -31,6 +31,8 @@ export const Like = ({ post, onUpdate }) => {
   const addToBatch = useSidebarStore((state) => state.addToBatch)
   const removeFromBatch = useSidebarStore((state) => state.removeFromBatch)
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
+  const likeOverridesMap = useSidebarStore((state) => state.likeOverrides ?? {})
+  const markLikeOverride = useSidebarStore((state) => state.markLikeOverride)
 
   const isMounted = useClientMounted()
   const activeChain = getActiveChain()
@@ -93,21 +95,32 @@ export const Like = ({ post, onUpdate }) => {
     hash,
   })
 
+  // The same receipt hook confirms both like and unlike txs; the ref remembers
+  // which intent the pending hash belongs to
+  const pendingActionRef = useRef(null)
+
   useEffect(() => {
     if (isConfirmed) {
+      const confirmedLike = pendingActionRef.current !== 'unlike'
+      pendingActionRef.current = null
+
+      // Pin the optimistic state past the cidex indexing lag so the immediate
+      // revalidation below cannot flip the heart back
+      markLikeOverride(address, post.network_id, post.id, confirmedLike)
+
       mutate(
         (prev) => ({
           ...prev,
           isProcessing: false,
-          isLiked: true,
+          isLiked: confirmedLike,
         }),
         { revalidate: true },
       )
 
       if (typeof onUpdate === 'function') {
-        onUpdate(post.id, { is_liked: 1, total_likes: interactionState.likeCount })
+        onUpdate(post.id, { is_liked: confirmedLike ? 1 : 0, total_likes: interactionState.likeCount })
       }
-      toast('Interaction saved on-chain!', 'success')
+      toast('Interaction saved onchain!', 'success')
     }
   }, [isConfirmed])
   
@@ -154,6 +167,7 @@ export const Like = ({ post, onUpdate }) => {
           args: [address, [id]],
         })
 
+        markLikeOverride(address, post.network_id, id, true)
         mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
 
         if (typeof onUpdate === 'function') {
@@ -163,6 +177,8 @@ export const Like = ({ post, onUpdate }) => {
         toast('Liked via active session key!', 'success')
         return
       }
+
+      pendingActionRef.current = 'like'
 
       await writeContractAsync({
         abi,
@@ -174,6 +190,7 @@ export const Like = ({ post, onUpdate }) => {
       toast('Confirming block execution...', 'success')
     } catch (err) {
       console.error('Like failed:', err)
+      pendingActionRef.current = null
       toast(err.message || 'Transaction rejected or encountered an error.', 'error')
       mutate(previousData, { revalidate: false })
     }
@@ -203,6 +220,8 @@ export const Like = ({ post, onUpdate }) => {
         { revalidate: false },
       )
 
+      pendingActionRef.current = 'unlike'
+
       await writeContractAsync({
         abi,
         address: targetChain.hup,
@@ -210,15 +229,27 @@ export const Like = ({ post, onUpdate }) => {
         args: [id],
       })
 
+      markLikeOverride(address, post.network_id, id, false)
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
 
-      toast('Removing like on-chain...', 'success')
+      toast('Removing like onchain...', 'success')
     } catch (err) {
       console.error('Unlike failed:', err)
+      pendingActionRef.current = null
       toast(err.message || 'Failed to remove transaction.', 'error')
       mutate(previousData, { revalidate: false })
     }
   }
+
+  // ■■■ Derived Display State ■■■
+  // A fresh optimistic override outranks the API snapshot: the indexer lags a
+  // few blocks behind the tx, so raw revalidations briefly report stale data
+  const likeOverride = getLikeOverride(likeOverridesMap, address, post.network_id, post.id)
+  const isLiked = likeOverride ? likeOverride.liked : interactionState.isLiked
+  const likeCount =
+    likeOverride && likeOverride.liked !== interactionState.isLiked
+      ? Math.max(0, interactionState.likeCount + (likeOverride.liked ? 1 : -1))
+      : interactionState.likeCount
 
   const handleLikeInteraction = (e) => {
     e.stopPropagation()
@@ -228,7 +259,7 @@ export const Like = ({ post, onUpdate }) => {
       return
     }
 
-    if (interactionState.isLiked) {
+    if (isLiked) {
       unlikePost(post.id)
     } else if (isQueued) {
       removeFromBatch(address, post.network_id, post.id)
@@ -246,8 +277,8 @@ export const Like = ({ post, onUpdate }) => {
 
   // ■■■ UI Style Layout Variables ■■■
   const isLoading = interactionState.isProcessing || isWalletPending || isConfirming
-  const heartColor = interactionState.isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
-  const heartWeight = interactionState.isLiked || isQueued ? 'fill' : 'regular'
+  const heartColor = isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
+  const heartWeight = isLiked || isQueued ? 'fill' : 'regular'
 
   if (!isMounted) return null
 
@@ -258,7 +289,7 @@ export const Like = ({ post, onUpdate }) => {
         disabled={isLoading}
         className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
         onClick={handleLikeInteraction}
-        aria-label={interactionState.isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
+        aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
       >
         {isLoading ? (
           <div className={clsx(styles.animatedHeader)}>
@@ -268,7 +299,7 @@ export const Like = ({ post, onUpdate }) => {
           <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
         )}
 
-        {interactionState.likeCount > 0 && !isLoading && <Counter value={interactionState.likeCount} />}
+        {likeCount > 0 && !isLoading && <Counter value={likeCount} />}
       </button>
     </div>
   )

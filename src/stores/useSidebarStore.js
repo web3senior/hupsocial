@@ -10,11 +10,13 @@ import {
   ChartBarIcon,
   ChatCircleIcon,
   CoinsIcon,
+  CrosshairIcon,
   HeartIcon,
   HouseIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   SquaresFourIcon,
+  StorefrontIcon,
   TagIcon,
   TrophyIcon,
   UsersIcon,
@@ -30,6 +32,8 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   { id: 'bazaar', name: 'Bazaar', path: '/bazaar', icon: TagIcon },
+  { id: 'nfts', name: 'NFTs', path: '/nfts', icon: StorefrontIcon },
+  { id: 'predict', name: 'Predict', path: '/predict', icon: CrosshairIcon },
   { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },
@@ -65,6 +69,17 @@ export const countBatchItems = (networkMap) => {
   }, 0)
 }
 
+// Optimistic like overrides outlive the cidex indexing lag; entries older than
+// this are ignored so the server state becomes authoritative again
+export const LIKE_OVERRIDE_TTL_MS = 5 * 60 * 1000
+
+// Resolve a still-fresh optimistic override for one post, or null
+export const getLikeOverride = (likeOverrides, address, networkId, postId) => {
+  const entry = likeOverrides?.[walletBatchKey(address)]?.[networkId]?.[postId]
+  if (!entry) return null
+  return Date.now() - entry.at < LIKE_OVERRIDE_TTL_MS ? entry : null
+}
+
 export const useSidebarStore = create(
   persist(
     (set, get) => ({
@@ -75,6 +90,34 @@ export const useSidebarStore = create(
 
       // Dictionary mapping wallet address keys to network-id keyed post id arrays
       likedPostIds: {},
+
+      // Optimistic like state written the moment a like/unlike tx lands,
+      // consumed by Like cards until the indexer confirms (wallet → network → post)
+      likeOverrides: {},
+
+      markLikeOverride: (wallet, networkId, postIds, liked) =>
+        set((state) => {
+          const walletKey = walletBatchKey(wallet)
+          const now = Date.now()
+          const walletMap = state.likeOverrides?.[walletKey] ?? {}
+          const networkMap = {}
+
+          // Re-copy only entries still inside the TTL so the persisted map stays small
+          for (const [id, entry] of Object.entries(walletMap[networkId] ?? {})) {
+            if (entry && now - entry.at < LIKE_OVERRIDE_TTL_MS) networkMap[id] = entry
+          }
+
+          for (const id of Array.isArray(postIds) ? postIds : [postIds]) {
+            networkMap[id] = { liked, at: now }
+          }
+
+          return {
+            likeOverrides: {
+              ...state.likeOverrides,
+              [walletKey]: { ...walletMap, [networkId]: networkMap },
+            },
+          }
+        }),
 
       // Actions for Batch Like queue management split by wallet then network id
       addToBatch: (wallet, networkId, postId) =>
@@ -216,6 +259,7 @@ export const useSidebarStore = create(
       partialize: (state) => ({
         isMenuOpen: state.isMenuOpen,
         likedPostIds: state.likedPostIds,
+        likeOverrides: state.likeOverrides,
         isComponentOpen: state.isComponentOpen,
       }),
     }
