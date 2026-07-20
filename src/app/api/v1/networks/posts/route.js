@@ -84,6 +84,17 @@ export async function GET(request) {
       )`
     }
 
+    // "NFT" (market) = posts carrying an active HupTrade listing. The listing reference
+    // lives inside the post's content JSON; the nft_listing_id generated column (maintained
+    // by the cidex schema) materializes it so this joins against the nft_listings replay
+    // state the cidex runTradeSync runner keeps current.
+    if (feedType === 'nft') {
+      whereClause += ` AND p.nft_listing_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM nft_listings nl
+        WHERE nl.network_id = p.network_id AND nl.listing_id = p.nft_listing_id AND nl.status = 1
+      )`
+    }
+
     // Apply dynamic filters using the direct performance indexes set on the posts table
     if (networkId) {
       whereClause += ` AND p.network_id = ?`

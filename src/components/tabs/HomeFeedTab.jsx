@@ -36,8 +36,9 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   const router = useRouter()
 
   const scopedNetworkId = feedMode === 'network' ? networkId : null
-  const feedType = feedMode === 'premium' ? 'premium' : null
-  const feedCacheKey = feedMode === 'network' ? `network-${networkId}` : feedMode === 'premium' ? 'premium' : 'foryou'
+  const feedType = feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : null
+  const feedCacheKey =
+    feedMode === 'network' ? `network-${networkId}` : feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : 'foryou'
   const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
 
   // Feed snapshot from an earlier visit this session, if any. Safe to read in
