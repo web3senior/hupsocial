@@ -1,10 +1,18 @@
 .hero {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.25rem;
   padding: 2rem 0 1.75rem;
   margin-bottom: 1.5rem;
   border-bottom: 1px solid var(--border);
+
+  &__headline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    text-align: center;
+  }
 
   &__eyebrow {
     font-size: 0.75rem;
@@ -14,56 +22,154 @@
     color: var(--text-muted);
   }
 
-  &__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: 0.75rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  &__card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    min-width: 0;
-    padding: 1rem 1.1rem;
-    border-radius: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-  }
-
-  &__symbol {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-  }
-
-  &__amount {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: clamp(1.35rem, 4vw, 1.75rem);
-    line-height: 1.15;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+  &__usd {
+    font-size: clamp(2rem, 6vw, 2.75rem);
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
     color: var(--text);
   }
 
-  &__cardMeta {
-    font-size: 0.72rem;
+  &__meta {
+    font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
 
-  &__meta {
+  &__tokens {
+    display: flex;
+    flex-direction: column;
     margin: 0;
-    font-size: 0.85rem;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  &__token {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.75rem 1rem;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid var(--border);
+    }
+  }
+
+  &__avatar {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--success) 14%, var(--surface));
+  }
+
+  &__avatarInitials {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    text-transform: uppercase;
+  }
+
+  &__avatarImg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface);
+  }
+
+  &__avatarChain {
+    z-index: 1;
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+    background: var(--surface);
+  }
+
+  &__tokenNames {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  &__symbol {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__network {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  &__address {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    cursor: pointer;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+
+    &:hover {
+      color: var(--text);
+      background: color-mix(in srgb, var(--success) 12%, var(--surface-muted));
+    }
+  }
+
+  &__tokenValues {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    margin-left: auto;
+    min-width: 0;
+  }
+
+  &__amount {
+    font-size: 0.9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40vw;
+  }
+
+  &__tokenMeta {
+    font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;

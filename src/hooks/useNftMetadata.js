@@ -3,11 +3,15 @@
 import useSWRImmutable from 'swr/immutable'
 import { usePublicClient } from 'wagmi'
 import { hexToString } from 'viem'
-import { resolveStorageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import {
+  LSP4_TOKEN_NAME_KEY,
+  LSP4_METADATA_KEY,
+  decodeVerifiableUri,
+  pickLsp4Image,
+  fetchMetadataJson,
+} from '@/lib/lsp4'
 
-// LSP4 metadata lives in ERC725Y storage — keccak256 data keys per the LSP4 spec
-const LSP4_TOKEN_NAME_KEY = '0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b6ecceaf653468af1'
-const LSP4_METADATA_KEY = '0x9afb95cacc9f95858ec44aa8c3b685511002e30ae54415823f406128b85b238e'
 // LSP8's second metadata mechanism: a collection-wide base URI the token id gets appended
 // to (e.g. Chillwhales), instead of per-token LSP4Metadata (e.g. Dracos)
 const LSP8_TOKEN_METADATA_BASE_URI_KEY = '0x1a7628600c3bac7101f53697f48df381ddc36b9015e7d7c9c5633d1252aa2843'
@@ -50,25 +54,6 @@ const lsp8MetadataAbi = [
   },
 ]
 
-// A VerifiableURI (LSP2) is `0x0000` + bytes4 verification method + bytes2 hash length +
-// hash + utf8 url. Rather than trusting every collection to encode it perfectly, decode the
-// whole payload as text and pull the trailing url out of it.
-const decodeVerifiableUri = (bytes) => {
-  if (!bytes || bytes === '0x') return null
-  let text
-  try {
-    text = hexToString(bytes)
-  } catch {
-    return null
-  }
-  const match = text.match(/(ipfs:\/\/|https?:\/\/|ar:\/\/|data:)[\x20-\x7E]*$/)
-  return match ? match[0] : null
-}
-
-// LSP4Metadata images are size-variant arrays; the first variant of the first image is the
-// canonical one. Icon is the square fallback.
-const pickLsp4Image = (lsp4) => lsp4?.images?.[0]?.[0]?.url || lsp4?.icon?.[0]?.url || null
-
 // Traits come in two dialects: ERC721's [{trait_type, value}] and LSP4's [{key, value, type}].
 // Normalize both to [{label, value}] strings for display.
 const normalizeAttributes = (json, lsp4) => {
@@ -100,17 +85,6 @@ const formatTokenIdForUri = (tokenId, formatBytes) => {
   }
   if (format === 2) return `0x${tokenId.slice(-40)}`
   return tokenId.slice(2)
-}
-
-const fetchMetadataJson = async (uri) => {
-  if (!uri) return null
-  if (uri.startsWith('data:application/json')) {
-    const payload = uri.slice(uri.indexOf(',') + 1)
-    return JSON.parse(uri.includes(';base64') ? atob(payload) : decodeURIComponent(payload))
-  }
-  const response = await fetch(resolveStorageUrl(uri))
-  if (!response.ok) return null
-  return response.json()
 }
 
 const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) => {
