@@ -7,19 +7,28 @@ import styles from './Share.module.scss'
 
 /**
  * Share Interaction Component
+ * Defaults to sharing a post (`item`), but any page can share its own subject by passing
+ * `url`/`title`/`creator` plus a custom `trigger` — the target menu stays identical.
  * @param {Object} props
- * @param {Object} props.item Core content model with network metadata.
+ * @param {Object} [props.item] Core content model with network metadata (post sharing).
+ * @param {string} [props.url] Absolute URL to share instead of the post permalink.
+ * @param {string} [props.title] Share title instead of the post text.
+ * @param {string} [props.creator] Creator wallet when there is no `item`.
+ * @param {import('react').ReactNode} [props.trigger] Custom popover trigger element.
+ * @param {string} [props.copyLabel] Label for the copy-link entry.
+ * @param {string} [props.copiedToast] Toast shown after a successful copy.
  */
-export const Share = ({ item }) => {
-  const shareUrl = `${location.protocol}//${window.location.host}/networks/${item.network_id}/${item.id}`
-  const sharePostTitle = item?.content?.elements?.[0]?.data?.text || item?.content || ''
+export const Share = ({ item, url, title, creator, trigger, copyLabel = 'Copy post link', copiedToast = 'Post link copied' }) => {
+  const shareUrl = url ?? `${location.protocol}//${window.location.host}/networks/${item.network_id}/${item.id}`
+  const sharePostTitle = title ?? (item?.content?.elements?.[0]?.data?.text || item?.content || '')
+  const creatorWallet = item?.wallet_address ?? creator
   const shareHupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
-  const shareContent = `${sharePostTitle}\n\n Creator: ${item.wallet_address} \n\n`
+  const shareContent = `${sharePostTitle}\n\n${creatorWallet ? ` Creator: ${creatorWallet} \n\n` : ''}`
 
   const handleCopyLink = async (close) => {
     try {
       await navigator.clipboard.writeText(shareUrl)
-      toast('Post link copied', 'success')
+      toast(copiedToast, 'success')
     } catch {
       toast('Failed to copy', 'error')
     }
@@ -62,9 +71,11 @@ export const Share = ({ item }) => {
       placement="bottom-end"
       type="auto"
       trigger={
-        <button data-action="share" aria-label="Share post">
-          <UploadSimpleIcon width={17} height={17} />
-        </button>
+        trigger ?? (
+          <button data-action="share" aria-label="Share post">
+            <UploadSimpleIcon width={17} height={17} />
+          </button>
+        )
       }
     >
       {({ close }) => (
@@ -72,7 +83,7 @@ export const Share = ({ item }) => {
           <ul className={styles.share__list}>
             <li>
               <button type="button" className={styles.share__link} onClick={() => handleCopyLink(close)}>
-                <span>Copy post link</span>
+                <span>{copyLabel}</span>
                 <LinkSimpleIcon size={16} />
               </button>
             </li>
