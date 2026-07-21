@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { zeroAddress } from 'viem'
 import { appChains } from '@/config/contracts'
 import { toRelative } from '@/lib/predict'
+import { useProfile } from '@/hooks/useProfile'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import PageTitle from '@/components/PageTitle'
@@ -50,6 +51,20 @@ const formatTokenId = (tokenId) => {
     // Non-numeric (bytes32 hex) — fall through to shortening
   }
   return raw.length > 12 ? `${raw.slice(0, 4)}…${raw.slice(-4)}` : raw
+}
+
+// Inline referral credit — resolves the wallet to a profile name (Universal Profile or
+// local DB) and links to their page; the bare shortened address is only the fallback
+// while loading or when the wallet has no stored name
+const ReferralName = ({ address }) => {
+  const { profile } = useProfile(address)
+  const name = profile?.fullName || (profile?.name && profile.name !== 'new-user' ? profile.name : null)
+
+  return (
+    <Link href={`/${address}`} title={address}>
+      {name || shortAddress(address)}
+    </Link>
+  )
 }
 
 export default function ListingDetail({ networkId, listingId }) {
@@ -308,7 +323,7 @@ export default function ListingDetail({ networkId, listingId }) {
                     )}
                     {hasReferral && (
                       <span>
-                        Referral {shortAddress(trade.referral)} earned {formatStake(trade.referral_amount, decimals) ?? '…'} {symbol}
+                        Referral <ReferralName address={trade.referral} /> earned {formatStake(trade.referral_amount, decimals) ?? '…'} {symbol}
                       </span>
                     )}
                     {explorerUrl && (
