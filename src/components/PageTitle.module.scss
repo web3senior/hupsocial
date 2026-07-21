@@ -3,10 +3,9 @@
 // fixed header: 0.7rem padding x2 + 38px controls, rounded up.
 .pageTitle__spacer {
   height: 4rem;
-
   // Extra breathing room below the fixed header; opt out via paddingTop={false}.
   // Taller spacer, not padding: the border-box reset would swallow padding here.
   &--padded {
-    height: 5rem;
+    height: 4.5rem;
   }
 }
