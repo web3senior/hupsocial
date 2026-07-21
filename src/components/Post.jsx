@@ -404,6 +404,7 @@ const LastCommentShimmer = () => (
 const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const isMounted = useClientMounted()
   const router = useRouter()
   const { setCurrentPost } = usePostStore()
@@ -417,6 +418,8 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
 
   const deletePost = async (e, id) => {
     e.stopPropagation()
+
+    if (isDeleting || isPending || isConfirming) return
 
     if (!isConnected || !address) {
       console.log('Please connect your wallet first', 'error')
@@ -448,14 +451,22 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
       //   return
       // }
 
-      writeContract({
-        abi,
-        address: targetChain.hup,
-        functionName: 'deleteContent',
-        args: [address, id],
-      })
+      setIsDeleting(true)
+
+      writeContract(
+        {
+          abi,
+          address: targetChain.hup,
+          functionName: 'deleteContent',
+          args: [address, id],
+        },
+        {
+          onError: () => setIsDeleting(false),
+        }
+      )
     } catch (err) {
       console.error('Delete failed:', err)
+      setIsDeleting(false)
     }
   }
 
@@ -534,8 +545,8 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
               )}
               {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
                 <li>
-                  <button onClick={(e) => deletePost(e, item.id)}>
-                    <span>Delete</span>
+                  <button onClick={(e) => deletePost(e, item.id)} disabled={isDeleting || isPending || isConfirming}>
+                    <span>{isDeleting || isPending || isConfirming ? 'Deleting…' : 'Delete'}</span>
                     <TrashSimpleIcon size={18} />
                   </button>
                 </li>

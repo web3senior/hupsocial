@@ -470,6 +470,11 @@
     &:hover {
       background-color: var(--surface-muted);
     }
+
+    &:disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
   }
 
   > ul {
