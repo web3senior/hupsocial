@@ -39,8 +39,8 @@ const STATUS_META = {
 
 const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
 
-// ERC721 decimal ids print whole; LSP8 bytes32 ids (or oversized decimals) shorten, with
-// the full value preserved in the cell's title attribute
+// ERC721 decimal ids print whole; LSP8 bytes32 ids (or oversized decimals) shorten to
+// first-4…last-4, with the full value preserved in the cell's title attribute
 const formatTokenId = (tokenId) => {
   const raw = String(tokenId ?? '')
   try {
@@ -49,7 +49,7 @@ const formatTokenId = (tokenId) => {
   } catch {
     // Non-numeric (bytes32 hex) — fall through to shortening
   }
-  return raw.length > 12 ? `${raw.slice(0, 10)}…` : raw
+  return raw.length > 12 ? `${raw.slice(0, 4)}…${raw.slice(-4)}` : raw
 }
 
 export default function ListingDetail({ networkId, listingId }) {
