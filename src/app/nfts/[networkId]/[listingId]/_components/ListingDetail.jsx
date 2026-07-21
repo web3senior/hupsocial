@@ -11,7 +11,7 @@ import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
-import TradeCard from '@/components/TradeCard'
+import TradeCard, { buildAssetLinks } from '@/components/TradeCard'
 import Share from '@/components/ui/Share'
 import { ContentSpinner } from '@/components/Loading'
 import {
@@ -39,6 +39,19 @@ const STATUS_META = {
 
 const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
 
+// ERC721 decimal ids print whole; LSP8 bytes32 ids (or oversized decimals) shorten, with
+// the full value preserved in the cell's title attribute
+const formatTokenId = (tokenId) => {
+  const raw = String(tokenId ?? '')
+  try {
+    const numeric = BigInt(raw)
+    if (numeric < 10n ** 12n) return numeric.toString()
+  } catch {
+    // Non-numeric (bytes32 hex) — fall through to shortening
+  }
+  return raw.length > 12 ? `${raw.slice(0, 10)}…` : raw
+}
+
 export default function ListingDetail({ networkId, listingId }) {
   const router = useRouter()
 
@@ -51,6 +64,7 @@ export default function ListingDetail({ networkId, listingId }) {
   const listing = detail?.data?.listing
   const trades = detail?.data?.trades ?? []
   const postId = detail?.data?.postId ?? null
+  const isLsp8 = Boolean(Number(listing?.is_lsp8))
 
   // Same shape SellNftModal writes into the post's content JSON — TradeCard resolves live
   // price/status/buy actions from it exactly like it does inside a post
@@ -60,7 +74,7 @@ export default function ListingDetail({ networkId, listingId }) {
         chainId,
         collection: listing.collection,
         tokenId: listing.token_id,
-        isLsp8: Boolean(Number(listing.is_lsp8)),
+        isLsp8,
       }
     : null
 
@@ -69,8 +83,9 @@ export default function ListingDetail({ networkId, listingId }) {
     chainId,
     collection: listing?.collection,
     tokenId: listing?.token_id,
-    isLsp8: Boolean(Number(listing?.is_lsp8)),
+    isLsp8,
     enabled: Boolean(listing?.collection && listing?.token_id),
+    imageWidth: 1024,
   })
 
   const { symbol, decimals } = useStakeToken(chainId, listing?.payment_token, Boolean(Number(listing?.is_lsp7)))
@@ -80,7 +95,7 @@ export default function ListingDetail({ networkId, listingId }) {
   if (!listing) {
     return (
       <div className={styles.listing__missing}>
-        <PageTitle name="NFT Market" paddingTop={false} />
+        <PageTitle name="NFT Market" spacer={false} />
         <WarningIcon size={32} />
         <p>This listing doesn&apos;t exist on {chainInfo?.name || `network #${chainId}`} — or the indexer hasn&apos;t caught up yet.</p>
       </div>
@@ -92,97 +107,169 @@ export default function ListingDetail({ networkId, listingId }) {
   const referralBps = Number(listing.referral_bps) || 0
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
   const title = metadata.name || `NFT listing #${listing.listing_id}`
+  const standard = isLsp8 ? 'LSP8' : 'ERC721'
+
+  const { collectionUrl, tokenUrl } = buildAssetLinks({
+    chainId,
+    chainInfo,
+    collection: listing.collection,
+    tokenId: listing.token_id,
+    isLsp8,
+  })
 
   return (
     <div className={`${styles.listing} animate fade`}>
-      {/* Fixed-header + document title carry the NFT's name, like post pages */}
-      <PageTitle name={title} paddingTop={false} />
+      {/* Fixed-header + document title carry the NFT's name; the clearance spacer
+          already renders at page level, outside the container */}
+      <PageTitle name={title} spacer={false} />
       <button type="button" className={styles.listing__back} onClick={() => router.back()}>
         <CaretLeftIcon size={16} />
         Back
       </button>
 
-      <header className={styles.listing__header}>
-        <span className={clsx(styles.listing__badge, styles[`listing__badge--${status.key}`])}>{status.label}</span>
-        <h1 className={styles.listing__title}>{title}</h1>
-
-        <p className={styles.listing__meta}>
-          <span>
-            <TimerIcon size={14} />
-            Listed {toRelative(listing.listed_at)}
-          </span>
-          {chainInfo?.name && (
-            <span>
-              <StorefrontIcon size={14} />
-              {chainInfo.name}
-            </span>
+      <div className={styles.listing__layout}>
+        {/* Media column — the artwork with the live price/buy panel right under it. The
+            compact TradeCard resolves price/status onchain, so the page can never sell on
+            stale indexed terms */}
+        <aside className={styles.listing__media}>
+          {metadata.image ? (
+            tokenUrl ? (
+              <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
+                <img src={metadata.image} alt={title} />
+              </a>
+            ) : (
+              <img src={metadata.image} alt={title} />
+            )
+          ) : (
+            <div className={styles.listing__mediaFallback}>
+              <StorefrontIcon size={48} weight="duotone" />
+            </div>
           )}
-        </p>
 
-        {/* Seller renders through the shared Profile component — avatar hover card, follow
-            affordances, and the profile link included */}
-        <div className={styles.listing__seller}>
-          <small>
-            <UserIcon size={12} />
-            Seller
-          </small>
-          <Profile variant="fullWithoutTime" creator={listing.wallet_address} networkId={chainId} />
-        </div>
-      </header>
+          {cardListing && <TradeCard listing={cardListing} compact showDetailsLink={false} />}
+        </aside>
 
-      {/* The live card — price, status, and buy/cancel resolve from HupTrade onchain, so the
-          page can never sell on stale indexed terms */}
-      {cardListing && <TradeCard listing={cardListing} showDetailsLink={false} />}
+        <div className={styles.listing__info}>
+          <div className={styles.listing__badges}>
+            <span className={clsx(styles.listing__badge, styles[`listing__badge--${status.key}`])}>{status.label}</span>
+            {chainInfo?.name && <span className={styles.listing__chip}>{chainInfo.name}</span>}
+            <span className={styles.listing__chip}>{standard}</span>
+            {referralPercent && (
+              <span className={styles.listing__chip}>
+                <RepeatIcon size={12} />
+                Referral {referralPercent}%
+              </span>
+            )}
+          </div>
 
-      <ul className={styles.listing__facts}>
-        <li>
-          <small>Listed price</small>
-          <strong>
-            {listedPrice ?? '…'} {symbol}
-          </strong>
-        </li>
-        {referralPercent && (
-          <li>
+          {metadata.collectionName &&
+            (collectionUrl ? (
+              <a href={collectionUrl} target="_blank" rel="noopener noreferrer" className={styles.listing__eyebrow}>
+                {metadata.collectionName}
+              </a>
+            ) : (
+              <span className={styles.listing__eyebrow}>{metadata.collectionName}</span>
+            ))}
+
+          <h1 className={styles.listing__title}>{title}</h1>
+
+          <p className={styles.listing__meta}>
+            <span>
+              <TimerIcon size={14} />
+              Listed {toRelative(listing.listed_at)}
+            </span>
+          </p>
+
+          {metadata.description && <p className={styles.listing__description}>{metadata.description}</p>}
+
+          {/* Seller renders through the shared Profile component — avatar hover card, follow
+              affordances, and the profile link included */}
+          <div className={styles.listing__seller}>
             <small>
-              <RepeatIcon size={12} />
-              Referral share
+              <UserIcon size={12} />
+              Seller
             </small>
-            <strong>{referralPercent}%</strong>
-          </li>
-        )}
-        <li>
-          <small>Listing ID</small>
-          <strong>#{listing.listing_id}</strong>
-        </li>
-      </ul>
+            <Profile variant="fullWithoutTime" creator={listing.wallet_address} networkId={chainId} />
+          </div>
 
-      <div className={styles.listing__actions}>
-        {postId && (
-          <Link href={`/networks/${chainId}/${postId}`} className={styles.listing__action}>
-            <ChatCircleIcon size={16} />
-            View post
-          </Link>
-        )}
-        {explorerUrl && listing.tx_hash && (
-          <a href={`${explorerUrl}/tx/${listing.tx_hash}`} target="_blank" rel="noopener noreferrer" className={styles.listing__action}>
-            <ArrowSquareOutIcon size={16} />
-            Listing transaction
-          </a>
-        )}
-        {/* Same target menu a post's share action offers (copy link, X, Telegram, ...) */}
-        <Share
-          url={`${window.location.origin}/nfts/${chainId}/${listing.listing_id}`}
-          title={title}
-          creator={listing.wallet_address}
-          copyLabel="Copy listing link"
-          copiedToast="Listing link copied"
-          trigger={
-            <button type="button" className={styles.listing__action} aria-label="Share listing">
-              <ShareNetworkIcon size={16} />
-              Share
-            </button>
-          }
-        />
+          {metadata.attributes.length > 0 && (
+            <ul className={styles.listing__traits}>
+              {metadata.attributes.map((attr) => (
+                <li key={`${attr.label}:${attr.value}`}>
+                  <small>{attr.label}</small>
+                  <strong title={attr.value}>{attr.value}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <dl className={styles.listing__details}>
+            <div>
+              <dt>Blockchain</dt>
+              <dd>{chainInfo?.name || `Network #${chainId}`}</dd>
+            </div>
+            <div>
+              <dt>Collection address</dt>
+              <dd>
+                {collectionUrl ? (
+                  <a href={collectionUrl} target="_blank" rel="noopener noreferrer">
+                    {shortAddress(listing.collection)}
+                    <ArrowSquareOutIcon size={12} />
+                  </a>
+                ) : (
+                  shortAddress(listing.collection)
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>NFT standard</dt>
+              <dd>{standard}</dd>
+            </div>
+            <div>
+              <dt>Token id</dt>
+              <dd title={String(listing.token_id)}>{formatTokenId(listing.token_id)}</dd>
+            </div>
+            <div>
+              <dt>Listing id</dt>
+              <dd>#{listing.listing_id}</dd>
+            </div>
+            <div>
+              <dt>Listed price</dt>
+              <dd>
+                {listedPrice ?? '…'} {symbol}
+              </dd>
+            </div>
+          </dl>
+
+          <div className={styles.listing__actions}>
+            {postId && (
+              <Link href={`/networks/${chainId}/${postId}`} className={styles.listing__action}>
+                <ChatCircleIcon size={16} />
+                View post
+              </Link>
+            )}
+            {explorerUrl && listing.tx_hash && (
+              <a href={`${explorerUrl}/tx/${listing.tx_hash}`} target="_blank" rel="noopener noreferrer" className={styles.listing__action}>
+                <ArrowSquareOutIcon size={16} />
+                Listing transaction
+              </a>
+            )}
+            {/* Same target menu a post's share action offers (copy link, X, Telegram, ...) */}
+            <Share
+              url={`${window.location.origin}/nfts/${chainId}/${listing.listing_id}`}
+              title={title}
+              creator={listing.wallet_address}
+              copyLabel="Copy listing link"
+              copiedToast="Listing link copied"
+              trigger={
+                <button type="button" className={styles.listing__action} aria-label="Share listing">
+                  <ShareNetworkIcon size={16} />
+                  Share
+                </button>
+              }
+            />
+          </div>
+        </div>
       </div>
 
       <section className={styles.listing__sales} aria-label="Sale records">

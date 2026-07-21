@@ -280,6 +280,20 @@
     }
   }
 
+  // Compact variant: price + action only — the aside spreads into a single full-width row
+  // (price left, action right), like the mobile layout at every width
+  &--compact &__aside {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  &--compact &__price {
+    align-items: flex-start;
+  }
+
   &__skeleton {
     display: block;
     border-radius: 6px;

@@ -31,7 +31,7 @@ const OPENSEA_CHAIN_SLUGS = {
   42220: 'celo',
 }
 
-const buildAssetLinks = ({ chainId, chainInfo, collection, tokenId, isLsp8 }) => {
+export const buildAssetLinks = ({ chainId, chainInfo, collection, tokenId, isLsp8 }) => {
   if (!collection || !tokenId) return { collectionUrl: null, tokenUrl: null }
 
   if (isLsp8) {
@@ -101,8 +101,10 @@ const lsp7Abi = [
  * @param {Object} props.listing The post's nftListing content payload (listingId, chainId, collection, tokenId, isLsp8).
  * @param {string} [props.referral] Reposter credited with the sale when the buyer arrived via a repost.
  * @param {boolean} [props.showDetailsLink] Renders the View button linking to the listing detail page (/nfts/[networkId]/[listingId]); the detail page itself passes false.
+ * @param {boolean} [props.compact] Price/action panel only — no media, name, or traits. For
+ * surfaces that already present the NFT (the listing detail page's media column).
  */
-const TradeCard = ({ listing, referral, showDetailsLink = true }) => {
+const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false }) => {
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const { address } = useConnection()
   const lastActionRef = useRef(null)
@@ -361,64 +363,67 @@ const TradeCard = ({ listing, referral, showDetailsLink = true }) => {
       : null
 
   return (
-    <div className={styles.tradeCard} onClick={(e) => e.stopPropagation()}>
-      <div className={styles.tradeCard__media}>
-        {metadata.image ? (
-          <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
-        ) : (
-          <div className={clsx(styles.tradeCard__mediaFallback, { [styles['tradeCard__mediaFallback--loading']]: isMetaLoading })}>
-            <StorefrontIcon size={26} weight="duotone" />
-          </div>
-        )}
-      </div>
-
-      <div className={styles.tradeCard__info}>
-        {metadata.collectionName ? (
-          collectionUrl ? (
-            <a href={collectionUrl} target="_blank" rel="noopener noreferrer" className={styles.tradeCard__eyebrow}>
-              {metadata.collectionName}
-            </a>
-          ) : (
-            <span className={styles.tradeCard__eyebrow}>{metadata.collectionName}</span>
-          )
-        ) : (
-          <span className={styles.tradeCard__eyebrow}>{isMetaLoading ? '' : 'NFT for sale'}</span>
-        )}
-
-        {isMetaLoading ? (
-          <>
-            <span className={clsx(styles.tradeCard__skeleton, styles['tradeCard__skeleton--title'])} />
-            <span className={clsx(styles.tradeCard__skeleton, styles['tradeCard__skeleton--line'])} />
-          </>
-        ) : (
-          <div className={styles.tradeCard__title}>
-            {tokenUrl ? (
-              <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
-                {metadata.name || 'Unnamed token'}
-              </a>
+    <div className={clsx(styles.tradeCard, { [styles['tradeCard--compact']]: compact })} onClick={(e) => e.stopPropagation()}>
+      {!compact && (
+        <>
+          <div className={styles.tradeCard__media}>
+            {metadata.image ? (
+              <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
             ) : (
-              metadata.name || 'Unnamed token'
+              <div className={clsx(styles.tradeCard__mediaFallback, { [styles['tradeCard__mediaFallback--loading']]: isMetaLoading })}>
+                <StorefrontIcon size={26} weight="duotone" />
+              </div>
             )}
           </div>
-        )}
 
-        {visibleTraits.length > 0 && (
-          <ul className={styles.tradeCard__traits}>
-            {visibleTraits.map((attr) => (
-              <li key={`${attr.label}:${attr.value}`}>
-                <span>{attr.label}</span>
-                <strong>{attr.value}</strong>
-              </li>
-            ))}
-            {hiddenTraits.length > 0 && (
-              <li className={styles.tradeCard__traitsMore} title={hiddenTraits.map((attr) => `${attr.label}: ${attr.value}`).join('\n')}>
-                <strong>+{hiddenTraits.length}</strong>
-              </li>
+          <div className={styles.tradeCard__info}>
+            {metadata.collectionName ? (
+              collectionUrl ? (
+                <a href={collectionUrl} target="_blank" rel="noopener noreferrer" className={styles.tradeCard__eyebrow}>
+                  {metadata.collectionName}
+                </a>
+              ) : (
+                <span className={styles.tradeCard__eyebrow}>{metadata.collectionName}</span>
+              )
+            ) : (
+              <span className={styles.tradeCard__eyebrow}>{isMetaLoading ? '' : 'NFT for sale'}</span>
             )}
-          </ul>
-        )}
 
-      </div>
+            {isMetaLoading ? (
+              <>
+                <span className={clsx(styles.tradeCard__skeleton, styles['tradeCard__skeleton--title'])} />
+                <span className={clsx(styles.tradeCard__skeleton, styles['tradeCard__skeleton--line'])} />
+              </>
+            ) : (
+              <div className={styles.tradeCard__title}>
+                {tokenUrl ? (
+                  <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
+                    {metadata.name || 'Unnamed token'}
+                  </a>
+                ) : (
+                  metadata.name || 'Unnamed token'
+                )}
+              </div>
+            )}
+
+            {visibleTraits.length > 0 && (
+              <ul className={styles.tradeCard__traits}>
+                {visibleTraits.map((attr) => (
+                  <li key={`${attr.label}:${attr.value}`}>
+                    <span>{attr.label}</span>
+                    <strong>{attr.value}</strong>
+                  </li>
+                ))}
+                {hiddenTraits.length > 0 && (
+                  <li className={styles.tradeCard__traitsMore} title={hiddenTraits.map((attr) => `${attr.label}: ${attr.value}`).join('\n')}>
+                    <strong>+{hiddenTraits.length}</strong>
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
 
       <div className={styles.tradeCard__aside}>
         {formattedPrice && (isActive || isSold) && (

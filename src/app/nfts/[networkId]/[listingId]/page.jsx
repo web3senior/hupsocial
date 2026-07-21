@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import PageTitle from '@/components/PageTitle'
 import ListingDetail from './_components/ListingDetail'
 import styles from './page.module.scss'
 
@@ -35,10 +36,16 @@ export default async function Page({ params }) {
   const { networkId, listingId } = await params
 
   return (
-    <div className={styles.page}>
-      <div className={`__container ${styles.page__container}`} data-width="small">
-        <ListingDetail networkId={networkId} listingId={listingId} />
+    <>
+      {/* Header clearance + initial title, like the predict page — the spacer must sit
+          outside the rounded container. ListingDetail re-titles with the NFT's name once
+          metadata loads (its later effect wins), spacerless so the gap never doubles. */}
+      <PageTitle name={`NFT listing #${listingId}`} />
+      <div className={styles.page}>
+        <div className={`__container ${styles.page__container}`} data-width="small">
+          <ListingDetail networkId={networkId} listingId={listingId} />
+        </div>
       </div>
-    </div>
+    </>
   )
 }
