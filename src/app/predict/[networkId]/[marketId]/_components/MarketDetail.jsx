@@ -9,7 +9,7 @@ import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWai
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { OUTCOME_COLORS, marketStatus, parseJsonArray, toRelative } from '@/lib/predict'
+import { marketStatus, outcomeColor, parseJsonArray, toRelative } from '@/lib/predict'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import predictAbi from '@/abis/HupPredict.json'
@@ -27,6 +27,7 @@ import {
   ShareNetworkIcon,
   TimerIcon,
   UserIcon,
+  UsersIcon,
   WarningIcon,
 } from '@phosphor-icons/react'
 import styles from './MarketDetail.module.scss'
@@ -45,7 +46,8 @@ export default function MarketDetail({ networkId, marketId }) {
   const isWrongChain = Boolean(walletChain && address && walletChain.id !== chainId)
 
   const detailKey = `/api/v1/predict/${marketId}?networkId=${chainId}${address ? `&bettor=${address.toLowerCase()}` : ''}`
-  const { data: detail, isLoading, mutate } = useSWR(detailKey, fetcher)
+  // refreshInterval keeps chances/pools/activity live while the page is open
+  const { data: detail, isLoading, mutate } = useSWR(detailKey, fetcher, { refreshInterval: 10000 })
 
   const market = detail?.data?.market
   const status = market ? marketStatus(market) : null
@@ -54,6 +56,9 @@ export default function MarketDetail({ networkId, marketId }) {
   const judges = market ? parseJsonArray(market.judges) : []
   const position = detail?.data?.position ?? []
   const claim = detail?.data?.claim ?? null
+  const holders = detail?.data?.holders ?? []
+  const recentBets = detail?.data?.recentBets ?? []
+  const participantCount = detail?.data?.participantCount ?? 0
 
   const { symbol, decimals } = useStakeToken(chainId, market?.token, Boolean(Number(market?.is_token_lsp7)))
 
@@ -91,6 +96,7 @@ export default function MarketDetail({ networkId, marketId }) {
   const [betOutcome, setBetOutcome] = useState(null)
   const [resolveMode, setResolveMode] = useState(false)
   const [resolveChoice, setResolveChoice] = useState(null)
+  const [infoTab, setInfoTab] = useState('holders')
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const [lastAction, setLastAction] = useState(null)
 
@@ -182,13 +188,12 @@ export default function MarketDetail({ networkId, marketId }) {
         Back
       </button>
 
+      {market.image_cid && (
+        <img className={styles.market__cover} src={resolveStorageImageUrl(market.image_cid, { width: 1200 }) || market.image_cid} alt="" />
+      )}
+
       <header className={styles.market__header}>
-        <div className={styles.market__topRow}>
-          {market.image_cid && (
-            <img className={styles.market__image} src={resolveStorageImageUrl(market.image_cid, { width: 256 }) || market.image_cid} alt="" />
-          )}
-          <span className={clsx(styles.market__badge, styles[`market__badge--${status.key}`])}>{status.label}</span>
-        </div>
+        <span className={clsx(styles.market__badge, styles[`market__badge--${status.key}`])}>{status.label}</span>
         <h1 className={styles.market__title}>{market.title || 'Untitled market'}</h1>
 
         <p className={styles.market__meta}>
@@ -222,8 +227,14 @@ export default function MarketDetail({ networkId, marketId }) {
         {market.description && <p className={styles.market__description}>{market.description}</p>}
 
         <p className={styles.market__volume}>
-          <CurrencyDollarIcon size={20} />
-          Volume: {volume ?? '…'} {symbol}
+          <span>
+            <CurrencyDollarIcon size={20} />
+            Volume: {volume ?? '…'} {symbol}
+          </span>
+          <span className={styles.market__participants}>
+            <UsersIcon size={16} />
+            {participantCount} {participantCount === 1 ? 'bettor' : 'bettors'}
+          </span>
         </p>
 
         {status.key === 'open' && (
@@ -346,6 +357,9 @@ export default function MarketDetail({ networkId, marketId }) {
         {Array.from({ length: Number(market.outcome_count) }, (_, index) => {
           const pool = BigInt(pools[index] ?? '0')
           const share = totalPool > 0n ? Number((pool * 10000n) / totalPool) / 100 : 0
+          // Parimutuel implied payout: the fee-adjusted pot divided by this outcome's pool
+          const distributable = Number(totalPool) * (1 - Number(market.fee_bps) / 10000)
+          const multiplier = pool > 0n ? distributable / Number(pool) : null
           const yourBet = positionByOutcome[index]
           const isWinner = status.key === 'resolved' && Number(market.winning_outcome) === index
           const clickable = (canBet || resolveMode) && !isBusy
@@ -367,7 +381,7 @@ export default function MarketDetail({ networkId, marketId }) {
             >
               <span
                 className={styles.market__outcomeFill}
-                style={{ width: `${share}%`, backgroundColor: OUTCOME_COLORS[index % OUTCOME_COLORS.length] }}
+                style={{ width: `${share}%`, backgroundColor: outcomeColor(index, market.outcome_count) }}
                 aria-hidden
               />
               <span className={styles.market__outcomeBody}>
@@ -387,13 +401,132 @@ export default function MarketDetail({ networkId, marketId }) {
                       {formatStake(yourBet, decimals) ?? '…'} {symbol}
                     </span>
                   )}
-                  {totalPool > 0n && <span className={styles.market__outcomeShare}>{share.toFixed(0)}%</span>}
                 </span>
               </span>
+              {totalPool > 0n && pool > 0n && (
+                <span className={styles.market__chance}>
+                  <strong style={{ color: outcomeColor(index, market.outcome_count) }}>{share.toFixed(share < 10 ? 1 : 0)}%</strong>
+                  {multiplier !== null && ['open', 'awaiting'].includes(status.key) && (
+                    <small>pays ~{multiplier.toFixed(multiplier < 10 ? 2 : 1)}×</small>
+                  )}
+                  {multiplier !== null && status.key === 'resolved' && isWinner && (
+                    <small>paid ~{multiplier.toFixed(multiplier < 10 ? 2 : 1)}×</small>
+                  )}
+                </span>
+              )}
               {(canBet || resolveMode) && <CaretRightIcon size={18} className={styles.market__outcomeChevron} />}
             </button>
           )
         })}
+      </section>
+
+      {/* Polymarket-style breakdown: top holders per outcome, all positions with projected
+          payouts, and the live bet feed — all from the indexed read model */}
+      <section className={styles.market__info}>
+        <div className={styles.market__infoTabs} role="tablist" aria-label="Market breakdown">
+          {[
+            { key: 'holders', label: 'Top Holders' },
+            { key: 'positions', label: 'Positions' },
+            { key: 'activity', label: 'Activity' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={infoTab === tab.key}
+              className={clsx(styles.market__infoTab, infoTab === tab.key && styles['market__infoTab--active'])}
+              onClick={() => setInfoTab(tab.key)}
+              data-label={tab.label}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {holders.length === 0 && <p className={styles.market__infoEmpty}>No bets yet — the breakdown appears with the first stake.</p>}
+
+        {infoTab === 'holders' && holders.length > 0 && (
+          <div className={styles.market__holdersGrid}>
+            {Array.from({ length: Number(market.outcome_count) }, (_, index) => {
+              const outcomeHolders = holders.filter((holder) => Number(holder.outcome) === index).slice(0, 8)
+              if (outcomeHolders.length === 0) return null
+
+              return (
+                <div key={index} className={styles.market__holdersColumn}>
+                  <div className={styles.market__holdersHeader}>
+                    <h3>{outcomes[index]?.label || `Outcome #${index + 1}`} holders</h3>
+                    <small>STAKE</small>
+                  </div>
+                  {outcomeHolders.map((holder) => (
+                    <div key={holder.wallet_address} className={styles.market__personRow}>
+                      <Profile
+                        variant="fullWithoutTime"
+                        creator={holder.wallet_address}
+                        networkId={chainId}
+                        className={styles.market__personProfile}
+                      />
+                      <span className={styles.market__personValue} style={{ color: outcomeColor(index, market.outcome_count) }}>
+                        {formatStake(holder.amount, decimals) ?? '…'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {infoTab === 'positions' && holders.length > 0 && (
+          <div className={styles.market__positions}>
+            {holders.slice(0, 30).map((holder) => {
+              const outcomeIndex = Number(holder.outcome)
+              const pool = Number(pools[outcomeIndex] ?? '0')
+              const distributable = Number(totalPool) * (1 - Number(market.fee_bps) / 10000)
+              // Projected payout if this outcome wins, at the pools as they stand now
+              const toWin = pool > 0 ? (Number(holder.amount) * distributable) / pool : 0
+
+              return (
+                <div key={`${holder.wallet_address}-${holder.outcome}`} className={styles.market__personRow}>
+                  <Profile
+                    variant="fullWithoutTime"
+                    creator={holder.wallet_address}
+                    networkId={chainId}
+                    className={styles.market__personProfile}
+                  />
+                  <span className={styles.market__personOutcome}>{outcomes[outcomeIndex]?.label || `#${outcomeIndex + 1}`}</span>
+                  <span className={styles.market__personMeta}>
+                    {formatStake(holder.amount, decimals) ?? '…'} {symbol}
+                  </span>
+                  {['open', 'awaiting'].includes(status.key) && toWin > 0 && (
+                    <span className={styles.market__personValue}>
+                      to win {formatStake(BigInt(Math.floor(toWin)).toString(), decimals) ?? '…'} {symbol}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {infoTab === 'activity' && recentBets.length > 0 && (
+          <div className={styles.market__positions}>
+            {recentBets.map((bet) => (
+              <div key={bet.tx_hash + bet.amount + bet.outcome} className={styles.market__personRow}>
+                <Profile
+                  variant="fullWithoutTime"
+                  creator={bet.wallet_address}
+                  networkId={chainId}
+                  className={styles.market__personProfile}
+                />
+                <span className={styles.market__personAction}>
+                  bet <strong>{formatStake(bet.amount, decimals) ?? '…'} {symbol}</strong> on{' '}
+                  <strong>{outcomes[Number(bet.outcome)]?.label || `#${Number(bet.outcome) + 1}`}</strong>
+                </span>
+                <span className={styles.market__personMeta}>{toRelative(bet.bet_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {betOutcome !== null && (

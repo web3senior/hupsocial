@@ -37,5 +37,17 @@ export const parseJsonArray = (raw) => {
   }
 }
 
-/** Distinct, screenshot-style pastel fills for outcome rows, cycled by outcome index. */
-export const OUTCOME_COLORS = ['#e8b4a0', '#d8dc8a', '#a8c8e8', '#f0b6d8', '#b8e0c0', '#e0c8f0', '#f0d8a0', '#c0d8d8']
+/**
+ * Outcome colors, assigned by index in fixed order (never re-ranked). The 8-slot
+ * categorical order is CVD-validated (adjacent-pair ΔE, lightness band, chroma floor);
+ * identity never rides on color alone — every fill carries the outcome label directly.
+ */
+export const OUTCOME_COLORS = ['#2a78d6', '#008300', '#e87ba4', '#eda100', '#1baf7a', '#eb6834', '#4a3aa7', '#e34948']
+
+// Two-outcome markets read as yes/no polarity — the green/red pair Polymarket trained
+// everyone on (CVD separation sits in the legal-with-labels band; labels are always on)
+const BINARY_COLORS = ['#008300', '#e34948']
+
+/** Resolves an outcome's color: polarity pair for binary markets, fixed categorical order otherwise. */
+export const outcomeColor = (index, outcomeCount) =>
+  Number(outcomeCount) === 2 ? BINARY_COLORS[index % 2] : OUTCOME_COLORS[index % OUTCOME_COLORS.length]

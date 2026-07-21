@@ -20,17 +20,11 @@
     gap: 0.6rem;
   }
 
-  &__topRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  &__image {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
+  &__cover {
+    width: 100%;
+    aspect-ratio: 3 / 1;
+    max-height: 220px;
+    border-radius: var(--global-border-radius);
     object-fit: cover;
     background: var(--surface-muted, rgba(0, 0, 0, 0.04));
   }
@@ -119,10 +113,23 @@
   &__volume {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 1.25rem;
+    flex-wrap: wrap;
     margin: 0;
     font-size: var(--font-size-16, 1rem);
     font-weight: 600;
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+
+  &__participants {
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 500;
+    color: var(--text-muted, #888);
   }
 
   &__deadline {
@@ -251,7 +258,8 @@
     position: absolute;
     inset: 0 auto 0 0;
     z-index: -1;
-    opacity: 0.55;
+    /* Mid-tone categorical colors at a light tint — labels and the % carry the weight */
+    opacity: 0.22;
     transition: width 0.3s ease;
   }
 
@@ -288,9 +296,26 @@
     }
   }
 
-  &__outcomeShare {
+  &__chance {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    flex-shrink: 0;
     margin-left: auto;
-    color: var(--text-muted, #888);
+
+    strong {
+      font-size: 1.35rem;
+      line-height: 1.1;
+      /* Slight darken keeps the lighter slots (yellow, magenta) readable as text */
+      filter: brightness(0.8);
+    }
+
+    small {
+      font-size: var(--font-size-10, 0.65rem);
+      color: var(--text-muted, #888);
+      white-space: nowrap;
+    }
   }
 
   &__outcomeChevron {
@@ -299,6 +324,144 @@
     border-radius: 50%;
     padding: 0.35rem;
     box-sizing: content-box;
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+
+  &__infoTabs {
+    display: flex;
+    gap: 1.25rem;
+  }
+
+  &__infoTab {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text-muted, #888);
+    padding-bottom: 0.25rem;
+    border-bottom: 2px solid transparent;
+
+    /* Invisible bold twin reserves the active-state width, so toggling
+       font-weight never shifts the row */
+    &::after {
+      content: attr(data-label);
+      font-weight: 700;
+      height: 0;
+      overflow: hidden;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    &--active {
+      color: inherit;
+      font-weight: 700;
+      border-bottom-color: currentColor;
+    }
+  }
+
+  &__infoEmpty {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__holdersGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+  }
+
+  &__holdersColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  &__holdersHeader {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    small {
+      font-size: var(--font-size-10, 0.65rem);
+      letter-spacing: 0.06em;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__positions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__personRow {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--font-size-14, 0.875rem);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  /* The shared Profile component owns avatar/name/address rendering — this only
+     claims the row's flexible space so values right-align */
+  &__personProfile {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__personAction {
+    flex-shrink: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    strong {
+      color: var(--text, inherit);
+      font-weight: 600;
+    }
+  }
+
+  &__personOutcome {
+    flex-shrink: 0;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+  }
+
+  &__personMeta {
+    flex-shrink: 0;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-12);
+  }
+
+  &__personValue {
+    flex-shrink: 0;
+    font-weight: 700;
+    filter: brightness(0.8);
   }
 
   &__missing {

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
 import { TargetIcon } from '@phosphor-icons/react'
-import { OUTCOME_COLORS, marketStatus, parseJsonArray, toRelative } from '@/lib/predict'
+import { marketStatus, outcomeColor, parseJsonArray, toRelative } from '@/lib/predict'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import styles from './PredictCard.module.scss'
 
@@ -64,7 +64,7 @@ export default function PredictCard({ marketRef }) {
             <div key={index} className={styles.predictCard__outcome}>
               <span
                 className={styles.predictCard__outcomeFill}
-                style={{ width: `${share}%`, backgroundColor: OUTCOME_COLORS[index % OUTCOME_COLORS.length] }}
+                style={{ width: `${share}%`, backgroundColor: outcomeColor(index, market.outcome_count) }}
                 aria-hidden
               />
               <span className={styles.predictCard__outcomeLabel}>

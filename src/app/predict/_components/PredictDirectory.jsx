@@ -9,6 +9,7 @@ import { CONTRACTS, appChains } from '@/config/contracts'
 import CreateMarketDialog from '@/components/CreateMarketDialog'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import { marketStatus, parseJsonArray, toRelative } from '@/lib/predict'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { MagnifyingGlassIcon, PlusIcon, ScalesIcon, TargetIcon, UsersIcon } from '@phosphor-icons/react'
 import styles from './PredictDirectory.module.scss'
 
@@ -91,6 +92,9 @@ export default function PredictDirectory() {
               aria-selected={scope === option.key}
               className={clsx(styles.directory__toggleButton, scope === option.key ? styles['directory__toggleButton--active'] : null)}
               onClick={() => setScope(option.key)}
+              // data-label feeds the hidden bold ::after that reserves the active width,
+              // so toggling bold never shifts the row
+              data-label={option.label}
             >
               {option.label}
             </button>
@@ -156,27 +160,39 @@ export default function PredictDirectory() {
               <span className={styles.directory__network}>{chainName(market.network_id)}</span>
             </div>
 
-            <h3 className={styles.directory__title}>{market.title || 'Untitled market'}</h3>
-
-            <p className={styles.directory__meta}>
-              <span>{market.display_name || shortWallet(market.wallet_address)}</span>
-              <span>{toRelative(market.opened_at)}</span>
-              {status.key === 'open' && <span>closes {toRelative(market.betting_deadline)}</span>}
-            </p>
-
-            <p className={styles.directory__stats}>
-              <MarketVolume market={market} />
-              <span className={styles.directory__outcomes}>
-                <UsersIcon size={12} />
-                {outcomes.length || market.outcome_count} outcomes
-              </span>
-              {status.key === 'resolved' && market.winning_outcome !== null && (
-                <span className={styles.directory__winner}>
-                  <ScalesIcon size={12} />
-                  {outcomes[Number(market.winning_outcome)]?.label || `Outcome #${Number(market.winning_outcome) + 1}`}
-                </span>
+            <div className={styles.directory__cardBody}>
+              {market.image_cid && (
+                <img
+                  className={styles.directory__thumb}
+                  src={resolveStorageImageUrl(market.image_cid, { width: 128 }) || market.image_cid}
+                  alt=""
+                />
               )}
-            </p>
+              <div className={styles.directory__cardMain}>
+                <h3 className={styles.directory__title}>{market.title || 'Untitled market'}</h3>
+
+                <p className={styles.directory__meta}>
+                  <span>{market.display_name || shortWallet(market.wallet_address)}</span>
+                  <span>{toRelative(market.opened_at)}</span>
+                  {status.key === 'open' && <span>closes {toRelative(market.betting_deadline)}</span>}
+                </p>
+
+                <p className={styles.directory__stats}>
+                  <MarketVolume market={market} />
+                  <span className={styles.directory__outcomes}>
+                    <UsersIcon size={12} />
+                    {market.bettor_count ?? 0} {Number(market.bettor_count) === 1 ? 'bettor' : 'bettors'}
+                  </span>
+                  <span className={styles.directory__outcomes}>{outcomes.length || market.outcome_count} outcomes</span>
+                  {status.key === 'resolved' && market.winning_outcome !== null && (
+                    <span className={styles.directory__winner}>
+                      <ScalesIcon size={12} />
+                      {outcomes[Number(market.winning_outcome)]?.label || `Outcome #${Number(market.winning_outcome) + 1}`}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
           </Link>
         )
       })}

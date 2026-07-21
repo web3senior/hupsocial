@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { isAddress, parseEventLogs, zeroAddress } from 'viem'
-import { useConnection, usePublicClient, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
@@ -82,6 +82,18 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
       ? trimmedCustomToken
       : null
   const isTokenLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
+
+  // Live protocol fee from the chain's contract, so the notice shows the real number
+  // that will be snapshotted into this market
+  const { data: feeBpsValue } = useReadContract({
+    abi: predictAbi,
+    address: predictAddress || undefined,
+    functionName: 'predictFeeBps',
+    chainId,
+    query: { enabled: Boolean(predictAddress) },
+  })
+  const feeLabel =
+    feeBpsValue !== undefined ? `${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(Number(feeBpsValue) / 100)}%` : null
 
   useImperativeHandle(ref, () => ({
     open: () => dialogRef.current?.open(),
@@ -439,7 +451,8 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
           </div>
 
           <p className={styles.marketDialog__notice}>
-            Creating a market is free. A small protocol fee is taken from the pot only when the market resolves — refunds are always in full.
+            Creating a market is free. {feeLabel ? `A ${feeLabel} protocol fee` : 'A small protocol fee'} is taken from the pot only when the
+            market resolves — refunds are always in full.
           </p>
 
           <button type="submit" disabled={isBusy || !predictAddress || isWrongChain} className={styles.marketDialog__submit}>

@@ -92,6 +92,24 @@ export async function GET(request) {
 
     await fulfillUniversalProfiles(markets, pool)
 
+    // Distinct-bettor counts for just this page, joined in JS — a select-list subquery
+    // would run for every row before the sort/limit (see the posts feed query shape)
+    if (markets.length > 0) {
+      const tuples = markets.map(() => '(?, ?)').join(', ')
+      const tupleArgs = markets.flatMap((market) => [market.network_id, market.market_id])
+      const [counts] = await pool.execute(
+        `SELECT network_id, market_id, COUNT(DISTINCT bettor) AS bettors
+         FROM market_bets
+         WHERE (network_id, market_id) IN (${tuples})
+         GROUP BY network_id, market_id`,
+        tupleArgs,
+      )
+      const countByKey = Object.fromEntries(counts.map((row) => [`${row.network_id}-${row.market_id}`, Number(row.bettors)]))
+      for (const market of markets) {
+        market.bettor_count = countByKey[`${market.network_id}-${market.market_id}`] ?? 0
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: markets,

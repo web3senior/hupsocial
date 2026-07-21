@@ -45,7 +45,7 @@ export async function GET(request, { params }) {
     const market = rows[0]
     await fulfillUniversalProfiles([market], pool)
 
-    // Distinct backers per outcome + the recent bet feed (newest first)
+    // Recent bet feed (newest first) — the Activity tab
     const [recentBets] = await pool.execute(
       `SELECT b.bettor AS wallet_address, b.outcome, CAST(b.amount AS CHAR) AS amount, b.bet_at, b.tx_hash,
               u.name AS display_name, u.profileImage AS profile_image
@@ -53,7 +53,7 @@ export async function GET(request, { params }) {
        LEFT JOIN users u ON u.wallet_address = b.bettor
        WHERE b.network_id = ? AND b.market_id = ?
        ORDER BY b.block_number DESC, b.log_index DESC
-       LIMIT 20`,
+       LIMIT 30`,
       [networkId, marketId],
     )
     await fulfillUniversalProfiles(recentBets, pool)
@@ -65,6 +65,28 @@ export async function GET(request, { params }) {
        GROUP BY outcome`,
       [networkId, marketId],
     )
+
+    const [[participants]] = await pool.execute(
+      `SELECT COUNT(DISTINCT bettor) AS total
+       FROM market_bets
+       WHERE network_id = ? AND market_id = ?`,
+      [networkId, marketId],
+    )
+
+    // Aggregated (bettor, outcome) stakes, largest first — feeds both the Top Holders
+    // columns and the Positions tab clientside
+    const [holders] = await pool.execute(
+      `SELECT b.bettor AS wallet_address, b.outcome, CAST(SUM(b.amount) AS CHAR) AS amount,
+              u.name AS display_name, u.profileImage AS profile_image
+       FROM market_bets b
+       LEFT JOIN users u ON u.wallet_address = b.bettor
+       WHERE b.network_id = ? AND b.market_id = ?
+       GROUP BY b.bettor, b.outcome, u.name, u.profileImage
+       ORDER BY SUM(b.amount) DESC
+       LIMIT 200`,
+      [networkId, marketId],
+    )
+    await fulfillUniversalProfiles(holders, pool)
 
     // The viewer's aggregated position and claim record, when a wallet was supplied
     let position = null
@@ -95,6 +117,8 @@ export async function GET(request, { params }) {
         market,
         recentBets,
         bettorCounts,
+        participantCount: Number(participants?.total ?? 0),
+        holders,
         position,
         claim,
       },

@@ -22,9 +22,23 @@
   &__toggleButton {
     all: unset;
     cursor: pointer;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
     padding: 0.3rem 0.75rem;
     border-radius: 999px;
     font-size: var(--font-size-12);
+
+    /* Invisible bold twin reserves the active-state width, so toggling
+       font-weight never shifts the row */
+    &::after {
+      content: attr(data-label);
+      font-weight: 600;
+      height: 0;
+      overflow: hidden;
+      visibility: hidden;
+      pointer-events: none;
+    }
 
     &--active {
       background: var(--surface);
@@ -108,6 +122,29 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+  }
+
+  &__cardBody {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  &__cardMain {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__thumb {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border-radius: calc(var(--global-border-radius) / 2);
+    object-fit: cover;
+    background: var(--surface-muted, rgba(0, 0, 0, 0.04));
   }
 
   &__badge {

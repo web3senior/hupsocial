@@ -91,7 +91,8 @@
     position: absolute;
     inset: 0 auto 0 0;
     z-index: -1;
-    opacity: 0.5;
+    /* Mid-tone categorical colors at a light tint — the label carries identity */
+    opacity: 0.22;
   }
 
   &__outcomeLabel {
