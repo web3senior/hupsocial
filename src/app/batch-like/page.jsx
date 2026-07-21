@@ -134,7 +134,7 @@ export default function Page() {
     <>
       <PageTitle name="Batch Like Basket" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           {networkIds.length === 0 ? (
             <div className={styles.emptyState}>
               <HeartIcon size={48} className={styles.emptyIcon} />
