@@ -154,10 +154,10 @@
     height: auto;
     max-width: 100%;
     max-height: 550px;
-    /* The box keeps the clamped feed ratio (no layout shift); cover crops the
-       overflow instead of letterboxing it — the lightbox shows the original. */
+    /* The box matches the media's natural ratio, so the whole image is
+       visible with no crop or letterbox; max-height bounds very tall assets. */
     aspect-ratio: var(--media-ratio, auto);
-    object-fit: cover;
+    object-fit: contain;
   }
 }
 

@@ -6,14 +6,11 @@ import { ArrowLeftIcon, ArrowRightIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon
 import styles from './Gallery.module.scss'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 
-// Clamp to Twitter/Instagram-style bounds so a single very tall or very wide
-// asset can't blow out the feed layout while still reserving accurate space.
-const MIN_ASPECT_RATIO = 0.56 // 9:16 portrait
-const MAX_ASPECT_RATIO = 1.91 // widescreen landscape
-
+// Reserve the media's natural ratio so the whole image is always visible
+// (X-style, no cropping); max-height in CSS keeps very tall assets in check.
 const getAspectRatio = (item) => {
   if (item?.width && item?.height) {
-    return Math.min(MAX_ASPECT_RATIO, Math.max(MIN_ASPECT_RATIO, item.width / item.height))
+    return item.width / item.height
   }
   // Unknown dimensions: let the media size itself naturally after load
   return null
