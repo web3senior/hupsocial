@@ -350,8 +350,8 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
   const isUnavailable = isActive && isPurchasable === false
 
   const isMetaLoading = metadata.isLoading && !metadata.name
-  const visibleTraits = metadata.attributes.slice(0, 5)
-  const hiddenTraits = metadata.attributes.slice(5)
+  const visibleTraits = metadata.attributes.slice(0, 4)
+  const hiddenTraits = metadata.attributes.slice(4)
 
   // Surface the seller-set referral share as a concrete number so reposters know what a
   // conversion pays them
