@@ -154,8 +154,10 @@
     height: auto;
     max-width: 100%;
     max-height: 550px;
-    aspect-ratio: var(--media-ratio, 1);
-    object-fit: contain;
+    /* The box keeps the clamped feed ratio (no layout shift); cover crops the
+       overflow instead of letterboxing it — the lightbox shows the original. */
+    aspect-ratio: var(--media-ratio, auto);
+    object-fit: cover;
   }
 }
 

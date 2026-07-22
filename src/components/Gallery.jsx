@@ -15,7 +15,8 @@ const getAspectRatio = (item) => {
   if (item?.width && item?.height) {
     return Math.min(MAX_ASPECT_RATIO, Math.max(MIN_ASPECT_RATIO, item.width / item.height))
   }
-  return 1
+  // Unknown dimensions: let the media size itself naturally after load
+  return null
 }
 
 // Persisted sound preferences shared by every gallery instance
@@ -338,7 +339,7 @@ export default function MediaGallery({ data = [] }) {
               >
                 <div
                   className={styles.mediaItem}
-                  style={!isCarousel ? { '--media-ratio': getAspectRatio(item) } : undefined}
+                  style={!isCarousel && getAspectRatio(item) ? { '--media-ratio': getAspectRatio(item) } : undefined}
                   onClick={(e) => { e.stopPropagation(); openLightbox(i) }}
                 >
                   {renderMedia(item, i)}
