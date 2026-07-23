@@ -126,7 +126,15 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
   const featuredValue = featured ? featuredFeeValue ?? 0n : 0n
 
   useImperativeHandle(ref, () => ({
-    open: () => dialogRef.current?.open(),
+    open: () => {
+      // Follow the wallet: opening with the wallet on a predict-deployed chain targets
+      // that chain, so the network-mismatch banner only appears when the wallet sits
+      // somewhere predict actually isn't
+      if (!fixedChainId && walletChain?.id && CONTRACTS[`chain${walletChain.id}`]?.predict) {
+        setChainId(walletChain.id)
+      }
+      dialogRef.current?.open()
+    },
     close: () => dialogRef.current?.close(),
   }))
 
