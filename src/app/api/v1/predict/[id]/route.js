@@ -27,12 +27,14 @@ export async function GET(request, { params }) {
     const [rows] = await pool.execute(
       `SELECT
          m.network_id, m.market_id, m.creator AS wallet_address, m.token, m.is_token_lsp7,
-         m.betting_deadline, m.closed_at, m.outcome_count, m.winning_outcome, m.state, m.fee_bps,
-         m.hidden, CAST(m.total_pool AS CHAR) AS total_pool, m.outcome_pools, m.judges,
+         m.betting_opens_at, m.betting_deadline, m.closed_at, m.outcome_count, m.winning_outcome, m.state, m.fee_bps, m.creator_fee_bps, m.featured,
+         m.hidden, m.category, mc.label AS category_label, mc.emoji AS category_emoji,
+         CAST(m.total_pool AS CHAR) AS total_pool, m.outcome_pools, m.judges, m.judges_confirmed,
          m.metadata_cid, m.title, m.description, m.outcome_labels, m.image_cid, m.tx_hash,
          m.opened_at, u.name AS display_name, u.profileImage AS profile_image
        FROM markets m
        LEFT JOIN users u ON u.wallet_address = m.creator
+       LEFT JOIN market_categories mc ON mc.slug = m.category
        WHERE m.network_id = ? AND m.market_id = ?
        LIMIT 1`,
       [networkId, marketId],

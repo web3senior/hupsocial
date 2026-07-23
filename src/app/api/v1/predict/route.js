@@ -18,12 +18,18 @@ const MARKET_COLUMNS = `
   m.creator AS wallet_address,
   m.token,
   m.is_token_lsp7,
+  m.betting_opens_at,
   m.betting_deadline,
   m.closed_at,
   m.outcome_count,
   m.winning_outcome,
   m.state,
   m.fee_bps,
+  m.creator_fee_bps,
+  m.category,
+  mc.label AS category_label,
+  mc.emoji AS category_emoji,
+  m.featured,
   CAST(m.total_pool AS CHAR) AS total_pool,
   m.outcome_pools,
   m.judges,
@@ -41,10 +47,12 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
 
-    const scope = ['open', 'closed', 'settled', 'mine'].includes(searchParams.get('scope'))
+    const scope = ['open', 'upcoming', 'closed', 'settled', 'mine'].includes(searchParams.get('scope'))
       ? searchParams.get('scope')
       : 'open'
     const networkId = parseInt(searchParams.get('networkId')) || null
+    // Slug-shaped only — the value came from the categories endpoint, but never trust the wire
+    const category = /^[a-z0-9-]{1,40}$/.test(searchParams.get('category') || '') ? searchParams.get('category') : null
     const participant = (searchParams.get('participant') || '').toLowerCase() || null
     const q = (searchParams.get('q') || '').trim().slice(0, 100) || null
     const page = parseInt(searchParams.get('page')) || 1
@@ -53,6 +61,9 @@ export async function GET(request) {
 
     const networkFilter = networkId ? 'AND m.network_id = ?' : ''
     const networkArgs = networkId ? [networkId] : []
+
+    const categoryFilter = category ? 'AND m.category = ?' : ''
+    const categoryArgs = category ? [category] : []
 
     const searchFilter = q ? 'AND (m.title LIKE ? OR m.description LIKE ?)' : ''
     const searchArgs = q ? [`%${q}%`, `%${q}%`] : []
@@ -63,7 +74,9 @@ export async function GET(request) {
     let scopeFilter = ''
     let scopeArgs = []
     if (scope === 'open') {
-      scopeFilter = 'AND m.state = 0 AND m.betting_deadline > UNIX_TIMESTAMP()'
+      scopeFilter = 'AND m.state = 0 AND m.betting_deadline > UNIX_TIMESTAMP() AND m.betting_opens_at <= UNIX_TIMESTAMP()'
+    } else if (scope === 'upcoming') {
+      scopeFilter = 'AND m.state = 0 AND m.betting_opens_at > UNIX_TIMESTAMP()'
     } else if (scope === 'closed') {
       scopeFilter = 'AND (m.state = 1 OR (m.state = 0 AND m.betting_deadline <= UNIX_TIMESTAMP()))'
     } else if (scope === 'settled') {
@@ -81,10 +94,11 @@ export async function GET(request) {
       `SELECT ${MARKET_COLUMNS}
        FROM markets m
        LEFT JOIN users u ON u.wallet_address = m.creator
-       WHERE m.hidden = 0 AND m.metadata_fetched = 1 ${networkFilter} ${searchFilter} ${scopeFilter}
-       ORDER BY m.opened_at DESC, m.market_id DESC
+       LEFT JOIN market_categories mc ON mc.slug = m.category
+       WHERE m.hidden = 0 AND m.metadata_fetched = 1 ${networkFilter} ${categoryFilter} ${searchFilter} ${scopeFilter}
+       ORDER BY m.featured DESC, m.opened_at DESC, m.market_id DESC
        LIMIT ? OFFSET ?`,
-      [...networkArgs, ...searchArgs, ...scopeArgs, limit + 1, offset],
+      [...networkArgs, ...categoryArgs, ...searchArgs, ...scopeArgs, limit + 1, offset],
     )
 
     const hasMore = rows.length > limit
@@ -92,11 +106,33 @@ export async function GET(request) {
 
     await fulfillUniversalProfiles(markets, pool)
 
-    // Distinct-bettor counts for just this page, joined in JS — a select-list subquery
-    // would run for every row before the sort/limit (see the posts feed query shape)
-    if (markets.length > 0) {
-      const tuples = markets.map(() => '(?, ?)').join(', ')
-      const tupleArgs = markets.flatMap((market) => [market.network_id, market.market_id])
+    // Featured strip for the directory header — page 1 of the open scope only. Featured
+    // rows also stay in the main list payload; the client renders the strip above it and
+    // filters the strip's markets out of the list so nothing shows twice.
+    let featured
+    if (page === 1 && scope === 'open') {
+      const [featuredRows] = await pool.execute(
+        `SELECT ${MARKET_COLUMNS}
+         FROM markets m
+         LEFT JOIN users u ON u.wallet_address = m.creator
+         LEFT JOIN market_categories mc ON mc.slug = m.category
+         WHERE m.featured = 1 AND m.hidden = 0 AND m.metadata_fetched = 1 AND m.state = 0
+           AND m.betting_deadline > UNIX_TIMESTAMP() ${networkFilter} ${categoryFilter}
+         ORDER BY m.opened_at DESC, m.market_id DESC
+         LIMIT 10`,
+        [...networkArgs, ...categoryArgs],
+      )
+      await fulfillUniversalProfiles(featuredRows, pool)
+      featured = featuredRows
+    }
+
+    // Distinct-bettor counts for just this page (and the featured strip), joined in JS —
+    // a select-list subquery would run for every row before the sort/limit (see the posts
+    // feed query shape)
+    const countTargets = [...markets, ...(featured ?? [])]
+    if (countTargets.length > 0) {
+      const tuples = countTargets.map(() => '(?, ?)').join(', ')
+      const tupleArgs = countTargets.flatMap((market) => [market.network_id, market.market_id])
       const [counts] = await pool.execute(
         `SELECT network_id, market_id, COUNT(DISTINCT bettor) AS bettors
          FROM market_bets
@@ -105,7 +141,7 @@ export async function GET(request) {
         tupleArgs,
       )
       const countByKey = Object.fromEntries(counts.map((row) => [`${row.network_id}-${row.market_id}`, Number(row.bettors)]))
-      for (const market of markets) {
+      for (const market of countTargets) {
         market.bettor_count = countByKey[`${market.network_id}-${market.market_id}`] ?? 0
       }
     }
@@ -114,7 +150,7 @@ export async function GET(request) {
       success: true,
       data: markets,
       nextPage: hasMore ? page + 1 : null,
-      meta: { page, count: markets.length, hasMore },
+      meta: { page, count: markets.length, hasMore, ...(featured ? { featured } : {}) },
     })
   } catch (error) {
     console.error('[GET_PREDICT_ERROR]:', error.message)
