@@ -256,8 +256,11 @@
       width: 76px;
     }
 
+    // The row must be able to wrap — price + View + Buy are all nowrap pills, and
+    // without this the last button gets pushed past the screen edge on small phones
     &__aside {
       flex-direction: row;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       width: 100%;
@@ -268,9 +271,12 @@
       align-items: flex-start;
     }
 
+    // Growing buttons turn a wrapped line into a full-width action instead of a
+    // stray left-aligned pill
     &__buy,
     &__cancelListing,
     &__view {
+      flex: 1 0 auto;
       padding-block: 0.65rem;
     }
 
