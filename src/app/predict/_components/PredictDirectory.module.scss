@@ -47,12 +47,19 @@
     }
   }
 
+  /* Full-width basis claims a whole row of the wrapping toolbar for search + help */
+  &__searchRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 100%;
+  }
+
   &__search {
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    /* Full-width basis claims a whole row of the wrapping toolbar for the search */
-    flex: 1 1 100%;
+    flex: 1;
     padding-block: 0.45rem;
     border: 1px solid var(--border);
     border-radius: 999px;

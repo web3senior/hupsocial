@@ -212,20 +212,21 @@ export default function PredictDirectory() {
           New market
         </button>
 
-        <HowPredictWorks />
-
-        {/* Full-width basis pushes the search onto its own row under the tabs */}
-        <div className={styles.directory__search}>
-          <MagnifyingGlassIcon size={14} />
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search markets"
-            aria-label="Search markets"
-            autoComplete="off"
-            spellCheck={false}
-          />
+        {/* Full-width basis pushes search + help onto their own row under the tabs */}
+        <div className={styles.directory__searchRow}>
+          <div className={styles.directory__search}>
+            <MagnifyingGlassIcon size={14} />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search markets"
+              aria-label="Search markets"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <HowPredictWorks />
         </div>
       </div>
 
