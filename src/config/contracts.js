@@ -46,7 +46,7 @@ export const CONTRACTS = {
     tipper: '0x9a8Daf359280eb03D734530992691888fA33D476',
     trade: '0x7eb333Ad710d398A38c45d49A6A96568c8276b5f',
     events: '',
-    predict: '',
+    predict: '0xc77372d05ccc2d30938aa58686671625769f88bd',
   },
   chain42: {
     name: 'lukso',
