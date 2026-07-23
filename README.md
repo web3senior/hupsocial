@@ -416,3 +416,16 @@ If the user has no valid subscription, the relayer rejects the request off-chain
 ## What stays free
 
 Direct contract interaction bypasses the relayer entirely, so technically the protocol always remains open. Subscription would gate the **app experience** (meta-tx relay, IPFS pinning, push notifications, etc.), not the raw protocol.
+# HupPredict Security Model
+
+HupPredict escrows real stakes, so its trust posture is stricter than the other Hup extensions:
+
+1. **Escrow is not withdrawable — by anyone.** The contract has no `withdrawAll`. The admin can only sweep `accruedFees`, a ledger that grows exclusively from the platform fee at resolution. Market creators earn a separate creator fee into `creatorFees`, a per-creator pull-based ledger only they can claim (`claimCreatorFees`). Bettors' pools never enter either ledger, and the combined fee rate (platform + creator) is hard-capped at 10% and snapshotted per market at creation.
+
+2. **The exits are pause-immune.** `claim()`, `claimCreatorFees()`, `enableRefunds()`, and `renounceJudge()` carry no `whenNotPaused`. Whatever happens — paused contract, vanished judges, compromised admin — once the resolve window lapses, anyone can flip an unresolved market to Refunding and every bettor reclaims their full stake, fee-free. No sequence of admin actions can strand escrowed money.
+
+3. **Market-control actions require direct signatures.** `resolve`, `confirmJudging`, `closeBetting`, `cancelMarket`, and `renounceJudge` read raw `msg.sender` — burner sessions and ERC2771 meta-transactions are deliberately not honored. A compromised session source or trusted forwarder therefore cannot fake a verdict, consent, closure, or cancellation. Only the convenience paths (`createMarket`, `placeBet`, `claim`) support sessions, and each can only move funds to or from the rightful owner.
+
+4. **Judges must consent onchain.** Being named a judge attaches a name but no power; only calling `confirmJudging` — with the judge's own key — grants the ability to act. Judges can step down at any time, and the last judge leaving a funded market opens refunds immediately.
+
+Residual trust assumptions: the `ADMIN_ROLE` holder can pause new activity, change fees for future markets, adjust the resolve window within 1–90 days, and moderate market visibility. Holding that role with a multisig or timelock is the recommended posture.

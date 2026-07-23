@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.35;
+pragma solidity ^0.8.36;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -62,8 +62,13 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
     /// @notice Maps market id to its judge panel (any listed judge can close/resolve/cancel)
     mapping(uint256 => address[]) private _judges;
 
-    /// @notice Maps market id to judge address to membership, for O(1) authorization checks
+    /// @notice Maps market id to judge address to panel membership (pending or confirmed)
     mapping(uint256 => mapping(address => bool)) public isJudge;
+
+    /// @notice Maps market id to judge address to role acceptance. Listing attaches a name;
+    ///         only confirming grants power — unconfirmed judges cannot close, resolve, or
+    ///         cancel, so nobody judges a market they never agreed to.
+    mapping(uint256 => mapping(address => bool)) public judgeConfirmed;
 
     /// @notice Maps market id to outcome id to that outcome's pool
     mapping(uint256 => mapping(uint8 => uint256)) public outcomePools;
@@ -85,10 +90,28 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
     ///         with the right standard without trusting an admin-supplied flag
     mapping(address => bool) public isLsp7Token;
 
+    /// @notice True once a token's standard was proven by a successful stake transfer. Locking
+    ///         on proof (not on creation) means a wrong flag can never stick — it would have
+    ///         reverted the transfer — and nobody can poison a token by front-registering it.
+    mapping(address => bool) private _tokenTypeLocked;
+
     mapping(address => bool) public trustedForwarders;
 
-    /// @notice Protocol fee in basis points snapshotted into newly created markets (100 = 1%)
-    uint256 public predictFeeBps = 200;
+    /// @notice Platform fee in basis points snapshotted into newly created markets (100 = 1%)
+    uint256 public predictFeeBps = 100;
+
+    /// @notice Creator fee in basis points snapshotted into newly created markets (100 = 1%).
+    ///         Taken from resolved pots only — canceled and refunded markets pay no fees, so
+    ///         cancellation is never profitable for a creator.
+    uint256 public creatorFeeBps = 100;
+
+    /// @notice Maps creator to stake token to their claimable accrued creator fees. A separate
+    ///         pull-based ledger like accruedFees, so escrowed pools are never touched.
+    mapping(address => mapping(address => uint256)) public creatorFees;
+
+    /// @notice Surcharge (in native wei) for the featured tier — paid at creation or via
+    ///         upgradeToFeatured. Accrues to the fee ledger, never to the escrowed pools.
+    uint256 public featuredFee = 0;
 
     /// @notice How long judges have to resolve after betting ends before anyone can enable
     ///         refunds. Applies from closedAt when betting was closed early, otherwise from the
@@ -138,16 +161,23 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         address _owner,
         address _token,
         bool _isTokenLsp7,
+        uint64 _bettingOpensAt,
         uint64 _bettingDeadline,
         uint8 _outcomeCount,
+        bool _featured,
         address[] calldata _judgeList,
         string calldata _metadata
-    ) external whenNotPaused returns (uint256 marketId) {
+    ) external payable whenNotPaused returns (uint256 marketId) {
+        // Creation itself stays free; the only payment ever due here is the featured surcharge
+        if (msg.value != (_featured ? featuredFee : 0)) revert InsufficientFee();
         if (bytes(_metadata).length == 0) revert InvalidMetadata();
         if (bytes(_metadata).length > maxMetadataBytes) {
             revert MetadataTooLarge(bytes(_metadata).length, maxMetadataBytes);
         }
         if (_bettingDeadline <= block.timestamp) revert InvalidDeadline();
+        // A future open time carves an upcoming phase out of the window; it must leave
+        // room to actually bet. Past or zero open times mean betting starts immediately.
+        if (_bettingOpensAt >= _bettingDeadline) revert InvalidDeadline();
         if (_outcomeCount < 2 || _outcomeCount > MAX_OUTCOME_COUNT) revert InvalidOutcomeCount();
         if (_judgeList.length > MAX_JUDGES) revert InvalidJudges();
 
@@ -155,7 +185,14 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         bool isTokenLsp7 = _token != address(0) && _isTokenLsp7;
 
         if (_token != address(0)) {
-            isLsp7Token[_token] = isTokenLsp7;
+            // Once the standard is proven (first successful bet), conflicting markets are
+            // rejected outright instead of being born unbettable; before proof the flag is
+            // just a hint the first working transfer will confirm or correct
+            if (_tokenTypeLocked[_token]) {
+                if (isLsp7Token[_token] != isTokenLsp7) revert TokenStandardMismatch();
+            } else {
+                isLsp7Token[_token] = isTokenLsp7;
+            }
         }
 
         marketId = nextMarketId++;
@@ -164,21 +201,26 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
             creator: creator,
             token: _token,
             isTokenLsp7: isTokenLsp7,
+            bettingOpensAt: _bettingOpensAt,
             bettingDeadline: _bettingDeadline,
             closedAt: 0,
             outcomeCount: _outcomeCount,
             winningOutcome: 0,
             state: MarketState.Open,
             feeBps: uint16(predictFeeBps),
+            creatorFeeBps: uint16(creatorFeeBps),
+            featured: _featured,
             hidden: false,
             totalPool: 0,
             metadata: _metadata
         });
 
-        // An empty panel defaults to the creator judging their own market — the screenshot case
+        // An empty panel defaults to the creator judging their own market — the screenshot case.
+        // Creating a market is consent: the creator self-confirms; everyone else starts pending.
         if (_judgeList.length == 0) {
             _judges[marketId].push(creator);
             isJudge[marketId][creator] = true;
+            judgeConfirmed[marketId][creator] = true;
         } else {
             for (uint256 i = 0; i < _judgeList.length; i++) {
                 address judge = _judgeList[i];
@@ -187,10 +229,19 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
 
                 _judges[marketId].push(judge);
                 isJudge[marketId][judge] = true;
+                if (judge == creator) judgeConfirmed[marketId][judge] = true;
             }
         }
 
-        emit MarketCreated(marketId, creator, _token, isTokenLsp7, _bettingDeadline, _outcomeCount, uint16(predictFeeBps), _judges[marketId], _metadata);
+        emit MarketCreated(marketId, creator, _token, isTokenLsp7, _bettingOpensAt, _bettingDeadline, _outcomeCount, uint16(predictFeeBps), uint16(creatorFeeBps), _judges[marketId], _metadata);
+
+        // Emitted after MarketCreated so log-order indexers see the market before its flag
+        if (_featured) {
+            // The surcharge joins the fee ledger — the escrowed pools never see it
+            if (msg.value > 0) accruedFees[address(0)] += msg.value;
+
+            emit MarketFeatured(marketId, msg.value);
+        }
     }
 
     function placeBet(address _owner, uint256 _marketId, uint8 _outcome, uint256 _amount) external payable whenNotPaused nonReentrant {
@@ -198,6 +249,7 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         if (market.creator == address(0)) revert MarketNotFound();
         if (market.hidden) revert MarketInactive();
         if (market.state != MarketState.Open) revert MarketNotOpen();
+        if (block.timestamp < market.bettingOpensAt) revert BettingNotOpen();
         if (block.timestamp >= market.bettingDeadline) revert BettingDeadlinePassed();
         if (_outcome >= market.outcomeCount) revert InvalidOutcome();
         if (_amount == 0) revert InvalidAmount();
@@ -217,24 +269,39 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         market.totalPool += _amount;
 
         if (token != address(0)) {
+            // Exact-amount escrow: the pools were credited `_amount`, and the token escrow is
+            // shared across every market staking this token, so a transfer that delivers fewer
+            // units (fee-on-transfer and similar) would default on other markets' claimants.
+            // LSP7 shares ERC20's balanceOf(address) selector, so one read covers both.
+            uint256 balanceBefore = IERC20(token).balanceOf(address(this));
             if (market.isTokenLsp7) {
                 // LSP7 (LUKSO): bettor must have called authorizeOperator(predict contract, amount)
                 ILSP7Minimal(token).transfer(bettor, address(this), _amount, true, "");
             } else {
                 IERC20(token).safeTransferFrom(bettor, address(this), _amount);
             }
+            if (IERC20(token).balanceOf(address(this)) - balanceBefore != _amount) revert UnsupportedToken();
+
+            // The transfer above succeeded under this market's flag — that PROVES the token's
+            // standard, so lock it for fee withdrawal and future market creation
+            if (!_tokenTypeLocked[token]) {
+                _tokenTypeLocked[token] = true;
+                isLsp7Token[token] = market.isTokenLsp7;
+            }
         }
 
         emit BetPlaced(_marketId, bettor, _outcome, _amount, outcomePools[_marketId][_outcome], market.totalPool);
     }
 
-    function closeBetting(address _owner, uint256 _marketId) external whenNotPaused {
+    function closeBetting(uint256 _marketId) external whenNotPaused {
         Market storage market = _markets[_marketId];
         if (market.creator == address(0)) revert MarketNotFound();
         if (market.state != MarketState.Open) revert MarketNotOpen();
 
-        address actor = _resolveActor(_owner);
-        if (actor != market.creator && !isJudge[_marketId][actor]) revert NotJudge();
+        // Raw msg.sender on purpose — every market-control action must be signed by the
+        // actor's own key; neither burner sessions nor ERC2771 forwarders are honored
+        address actor = msg.sender;
+        if (actor != market.creator && !judgeConfirmed[_marketId][actor]) revert NotJudge();
 
         // Closing after the deadline anchors on the deadline so a late close can never push the
         // refund-eligibility time further out than judge inaction would have
@@ -246,7 +313,7 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         emit BettingClosed(_marketId, actor, closedAt);
     }
 
-    function resolve(address _owner, uint256 _marketId, uint8 _winningOutcome) external whenNotPaused {
+    function resolve(uint256 _marketId, uint8 _winningOutcome) external whenNotPaused {
         Market storage market = _markets[_marketId];
         if (market.creator == address(0)) revert MarketNotFound();
         if (_winningOutcome >= market.outcomeCount) revert InvalidOutcome();
@@ -255,8 +322,10 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         bool closable = market.state == MarketState.Open && block.timestamp >= market.bettingDeadline;
         if (market.state != MarketState.Closed && !closable) revert MarketNotResolvable();
 
-        address judge = _resolveActor(_owner);
-        if (!isJudge[_marketId][judge]) revert NotJudge();
+        // Raw msg.sender on purpose — verdicts must be signed by the judge's own key, so
+        // neither burner sessions nor ERC2771 forwarders are honored here
+        address judge = msg.sender;
+        if (!judgeConfirmed[_marketId][judge]) revert NotJudge();
 
         uint256 winningPool = outcomePools[_marketId][_winningOutcome];
 
@@ -269,6 +338,7 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         }
 
         uint256 feeAmount = (market.totalPool * market.feeBps) / FEE_DENOMINATOR;
+        uint256 creatorFeeAmount = (market.totalPool * market.creatorFeeBps) / FEE_DENOMINATOR;
 
         market.state = MarketState.Resolved;
         market.winningOutcome = _winningOutcome;
@@ -276,24 +346,33 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         if (feeAmount > 0) {
             accruedFees[market.token] += feeAmount;
         }
+        if (creatorFeeAmount > 0) {
+            creatorFees[market.creator][market.token] += creatorFeeAmount;
+
+            emit CreatorFeeAccrued(_marketId, market.creator, market.token, creatorFeeAmount);
+        }
 
         emit MarketResolved(_marketId, _winningOutcome, judge, feeAmount);
     }
 
-    function cancelMarket(address _owner, uint256 _marketId) external whenNotPaused {
+    function cancelMarket(uint256 _marketId) external whenNotPaused {
         Market storage market = _markets[_marketId];
         if (market.creator == address(0)) revert MarketNotFound();
         if (market.state != MarketState.Open && market.state != MarketState.Closed) revert MarketNotRefundable();
 
-        address actor = _resolveActor(_owner);
-        if (actor != market.creator && !isJudge[_marketId][actor]) revert NotJudge();
+        // Raw msg.sender on purpose — see closeBetting
+        address actor = msg.sender;
+        if (actor != market.creator && !judgeConfirmed[_marketId][actor]) revert NotJudge();
 
         market.state = MarketState.Refunding;
 
         emit MarketCanceled(_marketId, actor);
     }
 
-    function enableRefunds(uint256 _marketId) external whenNotPaused {
+    // Deliberately NOT pausable, like claim(): pause can never strand escrow. Whatever
+    // happens to judges or admins, once the resolve window lapses anyone can flip the
+    // market to Refunding and every bettor can exit in full.
+    function enableRefunds(uint256 _marketId) external {
         Market storage market = _markets[_marketId];
         if (market.creator == address(0)) revert MarketNotFound();
 
@@ -318,8 +397,11 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
             uint256 winningStake = stakes[_marketId][account][market.winningOutcome];
             if (winningStake == 0) revert NothingToClaim();
 
-            // Winners split the whole pot minus the protocol fee, pro-rata by winning stake
-            uint256 distributable = market.totalPool - (market.totalPool * market.feeBps) / FEE_DENOMINATOR;
+            // Winners split the whole pot minus the platform and creator fees, pro-rata by
+            // winning stake. Each fee floors separately — exactly what resolve() accrued.
+            uint256 distributable = market.totalPool -
+                (market.totalPool * market.feeBps) / FEE_DENOMINATOR -
+                (market.totalPool * market.creatorFeeBps) / FEE_DENOMINATOR;
             amount = (winningStake * distributable) / outcomePools[_marketId][market.winningOutcome];
         } else if (market.state == MarketState.Refunding) {
             amount = totalStakeOf[_marketId][account];
@@ -339,6 +421,75 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         }
     }
 
+    // Deliberately NOT pausable, like claim(): earned fees are the creator's money and a
+    // pause can never strand them.
+    function claimCreatorFees(address _owner, address _token) external nonReentrant {
+        address creator = _resolveActor(_owner);
+
+        uint256 amount = creatorFees[creator][_token];
+        if (amount == 0) revert NothingToClaim();
+
+        creatorFees[creator][_token] = 0;
+
+        // Fees only accrue from resolved pots, which require bets — so the token's standard
+        // flag is always proven-locked by the time anything is claimable here
+        _payout(_token, _token != address(0) && isLsp7Token[_token], creator, amount);
+
+        emit CreatorFeesClaimed(creator, _token, amount);
+    }
+
+    function confirmJudging(uint256 _marketId) external whenNotPaused {
+        Market storage market = _markets[_marketId];
+        if (market.creator == address(0)) revert MarketNotFound();
+        // Confirming stays open while the market can still be judged — even after betting
+        // closed, a late acceptance is exactly what rescues an unresolved market
+        if (market.state != MarketState.Open && market.state != MarketState.Closed) revert MarketNotOpen();
+
+        // Raw msg.sender on purpose — consent must come from the judge's own key ─ so this can't be gasless
+        address judge = msg.sender;
+        if (!isJudge[_marketId][judge]) revert NotJudge();
+        if (judgeConfirmed[_marketId][judge]) revert AlreadyConfirmed();
+
+        judgeConfirmed[_marketId][judge] = true;
+
+        emit JudgeConfirmed(_marketId, judge);
+    }
+
+    // Also not pausable: a judge can always detach their name and power from a market,
+    // and the last judge leaving a funded market opens refunds — pause blocks neither.
+    function renounceJudge(uint256 _marketId) external {
+        Market storage market = _markets[_marketId];
+        if (market.creator == address(0)) revert MarketNotFound();
+        if (market.state != MarketState.Open && market.state != MarketState.Closed) revert MarketNotOpen();
+
+        // Raw msg.sender on purpose — see closeBetting
+        address judge = msg.sender;
+        if (!isJudge[_marketId][judge]) revert NotJudge();
+
+        // Unlike creator removal, stepping down is allowed even after bets exist — it can
+        // only reduce judging power, never redirect funds
+        address[] storage panel = _judges[_marketId];
+        for (uint256 i = 0; i < panel.length; i++) {
+            if (panel[i] == judge) {
+                panel[i] = panel[panel.length - 1];
+                panel.pop();
+                break;
+            }
+        }
+        isJudge[_marketId][judge] = false;
+        judgeConfirmed[_marketId][judge] = false;
+
+        emit JudgeRemoved(_marketId, judge);
+
+        // Nobody left to resolve a funded market — refund now instead of burning the window.
+        // An empty unfunded panel stays Open so the creator can rebuild it before bets.
+        if (panel.length == 0 && market.totalPool > 0) {
+            market.state = MarketState.Refunding;
+
+            emit RefundsEnabled(_marketId, judge);
+        }
+    }
+
     function addJudge(address _owner, uint256 _marketId, address _judge) external whenNotPaused {
         Market storage market = _markets[_marketId];
         if (market.creator == address(0)) revert MarketNotFound();
@@ -353,6 +504,7 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
 
         _judges[_marketId].push(_judge);
         isJudge[_marketId][_judge] = true;
+        if (_judge == market.creator) judgeConfirmed[_marketId][_judge] = true;
 
         emit JudgeAdded(_marketId, _judge);
     }
@@ -377,8 +529,48 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
             }
         }
         isJudge[_marketId][_judge] = false;
+        judgeConfirmed[_marketId][_judge] = false;
 
         emit JudgeRemoved(_marketId, _judge);
+    }
+
+    function updateMarketMetadata(address _owner, uint256 _marketId, uint8 _outcomeCount, string calldata _metadata) external whenNotPaused {
+        Market storage market = _markets[_marketId];
+        if (market.creator == address(0)) revert MarketNotFound();
+        if (market.state != MarketState.Open) revert MarketNotOpen();
+        if (market.hidden) revert MarketInactive();
+        // The question bettors staked on can never change under them — metadata locks with
+        // the judge panel at the first bet
+        if (market.totalPool != 0) revert MarketHasBets();
+        if (_resolveActor(_owner) != market.creator) revert NotCreator();
+        if (_outcomeCount < 2 || _outcomeCount > MAX_OUTCOME_COUNT) revert InvalidOutcomeCount();
+        if (bytes(_metadata).length == 0) revert InvalidMetadata();
+        if (bytes(_metadata).length > maxMetadataBytes) {
+            revert MetadataTooLarge(bytes(_metadata).length, maxMetadataBytes);
+        }
+
+        // Resizing outcomes is safe in this window: no bets exist, so every outcome pool is
+        // still zero and no stake can reference a removed outcome id
+        market.outcomeCount = _outcomeCount;
+        market.metadata = _metadata;
+
+        emit MarketMetadataUpdated(_marketId, _outcomeCount, _metadata);
+    }
+
+    function upgradeToFeatured(address _owner, uint256 _marketId) external payable whenNotPaused {
+        Market storage market = _markets[_marketId];
+        if (market.creator == address(0)) revert MarketNotFound();
+        if (market.state != MarketState.Open) revert MarketNotOpen();
+        if (market.hidden) revert MarketInactive();
+        if (market.featured) revert AlreadyFeatured();
+
+        if (_resolveActor(_owner) != market.creator) revert NotCreator();
+        if (msg.value != featuredFee) revert InsufficientFee();
+
+        market.featured = true;
+        if (msg.value > 0) accruedFees[address(0)] += msg.value;
+
+        emit MarketFeatured(_marketId, msg.value);
     }
 
     function setHidden(uint256 _marketId, bool _hidden) external onlyDirectModerator {
@@ -437,7 +629,9 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
             uint256 winningStake = stakes[_marketId][_account][market.winningOutcome];
             if (winningStake == 0) return 0;
 
-            uint256 distributable = market.totalPool - (market.totalPool * market.feeBps) / FEE_DENOMINATOR;
+            uint256 distributable = market.totalPool -
+                (market.totalPool * market.feeBps) / FEE_DENOMINATOR -
+                (market.totalPool * market.creatorFeeBps) / FEE_DENOMINATOR;
             return (winningStake * distributable) / outcomePools[_marketId][market.winningOutcome];
         }
 
@@ -471,7 +665,16 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
     }
 
     function setHupContract(address _hupAddress) external onlyDirectAdmin {
-        if (_hupAddress == address(0)) revert InvalidAddress();
+        if (_hupAddress == address(0) || _hupAddress.code.length == 0) revert InvalidAddress();
+
+        // Probe the session getter so a fat-fingered address can't silently break the
+        // burner-session path. This catches EOAs and contracts that don't answer the
+        // selector — a wrong-but-live contract returning well-shaped garbage still passes.
+        try IHup(_hupAddress).userSessions(address(0)) returns (address, uint256) {
+            // any decodable answer proves the interface resolves
+        } catch {
+            revert InvalidAddress();
+        }
 
         address oldValue = address(hupContract);
         hupContract = IHup(_hupAddress);
@@ -480,12 +683,29 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
     }
 
     function setPredictFeeBps(uint256 _feeBps) external onlyDirectAdmin {
-        if (_feeBps > ABSOLUTE_MAX_FEE_BPS) revert InvalidFeeBps();
+        // The combined take is what winners actually lose, so the cap covers both fees
+        if (_feeBps + creatorFeeBps > ABSOLUTE_MAX_FEE_BPS) revert InvalidFeeBps();
 
         uint256 oldValue = predictFeeBps;
         predictFeeBps = _feeBps;
 
         emit PredictFeeUpdated(oldValue, _feeBps);
+    }
+
+    function setCreatorFeeBps(uint256 _feeBps) external onlyDirectAdmin {
+        if (_feeBps + predictFeeBps > ABSOLUTE_MAX_FEE_BPS) revert InvalidFeeBps();
+
+        uint256 oldValue = creatorFeeBps;
+        creatorFeeBps = _feeBps;
+
+        emit CreatorFeeUpdated(oldValue, _feeBps);
+    }
+
+    function setFeaturedFee(uint256 _featuredFee) external onlyDirectAdmin {
+        uint256 oldValue = featuredFee;
+        featuredFee = _featuredFee;
+
+        emit FeaturedFeeUpdated(oldValue, _featuredFee);
     }
 
     function setResolveWindow(uint256 _resolveWindow) external onlyDirectAdmin {
@@ -627,7 +847,10 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
         return ERC2771Context._contextSuffixLength();
     }
 
+    /// @dev Every legitimate native payment enters through a payable function (createMarket,
+    ///      upgradeToFeatured, placeBet), so a plain transfer can only be a mistake — reject it
+    ///      rather than lock the funds in escrow forever with no recovery path.
     receive() external payable {
-        emit UnattributedDeposit(msg.sender, msg.value);
+        revert UnexpectedNativePayment();
     }
 }

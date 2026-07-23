@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.35;
+pragma solidity ^0.8.36;
 
 import "./../IHup.sol";
 
@@ -41,12 +41,15 @@ interface IHupPredict {
         address creator; // Address of the market creator, set once at creation
         address token; // Stake token: address(0) for native, otherwise an ERC20/LSP7 address
         bool isTokenLsp7; // True when `token` is an LSP7 (LUKSO) asset rather than ERC20
+        uint64 bettingOpensAt; // Before this unix UTC time no bets are accepted; 0 = open immediately
         uint64 bettingDeadline; // After this unix UTC time no new bets are accepted
         uint64 closedAt; // When betting was explicitly closed; 0 while still open
         uint8 outcomeCount; // Number of outcomes; ids are 0..outcomeCount-1
         uint8 winningOutcome; // Winning outcome id, meaningful only when state == Resolved
         MarketState state; // Current lifecycle state
-        uint16 feeBps; // Protocol fee snapshotted at creation, taken only from resolved pots
+        uint16 feeBps; // Platform fee snapshotted at creation, taken only from resolved pots
+        uint16 creatorFeeBps; // Creator fee snapshotted at creation, taken only from resolved pots
+        bool featured; // True when the paid featured tier is active (pinned/highlighted)
         bool hidden; // Moderator flag — indexers and clients suppress the market, funds unaffected
         uint256 totalPool; // Sum of all stakes across all outcomes
         string metadata; // IPFS CID of the market JSON (length-capped)
@@ -56,8 +59,9 @@ interface IHupPredict {
 
     /// @notice Emitted when a creator opens a new market.
     /// @dev `judges` is the full initial judge list (any listed judge can close/resolve/cancel).
-    ///      `feeBps` is snapshotted so later admin fee changes never affect existing markets.
-    event MarketCreated(uint256 indexed marketId, address indexed creator, address token, bool isTokenLsp7, uint64 bettingDeadline, uint8 outcomeCount, uint16 feeBps, address[] judges, string metadata);
+    ///      `feeBps` (platform) and `creatorFeeBps` are snapshotted so later admin fee changes
+    ///      never affect existing markets.
+    event MarketCreated(uint256 indexed marketId, address indexed creator, address token, bool isTokenLsp7, uint64 bettingOpensAt, uint64 bettingDeadline, uint8 outcomeCount, uint16 feeBps, uint16 creatorFeeBps, address[] judges, string metadata);
 
     /// @notice Emitted for every stake. `outcomePool` and `totalPool` are the post-bet totals so
     ///         indexers can maintain pool aggregates without replaying history.
@@ -67,9 +71,16 @@ interface IHupPredict {
     ///         market can otherwise only close by the deadline passing).
     event BettingClosed(uint256 indexed marketId, address indexed by, uint64 closedAt);
 
-    /// @notice Emitted when a judge resolves the market. `feeAmount` is the protocol cut accrued;
-    ///         the remaining pot is claimable pro-rata by winning-outcome bettors.
+    /// @notice Emitted when a judge resolves the market. `feeAmount` is the platform cut accrued
+    ///         (the creator cut is emitted separately via CreatorFeeAccrued); the remaining pot
+    ///         is claimable pro-rata by winning-outcome bettors.
     event MarketResolved(uint256 indexed marketId, uint8 winningOutcome, address indexed judge, uint256 feeAmount);
+
+    /// @notice Emitted when a resolved pot credits the creator's fee ledger.
+    event CreatorFeeAccrued(uint256 indexed marketId, address indexed creator, address token, uint256 amount);
+
+    /// @notice Emitted when a creator withdraws their accrued fees for one stake token.
+    event CreatorFeesClaimed(address indexed creator, address indexed token, uint256 amount);
 
     /// @notice Emitted when the creator or a judge cancels the market; all stakes become refundable.
     event MarketCanceled(uint256 indexed marketId, address indexed by);
@@ -85,10 +96,25 @@ interface IHupPredict {
     event RefundClaimed(uint256 indexed marketId, address indexed account, uint256 amount);
 
     /// @notice Emitted when the creator adds a judge (only possible before the first bet).
+    ///         The judge starts pending and gains no power until they confirm.
     event JudgeAdded(uint256 indexed marketId, address indexed judge);
 
-    /// @notice Emitted when the creator removes a judge (only possible before the first bet).
+    /// @notice Emitted when a judge leaves the panel — removed by the creator before the
+    ///         first bet, or renouncing themselves at any time before settlement.
     event JudgeRemoved(uint256 indexed marketId, address indexed judge);
+
+    /// @notice Emitted when a pending judge accepts the role. Only confirmed judges can
+    ///         close betting, resolve, or cancel. The creator self-confirms at creation.
+    event JudgeConfirmed(uint256 indexed marketId, address indexed judge);
+
+    /// @notice Emitted when a market gains the featured tier — paid at creation or upgraded
+    ///         later. `feePaid` is the native amount paid, which accrues to the fee ledger.
+    event MarketFeatured(uint256 indexed marketId, uint256 feePaid);
+
+    /// @notice Emitted when the creator replaces a market's metadata CID and (possibly) its
+    ///         outcome count. Only possible while the pool is empty — the question bettors
+    ///         staked on can never change under them.
+    event MarketMetadataUpdated(uint256 indexed marketId, uint8 outcomeCount, string metadata);
 
     /// @notice Emitted when a moderator hides or unhides a market. Funds are unaffected.
     event MarketHiddenSet(uint256 indexed marketId, bool hidden, address indexed moderator);
@@ -96,8 +122,14 @@ interface IHupPredict {
     /// @notice Emitted when the Hup Core contract reference is updated.
     event HupContractUpdated(address oldValue, address newValue);
 
-    /// @notice Emitted when the protocol fee for newly created markets is updated.
+    /// @notice Emitted when the platform fee for newly created markets is updated.
     event PredictFeeUpdated(uint256 oldValue, uint256 newValue);
+
+    /// @notice Emitted when the creator fee for newly created markets is updated.
+    event CreatorFeeUpdated(uint256 oldValue, uint256 newValue);
+
+    /// @notice Emitted when the featured surcharge is updated.
+    event FeaturedFeeUpdated(uint256 oldValue, uint256 newValue);
 
     /// @notice Emitted when the resolve window is updated.
     event ResolveWindowUpdated(uint256 oldValue, uint256 newValue);
@@ -110,9 +142,6 @@ interface IHupPredict {
 
     /// @notice Emitted when accrued protocol fees are withdrawn by an admin.
     event FeesWithdrawn(address indexed token, address indexed recipient, uint256 amount);
-
-    /// @notice Emitted when the contract receives a plain, unattributed native token deposit.
-    event UnattributedDeposit(address indexed from, uint256 amount);
 
     // --- SHARED ERRORS ---
 
@@ -130,17 +159,28 @@ interface IHupPredict {
     error MarketNotFound();
     error NotCreator();
     error NotJudge();
+    error AlreadyConfirmed();
     /// @notice The market is not in the state this action requires.
     error MarketNotOpen();
     error MarketNotResolvable();
     error MarketNotRefundable();
     /// @notice The market was hidden by a moderator; new bets are suppressed, claims still work.
     error MarketInactive();
+    /// @notice The market's betting window hasn't opened yet (upcoming market).
+    error BettingNotOpen();
     error BettingDeadlinePassed();
     /// @notice Judges can only change while the pool is empty — bettors bet under a fixed panel.
     error MarketHasBets();
     error InsufficientPayment(uint256 sent, uint256 expected);
     error UnexpectedNativePayment();
+    /// @notice The stake token delivered fewer units than requested (fee-on-transfer or
+    ///         otherwise lossy) — it would leave the shared escrow short, so it is rejected.
+    error UnsupportedToken();
+    /// @notice The market's LSP7 flag contradicts the standard this token already proved via a
+    ///         successful stake transfer — the flag steers fee withdrawal, so it locks at proof.
+    error TokenStandardMismatch();
+    error InsufficientFee();
+    error AlreadyFeatured();
     error NothingToClaim();
     error AlreadyClaimed();
     error TransferFailed();
@@ -157,6 +197,9 @@ interface IHupPredict {
     function trustedForwarders(address forwarder) external view returns (bool);
     function isTrustedForwarder(address forwarder) external view returns (bool);
     function predictFeeBps() external view returns (uint256);
+    function creatorFeeBps() external view returns (uint256);
+    function creatorFees(address creator, address token) external view returns (uint256);
+    function featuredFee() external view returns (uint256);
     function resolveWindow() external view returns (uint256);
     function maxMetadataBytes() external view returns (uint256);
     function accruedFees(address token) external view returns (uint256);
@@ -178,11 +221,20 @@ interface IHupPredict {
      * @param _owner The primary wallet address (or address(0) if caller is primary).
      * @param _token Stake token: address(0) for the chain's native coin, otherwise ERC20/LSP7.
      * @param _isTokenLsp7 True when `_token` is an LSP7 asset. Ignored for native markets.
+     * @param _bettingOpensAt Unix UTC seconds before which bets are rejected — the market is
+     *        visible as upcoming until then. Pass 0 to open immediately. Must be before
+     *        `_bettingDeadline`. The judge panel stays editable until the first bet, so an
+     *        upcoming market's panel can still be adjusted before it opens.
      * @param _bettingDeadline Unix UTC seconds after which no new bets are accepted; must be in
      *        the future. Also anchors the refund fallback: if judges never act, refunds unlock at
      *        `_bettingDeadline + resolveWindow`.
      * @param _outcomeCount Number of outcomes (2..MAX_OUTCOME_COUNT). Labels live in metadata.
-     * @param _judges Judge panel. An empty array defaults to the creator as sole judge.
+     * @param _featured True to pay the featured surcharge (msg.value must equal featuredFee)
+     *        and pin/highlight the market in the directory. The surcharge accrues to the fee
+     *        ledger — never to the escrowed pools.
+     * @param _judges Judge panel. An empty array defaults to the creator as sole judge. Every
+     *        judge starts pending except the creator, who self-confirms by creating; pending
+     *        judges must call confirmJudging before they can act.
      * @param _metadata IPFS CID of the market JSON. See the interface @dev for the expected shape.
      * @return marketId The id assigned to the new market.
      */
@@ -190,11 +242,40 @@ interface IHupPredict {
         address _owner,
         address _token,
         bool _isTokenLsp7,
+        uint64 _bettingOpensAt,
         uint64 _bettingDeadline,
         uint8 _outcomeCount,
+        bool _featured,
         address[] calldata _judges,
         string calldata _metadata
-    ) external returns (uint256 marketId);
+    ) external payable returns (uint256 marketId);
+
+    /**
+     * @notice Upgrades an existing market to the featured tier for the exact featured
+     *         surcharge. The payment accrues to the fee ledger, never to the pools.
+     * @dev Only the creator can execute this, while the market is still Open and visible.
+     *      Unlike metadata and the judge panel, featuring stays available after bets exist —
+     *      it changes display prominence only, never the terms bettors staked on.
+     * @param _owner The primary wallet address (or address(0) if caller is primary).
+     * @param _marketId The id of the market to feature.
+     */
+    function upgradeToFeatured(address _owner, uint256 _marketId) external payable;
+
+    /**
+     * @notice Replaces the market's metadata CID and outcome count — fixing a typo'd title,
+     *         adding/removing/rewording outcomes, or swapping the image before anyone staked.
+     * @dev Only the creator can execute this, while the market is Open, visible, and its pool
+     *      is still empty (`MarketHasBets` otherwise) — with no stakes, every outcome pool is
+     *      zero, so resizing can never orphan a bet. The replacement JSON's `outcomes` array
+     *      must contain exactly `_outcomeCount` entries. Token, deadlines, fee snapshots, and
+     *      creator can never change.
+     * @param _owner The primary wallet address (or address(0) if caller is primary).
+     * @param _marketId The id of the market.
+     * @param _outcomeCount Number of outcomes (2..MAX_OUTCOME_COUNT), replacing the current one.
+     * @param _metadata IPFS CID of the replacement market JSON. See the interface @dev for the
+     *        expected shape.
+     */
+    function updateMarketMetadata(address _owner, uint256 _marketId, uint8 _outcomeCount, string calldata _metadata) external;
 
     /**
      * @notice Stakes on an outcome. Betting on an outcome you already backed tops up your stake.
@@ -210,30 +291,34 @@ interface IHupPredict {
     /**
      * @notice Closes betting early. After the deadline this is unnecessary — bets are already
      *         rejected and resolution/refund timing anchors on the deadline itself.
-     * @dev Only the creator or a judge can execute this. Starts the resolve window from now.
-     * @param _owner The primary wallet address (or address(0) if caller is primary).
+     * @dev Only the creator or a confirmed judge can execute this. Starts the resolve window
+     *      from now. Direct signature required — like every market-control action, burner
+     *      sessions and meta-transactions are not honored.
      * @param _marketId The id of the market to close.
      */
-    function closeBetting(address _owner, uint256 _marketId) external;
+    function closeBetting(uint256 _marketId) external;
 
     /**
      * @notice Resolves the market to a winning outcome and accrues the protocol fee.
-     * @dev Only a judge can execute this, either after closeBetting or, once the betting
-     *      deadline has passed, straight from the Open state. If nobody staked the winning
-     *      outcome the market flips to Refunding instead so no funds are ever stranded.
-     * @param _owner The primary wallet address (or address(0) if caller is primary).
+     * @dev Only a confirmed judge can execute this, either after closeBetting or, once the
+     *      betting deadline has passed, straight from the Open state. If nobody staked the
+     *      winning outcome the market flips to Refunding instead so no funds are ever
+     *      stranded. Direct signature required: the caller must BE the judge — no burner
+     *      sessions and no meta-transactions — so a swapped forwarder or session source can
+     *      never fake a verdict.
      * @param _marketId The id of the market to resolve.
      * @param _winningOutcome Zero-based id of the outcome that occurred.
      */
-    function resolve(address _owner, uint256 _marketId, uint8 _winningOutcome) external;
+    function resolve(uint256 _marketId, uint8 _winningOutcome) external;
 
     /**
      * @notice Cancels the market and makes every stake refundable in full.
-     * @dev Only the creator or a judge can execute this, any time before resolution.
-     * @param _owner The primary wallet address (or address(0) if caller is primary).
+     * @dev Only the creator or a confirmed judge can execute this, any time before
+     *      resolution. Direct signature required — burner sessions and meta-transactions
+     *      are not honored.
      * @param _marketId The id of the market to cancel.
      */
-    function cancelMarket(address _owner, uint256 _marketId) external;
+    function cancelMarket(uint256 _marketId) external;
 
     /**
      * @notice Flips an abandoned market to Refunding. Callable by anyone once the resolve window
@@ -253,7 +338,39 @@ interface IHupPredict {
     function claim(address _owner, uint256 _marketId) external;
 
     /**
-     * @notice Adds a judge to the market's panel.
+     * @notice Withdraws the caller's accrued creator fees for one stake token. Fees accrue
+     *         when markets the caller created resolve; the ledger spans all their markets.
+     *         Claims never expire and are pause-immune.
+     * @dev Payout always goes to the resolved primary wallet, never to a burner key.
+     * @param _owner The primary wallet address (or address(0) if caller is primary).
+     * @param _token The stake token to withdraw fees for (address(0) for native).
+     */
+    function claimCreatorFees(address _owner, address _token) external;
+
+    /**
+     * @notice Accepts a pending judge assignment. Confirming is what grants judging power —
+     *         an unconfirmed judge can never close, resolve, or cancel, so nobody's name can
+     *         be attached to a market with authority they didn't agree to.
+     * @dev Direct signature required: the caller must BE the judge — no burner sessions and
+     *      no meta-transactions. Consent and verdicts are the two acts that must provably
+     *      come from the judge's own key, so neither can be spoofed through a compromised
+     *      forwarder or session source.
+     * @param _marketId The id of the market to accept judging for.
+     */
+    function confirmJudging(uint256 _marketId) external;
+
+    /**
+     * @notice Steps down from a market's judge panel. Callable by any listed judge (pending
+     *         or confirmed) at any time before settlement — reducing judging power is always
+     *         safe. If the last judge steps down from a market holding stakes, the market
+     *         flips to Refunding immediately rather than making bettors wait out the window.
+     *         Direct signature required — burner sessions and meta-transactions are not honored.
+     * @param _marketId The id of the market to step down from.
+     */
+    function renounceJudge(uint256 _marketId) external;
+
+    /**
+     * @notice Adds a judge to the market's panel, pending their confirmation.
      * @dev Only the creator can execute this, and only while the pool is empty — the panel
      *      bettors saw when staking is the panel that resolves.
      * @param _owner The primary wallet address (or address(0) if caller is primary).
@@ -295,9 +412,15 @@ interface IHupPredict {
     function getJudges(uint256 _marketId) external view returns (address[] memory);
 
     /**
-     * @notice Returns whether an address is a judge of the market.
+     * @notice Returns whether an address is listed on the market's judge panel (pending or confirmed).
      */
     function isJudge(uint256 _marketId, address _account) external view returns (bool);
+
+    /**
+     * @notice Returns whether a listed judge has confirmed the role. Only confirmed judges
+     *         can close betting, resolve, or cancel.
+     */
+    function judgeConfirmed(uint256 _marketId, address _account) external view returns (bool);
 
     /**
      * @notice Returns the per-outcome pools of a market, indexed by outcome id.
@@ -340,6 +463,8 @@ interface IHupPredict {
     function setHupContract(address _hupAddress) external;
     function setTrustedForwarder(address _forwarder, bool _trusted) external;
     function setPredictFeeBps(uint256 _feeBps) external;
+    function setCreatorFeeBps(uint256 _feeBps) external;
+    function setFeaturedFee(uint256 _featuredFee) external;
     function setResolveWindow(uint256 _resolveWindow) external;
     function setMaxMetadataBytes(uint256 _maxMetadataBytes) external;
     function withdrawFees(address _token, address _receiver) external;
