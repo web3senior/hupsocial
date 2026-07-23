@@ -20,7 +20,9 @@ export const toRelative = (unixSeconds) => {
  */
 export const marketStatus = (market) => {
   const state = Number(market.state)
-  const deadlinePassed = Number(market.betting_deadline) <= Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000)
+  const deadlinePassed = Number(market.betting_deadline) <= now
+  if (state === 0 && Number(market.betting_opens_at || 0) > now) return { key: 'upcoming', label: 'Upcoming' }
   if (state === 0 && !deadlinePassed) return { key: 'open', label: 'Bets open' }
   if (state === 0 || state === 1) return { key: 'awaiting', label: 'Awaiting result' }
   if (state === 2) return { key: 'resolved', label: 'Resolved' }

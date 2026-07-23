@@ -15,12 +15,38 @@ export const GitHub = () => (
   </svg>
 )
 
-export const Menu = () => (
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M19.25 16C19.9404 16 20.5 16.5596 20.5 17.25C20.5 17.9404 19.9404 18.5 19.25 18.5H4.25C3.55964 18.5 3 17.9404 3 17.25C3 16.5596 3.55964 16 4.25 16H19.25Z" fill="currentColor"/>
-<path d="M19.25 6C19.9404 6 20.5 6.55964 20.5 7.25C20.5 7.94036 19.9404 8.5 19.25 8.5H4.25C3.55964 8.5 3 7.94036 3 7.25C3 6.55964 3.55964 6 4.25 6H19.25Z" fill="currentColor"/>
-</svg>
+export const Money = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="14"
+    viewBox="0 0 20 14"
+    fill="none"
+    class="size-5"
+    data-state="closed"
+    data-slot="tooltip-trigger"
+  >
+    <path d="M0 8V5.49951H20V7.74951L5.5 14.0005L0 8Z" fill="#21832D"></path>
+    <path d="M12.5 -0.000488281L0 5.49951L5.5 11.6245L20 5.49951L12.5 -0.000488281Z" fill="#3AB549"></path>
+    <path
+      d="M3.5 5.49951C4.3 6.29951 3.5 6.66667 3 7L5 9C6.2 8.2 6.66667 8.83333 7 9.5L15.5 6C13.9 4.8 15 4.33284 15.5 3.99951L13.5 2.49951C12.3 2.89951 11.3333 2.33285 11 1.99951L3.5 5.49951Z"
+      fill="#92FF04"
+    ></path>
+    <ellipse cx="9.5" cy="5.49951" rx="2.5" ry="1.5" fill="#3AB549"></ellipse>
+  </svg>
+)
 
+export const Menu = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M19.25 16C19.9404 16 20.5 16.5596 20.5 17.25C20.5 17.9404 19.9404 18.5 19.25 18.5H4.25C3.55964 18.5 3 17.9404 3 17.25C3 16.5596 3.55964 16 4.25 16H19.25Z"
+      fill="currentColor"
+    />
+    <path
+      d="M19.25 6C19.9404 6 20.5 6.55964 20.5 7.25C20.5 7.94036 19.9404 8.5 19.25 8.5H4.25C3.55964 8.5 3 7.94036 3 7.25C3 6.55964 3.55964 6 4.25 6H19.25Z"
+      fill="currentColor"
+    />
+  </svg>
 )
 
 export const POAPIcon = () => (

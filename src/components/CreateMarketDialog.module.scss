@@ -69,6 +69,26 @@
     }
   }
 
+  &__tokenWarning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    background: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    border: 1px solid var(--warning-500, #f59e0b);
+    border-radius: var(--global-border-radius);
+    padding: 0.5rem 0.75rem;
+    font-size: var(--font-size-12);
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    span {
+      flex: 1;
+    }
+  }
+
   &__switchChain {
     flex-shrink: 0;
     border: 1px solid var(--warning-500, #f59e0b);
@@ -167,6 +187,24 @@
     }
   }
 
+  &__selfJudge {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    code {
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__listActions {
+    display: flex;
+    gap: 1rem;
+  }
+
   &__listAdd {
     all: unset;
     cursor: pointer;
@@ -180,6 +218,17 @@
     &:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+    }
+  }
+
+  &__featured {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 0.4rem !important;
+
+    input[type='checkbox'] {
+      width: auto;
+      padding: 0;
     }
   }
 

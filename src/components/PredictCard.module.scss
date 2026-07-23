@@ -32,6 +32,10 @@
     color: var(--text-muted, #888);
   }
 
+  &__star {
+    color: #eda100;
+  }
+
   &__badge {
     font-size: var(--font-size-10, 0.65rem);
     font-weight: 600;
@@ -45,6 +49,10 @@
       color: #ec4899;
     }
 
+    &--upcoming {
+      background: rgba(42, 120, 214, 0.14);
+      color: #2a78d6;
+    }
     &--awaiting {
       background: rgba(245, 158, 11, 0.14);
       color: #b45309;

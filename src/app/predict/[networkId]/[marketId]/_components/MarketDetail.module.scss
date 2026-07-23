@@ -29,6 +29,12 @@
     background: var(--surface-muted, rgba(0, 0, 0, 0.04));
   }
 
+  &__featuredStar {
+    color: #eda100;
+    margin-left: 0.35rem;
+    vertical-align: -2px;
+  }
+
   &__badge {
     align-self: flex-start;
     font-size: var(--font-size-10, 0.65rem);
@@ -43,6 +49,10 @@
       color: #ec4899;
     }
 
+    &--upcoming {
+      background: rgba(42, 120, 214, 0.14);
+      color: #2a78d6;
+    }
     &--awaiting {
       background: rgba(245, 158, 11, 0.14);
       color: #b45309;
@@ -81,11 +91,68 @@
     }
   }
 
+  &__category {
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    white-space: nowrap;
+  }
+
   &__people {
     display: flex;
     align-items: flex-start;
     gap: 2rem;
     flex-wrap: wrap;
+  }
+
+  /* Same affordance as the judges' Edit link, sized to sit beside the h1 title */
+  &__editMarket {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--font-size-12, 0.75rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--primary, #ec4899);
+    margin-left: 0.5rem;
+    vertical-align: middle;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__editJudges {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--primary, #ec4899);
+    margin-left: 0.35rem;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__judgeRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__judgePending {
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
   }
 
   &__peopleGroup {
@@ -383,7 +450,7 @@
   &__holdersColumn {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.6rem;
     min-width: 0;
   }
 
@@ -392,7 +459,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.25rem;
+    padding-inline: 0.25rem;
 
     h3 {
       margin: 0;
@@ -409,19 +476,24 @@
   &__positions {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.6rem;
   }
 
+  /* Each row is its own bordered card, exchange-listing style — clean white rows
+     with breathing room instead of a divider list */
   &__personRow {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.35rem 0;
-    border-bottom: 1px solid var(--border);
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background);
     font-size: var(--font-size-14, 0.875rem);
+    transition: border-color 0.15s ease;
 
-    &:last-child {
-      border-bottom: none;
+    &:hover {
+      border-color: var(--text-muted, #94a3b8);
     }
   }
 

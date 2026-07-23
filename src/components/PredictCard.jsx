@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
-import { TargetIcon } from '@phosphor-icons/react'
+import { StarIcon, TargetIcon } from '@phosphor-icons/react'
 import { marketStatus, outcomeColor, parseJsonArray, toRelative } from '@/lib/predict'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import styles from './PredictCard.module.scss'
+import { Money } from './Icons'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
 
@@ -22,10 +23,7 @@ export default function PredictCard({ marketRef }) {
   const chainId = Number(marketRef?.chainId)
   const marketId = marketRef?.marketId
 
-  const { data: detail } = useSWR(
-    chainId && marketId ? `/api/v1/predict/${marketId}?networkId=${chainId}` : null,
-    fetcher,
-  )
+  const { data: detail } = useSWR(chainId && marketId ? `/api/v1/predict/${marketId}?networkId=${chainId}` : null, fetcher)
 
   const market = detail?.data?.market
   const { symbol, decimals } = useStakeToken(chainId, market?.token, Boolean(Number(market?.is_token_lsp7)))
@@ -39,15 +37,12 @@ export default function PredictCard({ marketRef }) {
   const volume = formatStake(market.total_pool, decimals)
 
   return (
-    <Link
-      href={`/predict/${chainId}/${marketId}`}
-      className={styles.predictCard}
-      onClick={(e) => e.stopPropagation()}
-    >
+    <Link href={`/predict/${chainId}/${marketId}`} className={styles.predictCard} onClick={(e) => e.stopPropagation()}>
       <div className={styles.predictCard__top}>
         <span className={styles.predictCard__kind}>
           <TargetIcon size={14} />
           Prediction market
+          {Boolean(Number(market.featured)) && <StarIcon size={12} weight="fill" className={styles.predictCard__star} />}
         </span>
         <span className={clsx(styles.predictCard__badge, styles[`predictCard__badge--${status.key}`])}>{status.label}</span>
       </div>
@@ -75,18 +70,20 @@ export default function PredictCard({ marketRef }) {
             </div>
           )
         })}
-        {Number(market.outcome_count) > 4 && (
-          <span className={styles.predictCard__more}>+{Number(market.outcome_count) - 4} more</span>
-        )}
+        {Number(market.outcome_count) > 4 && <span className={styles.predictCard__more}>+{Number(market.outcome_count) - 4} more</span>}
       </div>
 
       <div className={styles.predictCard__footer}>
         {volume !== null && (
-          <span>
-            {volume} {symbol} pot
-          </span>
+          <>
+            <Money />
+            <span>
+              {volume} {symbol} pot
+            </span>
+          </>
         )}
         {status.key === 'open' ? <span>closes {toRelative(market.betting_deadline)}</span> : null}
+        {status.key === 'upcoming' ? <span>opens {toRelative(market.betting_opens_at)}</span> : null}
         <span className={styles.predictCard__cta}>{status.key === 'open' ? 'Place your bet' : 'View market'}</span>
       </div>
     </Link>

@@ -339,6 +339,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
           <BuyButton item={displayItem || item} />
         </main>
+        
 
         <footer className={`${styles.post__footer}`}>
           <div

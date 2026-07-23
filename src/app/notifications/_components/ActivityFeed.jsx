@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, BellIcon, ChatCircleIcon, ChecksIcon, ClockIcon, HeartIcon, PiggyBankIcon, PlusCircleIcon, QuotesIcon, SpinnerIcon, UserIcon, UserPlusIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, BellIcon, ChatCircleIcon, ChecksIcon, ClockIcon, HeartIcon, PiggyBankIcon, PlusCircleIcon, QuotesIcon, ScalesIcon, SpinnerIcon, TargetIcon, UserIcon, UserPlusIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
 import Profile from '@/components/Profile'
 import { toRelativeTime } from '@/lib/dateHelper'
@@ -47,6 +47,30 @@ const ACTION_META = {
   post_sent_tip: {
     icon: PiggyBankIcon,
     label: 'Tip sent',
+  },
+  market_received_bet: {
+    icon: TargetIcon,
+    label: 'New bet',
+  },
+  market_earned_fee: {
+    icon: PiggyBankIcon,
+    label: 'Creator fee earned',
+  },
+  market_resolved: {
+    icon: TargetIcon,
+    label: 'Market resolved',
+  },
+  market_refunds_available: {
+    icon: ArrowsCounterClockwiseIcon,
+    label: 'Refunds available',
+  },
+  market_judge_invited: {
+    icon: ScalesIcon,
+    label: 'Judge invitation',
+  },
+  market_judge_accepted: {
+    icon: ScalesIcon,
+    label: 'Judge accepted',
   },
 }
 

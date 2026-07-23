@@ -1,7 +1,8 @@
 'use client'
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { isAddress, parseEventLogs, zeroAddress } from 'viem'
+import useSWR from 'swr'
+import { formatEther, isAddress, parseEventLogs, zeroAddress } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
@@ -11,7 +12,7 @@ import { uploadFileToIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import predictAbi from '@/abis/HupPredict.json'
 import { toast } from '@/components/NextToast'
-import { PlusIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { PlusIcon, StarIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
 import ConnectedNetwork from './ConnectedNetwork'
 import styles from './CreateMarketDialog.module.scss'
@@ -58,15 +59,26 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [outcomeLabels, setOutcomeLabels] = useState(['', ''])
+  const [opensLocal, setOpensLocal] = useState('')
   const [deadlineLocal, setDeadlineLocal] = useState(defaultDeadline)
+  // The creator renders as an explicit, removable first judge instead of invisible
+  // default behavior; extra judges are typed below it
+  const [includeSelfAsJudge, setIncludeSelfAsJudge] = useState(true)
   const [judgeInputs, setJudgeInputs] = useState([''])
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
+  const [category, setCategory] = useState('')
+  const [featured, setFeatured] = useState(false)
   const [image, setImage] = useState('')
   const [isImageUploading, setIsImageUploading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmittingBurner, setIsSubmittingBurner] = useState(false)
   const imageInputRef = useRef(null)
+
+  // Taxonomy lives in the market_categories DB table (runtime-editable) — the dialog only
+  // ever stores the slug in the metadata JSON
+  const { data: categoriesPayload } = useSWR('/api/v1/predict/categories', (url) => fetch(url).then((res) => res.json()))
+  const categories = categoriesPayload?.data ?? []
 
   const isCustomToken = paymentChoice === 'custom-erc20' || paymentChoice === 'custom-lsp7'
   const listedToken = paymentChoice.startsWith('token:')
@@ -83,8 +95,8 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
       : null
   const isTokenLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
 
-  // Live protocol fee from the chain's contract, so the notice shows the real number
-  // that will be snapshotted into this market
+  // Live platform + creator fees from the chain's contract, so the notice shows the real
+  // numbers that will be snapshotted into this market
   const { data: feeBpsValue } = useReadContract({
     abi: predictAbi,
     address: predictAddress || undefined,
@@ -92,8 +104,26 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
     chainId,
     query: { enabled: Boolean(predictAddress) },
   })
+  const { data: creatorFeeBpsValue } = useReadContract({
+    abi: predictAbi,
+    address: predictAddress || undefined,
+    functionName: 'creatorFeeBps',
+    chainId,
+    query: { enabled: Boolean(predictAddress) },
+  })
+  const formatBps = (bps) => `${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(Number(bps) / 100)}%`
   const feeLabel =
-    feeBpsValue !== undefined ? `${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(Number(feeBpsValue) / 100)}%` : null
+    feeBpsValue !== undefined && creatorFeeBpsValue !== undefined ? formatBps(feeBpsValue + creatorFeeBpsValue) : null
+  const creatorFeeLabel = creatorFeeBpsValue !== undefined && creatorFeeBpsValue > 0n ? formatBps(creatorFeeBpsValue) : null
+
+  const { data: featuredFeeValue } = useReadContract({
+    abi: predictAbi,
+    address: predictAddress,
+    functionName: 'featuredFee',
+    chainId,
+    query: { enabled: Boolean(predictAddress) },
+  })
+  const featuredValue = featured ? featuredFeeValue ?? 0n : 0n
 
   useImperativeHandle(ref, () => ({
     open: () => dialogRef.current?.open(),
@@ -179,13 +209,28 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
       return
     }
 
-    const judges = judgeInputs.map((input) => input.trim()).filter(Boolean)
-    if (judges.some((judge) => !isAddress(judge))) {
+    // Empty = betting opens immediately; a future time lists the market as upcoming
+    const opensUnix = opensLocal ? Math.floor(new Date(opensLocal).getTime() / 1000) : 0
+    if (!Number.isFinite(opensUnix) || (opensUnix > 0 && opensUnix >= deadlineUnix)) {
+      toast('Betting must open before it closes', 'error')
+      return
+    }
+
+    const extraJudges = judgeInputs.map((input) => input.trim()).filter(Boolean)
+    if (extraJudges.some((judge) => !isAddress(judge))) {
       toast('One of the judge addresses is invalid', 'error')
       return
     }
+
+    // The creator's entry travels explicitly; an entirely empty list still means the
+    // contract defaults to the creator as sole judge
+    const judges = [...(includeSelfAsJudge && address ? [address] : []), ...extraJudges]
     if (new Set(judges.map((judge) => judge.toLowerCase())).size !== judges.length) {
       toast('Judge addresses must be unique', 'error')
+      return
+    }
+    if (judges.length > MAX_JUDGES) {
+      toast(`At most ${MAX_JUDGES} judges per market`, 'error')
       return
     }
 
@@ -202,6 +247,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
         description: description.trim(),
         outcomes: labels.map((label) => ({ label })),
         image,
+        ...(category ? { category } : {}),
       })
     } catch (err) {
       toast(err.message || 'Failed to upload market details', 'error')
@@ -211,7 +257,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
     setIsUploading(false)
 
     // An empty judge list defaults to the creator judging their own market (onchain too)
-    const args = [address, tokenAddress, isTokenLsp7, BigInt(deadlineUnix), labels.length, judges, cid]
+    const args = [address, tokenAddress, isTokenLsp7, BigInt(opensUnix), BigInt(deadlineUnix), labels.length, featured, judges, cid]
 
     const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
@@ -223,7 +269,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
           contractAddress: predictAddress,
           abi: predictAbi,
           functionName: 'createMarket',
-          args,
+          args: [...args, { value: featuredValue }],
         })
 
         // writeWithBurnerSession already awaited confirmation, so this resolves immediately
@@ -246,6 +292,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
       address: predictAddress,
       functionName: 'createMarket',
       args,
+      value: featuredValue,
       chainId,
     })
   }
@@ -331,6 +378,21 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
             />
           </label>
 
+          {categories.length > 0 && (
+            <label>
+              <span>Category (optional)</span>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={isBusy}>
+                <option value="">No category</option>
+                {categories.map((entry) => (
+                  <option key={entry.slug} value={entry.slug}>
+                    {entry.emoji ? `${entry.emoji} ` : ''}
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <fieldset className={styles.marketDialog__list}>
             <legend>Outcomes</legend>
             {outcomeLabels.map((label, index) => (
@@ -365,13 +427,29 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
           </fieldset>
 
           <label>
+            <span>Betting opens (optional)</span>
+            <input type="datetime-local" value={opensLocal} onChange={(e) => setOpensLocal(e.target.value)} disabled={isBusy} />
+            <small>Leave empty to open immediately. A future time lists the market as upcoming — visible to everyone, bettable by no one until then.</small>
+          </label>
+
+          <label>
             <span>Betting closes</span>
             <input type="datetime-local" value={deadlineLocal} onChange={(e) => setDeadlineLocal(e.target.value)} disabled={isBusy} required />
             <small>After this time no new bets are accepted. If no judge resolves within the resolve window after it, everyone can reclaim their stake.</small>
           </label>
 
           <fieldset className={styles.marketDialog__list}>
-            <legend>Judges (optional — defaults to you)</legend>
+            <legend>Judges</legend>
+            {includeSelfAsJudge && address && (
+              <div className={styles.marketDialog__listRow}>
+                <span className={styles.marketDialog__selfJudge}>
+                  You — <code>{`${address.slice(0, 6)}…${address.slice(-4)}`}</code>
+                </span>
+                <button type="button" onClick={() => setIncludeSelfAsJudge(false)} disabled={isBusy} aria-label="Remove yourself from the judges">
+                  <TrashIcon size={14} />
+                </button>
+              </div>
+            )}
             {judgeInputs.map((input, index) => (
               <div key={index} className={styles.marketDialog__listRow}>
                 <input
@@ -395,13 +473,27 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
                 )}
               </div>
             ))}
-            {judgeInputs.length < MAX_JUDGES && (
-              <button type="button" className={styles.marketDialog__listAdd} onClick={() => setJudgeInputs((inputs) => [...inputs, ''])} disabled={isBusy}>
-                <PlusIcon size={12} />
-                Add judge
-              </button>
+            <div className={styles.marketDialog__listActions}>
+              {judgeInputs.length + (includeSelfAsJudge ? 1 : 0) < MAX_JUDGES && (
+                <button type="button" className={styles.marketDialog__listAdd} onClick={() => setJudgeInputs((inputs) => [...inputs, ''])} disabled={isBusy}>
+                  <PlusIcon size={12} />
+                  Add judge
+                </button>
+              )}
+              {!includeSelfAsJudge && address && (
+                <button type="button" className={styles.marketDialog__listAdd} onClick={() => setIncludeSelfAsJudge(true)} disabled={isBusy}>
+                  <PlusIcon size={12} />
+                  Add yourself back
+                </button>
+              )}
+            </div>
+            {!includeSelfAsJudge && judgeInputs.every((input) => !input.trim()) && (
+              <small>No judges picked — the contract will make you the sole judge anyway.</small>
             )}
-            <small>Any listed judge can close betting, pick the winning outcome, or cancel. The panel locks at the first bet.</small>
+            <small>
+              Judges must accept the role onchain before they can close betting, pick the winning outcome, or cancel — you&apos;re
+              accepted automatically. The panel locks at the first bet.
+            </small>
           </fieldset>
 
           <label>
@@ -419,19 +511,28 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
           </label>
 
           {isCustomToken && (
-            <label>
-              <span>Token address</span>
-              <input
-                type="text"
-                placeholder="0x…"
-                value={customToken}
-                onChange={(e) => setCustomToken(e.target.value)}
-                disabled={isBusy}
-                spellCheck={false}
-                autoComplete="off"
-                required
-              />
-            </label>
+            <>
+              <label>
+                <span>Token address</span>
+                <input
+                  type="text"
+                  placeholder="0x…"
+                  value={customToken}
+                  onChange={(e) => setCustomToken(e.target.value)}
+                  disabled={isBusy}
+                  spellCheck={false}
+                  autoComplete="off"
+                  required
+                />
+              </label>
+              <div className={styles.marketDialog__tokenWarning}>
+                <WarningIcon size={14} />
+                <span>
+                  Standard tokens only — fee-on-transfer tokens are rejected at bet time, and rebasing tokens break payouts.
+                  Double-check the address: bets stake real funds into it.
+                </span>
+              </div>
+            </>
           )}
 
           <div className={styles.marketDialog__image}>
@@ -450,9 +551,21 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
             </div>
           </div>
 
+          <label className={styles.marketDialog__featured}>
+            <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} disabled={isBusy} />
+            <StarIcon size={14} weight={featured ? 'fill' : 'regular'} />
+            <span>
+              Featured — pinned and highlighted in the directory
+              {featuredFeeValue && featuredFeeValue > 0n
+                ? ` (+${formatEther(featuredFeeValue)} ${chainInfo?.nativeCurrency?.symbol || ''})`
+                : ''}
+            </span>
+          </label>
+
           <p className={styles.marketDialog__notice}>
-            Creating a market is free. {feeLabel ? `A ${feeLabel} protocol fee` : 'A small protocol fee'} is taken from the pot only when the
-            market resolves — refunds are always in full.
+            Creating a market is free. {feeLabel ? `A ${feeLabel} fee` : 'A small fee'} is taken from the pot only when the
+            market resolves{creatorFeeLabel ? ` — ${creatorFeeLabel} of it goes to you as the creator` : ''}. Refunds are
+            always in full.
           </p>
 
           <button type="submit" disabled={isBusy || !predictAddress || isWrongChain} className={styles.marketDialog__submit}>

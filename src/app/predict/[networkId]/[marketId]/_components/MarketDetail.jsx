@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import clsx from 'clsx'
-import { zeroAddress } from 'viem'
+import { formatEther, zeroAddress } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
@@ -15,6 +15,9 @@ import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import predictAbi from '@/abis/HupPredict.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
+import HowPredictWorks from '../../../_components/HowPredictWorks'
+import EditJudgesDialog from './EditJudgesDialog'
+import EditMarketDialog from './EditMarketDialog'
 import PlaceBetModal from '@/components/PlaceBetModal'
 import Share from '@/components/ui/Share'
 import { ContentSpinner } from '@/components/Loading'
@@ -25,6 +28,7 @@ import {
   CurrencyDollarIcon,
   ScalesIcon,
   ShareNetworkIcon,
+  StarIcon,
   TimerIcon,
   UserIcon,
   UsersIcon,
@@ -54,6 +58,7 @@ export default function MarketDetail({ networkId, marketId }) {
   const outcomes = market ? parseJsonArray(market.outcome_labels) : []
   const pools = market ? parseJsonArray(market.outcome_pools) : []
   const judges = market ? parseJsonArray(market.judges) : []
+  const judgesConfirmed = market ? parseJsonArray(market.judges_confirmed) : []
   const position = detail?.data?.position ?? []
   const claim = detail?.data?.claim ?? null
   const holders = detail?.data?.holders ?? []
@@ -64,7 +69,9 @@ export default function MarketDetail({ networkId, marketId }) {
 
   const lowerAddress = address?.toLowerCase()
   const isCreator = Boolean(lowerAddress && market?.wallet_address === lowerAddress)
-  const isJudge = Boolean(lowerAddress && judges.includes(lowerAddress))
+  // Being listed attaches a name; only a confirmed judge holds judging power
+  const isListedJudge = Boolean(lowerAddress && judges.includes(lowerAddress))
+  const isConfirmedJudge = Boolean(lowerAddress && judgesConfirmed.includes(lowerAddress))
 
   // Render-stable clock (lazy initializer runs once) — SWR revalidation refreshes the page
   // data anyway, so second-precision liveness isn't worth an impure render
@@ -82,6 +89,26 @@ export default function MarketDetail({ networkId, marketId }) {
     query: { enabled: Boolean(predictAddress && address && market && ['resolved', 'refunding'].includes(status?.key)) },
   })
 
+  // The creator's accrued fee ledger for this market's stake token — spans ALL their
+  // resolved markets in that token, claimed in one transaction
+  const { data: creatorEarnings, refetch: refetchCreatorEarnings } = useReadContract({
+    abi: predictAbi,
+    address: predictAddress,
+    functionName: 'creatorFees',
+    args: [address ?? zeroAddress, market?.token ?? zeroAddress],
+    chainId,
+    query: { enabled: Boolean(predictAddress && market && isCreator) },
+  })
+
+  // Featured surcharge for the upgrade button (native, admin-configured)
+  const { data: featuredFeeValue } = useReadContract({
+    abi: predictAbi,
+    address: predictAddress,
+    functionName: 'featuredFee',
+    chainId,
+    query: { enabled: Boolean(predictAddress && market && !Number(market.featured)) },
+  })
+
   // enableRefunds unlocks at this unix time — read live so the button appears without a reload
   const { data: refundEligibleAt } = useReadContract({
     abi: predictAbi,
@@ -93,6 +120,8 @@ export default function MarketDetail({ networkId, marketId }) {
   })
   const refundsUnlockable = Boolean(refundEligibleAt && Number(refundEligibleAt) > 0 && Number(refundEligibleAt) <= mountedAt)
 
+  const editJudgesRef = useRef(null)
+  const editMarketRef = useRef(null)
   const [betOutcome, setBetOutcome] = useState(null)
   const [resolveMode, setResolveMode] = useState(false)
   const [resolveChoice, setResolveChoice] = useState(null)
@@ -112,12 +141,17 @@ export default function MarketDetail({ networkId, marketId }) {
     if (!isConfirmed || !lastAction) return
     toast(`${lastAction} confirmed — the page updates once the indexer catches up`, 'success')
     refetchClaimable()
+    refetchCreatorEarnings()
     mutate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
 
-  /** Sends a HupPredict write through the burner session when active, else the wallet. */
-  const submitTx = async (functionName, args, actionLabel) => {
+  /**
+   * Sends a HupPredict write through the burner session when active, else the wallet.
+   * `direct: true` skips the session entirely — resolve and confirmJudging require the
+   * judge's own signature onchain, so only the real wallet can send them.
+   */
+  const submitTx = async (functionName, args, actionLabel, { direct = false, value = 0n } = {}) => {
     if (!address) {
       toast('Connect your wallet first', 'error')
       return
@@ -127,7 +161,9 @@ export default function MarketDetail({ networkId, marketId }) {
       return
     }
 
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+    const session = direct
+      ? { active: false }
+      : await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
     if (session.active) {
       setIsBurnerBusy(true)
@@ -137,12 +173,13 @@ export default function MarketDetail({ networkId, marketId }) {
           contractAddress: predictAddress,
           abi: predictAbi,
           functionName,
-          args,
+          args: value > 0n ? [...args, { value }] : args,
         })
         toast(`${actionLabel} confirmed — the page updates once the indexer catches up`, 'success')
         setResolveMode(false)
         setResolveChoice(null)
         refetchClaimable()
+        refetchCreatorEarnings()
         mutate()
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -153,7 +190,7 @@ export default function MarketDetail({ networkId, marketId }) {
     }
 
     setLastAction(actionLabel)
-    writeContract({ abi: predictAbi, address: predictAddress, functionName, args, chainId })
+    writeContract({ abi: predictAbi, address: predictAddress, functionName, args, chainId, ...(value > 0n ? { value } : {}) })
     // Resolve mode exits as soon as the transaction is handed to the wallet — if it's
     // rejected or fails, the judge just re-enters it
     setResolveMode(false)
@@ -177,9 +214,17 @@ export default function MarketDetail({ networkId, marketId }) {
   const claimableAmount = claimable !== undefined && decimals !== undefined ? formatStake(claimable.toString(), decimals) : null
 
   const canBet = status.key === 'open' && Boolean(address)
-  const canCloseBetting = status.key === 'open' && (isCreator || isJudge)
-  const canResolve = isJudge && (status.key === 'awaiting' || (status.key === 'open' && deadlinePassed))
-  const canCancel = (isCreator || isJudge) && ['open', 'awaiting'].includes(status.key)
+  const canCloseBetting = status.key === 'open' && (isCreator || isConfirmedJudge)
+  const canResolve = isConfirmedJudge && (status.key === 'awaiting' || (status.key === 'open' && deadlinePassed))
+  const canCancel = (isCreator || isConfirmedJudge) && ['upcoming', 'open', 'awaiting'].includes(status.key)
+  // Panel editing mirrors the contract window: creator only, and only while no stakes exist
+  const canEditJudges = isCreator && ['upcoming', 'open'].includes(status.key) && totalPool === 0n
+  // Metadata editing shares the exact same window — updateMarketMetadata locks at the first bet
+  const canEditMarket = canEditJudges
+  const canFeature = isCreator && !Number(market.featured) && ['upcoming', 'open'].includes(status.key) && featuredFeeValue !== undefined
+  // Pending judges see an accept prompt; any listed judge can step down while unsettled
+  const canConfirmJudging = isListedJudge && !isConfirmedJudge && ['upcoming', 'open', 'awaiting'].includes(status.key)
+  const canRenounceJudging = isListedJudge && ['upcoming', 'open', 'awaiting'].includes(status.key)
 
   return (
     <div className={`${styles.market} animate fade`}>
@@ -193,14 +238,31 @@ export default function MarketDetail({ networkId, marketId }) {
       )}
 
       <header className={styles.market__header}>
-        <span className={clsx(styles.market__badge, styles[`market__badge--${status.key}`])}>{status.label}</span>
-        <h1 className={styles.market__title}>{market.title || 'Untitled market'}</h1>
+        <span className={clsx(styles.market__badge, 'flex align-items-center', styles[`market__badge--${status.key}`])}>
+          {/* Upcoming markets carry their start countdown right in the badge */}
+          {status.key === 'upcoming' ? `Upcoming — opens ${toRelative(market.betting_opens_at)}` : status.label}
+          {Boolean(Number(market.featured)) && <StarIcon size={12} weight="fill" className={styles.market__featuredStar} />}
+        </span>
+        <h1 className={styles.market__title}>
+          {market.title || 'Untitled market'}
+          {canEditMarket && (
+            <button type="button" className={styles.market__editMarket} onClick={() => editMarketRef.current?.open()}>
+              Edit
+            </button>
+          )}
+        </h1>
 
         <p className={styles.market__meta}>
           <span>
             <TimerIcon size={14} />
             {toRelative(market.opened_at)}
           </span>
+          {market.category_label && (
+            <span className={styles.market__category}>
+              {market.category_emoji ? `${market.category_emoji} ` : ''}
+              {market.category_label}
+            </span>
+          )}
         </p>
 
         {/* Creator and judges render through the shared Profile component, like posts —
@@ -217,9 +279,17 @@ export default function MarketDetail({ networkId, marketId }) {
             <small>
               <ScalesIcon size={12} />
               {judges.length === 1 ? 'Judge' : 'Judges'}
+              {canEditJudges && (
+                <button type="button" className={styles.market__editJudges} onClick={() => editJudgesRef.current?.open()}>
+                  Edit
+                </button>
+              )}
             </small>
             {judges.map((judge) => (
-              <Profile key={judge} variant="fullWithoutTime" creator={judge} networkId={chainId} />
+              <div key={judge} className={styles.market__judgeRow}>
+                <Profile variant="fullWithoutTime" creator={judge} networkId={chainId} />
+                {!judgesConfirmed.includes(judge) && <span className={styles.market__judgePending}>pending</span>}
+              </div>
             ))}
           </div>
         </div>
@@ -235,11 +305,15 @@ export default function MarketDetail({ networkId, marketId }) {
             <UsersIcon size={16} />
             {participantCount} {participantCount === 1 ? 'bettor' : 'bettors'}
           </span>
+          <HowPredictWorks />
         </p>
 
-        {status.key === 'open' && (
-          <p className={styles.market__deadline}>Betting closes {toRelative(market.betting_deadline)}</p>
+        {status.key === 'upcoming' && (
+          <p className={styles.market__deadline}>
+            Betting opens {toRelative(market.betting_opens_at)} and closes {toRelative(market.betting_deadline)}
+          </p>
         )}
+        {status.key === 'open' && <p className={styles.market__deadline}>Betting closes {toRelative(market.betting_deadline)}</p>}
         {status.key === 'awaiting' && refundEligibleAt && Number(refundEligibleAt) > 0 && !refundsUnlockable && (
           <p className={styles.market__deadline}>If no judge resolves, refunds unlock {toRelative(Number(refundEligibleAt))}</p>
         )}
@@ -255,11 +329,22 @@ export default function MarketDetail({ networkId, marketId }) {
         )}
 
         <div className={styles.market__actions}>
+          {canConfirmJudging && (
+            <button
+              type="button"
+              className={styles['market__action--primary']}
+              onClick={() => submitTx('confirmJudging', [BigInt(marketId)], 'Judge role accepted', { direct: true })}
+              disabled={isBusy || isWrongChain}
+            >
+              Accept judge role — you were named a judge of this market
+            </button>
+          )}
+
           {canCloseBetting && !resolveMode && (
             <button
               type="button"
               className={styles['market__action--primary']}
-              onClick={() => submitTx('closeBetting', [address, BigInt(marketId)], 'Betting closed')}
+              onClick={() => submitTx('closeBetting', [BigInt(marketId)], 'Betting closed', { direct: true })}
               disabled={isBusy || isWrongChain}
             >
               Close Betting
@@ -280,8 +365,9 @@ export default function MarketDetail({ networkId, marketId }) {
                 onClick={() =>
                   submitTx(
                     'resolve',
-                    [address, BigInt(marketId), resolveChoice],
+                    [BigInt(marketId), resolveChoice],
                     `Resolved to "${outcomes[resolveChoice]?.label || `#${resolveChoice + 1}`}"`,
+                    { direct: true }
                   )
                 }
                 disabled={isBusy || resolveChoice === null || isWrongChain}
@@ -290,7 +376,15 @@ export default function MarketDetail({ networkId, marketId }) {
                   ? 'Pick the winning outcome below'
                   : `Confirm: ${outcomes[resolveChoice]?.label || `Outcome #${resolveChoice + 1}`} won`}
               </button>
-              <button type="button" className={styles.market__action} onClick={() => { setResolveMode(false); setResolveChoice(null) }} disabled={isBusy}>
+              <button
+                type="button"
+                className={styles.market__action}
+                onClick={() => {
+                  setResolveMode(false)
+                  setResolveChoice(null)
+                }}
+                disabled={isBusy}
+              >
                 Never mind
               </button>
             </>
@@ -300,11 +394,27 @@ export default function MarketDetail({ networkId, marketId }) {
             <button
               type="button"
               className={styles['market__action--claim']}
-              onClick={() => submitTx('claim', [address, BigInt(marketId)], status.key === 'resolved' ? 'Winnings claimed' : 'Refund claimed')}
+              onClick={() =>
+                submitTx('claim', [address, BigInt(marketId)], status.key === 'resolved' ? 'Winnings claimed' : 'Refund claimed')
+              }
               disabled={isBusy || isWrongChain}
             >
               <CoinsIcon size={16} />
               Claim {claimableAmount ?? ''} {symbol}
+            </button>
+          )}
+
+          {isCreator && creatorEarnings !== undefined && creatorEarnings > 0n && (
+            <button
+              type="button"
+              className={styles['market__action--claim']}
+              onClick={() => submitTx('claimCreatorFees', [address, market.token], 'Creator earnings claimed')}
+              disabled={isBusy || isWrongChain}
+              // The ledger spans every market the creator settled in this stake token
+              title="Your accrued creator fees across all your resolved markets in this token"
+            >
+              <CoinsIcon size={16} />
+              Claim creator earnings {formatStake(creatorEarnings.toString(), decimals) ?? ''} {symbol}
             </button>
           )}
 
@@ -323,10 +433,36 @@ export default function MarketDetail({ networkId, marketId }) {
             <button
               type="button"
               className={styles.market__action}
-              onClick={() => submitTx('cancelMarket', [address, BigInt(marketId)], 'Market canceled')}
+              onClick={() => submitTx('cancelMarket', [BigInt(marketId)], 'Market canceled', { direct: true })}
               disabled={isBusy || isWrongChain}
             >
               Cancel &amp; refund everyone
+            </button>
+          )}
+
+          {canFeature && !resolveMode && (
+            <button
+              type="button"
+              className={styles.market__action}
+              onClick={() =>
+                submitTx('upgradeToFeatured', [address, BigInt(marketId)], 'Market featured', { value: featuredFeeValue ?? 0n })
+              }
+              disabled={isBusy || isWrongChain}
+            >
+              <StarIcon size={16} />
+              Feature this market
+              {featuredFeeValue > 0n ? ` (+${formatEther(featuredFeeValue)} ${chainInfo?.nativeCurrency?.symbol || ''})` : ''}
+            </button>
+          )}
+
+          {canRenounceJudging && !resolveMode && (
+            <button
+              type="button"
+              className={styles.market__action}
+              onClick={() => submitTx('renounceJudge', [BigInt(marketId)], 'Stepped down as judge', { direct: true })}
+              disabled={isBusy || isWrongChain}
+            >
+              Step down as judge
             </button>
           )}
 
@@ -357,8 +493,9 @@ export default function MarketDetail({ networkId, marketId }) {
         {Array.from({ length: Number(market.outcome_count) }, (_, index) => {
           const pool = BigInt(pools[index] ?? '0')
           const share = totalPool > 0n ? Number((pool * 10000n) / totalPool) / 100 : 0
-          // Parimutuel implied payout: the fee-adjusted pot divided by this outcome's pool
-          const distributable = Number(totalPool) * (1 - Number(market.fee_bps) / 10000)
+          // Parimutuel implied payout: the fee-adjusted pot (platform + creator cuts)
+          // divided by this outcome's pool
+          const distributable = Number(totalPool) * (1 - (Number(market.fee_bps) + Number(market.creator_fee_bps || 0)) / 10000)
           const multiplier = pool > 0n ? distributable / Number(pool) : null
           const yourBet = positionByOutcome[index]
           const isWinner = status.key === 'resolved' && Number(market.winning_outcome) === index
@@ -371,7 +508,7 @@ export default function MarketDetail({ networkId, marketId }) {
               className={clsx(
                 styles.market__outcome,
                 isWinner && styles['market__outcome--winner'],
-                resolveMode && resolveChoice === index && styles['market__outcome--selected'],
+                resolveMode && resolveChoice === index && styles['market__outcome--selected']
               )}
               onClick={() => {
                 if (resolveMode) setResolveChoice(index)
@@ -519,8 +656,11 @@ export default function MarketDetail({ networkId, marketId }) {
                   className={styles.market__personProfile}
                 />
                 <span className={styles.market__personAction}>
-                  bet <strong>{formatStake(bet.amount, decimals) ?? '…'} {symbol}</strong> on{' '}
-                  <strong>{outcomes[Number(bet.outcome)]?.label || `#${Number(bet.outcome) + 1}`}</strong>
+                  bet{' '}
+                  <strong>
+                    {formatStake(bet.amount, decimals) ?? '…'} {symbol}
+                  </strong>{' '}
+                  on <strong>{outcomes[Number(bet.outcome)]?.label || `#${Number(bet.outcome) + 1}`}</strong>
                 </span>
                 <span className={styles.market__personMeta}>{toRelative(bet.bet_at)}</span>
               </div>
@@ -528,6 +668,23 @@ export default function MarketDetail({ networkId, marketId }) {
           </div>
         )}
       </section>
+
+      {canEditMarket && (
+        <EditMarketDialog ref={editMarketRef} market={market} marketId={marketId} viewer={address} onAction={submitTx} isBusy={isBusy} />
+      )}
+
+      {canEditJudges && (
+        <EditJudgesDialog
+          ref={editJudgesRef}
+          judges={judges}
+          judgesConfirmed={judgesConfirmed}
+          chainId={chainId}
+          marketId={marketId}
+          viewer={address}
+          onAction={submitTx}
+          isBusy={isBusy}
+        />
+      )}
 
       {betOutcome !== null && (
         <PlaceBetModal

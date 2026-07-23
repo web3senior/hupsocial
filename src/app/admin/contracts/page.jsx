@@ -3,12 +3,14 @@
 
 import { useState, useEffect } from 'react'
 import { useConnection, useWriteContract } from 'wagmi' // Hook added here
-import { createPublicClient, http, isAddress, keccak256, stringToHex, formatEther, parseEther } from 'viem'
+import { createPublicClient, http, isAddress, keccak256, stringToHex, formatEther, parseEther, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { config, CONTRACTS } from '@/config/wagmi'
 import storeAbi from '@/abis/HupBazaar.json'
 import eventsAbi from '@/abis/HupEvents.json'
+import predictAbi from '@/abis/HupPredict.json'
+import tradeAbi from '@/abis/HupTrade.json'
 import styles from './page.module.scss'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
@@ -81,6 +83,19 @@ export default function Page() {
   const [eventsFeeTxStates, setEventsFeeTxStates] = useState({})
   const [eventsReceiverInputs, setEventsReceiverInputs] = useState({})
   const [eventsWithdrawStates, setEventsWithdrawStates] = useState({})
+  const [predictConfigs, setPredictConfigs] = useState({})
+  const [predictInputs, setPredictInputs] = useState({})
+  const [predictTxStates, setPredictTxStates] = useState({})
+  const [predictReceiverInputs, setPredictReceiverInputs] = useState({})
+  const [predictTokenInputs, setPredictTokenInputs] = useState({})
+  const [predictWithdrawStates, setPredictWithdrawStates] = useState({})
+  const [tradeFees, setTradeFees] = useState({})
+  const [tradeFeeInputs, setTradeFeeInputs] = useState({})
+  const [tradeFeeTxStates, setTradeFeeTxStates] = useState({})
+  const [tradeReceiverInputs, setTradeReceiverInputs] = useState({})
+  const [tradeTokenInputs, setTradeTokenInputs] = useState({})
+  const [tradeTokenIsLsp7, setTradeTokenIsLsp7] = useState({})
+  const [tradeWithdrawStates, setTradeWithdrawStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
 
@@ -440,6 +455,224 @@ export default function Page() {
     } catch (err) {
       console.error(`Events withdrawal error on chain ${chain.id}:`, err)
       setEventsWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Read the live HupPredict config from a chain's deployment: protocol fee, resolve
+  // window, and the accrued native-coin fee ledger (token fees are read ad hoc)
+  const loadPredictConfig = async (chain, predictAddress) => {
+    setPredictConfigs((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const [feeBps, creatorFeeBps, featuredFee, resolveWindow, nativeFees] = await Promise.all([
+        client.readContract({ address: predictAddress, abi: predictAbi, functionName: 'predictFeeBps' }),
+        client.readContract({ address: predictAddress, abi: predictAbi, functionName: 'creatorFeeBps' }),
+        client.readContract({ address: predictAddress, abi: predictAbi, functionName: 'featuredFee' }),
+        client.readContract({ address: predictAddress, abi: predictAbi, functionName: 'resolveWindow' }),
+        client.readContract({ address: predictAddress, abi: predictAbi, functionName: 'accruedFees', args: [zeroAddress] }),
+      ])
+
+      setPredictConfigs((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, feeBps, creatorFeeBps, featuredFee, resolveWindow, nativeFees },
+      }))
+    } catch (err) {
+      console.error(`Predict config read error for chain ${chain.id}:`, err)
+      setPredictConfigs((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read config' },
+      }))
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const predictAddress = CONTRACTS[`chain${chain.id}`]?.predict
+      if (predictAddress) loadPredictConfig(chain, predictAddress)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  // Set the protocol fee (entered in %, stored in bps, snapshotted into new markets only)
+  // or the resolve window (entered in days) on a chain's HupPredict (admin wallet signs)
+  const handleSetPredictConfig = async (chain, predictAddress, which) => {
+    const draft = predictInputs[chain.id]?.[which]?.trim()
+    let functionName
+    let value
+
+    if (which === 'fee' || which === 'creatorFee') {
+      const percent = Number(draft)
+      if (!Number.isFinite(percent) || percent < 0 || percent > 10) {
+        setPredictTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Fee must be 0–10%' } }))
+        return
+      }
+      // The contract enforces the real cap: platform + creator combined ≤ 10%
+      functionName = which === 'fee' ? 'setPredictFeeBps' : 'setCreatorFeeBps'
+      value = BigInt(Math.round(percent * 100))
+    } else if (which === 'featured') {
+      try {
+        value = parseEther(draft || '')
+      } catch {
+        setPredictTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid amount in native units' } }))
+        return
+      }
+      functionName = 'setFeaturedFee'
+    } else {
+      const days = Number(draft)
+      if (!Number.isFinite(days) || days < 1 || days > 90) {
+        setPredictTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Window must be 1–90 days' } }))
+        return
+      }
+      functionName = 'setResolveWindow'
+      value = BigInt(Math.round(days * 86400))
+    }
+
+    setPredictTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: predictAddress,
+        abi: predictAbi,
+        functionName,
+        args: [value],
+        chainId: chain.id,
+      })
+
+      setPredictTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadPredictConfig(chain, predictAddress), 3000)
+    } catch (err) {
+      console.error(`Predict ${which} update error on chain ${chain.id}:`, err)
+      setPredictTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Withdraw accrued protocol fees for one stake token (empty token input = native coin).
+  // Only the fee ledger is withdrawable — escrowed stakes are untouchable by design.
+  const handleWithdrawPredictFees = async (chain, predictAddress) => {
+    const receiver = predictReceiverInputs[chain.id]?.trim()
+    const tokenDraft = predictTokenInputs[chain.id]?.trim()
+    const token = tokenDraft ? tokenDraft : zeroAddress
+
+    if (!isAddress(receiver) || (tokenDraft && !isAddress(tokenDraft))) {
+      setPredictWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver (and token) address' } }))
+      return
+    }
+
+    setPredictWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: predictAddress,
+        abi: predictAbi,
+        functionName: 'withdrawFees',
+        args: [token, receiver],
+        chainId: chain.id,
+      })
+
+      setPredictWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadPredictConfig(chain, predictAddress), 3000)
+    } catch (err) {
+      console.error(`Predict fee withdrawal error on chain ${chain.id}:`, err)
+      setPredictWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Read the current sale fee from a chain's HupTrade deployment
+  const loadTradeFee = async (chain, tradeAddress) => {
+    setTradeFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const feeBps = await client.readContract({ address: tradeAddress, abi: tradeAbi, functionName: 'tradeFeeBps' })
+
+      setTradeFees((prev) => ({ ...prev, [chain.id]: { loading: false, feeBps } }))
+    } catch (err) {
+      console.error(`Trade fee read error for chain ${chain.id}:`, err)
+      setTradeFees((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read fee' },
+      }))
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const tradeAddress = CONTRACTS[`chain${chain.id}`]?.trade
+      if (tradeAddress) loadTradeFee(chain, tradeAddress)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  // Set the sale fee (entered in %, stored in bps, hard-capped at 10%) on a chain's HupTrade
+  const handleSetTradeFee = async (chain, tradeAddress) => {
+    const percent = Number(tradeFeeInputs[chain.id]?.trim())
+    if (!Number.isFinite(percent) || percent < 0 || percent > 10) {
+      setTradeFeeTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Fee must be 0–10%' } }))
+      return
+    }
+
+    setTradeFeeTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: tradeAddress,
+        abi: tradeAbi,
+        functionName: 'setTradeFeeBps',
+        args: [BigInt(Math.round(percent * 100))],
+        chainId: chain.id,
+      })
+
+      setTradeFeeTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadTradeFee(chain, tradeAddress), 3000)
+    } catch (err) {
+      console.error(`Trade fee update error on chain ${chain.id}:`, err)
+      setTradeFeeTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Withdraw HupTrade's accumulated fees: native balance, or a token balance (ERC20/LSP7)
+  const handleWithdrawTrade = async (chain, tradeAddress, asToken) => {
+    const receiver = tradeReceiverInputs[chain.id]?.trim()
+    const token = tradeTokenInputs[chain.id]?.trim()
+
+    if (!isAddress(receiver) || (asToken && !isAddress(token))) {
+      setTradeWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver (and token) address' } }))
+      return
+    }
+
+    setTradeWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: tradeAddress,
+        abi: tradeAbi,
+        functionName: asToken ? 'withdrawAllToken' : 'withdrawAll',
+        args: asToken ? [token, receiver, Boolean(tradeTokenIsLsp7[chain.id])] : [receiver],
+        chainId: chain.id,
+      })
+
+      setTradeWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+    } catch (err) {
+      console.error(`Trade withdrawal error on chain ${chain.id}:`, err)
+      setTradeWithdrawStates((prev) => ({
         ...prev,
         [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
@@ -1115,6 +1348,469 @@ export default function Page() {
                         className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
                       >
                         {withdrawState?.loading ? 'Withdrawing...' : 'Withdraw Native Balance'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupPredict Config</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Set the platform and creator fees (snapshotted into new markets only, combined cap 10%) and the judge
+              resolve window, and withdraw accrued platform fees per stake token — escrowed stakes and creator fee
+              ledgers are never withdrawable.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.predict) return null
+
+              const predictConfig = predictConfigs[chain.id]
+              const drafts = predictInputs[chain.id] ?? {}
+              const configTx = predictTxStates[chain.id]
+              const receiverDraft = predictReceiverInputs[chain.id] ?? ''
+              const tokenDraft = predictTokenInputs[chain.id] ?? ''
+              const withdrawState = predictWithdrawStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+              const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+
+              return (
+                <div
+                  key={`predict-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPPREDICT</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Predict Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.predict}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.predict}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.predict}</code>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Current Config</span>
+                      <div className={styles['admin-contracts__detail-value']}>
+                        {(!predictConfig || predictConfig.loading) && <span>Loading…</span>}
+                        {predictConfig?.error && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                            {predictConfig.error}
+                          </div>
+                        )}
+                        {predictConfig && !predictConfig.loading && !predictConfig.error && (
+                          <strong>
+                            Platform fee {Number(predictConfig.feeBps) / 100}% · Creator fee {Number(predictConfig.creatorFeeBps) / 100}% ·
+                            Featured {formatEther(predictConfig.featuredFee)} {symbol} · Resolve window{' '}
+                            {Number(predictConfig.resolveWindow) / 86400}d · Accrued {formatEther(predictConfig.nativeFees)} {symbol}
+                          </strong>
+                        )}
+                      </div>
+                    </div>
+
+                    {configTx && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {configTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {configTx.error && <span style={{ color: '#ef4444' }}>❌ {configTx.error}</span>}
+                          {configTx.success && (
+                            <span style={{ color: '#10b981' }}>
+                              🚀{' '}
+                              {configTx.which === 'fee'
+                                ? 'Platform fee'
+                                : configTx.which === 'creatorFee'
+                                ? 'Creator fee'
+                                : configTx.which === 'featured'
+                                ? 'Featured fee'
+                                : 'Resolve window'}{' '}
+                              updated.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetPredictConfig(chain, deployment.predict, 'fee')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Platform Fee (%) — combined cap 10, new markets only</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={drafts.fee ?? ''}
+                        onChange={(e) => setPredictInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], fee: e.target.value } }))}
+                        placeholder="e.g. 1"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!drafts.fee?.trim() || configTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {configTx?.loading && configTx.which === 'fee' ? 'Writing...' : 'Set Platform Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetPredictConfig(chain, deployment.predict, 'creatorFee')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Creator Fee (%) — combined cap 10, new markets only</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={drafts.creatorFee ?? ''}
+                        onChange={(e) =>
+                          setPredictInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], creatorFee: e.target.value } }))
+                        }
+                        placeholder="e.g. 1"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!drafts.creatorFee?.trim() || configTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {configTx?.loading && configTx.which === 'creatorFee' ? 'Writing...' : 'Set Creator Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetPredictConfig(chain, deployment.predict, 'featured')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Featured Surcharge ({symbol})</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={drafts.featured ?? ''}
+                        onChange={(e) =>
+                          setPredictInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], featured: e.target.value } }))
+                        }
+                        placeholder="e.g. 0.5"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!drafts.featured?.trim() || configTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {configTx?.loading && configTx.which === 'featured' ? 'Writing...' : 'Set Featured Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetPredictConfig(chain, deployment.predict, 'window')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Resolve Window (days) — 1 to 90</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={drafts.window ?? ''}
+                        onChange={(e) =>
+                          setPredictInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], window: e.target.value } }))
+                        }
+                        placeholder="e.g. 7"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!drafts.window?.trim() || configTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {configTx?.loading && configTx.which === 'window' ? 'Writing...' : 'Set Resolve Window'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleWithdrawPredictFees(chain, deployment.predict)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Withdraw Receiver</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={receiverDraft}
+                        onChange={(e) => setPredictReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Fee Token (empty = native {symbol})</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={tokenDraft}
+                        onChange={(e) => setPredictTokenInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x... (optional)"
+                      />
+                    </div>
+
+                    {withdrawState && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Withdrawal</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {withdrawState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {withdrawState.error && <span style={{ color: '#ef4444' }}>❌ {withdrawState.error}</span>}
+                          {withdrawState.success && <span style={{ color: '#10b981' }}>🚀 Fees withdrawn.</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!receiverDraft.trim() || withdrawState?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        {withdrawState?.loading ? 'Withdrawing...' : 'Withdraw Accrued Fees'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupTrade Fees</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Set the sale fee (in %, hard-capped at 10%) on HupTrade deployments and withdraw accumulated fees —
+              native balance, or any ERC20/LSP7 token balance.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.trade) return null
+
+              const fee = tradeFees[chain.id]
+              const feeDraft = tradeFeeInputs[chain.id] ?? ''
+              const feeTx = tradeFeeTxStates[chain.id]
+              const receiverDraft = tradeReceiverInputs[chain.id] ?? ''
+              const tokenDraft = tradeTokenInputs[chain.id] ?? ''
+              const isLsp7 = Boolean(tradeTokenIsLsp7[chain.id])
+              const withdrawState = tradeWithdrawStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+
+              return (
+                <div
+                  key={`trade-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPTRADE</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Trade Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.trade}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.trade}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.trade}</code>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Current Sale Fee</span>
+                      <div className={styles['admin-contracts__detail-value']}>
+                        {(!fee || fee.loading) && <span>Loading…</span>}
+                        {fee?.error && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                            {fee.error}
+                          </div>
+                        )}
+                        {fee && !fee.loading && !fee.error && <strong>{Number(fee.feeBps) / 100}%</strong>}
+                      </div>
+                    </div>
+
+                    {feeTx && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {feeTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {feeTx.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
+                          {feeTx.success && <span style={{ color: '#10b981' }}>🚀 Sale fee updated.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetTradeFee(chain, deployment.trade)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Sale Fee (%) — max 10</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={feeDraft}
+                        onChange={(e) => setTradeFeeInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="e.g. 2.5"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!feeDraft.trim() || feeTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {feeTx?.loading ? 'Writing...' : 'Set Sale Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleWithdrawTrade(chain, deployment.trade, false)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Withdraw Receiver</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={receiverDraft}
+                        onChange={(e) => setTradeReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Token Address (for token withdrawal)</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={tokenDraft}
+                        onChange={(e) => setTradeTokenInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x... (optional)"
+                      />
+                    </div>
+
+                    <label className={styles['admin-contracts__detail-label']} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={isLsp7}
+                        onChange={(e) => setTradeTokenIsLsp7((prev) => ({ ...prev, [chain.id]: e.target.checked }))}
+                      />
+                      This token is an LSP7 Digital Asset (LUKSO), not an ERC20
+                    </label>
+
+                    {withdrawState && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Withdrawal</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {withdrawState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {withdrawState.error && <span style={{ color: '#ef4444' }}>❌ {withdrawState.error}</span>}
+                          {withdrawState.success && <span style={{ color: '#10b981' }}>🚀 Withdrawn.</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!receiverDraft.trim() || withdrawState?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        {withdrawState?.loading ? 'Withdrawing...' : 'Withdraw Native Balance'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleWithdrawTrade(chain, deployment.trade, true)}
+                        disabled={!receiverDraft.trim() || !tokenDraft.trim() || withdrawState?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        Withdraw Token Balance
                       </button>
                     </div>
                   </form>

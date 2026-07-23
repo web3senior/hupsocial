@@ -51,8 +51,9 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    flex: 1;
-    min-width: 140px;
+    /* Full-width basis claims a whole row of the wrapping toolbar for the search */
+    flex: 1 1 100%;
+    padding-block: 0.45rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     padding: 0.3rem 0.7rem;
@@ -73,7 +74,6 @@
   }
 
   &__networkFilter {
-    margin-left: auto;
     border: 1px solid var(--border);
     border-radius: var(--global-border-radius);
     background: var(--background);
@@ -83,11 +83,12 @@
   }
 
   &__createButton {
+    margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
     border: none;
-    background-color: var(--primary, #0d6efd);
+    background-color: var(--network-color-primary, #0d6efd);
     color: #fff;
     border-radius: 999px;
     padding: 0.4rem 0.85rem;
@@ -115,6 +116,33 @@
     &:hover {
       border-color: var(--primary, #0d6efd);
     }
+
+    &--featured {
+      border-color: rgba(237, 161, 0, 0.55);
+    }
+  }
+
+  &__star {
+    color: #eda100;
+    margin-right: auto;
+  }
+
+  &__featuredStrip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+
+    h2 {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 0;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #b47a00;
+    }
   }
 
   &__cardTop {
@@ -139,8 +167,8 @@
   }
 
   &__thumb {
-    width: 56px;
-    height: 56px;
+    width: 80px;
+    height: 80px;
     flex-shrink: 0;
     border-radius: calc(var(--global-border-radius) / 2);
     object-fit: cover;
@@ -160,6 +188,11 @@
       color: #ec4899;
     }
 
+    &--upcoming {
+      background: rgba(42, 120, 214, 0.14);
+      color: #2a78d6;
+    }
+    
     &--awaiting {
       background: rgba(245, 158, 11, 0.14);
       color: #b45309;
@@ -180,6 +213,61 @@
     font-size: var(--font-size-10, 0.65rem);
     color: var(--text-muted, #888);
     text-transform: capitalize;
+  }
+
+  /* Horizontal category filter chips under the toolbar — scrolls when they overflow.
+     min-width: 0 overrides the flex-item auto floor, else the row grows past the page
+     instead of scrolling inside itself. */
+  &__categories {
+    display: flex;
+    gap: 0.4rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+  }
+
+  &__categoryChip {
+    all: unset;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: var(--font-size-12, 0.75rem);
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+    color: var(--text-muted, #888);
+
+    &:hover {
+      background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+    }
+
+    /* Active fill follows the connected network's brand color (root-level var set on
+       connect/chain switch), falling back to the app primary when no wallet is connected */
+    &--active {
+      background: var(--network-color-primary, var(--primary, #ec4899));
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+      color: var(--network-color-text, #fff);
+
+      /* Declared after the base :hover so it wins the specificity tie — the active chip
+         keeps its fill and just dims, instead of flipping to the muted gray */
+      &:hover {
+        background: var(--network-color-primary, var(--primary, #ec4899));
+        opacity: 0.85;
+      }
+    }
+  }
+
+  /* Category tag on a card's top row, next to the network name */
+  &__categoryTag {
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+    white-space: nowrap;
   }
 
   &__title {
