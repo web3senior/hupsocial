@@ -74,7 +74,7 @@ export const CONTRACTS = {
     tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
     trade: '0x80218c06A00316687957951036bbD1326a6790C1',
     events: '0x39CB4342C425Cdc8576fa593988E5a4980db9853',
-    predict: '',
+    predict: '0xf9df0275821dbcCBd7Fe461c4224F1ccAC46ae20',
   },
   chain42220: {
     name: 'celo',
@@ -87,7 +87,7 @@ export const CONTRACTS = {
     tipper: '0xbc487be674065E39FeFF468856ce614E0Dec48fb',
     trade: '0x94D81b00b1e4596343e84298dD705e93E36eAb14',
     events: '0x10feacEEDDB387112f9a484EfB2df9FB197934E4',
-    predict: '',
+    predict: '0xb0F3D16De2B029Bb18d44C35AB811E23C4FC1B87',
   },
   chain8453: {
     name: 'base',
@@ -99,7 +99,7 @@ export const CONTRACTS = {
     tipper: '0x01F725975b17dB66DBF26ebAa02bc74F8a433A18',
     trade: '0x7E14bB18b370b59e0b70759C915f5E3A79599091',
     events: '0x6dB2352e9921F46F005449FcA36938e7cb5A29f5',
-    predict: '',
+    predict: '0x70DBfbb6E64f2e246A83d3Ae0262CC9588c31472',
   },
   chain56: {
     name: 'bnb',
@@ -111,7 +111,7 @@ export const CONTRACTS = {
     tipper: '0x74AC93C4A4a67f56af9d1Bd3153910D90F802632',
     trade: '0x594d084D863446cd1618244de695d574a5DfADD5',
     events: '0xD479950963A8F87d9Cd44Ad3983C96A5A4b3c14d',
-    predict: '',
+    predict: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
   },
   chain4663: {
     name: 'robinhood',
@@ -124,7 +124,7 @@ export const CONTRACTS = {
     tipper: '0x3EF07D888e4B4d91e5b6c889E6Bdb7A37BE76CDE',
     trade: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
     events: '0x735A8352036B953F8AC0Ae421DaEf8f2978EcC91',
-    predict: '',
+    predict: '0x08c4631B621959468770c3C9831E867aF9014780',
   },
   chain10143: {
     name: 'monad-testnet',
@@ -150,6 +150,6 @@ export const CONTRACTS = {
     tipper: '0x0Fc1223079367ADC73F9960E48d786705e992e14',
     trade: '0x71Ce7aF80996AB5a9c265E2048c5759435131631',
     events: '0x88C0963857049368470E2851aFf5EDFc2D32346C',
-    predict: '',
+    predict: '0x81369e32F31DDAb46F9BF3269e523A440822C748',
   },
 }
