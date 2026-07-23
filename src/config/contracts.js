@@ -60,7 +60,7 @@ export const CONTRACTS = {
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
     trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
-    predict: '',
+    predict: '0xD76dcBB664a002247269c1fBB161B0440674C570',
   },
   chain143: {
     name: 'monad',
@@ -137,7 +137,7 @@ export const CONTRACTS = {
     tipper: '0x487aE425f90425a3376F3bC8A016aA1Fb6bec96f',
     trade: '0xC2b7f6eDecE9E5aB04C296a02bf61054487812e5',
     events: '0x4A6D88aBd0fd9049c1adD6757D382c1bb5bbC1D9',
-    predict: '0xBBB8F5F17b6305A0aAD3F4ecebB0198B5c6728cf',
+    predict: '0x15C42Cf47D0Fe1D5314A91E5B23da35c72b129D9',
   },
   chain42161: {
     name: 'arbitrum',
