@@ -398,12 +398,32 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
                 )}
               </div>
             )}
+
+            {/* Price/referral/status as inline chips under the title — the aside column
+                is buttons only in the feed card */}
+            {(formattedPrice && (isActive || isSold)) || isSold || isCancelled || isUnavailable ? (
+              <div className={styles.tradeCard__meta}>
+                {formattedPrice && (isActive || isSold) && (
+                  <span className={styles.tradeCard__chip}>
+                    {formattedPrice} {symbol}
+                  </span>
+                )}
+                {isActive && !isUnavailable && referralPercent && (
+                  <span className={clsx(styles.tradeCard__chip, styles['tradeCard__chip--muted'])}>{referralPercent}% referral</span>
+                )}
+                {isSold && <span className={clsx(styles.tradeCard__chip, styles['tradeCard__chip--sold'])}>Sold</span>}
+                {isCancelled && <span className={styles.tradeCard__chip}>Cancelled</span>}
+                {isUnavailable && <span className={styles.tradeCard__chip}>Unavailable</span>}
+              </div>
+            ) : null}
           </div>
         </>
       )}
 
       <div className={styles.tradeCard__aside}>
-        {formattedPrice && (isActive || isSold) && (
+        {/* Compact (listing detail page) keeps the full price panel + status badges —
+            only the feed card's price moved to chips above */}
+        {compact && formattedPrice && (isActive || isSold) && (
           <div className={styles.tradeCard__price}>
             <span>{isSold ? 'Sold for' : 'Price'}</span>
             <strong>
@@ -417,13 +437,13 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
 
         {showDetailsLink && (
           <Link href={`/nfts/${chainId}/${listing.listingId}`} className={styles.tradeCard__view}>
-            View NFT
+            View
           </Link>
         )}
 
-        {isSold && <span className={clsx(styles.tradeCard__badge, styles['tradeCard__badge--sold'])}>Sold</span>}
-        {isCancelled && <span className={styles.tradeCard__badge}>Listing cancelled</span>}
-        {isUnavailable && <span className={styles.tradeCard__badge}>No longer available</span>}
+        {compact && isSold && <span className={clsx(styles.tradeCard__badge, styles['tradeCard__badge--sold'])}>Sold</span>}
+        {compact && isCancelled && <span className={styles.tradeCard__badge}>Listing cancelled</span>}
+        {compact && isUnavailable && <span className={styles.tradeCard__badge}>No longer available</span>}
 
         {isActive &&
           !isUnavailable &&
@@ -454,7 +474,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
             </button>
           ) : (
             <button type="button" className={styles.tradeCard__buy} onClick={handleBuy} disabled={isBusy || !address}>
-              {isBusy ? 'Confirming...' : 'Buy now'}
+              {isBusy ? 'Confirming...' : 'Buy'}
             </button>
           ))}
       </div>
