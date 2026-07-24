@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
-import { RepeatIcon, StorefrontIcon } from '@phosphor-icons/react'
+import { StorefrontIcon } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
@@ -13,6 +13,7 @@ import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import tradeAbi from '@/abis/HupTrade.json'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { toast } from '@/components/NextToast'
+import EditListingModal from './EditListingModal'
 import styles from './TradeCard.module.scss'
 
 // IHupTrade.ListingStatus
@@ -106,6 +107,7 @@ const lsp7Abi = [
  */
 const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false }) => {
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
   const { address } = useConnection()
   const lastActionRef = useRef(null)
 
@@ -350,17 +352,11 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
   const isUnavailable = isActive && isPurchasable === false
 
   const isMetaLoading = metadata.isLoading && !metadata.name
-  const visibleTraits = metadata.attributes.slice(0, 4)
-  const hiddenTraits = metadata.attributes.slice(4)
 
   // Surface the seller-set referral share as a concrete number so reposters know what a
   // conversion pays them
   const referralBps = liveListing ? Number(liveListing.referralBps) : 0
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
-  const referralShare =
-    referralBps > 0 && price !== undefined && decimals !== undefined
-      ? new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(Number(formatUnits((price * liveListing.referralBps) / 10_000n, decimals)))
-      : null
 
   return (
     <div className={clsx(styles.tradeCard, { [styles['tradeCard--compact']]: compact })} onClick={(e) => e.stopPropagation()}>
@@ -371,23 +367,20 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
               <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
             ) : (
               <div className={clsx(styles.tradeCard__mediaFallback, { [styles['tradeCard__mediaFallback--loading']]: isMetaLoading })}>
-                <StorefrontIcon size={26} weight="duotone" />
+                <StorefrontIcon size={18} weight="duotone" />
               </div>
             )}
           </div>
 
           <div className={styles.tradeCard__info}>
-            {metadata.collectionName ? (
-              collectionUrl ? (
+            {metadata.collectionName &&
+              (collectionUrl ? (
                 <a href={collectionUrl} target="_blank" rel="noopener noreferrer" className={styles.tradeCard__eyebrow}>
                   {metadata.collectionName}
                 </a>
               ) : (
                 <span className={styles.tradeCard__eyebrow}>{metadata.collectionName}</span>
-              )
-            ) : (
-              <span className={styles.tradeCard__eyebrow}>{isMetaLoading ? '' : 'NFT for sale'}</span>
-            )}
+              ))}
 
             {isMetaLoading ? (
               <>
@@ -405,22 +398,6 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
                 )}
               </div>
             )}
-
-            {visibleTraits.length > 0 && (
-              <ul className={styles.tradeCard__traits}>
-                {visibleTraits.map((attr) => (
-                  <li key={`${attr.label}:${attr.value}`}>
-                    <span>{attr.label}</span>
-                    <strong>{attr.value}</strong>
-                  </li>
-                ))}
-                {hiddenTraits.length > 0 && (
-                  <li className={styles.tradeCard__traitsMore} title={hiddenTraits.map((attr) => `${attr.label}: ${attr.value}`).join('\n')}>
-                    <strong>+{hiddenTraits.length}</strong>
-                  </li>
-                )}
-              </ul>
-            )}
           </div>
         </>
       )}
@@ -432,6 +409,9 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
             <strong>
               {formattedPrice} {symbol}
             </strong>
+            {isActive && !isUnavailable && referralPercent && (
+              <small className={styles.tradeCard__referralNote}>{referralPercent}% referral</small>
+            )}
           </div>
         )}
 
@@ -448,9 +428,26 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
         {isActive &&
           !isUnavailable &&
           (isSeller ? (
-            <button type="button" className={styles.tradeCard__cancelListing} onClick={handleCancel} disabled={isBusy}>
-              {isBusy ? 'Confirming...' : 'Cancel listing'}
-            </button>
+            // Management actions only appear on the listing detail page — the feed card
+            // is just a reference, and links there through View NFT
+            compact && (
+              <>
+                <button
+                  type="button"
+                  className={styles.tradeCard__cancelListing}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsEditOpen(true)
+                  }}
+                  disabled={isBusy}
+                >
+                  Edit listing
+                </button>
+                <button type="button" className={styles.tradeCard__cancelListing} onClick={handleCancel} disabled={isBusy}>
+                  {isBusy ? 'Confirming...' : 'Cancel listing'}
+                </button>
+              </>
+            )
           ) : needsApproval ? (
             <button type="button" className={styles.tradeCard__buy} onClick={handleApprove} disabled={isBusy || !address}>
               {isBusy ? 'Confirming...' : `Approve ${symbol}`}
@@ -462,13 +459,24 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
           ))}
       </div>
 
-      {isActive && !isUnavailable && referralPercent && referralShare && (
-        <p className={styles.tradeCard__referralNote}>
-          <RepeatIcon size={14} />
-          <span>
-            Repost or quote this post and earn <strong>{referralPercent}%</strong> ({referralShare} {symbol}) when someone buys through you
-          </span>
-        </p>
+      {isEditOpen && (
+        <EditListingModal
+          chainId={chainId}
+          tradeAddress={tradeAddress}
+          listingId={listingId}
+          initialToken={token}
+          initialIsTokenLsp7={isTokenLsp7}
+          initialPrice={price}
+          initialReferralBps={referralBps}
+          initialDecimals={decimals}
+          nativeCurrency={nativeCurrency}
+          tipTokens={TIP_TOKENS[chainId] ?? []}
+          onClose={() => setIsEditOpen(false)}
+          onUpdated={() => {
+            refetchListing()
+            refetchPurchasable()
+          }}
+        />
       )}
     </div>
   )
