@@ -277,7 +277,7 @@ export const Like = ({ post, onUpdate }) => {
 
   // ■■■ UI Style Layout Variables ■■■
   const isLoading = interactionState.isProcessing || isWalletPending || isConfirming
-  const heartColor = isLiked ? 'var(--liked-color, red)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
+  const heartColor = isLiked ? 'var(--liked-color, #ff007a)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
   const heartWeight = isLiked || isQueued ? 'fill' : 'regular'
 
   if (!isMounted) return null
@@ -286,6 +286,8 @@ export const Like = ({ post, onUpdate }) => {
     <div className={clsx('flex', 'align-items-center', 'gap-050')}>
       <button
         data-action="like"
+        data-liked={isLiked ? 'true' : undefined}
+        data-queued={!isLiked && isQueued ? 'true' : undefined}
         disabled={isLoading}
         className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
         onClick={handleLikeInteraction}
