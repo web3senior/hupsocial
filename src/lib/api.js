@@ -81,6 +81,38 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
   return response.json()
 }
 
+/**
+ * Get NFT Listings
+ * Lists HupTrade NFT listings straight from the indexed nft_listings table (not
+ * posts) for the NFT Market grid. `filters` mirrors the API's own query params —
+ * pass only the ones you want applied.
+ * @param {number} page
+ * @param {number} limit
+ * @param {Object} [filters]
+ * @param {number|string} [filters.networkId]
+ * @param {string} [filters.collection] Collection contract address.
+ * @param {'active'|'sold'|'cancelled'|'all'} [filters.status]
+ * @param {'lsp8'|'erc721'} [filters.standard]
+ * @param {'native'|string} [filters.token] Payment token address, or 'native'.
+ * @param {string} [filters.minPrice] Base units (decimal string).
+ * @param {string} [filters.maxPrice] Base units (decimal string).
+ * @param {string} [filters.seller] Wallet address or username fragment.
+ * @param {'any'|'none'|string} [filters.referral] Referral share: 'any' (pays anything),
+ * 'none' (pays nothing), or a minimum in basis points ('500' for 5%+).
+ * @param {'newest'|'price_asc'|'price_desc'} [filters.sort]
+ */
+export const getNftListings = async (page = 1, limit = 24, filters = {}) => {
+  const params = new URLSearchParams({ page, limit })
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') params.set(key, value)
+  })
+
+  const response = await fetch(`/api/v1/nfts?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch NFT listings')
+
+  return response.json()
+}
+
 export const getFollowingPosts = async (networkId, viewerAddress, page = 1, limit = 20) => {
   const url = `/api/v1/networks/posts?feed_type=following&page=${page}&limit=${limit}&network_id=${networkId}&viewer_address=${viewerAddress}`
 

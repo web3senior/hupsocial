@@ -1,0 +1,246 @@
+.market {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-block: 0.75rem 2rem;
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  &__filterButton {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--text-muted);
+    }
+  }
+
+  &__filterBadge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    display: grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--network-color-text, var(--white));
+    font-size: var(--font-size-10, 10px);
+    font-weight: 700;
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    padding-inline: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.9rem;
+
+      &::placeholder {
+        color: var(--text-muted);
+      }
+    }
+
+    button {
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+  }
+
+  /* Fixed column counts, not auto-fill — the tiles should read as large artwork, so the
+     count is a deliberate choice per breakpoint rather than whatever a min tile width
+     happens to yield at the container's size. */
+  &__grid {
+    display: grid;
+    /* minmax(0, …), not a bare 1fr — 1fr means minmax(auto, 1fr), and a long collection
+       name's min-content width would then widen the track and overflow the row. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 0.85rem;
+
+    /* Name search runs inside each card (NFT metadata isn't indexed, so it can only be
+       matched once it resolves) and a non-matching card renders nothing — leaving the
+       grid with no children and no count up here to branch on. Cards still loading do
+       render, so this can't flash before metadata settles. */
+    &:empty::after {
+      content: 'No NFTs match your search.';
+      grid-column: 1 / -1;
+      padding: 3rem 1rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+  }
+
+  &__skeletonTile {
+    aspect-ratio: 1;
+    border-radius: 16px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: nftMarketPulse 1.4s ease-in-out infinite;
+  }
+
+  &__empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  &__loadMoreWrap {
+    display: flex;
+    justify-content: center;
+    padding-top: 0.5rem;
+  }
+
+  &__loadMore {
+    padding: 0.6rem 1.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--text-muted);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+  }
+
+  @media (min-width: 640px) {
+    &__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+}
+
+/* Chrome only — NativePopover owns `display` on the panel itself (UA `display: none`
+   while closed, `block !important` when open). A bare `display` here is author-origin
+   and would beat the UA closed-state rule, leaving an invisible opacity-0 panel laid
+   out over the toolbar eating every click. The column layout lives on __body instead. */
+.filtersPanel {
+  width: min(280px, calc(100vw - 32px));
+  padding: 1rem;
+  border-radius: 16px;
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    label {
+      color: var(--text-muted);
+      font-size: var(--font-size-12, 0.78rem);
+      font-weight: 600;
+    }
+
+    select,
+    input {
+      width: 100%;
+      height: 38px;
+      padding: 0 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background-color: var(--background);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.85rem;
+
+      &:disabled {
+        opacity: 0.6;
+      }
+    }
+  }
+
+  &__range {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    span {
+      flex-shrink: 0;
+      color: var(--text-muted);
+    }
+  }
+
+  &__hint {
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+  }
+
+  &__reset {
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--text) 7%, transparent);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--text) 12%, transparent);
+    }
+  }
+}
+
+@keyframes nftMarketPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}

@@ -1,17 +1,15 @@
 'use client'
 
 import PageTitle from '@/components/PageTitle'
-import HomeFeedTab from '@/components/tabs/HomeFeedTab'
+import NftMarketGrid from './_components/NftMarketGrid'
 
-// NFT market: the home feed filtered to posts with an active HupTrade NFT listing
-// (feed_type=nft on the posts API), across all networks. PageTitle renders here (not
-// via HomeFeedTab) so the page gets the fixed header title + spacer like every other
-// standalone page.
+// NFT market: a search/filter grid of HupTrade listings read straight from the
+// indexed nft_listings table (see GET /api/v1/nfts) — not the post feed.
 export default function Page() {
   return (
     <>
       <PageTitle name="NFT Market" />
-      <HomeFeedTab feedMode="nft" title="NFT Market" />
+      <NftMarketGrid />
     </>
   )
 }

@@ -1,0 +1,425 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useReadContract } from 'wagmi'
+import { erc20Abi, parseUnits } from 'viem'
+import clsx from 'clsx'
+import { FunnelIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
+import { getNftListings } from '@/lib/api'
+import { appChains } from '@/config/contracts'
+import { CONTRACTS } from '@/config/wagmi'
+import { TIP_TOKENS } from '@/lib/tokens'
+import NativePopover from '@/components/ui/NativePopover'
+import NftMarketCard from '@/components/NftMarketCard'
+import styles from './NftMarketGrid.module.scss'
+
+const PAGE_SIZE = 24
+
+const STATUS_OPTIONS = [
+  { value: 'default', label: 'Active + sold' },
+  { value: 'active', label: 'Active' },
+  { value: 'sold', label: 'Sold' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'all', label: 'All statuses' },
+]
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'price_asc', label: 'Price: low to high' },
+  { value: 'price_desc', label: 'Price: high to low' },
+]
+
+// Thresholds in basis points — the API takes 'any'/'none' or a minimum bps
+const REFERRAL_OPTIONS = [
+  { value: '', label: 'Any' },
+  { value: 'any', label: 'Pays a referral' },
+  { value: '500', label: '5% or more' },
+  { value: '1000', label: '10% or more' },
+  { value: 'none', label: 'No referral' },
+]
+
+const DEFAULT_FILTERS = {
+  networkId: '',
+  collection: '',
+  status: 'default',
+  standard: '',
+  token: '',
+  referral: '',
+  minPrice: '',
+  maxPrice: '',
+  sort: 'newest',
+}
+
+const COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+// Only chains with HupTrade actually deployed are worth offering as a filter
+const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)
+
+// Min/max price inputs are human units — resolving the selected token's decimals (native
+// currency needs no read; an ERC20/LSP7 does, same selector both standards share) lets the
+// filter convert them to the base-unit strings the API compares against.
+function usePriceDecimals(networkId, token) {
+  const numericChainId = networkId ? Number(networkId) : undefined
+  const chainInfo = numericChainId ? appChains.find((c) => c.id === numericChainId) : null
+  const isSpecificToken = Boolean(token && token !== 'native')
+
+  const { data: tokenDecimals } = useReadContract({
+    abi: erc20Abi,
+    address: isSpecificToken ? token : undefined,
+    functionName: 'decimals',
+    chainId: numericChainId,
+    query: { enabled: Boolean(isSpecificToken && numericChainId) },
+  })
+
+  if (isSpecificToken) return tokenDecimals ?? 18
+  return chainInfo?.nativeCurrency?.decimals ?? 18
+}
+
+function buildApiFilters(filters, priceDecimals) {
+  const api = {}
+  if (filters.networkId) api.networkId = filters.networkId
+  if (filters.collection) api.collection = filters.collection
+  if (filters.status && filters.status !== 'default') api.status = filters.status
+  if (filters.standard) api.standard = filters.standard
+  if (filters.token) api.token = filters.token
+  if (filters.referral) api.referral = filters.referral
+  if (filters.sort && filters.sort !== 'newest') api.sort = filters.sort
+  if (filters.minPrice) {
+    try {
+      api.minPrice = parseUnits(filters.minPrice, priceDecimals).toString()
+    } catch {
+      // Invalid number typed mid-edit — skip until it parses
+    }
+  }
+  if (filters.maxPrice) {
+    try {
+      api.maxPrice = parseUnits(filters.maxPrice, priceDecimals).toString()
+    } catch {
+      // Invalid number typed mid-edit — skip until it parses
+    }
+  }
+  return api
+}
+
+const activeFilterCount = (filters) =>
+  [
+    filters.networkId,
+    filters.collection,
+    filters.status !== 'default' ? filters.status : '',
+    filters.standard,
+    filters.token,
+    filters.referral,
+    filters.minPrice,
+    filters.maxPrice,
+  ].filter(Boolean).length
+
+/**
+ * NFT Market Grid
+ * Search + filter toolbar over a responsive grid of NftMarketCard tiles, replacing the old
+ * post-feed rendering on the NFT Market page. Status/network/standard/payment-token/price/sort
+ * all resolve server-side against the indexed nft_listings table (see GET /api/v1/nfts).
+ * Name/seller search stays client-side over the currently loaded page — NFT metadata (name,
+ * image) is resolved live per token, not indexed, so there's nothing to search server-side.
+ */
+export default function NftMarketGrid() {
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+
+  const [items, setItems] = useState([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isFetchingMore, setIsFetchingMore] = useState(false)
+
+  // Collection addresses aren't indexed by name anywhere — this Map fills in as each
+  // visible card's live metadata resolves, so the "Collection" filter only ever offers
+  // collections that actually showed up on screen. Cleared whenever the server-side
+  // filters change (a fresh page 1), since a network switch invalidates prior entries.
+  const [collectionOptions, setCollectionOptions] = useState(new Map())
+
+  const handleCollectionResolved = useCallback((collectionAddress, collectionName) => {
+    setCollectionOptions((prev) => (prev.has(collectionAddress) ? prev : new Map(prev).set(collectionAddress, collectionName)))
+  }, [])
+
+  const isFetchingRef = useRef(false)
+  const hasMoreRef = useRef(false)
+
+  const priceDecimals = usePriceDecimals(filters.networkId, filters.token)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 400)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchFirstPage = async () => {
+      setIsLoading(true)
+      // Keep the selected collection's label — selecting one triggers this very refetch,
+      // and dropping its entry would leave the <select> pointing at a missing <option>.
+      // The rest re-fills as this page's cards resolve their metadata.
+      setCollectionOptions((prev) => {
+        const label = filters.collection ? prev.get(filters.collection) : null
+        return label ? new Map([[filters.collection, label]]) : new Map()
+      })
+      try {
+        const res = await getNftListings(1, PAGE_SIZE, buildApiFilters(filters, priceDecimals))
+        if (cancelled) return
+        setItems(res.data || [])
+        setHasMore(res.meta?.hasMore || false)
+        setPage(1)
+      } catch {
+        if (!cancelled) {
+          setItems([])
+          setHasMore(false)
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    fetchFirstPage()
+
+    return () => {
+      cancelled = true
+    }
+  }, [filters, priceDecimals])
+
+  useEffect(() => {
+    isFetchingRef.current = isFetchingMore
+    hasMoreRef.current = hasMore
+  }, [isFetchingMore, hasMore])
+
+  const loadMore = useCallback(async () => {
+    if (isFetchingRef.current || !hasMoreRef.current) return
+    setIsFetchingMore(true)
+    const nextPage = page + 1
+
+    try {
+      const res = await getNftListings(nextPage, PAGE_SIZE, buildApiFilters(filters, priceDecimals))
+      setItems((prev) => [...prev, ...(res.data || [])])
+      setHasMore(res.meta?.hasMore || false)
+      setPage(nextPage)
+    } catch {
+      // A manual scroll/retry picks it back up — no need to surface an error for a load-more miss
+    } finally {
+      setIsFetchingMore(false)
+    }
+  }, [page, filters, priceDecimals])
+
+  useEffect(() => {
+    const onScroll = () => {
+      const { scrollTop, clientHeight, scrollHeight } = document.documentElement
+      if (scrollTop + clientHeight >= scrollHeight - 400 && hasMoreRef.current && !isFetchingRef.current) loadMore()
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [loadMore])
+
+  const tokensForNetwork = filters.networkId ? TIP_TOKENS[Number(filters.networkId)] ?? [] : []
+  const collectionEntries = [...collectionOptions.entries()].sort((a, b) => COLLATOR.compare(a[1], b[1]))
+  const searchLower = search.toLowerCase()
+  const filterCount = activeFilterCount(filters)
+
+  return (
+    <div className={clsx('__container')} data-width="medium">
+      <div className={styles.market}>
+        <div className={styles.market__toolbar}>
+          <NativePopover
+            placement="bottom-start"
+            className={styles.filtersPanel}
+            trigger={
+              <button type="button" className={styles.market__filterButton} aria-label="Filters">
+                <FunnelIcon size={16} />
+                {filterCount > 0 && <span className={styles.market__filterBadge}>{filterCount}</span>}
+              </button>
+            }
+          >
+            {() => (
+              <div className={styles.filtersPanel__body}>
+                <div className={styles.filtersPanel__field}>
+                  <label htmlFor="nftFilterNetwork">Network</label>
+                  <select
+                    id="nftFilterNetwork"
+                    value={filters.networkId}
+                    onChange={(e) => setFilters((f) => ({ ...f, networkId: e.target.value, token: '', collection: '' }))}
+                  >
+                    <option value="">All networks</option>
+                    {tradeChains.map((chain) => (
+                      <option key={chain.id} value={chain.id}>
+                        {chain.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.filtersPanel__field}>
+                  <label htmlFor="nftFilterCollection">Collection</label>
+                  <select
+                    id="nftFilterCollection"
+                    value={filters.collection}
+                    disabled={collectionEntries.length === 0}
+                    onChange={(e) => setFilters((f) => ({ ...f, collection: e.target.value }))}
+                  >
+                    <option value="">All collections</option>
+                    {collectionEntries.map(([address, name]) => (
+                      <option key={address} value={address}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  {collectionEntries.length === 0 && (
+                    <small className={styles.filtersPanel__hint}>Collections appear as listings load</small>
+                  )}
+                </div>
+
+                <div className={styles.filtersPanel__field}>
+                  <label htmlFor="nftFilterStatus">Status</label>
+                  <select id="nftFilterStatus" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
+                    {STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.filtersPanel__field}>
+                  <label htmlFor="nftFilterStandard">NFT standard</label>
+                  <select id="nftFilterStandard" value={filters.standard} onChange={(e) => setFilters((f) => ({ ...f, standard: e.target.value }))}>
+                    <option value="">Any</option>
+                    <option value="erc721">ERC721</option>
+                    <option value="lsp8">LSP8</option>
+                  </select>
+                </div>
+
+                <div className={styles.filtersPanel__field}>
+                  <label htmlFor="nftFilterToken">Payment token</label>
+                  <select
+                    id="nftFilterToken"
+                    value={filters.token}
+                    disabled={!filters.networkId}
+                    onChange={(e) => setFilters((f) => ({ ...f, token: e.target.value }))}
+                  >
+                    <option value="">Any</option>
+                    <option value="native">Native currency</option>
+                    {tokensForNetwork.map((t) => (
+                      <option key={t.address} value={t.address}>
+                        {t.symbol}
+                      </option>
+                    ))}
+                  </select>
+                  {!filters.networkId && <small className={styles.filtersPanel__hint}>Pick a network first</small>}
+                </div>
+
+                <div className={styles.filtersPanel__field}>
+                  <label htmlFor="nftFilterReferral">Referral reward</label>
+                  <select id="nftFilterReferral" value={filters.referral} onChange={(e) => setFilters((f) => ({ ...f, referral: e.target.value }))}>
+                    {REFERRAL_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.filtersPanel__field}>
+                  <label>Price range</label>
+                  <div className={styles.filtersPanel__range}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder="Min"
+                      value={filters.minPrice}
+                      disabled={!filters.networkId}
+                      onChange={(e) => setFilters((f) => ({ ...f, minPrice: e.target.value }))}
+                    />
+                    <span>–</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder="Max"
+                      value={filters.maxPrice}
+                      disabled={!filters.networkId}
+                      onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))}
+                    />
+                  </div>
+                  {!filters.networkId && <small className={styles.filtersPanel__hint}>Pick a network first</small>}
+                </div>
+
+                <div className={styles.filtersPanel__field}>
+                  <label htmlFor="nftFilterSort">Sort</label>
+                  <select id="nftFilterSort" value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}>
+                    {SORT_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {filterCount > 0 && (
+                  <button type="button" className={styles.filtersPanel__reset} onClick={() => setFilters(DEFAULT_FILTERS)}>
+                    Reset filters
+                  </button>
+                )}
+              </div>
+            )}
+          </NativePopover>
+
+          <div className={styles.market__search}>
+            <MagnifyingGlassIcon size={16} />
+            <input type="text" placeholder="Search NFT or seller" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+            {searchInput && (
+              <button type="button" onClick={() => setSearchInput('')} aria-label="Clear search">
+                <XIcon size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className={styles.market__grid}>
+            {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className={styles.market__skeletonTile} />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className={styles.market__empty}>No listings match these filters.</p>
+        ) : (
+          <div className={styles.market__grid}>
+            {items.map((listing) => {
+              const sellerMatches = Boolean(
+                searchLower &&
+                  ((listing.display_name && listing.display_name.toLowerCase().includes(searchLower)) ||
+                    listing.wallet_address?.toLowerCase().includes(searchLower)),
+              )
+              return (
+                <NftMarketCard
+                  key={`${listing.network_id}-${listing.listing_id}`}
+                  listing={listing}
+                  nameFilter={searchLower && !sellerMatches ? searchLower : undefined}
+                  onCollectionResolved={handleCollectionResolved}
+                />
+              )
+            })}
+          </div>
+        )}
+
+        {hasMore && !isLoading && (
+          <div className={styles.market__loadMoreWrap}>
+            <button type="button" className={styles.market__loadMore} onClick={loadMore} disabled={isFetchingMore}>
+              {isFetchingMore ? 'Loading...' : 'Load more'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
