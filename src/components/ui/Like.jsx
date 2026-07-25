@@ -12,10 +12,9 @@ import abi from '@/abi/post.json'
 import { useSidebarStore, getWalletBatchMap, getLikeOverride } from '@/stores/useSidebarStore'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
-import { AnimatedHeart } from '@/components/Icons'
 import { getPostById } from '@/lib/api'
+import { shortTxError } from '@/lib/utils'
 import Counter from './Counter'
-import styles from './Like.module.scss'
 
 const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
 
@@ -191,7 +190,7 @@ export const Like = ({ post, onUpdate }) => {
     } catch (err) {
       console.error('Like failed:', err)
       pendingActionRef.current = null
-      toast(err.message || 'Transaction rejected or encountered an error.', 'error')
+      toast(shortTxError(err, 'Could not like post'), 'error')
       mutate(previousData, { revalidate: false })
     }
   }
@@ -220,6 +219,33 @@ export const Like = ({ post, onUpdate }) => {
         { revalidate: false },
       )
 
+      const session = await isSessionActive({
+        userAddress: address,
+        publicClient,
+      })
+
+      // The contract resolves the burner key back to _owner, so the session key
+      // signs unlike() exactly like it signs batchLike()
+      if (session.active) {
+        await writeWithBurnerSession({
+          chain: activeChain[0],
+          contractAddress: targetChain.hup,
+          abi,
+          functionName: 'unlike',
+          args: [address, id],
+        })
+
+        markLikeOverride(address, post.network_id, id, false)
+        mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
+
+        if (typeof onUpdate === 'function') {
+          onUpdate(id, { is_liked: 0, total_likes: Math.max(0, previousData.likeCount - 1) })
+        }
+
+        toast('Like removed via active session key!', 'success')
+        return
+      }
+
       pendingActionRef.current = 'unlike'
 
       await writeContractAsync({
@@ -236,7 +262,7 @@ export const Like = ({ post, onUpdate }) => {
     } catch (err) {
       console.error('Unlike failed:', err)
       pendingActionRef.current = null
-      toast(err.message || 'Failed to remove transaction.', 'error')
+      toast(shortTxError(err, 'Could not remove like'), 'error')
       mutate(previousData, { revalidate: false })
     }
   }
@@ -293,15 +319,11 @@ export const Like = ({ post, onUpdate }) => {
         onClick={handleLikeInteraction}
         aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
       >
-        {isLoading ? (
-          <div className={clsx(styles.animatedHeader)}>
-            <AnimatedHeart />
-          </div>
-        ) : (
-          <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
-        )}
+        {/* The optimistic heart is the pending feedback — no loader swap, so the
+            icon and counter never jump while the tx settles */}
+        <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
 
-        {likeCount > 0 && !isLoading && <Counter value={likeCount} />}
+        {likeCount > 0 && <Counter value={likeCount} />}
       </button>
     </div>
   )
