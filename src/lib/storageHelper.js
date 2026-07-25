@@ -55,7 +55,8 @@ export const resolveIPFSUrl = (ipfsUrl) => {
  * Only use for images — video/audio should resolve via resolveIPFSUrl to keep
  * native gateway streaming.
  * @param {string} ipfsUrl - The IPFS URL or raw CID.
- * @param {{ width?: number, quality?: number }} [options] - Optional resize width and WebP quality (1-100).
+ * @param {{ width?: number, quality?: number, still?: boolean }} [options] - Optional resize width,
+ * WebP quality (1-100), and still (first-frame-only, skips animated encoding — for thumbnails).
  * @returns {string|null} The API proxy endpoint URL, or null if invalid.
  */
 export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
@@ -68,6 +69,7 @@ export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
   const params = new URLSearchParams({ cid: hash })
   if (options.width) params.set('w', String(options.width))
   if (options.quality) params.set('q', String(options.quality))
+  if (options.still) params.set('still', '1')
 
   return `/api/ipfs/file?${params.toString()}`
 }
@@ -129,7 +131,8 @@ export const resolveStorageUrl = (src) => {
  * Only use for images; video/audio must resolve via resolveStorageUrl to keep
  * native gateway streaming.
  * @param {string} src - The raw input string (IPFS CID, 0G Hash, Custom URI, or HTTP URL).
- * @param {{ width?: number, quality?: number }} [options] - Optional resize width and WebP quality (1-100).
+ * @param {{ width?: number, quality?: number, still?: boolean }} [options] - Optional resize width,
+ * WebP quality (1-100), and still (first-frame-only, skips animated encoding — for thumbnails).
  * @returns {string|null} The fully resolved target URL string.
  */
 export const resolveStorageImageUrl = (src, options = {}) => {
@@ -147,6 +150,7 @@ export const resolveStorageImageUrl = (src, options = {}) => {
     const params = []
     if (options.width) params.push(`w=${options.width}`)
     if (options.quality) params.push(`q=${options.quality}`)
+    if (options.still) params.push('still=1')
     return params.length ? `${base}&${params.join('&')}` : base
   }
 

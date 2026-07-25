@@ -164,8 +164,10 @@ const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) =
  * @param {boolean} params.isLsp8 True for LSP8 collections, false for ERC721.
  * @param {boolean} [params.enabled=true] Skip fetching while inputs are incomplete.
  * @param {number} [params.imageWidth=512] Width hint for the proxied image URL.
+ * @param {boolean} [params.still=false] First-frame-only for animated images — skips the
+ * expensive animated re-encode for thumbnail contexts that don't render motion anyway.
  */
-export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, enabled = true, imageWidth = 512 }) {
+export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, enabled = true, imageWidth = 512, still = false }) {
   const publicClient = usePublicClient({ chainId })
   const ready = Boolean(enabled && publicClient && collection && tokenId !== undefined && tokenId !== null && tokenId !== '')
 
@@ -178,7 +180,7 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
     name: data?.name || null,
     collectionName: data?.collectionName || null,
     description: data?.description || null,
-    image: data?.image ? resolveStorageImageUrl(data.image, { width: imageWidth }) : null,
+    image: data?.image ? resolveStorageImageUrl(data.image, { width: imageWidth, still }) : null,
     attributes: data?.attributes || [],
     // 'token' = data is specific to this token id; 'collection' = only collection-level
     // metadata exists and the image/name describe the collection, not the token

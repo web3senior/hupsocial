@@ -143,6 +143,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
     tokenId: listing?.tokenId,
     isLsp8: Boolean(listing?.isLsp8),
     enabled: Boolean(listing?.collection && listing?.tokenId),
+    still: true,
   })
 
   const { collectionUrl, tokenUrl } = buildAssetLinks({

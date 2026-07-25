@@ -75,6 +75,7 @@ export async function GET(req) {
 
   const width = intParam(searchParams.get('w'), null, 1, 4096)
   const quality = intParam(searchParams.get('q'), 80, 1, 100)
+  const stillOnly = searchParams.get('still') === '1'
 
   if (!rootHash) {
     return NextResponse.json({ error: 'Root Hash is required' }, { status: 400 })
@@ -93,10 +94,13 @@ export async function GET(req) {
     const arrayBuffer = await blob.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    const metadata = await sharp(buffer, { animated: true }).metadata()
-    const isAnimated = (metadata.pages ?? 1) > 1
+    /* still=1 decodes/encodes only the first frame — skips the expensive per-frame
+       resize+encode animated GIFs/WEBPs otherwise need, for thumbnail contexts that
+       don't render motion anyway (grid cards, compact previews) */
+    const metadata = await sharp(buffer, { animated: !stillOnly }).metadata()
+    const isAnimated = !stillOnly && (metadata.pages ?? 1) > 1
 
-    let pipeline = sharp(buffer, { animated: true, autoOrient: true })
+    let pipeline = sharp(buffer, { animated: !stillOnly, autoOrient: true })
 
     if (width) {
       pipeline = pipeline.resize({
