@@ -197,7 +197,7 @@ export const Like = ({ post, onUpdate }) => {
   }
 
   const unlikePost = async (id) => {
-    if (!isConnected) {
+    if (!isConnected || !address) {
       toast('Please connect your wallet first', 'error')
       return
     }
@@ -225,8 +225,8 @@ export const Like = ({ post, onUpdate }) => {
       await writeContractAsync({
         abi,
         address: targetChain.hup,
-        functionName: 'batchUnLike',
-        args: [id],
+        functionName: 'unlike',
+        args: [address, id],
       })
 
       markLikeOverride(address, post.network_id, id, false)
