@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
-import { StorefrontIcon } from '@phosphor-icons/react'
+import HupMark from '@/components/ui/HupMark'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
@@ -368,7 +368,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
               <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
             ) : (
               <div className={clsx(styles.tradeCard__mediaFallback, { [styles['tradeCard__mediaFallback--loading']]: isMetaLoading })}>
-                <StorefrontIcon size={18} weight="duotone" />
+                <HupMark size={22} />
               </div>
             )}
           </div>

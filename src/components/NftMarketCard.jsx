@@ -2,7 +2,8 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { DiamondIcon, StorefrontIcon } from '@phosphor-icons/react'
+import { DiamondIcon } from '@phosphor-icons/react'
+import HupMark from '@/components/ui/HupMark'
 import { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { appChains } from '@/config/contracts'
@@ -91,7 +92,7 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
           <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
         ) : (
           <div className={styles.nftCard__mediaFallback}>
-            <StorefrontIcon size={28} weight="duotone" />
+            <HupMark size={44} />
           </div>
         )}
         {isSold && <span className={styles.nftCard__sold}>Sold</span>}

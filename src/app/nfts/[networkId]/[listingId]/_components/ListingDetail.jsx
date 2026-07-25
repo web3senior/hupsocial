@@ -14,6 +14,7 @@ import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import TradeCard, { buildAssetLinks } from '@/components/TradeCard'
 import Share from '@/components/ui/Share'
+import HupMark from '@/components/ui/HupMark'
 import { ContentSpinner } from '@/components/Loading'
 import {
   ArrowSquareOutIcon,
@@ -22,7 +23,6 @@ import {
   ReceiptIcon,
   RepeatIcon,
   ShareNetworkIcon,
-  StorefrontIcon,
   TimerIcon,
   UserIcon,
   WarningIcon,
@@ -157,7 +157,7 @@ export default function ListingDetail({ networkId, listingId }) {
             )
           ) : (
             <div className={styles.listing__mediaFallback}>
-              <StorefrontIcon size={48} weight="duotone" />
+              <HupMark size={56} />
             </div>
           )}
 
