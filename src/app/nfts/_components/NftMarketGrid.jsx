@@ -25,13 +25,13 @@ const STATUS_OPTIONS = [
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
-  { value: 'price_asc', label: 'Price: low to high' },
-  { value: 'price_desc', label: 'Price: high to low' },
+  { value: 'price_asc', label: 'Lowest price' },
+  { value: 'price_desc', label: 'Highest price' },
 ]
 
 // Thresholds in basis points — the API takes 'any'/'none' or a minimum bps
 const REFERRAL_OPTIONS = [
-  { value: '', label: 'Any' },
+  { value: '', label: 'Any referral' },
   { value: 'any', label: 'Pays a referral' },
   { value: '500', label: '5% or more' },
   { value: '1000', label: '10% or more' },
@@ -54,6 +54,8 @@ const COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: tr
 
 // Only chains with HupTrade actually deployed are worth offering as a filter
 const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)
+
+const NETWORK_OPTIONS = [{ value: '', label: 'All networks' }, ...tradeChains.map((chain) => ({ value: String(chain.id), label: chain.name }))]
 
 // Min/max price inputs are human units — resolving the selected token's decimals (native
 // currency needs no read; an ERC20/LSP7 does, same selector both standards share) lets the
@@ -101,17 +103,33 @@ function buildApiFilters(filters, priceDecimals) {
   return api
 }
 
-const activeFilterCount = (filters) =>
-  [
-    filters.networkId,
-    filters.collection,
-    filters.status !== 'default' ? filters.status : '',
-    filters.standard,
-    filters.token,
-    filters.referral,
-    filters.minPrice,
-    filters.maxPrice,
-  ].filter(Boolean).length
+// Counts only what the popover still hides — network/status/referral/sort live in the
+// always-visible quick row, so badging them would flag filters the user can already see
+const hiddenFilterCount = (filters) =>
+  [filters.collection, filters.standard, filters.token, filters.minPrice, filters.maxPrice].filter(Boolean).length
+
+/**
+ * Quick Select
+ * One pill in the always-visible filter row. Carries no label of its own — the selected
+ * option is the label — so it needs an aria-label to stay announceable, and highlights
+ * itself whenever it holds something other than its default.
+ */
+function QuickSelect({ label, value, defaultValue, options, onChange }) {
+  return (
+    <select
+      aria-label={label}
+      className={clsx(styles.market__quickSelect, value !== defaultValue && styles['market__quickSelect--active'])}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  )
+}
 
 /**
  * NFT Market Grid
@@ -220,40 +238,69 @@ export default function NftMarketGrid() {
   const tokensForNetwork = filters.networkId ? TIP_TOKENS[Number(filters.networkId)] ?? [] : []
   const collectionEntries = [...collectionOptions.entries()].sort((a, b) => COLLATOR.compare(a[1], b[1]))
   const searchLower = search.toLowerCase()
-  const filterCount = activeFilterCount(filters)
+  const hiddenCount = hiddenFilterCount(filters)
+  const isFiltered = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS)
 
   return (
     <div className={clsx('__container')} data-width="medium">
       <div className={styles.market}>
+        <div className={styles.market__search}>
+          <MagnifyingGlassIcon size={16} />
+          <input type="text" placeholder="Search NFT or seller" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+          {searchInput && (
+            <button type="button" onClick={() => setSearchInput('')} aria-label="Clear search">
+              <XIcon size={13} />
+            </button>
+          )}
+        </div>
+
+        {/* The filters users reach for constantly sit in the open; the narrower ones
+            (collection, standard, payment token, price) stay behind the funnel. The pills
+            scroll, the funnel does not — it must stay reachable at any width. */}
         <div className={styles.market__toolbar}>
+          <div className={styles.market__quickFilters}>
+            <QuickSelect
+              label="Network"
+              value={filters.networkId}
+              defaultValue=""
+              options={NETWORK_OPTIONS}
+              onChange={(value) => setFilters((f) => ({ ...f, networkId: value, token: '', collection: '' }))}
+            />
+            <QuickSelect
+              label="Status"
+              value={filters.status}
+              defaultValue="default"
+              options={STATUS_OPTIONS}
+              onChange={(value) => setFilters((f) => ({ ...f, status: value }))}
+            />
+            <QuickSelect
+              label="Referral reward"
+              value={filters.referral}
+              defaultValue=""
+              options={REFERRAL_OPTIONS}
+              onChange={(value) => setFilters((f) => ({ ...f, referral: value }))}
+            />
+            <QuickSelect
+              label="Sort"
+              value={filters.sort}
+              defaultValue="newest"
+              options={SORT_OPTIONS}
+              onChange={(value) => setFilters((f) => ({ ...f, sort: value }))}
+            />
+          </div>
+
           <NativePopover
-            placement="bottom-start"
+            placement="bottom-end"
             className={styles.filtersPanel}
             trigger={
-              <button type="button" className={styles.market__filterButton} aria-label="Filters">
+              <button type="button" className={styles.market__filterButton} aria-label="More filters">
                 <FunnelIcon size={16} />
-                {filterCount > 0 && <span className={styles.market__filterBadge}>{filterCount}</span>}
+                {hiddenCount > 0 && <span className={styles.market__filterBadge}>{hiddenCount}</span>}
               </button>
             }
           >
             {() => (
               <div className={styles.filtersPanel__body}>
-                <div className={styles.filtersPanel__field}>
-                  <label htmlFor="nftFilterNetwork">Network</label>
-                  <select
-                    id="nftFilterNetwork"
-                    value={filters.networkId}
-                    onChange={(e) => setFilters((f) => ({ ...f, networkId: e.target.value, token: '', collection: '' }))}
-                  >
-                    <option value="">All networks</option>
-                    {tradeChains.map((chain) => (
-                      <option key={chain.id} value={chain.id}>
-                        {chain.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <div className={styles.filtersPanel__field}>
                   <label htmlFor="nftFilterCollection">Collection</label>
                   <select
@@ -272,17 +319,6 @@ export default function NftMarketGrid() {
                   {collectionEntries.length === 0 && (
                     <small className={styles.filtersPanel__hint}>Collections appear as listings load</small>
                   )}
-                </div>
-
-                <div className={styles.filtersPanel__field}>
-                  <label htmlFor="nftFilterStatus">Status</label>
-                  <select id="nftFilterStatus" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
-                    {STATUS_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className={styles.filtersPanel__field}>
@@ -314,17 +350,6 @@ export default function NftMarketGrid() {
                 </div>
 
                 <div className={styles.filtersPanel__field}>
-                  <label htmlFor="nftFilterReferral">Referral reward</label>
-                  <select id="nftFilterReferral" value={filters.referral} onChange={(e) => setFilters((f) => ({ ...f, referral: e.target.value }))}>
-                    {REFERRAL_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className={styles.filtersPanel__field}>
                   <label>Price range</label>
                   <div className={styles.filtersPanel__range}>
                     <input
@@ -352,18 +377,7 @@ export default function NftMarketGrid() {
                   {!filters.networkId && <small className={styles.filtersPanel__hint}>Pick a network first</small>}
                 </div>
 
-                <div className={styles.filtersPanel__field}>
-                  <label htmlFor="nftFilterSort">Sort</label>
-                  <select id="nftFilterSort" value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}>
-                    {SORT_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {filterCount > 0 && (
+                {isFiltered && (
                   <button type="button" className={styles.filtersPanel__reset} onClick={() => setFilters(DEFAULT_FILTERS)}>
                     Reset filters
                   </button>
@@ -371,16 +385,6 @@ export default function NftMarketGrid() {
               </div>
             )}
           </NativePopover>
-
-          <div className={styles.market__search}>
-            <MagnifyingGlassIcon size={16} />
-            <input type="text" placeholder="Search NFT or seller" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
-            {searchInput && (
-              <button type="button" onClick={() => setSearchInput('')} aria-label="Clear search">
-                <XIcon size={13} />
-              </button>
-            )}
-          </div>
         </div>
 
         {isLoading ? (
