@@ -14,6 +14,45 @@ export const runtime = 'nodejs'
 
 const STATUS_BY_KEY = { active: [1], sold: [2], cancelled: [3], all: [1, 2, 3] }
 
+/**
+ * Attach each row's most recent onchain sale, in place.
+ *
+ * Deliberately a second query over the already-paginated rows rather than a subquery in
+ * the main select list: MariaDB evaluates select-list subqueries for every candidate row
+ * before ORDER BY/LIMIT, so a per-token lookup there would run across the whole table
+ * instead of the 24 rows actually returned.
+ */
+async function attachLastSales(rows) {
+  if (!rows.length) return
+
+  const keys = rows.map((r) => [r.network_id, r.collection, r.token_id])
+  const [trades] = await pool.execute(
+    `SELECT t.network_id, t.collection, t.token_id, CAST(t.price AS CHAR) AS price, t.sold_at,
+            st.symbol, st.decimals
+       FROM nft_trades t
+       LEFT JOIN store_tokens st ON st.network_id = t.network_id AND st.token = t.payment_token
+      WHERE (t.network_id, t.collection, t.token_id) IN (${keys.map(() => '(?,?,?)').join(',')})
+      ORDER BY t.sold_at DESC`,
+    keys.flat(),
+  )
+
+  // Sorted newest first, so the first hit per token is the last sale
+  const latest = new Map()
+  for (const trade of trades) {
+    const key = `${trade.network_id}-${trade.collection}-${trade.token_id}`
+    if (!latest.has(key)) latest.set(key, trade)
+  }
+
+  for (const row of rows) {
+    const trade = latest.get(`${row.network_id}-${row.collection}-${row.token_id}`)
+    if (!trade) continue
+    row.last_sale_price = trade.price
+    row.last_sale_symbol = trade.symbol
+    row.last_sale_decimals = trade.decimals
+    row.last_sale_at = trade.sold_at
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -119,6 +158,7 @@ export async function GET(request) {
     const hasMore = rows.length > limit
     const data = hasMore ? rows.slice(0, limit) : rows
     await fulfillUniversalProfiles(data, pool)
+    await attachLastSales(data)
 
     return NextResponse.json({ success: true, data, meta: { page, hasMore } })
   } catch (error) {

@@ -5,28 +5,38 @@ import Link from 'next/link'
 import { DiamondIcon, StorefrontIcon } from '@phosphor-icons/react'
 import { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
+import { appChains } from '@/config/contracts'
 import styles from './NftMarketCard.module.scss'
 
-const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
+const TOKEN_ID_FORMAT = new Intl.NumberFormat('en')
 
-// ERC721 decimal ids print whole; LSP8 bytes32 ids (or oversized decimals) shorten to
-// first-4…last-4 — mirrors the listing detail page's formatting
+// ERC721 decimal ids print grouped (#1,042); LSP8 bytes32 ids (or oversized decimals)
+// shorten to first-4…last-4 — mirrors the listing detail page's formatting
 const formatTokenId = (tokenId) => {
   const raw = String(tokenId ?? '')
   try {
     const numeric = BigInt(raw)
-    if (numeric < 10n ** 12n) return numeric.toString()
+    if (numeric < 10n ** 12n) return TOKEN_ID_FORMAT.format(numeric)
   } catch {
     // Non-numeric (bytes32 hex) — fall through to shortening
   }
   return raw.length > 12 ? `${raw.slice(0, 4)}…${raw.slice(-4)}` : raw
 }
 
+// wagmi's config module stamps iconUrl onto the shared chain objects as a side effect, so
+// derive it here too rather than depending on that module having been evaluated first
+const chainIconFor = (chain) => {
+  if (!chain) return null
+  if (chain.iconUrl) return chain.iconUrl
+  return chain.icon ? `data:image/svg+xml,${encodeURIComponent(chain.icon)}` : null
+}
+
 /**
  * NFT Market Card
- * Grid tile for the NFT Market page — image, collection + token id, seller, price. Reads
- * from an indexed nft_listings row (price/status/seller already resolved server-side);
- * only the image/name come from a live per-token metadata read, same source TradeCard uses.
+ * Grid tile for the NFT Market page — artwork, collection + token id, price and last sale.
+ * Reads from an indexed nft_listings row (price/status/last sale already resolved
+ * server-side); only the image/name come from a live per-token metadata read, the same
+ * source TradeCard uses.
  * @param {Object} props
  * @param {Object} props.listing Row from GET /api/v1/nfts.
  * @param {string} [props.nameFilter] Case-insensitive substring — hides the card once
@@ -63,8 +73,11 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
     if (!haystack.includes(nameFilter.toLowerCase())) return null
   }
 
+  const chain = appChains.find((c) => c.id === networkId)
+  const chainIcon = chainIconFor(chain)
+
   const formattedPrice = formatStake(listing.price, listing.decimals)
-  const sellerName = listing.display_name || shortAddress(listing.wallet_address)
+  const lastSalePrice = listing.last_sale_price ? formatStake(listing.last_sale_price, listing.last_sale_decimals) : null
 
   // Seller-set referral share, same formatting as TradeCard — reposters filter on it,
   // so it has to be readable on the tile. Moot once sold, so it rides with the badge.
@@ -93,22 +106,23 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
             <span className={styles.nftCard__title}>{metadata.collectionName || metadata.name || 'Unnamed'}</span>
           )}
           <span className={styles.nftCard__tokenId}>
-            <DiamondIcon size={11} weight="fill" />
-            {formatTokenId(listing.token_id)}
+            <DiamondIcon size={11} weight="fill" />#{formatTokenId(listing.token_id)}
           </span>
         </div>
 
-        <div className={styles.nftCard__seller}>
-          {listing.profile_image ? (
-            <img src={listing.profile_image} alt="" loading="lazy" />
-          ) : (
-            <span className={styles.nftCard__sellerFallback} aria-hidden />
-          )}
-          <span>{sellerName}</span>
+        <div className={styles.nftCard__price}>
+          <span className={styles.nftCard__priceValue}>{formattedPrice ?? '…'}</span>
+          {listing.symbol && <span className={styles.nftCard__priceSymbol}>{listing.symbol}</span>}
+          {chainIcon && <img className={styles.nftCard__priceIcon} src={chainIcon} alt="" title={chain?.name} />}
         </div>
 
-        <div className={styles.nftCard__price}>
-          {formattedPrice ?? '…'} {listing.symbol || ''}
+        {/* Reserved even when empty so tiles in a row keep a common baseline */}
+        <div className={styles.nftCard__lastSale}>
+          {lastSalePrice && (
+            <>
+              Last sale <span className={styles.nftCard__lastSaleValue}>{lastSalePrice}</span> {listing.last_sale_symbol || ''}
+            </>
+          )}
         </div>
       </div>
     </Link>

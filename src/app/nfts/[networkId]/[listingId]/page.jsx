@@ -42,7 +42,7 @@ export default async function Page({ params }) {
           metadata loads (its later effect wins), spacerless so the gap never doubles. */}
       <PageTitle name={`NFT listing #${listingId}`} />
       <div className={styles.page}>
-        <div className={`__container ${styles.page__container}`} data-width="small">
+        <div className={`__container ${styles.page__container}`} data-width="large">
           <ListingDetail networkId={networkId} listingId={listingId} />
         </div>
       </div>

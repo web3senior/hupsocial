@@ -242,7 +242,7 @@ export default function NftMarketGrid() {
   const isFiltered = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS)
 
   return (
-    <div className={clsx('__container')} data-width="medium">
+    <div className={clsx('__container')} data-width="large">
       <div className={styles.market}>
         <label className={clsx(styles.search, 'rounded-full')}>
           <MagnifyingGlassIcon size={18} aria-hidden="true" />
