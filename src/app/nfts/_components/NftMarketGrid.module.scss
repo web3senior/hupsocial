@@ -87,50 +87,6 @@
     font-weight: 700;
   }
 
-  &__search {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1;
-    min-width: 0;
-    height: 40px;
-    padding-inline: 0.85rem;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background-color: var(--surface-muted);
-    color: var(--text-muted);
-
-    input {
-      flex: 1;
-      min-width: 0;
-      border: 0;
-      outline: none;
-      background: transparent;
-      color: var(--text);
-      font: inherit;
-      font-size: 0.9rem;
-
-      &::placeholder {
-        color: var(--text-muted);
-      }
-    }
-
-    button {
-      display: grid;
-      place-items: center;
-      flex-shrink: 0;
-      padding: 0;
-      border: 0;
-      background: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-
-      &:hover {
-        color: var(--text);
-      }
-    }
-  }
-
   /* Fixed column counts, not auto-fill — the tiles should read as large artwork, so the
      count is a deliberate choice per breakpoint rather than whatever a min tile width
      happens to yield at the container's size. */
@@ -274,6 +230,56 @@
     &:hover {
       background-color: color-mix(in srgb, var(--text) 12%, transparent);
     }
+  }
+}
+
+// Shared search-field look — kept byte-identical to the communities/apps/saved/search
+// pages so every directory in the app has one search box style
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  background-color: var(--search-bg, var(--surface-muted));
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 100%;
+
+  &__input {
+    min-width: 220px;
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+
+    color: inherit;
+
+    @media (max-width: 600px) {
+      min-width: 0;
+    }
+  }
+}
+
+:global([data-theme='light']) {
+  .search {
+    --search-bg: var(--gray-050);
+    --border: var(--gray-200);
+
+    svg {
+      color: var(--gray-400);
+    }
+  }
+}
+
+:global([data-theme='dark']) {
+  .search {
+    --search-bg: #20232a;
+  }
+}
+
+:global([data-theme='terminal']) {
+  .search {
+    --search-bg: #12301c;
   }
 }
 

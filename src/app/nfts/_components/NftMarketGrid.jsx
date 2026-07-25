@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
-import { FunnelIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
+import { FunnelIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
@@ -244,15 +244,17 @@ export default function NftMarketGrid() {
   return (
     <div className={clsx('__container')} data-width="medium">
       <div className={styles.market}>
-        <div className={styles.market__search}>
-          <MagnifyingGlassIcon size={16} />
-          <input type="text" placeholder="Search NFT or seller" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
-          {searchInput && (
-            <button type="button" onClick={() => setSearchInput('')} aria-label="Clear search">
-              <XIcon size={13} />
-            </button>
-          )}
-        </div>
+        <label className={clsx(styles.search, 'rounded-full')}>
+          <MagnifyingGlassIcon size={18} aria-hidden="true" />
+          <input
+            type="search"
+            className={styles.search__input}
+            placeholder="Search NFT or seller..."
+            aria-label="Search NFTs"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </label>
 
         {/* The filters users reach for constantly sit in the open; the narrower ones
             (collection, standard, payment token, price) stay behind the funnel. The pills
