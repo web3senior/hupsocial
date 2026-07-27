@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
 import clsx from 'clsx'
-import { CONTRACTS } from '@/config/wagmi'
+import { WarningIcon } from '@phosphor-icons/react'
+import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
@@ -15,6 +16,9 @@ import NativeDialog from './ui/NativeDialog'
 import styles from './SellNftModal.module.scss'
 
 const LUKSO_CHAIN_IDS = [42, 4201]
+
+// A listing can only settle where HupTrade is deployed — the network picker offers nothing else
+const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)
 
 // Listing terms live onchain; HupTrade caps the referral share at 50% (MAX_REFERRAL_BPS)
 const MAX_REFERRAL_PERCENT = 50
@@ -144,21 +148,32 @@ const normalizeTokenId = (raw) => {
 
 /**
  * Sell NFT Modal
- * Lists an ERC721 or LSP8 token on HupTrade (approve → list, non-custodial) and hands the
- * resulting listing reference back to the composer so it can travel inside the post's
- * content JSON.
+ * Lists an ERC721 or LSP8 token on HupTrade (approve → list, non-custodial). Opened from the
+ * composer it hands the listing reference back so it can travel inside the post's content
+ * JSON; opened on its own (the NFT Market) the listing simply stands alone onchain and
+ * reaches the market through the indexer.
  * @param {Object} props
- * @param {number} props.chainId Chain the post (and therefore the listing) lands on.
- * @param {Function} props.onAttached Receives the nftListing content payload after listing.
+ * @param {number} props.chainId Chain the listing settles on — fixed by the post when the
+ *   composer is listening, otherwise only the starting point of the network picker.
+ * @param {Function} [props.onAttached] Composer hook: receives the nftListing content payload.
+ *   Its absence is what puts the modal in standalone mode.
+ * @param {Function} [props.onListed] Standalone hook: fires with the same payload after listing.
  * @param {Function} props.onClose Clears the open-modal state on close.
  */
-const SellNftModal = ({ chainId, onAttached, onClose }) => {
+const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, onClose }) => {
+  // Without a composer there is no post pinning the chain, so the network becomes the
+  // user's choice — and there is nothing to attach a pre-existing listing to
+  const isStandalone = !onAttached
+  const [chainId, setChainId] = useState(() => initialChainId ?? tradeChains[0]?.id ?? null)
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
 
   const [collection, setCollection] = useState('')
   const [tokenIdInput, setTokenIdInput] = useState('')
-  // LSP8 is the native NFT standard on LUKSO; everywhere else ERC721 is the only option
-  const [standard, setStandard] = useState(isLukso ? 'lsp8' : 'erc721')
+  // LSP8 is the native NFT standard on LUKSO; everywhere else ERC721 is the only option, so
+  // the picked value is derived rather than stored — switching away from LUKSO can't strand
+  // an lsp8 selection on a chain that has no such standard
+  const [luksoStandard, setLuksoStandard] = useState('lsp8')
+  const standard = isLukso ? luksoStandard : 'erc721'
   const [price, setPrice] = useState('')
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
@@ -168,11 +183,13 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
   // composer was abandoned) — offered for re-attach or cancel so they're never stranded
   const [myListings, setMyListings] = useState([])
   const [cancellingId, setCancellingId] = useState(null)
-  const { address } = useConnection()
+  const { address, chain: walletChain } = useConnection()
+  const switchChain = useSwitchChain({ config })
   const dialogRef = useRef(null)
   const lastActionRef = useRef(null)
 
   const chainInfo = appChains.find((c) => c.id === chainId)
+  const isWrongChain = Boolean(walletChain && chainId && walletChain.id !== chainId)
   const tradeAddress = CONTRACTS[`chain${chainId}`]?.trade || null
   const nativeCurrency = chainInfo?.nativeCurrency
   const tipTokens = TIP_TOKENS[chainId] ?? []
@@ -194,6 +211,17 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
   const trimmedCustomToken = customToken.trim()
   const tokenAddress = listedToken ? listedToken.address : isCustomToken && isAddress(trimmedCustomToken) ? trimmedCustomToken : null
   const isTokenLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
+
+  // Switching networks invalidates everything chain-scoped: a curated token from the previous
+  // network (or a custom address that only exists there) would silently price the listing in
+  // nothing, and the listing rows below belong to one chain each
+  const handleChainChange = (nextChainId) => {
+    setChainId(nextChainId)
+    setPaymentChoice('native')
+    setCustomToken('')
+    setTokenSearchResults([])
+    setMyListings([])
+  }
 
   // Debounced name search for the custom-token field — a pasted address never triggers a
   // search (isAddress short-circuits it). Results arrive most-held/most-liquid first from
@@ -400,8 +428,7 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
       return
     }
 
-    toast('NFT listed for sale', 'success')
-    onAttached({
+    const listing = {
       listingId,
       chainId,
       collection: collectionAddress,
@@ -411,7 +438,12 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
       isTokenLsp7,
       price: priceUnits.toString(),
       referralBps,
-    })
+    }
+    // A standalone listing is live onchain immediately, but only reaches the market grid
+    // once the indexer picks up the Listed event — say so rather than promise it's there
+    toast(isStandalone ? 'NFT listed — it appears in the market once indexed' : 'NFT listed for sale', 'success')
+    if (onAttached) onAttached(listing)
+    else onListed?.(listing)
     dialogRef.current?.close()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
@@ -507,11 +539,36 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
       </header>
 
       <main className={styles.sellNftModal__body}>
+        {isWrongChain && (
+          <div className={styles.sellNftModal__chainWarning}>
+            <WarningIcon size={14} />
+            <span>Listing on {chainInfo?.name || 'this network'} needs your wallet on the same network.</span>
+            <button type="button" onClick={() => switchChain.mutate({ chainId })} disabled={switchChain.isPending}>
+              {switchChain.isPending ? 'Switching...' : 'Switch'}
+            </button>
+          </div>
+        )}
+
+        {isStandalone && tradeChains.length > 1 && (
+          <div className={styles.sellNftModal__field}>
+            <label htmlFor="sellNftNetwork">Network</label>
+            <select id="sellNftNetwork" value={chainId ?? ''} onChange={(e) => handleChainChange(Number(e.target.value))} disabled={isBusy}>
+              {tradeChains.map((chain) => (
+                <option key={chain.id} value={chain.id}>
+                  {chain.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {myListings.length > 0 && (
           <div className={styles.sellNftModal__existing}>
             <p className={styles.sellNftModal__existingTitle}>Your active listings</p>
             <p className={styles.sellNftModal__hint}>
-              Already listed onchain — attach one to this post, or cancel it to release the NFT.
+              {isStandalone
+                ? 'Already listed onchain — cancel one to release the NFT.'
+                : 'Already listed onchain — attach one to this post, or cancel it to release the NFT.'}
             </p>
             {myListings.map((row) => (
               <div key={row.listing_id} className={styles.sellNftModal__existingRow}>
@@ -527,9 +584,16 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
                   </span>
                 </div>
                 <div className={styles.sellNftModal__existingActions}>
-                  <button type="button" onClick={() => handleAttachExisting(row)} disabled={isBusy}>
-                    Attach
-                  </button>
+                  {!isStandalone && (
+                    <button
+                      type="button"
+                      className={styles.sellNftModal__existingAttach}
+                      onClick={() => handleAttachExisting(row)}
+                      disabled={isBusy}
+                    >
+                      Attach
+                    </button>
+                  )}
                   <button type="button" onClick={() => handleCancelExisting(row)} disabled={isBusy}>
                     {cancellingId === String(row.listing_id) && isBusy ? 'Confirming...' : 'Cancel'}
                   </button>
@@ -542,7 +606,7 @@ const SellNftModal = ({ chainId, onAttached, onClose }) => {
         {isLukso && (
           <div className={styles.sellNftModal__field}>
             <label htmlFor="sellNftStandard">Standard</label>
-            <select id="sellNftStandard" value={standard} onChange={(e) => setStandard(e.target.value)}>
+            <select id="sellNftStandard" value={luksoStandard} onChange={(e) => setLuksoStandard(e.target.value)}>
               <option value="lsp8">LSP8 (LUKSO NFT)</option>
               <option value="erc721">ERC721</option>
             </select>

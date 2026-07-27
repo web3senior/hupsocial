@@ -92,6 +92,40 @@
     }
   }
 
+  &__chainWarning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--warning-500, #f59e0b);
+    border-radius: var(--global-border-radius);
+    background: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    font-size: 0.8rem;
+
+    span {
+      flex: 1;
+    }
+
+    button {
+      flex-shrink: 0;
+      padding: 0.3rem 0.75rem;
+      border: 1px solid var(--warning-500, #f59e0b);
+      border-radius: 999px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+
+      &[disabled] {
+        opacity: 0.7;
+        cursor: default;
+      }
+    }
+  }
+
   &__existing {
     display: flex;
     flex-direction: column;
@@ -153,7 +187,10 @@
       font-weight: 600;
       cursor: pointer;
 
-      &:first-child {
+      // The primary of the pair — an explicit modifier, not :first-child, since standalone
+      // mode drops Attach entirely and Cancel must not inherit the emphasis. Nested inside
+      // the shared button rule so it wins on specificity without !important.
+      &.sellNftModal__existingAttach {
         border-color: var(--network-color-primary, var(--color-primary));
         color: var(--network-color-primary, var(--color-primary));
       }

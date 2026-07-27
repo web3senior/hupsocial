@@ -71,6 +71,39 @@
     }
   }
 
+  &__sellButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 0.85rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--network-color-text, var(--white));
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      opacity: 0.9;
+    }
+
+    /* The pills already scroll sideways here — the label is the first thing to go so the
+       button itself never squeezes the funnel off the row */
+    @media (max-width: 420px) {
+      padding: 0;
+      width: 34px;
+      justify-content: center;
+
+      span {
+        display: none;
+      }
+    }
+  }
+
   &__filterBadge {
     position: absolute;
     top: -4px;

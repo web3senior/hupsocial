@@ -1,16 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useReadContract } from 'wagmi'
+import { useConnection, useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
-import { FunnelIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { FunnelIcon, MagnifyingGlassIcon, StorefrontIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
 import { TIP_TOKENS } from '@/lib/tokens'
+import { toast } from '@/components/NextToast'
 import NativePopover from '@/components/ui/NativePopover'
 import NftMarketCard from '@/components/NftMarketCard'
+import SellNftModal from '@/components/SellNftModal'
 import styles from './NftMarketGrid.module.scss'
 
 const PAGE_SIZE = 24
@@ -150,6 +152,12 @@ export default function NftMarketGrid() {
   const [isLoading, setIsLoading] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
 
+  // Selling from here needs no post — the listing goes straight onchain and reaches this
+  // grid through the indexer, so a fresh listing asks for a refetch of page 1
+  const [isSelling, setIsSelling] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const { address, chain: walletChain } = useConnection()
+
   // Collection addresses aren't indexed by name anywhere — this Map fills in as each
   // visible card's live metadata resolves, so the "Collection" filter only ever offers
   // collections that actually showed up on screen. Cleared whenever the server-side
@@ -202,7 +210,7 @@ export default function NftMarketGrid() {
     return () => {
       cancelled = true
     }
-  }, [filters, priceDecimals])
+  }, [filters, priceDecimals, refreshKey])
 
   useEffect(() => {
     isFetchingRef.current = isFetchingMore
@@ -234,6 +242,22 @@ export default function NftMarketGrid() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [loadMore])
+
+  // The sell modal opens on the network being browsed, else the wallet's own chain when
+  // HupTrade lives there, else the first chain it's deployed on — and stays switchable inside
+  const sellChainId =
+    (filters.networkId ? Number(filters.networkId) : null) ??
+    (walletChain && CONTRACTS[`chain${walletChain.id}`]?.trade ? walletChain.id : null) ??
+    tradeChains[0]?.id ??
+    null
+
+  const handleSell = () => {
+    if (!address) {
+      toast('Connect your wallet to list an NFT', 'error')
+      return
+    }
+    setIsSelling(true)
+  }
 
   const tokensForNetwork = filters.networkId ? TIP_TOKENS[Number(filters.networkId)] ?? [] : []
   const collectionEntries = [...collectionOptions.entries()].sort((a, b) => COLLATOR.compare(a[1], b[1]))
@@ -387,6 +411,12 @@ export default function NftMarketGrid() {
               </div>
             )}
           </NativePopover>
+
+          {/* Listing needs no post — this opens the same HupTrade flow the composer uses */}
+          <button type="button" className={styles.market__sellButton} aria-label="Sell NFT" onClick={handleSell}>
+            <StorefrontIcon size={16} weight="fill" />
+            <span>Sell NFT</span>
+          </button>
         </div>
 
         {isLoading ? (
@@ -424,6 +454,11 @@ export default function NftMarketGrid() {
               {isFetchingMore ? 'Loading...' : 'Load more'}
             </button>
           </div>
+        )}
+
+        {/* No onAttached — the modal lists standalone and the grid just refetches after */}
+        {isSelling && (
+          <SellNftModal chainId={sellChainId} onListed={() => setRefreshKey((key) => key + 1)} onClose={() => setIsSelling(false)} />
         )}
       </div>
     </div>
