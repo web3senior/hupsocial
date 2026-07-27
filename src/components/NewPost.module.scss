@@ -45,6 +45,49 @@
   }
 }
 
+/* Wrong-network prompt — mirrors the Bazaar/Predict dialogs so the switch affordance
+   reads the same everywhere it appears */
+.chainWarning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin: 12px 36px 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--warning-surface, rgba(245, 158, 11, 0.12));
+  border: 1px solid var(--warning-500, #f59e0b);
+  border-radius: var(--global-border-radius);
+  font-size: var(--font-size-12);
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  span {
+    flex: 1;
+  }
+
+  &__switch {
+    flex-shrink: 0;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--warning-500, #f59e0b);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: inherit;
+    font-size: var(--font-size-12);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background-color: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
 .cancelButton,
 .headerActions button,
 .toolbar button,
@@ -534,6 +577,10 @@
 
   .cancelButton {
     font-size: 1rem;
+  }
+
+  .chainWarning {
+    margin: 10px 18px 0;
   }
 
   .composer {

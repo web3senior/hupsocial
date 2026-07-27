@@ -1,16 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { TargetIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { TargetIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { getActiveChain } from '@/lib/communication'
-import { CONTRACTS } from '@/config/wagmi'
+import { CONTRACTS, config } from '@/config/wagmi'
+import { appChains } from '@/config/contracts'
 import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
@@ -244,7 +245,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   // stack can't track — so Ctrl+Z is backed by these snapshots instead.
   const historyRef = useRef({ stack: [], index: -1, timer: null, restoring: false })
 
-  const { address, isConnected } = useConnection()
+  const { address, isConnected, chain: walletChain } = useConnection()
+  const switchChain = useSwitchChain({ config })
   const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
@@ -321,18 +323,31 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing) || Boolean(predictMarket)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
-  // NFT listings ride on plain posts and post edits — the listing settles on the chain the
-  // post lands on (the edited post's own chain, the community's chain, or the active chain)
-  const canAttachNft = actionType === 'post' || actionType === 'edit'
-  const nftChainId =
+  // Every submission is pinned to one chain: an edit updates the post where it already lives,
+  // replies and quotes land on the chain of the post they target, community posts on the
+  // community's chain, and a plain post on whatever chain the wallet is currently on.
+  const targetChainId =
     actionType === 'edit'
       ? Number(existingPost?.network_id) || null
+      : isComment
+      ? Number(replyTarget?.network_id) || null
+      : isQuote
+      ? Number(quoteTarget?.network_id) || null
       : communityTarget
       ? Number(communityTarget.networkId)
       : Number(getActiveChain()?.[0]?.id) || null
-  const nftTradeAvailable = Boolean(nftChainId && CONTRACTS[`chain${nftChainId}`]?.trade)
+  const targetChain = appChains.find((chain) => chain.id === targetChainId)
+  // The wallet only ever signs on the chain it is connected to — editing a Celo post from a
+  // LUKSO connection would otherwise fire `update` at Celo's contract address on LUKSO, so the
+  // composer prompts for a switch instead (same pattern as the Bazaar/Predict dialogs)
+  const isWrongChain = Boolean(walletChain && targetChainId && walletChain.id !== targetChainId)
+
+  // NFT listings ride on plain posts and post edits — the listing settles on the chain the
+  // post lands on
+  const canAttachNft = actionType === 'post' || actionType === 'edit'
+  const nftTradeAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.trade)
   // Prediction markets pin to the same chain the post lands on, like NFT listings
-  const predictAvailable = Boolean(nftChainId && CONTRACTS[`chain${nftChainId}`]?.predict)
+  const predictAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.predict)
 
   const handleClose = useCallback(
     (e) => {
@@ -845,6 +860,12 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       return
     }
 
+    // Bail before the IPFS upload — signing on the wrong network can only fail
+    if (isWrongChain) {
+      toast(`Switch your wallet to ${targetChain?.name || 'the right network'} first`, 'error')
+      return
+    }
+
     if (!hasPostBody) {
       editorRef.current?.focus()
       return
@@ -905,13 +926,16 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       if (!metadata) throw new Error('CID not found')
 
       if (actionType === 'edit') {
-        const activeChain = getActiveChain()
-        const postContractAddress = activeChain?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
+        // Edits must go back to the chain the post already lives on — the wallet's active chain
+        // can be an entirely different network
+        const postContractAddress = CONTRACTS[`chain${existingPost?.network_id}`]?.hup
+        if (!postContractAddress) throw new Error('Contract configuration missing for network')
         writeContract({
           abi,
           address: postContractAddress,
           functionName: 'update',
           args: [address, existingPost.id, metadata, allowComments],
+          chainId: targetChainId,
         })
       } else if (isComment) {
         // Replies must land on the same network as the post they target, not whatever chain the wallet happens to be on
@@ -922,6 +946,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
           address: targetContractAddress,
           functionName: 'create',
           args: [address, ContentType.Comment, metadata, replyTarget.id, allowComments],
+          chainId: targetChainId,
         })
       } else if (isQuote) {
         // Quotes must land on the same network as the post they quote, so the id stays resolvable
@@ -932,6 +957,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
           address: targetContractAddress,
           functionName: 'create',
           args: [address, ContentType.Post, metadata, 0, allowComments],
+          chainId: targetChainId,
         })
       } else {
         // Community posts must land on the community's chain (like replies/quotes do), not
@@ -945,6 +971,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
           address: postContractAddress,
           functionName: 'create',
           args: [address, ContentType.Post, metadata, 0, allowComments],
+          chainId: targetChainId,
         })
       }
     } catch (error) {
@@ -1010,6 +1037,30 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
         </button>
         <h2>{actionType === 'edit' ? 'Edit post' : isComment ? 'Reply' : isQuote ? 'Quote post' : communityTarget ? `Post to ${communityTarget.name || 'community'}` : 'New post'}</h2>
       </header>
+
+      {isWrongChain && (
+        <div className={styles.chainWarning} role="alert">
+          <WarningIcon size={16} />
+          <span>
+            {actionType === 'edit'
+              ? `This post lives on ${targetChain?.name || 'another network'}`
+              : isComment
+                ? `This reply lands on ${targetChain?.name || 'another network'}`
+                : isQuote
+                  ? `This quote lands on ${targetChain?.name || 'another network'}`
+                  : `This post lands on ${targetChain?.name || 'another network'}`}
+            {' — switch your wallet to sign.'}
+          </span>
+          <button
+            type="button"
+            className={styles.chainWarning__switch}
+            onClick={() => switchChain.mutate({ chainId: targetChainId })}
+            disabled={switchChain.isPending}
+          >
+            {switchChain.isPending ? 'Switching...' : 'Switch'}
+          </button>
+        </div>
+      )}
 
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} />
@@ -1251,7 +1302,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
             )}
           </div>
 
-          <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit}>
+          <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain}>
             {isConfirming
               ? actionType === 'edit' ? 'Updating...' : isComment ? 'Replying...' : 'Posting...'
               : isSigning
@@ -1266,7 +1317,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
 
       {showSellNftModal && (
         <SellNftModal
-          chainId={nftChainId}
+          chainId={targetChainId}
           onAttached={(listing) => {
             setNftListing(listing)
             setShowSellNftModal(false)
@@ -1277,7 +1328,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
 
       {showAttachMarket && (
         <AttachMarketModal
-          chainId={nftChainId}
+          chainId={targetChainId}
           onAttached={(marketRef) => {
             setPredictMarket(marketRef)
             setShowAttachMarket(false)
