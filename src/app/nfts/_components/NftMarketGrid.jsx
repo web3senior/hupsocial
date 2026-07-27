@@ -5,10 +5,9 @@ import { useConnection, useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
 import { FunnelIcon, MagnifyingGlassIcon, StorefrontIcon } from '@phosphor-icons/react'
-import { getNftListings } from '@/lib/api'
+import { getNftListings, getNftPaymentTokens } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
-import { TIP_TOKENS } from '@/lib/tokens'
 import { toast } from '@/components/NextToast'
 import NativePopover from '@/components/ui/NativePopover'
 import NftMarketCard from '@/components/NftMarketCard'
@@ -60,23 +59,62 @@ const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.t
 
 const NETWORK_OPTIONS = [{ value: '', label: 'All networks' }, ...tradeChains.map((chain) => ({ value: String(chain.id), label: chain.name }))]
 
-// Min/max price inputs are human units — resolving the selected token's decimals (native
-// currency needs no read; an ERC20/LSP7 does, same selector both standards share) lets the
-// filter convert them to the base-unit strings the API compares against.
-function usePriceDecimals(networkId, token) {
+const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
+
+/**
+ * Turn the payment-token rows the API returns into <select> options.
+ *
+ * The API answers per (chain, token) because symbol and decimals are indexed per chain, but the
+ * filter itself matches on the address alone — so one token listed on several chains collapses
+ * into a single option, and every chain's native currency collapses into the API's shared
+ * 'native' keyword. Tokens the indexer hasn't named yet fall back to their address, and the
+ * count keeps the currencies most of the market is priced in at the top.
+ */
+function buildTokenOptions(rows) {
+  const options = new Map()
+
+  for (const row of rows) {
+    const value = row.is_native ? 'native' : String(row.token).toLowerCase()
+    const chain = appChains.find((c) => c.id === Number(row.network_id))
+    const label = row.is_native
+      ? row.symbol || chain?.nativeCurrency?.symbol || 'Native currency'
+      : row.symbol || shortAddress(String(row.token))
+    const existing = options.get(value)
+
+    if (existing) {
+      existing.count += row.listing_count || 0
+      // Native means a different currency on every chain (LYX here, MON there) — with no
+      // network picked there's no one symbol to show, so the generic name stands in
+      if (existing.label !== label) existing.label = row.is_native ? 'Native currency' : existing.label
+      existing.decimals = existing.decimals ?? row.decimals ?? null
+      continue
+    }
+
+    options.set(value, { value, label, decimals: row.decimals ?? null, count: row.listing_count || 0 })
+  }
+
+  return [...options.values()].sort((a, b) => b.count - a.count || COLLATOR.compare(a.label, b.label))
+}
+
+// Min/max price inputs are human units — resolving the selected token's decimals lets the filter
+// convert them to the base-unit strings the API compares against. store_tokens already carries
+// decimals for anything the indexer has named, so the onchain read (same `decimals()` selector
+// ERC20 and LSP7 share) is only a fallback for tokens it hasn't.
+function usePriceDecimals(networkId, token, indexedDecimals) {
   const numericChainId = networkId ? Number(networkId) : undefined
   const chainInfo = numericChainId ? appChains.find((c) => c.id === numericChainId) : null
   const isSpecificToken = Boolean(token && token !== 'native')
+  const needsRead = isSpecificToken && indexedDecimals == null
 
   const { data: tokenDecimals } = useReadContract({
     abi: erc20Abi,
-    address: isSpecificToken ? token : undefined,
+    address: needsRead ? token : undefined,
     functionName: 'decimals',
     chainId: numericChainId,
-    query: { enabled: Boolean(isSpecificToken && numericChainId) },
+    query: { enabled: Boolean(needsRead && numericChainId) },
   })
 
-  if (isSpecificToken) return tokenDecimals ?? 18
+  if (isSpecificToken) return indexedDecimals ?? tokenDecimals ?? 18
   return chainInfo?.nativeCurrency?.decimals ?? 18
 }
 
@@ -169,10 +207,38 @@ export default function NftMarketGrid() {
     setCollectionOptions((prev) => (prev.has(collectionAddress) ? prev : new Map(prev).set(collectionAddress, collectionName)))
   }, [])
 
+  // Payment tokens come from the listings themselves, not a curated list — anything a seller
+  // priced in shows up here. Refetched per network, and after a fresh listing, which may have
+  // introduced a currency nothing else on the market uses yet.
+  const [tokenOptions, setTokenOptions] = useState([])
+  const [isLoadingTokens, setIsLoadingTokens] = useState(true)
+
   const isFetchingRef = useRef(false)
   const hasMoreRef = useRef(false)
 
-  const priceDecimals = usePriceDecimals(filters.networkId, filters.token)
+  const selectedToken = tokenOptions.find((o) => o.value === filters.token)
+  const priceDecimals = usePriceDecimals(filters.networkId, filters.token, selectedToken?.decimals)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchTokens = async () => {
+      setIsLoadingTokens(true)
+      try {
+        const res = await getNftPaymentTokens(filters.networkId)
+        if (!cancelled) setTokenOptions(buildTokenOptions(res.data || []))
+      } catch {
+        if (!cancelled) setTokenOptions([])
+      } finally {
+        if (!cancelled) setIsLoadingTokens(false)
+      }
+    }
+    fetchTokens()
+
+    return () => {
+      cancelled = true
+    }
+  }, [filters.networkId, refreshKey])
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 400)
@@ -282,7 +348,9 @@ export default function NftMarketGrid() {
     setIsSelling(true)
   }
 
-  const tokensForNetwork = filters.networkId ? TIP_TOKENS[Number(filters.networkId)] ?? [] : []
+  // A price range only means something once its unit is pinned down: a chain fixes the native
+  // currency's decimals, and a specific token carries its own from the index
+  const canFilterPrice = Boolean(filters.networkId) || Boolean(selectedToken && selectedToken.value !== 'native' && selectedToken.decimals != null)
   const collectionEntries = [...collectionOptions.entries()].sort((a, b) => COLLATOR.compare(a[1], b[1]))
   const searchLower = search.toLowerCase()
   const hiddenCount = hiddenFilterCount(filters)
@@ -386,18 +454,21 @@ export default function NftMarketGrid() {
                   <select
                     id="nftFilterToken"
                     value={filters.token}
-                    disabled={!filters.networkId}
+                    disabled={tokenOptions.length === 0}
                     onChange={(e) => setFilters((f) => ({ ...f, token: e.target.value }))}
                   >
                     <option value="">Any</option>
-                    <option value="native">Native currency</option>
-                    {tokensForNetwork.map((t) => (
-                      <option key={t.address} value={t.address}>
-                        {t.symbol}
+                    {tokenOptions.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label} ({t.count})
                       </option>
                     ))}
                   </select>
-                  {!filters.networkId && <small className={styles.filtersPanel__hint}>Pick a network first</small>}
+                  {tokenOptions.length === 0 && (
+                    <small className={styles.filtersPanel__hint}>
+                      {isLoadingTokens ? 'Loading currencies...' : 'No listings on this network yet'}
+                    </small>
+                  )}
                 </div>
 
                 <div className={styles.filtersPanel__field}>
@@ -410,7 +481,7 @@ export default function NftMarketGrid() {
                       inputMode="decimal"
                       placeholder="Min"
                       value={filters.minPrice}
-                      disabled={!filters.networkId}
+                      disabled={!canFilterPrice}
                       onChange={(e) => setFilters((f) => ({ ...f, minPrice: e.target.value }))}
                     />
                     <span>–</span>
@@ -421,11 +492,11 @@ export default function NftMarketGrid() {
                       inputMode="decimal"
                       placeholder="Max"
                       value={filters.maxPrice}
-                      disabled={!filters.networkId}
+                      disabled={!canFilterPrice}
                       onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))}
                     />
                   </div>
-                  {!filters.networkId && <small className={styles.filtersPanel__hint}>Pick a network first</small>}
+                  {!canFilterPrice && <small className={styles.filtersPanel__hint}>Pick a network or payment token first</small>}
                 </div>
 
                 {isFiltered && (

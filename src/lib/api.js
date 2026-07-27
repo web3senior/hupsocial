@@ -114,6 +114,24 @@ export const getNftListings = async (page = 1, limit = 24, filters = {}) => {
 }
 
 /**
+ * Get NFT Payment Tokens
+ * The currencies sellers have actually listed in, for the NFT Market's payment-token filter.
+ * Read off the indexed nft_listings table, so it covers tokens no curated config knows about.
+ * Rows carry `is_native`, `symbol`/`decimals` (null until the indexer names the token) and a
+ * `listing_count` — the client labels and orders the <select> from those.
+ * @param {string|number} [networkId] Restrict to one chain; omitted returns every chain's.
+ */
+export const getNftPaymentTokens = async (networkId) => {
+  const params = new URLSearchParams()
+  if (networkId) params.set('networkId', networkId)
+
+  const response = await fetch(`/api/v1/nfts/tokens?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch NFT payment tokens')
+
+  return response.json()
+}
+
+/**
  * Collections with live HupTrade listings, for the NFT Market hero. Names and artwork are
  * resolved client-side from the sample token ids each row carries — collection metadata
  * isn't indexed anywhere server-side.
