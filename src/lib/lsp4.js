@@ -44,8 +44,21 @@ export const pickLsp4Icon = (lsp4) => lsp4?.icon?.[0]?.url || lsp4?.images?.[0]?
 export const fetchMetadataJson = async (uri) => {
   if (!uri) return null
   if (uri.startsWith('data:application/json')) {
-    const payload = uri.slice(uri.indexOf(',') + 1)
-    return JSON.parse(uri.includes(';base64') ? atob(payload) : decodeURIComponent(payload))
+    const comma = uri.indexOf(',')
+    // Only the header before the comma decides the encoding. Collections that embed their
+    // artwork inline (Burnt Pix ships the whole SVG as `data:image/svg+xml;base64,…` inside
+    // the JSON) would otherwise look base64 because of the *image's* marker, and atob would
+    // choke on the plain-text body.
+    const isBase64 = comma !== -1 && uri.slice(0, comma).includes(';base64')
+    const payload = uri.slice(comma + 1)
+    if (isBase64) return JSON.parse(atob(payload))
+    // Percent-decoding is best effort — a body containing a bare `%` is not valid
+    // percent-encoding but is still valid JSON.
+    try {
+      return JSON.parse(decodeURIComponent(payload))
+    } catch {
+      return JSON.parse(payload)
+    }
   }
   const response = await fetch(resolveStorageUrl(uri))
   if (!response.ok) return null
