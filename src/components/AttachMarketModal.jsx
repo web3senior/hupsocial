@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import { useConnection } from 'wagmi'
-import { TargetIcon, PlusIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, PlusIcon } from '@phosphor-icons/react'
 import { marketStatus } from '@/lib/predict'
 import CreateMarketDialog from './CreateMarketDialog'
 import NativeDialog from './ui/NativeDialog'
@@ -83,7 +83,7 @@ const AttachMarketModal = ({ chainId, onAttached, onClose }) => {
               {openMarkets.map((market) => (
                 <li key={`${market.network_id}-${market.market_id}`}>
                   <button type="button" onClick={() => onAttached({ marketId: String(market.market_id), chainId })}>
-                    <TargetIcon size={16} />
+                    <ChartLineUpIcon size={16} />
                     <span>{market.title || `Market #${market.market_id}`}</span>
                   </button>
                 </li>

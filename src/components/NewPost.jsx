@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, usePublicClient, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { TargetIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -1182,7 +1182,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                   aria-label="Attach a prediction market"
                   disabled={isBusy || Boolean(predictMarket)}
                 >
-                  <TargetIcon size={20} />
+                  <ChartLineUpIcon size={20} />
                   <span>Predict</span>
                 </button>
               )}
@@ -1200,7 +1200,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
 
             {predictMarket && (
               <div className={styles.nftAttachment}>
-                <TargetIcon size={16} />
+                <ChartLineUpIcon size={16} />
                 <span>Prediction market attached (market #{predictMarket.marketId})</span>
                 <button type="button" onClick={() => setPredictMarket(null)} aria-label="Detach prediction market" disabled={isBusy}>
                   <XIcon size={14} />

@@ -12,7 +12,7 @@ import HowPredictWorks from './HowPredictWorks'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import { marketStatus, parseJsonArray, toRelative } from '@/lib/predict'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
-import { MagnifyingGlassIcon, PlusIcon, ScalesIcon, StarIcon, TargetIcon, UsersIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, MagnifyingGlassIcon, PlusIcon, ScalesIcon, StarIcon, UsersIcon } from '@phosphor-icons/react'
 import styles from './PredictDirectory.module.scss'
 
 const PAGE_SIZE = 25
@@ -262,7 +262,7 @@ export default function PredictDirectory() {
 
       {!isLoading && listMarkets.length === 0 && !showFeaturedStrip && (
         <div className={styles.directory__empty}>
-          <TargetIcon size={32} />
+          <ChartLineUpIcon size={32} />
           <p>{search ? `No markets match “${search}”.` : emptyCopy[scope]}</p>
         </div>
       )}

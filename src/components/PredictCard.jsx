@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
-import { StarIcon, TargetIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, StarIcon } from '@phosphor-icons/react'
 import { marketStatus, outcomeColor, parseJsonArray, toRelative } from '@/lib/predict'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import styles from './PredictCard.module.scss'
@@ -40,7 +40,7 @@ export default function PredictCard({ marketRef }) {
     <Link href={`/predict/${chainId}/${marketId}`} className={styles.predictCard} onClick={(e) => e.stopPropagation()}>
       <div className={styles.predictCard__top}>
         <span className={styles.predictCard__kind}>
-          <TargetIcon size={14} />
+          <ChartLineUpIcon size={14} />
           Prediction market
           {Boolean(Number(market.featured)) && <StarIcon size={12} weight="fill" className={styles.predictCard__star} />}
         </span>
