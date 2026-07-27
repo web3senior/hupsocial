@@ -1,159 +1,50 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, BellIcon, ChatCircleIcon, ChecksIcon, ClockIcon, HeartIcon, PiggyBankIcon, PlusCircleIcon, QuotesIcon, ScalesIcon, SpinnerIcon, TargetIcon, UserIcon, UserPlusIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
+import { ArrowsCounterClockwiseIcon, BellIcon, ChecksIcon, SpinnerIcon, UserIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
-import Profile from '@/components/Profile'
-import { toRelativeTime } from '@/lib/dateHelper'
-import { getPostById, getViewPost } from '@/lib/api'
+import NotificationRow from './NotificationRow'
+import { FILTERS, buildGroups } from './notificationModel'
 import styles from './ActivityFeed.module.scss'
 
-const PAGE_SIZE = 20
-
-const ACTION_META = {
-  post_created: {
-    icon: PlusCircleIcon,
-    label: 'Post created',
-  },
-  comment_created: {
-    icon: ChatCircleIcon,
-    label: 'Comment created',
-  },
-  post_received_comment: {
-    icon: ChatCircleIcon,
-    label: 'New comment',
-  },
-  post_received_quote: {
-    icon: QuotesIcon,
-    label: 'New quote',
-  },
-  post_liked: {
-    icon: HeartIcon,
-    label: 'New like',
-  },
-  content_liked: {
-    icon: HeartIcon,
-    label: 'New like',
-  },
-  user_received_follow: {
-    icon: UserPlusIcon,
-    label: 'New follower',
-  },
-  post_received_tip: {
-    icon: PiggyBankIcon,
-    label: 'New tip',
-  },
-  post_sent_tip: {
-    icon: PiggyBankIcon,
-    label: 'Tip sent',
-  },
-  market_received_bet: {
-    icon: TargetIcon,
-    label: 'New bet',
-  },
-  market_earned_fee: {
-    icon: PiggyBankIcon,
-    label: 'Creator fee earned',
-  },
-  market_resolved: {
-    icon: TargetIcon,
-    label: 'Market resolved',
-  },
-  market_refunds_available: {
-    icon: ArrowsCounterClockwiseIcon,
-    label: 'Refunds available',
-  },
-  market_judge_invited: {
-    icon: ScalesIcon,
-    label: 'Judge invitation',
-  },
-  market_judge_accepted: {
-    icon: ScalesIcon,
-    label: 'Judge accepted',
-  },
-}
+// Rows collapse into groups, so a page of raw notifications yields far fewer visible rows — 40 keeps
+// a first screen full without pushing past the endpoint's 50-row ceiling.
+const PAGE_SIZE = 40
+const EMPTY_COUNTS = { inbox: 0, mentions: 0, money: 0, you: 0 }
+const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
 export default function ActivityFeed() {
   const { address, isConnected, chain } = useConnection()
   const { mutateAsync: signMessageAsync } = useSignMessage()
+
+  const [filter, setFilter] = useState(FILTERS[0].id)
   const [notifications, setNotifications] = useState([])
   const [nextPage, setNextPage] = useState(null)
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [unreadByFilter, setUnreadByFilter] = useState(EMPTY_COUNTS)
   const [isLoading, setIsLoading] = useState(false)
+  const [isPaging, setIsPaging] = useState(false)
   const [error, setError] = useState(null)
 
   const pendingReadIds = useRef(new Set())
   const readBatchTimer = useRef(null)
 
-  const markAllAsRead = useCallback(async () => {
-    if (!address || unreadCount === 0) return
-
-    const timestamp = Date.now()
-    const message = `Mark all notifications as read\nTimestamp: ${timestamp}`
-
-    let signature
-    try {
-      signature = await signMessageAsync({ message })
-    } catch {
-      return
-    }
-
-    setNotifications((prev) => prev.map((n) => (n.is_read ? n : { ...n, is_read: true, read_at: new Date().toISOString() })))
-    setUnreadCount(0)
-
-    const isLukso = chain?.id === 42 || chain?.id === 4201
-    const body = { mark_all: true, message, signature, ...(isLukso && { up_address: address }) }
-
-    try {
-      await fetch('/api/v1/notifications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    } catch (err) {
-      console.error('Failed to mark all notifications as read:', err)
-    }
-  }, [address, chain, unreadCount, signMessageAsync])
-
-  const markAsRead = useCallback(
-    (id) => {
-      if (!address) return
-
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id && !n.is_read ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)),
-      )
-      setUnreadCount((c) => Math.max(0, c - 1))
-
-      pendingReadIds.current.add(id)
-      clearTimeout(readBatchTimer.current)
-      readBatchTimer.current = setTimeout(async () => {
-        const ids = [...pendingReadIds.current]
-        pendingReadIds.current.clear()
-        try {
-          await fetch('/api/v1/notifications', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, wallet_address: address }),
-          })
-        } catch (err) {
-          console.error('Failed to mark notifications as read:', err)
-        }
-      }, 500)
-    },
-    [address],
-  )
+  // Every notification is either something you did or something somebody else did, so those two
+  // tabs already cover the table — Mentions and Money overlap them and must not be added in.
+  const totalUnread = unreadByFilter.inbox + unreadByFilter.you
 
   const loadNotifications = useCallback(
     async ({ page = 1, append = false, signal } = {}) => {
       if (!address) return
 
-      setIsLoading(true)
+      if (append) setIsPaging(true)
+      else setIsLoading(true)
       setError(null)
 
       try {
         const params = new URLSearchParams({
           wallet_address: address,
+          filter,
           page: String(page),
           limit: String(PAGE_SIZE),
         })
@@ -167,25 +58,27 @@ export default function ActivityFeed() {
 
         setNotifications((current) => (append ? [...current, ...payload.data] : payload.data))
         setNextPage(payload.nextPage)
-        setUnreadCount(payload.meta?.unread_count || 0)
+        setUnreadByFilter(payload.meta?.unread_by_filter || EMPTY_COUNTS)
       } catch (err) {
         if (err.name === 'AbortError') return
         console.error('Notifications fetch error:', err)
         setError('Could not load notifications.')
       } finally {
-        if (!signal?.aborted) setIsLoading(false)
+        if (!signal?.aborted) {
+          setIsLoading(false)
+          setIsPaging(false)
+        }
       }
     },
-    [address],
+    [address, filter],
   )
 
   useEffect(() => {
     if (!isConnected || !address) return
 
     const controller = new AbortController()
-    const timer = setTimeout(() => {
-      loadNotifications({ signal: controller.signal })
-    }, 0)
+    // Deferred by a tick so the fetch's own setState lands outside the effect body.
+    const timer = setTimeout(() => loadNotifications({ signal: controller.signal }), 0)
 
     return () => {
       clearTimeout(timer)
@@ -193,315 +86,221 @@ export default function ActivityFeed() {
     }
   }, [address, isConnected, loadNotifications])
 
-  const visibleNotifications = useMemo(
-    () =>
-      isConnected && address
-        ? notifications.filter(
-            (notification) =>
-              notification.recipient_wallet_address?.toLowerCase() === address.toLowerCase(),
-          )
-        : [],
-    [address, isConnected, notifications],
+  // A row can belong to several tabs at once (a reply counts under All and Mentions), so the tab
+  // counters are re-read from the server after a write instead of guessed locally.
+  const refreshCounts = useCallback(async () => {
+    if (!address) return
+
+    try {
+      const response = await fetch(`/api/v1/notifications?wallet_address=${address}&counts_only=1`)
+      const payload = await response.json()
+      if (payload.success) setUnreadByFilter(payload.meta?.unread_by_filter || EMPTY_COUNTS)
+    } catch (err) {
+      console.error('Failed to refresh notification counts:', err)
+    }
+  }, [address])
+
+  // The previous tab's rows stay on screen, dimmed, until the new ones land — clearing first made
+  // the feed collapse to skeletons and snap back on every tab press.
+  const selectFilter = (next) => {
+    if (next === filter) return
+
+    setFilter(next)
+    setNextPage(null)
+  }
+
+  const markAsRead = useCallback(
+    (ids) => {
+      if (!address || !ids?.length) return
+
+      const idSet = new Set(ids.map(String))
+      setNotifications((current) =>
+        current.map((notification) =>
+          idSet.has(String(notification.id)) && !notification.is_read
+            ? { ...notification, is_read: true, read_at: new Date().toISOString() }
+            : notification,
+        ),
+      )
+      ids.forEach((id) => pendingReadIds.current.add(id))
+      clearTimeout(readBatchTimer.current)
+      readBatchTimer.current = setTimeout(async () => {
+        const batch = [...pendingReadIds.current]
+        pendingReadIds.current.clear()
+
+        try {
+          await fetch('/api/v1/notifications', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: batch, wallet_address: address }),
+          })
+          refreshCounts()
+        } catch (err) {
+          console.error('Failed to mark notifications as read:', err)
+        }
+      }, 500)
+    },
+    [address, refreshCounts],
   )
-  const hasNotifications = visibleNotifications.length > 0
-  const activeNextPage = hasNotifications ? nextPage : null
-  const headerLabel = useMemo(() => {
-    if (!hasNotifications || unreadCount === 0) return 'Notifications'
-    return `${unreadCount} unread`
-  }, [hasNotifications, unreadCount])
+
+  const markAllAsRead = useCallback(async () => {
+    if (!address || totalUnread === 0) return
+
+    const message = `Mark all notifications as read\nTimestamp: ${Date.now()}`
+
+    let signature
+    try {
+      signature = await signMessageAsync({ message })
+    } catch {
+      return
+    }
+
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.is_read ? notification : { ...notification, is_read: true, read_at: new Date().toISOString() },
+      ),
+    )
+    setUnreadByFilter(EMPTY_COUNTS)
+
+    // Universal Profiles sign through the account contract, so the route needs the UP address to
+    // run the ERC-1271 check instead of a plain EOA recovery.
+    const isLukso = chain?.id === 42 || chain?.id === 4201
+    const body = { mark_all: true, message, signature, ...(isLukso && { up_address: address }) }
+
+    try {
+      await fetch('/api/v1/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      refreshCounts()
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err)
+    }
+  }, [address, chain, totalUnread, refreshCounts, signMessageAsync])
+
+  const groups = useMemo(() => {
+    if (!isConnected || !address) return []
+
+    const owned = notifications.filter(
+      (notification) => notification.recipient_wallet_address?.toLowerCase() === address.toLowerCase(),
+    )
+    return buildGroups(owned)
+  }, [address, isConnected, notifications])
+
+  const activeFilter = FILTERS.find((entry) => entry.id === filter) || FILTERS[0]
+  const hasGroups = groups.length > 0
 
   if (!isConnected) {
     return (
-      <div className={styles.container}>
-        <div className={styles.status}>
+      <div className={styles.feed}>
+        <div className={styles.feed__status}>
           <UserIcon size={20} />
-          Please connect your wallet to view activity.
+          Connect your wallet to see your notifications.
         </div>
       </div>
     )
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h4>
-          <BellIcon size={18} />
-          {headerLabel}
-        </h4>
-        <div className={styles.headerActions}>
-          {unreadCount > 0 && (
+    <div className={styles.feed}>
+      {/* The page name lives in the app header via PageTitle, so this bar carries only the
+          tab switcher and the feed's own actions. */}
+      <header className={styles.feed__header}>
+        <nav className={styles.feed__tabs}>
+          {FILTERS.map((entry) => (
             <button
+              key={entry.id}
               type="button"
-              onClick={markAllAsRead}
-              className={styles.markAllButton}
-              aria-label="Mark all as read"
-              title="Mark all as read"
+              className={clsx(styles.feed__tab, entry.id === filter && styles['feed__tab--active'])}
+              aria-current={entry.id === filter ? 'page' : undefined}
+              onClick={() => selectFilter(entry.id)}
             >
-              <ChecksIcon size={14} />
-              Mark all read
+              {entry.label}
+              {/* Rendered on every tab, always: a counter that appears only once it has something
+                  to say would re-measure the strip under the user's cursor. */}
+              <span className={clsx(styles.feed__count, unreadByFilter[entry.id] === 0 && styles['feed__count--empty'])}>
+                {compactNumber.format(unreadByFilter[entry.id] || 0)}
+              </span>
             </button>
-          )}
+          ))}
+        </nav>
+
+        {/* Both buttons render unconditionally: a control appearing on state change would resize
+            the tab strip beside it. */}
+        <div className={styles.feed__actions}>
           <button
             type="button"
-            onClick={() => loadNotifications()}
-            className={styles.refreshButton}
-            disabled={isLoading}
-            aria-label="Refresh notifications"
-            title="Refresh notifications"
+            className={styles.feed__action}
+            onClick={markAllAsRead}
+            disabled={totalUnread === 0}
+            title="Mark all as read"
+            aria-label="Mark all as read"
           >
-            <ArrowsCounterClockwiseIcon className={isLoading ? styles.spin : undefined} size={16} />
+            <ChecksIcon size={18} />
+          </button>
+          <button
+            type="button"
+            className={styles.feed__action}
+            onClick={() => loadNotifications()}
+            disabled={isLoading}
+            title="Refresh"
+            aria-label="Refresh notifications"
+          >
+            <ArrowsCounterClockwiseIcon className={clsx(isLoading && styles.feed__spin)} size={18} />
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className={styles.feed}>
-        {!hasNotifications && isLoading ? (
-          <div className={styles.status}>
-            <SpinnerIcon className={styles.spin} size={16} />
-            Loading notifications...
+      <div className={clsx(styles.feed__list, isLoading && hasGroups && styles['feed__list--busy'])}>
+        {isLoading && !hasGroups && <SkeletonRows />}
+
+        {!isLoading && !hasGroups && (
+          <div className={styles.feed__empty}>
+            <BellIcon size={28} />
+            <p>{activeFilter.empty}</p>
           </div>
-        ) : null}
+        )}
 
-        {!hasNotifications && !isLoading ? (
-          <div className={styles.status}>
-            <BellIcon size={18} />
-            No notifications yet.
-          </div>
-        ) : null}
-
-        {visibleNotifications.map((notification) => (
-          <NotificationRow
-            key={notification.id}
-            notification={notification}
-            currentAddress={address}
-            onRead={markAsRead}
-          />
+        {groups.map((group) => (
+          <NotificationRow key={group.key} group={group} viewerAddress={address} onRead={markAsRead} />
         ))}
       </div>
 
-      <div className={styles.footer}>
-        {activeNextPage ? (
-          <button
-            type="button"
-            onClick={() => loadNotifications({ page: activeNextPage, append: true })}
-            disabled={isLoading}
-            className={styles.loadMore}
-          >
-            {isLoading ? (
-              <>
-                <SpinnerIcon className={styles.spin} size={16} />
-                Loading...
-              </>
-            ) : (
-              'Load more'
-            )}
-          </button>
-        ) : (
-          hasNotifications && (
-            <div className={styles.status}>
-              <ClockIcon size={14} />
-              You are all caught up
-            </div>
-          )
-        )}
-      </div>
+      {error && <p className={styles.feed__error}>{error}</p>}
 
-      {error && <p className={styles.error}>{error}</p>}
+      {hasGroups && (
+        <footer className={styles.feed__footer}>
+          {nextPage ? (
+            <button
+              type="button"
+              className={styles.feed__more}
+              disabled={isPaging}
+              onClick={() => loadNotifications({ page: nextPage, append: true })}
+            >
+              {isPaging ? <SpinnerIcon className={styles.feed__spin} size={16} /> : 'Show more'}
+            </button>
+          ) : (
+            <span className={styles.feed__status}>You are all caught up</span>
+          )}
+        </footer>
+      )}
     </div>
   )
 }
-function NotificationRow({ notification, currentAddress, onRead }) {
-  const actor = notification.actor_wallet_address || notification.recipient_wallet_address
-  const href = getNotificationHref(notification)
-  const { icon: Icon, label } = ACTION_META[notification.action_type] || {
-    icon: BellIcon,
-    label: formatActionType(notification.action_type),
-  }
 
-  const rowRef = useRef(null)
-  const hasMarkedRead = useRef(false)
-
-  const [post, setPost] = useState(null)
-  const [isLoadingPost, setIsLoadingPost] = useState(false)
-
-  useEffect(() => {
-    if (notification.is_read || !onRead) return
-
-    const el = rowRef.current
-    if (!el) return
-
-    let readTimer = null
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasMarkedRead.current) {
-          readTimer = setTimeout(() => {
-            if (!hasMarkedRead.current) {
-              hasMarkedRead.current = true
-              onRead(notification.id)
-              observer.disconnect()
-            }
-          }, 3000)
-        } else {
-          clearTimeout(readTimer)
-          readTimer = null
-        }
-      },
-      { threshold: 0.5 },
-    )
-
-    observer.observe(el)
-    return () => {
-      observer.disconnect()
-      clearTimeout(readTimer)
-    }
-  }, [notification.id, notification.is_read, onRead])
-
-  // Extract variables safely using top level parameters or data attributes
-  const entityId = notification.data?.parent_post_id || notification.entity_id || notification.data?.post_id
-  const networkId = notification.network_id || notification.data?.network_id
-  // Follow (entity_type 'user') and community notifications carry a non-post entity_id —
-  // never feed those into the post preview fetch.
-  const isPostEntity = !notification.entity_type || notification.entity_type === 'post'
-
-  useEffect(() => {
-    if (!isPostEntity || !networkId || !entityId) return
-
-    let cancelled = false
-    setIsLoadingPost(true)
-
-    // Using getPostById exactly like your working Post component
-    getPostById(networkId, entityId, currentAddress)
-      .then((res) => {
-        if (cancelled) return
-
-        const fetchedPost = Array.isArray(res?.data) ? res.data[0] : res?.data
-        setPost(fetchedPost || null)
-      })
-      .catch((err) => {
-        console.error('Error fetching notification content:', err)
-        if (!cancelled) setPost(null)
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingPost(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [isPostEntity, networkId, entityId, currentAddress])
-
-  // Mirror the text resolution structure from your Post component
-  const postTextPreview = useMemo(() => {
-    if (!post) return null
-
-    if (post.content?.elements?.length > 0) {
-      return post.content.elements[0]?.data?.text || ''
-    }
-
-    return typeof post.content === 'string' ? post.content : null
-  }, [post])
-
+function SkeletonRows() {
   return (
-    <article ref={rowRef} className={`${styles.activityRow} ${notification.is_read ? '' : styles.unread}`}>
-      <div className={styles.iconBox}>
-        <Icon size={18} />
-      </div>
-
-      <div className={styles.rowBody}>
-        <div className={styles.profileWrapper}>
-          <Profile creator={actor} networkId={notification.network_id} />
-        </div>
-
-        <div className={styles.messageGroup}>
-          <strong>{notification.title || label}</strong>
-          {notification.message && <p>{linkActorInMessage(notification.message, actor)}</p>}
-          
-          {isLoadingPost && (
-            <div className={styles.postPreviewLoader}>
-              <SpinnerIcon className={styles.spin} size={12} />
-              <span>Loading post content...</span>
-            </div>
-          )}
-
-          {postTextPreview && (
-            <div className={styles.postPreview}>
-             {postTextPreview}
-            </div>
-          )}
-
-          <div className={styles.meta}>
-            <span>{label}</span>
-            {isPostEntity && notification.entity_id && <span>Post #{notification.entity_id}</span>}
-            {notification.created_at && <time>{toRelativeTime(notification.created_at)}</time>}
+    <div aria-busy="true" aria-live="polite">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className={styles.feed__skeleton}>
+          <span className={styles.feed__skeletonIcon} />
+          <div className={styles.feed__skeletonBody}>
+            <span className={styles.feed__skeletonAvatar} />
+            <span className={styles.feed__skeletonLine} />
+            <span className={clsx(styles.feed__skeletonLine, styles['feed__skeletonLine--short'])} />
           </div>
         </div>
-      </div>
-
-      {href && (
-        <Link href={href} className={styles.openLink} aria-label="Open notification">
-          <ArrowSquareOutIcon size={16} />
-        </Link>
-      )}
-    </article>
+      ))}
+    </div>
   )
-}
-function getNotificationHref(notification) {
-  const networkId = notification.network_id || notification.data?.network_id
-  const entityId = notification.entity_id || notification.data?.parent_post_id || notification.data?.post_id
-
-  if (networkId && notification.entity_type === 'post' && entityId) {
-    return `/networks/${networkId}/${entityId}`
-  }
-
-  if (!notification.action_url) return null
-
-  if (notification.action_url.startsWith('/posts/')) {
-    const [path, queryString] = notification.action_url.split('?')
-    const postId = path.replace('/posts/', '')
-    const params = new URLSearchParams(queryString || '')
-    const legacyNetworkId = params.get('network_id') || networkId
-
-    if (legacyNetworkId && postId) {
-      return `/networks/${legacyNetworkId}/${postId}`
-    }
-  }
-
-  return notification.action_url
-}
-
-// Messages like `0x0644...Bc32 requested to join "xxx"` carry the actor only as a truncated
-// string — turn that snippet into a link to the actor's profile page. Guarded: the snippet's
-// hex prefix/suffix must actually match the actor address, so an address-looking fragment that
-// belongs to someone else is never mislinked.
-function linkActorInMessage(message, actor) {
-  if (!actor) return message
-
-  const match = message.match(/0x[a-fA-F0-9]{2,8}\.{3}[a-fA-F0-9]{2,8}/)
-  if (!match) return message
-
-  const [snippet] = match
-  const [prefix, suffix] = snippet.split('...')
-  const actorLower = actor.toLowerCase()
-  if (!actorLower.startsWith(prefix.toLowerCase()) || !actorLower.endsWith(suffix.toLowerCase())) {
-    return message
-  }
-
-  return (
-    <>
-      {message.slice(0, match.index)}
-      <Link href={`/${actor}`} className={styles.actorLink}>
-        {snippet}
-      </Link>
-      {message.slice(match.index + snippet.length)}
-    </>
-  )
-}
-
-function formatActionType(actionType = 'notification') {
-  return actionType
-    .split('_')
-    .filter(Boolean)
-    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
-    .join(' ')
 }

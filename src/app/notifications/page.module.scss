@@ -21,7 +21,8 @@
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
     overflow: clip;
     isolation: isolate;
-    padding: 2rem;
+    // Rows carry their own padding and run edge to edge, so the shell adds none.
+    padding: 0;
 
     @media (max-width: 600px) {
       padding: 0;
