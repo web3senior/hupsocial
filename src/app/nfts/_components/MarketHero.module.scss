@@ -1,0 +1,212 @@
+// Showcase rail above the market grid. Scrolls sideways rather than wrapping — the grid
+// underneath is the browsing surface, so the hero must never grow tall enough to push it
+// below the fold.
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  &__heading {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  &__subheading {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+  }
+
+  &__rail {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    // Cards lift on hover; without the room the transform clips against the scroll box
+    padding: 0.25rem 0.15rem 0.5rem;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background-color: color-mix(in srgb, var(--text) 15%, transparent);
+    }
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    flex-shrink: 0;
+    width: 208px;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--surface);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    scroll-snap-align: start;
+    cursor: pointer;
+    transition: border-color 0.18s ease, transform 0.18s ease;
+
+    &:hover {
+      border-color: var(--text-muted);
+      transform: translateY(-2px);
+    }
+
+    &--active {
+      border-color: var(--network-color-primary, var(--color-primary));
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 8%, var(--surface));
+    }
+  }
+
+  // Lead artwork with two stacked thumbnails beside it — a collection reads as a collection
+  // at a glance, where a single square would just look like another grid tile
+  &__mosaic {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 3px;
+    height: 128px;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: var(--surface-muted);
+  }
+
+  // Auto rows, not a fixed 1fr 1fr — a collection with exactly two listings has one thumb
+  // here, and it should fill the column rather than leave half of it grey
+  &__mosaicSide {
+    display: grid;
+    grid-auto-rows: 1fr;
+    gap: 3px;
+    min-height: 0;
+  }
+
+  &__cover {
+    position: relative;
+    min-height: 0;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  // A collection with a single listing would leave the side column an empty grey strip,
+  // so the lead artwork takes the whole box instead
+  &__mosaic--single {
+    grid-template-columns: 1fr;
+  }
+
+  &__coverFallback {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted);
+  }
+
+  &__chain {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.4rem;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--surface) 80%, transparent);
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 0 0.2rem 0.2rem;
+  }
+
+  &__name {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 700;
+    font-size: 0.92rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &--pending {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+  }
+
+  &__stats {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.5rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+  }
+
+  &__stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    white-space: nowrap;
+
+    b {
+      color: var(--text);
+      font-family: var(--ff-mono);
+    }
+  }
+
+  &__sold {
+    min-height: 0.95rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+  }
+
+  &__skeleton {
+    flex-shrink: 0;
+    width: 208px;
+    height: 196px;
+    border-radius: 16px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: marketHeroPulse 1.4s ease-in-out infinite;
+  }
+
+  @media (min-width: 640px) {
+    &__card,
+    &__skeleton {
+      width: 232px;
+    }
+
+    &__mosaic {
+      height: 144px;
+    }
+  }
+}
+
+@keyframes marketHeroPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}

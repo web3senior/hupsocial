@@ -113,6 +113,23 @@ export const getNftListings = async (page = 1, limit = 24, filters = {}) => {
   return response.json()
 }
 
+/**
+ * Collections with live HupTrade listings, for the NFT Market hero. Names and artwork are
+ * resolved client-side from the sample token ids each row carries — collection metadata
+ * isn't indexed anywhere server-side.
+ * @param {number} [limit=12] Collections to return (server caps at 24).
+ * @param {string|number} [networkId] Restrict to one chain.
+ */
+export const getNftCollections = async (limit = 12, networkId) => {
+  const params = new URLSearchParams({ limit })
+  if (networkId) params.set('networkId', networkId)
+
+  const response = await fetch(`/api/v1/nfts/collections?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch NFT collections')
+
+  return response.json()
+}
+
 export const getFollowingPosts = async (networkId, viewerAddress, page = 1, limit = 20) => {
   const url = `/api/v1/networks/posts?feed_type=following&page=${page}&limit=${limit}&network_id=${networkId}&viewer_address=${viewerAddress}`
 
