@@ -473,6 +473,28 @@
     }
   }
 
+  /* The full holder count sits beside the column title so a truncated preview
+     still reads as a subset, never as the whole list */
+  &__holdersCount {
+    font-weight: 400;
+    color: var(--text-muted, #888);
+  }
+
+  &__moreButton {
+    all: unset;
+    cursor: pointer;
+    align-self: flex-start;
+    padding: 0.35rem 0.25rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover,
+    &:focus-visible {
+      color: inherit;
+      text-decoration: underline;
+    }
+  }
+
   &__positions {
     display: flex;
     flex-direction: column;

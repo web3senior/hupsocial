@@ -38,6 +38,10 @@ import styles from './MarketDetail.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
 
+// How many rows each breakdown tab shows before its "Show all" toggle
+const HOLDERS_PREVIEW = 8
+const POSITIONS_PREVIEW = 30
+
 export default function MarketDetail({ networkId, marketId }) {
   const router = useRouter()
   const { address, chain: walletChain } = useConnection()
@@ -126,6 +130,10 @@ export default function MarketDetail({ networkId, marketId }) {
   const [resolveMode, setResolveMode] = useState(false)
   const [resolveChoice, setResolveChoice] = useState(null)
   const [infoTab, setInfoTab] = useState('holders')
+  // Each breakdown tab previews a slice and expands on demand, so a column never
+  // silently lists fewer people than the Positions/Activity tabs do
+  const [expandedOutcomes, setExpandedOutcomes] = useState([])
+  const [showAllPositions, setShowAllPositions] = useState(false)
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const [lastAction, setLastAction] = useState(null)
 
@@ -585,16 +593,22 @@ export default function MarketDetail({ networkId, marketId }) {
         {infoTab === 'holders' && holders.length > 0 && (
           <div className={styles.market__holdersGrid}>
             {Array.from({ length: Number(market.outcome_count) }, (_, index) => {
-              const outcomeHolders = holders.filter((holder) => Number(holder.outcome) === index).slice(0, 8)
+              const outcomeHolders = holders.filter((holder) => Number(holder.outcome) === index)
               if (outcomeHolders.length === 0) return null
+
+              const isExpanded = expandedOutcomes.includes(index)
+              const visibleHolders = isExpanded ? outcomeHolders : outcomeHolders.slice(0, HOLDERS_PREVIEW)
 
               return (
                 <div key={index} className={styles.market__holdersColumn}>
                   <div className={styles.market__holdersHeader}>
-                    <h3>{outcomes[index]?.label || `Outcome #${index + 1}`} holders</h3>
+                    <h3>
+                      {outcomes[index]?.label || `Outcome #${index + 1}`} holders{' '}
+                      <span className={styles.market__holdersCount}>{new Intl.NumberFormat().format(outcomeHolders.length)}</span>
+                    </h3>
                     <small>STAKE</small>
                   </div>
-                  {outcomeHolders.map((holder) => (
+                  {visibleHolders.map((holder) => (
                     <div key={holder.wallet_address} className={styles.market__personRow}>
                       <Profile
                         variant="fullWithoutTime"
@@ -607,6 +621,20 @@ export default function MarketDetail({ networkId, marketId }) {
                       </span>
                     </div>
                   ))}
+                  {outcomeHolders.length > HOLDERS_PREVIEW && (
+                    <button
+                      type="button"
+                      className={styles.market__moreButton}
+                      aria-expanded={isExpanded}
+                      onClick={() =>
+                        setExpandedOutcomes((current) =>
+                          current.includes(index) ? current.filter((outcome) => outcome !== index) : [...current, index],
+                        )
+                      }
+                    >
+                      {isExpanded ? 'Show less' : `Show all ${new Intl.NumberFormat().format(outcomeHolders.length)}`}
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -615,7 +643,7 @@ export default function MarketDetail({ networkId, marketId }) {
 
         {infoTab === 'positions' && holders.length > 0 && (
           <div className={styles.market__positions}>
-            {holders.slice(0, 30).map((holder) => {
+            {(showAllPositions ? holders : holders.slice(0, POSITIONS_PREVIEW)).map((holder) => {
               const outcomeIndex = Number(holder.outcome)
               const pool = Number(pools[outcomeIndex] ?? '0')
               const distributable = Number(totalPool) * (1 - Number(market.fee_bps) / 10000)
@@ -642,6 +670,16 @@ export default function MarketDetail({ networkId, marketId }) {
                 </div>
               )
             })}
+            {holders.length > POSITIONS_PREVIEW && (
+              <button
+                type="button"
+                className={styles.market__moreButton}
+                aria-expanded={showAllPositions}
+                onClick={() => setShowAllPositions((current) => !current)}
+              >
+                {showAllPositions ? 'Show less' : `Show all ${new Intl.NumberFormat().format(holders.length)}`}
+              </button>
+            )}
           </div>
         )}
 
