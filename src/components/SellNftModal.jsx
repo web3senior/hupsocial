@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useConnection, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
 import clsx from 'clsx'
-import { WarningIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, WarningIcon } from '@phosphor-icons/react'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
 import tradeAbi from '@/abis/HupTrade.json'
 import useNftMetadata from '@/hooks/useNftMetadata'
+import useCollectionSuggestions from '@/hooks/useCollectionSuggestions'
+import useOwnedTokenIds from '@/hooks/useOwnedTokenIds'
 import { toast } from '@/components/NextToast'
 import NativeDialog from './ui/NativeDialog'
 import styles from './SellNftModal.module.scss'
@@ -24,6 +26,14 @@ const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.t
 const MAX_REFERRAL_PERCENT = 50
 
 const shortAddress = (value) => `${value.slice(0, 6)}…${value.slice(-4)}`
+
+// Collection suggestions are headed by where they came from — proven onchain ownership is a
+// very different claim from "a collection by this name exists"
+const COLLECTION_GROUP_LABELS = {
+  owned: 'Your NFTs',
+  market: 'Trading on Hup',
+  search: 'Search results',
+}
 
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
@@ -50,14 +60,27 @@ const erc725yAbi = [
   },
 ]
 
+// LSP8 ids arrive in three dialects — left-padded numbers, utf8 strings, and opaque hashes.
+// Decode the string case so a token called "magic" shows as magic rather than 0x6d61676963…
+const decodeUtf8TokenId = (tokenId) => {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(tokenId)) return null
+  try {
+    const text = hexToString(tokenId).replace(/\0+$/, '')
+    return text.length > 0 && /^[\x20-\x7e]+$/.test(text) ? text : null
+  } catch {
+    return null
+  }
+}
+
 // Numeric-ish token ids read better as numbers; hash-style bytes32 ids get truncated hex
 const shortTokenId = (tokenId) => {
   try {
     const numeric = BigInt(tokenId)
-    return numeric < 10n ** 12n ? `#${numeric}` : `${tokenId.slice(0, 10)}…`
+    if (numeric < 10n ** 12n) return `#${numeric}`
   } catch {
     return tokenId
   }
+  return decodeUtf8TokenId(tokenId) || `${tokenId.slice(0, 10)}…`
 }
 
 const erc721Abi = [
@@ -168,6 +191,10 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
 
   const [collection, setCollection] = useState('')
+  const [isCollectionOpen, setIsCollectionOpen] = useState(false)
+  // The picker row already knows a collection's name and artwork; the preview below only
+  // learns them once a token id resolves, so hold on to the row that was chosen
+  const [pickedCollection, setPickedCollection] = useState(null)
   const [tokenIdInput, setTokenIdInput] = useState('')
   // LSP8 is the native NFT standard on LUKSO; everywhere else ERC721 is the only option, so
   // the picked value is derived rather than stored — switching away from LUKSO can't strand
@@ -187,6 +214,7 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   const switchChain = useSwitchChain({ config })
   const dialogRef = useRef(null)
   const lastActionRef = useRef(null)
+  const autoFilledRef = useRef(null)
 
   const chainInfo = appChains.find((c) => c.id === chainId)
   const isWrongChain = Boolean(walletChain && chainId && walletChain.id !== chainId)
@@ -212,11 +240,16 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   const tokenAddress = listedToken ? listedToken.address : isCustomToken && isAddress(trimmedCustomToken) ? trimmedCustomToken : null
   const isTokenLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
 
-  // Switching networks invalidates everything chain-scoped: a curated token from the previous
-  // network (or a custom address that only exists there) would silently price the listing in
-  // nothing, and the listing rows below belong to one chain each
+  // Switching networks invalidates everything chain-scoped: the collection and token being sold
+  // live at an address on one chain, a curated token from the previous network (or a custom
+  // address that only exists there) would silently price the listing in nothing, and the
+  // listing rows below belong to one chain each
   const handleChainChange = (nextChainId) => {
     setChainId(nextChainId)
+    setCollection('')
+    setPickedCollection(null)
+    setTokenIdInput('')
+    autoFilledRef.current = null
     setPaymentChoice('native')
     setCustomToken('')
     setTokenSearchResults([])
@@ -250,6 +283,40 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
     setCustomToken(result.address)
     setTokenSearchResults([])
   }
+
+  // Collection discovery — the wallet's own holdings where the chain has an index, the
+  // collections trading on Hup everywhere, and a name search on top
+  const {
+    suggestions: collectionSuggestions,
+    isLoading: isLoadingCollections,
+    canScanWallet,
+  } = useCollectionSuggestions({ chainId, owner: address ?? null, isLsp8, query: collection })
+
+  // Which tokens of that collection the wallet actually holds, read live onchain
+  const ownedTokens = useOwnedTokenIds({ chainId, collection: collectionAddress, owner: address ?? null, isLsp8 })
+
+  // The chosen row only describes the collection while the field still holds its address —
+  // typing over it drops back to the address alone
+  const collectionInfo =
+    pickedCollection && collectionAddress && pickedCollection.address.toLowerCase() === collectionAddress.toLowerCase()
+      ? pickedCollection
+      : null
+
+  const handleSelectCollection = (suggestion) => {
+    setCollection(suggestion.address)
+    setPickedCollection(suggestion)
+    setTokenIdInput('')
+    setIsCollectionOpen(false)
+  }
+
+  // Owning exactly one token in a collection isn't a choice — fill it in. Keyed on the
+  // collection so clearing the field by hand doesn't immediately refill it.
+  useEffect(() => {
+    if (!collectionAddress || ownedTokens.tokenIds.length !== 1) return
+    if (autoFilledRef.current === collectionAddress) return
+    autoFilledRef.current = collectionAddress
+    setTokenIdInput(ownedTokens.tokenIds[0])
+  }, [collectionAddress, ownedTokens.tokenIds])
 
   const metadata = useNftMetadata({ chainId, collection: collectionAddress, tokenId, isLsp8, enabled: hasToken })
 
@@ -563,8 +630,15 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
         )}
 
         {myListings.length > 0 && (
-          <div className={styles.sellNftModal__existing}>
-            <p className={styles.sellNftModal__existingTitle}>Your active listings</p>
+          // Collapsed by default so a long listing history never pushes the sell form
+          // below the fold — the count on the summary says what's inside
+          <details className={styles.sellNftModal__existing}>
+            <summary className={styles.sellNftModal__existingSummary}>
+              <span>
+                Your active listings ({myListings.length})
+              </span>
+              <CaretDownIcon size={14} />
+            </summary>
             <p className={styles.sellNftModal__hint}>
               {isStandalone
                 ? 'Already listed onchain — cancel one to release the NFT.'
@@ -600,7 +674,7 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
                 </div>
               </div>
             ))}
-          </div>
+          </details>
         )}
 
         {isLukso && (
@@ -613,17 +687,79 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
           </div>
         )}
 
-        <div className={styles.sellNftModal__field}>
-          <label htmlFor="sellNftCollection">Collection address</label>
+        <div className={clsx(styles.sellNftModal__field, styles.sellNftModal__picker)}>
+          <label htmlFor="sellNftCollection">Collection</label>
           <input
             type="text"
             id="sellNftCollection"
             value={collection}
-            onChange={(e) => setCollection(e.target.value)}
-            placeholder="0x..."
+            // Typing reopens the list as well as focus: after picking a collection the input
+            // still holds focus, so onFocus alone would never fire again
+            onChange={(e) => {
+              setCollection(e.target.value)
+              setIsCollectionOpen(true)
+            }}
+            onFocus={() => setIsCollectionOpen(true)}
+            onBlur={() => setIsCollectionOpen(false)}
+            placeholder={canScanWallet ? 'Search collections or paste 0x...' : 'Collection name or 0x...'}
             autoComplete="off"
             spellCheck={false}
           />
+
+          {collectionInfo && (
+            <p className={styles.sellNftModal__pickerNote}>
+              {collectionInfo.name || 'Unnamed collection'}
+              {collectionInfo.ownedCount > 0 && ` — you own ${collectionInfo.ownedCount}`}
+            </p>
+          )}
+
+          {isCollectionOpen && (
+            <>
+              {collectionSuggestions.length > 0 && (
+                <ul className={styles.sellNftModal__suggestions}>
+                  {collectionSuggestions.map((suggestion, index) => (
+                    <li key={suggestion.address}>
+                      {suggestion.group !== collectionSuggestions[index - 1]?.group && (
+                        <p className={styles.sellNftModal__suggestionGroup}>{COLLECTION_GROUP_LABELS[suggestion.group]}</p>
+                      )}
+                      {/* mousedown would blur the input and unmount the list before the click lands */}
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => handleSelectCollection(suggestion)}>
+                        <span className={styles.sellNftModal__suggestionArt}>
+                          {suggestion.image ? (
+                            <img src={suggestion.image} alt="" />
+                          ) : (
+                            <span>{(suggestion.name || suggestion.address.slice(2)).slice(0, 1).toUpperCase()}</span>
+                          )}
+                        </span>
+                        <span className={styles.sellNftModal__suggestionMain}>
+                          <span className={styles.sellNftModal__suggestionName}>{suggestion.name || 'Unnamed collection'}</span>
+                          <span className={styles.sellNftModal__suggestionAddress}>{shortAddress(suggestion.address)}</span>
+                        </span>
+                        <span className={styles.sellNftModal__suggestionMeta}>
+                          {suggestion.ownedCount > 0 && (
+                            <span className={styles.sellNftModal__suggestionOwned}>{suggestion.ownedCount} owned</span>
+                          )}
+                          {suggestion.activeCount > 0 && <span>{suggestion.activeCount} listed</span>}
+                          {suggestion.group === 'search' && suggestion.holderCount > 0 && (
+                            <span>{compactNumber.format(suggestion.holderCount)} holders</span>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {collectionSuggestions.length === 0 && (
+                <p className={styles.sellNftModal__hint}>
+                  {isLoadingCollections
+                    ? 'Looking for collections...'
+                    : canScanWallet
+                    ? 'No match — paste the collection address instead.'
+                    : `${chainInfo?.name || 'This network'} has no NFT index, so only collections trading on Hup are suggested — paste any other address.`}
+                </p>
+              )}
+            </>
+          )}
         </div>
 
         <div className={styles.sellNftModal__field}>
@@ -637,6 +773,47 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
             autoComplete="off"
             spellCheck={false}
           />
+
+          {collectionAddress && address && (
+            <>
+              {ownedTokens.isLoading && <p className={styles.sellNftModal__hint}>Checking what you own here...</p>}
+
+              {!ownedTokens.isLoading && ownedTokens.tokenIds.length > 0 && (
+                <>
+                  <p className={styles.sellNftModal__hint}>Yours in this collection — tap one to list it</p>
+                  <ul className={styles.sellNftModal__tokenChips}>
+                    {ownedTokens.tokenIds.map((ownedId) => (
+                      <li key={ownedId}>
+                        <button
+                          type="button"
+                          className={clsx(normalizeTokenId(ownedId) === tokenId && styles['sellNftModal__tokenChip--active'])}
+                          onClick={() => setTokenIdInput(ownedId)}
+                        >
+                          {shortTokenId(ownedId)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {ownedTokens.balance > ownedTokens.tokenIds.length && (
+                    <p className={styles.sellNftModal__hint}>
+                      +{ownedTokens.balance - ownedTokens.tokenIds.length} more — paste the id above to list one of those.
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* A real balance with nothing to show means the collection skips ERC721Enumerable */}
+              {!ownedTokens.isLoading && ownedTokens.tokenIds.length === 0 && ownedTokens.balance > 0 && (
+                <p className={styles.sellNftModal__hint}>
+                  You own {ownedTokens.balance} here, but this collection doesn&apos;t publish a token list — enter the id above.
+                </p>
+              )}
+
+              {!ownedTokens.isLoading && ownedTokens.balance === 0 && (
+                <p className={styles.sellNftModal__hint}>This wallet doesn&apos;t hold anything in this collection.</p>
+              )}
+            </>
+          )}
         </div>
 
         {hasToken && (
