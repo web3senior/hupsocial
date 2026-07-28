@@ -160,12 +160,20 @@ export default function Aside() {
     if (isConnected && address) claimLegacyBatch(address)
   }, [isConnected, address, claimLegacyBatch])
 
-  const { data: notifData } = useSWR(
-    isConnected && address ? `/api/v1/notifications?wallet_address=${address}&limit=1` : null,
+  const { data: notifData, mutate: revalidateUnread } = useSWR(
+    // `filter=inbox` counts only what other people did — the same set the notifications page
+    // opens on, so the badge always clears by reading the feed.
+    isConnected && address ? `/api/v1/notifications?wallet_address=${address}&filter=inbox&limit=1` : null,
     (url) => fetch(url).then((r) => r.json()),
     { refreshInterval: 60_000, revalidateOnFocus: true }
   )
   const unreadCount = notifData?.success ? (notifData.meta?.unread_count ?? 0) : 0
+
+  // Client-side navigation fires no focus event and never remounts the layout, so without this the
+  // badge only moves on the 60s poll tick.
+  useEffect(() => {
+    revalidateUnread()
+  }, [pathname, revalidateUnread])
 
   const [isWideScreen, setIsWideScreen] = useState(false)
 

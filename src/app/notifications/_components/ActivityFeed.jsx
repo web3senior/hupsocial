@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { mutate as mutateGlobal } from 'swr'
 import clsx from 'clsx'
 import { ArrowsCounterClockwiseIcon, BellIcon, ChecksIcon, SpinnerIcon, UserIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
@@ -14,8 +15,11 @@ const PAGE_SIZE = 40
 const EMPTY_COUNTS = { inbox: 0, mentions: 0, money: 0, you: 0 }
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
-export default function ActivityFeed() {
-  const { address, isConnected, chain } = useConnection()
+export default function ActivityFeed({ debugAddress }) {
+  const connection = useConnection()
+  const address = debugAddress || connection.address
+  const isConnected = debugAddress ? true : connection.isConnected
+  const chain = connection.chain
   const { mutateAsync: signMessageAsync } = useSignMessage()
 
   const [filter, setFilter] = useState(FILTERS[0].id)
@@ -95,6 +99,10 @@ export default function ActivityFeed() {
       const response = await fetch(`/api/v1/notifications?wallet_address=${address}&counts_only=1`)
       const payload = await response.json()
       if (payload.success) setUnreadByFilter(payload.meta?.unread_by_filter || EMPTY_COUNTS)
+
+      // The sidebar badge caches its count under its own SWR key; without this it keeps the stale
+      // number until the next poll tick after rows are marked read here.
+      mutateGlobal((key) => typeof key === 'string' && key.startsWith('/api/v1/notifications?'))
     } catch (err) {
       console.error('Failed to refresh notification counts:', err)
     }
