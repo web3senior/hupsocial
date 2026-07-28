@@ -9,6 +9,9 @@ function escapeAttr(value) {
     .replaceAll('>', '&gt;')
 }
 
+// A cashtag must start with a letter — `$0.025` and `$25` are prices, not tickers.
+const CASHTAG_PATTERN = /(^|[^A-Za-z0-9_$])\$([A-Za-z][A-Za-z0-9]{0,9})\b/g
+
 export function renderMarkdown(markdown) {
   const content = typeof markdown === 'string' ? markdown.trim() : ''
 
@@ -17,8 +20,8 @@ export function renderMarkdown(markdown) {
   renderer.text = (token) => {
     const rawText = typeof token === 'string' ? token : token?.text || ''
 
-    return rawText.replace(/\$([A-Za-z0-9]{1,10})\b/g, (match, symbol) => {
-      return `<span class="ticker-trigger" data-symbol="${symbol.toUpperCase()}">${match}</span>`
+    return rawText.replace(CASHTAG_PATTERN, (match, prefix, symbol) => {
+      return `${prefix}<span class="ticker-trigger" data-symbol="${symbol.toUpperCase()}">$${symbol}</span>`
     })
   }
 
