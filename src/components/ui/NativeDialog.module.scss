@@ -5,6 +5,13 @@
   margin: auto;
   opacity: 0;
   transform: scale(0.96);
+  // margin:auto centering usually lands the dialog on a fractional y offset. The
+  // enter transition rasterizes it on a compositor layer with one subpixel snap;
+  // if that layer is dropped once the transition ends, the first hover repaint
+  // (e.g. a Cancel button's color change) re-rasterizes with a different snap and
+  // the whole dialog hops 1px. Pinning the layer keeps the snap stable for the
+  // dialog's entire open life.
+  will-change: transform;
   transition:
     opacity 0.18s ease,
     transform 0.18s ease,
@@ -13,8 +20,6 @@
 
   &[open] {
     opacity: 1;
-    // Settle at none, not scale(1) — an identity transform keeps the dialog on a
-    // composited layer that re-snaps subpixels on hover repaints, jiggling the modal
     transform: none;
   }
 
