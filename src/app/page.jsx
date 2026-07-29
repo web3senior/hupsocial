@@ -22,8 +22,10 @@ export default function Page() {
 
   return (
     <div className={styles.page}>
-      <div className={`__container`} data-width={`small`}>
-        <HomeTabStrip />
+      <div className={styles['page__tab-bar']}>
+        <div className={`__container`} data-width={`small`}>
+          <HomeTabStrip />
+        </div>
       </div>
 
       {/* Keyed per tab: switching between two network tabs must remount the

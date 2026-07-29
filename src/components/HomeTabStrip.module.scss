@@ -1,16 +1,15 @@
 .tab-strip {
-  // In-flow strip inside the page's small container: no stickiness, no
-  // full-width divider, no opaque backdrop.
+  // Stickiness, header clearance, and the opaque backdrop live on the page's
+  // tab-bar wrapper (page__tab-bar in page.module.scss); this row only lays
+  // out the pills.
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 1rem 0 1rem 0;
 
   // The container spans edge to edge on small screens, so the pills need
   // their own side inset there.
   @media (max-width: 640px) {
-    padding: 0.5rem 1rem;
-    margin-top: 3.5rem;
+    padding: 0 1rem;
   }
 
   &__scroll {

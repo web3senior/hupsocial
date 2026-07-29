@@ -7,10 +7,23 @@
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
-  // Clear the fixed app header (0.7rem padding x2 + 38px controls) so the
-  // in-flow tab strip isn't painted underneath it.
+  // Fixed app header height (0.7rem padding x2 + 38px controls). Clearance
+  // lives on the tab bar's margin, NOT as padding here: HomeFeedTab reuses
+  // this .page class on nested wrappers, so page-level padding stacks up.
+  --app-header-clearance: calc(1.4rem + 38px);
 
-
+  &__tab-bar {
+    // Keeps the tab strip visible while the feed scrolls. Sticky lives on this
+    // full-width wrapper: the strip's own __container parent is exactly the
+    // strip's height, so sticky inside it could never engage. z-index stays
+    // under the Aside's 3 so the bar never paints over the sidebar.
+    position: sticky;
+    top: var(--app-header-clearance);
+    z-index: 2;
+    margin-top: var(--app-header-clearance);
+    padding: 0.75rem 0;
+    background-color: var(--background);
+  }
 
   &__container {
     position: relative;
@@ -364,10 +377,12 @@
 
 .new-posts {
   position: sticky;
-  top: 3.6rem;
+  // Below the sticky tab bar (header clearance + ~bar height); z-index sits
+  // under the bar's 2 so any overlap tucks beneath the tabs, not over them.
+  top: calc(var(--app-header-clearance, calc(1.4rem + 38px)) + 3.4rem);
   left: 0;
   right: 0;
-  z-index: 50;
+  z-index: 1;
   border: none;
   width: 100%;
   flex: 1;
