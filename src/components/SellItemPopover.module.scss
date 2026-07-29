@@ -99,10 +99,14 @@
         border: 1px solid var(--border);
         border-radius: var(--global-border-radius);
         padding: 0.5rem 0.75rem;
-        background: var(--background);
+        background-color: var(--background);
         font-size: var(--font-size-14, 0.875rem);
         font-family: inherit;
         resize: vertical;
+      }
+
+      select {
+        padding-right: 2rem;
       }
     }
 

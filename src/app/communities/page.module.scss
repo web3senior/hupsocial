@@ -73,7 +73,7 @@
   &__textarea {
     width: 100%;
     padding: 0.75rem 1rem;
-    background: var(--surface-muted);
+    background-color: var(--surface-muted);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
@@ -84,8 +84,12 @@
     &:focus {
       outline: none;
       border-color: var(--foreground);
-      background: var(--surface);
+      background-color: var(--surface);
     }
+  }
+
+  &__select {
+    padding-right: 2rem;
   }
 
   &__textarea {
@@ -227,10 +231,10 @@
   }
 
   &__networkSelect {
-    padding: 0.45rem 0.75rem;
+    padding: 0.45rem 2rem 0.45rem 0.75rem;
     border-radius: 8px;
     border: 1px solid var(--border);
-    background: var(--surface-muted);
+    background-color: var(--surface-muted);
     color: var(--text);
     font-size: 0.9rem;
     font-weight: 600;
@@ -588,7 +592,7 @@
   &__textarea {
     width: 100%;
     padding: 0.5rem 0.75rem;
-    background: var(--surface-muted);
+    background-color: var(--surface-muted);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
@@ -599,6 +603,10 @@
       outline: none;
       border-color: var(--foreground);
     }
+  }
+
+  &__select {
+    padding-right: 2rem;
   }
 
   &__textarea {

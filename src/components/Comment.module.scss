@@ -1286,12 +1286,6 @@
       font-weight: bold;
     }
 
-    input {
-    }
-
-    select {
-    }
-
     select,
     input {
       width: 100%;
@@ -1299,6 +1293,10 @@
       border-radius: 4px;
       height: 30px;
       padding: 0 0.2rem;
+    }
+
+    select {
+      padding-right: 2rem;
     }
   }
 

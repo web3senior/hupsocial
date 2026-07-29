@@ -98,6 +98,10 @@
       font: inherit;
     }
 
+    select {
+      padding-right: 2rem;
+    }
+
     > input {
       outline: none;
       font-family: var(--font-family-monospace);

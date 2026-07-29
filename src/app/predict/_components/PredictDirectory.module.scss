@@ -83,9 +83,9 @@
   &__networkFilter {
     border: 1px solid var(--border);
     border-radius: var(--global-border-radius);
-    background: var(--background);
+    background-color: var(--background);
     color: inherit;
-    padding: 0.35rem 0.5rem;
+    padding: 0.35rem 2rem 0.35rem 0.5rem;
     font-size: var(--font-size-12);
   }
 

@@ -1,0 +1,13 @@
+// The native select arrow is painted flush against the control's right edge and ignores
+// CSS padding, so selects draw their own theme-aware chevron (--select-chevron, set per
+// theme in app/Globals.scss). Consumers keep their own border/radius/padding — they only
+// need to leave the 2rem inline-end gutter free; text-like selects that `all: unset`
+// opt out by specificity and stay arrowless.
+select {
+  appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 14px 14px;
+  padding-right: 2rem;
+}

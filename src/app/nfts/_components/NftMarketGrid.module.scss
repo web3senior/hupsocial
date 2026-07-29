@@ -32,7 +32,7 @@
   &__quickSelect {
     flex-shrink: 0;
     height: 34px;
-    padding: 0 0.6rem;
+    padding: 0 2rem 0 0.6rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     background-color: var(--surface-muted);
@@ -230,6 +230,10 @@
       &:disabled {
         opacity: 0.6;
       }
+    }
+
+    select {
+      padding-right: 2rem;
     }
   }
 
