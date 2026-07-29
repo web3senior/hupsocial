@@ -8,6 +8,7 @@ import TickerTooltip from './TickerTooltip'
 import Header from './Header'
 import Aside from './Aside'
 import Footer from './Footer'
+import InstallAppDialog from './InstallAppDialog'
 import { Providers } from '@/app/providers'
 import styles from './ClientLayout.module.scss'
 
@@ -41,6 +42,7 @@ export default function ClientLayout({ children }) {
         <Aside />
         <main className={styles.main}>{children}</main>
         <Footer />
+        <InstallAppDialog />
       </WagmiContext>
     </Providers>
   )

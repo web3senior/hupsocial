@@ -1,0 +1,162 @@
+@use './../styles/components/responsive' as *;
+
+.installDialog {
+  width: min(440px, calc(100vw - 28px));
+  max-height: calc(100vh - 40px);
+  // iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport
+  max-height: calc(100dvh - 40px);
+  padding: 1.75rem;
+  border: 0;
+  overflow-y: auto;
+  color: var(--text);
+  background: var(--background);
+  border-radius: 22px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  flex-direction: column;
+  gap: 1.5rem;
+
+  // Only style the open state's display — a bare `display: flex` would override the
+  // UA's `display: none` on the closed dialog and flash it before showModal() runs
+  &[open] {
+    display: flex;
+  }
+
+  @include sm-down() {
+    padding: 1.25rem;
+    gap: 1.25rem;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+  }
+
+  &__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--surface-muted);
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
+  &__names {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  &__origin {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__about {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  &__aboutTitle {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  &__description {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+  }
+
+  // The strip scrolls on its own so a wide desktop capture never widens the dialog
+  &__screenshots {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    padding-bottom: 0.25rem;
+  }
+
+  // Capped rather than fixed, so portrait and landscape captures both keep their
+  // aspect ratio instead of being cropped to a common height
+  &__screenshot {
+    width: auto;
+    height: auto;
+    max-height: 220px;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    object-fit: contain;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+
+    @include sm-down() {
+      max-height: 180px;
+    }
+  }
+
+  &__manual {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
+  &__cancel,
+  &__install {
+    padding: 0.7rem 1.6rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      opacity 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  &__cancel {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+
+    &:hover {
+      background: var(--surface-muted);
+    }
+  }
+
+  &__install {
+    border: 0;
+    background: var(--color-primary);
+    color: var(--white, #fff);
+
+    &:hover {
+      opacity: 0.88;
+    }
+  }
+}

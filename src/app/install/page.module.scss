@@ -27,6 +27,23 @@
   gap: 1.25rem;
 }
 
+.description {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+// Manual instructions for the browsers that never fire beforeinstallprompt
+.ios,
+.desktopSafari,
+.fallback {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .field {
   display: flex;
   flex-direction: column;
