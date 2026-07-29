@@ -317,10 +317,6 @@
     position: relative;
   }
 
-  &__picker {
-    position: relative;
-  }
-
   &__pickerNote {
     margin: 0;
     overflow: hidden;
@@ -328,6 +324,16 @@
     font-size: 0.85rem;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  // The NativePopover panel carrying the collection suggestions — the primitive brings
+  // border, background, and shadow; this only sizes it to mirror the input it anchors to
+  // (dialog width minus the body's 1.25rem side padding on each side)
+  &__suggestionsPanel {
+    width: calc(min(420px, 100vw - 28px) - 2.5rem);
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
   }
 
   &__suggestions {
@@ -339,10 +345,6 @@
     padding: 0.35rem;
     overflow-y: auto;
     list-style: none;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background-color: var(--surface);
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
 
     li button {
       display: flex;
@@ -362,6 +364,12 @@
         background-color: var(--hover);
       }
     }
+  }
+
+  // The empty/loading state inside the suggestions panel — the panel itself has no
+  // padding (the list manages its own), so the lone hint brings its own
+  &__suggestionsEmpty {
+    padding: 0.6rem 0.75rem;
   }
 
   &__suggestionGroup {

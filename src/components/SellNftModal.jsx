@@ -15,6 +15,7 @@ import useCollectionSuggestions from '@/hooks/useCollectionSuggestions'
 import useOwnedTokenIds from '@/hooks/useOwnedTokenIds'
 import { toast } from '@/components/NextToast'
 import NativeDialog from './ui/NativeDialog'
+import NativePopover from './ui/NativePopover'
 import styles from './SellNftModal.module.scss'
 
 const LUKSO_CHAIN_IDS = [42, 4201]
@@ -191,7 +192,6 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
 
   const [collection, setCollection] = useState('')
-  const [isCollectionOpen, setIsCollectionOpen] = useState(false)
   // The picker row already knows a collection's name and artwork; the preview below only
   // learns them once a token id resolves, so hold on to the row that was chosen
   const [pickedCollection, setPickedCollection] = useState(null)
@@ -213,6 +213,9 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   const { address, chain: walletChain } = useConnection()
   const switchChain = useSwitchChain({ config })
   const dialogRef = useRef(null)
+  // A text input can't be a native popover invoker (popovertarget only works on buttons),
+  // so the suggestions panel is opened/closed imperatively from the input's events
+  const collectionPopoverRef = useRef(null)
   const lastActionRef = useRef(null)
   const autoFilledRef = useRef(null)
 
@@ -306,7 +309,7 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
     setCollection(suggestion.address)
     setPickedCollection(suggestion)
     setTokenIdInput('')
-    setIsCollectionOpen(false)
+    collectionPopoverRef.current?.close()
   }
 
   // Owning exactly one token in a collection isn't a choice — fill it in. Keyed on the
@@ -687,78 +690,85 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
           </div>
         )}
 
-        <div className={clsx(styles.sellNftModal__field, styles.sellNftModal__picker)}>
+        <div className={styles.sellNftModal__field}>
           <label htmlFor="sellNftCollection">Collection</label>
-          <input
-            type="text"
-            id="sellNftCollection"
-            value={collection}
-            // Typing reopens the list as well as focus: after picking a collection the input
-            // still holds focus, so onFocus alone would never fire again
-            onChange={(e) => {
-              setCollection(e.target.value)
-              setIsCollectionOpen(true)
-            }}
-            onFocus={() => setIsCollectionOpen(true)}
-            onBlur={() => setIsCollectionOpen(false)}
-            placeholder={canScanWallet ? 'Search collections or paste 0x...' : 'Collection name or 0x...'}
-            autoComplete="off"
-            spellCheck={false}
-          />
+          {/* The suggestions overlay the fields below instead of pushing them down — the
+              popover panel floats in the top layer, anchored under the input */}
+          <NativePopover
+            ref={collectionPopoverRef}
+            placement="bottom-start"
+            className={styles.sellNftModal__suggestionsPanel}
+            trigger={
+              <input
+                type="text"
+                id="sellNftCollection"
+                value={collection}
+                // Typing reopens the list as well as focus: after picking a collection the input
+                // still holds focus, so onFocus alone would never fire again
+                onChange={(e) => {
+                  setCollection(e.target.value)
+                  collectionPopoverRef.current?.open()
+                }}
+                onFocus={() => collectionPopoverRef.current?.open()}
+                // A text input can't hold the invoker exemption, so clicking the focused
+                // input light-dismisses the panel on pointerdown — the click reopens it
+                onClick={() => collectionPopoverRef.current?.open()}
+                onBlur={() => collectionPopoverRef.current?.close()}
+                placeholder={canScanWallet ? 'Search collections or paste 0x...' : 'Collection name or 0x...'}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            }
+          >
+            {collectionSuggestions.length > 0 ? (
+              <ul className={styles.sellNftModal__suggestions}>
+                {collectionSuggestions.map((suggestion, index) => (
+                  <li key={suggestion.address}>
+                    {suggestion.group !== collectionSuggestions[index - 1]?.group && (
+                      <p className={styles.sellNftModal__suggestionGroup}>{COLLECTION_GROUP_LABELS[suggestion.group]}</p>
+                    )}
+                    {/* mousedown would blur the input and close the panel before the click lands */}
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => handleSelectCollection(suggestion)}>
+                      <span className={styles.sellNftModal__suggestionArt}>
+                        {suggestion.image ? (
+                          <img src={suggestion.image} alt="" />
+                        ) : (
+                          <span>{(suggestion.name || suggestion.address.slice(2)).slice(0, 1).toUpperCase()}</span>
+                        )}
+                      </span>
+                      <span className={styles.sellNftModal__suggestionMain}>
+                        <span className={styles.sellNftModal__suggestionName}>{suggestion.name || 'Unnamed collection'}</span>
+                        <span className={styles.sellNftModal__suggestionAddress}>{shortAddress(suggestion.address)}</span>
+                      </span>
+                      <span className={styles.sellNftModal__suggestionMeta}>
+                        {suggestion.ownedCount > 0 && (
+                          <span className={styles.sellNftModal__suggestionOwned}>{suggestion.ownedCount} owned</span>
+                        )}
+                        {suggestion.activeCount > 0 && <span>{suggestion.activeCount} listed</span>}
+                        {suggestion.group === 'search' && suggestion.holderCount > 0 && (
+                          <span>{compactNumber.format(suggestion.holderCount)} holders</span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className={clsx(styles.sellNftModal__hint, styles.sellNftModal__suggestionsEmpty)}>
+                {isLoadingCollections
+                  ? 'Looking for collections...'
+                  : canScanWallet
+                  ? 'No match — paste the collection address instead.'
+                  : `${chainInfo?.name || 'This network'} has no NFT index, so only collections trading on Hup are suggested — paste any other address.`}
+              </p>
+            )}
+          </NativePopover>
 
           {collectionInfo && (
             <p className={styles.sellNftModal__pickerNote}>
               {collectionInfo.name || 'Unnamed collection'}
               {collectionInfo.ownedCount > 0 && ` — you own ${collectionInfo.ownedCount}`}
             </p>
-          )}
-
-          {isCollectionOpen && (
-            <>
-              {collectionSuggestions.length > 0 && (
-                <ul className={styles.sellNftModal__suggestions}>
-                  {collectionSuggestions.map((suggestion, index) => (
-                    <li key={suggestion.address}>
-                      {suggestion.group !== collectionSuggestions[index - 1]?.group && (
-                        <p className={styles.sellNftModal__suggestionGroup}>{COLLECTION_GROUP_LABELS[suggestion.group]}</p>
-                      )}
-                      {/* mousedown would blur the input and unmount the list before the click lands */}
-                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => handleSelectCollection(suggestion)}>
-                        <span className={styles.sellNftModal__suggestionArt}>
-                          {suggestion.image ? (
-                            <img src={suggestion.image} alt="" />
-                          ) : (
-                            <span>{(suggestion.name || suggestion.address.slice(2)).slice(0, 1).toUpperCase()}</span>
-                          )}
-                        </span>
-                        <span className={styles.sellNftModal__suggestionMain}>
-                          <span className={styles.sellNftModal__suggestionName}>{suggestion.name || 'Unnamed collection'}</span>
-                          <span className={styles.sellNftModal__suggestionAddress}>{shortAddress(suggestion.address)}</span>
-                        </span>
-                        <span className={styles.sellNftModal__suggestionMeta}>
-                          {suggestion.ownedCount > 0 && (
-                            <span className={styles.sellNftModal__suggestionOwned}>{suggestion.ownedCount} owned</span>
-                          )}
-                          {suggestion.activeCount > 0 && <span>{suggestion.activeCount} listed</span>}
-                          {suggestion.group === 'search' && suggestion.holderCount > 0 && (
-                            <span>{compactNumber.format(suggestion.holderCount)} holders</span>
-                          )}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {collectionSuggestions.length === 0 && (
-                <p className={styles.sellNftModal__hint}>
-                  {isLoadingCollections
-                    ? 'Looking for collections...'
-                    : canScanWallet
-                    ? 'No match — paste the collection address instead.'
-                    : `${chainInfo?.name || 'This network'} has no NFT index, so only collections trading on Hup are suggested — paste any other address.`}
-                </p>
-              )}
-            </>
           )}
         </div>
 
