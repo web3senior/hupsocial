@@ -13,7 +13,9 @@
 
   &[open] {
     opacity: 1;
-    transform: scale(1);
+    // Settle at none, not scale(1) — an identity transform keeps the dialog on a
+    // composited layer that re-snaps subpixels on hover repaints, jiggling the modal
+    transform: none;
   }
 
   &::backdrop {
