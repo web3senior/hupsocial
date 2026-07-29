@@ -15,11 +15,8 @@ const PAGE_SIZE = 40
 const EMPTY_COUNTS = { inbox: 0, mentions: 0, money: 0, you: 0 }
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
-export default function ActivityFeed({ debugAddress }) {
-  const connection = useConnection()
-  const address = debugAddress || connection.address
-  const isConnected = debugAddress ? true : connection.isConnected
-  const chain = connection.chain
+export default function ActivityFeed() {
+  const { address, isConnected, chain } = useConnection()
   const { mutateAsync: signMessageAsync } = useSignMessage()
 
   const [filter, setFilter] = useState(FILTERS[0].id)
@@ -224,11 +221,11 @@ export default function ActivityFeed({ debugAddress }) {
               onClick={() => selectFilter(entry.id)}
             >
               {entry.label}
-              {/* Rendered on every tab, always: a counter that appears only once it has something
-                  to say would re-measure the strip under the user's cursor. */}
-              <span className={clsx(styles.feed__count, unreadByFilter[entry.id] === 0 && styles['feed__count--empty'])}>
-                {compactNumber.format(unreadByFilter[entry.id] || 0)}
-              </span>
+              {/* Tabs are fixed equal widths, so a counter coming or going re-centres its own
+                  label without moving anything else — no reserved slot needed. */}
+              {unreadByFilter[entry.id] > 0 && (
+                <span className={styles.feed__count}>{compactNumber.format(unreadByFilter[entry.id])}</span>
+              )}
             </button>
           ))}
         </nav>
