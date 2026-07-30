@@ -242,7 +242,16 @@ export default function ListingDetail({ networkId, listingId }) {
             </div>
             <div>
               <dt>Token id</dt>
-              <dd title={String(listing.token_id)}>{formatTokenId(listing.token_id)}</dd>
+              <dd title={String(listing.token_id)}>
+                {tokenUrl ? (
+                  <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
+                    {formatTokenId(listing.token_id)}
+                    <ArrowSquareOutIcon size={12} />
+                  </a>
+                ) : (
+                  formatTokenId(listing.token_id)
+                )}
+              </dd>
             </div>
             <div>
               <dt>Listing id</dt>
