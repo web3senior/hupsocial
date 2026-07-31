@@ -11,11 +11,20 @@ import storeAbi from '@/abis/HupBazaar.json'
 import eventsAbi from '@/abis/HupEvents.json'
 import predictAbi from '@/abis/HupPredict.json'
 import tradeAbi from '@/abis/HupTrade.json'
+import tipperAbi from '@/abis/HupTipper.json'
+import { TIP_TOKENS } from '@/lib/tokens'
 import styles from './page.module.scss'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
 
 const OPERATOR_ROLE = keccak256(stringToHex('OPERATOR_ROLE'))
+
+// setErc677Token/onTokenTransfer landed in HupTipper 1.1.0 — older deployments have no such
+// function, so writing to them would revert. Gate the whole card on the version it reports.
+const supportsErc677 = (version) => {
+  const [major = 0, minor = 0] = String(version ?? '').split('.').map(Number)
+  return major > 1 || (major === 1 && minor >= 1)
+}
 
 const EIP712_DOMAIN_ABI = [
   {
@@ -96,6 +105,10 @@ export default function Page() {
   const [tradeTokenInputs, setTradeTokenInputs] = useState({})
   const [tradeTokenIsLsp7, setTradeTokenIsLsp7] = useState({})
   const [tradeWithdrawStates, setTradeWithdrawStates] = useState({})
+  const [tipperVersions, setTipperVersions] = useState({})
+  const [erc677Inputs, setErc677Inputs] = useState({})
+  const [erc677Checks, setErc677Checks] = useState({})
+  const [erc677TxStates, setErc677TxStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
 
@@ -673,6 +686,107 @@ export default function Page() {
     } catch (err) {
       console.error(`Trade withdrawal error on chain ${chain.id}:`, err)
       setTradeWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Read a chain's HupTipper version — decides whether the ERC677 controls are usable at all
+  const loadTipperVersion = async (chain, tipperAddress) => {
+    setTipperVersions((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const version = await client.readContract({ address: tipperAddress, abi: tipperAbi, functionName: 'version' })
+
+      setTipperVersions((prev) => ({ ...prev, [chain.id]: { loading: false, version } }))
+    } catch (err) {
+      console.error(`Tipper version read error for chain ${chain.id}:`, err)
+      setTipperVersions((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read version' },
+      }))
+    }
+  }
+
+  // Load tipper versions, and seed each input with the chain's curated ERC677 token so the
+  // common case (enable G$ on Celo) is one click rather than an address paste
+  useEffect(() => {
+    if (!isAdmin) return
+
+    const seeds = {}
+    config.chains.forEach((chain) => {
+      const tipperAddress = CONTRACTS[`chain${chain.id}`]?.tipper
+      if (!tipperAddress) return
+
+      loadTipperVersion(chain, tipperAddress)
+
+      const curated = (TIP_TOKENS[chain.id] ?? []).find((token) => token.erc677)
+      if (curated) seeds[chain.id] = curated.address
+    })
+
+    setErc677Inputs((prev) => ({ ...seeds, ...prev }))
+  }, [isAdmin])
+
+  // Read whether a token is currently whitelisted for one-transaction ERC677 tipping
+  const handleCheckErc677 = async (chain, tipperAddress) => {
+    const token = erc677Inputs[chain.id]?.trim()
+    if (!isAddress(token)) {
+      setErc677Checks((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid token address' } }))
+      return
+    }
+
+    setErc677Checks((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const enabled = await client.readContract({
+        address: tipperAddress,
+        abi: tipperAbi,
+        functionName: 'erc677Tokens',
+        args: [token],
+      })
+
+      setErc677Checks((prev) => ({ ...prev, [chain.id]: { loading: false, checked: token, enabled } }))
+    } catch (err) {
+      console.error(`ERC677 status read error for chain ${chain.id}:`, err)
+      setErc677Checks((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read status' },
+      }))
+    }
+  }
+
+  // Enable or disable an ERC677 token on a chain's HupTipper (admin wallet signs). Only
+  // whitelisted tokens may call onTokenTransfer, so this is what activates one-tx tipping.
+  const handleSetErc677 = async (chain, tipperAddress, enabled) => {
+    const token = erc677Inputs[chain.id]?.trim()
+    if (!isAddress(token)) {
+      setErc677TxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid token address' } }))
+      return
+    }
+
+    setErc677TxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: tipperAddress,
+        abi: tipperAbi,
+        functionName: 'setErc677Token',
+        args: [token, enabled],
+        chainId: chain.id,
+      })
+
+      setErc677TxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, success: true, hash: txHash, action: enabled ? 'enabled' : 'disabled' },
+      }))
+
+      setTimeout(() => handleCheckErc677(chain, tipperAddress), 3000)
+    } catch (err) {
+      console.error(`ERC677 ${enabled ? 'enable' : 'disable'} error on chain ${chain.id}:`, err)
+      setErc677TxStates((prev) => ({
         ...prev,
         [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
@@ -1811,6 +1925,170 @@ export default function Page() {
                         className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
                       >
                         Withdraw Token Balance
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupTipper ERC677 Tokens</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Whitelist ERC677 tokens (e.g. GoodDollar) so they can tip in a single transaction via transferAndCall, with no
+              approve step. Only whitelisted tokens may call onTokenTransfer — an unlisted token is rejected, which is what stops
+              anyone forging tip events. Requires HupTipper 1.1.0 or newer.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.tipper) return null
+
+              const tokenDraft = erc677Inputs[chain.id] ?? ''
+              const versionState = tipperVersions[chain.id]
+              const check = erc677Checks[chain.id]
+              const tx = erc677TxStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+              const isSupported = supportsErc677(versionState?.version)
+              const isLocked = !versionState || versionState.loading || !isSupported
+
+              return (
+                <div
+                  key={`tipper-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPTIPPER</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Tipper Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.tipper}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.tipper}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.tipper}</code>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Contract Version</span>
+                      <div className={styles['admin-contracts__detail-value']}>
+                        {(!versionState || versionState.loading) && <span>Loading…</span>}
+                        {versionState?.error && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                            {versionState.error}
+                          </div>
+                        )}
+                        {versionState?.version && isSupported && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
+                            ✓ v{versionState.version} — supports one-transaction ERC677 tipping
+                          </div>
+                        )}
+                        {versionState?.version && !isSupported && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                            ⚠️ v{versionState.version} predates 1.1.0 — redeploy before whitelisting anything here
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {check && !check.loading && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Token Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {check.error && (
+                            <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                              {check.error}
+                            </div>
+                          )}
+                          {check.checked && check.enabled && (
+                            <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
+                              ✓ {check.checked.slice(0, 6)}...{check.checked.slice(-4)} is enabled for one-tx tipping
+                            </div>
+                          )}
+                          {check.checked && !check.enabled && (
+                            <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                              {check.checked.slice(0, 6)}...{check.checked.slice(-4)} is not whitelisted — tips revert with
+                              UnsupportedToken
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {tx && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {tx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {tx.error && <span style={{ color: '#ef4444' }}>❌ {tx.error}</span>}
+                          {tx.success && <span style={{ color: '#10b981' }}>🚀 Token {tx.action}.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetErc677(chain, deployment.tipper, true)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>ERC677 Token Address</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={tokenDraft}
+                        onChange={(e) => setErc677Inputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={isLocked || !tokenDraft.trim() || tx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {tx?.loading ? 'Writing...' : 'Enable One-Tx Tipping'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSetErc677(chain, deployment.tipper, false)}
+                        disabled={isLocked || !tokenDraft.trim() || tx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        Disable
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCheckErc677(chain, deployment.tipper)}
+                        disabled={isLocked || !tokenDraft.trim() || check?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        {check?.loading ? 'Checking...' : 'Check Status'}
                       </button>
                     </div>
                   </form>
