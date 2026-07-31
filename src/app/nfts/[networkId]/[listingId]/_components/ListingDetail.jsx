@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { zeroAddress } from 'viem'
 import { appChains } from '@/config/contracts'
 import { toRelative } from '@/lib/predict'
+import { handleBrokenImage } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
@@ -150,10 +151,10 @@ export default function ListingDetail({ networkId, listingId }) {
           {metadata.image ? (
             tokenUrl ? (
               <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
-                <img src={metadata.image} alt={title} />
+                <img src={metadata.image} alt={title} onError={handleBrokenImage} />
               </a>
             ) : (
-              <img src={metadata.image} alt={title} />
+              <img src={metadata.image} alt={title} onError={handleBrokenImage} />
             )
           ) : (
             <div className={styles.listing__mediaFallback}>

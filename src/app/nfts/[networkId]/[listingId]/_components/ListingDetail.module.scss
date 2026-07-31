@@ -43,6 +43,14 @@
       object-fit: cover;
       border: 1px solid var(--border);
       border-radius: 16px;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is
+      // line-art, so contain it at icon scale rather than cover-crop it
+      &[data-broken] {
+        object-fit: contain;
+        padding: 30%;
+        background-color: var(--surface-muted);
+      }
     }
   }
 

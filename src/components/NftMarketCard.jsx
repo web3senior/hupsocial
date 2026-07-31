@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { DiamondIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
 import { formatStake } from '@/hooks/useStakeToken'
+import { handleBrokenImage } from '@/lib/utils'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { appChains } from '@/config/contracts'
 import styles from './NftMarketCard.module.scss'
@@ -89,7 +90,7 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
     <Link href={`/nfts/${networkId}/${listing.listing_id}`} className={styles.nftCard} onClick={(e) => e.stopPropagation()}>
       <div className={styles.nftCard__media}>
         {metadata.image ? (
-          <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
+          <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" onError={handleBrokenImage} />
         ) : (
           <div className={styles.nftCard__mediaFallback}>
             <HupMark size={44} />

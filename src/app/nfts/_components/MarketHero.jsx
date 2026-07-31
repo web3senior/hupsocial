@@ -6,6 +6,7 @@ import { StackIcon } from '@phosphor-icons/react'
 import { getNftCollections } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
+import { handleBrokenImage } from '@/lib/utils'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import HupMark from '@/components/ui/HupMark'
 import styles from './MarketHero.module.scss'
@@ -51,7 +52,7 @@ function CoverTile({ networkId, collection, sample, onName, className }) {
   return (
     <div className={clsx(styles.hero__cover, className)}>
       {metadata.image ? (
-        <img src={metadata.image} alt="" loading="lazy" />
+        <img src={metadata.image} alt="" loading="lazy" onError={handleBrokenImage} />
       ) : (
         <span className={styles.hero__coverFallback}>
           <HupMark size={22} />

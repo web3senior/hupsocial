@@ -45,6 +45,20 @@ export const shortTxError = (error, fallback = 'Transaction failed') => {
   return firstLine.length > 80 ? `${firstLine.slice(0, 79)}…` : firstLine
 }
 
+/**
+ * onError handler for <img> tags whose source can die after resolving (IPFS gateways,
+ * external NFT metadata). Swaps in the bundled placeholder and stamps `data-broken` —
+ * the flag stops the swap from looping if the placeholder itself ever fails, and gives
+ * SCSS a hook to render the line-art contained instead of cover-cropped.
+ * @param {import('react').SyntheticEvent<HTMLImageElement>} event The img error event.
+ */
+export const handleBrokenImage = (event) => {
+  const img = event.currentTarget
+  if (img.dataset.broken) return
+  img.dataset.broken = 'true'
+  img.src = '/no-image.svg'
+}
+
 export const slugify = (str) => {
   str = str.replace(/^\s+|\s+$/g, '') // trim leading/trailing white space
   str = str.toLowerCase() // convert string to lowercase
