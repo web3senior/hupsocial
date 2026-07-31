@@ -240,6 +240,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
   const [pendingRequests, setPendingRequests] = useState([])
   const [members, setMembers] = useState([])
   const [approvingAddress, setApprovingAddress] = useState(null)
+  const [rejectingAddress, setRejectingAddress] = useState(null)
   const [banningAddress, setBanningAddress] = useState(null)
   const [whitelistEntries, setWhitelistEntries] = useState([])
   const [newWhitelistAddress, setNewWhitelistAddress] = useState('')
@@ -416,6 +417,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
 
   const { mutate: approveRequest, data: approveHash, isPending: isApprovePending, error: approveError } = useWriteContract()
   const { isSuccess: isApproveConfirmed } = useWaitForTransactionReceipt({ hash: approveHash })
+
+  const { mutate: rejectRequestWrite, data: rejectHash, isPending: isRejectPending } = useWriteContract()
+  const { isSuccess: isRejectConfirmed } = useWaitForTransactionReceipt({ hash: rejectHash })
 
   const { mutate: grantKeyToMember, data: grantHash } = useWriteContract()
   useWaitForTransactionReceipt({ hash: grantHash })
@@ -837,6 +841,22 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
     }
     run()
   }, [isApproveConfirmed, approveHash, approvingAddress])
+
+  // After a rejection confirms: drop the request from the off-chain discovery index so it
+  // disappears for every moderator, and from this panel immediately. The wallet stays free to
+  // request again later — rejection only clears isPending, it doesn't ban.
+  const rejectHandledRef = useRef(null)
+  useEffect(() => {
+    if (!isRejectConfirmed || !rejectingAddress || rejectHandledRef.current === rejectHash) return
+    rejectHandledRef.current = rejectHash
+
+    fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&wallet_address=${rejectingAddress}`, {
+      method: 'DELETE',
+    }).catch(() => {})
+
+    setPendingRequests((prev) => prev.filter((r) => r.wallet_address?.toLowerCase() !== rejectingAddress.toLowerCase()))
+    setRejectingAddress(null)
+  }, [isRejectConfirmed, rejectHash, rejectingAddress])
 
   // After a ban/leave confirms on encrypted communities: rotate the key so the departed member
   // can't read future posts. Only a moderator can rotate (bumpKeyVersion is moderator-gated), so
@@ -1319,6 +1339,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
       chainId,
       abi: HupCommunityABI,
       functionName: 'approveRequest',
+      args: [id, memberAddress],
+    })
+  }
+
+  const handleReject = (memberAddress) => {
+    setRejectingAddress(memberAddress)
+    rejectRequestWrite({
+      address: CONTRACT_ADDRESS,
+      chainId,
+      abi: HupCommunityABI,
+      functionName: 'rejectRequest',
       args: [id, memberAddress],
     })
   }
@@ -2003,15 +2034,25 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                 pendingRequests.map((req) => (
                   <div key={req.wallet_address} className="flex justify-content-between align-items-center" style={{ padding: '0.5rem 0' }}>
                     <Profile creator={req.wallet_address} networkId={chainId} variant="fullWithoutTime" />
-                    <button
-                      type="button"
-                      className={styles.card__submit}
-                      style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
-                      disabled={isApprovePending && approvingAddress === req.wallet_address}
-                      onClick={() => handleApprove(req.wallet_address)}
-                    >
-                      {isApprovePending && approvingAddress === req.wallet_address ? 'Approving...' : 'Approve'}
-                    </button>
+                    <div className="flex gap-050">
+                      <button
+                        type="button"
+                        className={styles.card__submit}
+                        style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
+                        disabled={isApprovePending && approvingAddress === req.wallet_address}
+                        onClick={() => handleApprove(req.wallet_address)}
+                      >
+                        {isApprovePending && approvingAddress === req.wallet_address ? 'Approving...' : 'Approve'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.card__cancelBtn}
+                        disabled={isRejectPending && rejectingAddress === req.wallet_address}
+                        onClick={() => handleReject(req.wallet_address)}
+                      >
+                        {isRejectPending && rejectingAddress === req.wallet_address ? 'Rejecting...' : 'Reject'}
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
