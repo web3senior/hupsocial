@@ -119,38 +119,90 @@ const getSerializablePostContent = (content) => ({
   }),
 })
 
-// Convert stored markdown to editor HTML (bold/italic only — used once on init)
+// Tags the browser creates on Enter — each one is its own line in the editor
+const BLOCK_ELEMENTS = new Set(['DIV', 'P', 'LI', 'BLOCKQUOTE', 'PRE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'])
+
+const escapeEditorHtml = (text) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// Convert stored markdown to editor HTML (bold/italic only — used once on init).
+// Escaping runs first so a post that literally contains "<b>hi</b>" re-opens as text
+// rather than turning into markup on every edit.
 const markdownToEditorHtml = (text) => {
   if (!text) return ''
   return text
     .split('\n')
     .map((line) =>
-      line
+      escapeEditorHtml(line)
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
     )
     .join('<br>')
 }
 
-// Convert the editor's innerHTML back to markdown for state / on-chain storage
-const editorHtmlToMarkdown = (html) => {
-  if (!html) return ''
-  return html
-    .replace(/<strong>([\s\S]*?)<\/strong>/gi, '**$1**')
-    .replace(/<b>([\s\S]*?)<\/b>/gi, '**$1**')
-    .replace(/<em>([\s\S]*?)<\/em>/gi, '*$1*')
-    .replace(/<i>([\s\S]*?)<\/i>/gi, '*$1*')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<div>/gi, '')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<p>/gi, '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
+// Convert the editor's DOM back to markdown for state / onchain storage.
+//
+// This walks nodes rather than string-replacing tags because a contentEditable mixes
+// two line models: the explicit <br>s we seed on init, and the block wrappers the
+// browser produces once the user presses Enter. Every browser-made block also carries
+// a trailing filler <br> that exists only to give the line height — scraping innerHTML
+// counted that filler *and* the block boundary, so each edit pass added a blank line.
+const editorToMarkdown = (editor) => {
+  if (!editor) return ''
+
+  const lines = ['']
+  const appendText = (text) => {
+    // A pre-wrap editor also receives literal newlines from the browser's Enter handling
+    const parts = text.split('\n')
+    lines[lines.length - 1] += parts[0]
+    for (let index = 1; index < parts.length; index += 1) lines.push(parts[index])
+  }
+  const breakLine = () => lines.push('')
+
+  const walk = (node) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        appendText(child.data)
+        return
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) return
+
+      const tag = child.nodeName
+      if (tag === 'BR') {
+        // No following sibling means this is the browser's filler <br>, not a typed break
+        if (child.nextSibling) breakLine()
+        return
+      }
+      if (BLOCK_ELEMENTS.has(tag)) {
+        if (lines[lines.length - 1] !== '') breakLine()
+        walk(child)
+        if (child.nextSibling) breakLine()
+        return
+      }
+      if (tag === 'STRONG' || tag === 'B') {
+        appendText('**')
+        walk(child)
+        appendText('**')
+        return
+      }
+      if (tag === 'EM' || tag === 'I') {
+        appendText('*')
+        walk(child)
+        appendText('*')
+        return
+      }
+      walk(child)
+    })
+  }
+
+  walk(editor)
+
+  // Text nodes carry already-decoded characters, so the zero-width space applyFormat
+  // parks after a tag and the nbsp the browser inserts are stripped as literals here
+  return lines
+    .join('\n')
     .replace(/​/g, '')
+    .replace(/ /g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
@@ -374,8 +426,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   }
 
   const handleEditorInput = () => {
-    const html = editorRef.current?.innerHTML || ''
-    updateTextContent(editorHtmlToMarkdown(html))
+    updateTextContent(editorToMarkdown(editorRef.current))
     if (!historyRef.current.restoring) scheduleHistorySnapshot()
   }
 
