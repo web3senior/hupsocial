@@ -915,6 +915,12 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
         body: JSON.stringify({ content: serializableContent }),
       })
       const moderation = await moderationRes.json().catch(() => ({}))
+      // Block tier (CSAM, explicit sexual imagery) has no override — pinning it to IPFS
+      // would make the platform itself the host
+      if (moderation?.blocked) {
+        toast('This content can’t be published on Hup.', 'error')
+        return
+      }
       if (moderation?.flagged) {
         // Advisory, never a gate — the author always keeps the final say. Flagged posts are
         // still labeled by the indexer (moderation_flagged) so clients can blur or collapse them.

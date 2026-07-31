@@ -84,12 +84,19 @@ async function buildModerationInput(contentJson) {
   return input
 }
 
+// Hard-block tier: categories where "post anyway" must not exist because pinning the content
+// creates criminal liability for the infrastructure operator. sexual/minors blocks on OpenAI's
+// (deliberately trigger-happy) boolean; adult `sexual` content blocks only on high-confidence
+// explicit material — suggestive/borderline text falls through to the overridable warn tier.
+const BLOCK_SEXUAL_SCORE = 0.8
+
 /**
  * Classifies a post's content via OpenAI moderation.
  * Returns null when there's nothing to check or the check could not be run,
  * so callers can leave any existing moderation state untouched.
+ * `flagged` is advisory (warn tier); `blocked` means the content must not be published.
  * @param {string|object|null} contentJson - Raw `posts.content` value.
- * @returns {Promise<{flagged: boolean, categories: string[]}|null>}
+ * @returns {Promise<{flagged: boolean, blocked: boolean, categories: string[], blockedCategories: string[]}|null>}
  */
 export async function moderateContent(contentJson) {
   if (!contentJson) return null
@@ -140,7 +147,13 @@ export async function moderateContent(contentJson) {
       ),
     ]
 
-    return { flagged, categories }
+    const blockedCategories = new Set()
+    for (const result of results) {
+      if (result?.categories?.['sexual/minors']) blockedCategories.add('sexual/minors')
+      if ((result?.category_scores?.sexual ?? 0) >= BLOCK_SEXUAL_SCORE) blockedCategories.add('sexual')
+    }
+
+    return { flagged, blocked: blockedCategories.size > 0, categories, blockedCategories: [...blockedCategories] }
   } catch (err) {
     console.warn('OpenAI moderation request errored', { err: err.message })
     return null
