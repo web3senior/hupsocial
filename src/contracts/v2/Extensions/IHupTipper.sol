@@ -9,7 +9,7 @@ import "./../IHup.sol";
  * @notice Shared interface for the Hup Tipper protocol.
  * @dev Defines the protocol's public events, custom errors, and public interface used by
  *      HupTipper-compatible contracts, clients, and offchain indexers.
- * @custom:version 1.0.0
+ * @custom:version 1.1.0
  * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
@@ -28,6 +28,9 @@ interface IHupTipper {
 
     /// @notice Emitted when a trusted forwarder's status is updated.
     event TrustedForwarderUpdated(address indexed forwarder, bool trusted);
+
+    /// @notice Emitted when an ERC677 token is enabled or disabled for one-transaction tipping.
+    event Erc677TokenUpdated(address indexed token, bool enabled);
 
     /// @notice Emitted when the percentage tip fee (in basis points) is updated.
     event TipFeeUpdated(uint256 oldValue, uint256 newValue);
@@ -59,6 +62,10 @@ interface IHupTipper {
     error TransferFailed();
     error Unauthorized();
     error SessionExpired();
+    /// @notice onTokenTransfer was called by a contract that is not a whitelisted ERC677 token.
+    error UnsupportedToken();
+    /// @notice An ERC677 tip carried no payload, so there is no postId to credit.
+    error InvalidTipData();
 
     // --- STATE GETTERS ---
 
@@ -66,6 +73,8 @@ interface IHupTipper {
     function hupContract() external view returns (IHup);
     function ADMIN_ROLE() external view returns (bytes32);
     function trustedForwarders(address forwarder) external view returns (bool);
+    /// @notice True if the token is whitelisted for one-transaction ERC677 tipping.
+    function erc677Tokens(address token) external view returns (bool);
     function isTrustedForwarder(address forwarder) external view returns (bool);
     function tipFeeBps() external view returns (uint256);
     function FEE_DENOMINATOR() external view returns (uint256);
@@ -112,6 +121,21 @@ interface IHupTipper {
      *        stored — capped at maxMemoBytes since it's only ever calldata + a log.
      */
     function tip(address _tipper, uint256 _postId, uint256 _amount, address _token, bool _isLsp7, bytes calldata _memo) external payable;
+
+    /**
+     * @notice ERC677 receiver hook — settles a tip in a single transaction, with no prior approve.
+     * @dev Called by the token itself during `transferAndCall`, after the tokens have already been
+     *      moved to this contract. Only whitelisted tokens are accepted (`erc677Tokens`): the
+     *      callback carries no proof of transfer beyond the identity of its caller, so an unlisted
+     *      caller could otherwise forge Tipped events. Reverting here unwinds the transfer, so a
+     *      rejected tip never leaves funds stranded. Burner sessions do not apply — the tokens
+     *      must come from whoever holds them, and the token reports that holder as `_sender`.
+     * @param _sender The address that called transferAndCall, i.e. the tipper.
+     * @param _amount The gross tip amount, in the token's base units.
+     * @param _data ABI-encoded `(uint256 postId, bytes memo)` identifying the post to credit.
+     * @return Always true; ERC677 tokens require a truthy return for the transfer to stand.
+     */
+    function onTokenTransfer(address _sender, uint256 _amount, bytes calldata _data) external returns (bool);
 
     // --- VIEW FUNCTIONS ---
 
@@ -173,6 +197,8 @@ interface IHupTipper {
     function pause() external;
     function unpause() external;
     function setTrustedForwarder(address _forwarder, bool _trusted) external;
+    /// @notice Enables or disables an ERC677 token for one-transaction tipping via onTokenTransfer.
+    function setErc677Token(address _token, bool _enabled) external;
     function setTipFeeBps(uint256 _tipFeeBps) external;
     function setMaxMemoBytes(uint256 _maxMemoBytes) external;
     function withdrawAll(address payable _receiver) external;

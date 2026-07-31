@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { erc20Abi, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
+import { encodeAbiParameters, erc20Abi, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
 import { useSWRConfig } from 'swr'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
@@ -71,6 +71,26 @@ const lsp7Abi = [
   },
 ]
 
+// ERC677 (e.g. GoodDollar) — transferAndCall moves the tokens and invokes the tipper's
+// onTokenTransfer in the same transaction, so no approve step is needed at all
+const erc677Abi = [
+  {
+    type: 'function',
+    name: 'transferAndCall',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+]
+
+// The payload HupTipper.onTokenTransfer decodes to learn which post to credit
+const encodeErc677TipData = (postId, memo = '0x') =>
+  encodeAbiParameters([{ type: 'uint256' }, { type: 'bytes' }], [postId, memo])
+
 /**
  * Tip Modal
  * Sends a tip for a post through HupTipper in the native coin, a curated popular token
@@ -125,6 +145,9 @@ const TipModal = ({ item, setShowTipModal }) => {
   // disabled and the send button locked until a real address is pasted or picked from search
   const tokenAddress = listedToken ? listedToken.address : isCustomToken && isAddress(trimmedCustomToken) ? trimmedCustomToken : null
   const isLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
+  // Only curated entries can be ERC677: the tipper rejects onTokenTransfer from any token it
+  // hasn't whitelisted, so a pasted address always takes the approve path
+  const isErc677 = Boolean(listedToken?.erc677)
   const isSelf = address?.toLowerCase() === creator?.toLowerCase()
 
   // Debounced name search for the custom-token field — a pasted address never triggers a
@@ -217,7 +240,7 @@ const TipModal = ({ item, setShowTipModal }) => {
     functionName: 'allowance',
     args: [address, tipperAddress],
     chainId,
-    query: { enabled: Boolean(isTokenTip && !isLsp7 && tokenAddress && address && tipperAddress) },
+    query: { enabled: Boolean(isTokenTip && !isLsp7 && !isErc677 && tokenAddress && address && tipperAddress) },
   })
 
   const { data: lsp7Allowance, refetch: refetchLsp7Allowance } = useReadContract({
@@ -231,7 +254,8 @@ const TipModal = ({ item, setShowTipModal }) => {
 
   const allowance = isLsp7 ? lsp7Allowance : erc20Allowance
   const refetchAllowance = isLsp7 ? refetchLsp7Allowance : refetchErc20Allowance
-  const needsApproval = isTokenTip && allowance !== undefined && amountUnits !== null && allowance < amountUnits
+  // ERC677 funds and credits the tip in one transaction, so it never needs an allowance
+  const needsApproval = isTokenTip && !isErc677 && allowance !== undefined && amountUnits !== null && allowance < amountUnits
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
@@ -287,6 +311,21 @@ const TipModal = ({ item, setShowTipModal }) => {
   const handleTip = async (e) => {
     e.stopPropagation()
     if (amountUnits === null || !tipperAddress || (isTokenTip && !tokenAddress)) return
+
+    // ERC677: one transaction, no approve. The tipper is credited from onTokenTransfer, which
+    // reads the post id out of the payload. Burner sessions can't apply here — the tokens have
+    // to leave the wallet that actually holds them — so this path always uses wagmi.
+    if (isErc677) {
+      lastActionRef.current = 'tip'
+      writeContract({
+        abi: erc677Abi,
+        address: tokenAddress,
+        functionName: 'transferAndCall',
+        args: [tipperAddress, amountUnits, encodeErc677TipData(BigInt(item.id))],
+        chainId,
+      })
+      return
+    }
 
     // The recipient is resolved onchain by HupTipper from the post's creator — the client
     // only commits the post id, amount, and token
@@ -442,7 +481,7 @@ const TipModal = ({ item, setShowTipModal }) => {
       <footer className={styles.tipModal__footer}>
         {!tipperAddress && <p className={styles.tipModal__hint}>Tipping isn&apos;t available on this network yet</p>}
         {needsApproval ? (
-          <button type="button" className={styles.tipModal__send} onClick={handleApprove} disabled={isBusy || amountUnits === null}>
+          <button type="button" className={styles.tipModal__send} onClick={handleApprove} disabled={isBusy || amountUnits === null || isSelf}>
             {isBusy ? 'Confirming...' : `Approve ${new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(parsedAmount)} ${symbol}`}
           </button>
         ) : (

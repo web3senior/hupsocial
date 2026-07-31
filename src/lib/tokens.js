@@ -37,8 +37,10 @@ export const X402_NETWORKS = {
 // everything else). Every address verified onchain (symbol/decimals read) on 2026-07-17;
 // symbols mirror what the token reports today (Arbitrum USDT rebranded to USD₮0, Celo's
 // old cUSD address now reports USDm). `lsp7: true` → LSP7 Digital Asset (LUKSO), paid via
-// authorizeOperator instead of approve. Decimals are read onchain at tip time, not trusted
-// from here.
+// authorizeOperator instead of approve. `erc677: true` → pays in a single transaction via
+// transferAndCall, skipping approve entirely; only set it for tokens the chain's HupTipper has
+// whitelisted with setErc677Token, since the contract rejects any other caller. Decimals are read
+// onchain at tip time, not trusted from here.
 export const TIP_TOKENS = {
   1: [
     { symbol: 'USDC', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
@@ -64,7 +66,7 @@ export const TIP_TOKENS = {
   42220: [
     { symbol: 'USDC', address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C' }, // native Circle USDC
     { symbol: 'USDm', address: '0x765DE816845861e75A25fCA122bb6898B8B1282a' }, // ex-cUSD (Mento)
-    { symbol: 'G$', address: '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A' }, // GoodDollar
+    { symbol: 'G$', address: '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A', erc677: true }, // GoodDollar
   ],
   // 143 (monad), 4663 (robinhood): no curated tokens yet
 }

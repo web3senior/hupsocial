@@ -84,7 +84,7 @@ export const CONTRACTS = {
     chat: '',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
-    tipper: '0xbc487be674065E39FeFF468856ce614E0Dec48fb',
+    tipper: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     trade: '0x94D81b00b1e4596343e84298dD705e93E36eAb14',
     events: '0x10feacEEDDB387112f9a484EfB2df9FB197934E4',
     predict: '0xb0F3D16De2B029Bb18d44C35AB811E23C4FC1B87',

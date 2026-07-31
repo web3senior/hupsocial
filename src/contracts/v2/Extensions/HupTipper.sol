@@ -14,15 +14,18 @@ import "./ILSP7Minimal.sol";
 /**
  * @title Hup Tipper
  * @author Hup Labs
- * @notice Extension contract enabling users to tip post creators in native coins, ERC20, or LSP7
- *         tokens. Tips are forwarded directly to the creator's wallet; every tip emits a Tipped
- *         event so offchain indexers can list tippers per post and top supporters per creator.
+ * @notice Extension contract enabling users to tip post creators in native coins, ERC20, LSP7, or
+ *         ERC677 tokens. Tips are forwarded directly to the creator's wallet; every tip emits a
+ *         Tipped event so offchain indexers can list tippers per post and top supporters per
+ *         creator.
  * @dev Uses IHupTipper for shared events, errors, and view signatures. Integrates with Hup Core
  *      via IHup — the tip recipient is always the post's onchain creator, never a caller-supplied
- *      address. Supports rotatable ERC2771 trusted forwarders for meta-transactions,
- *      AccessControl for admin permissions, Pausable for emergency controls, and ReentrancyGuard
- *      for protected payout distribution. Resolves burner session keys to primary wallets.
- * @custom:version 1.0.0
+ *      address. Whitelisted ERC677 tokens settle a tip in a single transaction via
+ *      transferAndCall; every other standard needs a prior approve/authorizeOperator. Supports
+ *      rotatable ERC2771 trusted forwarders for meta-transactions, AccessControl for admin
+ *      permissions, Pausable for emergency controls, and ReentrancyGuard for protected payout
+ *      distribution. Resolves burner session keys to primary wallets.
+ * @custom:version 1.1.0
  * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
@@ -69,6 +72,13 @@ contract HupTipper is IHupTipper, Pausable, ReentrancyGuard, AccessControl, ERC2
     mapping(address => mapping(address => uint256)) public supporterTipCount;
 
     mapping(address => bool) public trustedForwarders;
+
+    /// @notice ERC677 tokens whose onTokenTransfer callback is accepted as a one-transaction tip.
+    /// @dev Admin-curated, and deliberately not auto-detected: onTokenTransfer is invoked *by the
+    ///      token*, so msg.sender being a known token is the only proof that a transfer actually
+    ///      happened. Without this gate any contract could call onTokenTransfer with an arbitrary
+    ///      sender and amount and mint fake Tipped events, poisoning every offchain aggregate.
+    mapping(address => bool) public erc677Tokens;
 
     /// @notice Percentage fee charged on each tip, in basis points (100 = 1%)
     uint256 public tipFeeBps = 0;
@@ -128,22 +138,7 @@ contract HupTipper is IHupTipper, Pausable, ReentrancyGuard, AccessControl, ERC2
         bool _isLsp7,
         bytes calldata _memo
     ) external payable whenNotPaused nonReentrant {
-        if (_amount == 0) revert InvalidAmount();
-        if (_memo.length > maxMemoBytes) revert MemoTooLarge(_memo.length, maxMemoBytes);
-
         address tipper = _resolveActor(_tipper);
-
-        // Query the core Hup contract — the recipient is always the post's onchain creator, so
-        // a tip can never be redirected to a caller-supplied address
-        IHup.ContentView memory content = hupContract.getContent(_postId, address(0));
-
-        if (content.isDeleted) revert ContentDeleted();
-
-        address creator = content.creator;
-        if (creator == address(0)) revert InvalidAddress();
-        if (creator == tipper) revert SelfTip();
-
-        bool isLsp7 = _token != address(0) && _isLsp7;
 
         if (_token == address(0)) {
             if (msg.value != _amount) revert InsufficientPayment(msg.value, _amount);
@@ -151,45 +146,35 @@ contract HupTipper is IHupTipper, Pausable, ReentrancyGuard, AccessControl, ERC2
             if (msg.value != 0) revert UnexpectedNativePayment();
         }
 
-        // Record the tip (gross, pre-fee — same convention as Bazaar's revenueByToken)
-        tipCount[_postId] += 1;
-        tippedByToken[_postId][_token] += _amount;
-        tipsFrom[_postId][tipper] += 1;
-        tipperAmountByToken[_postId][tipper][_token] += _amount;
-        creatorTipCount[creator] += 1;
-        creatorReceivedByToken[creator][_token] += _amount;
-        supporterTipCount[creator][tipper] += 1;
-        _tippersOf[_postId].add(tipper);
-        _supportersOf[creator].add(tipper);
-        _tokensOf[_postId].add(_token);
+        // Pull-funded: the tipper pre-authorized this contract, so _recordTip collects the gross
+        // amount before paying the creator out
+        _recordTip(tipper, _postId, _amount, _token, _isLsp7, _memo, false);
+    }
 
-        // Split payment: platform fee stays in the contract, remainder goes straight to the
-        // creator's wallet. Fee-on-transfer/deflationary tokens are unsupported: the contract
-        // pulls the gross amount and pushes the creator's share, so a transfer tax would eat
-        // into accumulated fees.
-        uint256 feeAmount = (_amount * tipFeeBps) / FEE_DENOMINATOR;
+    function onTokenTransfer(address _sender, uint256 _amount, bytes calldata _data) external whenNotPaused nonReentrant returns (bool) {
+        // msg.sender IS the token contract. The whitelist is the only proof that a real transfer
+        // preceded this call — see the erc677Tokens declaration for why it can't be inferred.
+        if (!erc677Tokens[msg.sender]) revert UnsupportedToken();
+        if (_data.length == 0) revert InvalidTipData();
 
-        if (_token == address(0)) {
-            (bool success, ) = creator.call{value: _amount - feeAmount}("");
-            if (!success) revert TransferFailed();
-        } else if (isLsp7) {
-            // LSP7 (LUKSO): tipper must have called authorizeOperator(tipper contract, amount) beforehand
-            ILSP7Minimal token = ILSP7Minimal(_token);
-            token.transfer(tipper, address(this), _amount, true, "");
-            token.transfer(address(this), creator, _amount - feeAmount, true, "");
-        } else {
-            IERC20 token = IERC20(_token);
-            token.safeTransferFrom(tipper, address(this), _amount);
-            token.safeTransfer(creator, _amount - feeAmount);
-        }
+        (uint256 postId, bytes memory memo) = abi.decode(_data, (uint256, bytes));
 
-        emit Tipped(_postId, tipper, creator, _token, isLsp7, _amount, feeAmount, _memo);
+        // No _resolveActor here: burner sessions can't apply, because the tokens must come from
+        // whoever actually holds them and the token reports that holder as _sender.
+        //
+        // Already-funded: transferAndCall moves the tokens before invoking this callback, so
+        // _recordTip skips the pull and only pushes the creator's share. Reverting anywhere below
+        // unwinds that transfer — ERC677 requires this callback to succeed — so a rejected tip
+        // (deleted post, self-tip, paused) can never strand funds in the contract.
+        _recordTip(_sender, postId, _amount, msg.sender, false, memo, true);
+
+        return true;
     }
 
     // --- VIEW FUNCTIONS ---
 
     function version() external pure override returns (string memory) {
-        return "1.0.0";
+        return "1.1.0";
     }
 
     function getTipperCount(uint256 _postId) external view returns (uint256) {
@@ -299,6 +284,14 @@ contract HupTipper is IHupTipper, Pausable, ReentrancyGuard, AccessControl, ERC2
         emit TrustedForwarderUpdated(_forwarder, _trusted);
     }
 
+    function setErc677Token(address _token, bool _enabled) external onlyDirectAdmin {
+        if (_token == address(0)) revert InvalidAddress();
+
+        erc677Tokens[_token] = _enabled;
+
+        emit Erc677TokenUpdated(_token, _enabled);
+    }
+
     function setTipFeeBps(uint256 _tipFeeBps) external onlyDirectAdmin {
         if (_tipFeeBps > ABSOLUTE_MAX_TIP_FEE_BPS) revert InvalidFeeBps();
 
@@ -367,6 +360,76 @@ contract HupTipper is IHupTipper, Pausable, ReentrancyGuard, AccessControl, ERC2
     }
 
     // --- INTERNAL & OVERRIDE HELPERS ---
+
+    /**
+     * @dev Single funnel for every payment rail: validates the tip, resolves the recipient from
+     *      Hup Core, records the accounting, and settles the payout. Callers are responsible only
+     *      for how the funds arrive.
+     * @param _tipper The resolved tipper — already past session resolution, never caller-supplied
+     *        in the ERC677 path.
+     * @param _prefunded True when the tokens already sit in this contract (ERC677 transferAndCall)
+     *        so the pull is skipped; false when they must be pulled from the tipper.
+     */
+    function _recordTip(
+        address _tipper,
+        uint256 _postId,
+        uint256 _amount,
+        address _token,
+        bool _isLsp7,
+        bytes memory _memo,
+        bool _prefunded
+    ) internal {
+        if (_amount == 0) revert InvalidAmount();
+        if (_memo.length > maxMemoBytes) revert MemoTooLarge(_memo.length, maxMemoBytes);
+
+        // Query the core Hup contract — the recipient is always the post's onchain creator, so
+        // a tip can never be redirected to a caller-supplied address
+        IHup.ContentView memory content = hupContract.getContent(_postId, address(0));
+
+        if (content.isDeleted) revert ContentDeleted();
+
+        address creator = content.creator;
+        if (creator == address(0)) revert InvalidAddress();
+        if (creator == _tipper) revert SelfTip();
+
+        bool isLsp7 = _token != address(0) && _isLsp7;
+
+        // Record the tip (gross, pre-fee — same convention as Bazaar's revenueByToken)
+        tipCount[_postId] += 1;
+        tippedByToken[_postId][_token] += _amount;
+        tipsFrom[_postId][_tipper] += 1;
+        tipperAmountByToken[_postId][_tipper][_token] += _amount;
+        creatorTipCount[creator] += 1;
+        creatorReceivedByToken[creator][_token] += _amount;
+        supporterTipCount[creator][_tipper] += 1;
+        _tippersOf[_postId].add(_tipper);
+        _supportersOf[creator].add(_tipper);
+        _tokensOf[_postId].add(_token);
+
+        // Split payment: platform fee stays in the contract, remainder goes straight to the
+        // creator's wallet. Fee-on-transfer/deflationary tokens are unsupported: the contract
+        // holds the gross amount and pushes the creator's share, so a transfer tax would eat
+        // into accumulated fees. Accounting is written before any payout, so an ERC777-style
+        // recipient hook re-entering here finds state already settled (and nonReentrant on both
+        // entry points rejects it outright).
+        uint256 feeAmount = (_amount * tipFeeBps) / FEE_DENOMINATOR;
+
+        if (_token == address(0)) {
+            (bool success, ) = creator.call{value: _amount - feeAmount}("");
+            if (!success) revert TransferFailed();
+        } else if (isLsp7) {
+            // LSP7 (LUKSO): tipper must have called authorizeOperator(tipper contract, amount) beforehand
+            ILSP7Minimal token = ILSP7Minimal(_token);
+            if (!_prefunded) token.transfer(_tipper, address(this), _amount, true, "");
+            token.transfer(address(this), creator, _amount - feeAmount, true, "");
+        } else {
+            IERC20 token = IERC20(_token);
+            if (!_prefunded) token.safeTransferFrom(_tipper, address(this), _amount);
+            token.safeTransfer(creator, _amount - feeAmount);
+        }
+
+        emit Tipped(_postId, _tipper, creator, _token, isLsp7, _amount, feeAmount, _memo);
+    }
 
     /**
      * @dev Resolves the primary owner address based on burner session rules.
