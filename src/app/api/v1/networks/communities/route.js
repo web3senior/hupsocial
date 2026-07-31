@@ -27,16 +27,40 @@ export async function GET(request) {
     const creatorAddress = searchParams.get('creator_address')
     const viewerAddress = searchParams.get('viewer_address')
 
-    if (!networkId) {
-      return NextResponse.json({ error: 'network_id is required' }, { status: 400 })
+    // Cross-network directory mode: `contracts` is a comma-separated list of
+    // `networkId:contractAddress` pairs (the client's current deployments). It replaces the
+    // single network_id/contract_address filter, and pinning each network to its known contract
+    // keeps stale rows from retired deployments out of the result.
+    const contractPairs = (searchParams.get('contracts') || '')
+      .split(',')
+      .map((pair) => pair.trim())
+      .filter(Boolean)
+      .map((pair) => {
+        const [pairNetworkId, pairAddress] = pair.split(':')
+        return { networkId: pairNetworkId, address: pairAddress?.toLowerCase() }
+      })
+      .filter((pair) => pair.networkId && pair.address)
+
+    if (!networkId && contractPairs.length === 0) {
+      return NextResponse.json({ error: 'network_id or contracts is required' }, { status: 400 })
     }
 
-    let whereClause = ` WHERE c.network_id = ?`
-    const whereParams = [networkId]
+    let whereClause
+    const whereParams = []
 
-    if (contractAddress) {
-      whereClause += ` AND c.contract_address = ?`
-      whereParams.push(contractAddress.toLowerCase())
+    if (contractPairs.length > 0) {
+      whereClause = ` WHERE (${contractPairs.map(() => '(c.network_id = ? AND c.contract_address = ?)').join(' OR ')})`
+      for (const pair of contractPairs) {
+        whereParams.push(pair.networkId, pair.address)
+      }
+    } else {
+      whereClause = ` WHERE c.network_id = ?`
+      whereParams.push(networkId)
+
+      if (contractAddress) {
+        whereClause += ` AND c.contract_address = ?`
+        whereParams.push(contractAddress.toLowerCase())
+      }
     }
     if (membershipType !== null && membershipType !== '' && membershipType !== undefined) {
       whereClause += ` AND c.membership_type = ?`
@@ -59,8 +83,11 @@ export async function GET(request) {
     const [[{ total }]] = await pool.execute(`SELECT COUNT(*) as total FROM communities c${whereClause}`, whereParams)
 
     // Default sort surfaces the connected wallet's own communities first, without filtering the
-    // rest of the directory out — viewer_address only affects ordering, unlike creator_address
-    const orderClause = viewerAddress ? `ORDER BY (c.creator_address = ?) DESC, c.id DESC` : `ORDER BY c.id DESC`
+    // rest of the directory out — viewer_address only affects ordering, unlike creator_address.
+    // Ids are only monotonic within one contract, so the cross-network mode sorts by indexed
+    // creation time instead.
+    const baseOrder = contractPairs.length > 0 ? `c.created_at DESC, c.id DESC` : `c.id DESC`
+    const orderClause = viewerAddress ? `ORDER BY (c.creator_address = ?) DESC, ${baseOrder}` : `ORDER BY ${baseOrder}`
     const orderParams = viewerAddress ? [viewerAddress.toLowerCase()] : []
 
     const [rows] = await pool.execute(

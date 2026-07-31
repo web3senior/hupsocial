@@ -2355,7 +2355,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
 // Top-level layout entry default page export module
 export default function CommunitiesPage() {
   const vault = useCommunityVault()
-  const chainId = useChainId()
   const { address: activeAccountAddress } = useAccount()
 
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -2363,11 +2362,13 @@ export default function CommunitiesPage() {
   // Chains that actually have a HupCommunity deployment — the network filter's option list
   const communityChains = config.chains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.community)
 
-  // Network filter: defaults to the wallet's chain, browsable to any deployed network.
-  // CommunityCard is chain-aware (networkId prop) so cards from other networks read correctly.
-  const [selectedNetworkId, setSelectedNetworkId] = useState(null)
-  const directoryNetworkId = selectedNetworkId ?? chainId
-  const directoryContractAddress = CONTRACTS[`chain${directoryNetworkId}`]?.community
+  // Network filter: defaults to All Networks so every deployed chain's communities are visible
+  // without switching the wallet, still narrowable to a single network. CommunityCard is
+  // chain-aware (networkId prop) so cards from other networks read correctly.
+  const [selectedNetworkId, setSelectedNetworkId] = useState('all')
+  const isAllNetworks = selectedNetworkId === 'all'
+  const directoryNetworkId = isAllNetworks ? null : Number(selectedNetworkId)
+  const directoryContractAddress = isAllNetworks ? null : CONTRACTS[`chain${directoryNetworkId}`]?.community
 
   // Directory is searchable/paginated from cidex's indexed `communities` table (from
   // CommunityCreated/CommunityUpdated events) instead of iterating every on-chain id client-side.
@@ -2394,11 +2395,19 @@ export default function CommunitiesPage() {
   const directoryFetchSeqRef = useRef(0)
 
   const fetchDirectory = async (page = 1, append = false) => {
-    if (!directoryNetworkId || !directoryContractAddress) return
+    if (isAllNetworks ? communityChains.length === 0 : !directoryNetworkId || !directoryContractAddress) return
     const fetchSeq = ++directoryFetchSeqRef.current
     setIsDirectoryLoading(true)
     try {
-      const params = new URLSearchParams({ network_id: directoryNetworkId, contract_address: directoryContractAddress, page, limit: 20 })
+      const params = new URLSearchParams({ page, limit: 20 })
+      if (isAllNetworks) {
+        // Every deployed network at once — pinning each network to its current contract address
+        // keeps stale rows from retired deployments out of the directory
+        params.set('contracts', communityChains.map((chain) => `${chain.id}:${CONTRACTS[`chain${chain.id}`].community}`).join(','))
+      } else {
+        params.set('network_id', directoryNetworkId)
+        params.set('contract_address', directoryContractAddress)
+      }
       if (searchQuery) params.set('search', searchQuery)
       // Default sort brings communities the connected wallet created to the top of the directory
       if (activeAccountAddress) params.set('viewer_address', activeAccountAddress)
@@ -2424,9 +2433,7 @@ export default function CommunitiesPage() {
 
   useEffect(() => {
     fetchDirectory(1, false)
-  }, [directoryNetworkId, directoryContractAddress, searchQuery, activeAccountAddress])
-
-  const communityIds = communityRows.map((row) => Number(row.id))
+  }, [selectedNetworkId, directoryContractAddress, searchQuery, activeAccountAddress])
 
   return (
     <>
@@ -2453,10 +2460,11 @@ export default function CommunitiesPage() {
             <div className={styles.directory__header}>
               <select
                 className={styles.directory__networkSelect}
-                value={directoryNetworkId ?? ''}
-                onChange={(e) => setSelectedNetworkId(Number(e.target.value))}
+                value={selectedNetworkId}
+                onChange={(e) => setSelectedNetworkId(e.target.value)}
                 aria-label="Filter communities by network"
               >
+                <option value="all">All Networks</option>
                 {communityChains.map((chain) => (
                   <option key={chain.id} value={chain.id}>
                     {chain.name}
@@ -2476,12 +2484,14 @@ export default function CommunitiesPage() {
             {directoryError && <div className={styles.manager__error}>Failed to load community directory: {directoryError}</div>}
 
             <div className={styles.directory__grid}>
-              {communityIds.length === 0 && !isDirectoryLoading ? (
+              {communityRows.length === 0 && !isDirectoryLoading ? (
                 <p className={styles.directory__empty}>
                   {searchQuery ? 'No communities match your search.' : 'No communities found. Be the first to create one!'}
                 </p>
               ) : (
-                communityIds.map((id) => <CommunityCard key={`${directoryNetworkId}-${id}`} id={id} networkId={directoryNetworkId} />)
+                communityRows.map((row) => (
+                  <CommunityCard key={`${row.network_id}-${row.id}`} id={Number(row.id)} networkId={Number(row.network_id)} />
+                ))
               )}
             </div>
 
