@@ -130,7 +130,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     }
 
     modifier onlyModerator(uint256 communityId) {
-        if (communities[communityId].creator != _msgSender() && !registry[communityId][_msgSender()].isModerator) {
+        MemberStatus storage callerStatus = registry[communityId][_msgSender()];
+        // A banned moderator has no powers — without this, a freshly banned moderator could
+        // simply unban themselves via setBanStatus (their isModerator flag alone would pass).
+        if (communities[communityId].creator != _msgSender() && (!callerStatus.isModerator || callerStatus.isBanned)) {
             revert Unauthorized();
         }
         _;
@@ -190,7 +193,9 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         string calldata _metadataCid,
         bytes calldata initialWrappedKey
     ) external payable whenNotPaused returns (uint256) {
-        if (fee > 0 && msg.value != fee) revert InsufficientFee();
+        // Exact-value check both ways: rejects underpayment when a fee is set AND accidental
+        // dust when it isn't (previously silently kept when fee == 0).
+        if (msg.value != fee) revert InsufficientFee();
         if (bytes(_metadataCid).length > MAX_METADATA_LENGTH) revert MetadataTooLong();
 
         address sender = _msgSender();
@@ -280,6 +285,9 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     function grantKey(uint256 _id, address member, bytes calldata wrappedKey) external communityExists(_id) onlyModerator(_id) {
         uint256 version = keyVersion[_id];
         if (version == 0) revert NotInitialized();
+        // Envelopes only for actual members — key delivery to outsiders was previously possible
+        // (moderator-trust only); now the roster is enforced at the contract layer too.
+        if (!registry[_id][member].isMember) revert NotMember();
 
         wrappedKeys[_id][member][version] = wrappedKey;
         emit KeyGranted(_id, member, version);
@@ -302,6 +310,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         if (version == 0) revert NotInitialized();
 
         for (uint256 i = 0; i < _members.length; i++) {
+            // Skip (not revert on) non-members: a batch prepared from a member snapshot must not
+            // be wholly rejected because one address left between snapshot and confirmation.
+            if (!registry[_id][_members[i]].isMember) continue;
+
             wrappedKeys[_id][_members[i]][version] = _wrappedKeys[i];
             emit KeyGranted(_id, _members[i], version);
         }
@@ -343,7 +355,11 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
      */
     function publishKeyBacklink(uint256 _id, uint256 _version, bytes calldata _link) external communityExists(_id) onlyModerator(_id) {
         if (_version < 2 || _version > keyVersion[_id]) revert InvalidKeyVersion();
-        if (keyBacklinks[_id][_version].length != 0) revert BacklinkAlreadyPublished();
+        // Write-once for moderators (a rogue moderator can't corrupt a valid link), but the
+        // CREATOR may overwrite — the repair path if a moderator published garbage first.
+        if (keyBacklinks[_id][_version].length != 0 && communities[_id].creator != _msgSender()) {
+            revert BacklinkAlreadyPublished();
+        }
 
         keyBacklinks[_id][_version] = _link;
         emit KeyBacklinkPublished(_id, _version);
@@ -466,14 +482,34 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit MemberStatusUpdated(_id, _actor, true);
     }
 
+    /**
+     * @notice Declines a pending join request without banning — clears isPending so the wallet
+     *         is free to request again later. Pairs with approveRequest; before this existed a
+     *         pending flag could never be cleared on-chain except by approving.
+     */
+    function rejectRequest(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
+        registry[_id][_actor].isPending = false;
+
+        emit MemberStatusUpdated(_id, _actor, registry[_id][_actor].isMember);
+    }
+
     function setModerator(uint256 _id, address _actor, bool _isMod) external communityExists(_id) onlyCreator(_id) {
         registry[_id][_actor].isModerator = _isMod;
 
         emit ModeratorUpdated(_id, _actor, _isMod);
     }
 
+    /// @dev The creator can't be banned (mirrors kick's guard — a moderator outranking the
+    ///      creator would be a privilege inversion). Banning also strips moderator status, so a
+    ///      later unban doesn't silently restore moderation powers — the creator must re-grant.
     function setBanStatus(uint256 _id, address _actor, bool _banned) external communityExists(_id) onlyModerator(_id) {
-        registry[_id][_actor].isBanned = _banned;
+        if (communities[_id].creator == _actor) revert Unauthorized();
+
+        MemberStatus storage status = registry[_id][_actor];
+        status.isBanned = _banned;
+        if (_banned) {
+            status.isModerator = false;
+        }
 
         emit MemberStatusUpdated(_id, _actor, !_banned);
     }
@@ -498,8 +534,8 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit MemberStatusUpdated(_id, _actor, false);
     }
 
-    function setNftRequirement(uint256 _id, address _nftAddress, uint256 _tokenId) external communityExists(_id) onlyModerator(_id) {
-        nftRequirements[_id] = NftRequirement(_nftAddress, _tokenId);
+    function setNftRequirement(uint256 _id, address _nftAddress, uint256 _minBalance) external communityExists(_id) onlyModerator(_id) {
+        nftRequirements[_id] = NftRequirement(_nftAddress, _minBalance);
     }
 
     function setTokenRequirement(uint256 _id, address _tokenAddress, uint256 _minBalance) external communityExists(_id) onlyModerator(_id) {
@@ -509,12 +545,15 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     /// @notice Sets the join price for a PaidGated community. `_token` address(0) means native
     ///         coin; `_isLsp7` only matters when `_token` is set and selects the LSP7 transfer
     ///         path over plain ERC-20.
+    /// @dev Creator-only (unlike the NFT/token gates): the payout goes to the creator, so the
+    ///      price is theirs to set — a moderator repricing someone else's revenue is out of scope
+    ///      for moderation powers.
     function setPaymentRequirement(
         uint256 _id,
         address _token,
         uint256 _price,
         bool _isLsp7
-    ) external communityExists(_id) onlyModerator(_id) {
+    ) external communityExists(_id) onlyCreator(_id) {
         paymentRequirements[_id] = PaymentRequirement(_token, _price, _token != address(0) && _isLsp7);
     }
 
@@ -576,7 +615,9 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         NftRequirement memory req = nftRequirements[_id];
         if (req.nftAddress == address(0)) return false;
 
-        return IERC721(req.nftAddress).balanceOf(_actor) > 0;
+        // The UI collects a minimum-balance threshold — enforce it (0 kept as "hold any 1")
+        uint256 required = req.minBalance == 0 ? 1 : req.minBalance;
+        return IERC721(req.nftAddress).balanceOf(_actor) >= required;
     }
 
     /// @notice True if `_actor` follows the community's creator on the wired-in LSP26-compatible

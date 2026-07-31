@@ -45,7 +45,7 @@ interface IHupCommunity {
 
     struct NftRequirement {
         address nftAddress;
-        uint256 tokenId; // Set to 0 if any token in the collection is valid
+        uint256 minBalance; // Minimum NFTs of the collection to hold; 0 is treated as 1
     }
 
     struct TokenRequirement {
