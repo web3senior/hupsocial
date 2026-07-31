@@ -41,7 +41,14 @@ export const pickLsp4Image = (lsp4) => lsp4?.images?.[0]?.[0]?.url || lsp4?.icon
 // For token avatars the square icon is the primary asset and images are the fallback.
 export const pickLsp4Icon = (lsp4) => lsp4?.icon?.[0]?.url || lsp4?.images?.[0]?.[0]?.url || null
 
-export const fetchMetadataJson = async (uri) => {
+/**
+ * Fetches and parses a metadata JSON document from any storage URI.
+ * @param {string} uri ipfs://, https://, 0g:// or a data: URI.
+ * @param {{ baseUrl?: string }} [options] `baseUrl` makes the resolver's relative
+ * output (the 0G proxy path) absolute — required on the server, where fetch has no
+ * document origin to resolve against.
+ */
+export const fetchMetadataJson = async (uri, options = {}) => {
   if (!uri) return null
   if (uri.startsWith('data:application/json')) {
     const comma = uri.indexOf(',')
@@ -60,7 +67,10 @@ export const fetchMetadataJson = async (uri) => {
       return JSON.parse(payload)
     }
   }
-  const response = await fetch(resolveStorageUrl(uri))
+  const resolved = resolveStorageUrl(uri)
+  if (!resolved) return null
+  const target = resolved.startsWith('/') && options.baseUrl ? new URL(resolved, options.baseUrl).toString() : resolved
+  const response = await fetch(target)
   if (!response.ok) return null
   return response.json()
 }

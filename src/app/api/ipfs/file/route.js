@@ -67,6 +67,12 @@ export async function POST(request) {
   }
 }
 
+// A gateway that never answers used to hold the request open until the socket died ~30s
+// later. Browsers only open ~6 connections per origin, so two such stalls were enough to
+// starve every other image on the page — cards spun forever instead of falling back to a
+// placeholder. Failing fast frees the connection and lets the rest of the grid render.
+const GATEWAY_TIMEOUT_MS = 8000
+
 function intParam(value, fallback, min, max) {
   const parsed = Number.parseInt(value ?? '', 10)
   if (!Number.isFinite(parsed)) return fallback
@@ -88,7 +94,7 @@ export async function GET(req) {
   const gatewayUrl = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${cid}`
 
   try {
-    const upstream = await fetch(gatewayUrl)
+    const upstream = await fetch(gatewayUrl, { signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS) })
 
     if (!upstream.ok) {
       throw new Error(`IPFS Gateway Error: ${upstream.status}`)
@@ -144,7 +150,11 @@ export async function GET(req) {
       },
     })
   } catch (error) {
-    console.error('IPFS_API_ROUTE_ERROR:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    // TimeoutError means the gateway never answered; report it as a gateway timeout so the
+    // difference between "we broke" and "the gateway is unreachable" is visible in the logs.
+    const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError'
+    if (!timedOut) console.error('IPFS_API_ROUTE_ERROR:', error)
+    else console.warn(`IPFS_GATEWAY_TIMEOUT after ${GATEWAY_TIMEOUT_MS}ms:`, cid)
+    return NextResponse.json({ error: timedOut ? 'IPFS gateway timed out' : error.message || 'Internal Server Error' }, { status: timedOut ? 504 : 500 })
   }
 }
