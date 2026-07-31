@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback, useState } from 'react'
 import useSWRImmutable from 'swr/immutable'
 import { usePublicClient } from 'wagmi'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
@@ -51,10 +52,35 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
   const publicClient = usePublicClient({ chainId })
   const ready = Boolean(enabled && collection && tokenId !== undefined && tokenId !== null && tokenId !== '')
 
-  const { data, error, isLoading } = useSWRImmutable(
+  const { data, error, isLoading, mutate } = useSWRImmutable(
     ready ? ['nft-metadata', chainId, collection.toLowerCase(), String(tokenId), Boolean(isLsp8)] : null,
     () => fetchNftMetadata({ publicClient, chainId, collection, tokenId, isLsp8 }),
   )
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Collections that update their onchain metadata give the app no signal, so a cached token
+  // would otherwise show its old name and artwork until the TTL lapsed. This re-reads it from
+  // chain on demand and writes the result straight into the SWR cache, so the card updates in
+  // place. Throttled server-side per token; a 429 surfaces to the caller as an Error.
+  const refresh = useCallback(async () => {
+    if (!ready || isRefreshing) return null
+    setIsRefreshing(true)
+    try {
+      const response = await fetch('/api/v1/nfts/metadata/refresh', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ chainId: Number(chainId), collection, tokenId: String(tokenId), isLsp8: Boolean(isLsp8) }),
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok || !body?.success) throw new Error(body?.error || `Refresh failed (${response.status})`)
+
+      await mutate(body.data, { revalidate: false })
+      return body.data
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [ready, isRefreshing, chainId, collection, tokenId, isLsp8, mutate])
 
   let image = null
   if (data?.image) {
@@ -79,5 +105,8 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
     source: data?.source || null,
     isLoading: ready && isLoading,
     error,
+    // Re-reads this token from chain, for collections that changed their onchain metadata.
+    refresh,
+    isRefreshing,
   }
 }

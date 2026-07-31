@@ -18,6 +18,7 @@ import Share from '@/components/ui/Share'
 import HupMark from '@/components/ui/HupMark'
 import { ContentSpinner } from '@/components/Loading'
 import {
+  ArrowsClockwiseIcon,
   ArrowSquareOutIcon,
   CaretLeftIcon,
   ChatCircleIcon,
@@ -28,6 +29,7 @@ import {
   UserIcon,
   WarningIcon,
 } from '@phosphor-icons/react'
+import { toast } from '@/components/NextToast'
 import styles from './ListingDetail.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
@@ -106,6 +108,15 @@ export default function ListingDetail({ networkId, listingId }) {
 
   const { symbol, decimals } = useStakeToken(chainId, listing?.payment_token, Boolean(Number(listing?.is_lsp7)))
 
+  const handleRefreshMetadata = async () => {
+    try {
+      await metadata.refresh()
+      toast('Metadata refreshed from the blockchain', 'success')
+    } catch (refreshError) {
+      toast(refreshError.message || 'Could not refresh metadata', 'error')
+    }
+  }
+
   if (isLoading) return <ContentSpinner />
 
   if (!listing) {
@@ -161,6 +172,20 @@ export default function ListingDetail({ networkId, listingId }) {
               <HupMark size={56} />
             </div>
           )}
+
+          {/* Collections that change their onchain metadata give the app no signal, so a
+              cached token keeps its old name and artwork until the TTL lapses. This is the
+              escape hatch for whoever made the change. */}
+          <button
+            type="button"
+            className={styles.listing__refresh}
+            onClick={handleRefreshMetadata}
+            disabled={metadata.isRefreshing}
+            title="Re-read this NFT's name, traits and artwork from the blockchain"
+          >
+            <ArrowsClockwiseIcon size={14} className={clsx(metadata.isRefreshing && styles['listing__refresh--spinning'])} />
+            {metadata.isRefreshing ? 'Refreshing…' : 'Refresh metadata'}
+          </button>
 
           {cardListing && <TradeCard listing={cardListing} compact showDetailsLink={false} />}
         </aside>

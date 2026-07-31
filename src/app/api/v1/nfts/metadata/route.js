@@ -11,7 +11,7 @@
 
 import { NextResponse } from 'next/server'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
-import { isInlineDataUri } from '@/lib/nftMetadata'
+import { toMetadataPayload } from '@/lib/nftMetadataPayload'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -35,26 +35,6 @@ const mapWithConcurrency = async (items, limit, worker) => {
   })
   await Promise.all(runners)
   return results
-}
-
-const toPayload = ({ metadata, chainId, collection, tokenId, isLsp8 }) => {
-  const inline = isInlineDataUri(metadata.image)
-
-  // The consumer appends its own w/q/still hints to this path.
-  const imageProxyParams = new URLSearchParams({ chainId: String(Number(chainId)), collection: collection.toLowerCase(), tokenId: String(tokenId) })
-  if (isLsp8) imageProxyParams.set('isLsp8', '1')
-
-  return {
-    name: metadata.name,
-    collectionName: metadata.collectionName,
-    description: metadata.description,
-    image: inline ? `/api/nft/image?${imageProxyParams.toString()}` : metadata.image,
-    // Lets the client know the URL is already a sized proxy endpoint rather than a
-    // storage reference it still has to route.
-    imageIsProxied: inline,
-    attributes: metadata.attributes,
-    source: metadata.source,
-  }
 }
 
 /**
@@ -83,7 +63,7 @@ export async function POST(request) {
 
       try {
         const result = await getNftMetadata({ chainId, collection, tokenId, isLsp8: Boolean(isLsp8), baseUrl: origin })
-        return result ? toPayload({ metadata: result.metadata, chainId, collection, tokenId, isLsp8 }) : null
+        return result ? toMetadataPayload({ metadata: result.metadata, chainId, collection, tokenId, isLsp8 }) : null
       } catch (error) {
         // One bad token must not fail the other 29 — the client renders a placeholder for nulls.
         console.warn('[POST_NFT_METADATA_BATCH] token failed:', error.message)
@@ -118,7 +98,7 @@ export async function GET(request) {
     }
 
     return NextResponse.json(
-      { success: true, data: toPayload({ metadata: result.metadata, chainId, collection, tokenId, isLsp8 }) },
+      { success: true, data: toMetadataPayload({ metadata: result.metadata, chainId, collection, tokenId, isLsp8 }) },
       { headers: { 'Cache-Control': CACHE_CONTROL } },
     )
   } catch (error) {

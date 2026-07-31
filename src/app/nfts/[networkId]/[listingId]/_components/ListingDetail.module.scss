@@ -54,6 +54,39 @@
     }
   }
 
+  // Secondary by design: useful when a collection has just changed its onchain metadata,
+  // noise the rest of the time, so it sits quietly under the artwork.
+  &__refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    align-self: flex-start;
+    margin-top: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    color: var(--text-muted, #888);
+    background: transparent;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      color: var(--color-text);
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
+    }
+
+    &:disabled {
+      cursor: progress;
+      opacity: 0.7;
+    }
+
+    &--spinning {
+      animation: listing-refresh-spin 0.9s linear infinite;
+    }
+  }
+
   &__mediaFallback {
     display: grid;
     place-items: center;
@@ -390,5 +423,11 @@
     min-height: 50svh;
     text-align: center;
     color: var(--text-muted, #888);
+  }
+}
+
+@keyframes listing-refresh-spin {
+  to {
+    transform: rotate(360deg);
   }
 }

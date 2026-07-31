@@ -43,6 +43,11 @@ const ttlFor = (source) => {
   return TTL_MS
 }
 
+// Manual refresh triggers real RPC work, so it is rate limited — but the limit is derived
+// from the row's own fetched_at rather than an in-memory counter, which keeps it correct
+// across serverless instances without any shared state to provision.
+const REFRESH_COOLDOWN_MS = 60 * 1000
+
 // Guards a hostile or broken contract from writing an unbounded blob into the row.
 // MEDIUMTEXT tops out at 16MB; refuse well before that.
 const MAX_IMAGE_URI_BYTES = 8 * 1024 * 1024
@@ -136,10 +141,13 @@ const touchRow = async (key) => {
  * @param {boolean} [params.allowStale=false] Serve an expired row instead of re-reading —
  * used by the image proxy, which only needs the artwork reference and would rather answer
  * from a stale row than block a render on RPC.
+ * @param {boolean} [params.forceRefresh=false] Ignore the cached row's freshness and
+ * re-read from chain. The row is still loaded, because it is what protects good artwork
+ * from being demoted if this read comes back empty.
  * @returns {Promise<{metadata: Object, cached: boolean}|null>} null when the chain is
  * unconfigured or the read failed outright.
  */
-export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, baseUrl, allowStale = false }) => {
+export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, baseUrl, allowStale = false, forceRefresh = false }) => {
   const key = normalizeKey({ chainId, collection, tokenId })
 
   let row = null
@@ -149,7 +157,7 @@ export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, bas
     console.warn('[nft-metadata-cache] read failed, falling back to RPC:', error.message)
   }
 
-  if (row) {
+  if (row && !forceRefresh) {
     const age = Date.now() - new Date(row.fetched_at).getTime()
     const complete = isComplete(row)
     // `allowStale` is a latency shortcut for callers that just need the artwork reference,
@@ -220,4 +228,38 @@ export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, bas
   }
 
   return { metadata, cached: false }
+}
+
+/**
+ * Forces a token's metadata to be re-read from chain, for when a collection has updated its
+ * onchain metadata and would otherwise wait out the cache TTL before anyone saw the change.
+ *
+ * Throttled per token off the row's own timestamp. That also makes the throttle self-tuning
+ * in the useful direction: a token nobody has touched in days refreshes instantly, while
+ * repeated clicks on the same one are refused.
+ *
+ * @param {Object} params Same shape as getNftMetadata.
+ * @returns {Promise<{throttled: true, retryAfterSeconds: number} | {throttled: false, metadata: Object}>}
+ */
+export const refreshNftMetadata = async ({ chainId, collection, tokenId, isLsp8, baseUrl }) => {
+  const key = normalizeKey({ chainId, collection, tokenId })
+
+  let row = null
+  try {
+    row = await readRow(key)
+  } catch (error) {
+    console.warn('[nft-metadata-cache] refresh read failed:', error.message)
+  }
+
+  if (row) {
+    const age = Date.now() - new Date(row.fetched_at).getTime()
+    if (age < REFRESH_COOLDOWN_MS) {
+      return { throttled: true, retryAfterSeconds: Math.max(1, Math.ceil((REFRESH_COOLDOWN_MS - age) / 1000)) }
+    }
+  }
+
+  const result = await getNftMetadata({ chainId, collection, tokenId, isLsp8, baseUrl, forceRefresh: true })
+  if (!result) return { throttled: false, metadata: null }
+
+  return { throttled: false, metadata: result.metadata }
 }
