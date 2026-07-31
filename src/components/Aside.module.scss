@@ -37,10 +37,14 @@
   header {
     width: 100%;
 
-    &:hover {
-      .menuButtonFloat {
-        display: flex;
-      }
+    .menuButtonFloat {
+      display: flex;
+      position: absolute;
+      top: 10px;
+      right: -32px;
+      box-shadow: var(--shadow-md);
+      zoom: 0.5;
+      background-color: var(--background);
     }
   }
 
