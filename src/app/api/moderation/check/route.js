@@ -1,11 +1,11 @@
 // app/api/moderation/check/route.js
 //
-// Pre-upload moderation gate for PUBLIC content (posts, comments) — call this before uploading
-// content to IPFS so flagged content never gets pinned in the first place. Do NOT call this for
+// Pre-upload moderation check for PUBLIC content (posts, comments) — advisory only: the composer
+// warns the author when content is flagged but never blocks posting. Do NOT call this for
 // chat: chat payloads are end-to-end encrypted ciphertext, so moderating them would both leak
 // private user data to a third party (OpenAI) and produce meaningless results (ciphertext isn't
 // readable text/images). The indexer separately re-checks published posts and flags
-// `moderation_flagged` in the DB — this route is the earlier, preventive check on the way in.
+// `moderation_flagged` in the DB — this route is only the earlier heads-up on the way in.
 
 import { NextResponse } from 'next/server'
 import { moderateContent } from '@/lib/moderation'

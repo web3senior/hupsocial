@@ -88,6 +88,60 @@
   }
 }
 
+.moderationWarning {
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, calc(100vw - 48px));
+  padding: 20px;
+  border: 0;
+  color: var(--text);
+  background: var(--background);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16);
+  }
+
+  &__body {
+    margin: 0;
+    font-size: var(--font-size-14);
+    line-height: 1.5;
+    color: var(--text-secondary, inherit);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  &__revise,
+  &__confirm {
+    padding: 0.45rem 0.9rem;
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-14);
+    cursor: pointer;
+  }
+
+  &__revise {
+    border: 1px solid var(--border, rgba(15, 23, 42, 0.16));
+    background: transparent;
+    color: inherit;
+  }
+
+  &__confirm {
+    border: 1px solid var(--warning-500, #f59e0b);
+    background: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    color: inherit;
+  }
+}
+
 .cancelButton,
 .headerActions button,
 .toolbar button,

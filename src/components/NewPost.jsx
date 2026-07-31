@@ -234,6 +234,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedMediaType, setSelectedMediaType] = useState(null)
+  // { categories, resolve } while the advisory moderation warning awaits the author's decision
+  const [moderationWarning, setModerationWarning] = useState(null)
+  const moderationDialogRef = useRef(null)
+  const moderationDecisionRef = useRef(false)
   const editorRef = useRef(null)
   const dialogRef = useRef(null)
   const composerRef = useRef(null)
@@ -852,6 +856,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     })
   }
 
+  useEffect(() => {
+    if (moderationWarning) moderationDialogRef.current?.open()
+  }, [moderationWarning])
+
   const handleCreatePost = async (event) => {
     event.preventDefault()
 
@@ -908,9 +916,14 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       })
       const moderation = await moderationRes.json().catch(() => ({}))
       if (moderation?.flagged) {
-        const categories = moderation.categories?.length ? ` (${moderation.categories.join(', ')})` : ''
-        toast(`Flagged as harmful${categories}. Please revise.`, 'error')
-        return
+        // Advisory, never a gate — the author always keeps the final say. Flagged posts are
+        // still labeled by the indexer (moderation_flagged) so clients can blur or collapse them.
+        const proceed = await new Promise((resolve) => {
+          moderationDecisionRef.current = false
+          setModerationWarning({ categories: moderation.categories || [], resolve })
+        })
+        setModerationWarning(null)
+        if (!proceed) return
       }
 
       // Community submissions (posts, replies, quotes) are sealed/tagged after moderation
@@ -1324,6 +1337,43 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
           }}
           onClose={() => setShowSellNftModal(false)}
         />
+      )}
+
+      {moderationWarning && (
+        <NativeDialog
+          ref={moderationDialogRef}
+          className={styles.moderationWarning}
+          aria-label="Content sensitivity warning"
+          onClick={(e) => e.stopPropagation()}
+          onCancel={(e) => e.stopPropagation()}
+          onClose={(e) => {
+            // Nested dialog: without this, closing the warning also closes the composer
+            e.stopPropagation()
+            moderationWarning.resolve(moderationDecisionRef.current)
+          }}
+        >
+          <h3 className={styles.moderationWarning__title}>Sensitive content warning</h3>
+          <p className={styles.moderationWarning__body}>
+            This may be seen as sensitive
+            {moderationWarning.categories.length > 0 && <> ({moderationWarning.categories.join(', ')})</>}. Nothing stops you
+            from posting it — Hup doesn't censor — but it may be labeled so other users can choose not to see it.
+          </p>
+          <div className={styles.moderationWarning__actions}>
+            <button type="button" className={styles.moderationWarning__revise} onClick={() => moderationDialogRef.current?.close()}>
+              Go back
+            </button>
+            <button
+              type="button"
+              className={styles.moderationWarning__confirm}
+              onClick={() => {
+                moderationDecisionRef.current = true
+                moderationDialogRef.current?.close()
+              }}
+            >
+              Post anyway
+            </button>
+          </div>
+        </NativeDialog>
       )}
 
       {showAttachMarket && (
