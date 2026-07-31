@@ -14,7 +14,7 @@ const fetcher = (url) => fetch(url).then((res) => res.json())
 /**
  * Attach Market Modal
  * Lets the post composer attach a prediction market on the post's chain: either one of the
- * author's still-open markets (from the indexed API), or a brand-new one created inline via
+ * author's markets in any state (from the indexed API), or a brand-new one created inline via
  * CreateMarketDialog — the market id is read from the creation receipt so the attachment
  * never waits on the indexer.
  * @param {Object} props
@@ -33,12 +33,12 @@ const AttachMarketModal = ({ chainId, onAttached, onClose }) => {
   }, [])
 
   const { data: mine } = useSWR(
-    address ? `/api/v1/predict?scope=mine&participant=${address.toLowerCase()}&networkId=${chainId}&limit=10` : null,
+    address ? `/api/v1/predict?scope=mine&participant=${address.toLowerCase()}&networkId=${chainId}&limit=50` : null,
     fetcher,
   )
 
-  // Only still-bettable markets are worth pinning to a fresh post
-  const openMarkets = (mine?.data ?? []).filter((market) => marketStatus(market).key === 'open')
+  // Any market can anchor a post — resolved ones make recap content, so no status filter
+  const myMarkets = mine?.data ?? []
 
   const handleCreated = (marketRef) => {
     // Receipt parsing can fail on exotic RPCs — the market exists onchain either way, the
@@ -76,15 +76,16 @@ const AttachMarketModal = ({ chainId, onAttached, onClose }) => {
           New market on this chain
         </button>
 
-        {openMarkets.length > 0 && (
+        {myMarkets.length > 0 && (
           <>
-            <p className={styles.attachMarket__sectionTitle}>Or pin one of your open markets</p>
+            <p className={styles.attachMarket__sectionTitle}>Or pin one of your markets</p>
             <ul className={styles.attachMarket__list}>
-              {openMarkets.map((market) => (
+              {myMarkets.map((market) => (
                 <li key={`${market.network_id}-${market.market_id}`}>
                   <button type="button" onClick={() => onAttached({ marketId: String(market.market_id), chainId })}>
                     <ChartLineUpIcon size={16} />
                     <span>{market.title || `Market #${market.market_id}`}</span>
+                    <small className={styles.attachMarket__status}>{marketStatus(market).label}</small>
                   </button>
                 </li>
               ))}

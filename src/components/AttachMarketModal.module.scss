@@ -92,10 +92,19 @@
       }
 
       span {
+        flex: 1;
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
     }
+  }
+
+  &__status {
+    flex-shrink: 0;
+    font-size: var(--font-size-10, 0.625rem);
+    color: var(--text-muted, #888);
+    white-space: nowrap;
   }
 }
