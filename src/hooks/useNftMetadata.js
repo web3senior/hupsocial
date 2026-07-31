@@ -11,6 +11,7 @@ import {
   pickLsp4Image,
   fetchMetadataJson,
 } from '@/lib/lsp4'
+import { isLuksoIndexerChain, fetchLuksoTokenMetadata } from '@/lib/luksoIndexer'
 
 // LSP8's second metadata mechanism: a collection-wide base URI the token id gets appended
 // to (e.g. Chillwhales), instead of per-token LSP4Metadata (e.g. Dracos)
@@ -87,8 +88,15 @@ const formatTokenIdForUri = (tokenId, formatBytes) => {
   return tokenId.slice(2)
 }
 
-const fetchNftMetadata = async ({ publicClient, collection, tokenId, isLsp8 }) => {
+const fetchNftMetadata = async ({ publicClient, chainId, collection, tokenId, isLsp8 }) => {
   if (isLsp8) {
+    // LUKSO mainnet resolves from the Envio indexer first — pre-resolved metadata plus a
+    // cacheable CDN image URL, instead of pulling fully onchain artwork (hundreds of KB
+    // for Burnt Pix-style collections) through an eth_call on every fresh page load
+    if (isLuksoIndexerChain(chainId)) {
+      const indexed = await fetchLuksoTokenMetadata({ collection, tokenId }).catch(() => null)
+      if (indexed) return indexed
+    }
     const [nameBytes, tokenMetadataBytes, baseUriBytes, tokenIdFormatBytes, collectionMetadataBytes] = await Promise.all([
       publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getData', args: [LSP4_TOKEN_NAME_KEY] }).catch(() => null),
       publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getDataForTokenId', args: [tokenId, LSP4_METADATA_KEY] }).catch(() => null),
@@ -173,7 +181,7 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
 
   const { data, error, isLoading } = useSWRImmutable(
     ready ? ['nft-metadata', chainId, collection.toLowerCase(), String(tokenId), Boolean(isLsp8)] : null,
-    () => fetchNftMetadata({ publicClient, collection, tokenId, isLsp8 }),
+    () => fetchNftMetadata({ publicClient, chainId, collection, tokenId, isLsp8 }),
   )
 
   return {

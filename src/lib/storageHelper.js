@@ -154,6 +154,12 @@ export const resolveStorageImageUrl = (src, options = {}) => {
     return params.length ? `${base}&${params.join('&')}` : base
   }
 
+  /* LUKSO's UP-cloud image CDN resizes via ?width= — pass the hint through so
+     thumbnails don't download full-size artwork (URLs already carry ?method=&data=) */
+  if (src.startsWith('https://api.universalprofile.cloud/image/') && options.width) {
+    return `${src}${src.includes('?') ? '&' : '?'}width=${options.width}`
+  }
+
   /* Everything else (custom protocol, http, asset paths) resolves as before */
   return resolveStorageUrl(src)
 }
