@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { ArrowLeftIcon, ArrowRightIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowLeftIcon, ArrowRightIcon, PauseIcon, PlayIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 
@@ -15,6 +15,14 @@ const getAspectRatio = (item) => {
   // Unknown dimensions: let the media size itself naturally after load
   return null
 }
+
+// GIFs are pinned like any other image, so the mime type is the only marker.
+// Items stored before mimeType was recorded simply keep animating.
+const isGif = (item) => item?.mimeType === 'image/gif'
+
+// Only assets that go through a compression proxy can be served as a still first
+// frame — a GIF hotlinked from an external URL has no paused rendition to show.
+const supportsStill = (item) => Boolean(item?.cid) && !item.cid.startsWith('http')
 
 // Persisted sound preferences shared by every gallery instance
 const SOUND_PREFS_KEY = 'hup_media_sound'
@@ -47,6 +55,9 @@ export default function MediaGallery({ data = [] }) {
   const volumeRef = useRef(DEFAULT_SOUND_PREFS.volume)
   const [revealedItems, setRevealedItems] = useState({})
   const [resolvedUrls, setResolvedUrls] = useState({})
+  // GIFs open paused on their first frame; these track which ones the reader started
+  const [playingGifs, setPlayingGifs] = useState({})
+  const [loadingGifs, setLoadingGifs] = useState({})
 
   // State for Lightbox (Maximize)
   const [selectedIndex, setSelectedIndex] = useState(null)
@@ -256,25 +267,49 @@ export default function MediaGallery({ data = [] }) {
 
   if (!data.length) return null
 
-  const resolveUrl = (item) => {
-    if (item?.storage === '0G') return `/api/0g/file?hash=${item.cid}`
+  /* `still` asks the compression proxy for the first frame only — the paused
+     rendition of an animated GIF, and a lighter download than the animated one */
+  const resolveUrl = (item, still = false) => {
+    const imageOptions = still ? { still: true } : {}
+    if (item?.storage === '0G') return `/api/0g/file?hash=${item.cid}${still ? '&still=1' : ''}`
     if (item?.storage === 'IPFS') {
       /* Images go through the sharp compression proxy; video/audio keep native gateway streaming */
       if (item.type === 'video' || item.type === 'audio') return resolveIPFSUrl(item.cid)
-      return resolveIPFSImageUrl(item.cid)
+      return resolveIPFSImageUrl(item.cid, imageOptions)
     }
     if (item.cid) {
       if (item.cid.startsWith('http')) return item.cid
       if (item.type === 'video' || item.type === 'audio') return `${GATEWAY_URL}${item.cid}`
-      return resolveIPFSImageUrl(item.cid)
+      return resolveIPFSImageUrl(item.cid, imageOptions)
     }
     return ''
+  }
+
+  const toggleGif = (index, item, e) => {
+    e.stopPropagation()
+    if (playingGifs[index]) {
+      setPlayingGifs((prev) => ({ ...prev, [index]: false }))
+      return
+    }
+    // Fetch the animated rendition before swapping the src, otherwise the tile
+    // blanks out for as long as the (much heavier) animation takes to arrive
+    setLoadingGifs((prev) => ({ ...prev, [index]: true }))
+    const preload = new Image()
+    const play = () => {
+      setLoadingGifs((prev) => ({ ...prev, [index]: false }))
+      setPlayingGifs((prev) => ({ ...prev, [index]: true }))
+    }
+    preload.onload = play
+    preload.onerror = play // let the <img> surface the failure itself
+    preload.src = resolveUrl(item)
   }
 
   // Helper to render visual media content (image / video only)
   const renderMedia = (item, i, isFullscreen = false) => {
     const isVideo = item.type === 'video'
-    const url = resolveUrl(item)
+    // Inline GIFs stay on their first frame until played; fullscreen always animates
+    const isPaused = isGif(item) && supportsStill(item) && !isFullscreen && !playingGifs[i]
+    const url = resolveUrl(item, isPaused)
     const isBlurred = item.spoiler && !revealedItems[i] && !isFullscreen
 
     if (item?.storage === '0G' && !url) {
@@ -340,6 +375,19 @@ export default function MediaGallery({ data = [] }) {
                   onClick={(e) => { e.stopPropagation(); openLightbox(i) }}
                 >
                   {renderMedia(item, i)}
+
+                  {isGif(item) && supportsStill(item) && (
+                    <button
+                      className={styles.gifToggle}
+                      data-loading={loadingGifs[i] ? '' : undefined}
+                      onClick={(e) => toggleGif(i, item, e)}
+                      aria-label={playingGifs[i] ? 'Pause GIF' : 'Play GIF'}
+                      aria-pressed={Boolean(playingGifs[i])}
+                    >
+                      {playingGifs[i] ? <PauseIcon size={12} weight="fill" /> : <PlayIcon size={12} weight="fill" />}
+                      <span>GIF</span>
+                    </button>
+                  )}
 
                   {item.type === 'video' && (
                     <div className={styles.controls}>
