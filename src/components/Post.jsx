@@ -106,7 +106,11 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const [repostedPost, setRepostedPost] = useState(null)
   const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
+  // Flagged posts are never withheld — the content still renders, blurred behind a veil until
+  // the viewer opts in. Revealing is per-post and resets on remount.
   const isActioned = Number(item.actioned_reports || 0) >= 3 || Number(item.moderation_flagged || 0) === 1
+  const [isRevealed, setIsRevealed] = useState(false)
+  const isVeiled = isActioned && !isRevealed
   const repostedPostId = isRepost ? Number(item.is_repost) : null
   const [showEditModal, setShowEditModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(null)
@@ -285,59 +289,70 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         </header>
 
         <main className={clsx(styles.post__main, 'w-100')}>
-          {isActioned ? (
-            <div className={styles.post__flagBanner}>
-              <FlagIcon size={14} weight="fill" />
-              This post has been flagged for violations.
+          <div className={clsx(styles.post__sensitive, isVeiled && styles['post__sensitive--veiled'])}>
+            <div className={styles.post__sensitive__body} inert={isVeiled}>
+              {displayItem?.content?.elements?.length > 1 ? (
+                <>
+                  <PostText
+                    sourceText={sourceText}
+                    postId={displayItem.id}
+                    styles={styles}
+                    renderMarkdown={renderMarkdown}
+                    isCollapsible={true}
+                    baseClassName={styles.post__main__content}
+                  />
+
+                  <div className={`${styles.post__main__media}`}>
+                    <MediaGallery data={displayItem.content.elements[1].data.items} />
+                  </div>
+                </>
+              ) : (
+                <PostText
+                  sourceText={sourceText}
+                  postId={displayItem?.id}
+                  styles={styles}
+                  renderMarkdown={renderMarkdown}
+                  isCollapsible={false}
+                  baseClassName={styles.post__content}
+                />
+              )}
+
+              {displayItem?.content?.quoteOf && (
+                <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} quotedBy={displayItem.wallet_address} />
+              )}
+
+              {displayItem?.content?.nftListing && (
+                <TradeCard
+                  listing={displayItem.content.nftListing}
+                  // Buying through someone's repost credits the reposter with the listing's
+                  // referral share — HupTrade rejects self- and seller-referrals onchain
+                  referral={
+                    isRepost && item.wallet_address?.toLowerCase() !== displayItem?.wallet_address?.toLowerCase()
+                      ? item.wallet_address
+                      : null
+                  }
+                />
+              )}
+
+              {displayItem?.content?.predictMarket && <PredictCard marketRef={displayItem.content.predictMarket} />}
+
+              <BuyButton item={displayItem || item} />
             </div>
-          ) : displayItem?.content?.elements?.length > 1 ? (
-            <>
-              <PostText
-                sourceText={sourceText}
-                postId={displayItem.id}
-                styles={styles}
-                renderMarkdown={renderMarkdown}
-                isCollapsible={true}
-                baseClassName={styles.post__main__content}
-              />
 
-              <div className={`${styles.post__main__media}`}>
-                <MediaGallery data={displayItem.content.elements[1].data.items} />
+            {isVeiled && (
+              <div className={styles.post__sensitive__veil} onClick={(e) => e.stopPropagation()}>
+                <FlagIcon size={14} weight="fill" />
+                <button
+                  type="button"
+                  className={styles.post__sensitive__reveal}
+                  title="This post has been flagged for violations"
+                  onClick={() => setIsRevealed(true)}
+                >
+                  Show anyway
+                </button>
               </div>
-            </>
-          ) : (
-            <PostText
-              sourceText={sourceText}
-              postId={displayItem?.id}
-              styles={styles}
-              renderMarkdown={renderMarkdown}
-              isCollapsible={false}
-              baseClassName={styles.post__content}
-            />
-          )}
-
-          {!isActioned && displayItem?.content?.quoteOf && (
-            <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} quotedBy={displayItem.wallet_address} />
-          )}
-
-          {!isActioned && displayItem?.content?.nftListing && (
-            <TradeCard
-              listing={displayItem.content.nftListing}
-              // Buying through someone's repost credits the reposter with the listing's
-              // referral share — HupTrade rejects self- and seller-referrals onchain
-              referral={
-                isRepost && item.wallet_address?.toLowerCase() !== displayItem?.wallet_address?.toLowerCase()
-                  ? item.wallet_address
-                  : null
-              }
-            />
-          )}
-
-          {!isActioned && displayItem?.content?.predictMarket && (
-            <PredictCard marketRef={displayItem.content.predictMarket} />
-          )}
-
-          <BuyButton item={displayItem || item} />
+            )}
+          </div>
         </main>
         
 
