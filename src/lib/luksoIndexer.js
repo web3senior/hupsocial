@@ -81,6 +81,9 @@ export const fetchLuksoTokenMetadata = async ({ collection, tokenId }) => {
     collectionName,
     description: token.description || null,
     image,
+    // The indexer exposes images and icons but not the collection's `assets` files, so a
+    // token that resolves here has no 3D model even when its document declares one.
+    model: null,
     attributes,
     // Distinct from 'token' so the cache can re-check the canonical onchain source on a
     // much shorter clock than a normal successful resolution.

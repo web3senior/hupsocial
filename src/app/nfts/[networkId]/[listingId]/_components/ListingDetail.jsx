@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -16,12 +17,15 @@ import Profile from '@/components/Profile'
 import TradeCard, { buildAssetLinks } from '@/components/TradeCard'
 import Share from '@/components/ui/Share'
 import HupMark from '@/components/ui/HupMark'
+import ModelViewer from '@/components/ui/ModelViewer'
 import { ContentSpinner } from '@/components/Loading'
 import {
   ArrowsClockwiseIcon,
   ArrowSquareOutIcon,
   CaretLeftIcon,
   ChatCircleIcon,
+  CubeIcon,
+  ImageIcon,
   ReceiptIcon,
   RepeatIcon,
   ShareNetworkIcon,
@@ -72,6 +76,10 @@ const ReferralName = ({ address }) => {
 
 export default function ListingDetail({ networkId, listingId }) {
   const router = useRouter()
+
+  // Collections that ship a 3D asset still lead with their artwork: the mesh is megabytes
+  // and the renderer another few hundred KB, so both wait until someone asks for them.
+  const [showModel, setShowModel] = useState(false)
 
   const chainId = Number(networkId)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
@@ -135,6 +143,9 @@ export default function ListingDetail({ networkId, listingId }) {
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
   const title = metadata.name || `NFT listing #${listing.listing_id}`
   const standard = isLsp8 ? 'LSP8' : 'ERC721'
+  // {url, fileType, isRenderable}, for the collections whose metadata carries a 3D file
+  // next to the artwork
+  const model = metadata.model
 
   const { collectionUrl, tokenUrl } = buildAssetLinks({
     chainId,
@@ -159,33 +170,56 @@ export default function ListingDetail({ networkId, listingId }) {
             compact TradeCard resolves price/status onchain, so the page can never sell on
             stale indexed terms */}
         <aside className={styles.listing__media}>
-          {metadata.image ? (
-            tokenUrl ? (
-              <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
+          <div className={styles.listing__stage}>
+            {showModel && model?.isRenderable ? (
+              <ModelViewer src={model.url} poster={metadata.image} alt={`${title} in 3D`} />
+            ) : metadata.image ? (
+              tokenUrl ? (
+                <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
+                  <img src={metadata.image} alt={title} onError={handleBrokenImage} />
+                </a>
+              ) : (
                 <img src={metadata.image} alt={title} onError={handleBrokenImage} />
-              </a>
+              )
             ) : (
-              <img src={metadata.image} alt={title} onError={handleBrokenImage} />
-            )
-          ) : (
-            <div className={styles.listing__mediaFallback}>
-              <HupMark size={56} />
-            </div>
-          )}
+              <div className={styles.listing__mediaFallback}>
+                <HupMark size={56} />
+              </div>
+            )}
 
-          {/* Collections that change their onchain metadata give the app no signal, so a
-              cached token keeps its old name and artwork until the TTL lapses. This is the
-              escape hatch for whoever made the change. */}
-          <button
-            type="button"
-            className={styles.listing__refresh}
-            onClick={handleRefreshMetadata}
-            disabled={metadata.isRefreshing}
-            title="Re-read this NFT's name, traits and artwork from the blockchain"
-          >
-            <ArrowsClockwiseIcon size={14} className={clsx(metadata.isRefreshing && styles['listing__refresh--spinning'])} />
-            {metadata.isRefreshing ? 'Refreshing…' : 'Refresh metadata'}
-          </button>
+            {/* Only for formats that actually paint — an fbx or usdz gets the download link
+                below instead of a button that would open an empty canvas */}
+            {model?.isRenderable && (
+              <button type="button" className={styles.listing__stageToggle} onClick={() => setShowModel((visible) => !visible)}>
+                {showModel ? <ImageIcon size={14} weight="bold" /> : <CubeIcon size={14} weight="bold" />}
+                {showModel ? 'View image' : 'View in 3D'}
+              </button>
+            )}
+          </div>
+
+          <div className={styles.listing__mediaActions}>
+            {/* Collections that change their onchain metadata give the app no signal, so a
+                cached token keeps its old name and artwork until the TTL lapses. This is the
+                escape hatch for whoever made the change. */}
+            <button
+              type="button"
+              className={styles.listing__refresh}
+              onClick={handleRefreshMetadata}
+              disabled={metadata.isRefreshing}
+              title="Re-read this NFT's name, traits and artwork from the blockchain"
+            >
+              <ArrowsClockwiseIcon size={14} className={clsx(metadata.isRefreshing && styles['listing__refresh--spinning'])} />
+              {metadata.isRefreshing ? 'Refreshing…' : 'Refresh metadata'}
+            </button>
+
+            {model && !model.isRenderable && (
+              <a href={model.url} target="_blank" rel="noopener noreferrer" className={styles.listing__refresh} title="This collection ships a 3D file the browser can't render inline">
+                <CubeIcon size={14} />
+                3D file (.{model.fileType})
+                <ArrowSquareOutIcon size={12} />
+              </a>
+            )}
+          </div>
 
           {cardListing && <TradeCard listing={cardListing} compact showDetailsLink={false} />}
         </aside>
@@ -195,6 +229,12 @@ export default function ListingDetail({ networkId, listingId }) {
             <span className={clsx(styles.listing__badge, styles[`listing__badge--${status.key}`])}>{status.label}</span>
             {chainInfo?.name && <span className={styles.listing__chip}>{chainInfo.name}</span>}
             <span className={styles.listing__chip}>{standard}</span>
+            {model && (
+              <span className={styles.listing__chip}>
+                <CubeIcon size={12} />
+                3D
+              </span>
+            )}
             {referralPercent && (
               <span className={styles.listing__chip}>
                 <RepeatIcon size={12} />

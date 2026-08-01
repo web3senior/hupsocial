@@ -1,0 +1,81 @@
+// Square stage matching the artwork it replaces, so toggling between image and 3D never
+// shifts the page. Sizing beyond the aspect ratio comes from the consumer's own class.
+.model {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background-color: var(--surface-muted);
+
+  model-viewer {
+    display: block;
+    width: 100%;
+    height: 100%;
+    // The canvas swallows drags for orbiting; keep the page scrollable on touch anyway
+    // (paired with the element's own touch-action="pan-y")
+    background-color: transparent;
+    --poster-color: transparent;
+  }
+
+  // Renderer still downloading — the still artwork holds the frame so the slot is never
+  // an empty box
+  &--pending {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.5;
+    }
+  }
+
+  &--failed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-muted, #888);
+
+    p {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    a {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--network-color-primary, var(--color-primary));
+      text-decoration: underline;
+    }
+  }
+
+  &__badge,
+  &__pendingBadge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+  }
+}

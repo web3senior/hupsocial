@@ -31,6 +31,13 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+  }
+
+  // Holds whichever representation is on show — artwork or 3D model — so swapping between
+  // them keeps the same square footprint and the toggle can anchor to a corner of it
+  &__stage {
+    position: relative;
+    min-width: 0;
 
     a {
       display: block;
@@ -54,6 +61,39 @@
     }
   }
 
+  // Sits over the bottom-right of the artwork rather than under it: it is an alternate view
+  // of the same thing, not a separate action
+  &__stageToggle {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.78);
+    }
+  }
+
+  &__mediaActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
   // Secondary by design: useful when a collection has just changed its onchain metadata,
   // noise the rest of the time, so it sits quietly under the artwork.
   &__refresh {
@@ -62,13 +102,13 @@
     justify-content: center;
     gap: 6px;
     align-self: flex-start;
-    margin-top: 10px;
     padding: 6px 10px;
     border: 1px solid var(--border);
     border-radius: 999px;
     font-size: 0.78rem;
     color: var(--text-muted, #888);
     background: transparent;
+    text-decoration: none;
     cursor: pointer;
     transition: color 0.15s ease, border-color 0.15s ease;
 

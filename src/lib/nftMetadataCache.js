@@ -74,13 +74,16 @@ const rowToMetadata = (row) => ({
   collectionName: row.collection_name || null,
   description: row.description || null,
   image: row.image_uri || null,
+  // model_type is never null while model_uri is set — the resolver only keeps a file whose
+  // format it recognized, so the pair is written and read together.
+  model: row.model_uri ? { url: row.model_uri, fileType: row.model_type || null } : null,
   attributes: parseAttributes(row.attributes),
   source: row.source || null,
 })
 
 const readRow = async (key) => {
   const [rows] = await pool.execute(
-    `SELECT name, collection_name, description, image_uri, attributes, source, fetched_at
+    `SELECT name, collection_name, description, image_uri, model_uri, model_type, attributes, source, fetched_at
        FROM nft_metadata_cache
       WHERE network_id = ? AND collection = ? AND token_id = ?
       LIMIT 1`,
@@ -94,14 +97,16 @@ const writeRow = async (key, isLsp8, metadata) => {
 
   await pool.execute(
     `INSERT INTO nft_metadata_cache
-       (network_id, collection, token_id, is_lsp8, name, collection_name, description, image_uri, attributes, source, fetched_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+       (network_id, collection, token_id, is_lsp8, name, collection_name, description, image_uri, model_uri, model_type, attributes, source, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE
        is_lsp8 = VALUES(is_lsp8),
        name = VALUES(name),
        collection_name = VALUES(collection_name),
        description = VALUES(description),
        image_uri = VALUES(image_uri),
+       model_uri = VALUES(model_uri),
+       model_type = VALUES(model_type),
        attributes = VALUES(attributes),
        source = VALUES(source),
        fetched_at = VALUES(fetched_at)`,
@@ -114,6 +119,8 @@ const writeRow = async (key, isLsp8, metadata) => {
       metadata.collectionName,
       metadata.description,
       imageUri,
+      metadata.model?.url || null,
+      metadata.model?.fileType || null,
       JSON.stringify(metadata.attributes || []),
       metadata.source,
     ],

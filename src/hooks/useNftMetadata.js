@@ -3,8 +3,8 @@
 import { useCallback, useState } from 'react'
 import useSWRImmutable from 'swr/immutable'
 import { usePublicClient } from 'wagmi'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
-import { resolveNftMetadata, isInlineDataUri } from '@/lib/nftMetadata'
+import { resolveStorageImageUrl, resolveStorageUrl } from '@/lib/storageHelper'
+import { resolveNftMetadata, isInlineDataUri, isRenderableModelType } from '@/lib/nftMetadata'
 import { loadNftMetadata } from '@/lib/nftMetadataBatch'
 
 // Fully onchain collections return their artwork inline as a data: URI. Those can't be
@@ -94,11 +94,26 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
     }
   }
 
+  // 3D files route through the plain storage resolver, never the image proxy — the mesh has
+  // to arrive intact, and sharp would either mangle it or refuse it outright.
+  let model = null
+  const modelUrl = data?.model?.url ? resolveStorageUrl(data.model.url) : null
+  if (modelUrl) {
+    model = {
+      url: modelUrl,
+      fileType: data.model.fileType || null,
+      // Formats the viewer can't paint (fbx, usdz, …) still surface — as a download.
+      isRenderable: isRenderableModelType(data.model.fileType),
+    }
+  }
+
   return {
     name: data?.name || null,
     collectionName: data?.collectionName || null,
     description: data?.description || null,
     image,
+    // {url, fileType, isRenderable} for the token's 3D asset, or null when it has none.
+    model,
     attributes: data?.attributes || [],
     // 'token' = data is specific to this token id; 'collection' = only collection-level
     // metadata exists and the image/name describe the collection, not the token

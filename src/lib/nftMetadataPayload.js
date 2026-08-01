@@ -32,6 +32,10 @@ export const toMetadataPayload = ({ metadata, chainId, collection, tokenId, isLs
     // Lets the client know the URL is already a sized proxy endpoint rather than a
     // storage reference it still has to route.
     imageIsProxied: inline,
+    // {url, fileType} for the collection's 3D file, or null. Unlike the artwork this is
+    // never proxied: a mesh has to reach the renderer byte-for-byte, and the image proxy
+    // would try to make a WebP out of it.
+    model: metadata.model || null,
     attributes: metadata.attributes,
     source: metadata.source,
   }

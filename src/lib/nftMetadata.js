@@ -59,6 +59,76 @@ export const lsp8MetadataAbi = [
  */
 export const isInlineDataUri = (src) => typeof src === 'string' && src.startsWith('data:')
 
+// A collection's 3D asset travels in the same document as its artwork: LSP4 lists files in
+// `assets`, ERC721 hides them behind `animation_url` and friends. Only glb/gltf can be shown
+// in a canvas, but the rest are still worth surfacing as a download rather than dropping.
+const RENDERABLE_MODEL_TYPES = new Set(['glb', 'gltf'])
+const MODEL_FILE_TYPES = new Set([...RENDERABLE_MODEL_TYPES, 'fbx', 'obj', 'usdz', 'usd', 'stl', 'dae', '3ds', 'ply', 'vrm'])
+
+// Collections that declare a mime type rather than an extension
+const MODEL_TYPE_ALIASES = { 'gltf-binary': 'glb', 'gltf+json': 'gltf', 'vnd.usdz+zip': 'usdz' }
+
+/**
+ * True for the model formats the app renders inline; everything else is download-only.
+ * @param {string} fileType
+ * @returns {boolean}
+ */
+export const isRenderableModelType = (fileType) => RENDERABLE_MODEL_TYPES.has(String(fileType || '').toLowerCase())
+
+// The document's declared type wins over the URL's extension, because storage references are
+// usually extension-less CIDs (`ipfs://Qm…`) — the extension is only the fallback.
+const modelTypeOf = (url, declared) => {
+  const stripped = String(declared || '')
+    .toLowerCase()
+    .trim()
+    .replace(/^\./, '')
+    .replace(/^model\//, '')
+  const normalized = MODEL_TYPE_ALIASES[stripped] || stripped
+  if (MODEL_FILE_TYPES.has(normalized)) return normalized
+
+  const extension = String(url || '')
+    .split(/[?#]/)[0]
+    .split('.')
+    .pop()
+    .toLowerCase()
+  return MODEL_FILE_TYPES.has(extension) ? extension : null
+}
+
+// Inline models are refused outright: a base64 mesh is megabytes the browser can never cache,
+// and unlike artwork there is no proxy that could rasterize it into something smaller.
+const toModel = (url, declared) => {
+  if (!url || typeof url !== 'string' || isInlineDataUri(url)) return null
+  const fileType = modelTypeOf(url, declared)
+  return fileType ? { url, fileType } : null
+}
+
+// LSP4 `assets` is a flat list of {url, fileType} files — but it also carries asset
+// *references* ({address, tokenId}) that have no url, and a few collections nest it the way
+// `images` is nested, hence the flatten.
+const pickLsp4Model = (lsp4) => {
+  const assets = Array.isArray(lsp4?.assets) ? lsp4.assets.flat() : []
+  for (const asset of assets) {
+    const model = toModel(asset?.url, asset?.fileType)
+    if (model) return model
+  }
+  return null
+}
+
+// `animation_url` is a grab-bag — mp4, interactive HTML and glb all share it — so it only
+// counts once it actually names a model format.
+const pickErc721Model = (json) => {
+  const candidates = [
+    [json?.model_url, json?.model_type],
+    [json?.glb_url, 'glb'],
+    [json?.animation_url, json?.animation_details?.format],
+  ]
+  for (const [url, declared] of candidates) {
+    const model = toModel(url, declared)
+    if (model) return model
+  }
+  return null
+}
+
 // Traits come in two dialects: ERC721's [{trait_type, value}] and LSP4's [{key, value, type}].
 // Normalize both to [{label, value}] strings for display.
 const normalizeAttributes = (json, lsp4) => {
@@ -102,7 +172,8 @@ const formatTokenIdForUri = (tokenId, formatBytes) => {
  * @param {string} [params.baseUrl] Absolute origin for resolving proxy-relative
  * metadata URLs — required server-side, omitted in the browser.
  * @returns {Promise<{name: string|null, collectionName: string|null, description: string|null,
- * image: string|null, attributes: Array<{label: string, value: string}>, source: string|null}>}
+ * image: string|null, model: {url: string, fileType: string}|null,
+ * attributes: Array<{label: string, value: string}>, source: string|null}>}
  */
 export const resolveNftMetadata = async ({ publicClient, collection, tokenId, isLsp8, baseUrl }) => {
   if (isLsp8) {
@@ -147,6 +218,7 @@ export const resolveNftMetadata = async ({ publicClient, collection, tokenId, is
       collectionName,
       description: lsp4?.description || null,
       image: pickLsp4Image(lsp4),
+      model: pickLsp4Model(lsp4),
       attributes: normalizeAttributes(json, lsp4),
       source: json ? source : null,
     }
@@ -164,6 +236,7 @@ export const resolveNftMetadata = async ({ publicClient, collection, tokenId, is
     collectionName,
     description: json?.description || null,
     image: json?.image || json?.image_url || null,
+    model: pickErc721Model(json),
     attributes: normalizeAttributes(json, null),
     // tokenURI is inherently per-token
     source: json ? 'token' : null,
