@@ -7,6 +7,7 @@
 
 import { hexToString } from 'viem'
 import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, decodeVerifiableUri, pickLsp4Image, fetchMetadataJson } from '@/lib/lsp4'
+import { resolveStorageUrl } from '@/lib/storageHelper'
 
 // LSP8's second metadata mechanism: a collection-wide base URI the token id gets appended
 // to (e.g. Chillwhales), instead of per-token LSP4Metadata (e.g. Dracos)
@@ -75,6 +76,16 @@ const MODEL_TYPE_ALIASES = { 'gltf-binary': 'glb', 'gltf+json': 'gltf', 'vnd.usd
  */
 export const isRenderableModelType = (fileType) => RENDERABLE_MODEL_TYPES.has(String(fileType || '').toLowerCase())
 
+// Extension of the last path segment, or null when there isn't one. Deliberately not
+// `split('.').pop()`: that reads the extension of `https://arweave.net/Rdsn…` as
+// `net/Rdsn…` — a dot in the *host* is not a file extension.
+const extensionOf = (url) => {
+  const path = String(url || '').split(/[?#]/)[0]
+  const segment = path.slice(path.lastIndexOf('/') + 1)
+  const dot = segment.lastIndexOf('.')
+  return dot === -1 ? null : segment.slice(dot + 1).toLowerCase()
+}
+
 // The document's declared type wins over the URL's extension, because storage references are
 // usually extension-less CIDs (`ipfs://Qm…`) — the extension is only the fallback.
 const modelTypeOf = (url, declared) => {
@@ -86,12 +97,8 @@ const modelTypeOf = (url, declared) => {
   const normalized = MODEL_TYPE_ALIASES[stripped] || stripped
   if (MODEL_FILE_TYPES.has(normalized)) return normalized
 
-  const extension = String(url || '')
-    .split(/[?#]/)[0]
-    .split('.')
-    .pop()
-    .toLowerCase()
-  return MODEL_FILE_TYPES.has(extension) ? extension : null
+  const extension = extensionOf(url)
+  return extension && MODEL_FILE_TYPES.has(extension) ? extension : null
 }
 
 // Inline models are refused outright: a base64 mesh is megabytes the browser can never cache,
@@ -102,21 +109,94 @@ const toModel = (url, declared) => {
   return fileType ? { url, fileType } : null
 }
 
+// Some collections mint the mesh with neither a `fileType` on the asset entry nor an
+// extension on the URL — an Arweave txid or a bare CID says nothing about what it holds, so
+// the file has to be asked directly. Storage gateways serve the stored content type
+// (`model/gltf-binary`), which MODEL_TYPE_ALIASES already understands; the ones that answer
+// `application/octet-stream` still can't disguise the magic bytes at the head of a GLB.
+const GLB_MAGIC = 'glTF'
+// A document listing dozens of unlabelled files is malformed rather than interesting — probe
+// the first few and let the rest stay unrecognized.
+const MAX_SNIFFED_ASSETS = 3
+// The whole second pass, wall clock. Candidates are probed concurrently, so this is the cost
+// of the slowest one rather than their sum — the batch endpoint resolves a grid of tokens
+// through a fixed worker pool, and a probe that held a worker per asset would stall the tile
+// behind it for a multiple of this.
+const SNIFF_BUDGET_MS = 8000
+const SNIFF_ATTEMPT_MS = 4000
+// Storage gateways are noticeably slower on a cold object than a warm one, and a first
+// attempt that timed out has usually warmed it. Worth one retry: the answer here is written
+// into the metadata cache for a week, so a transient miss is not a transient symptom.
+const SNIFF_ATTEMPTS = 2
+
+// A ranged GET answers both halves of the question in one round trip: 206 or not, the
+// response still carries the stored Content-Type, and the body still starts with the file's
+// magic bytes. (A HEAD would be cheaper but several gateways simply never answer one.)
+const probeModelType = async (target, url, timeoutMs) => {
+  const response = await fetch(target, { headers: { range: `bytes=0-${GLB_MAGIC.length - 1}` }, signal: AbortSignal.timeout(timeoutMs) })
+  if (!response.ok || !response.body) return null
+
+  const declared = modelTypeOf(url, response.headers.get('content-type')?.split(';')[0])
+
+  // Servers are free to ignore `Range` — and they do, so the response in hand may be the
+  // entire mesh. Take the first chunk and drop the connection rather than draining it.
+  const reader = response.body.getReader()
+  const { value } = await reader.read()
+  reader.cancel().catch(() => {})
+
+  if (declared) return declared
+  if (!value) return null
+  // Nothing useful in the header (`application/octet-stream` is the common case), but a GLB
+  // still can't disguise its first four bytes.
+  return new TextDecoder().decode(value.slice(0, GLB_MAGIC.length)) === GLB_MAGIC ? 'glb' : null
+}
+
+const sniffModelType = async (url, deadline) => {
+  const target = resolveStorageUrl(url)
+  if (!target || !/^https?:\/\//i.test(target)) return null
+
+  for (let attempt = 0; attempt < SNIFF_ATTEMPTS; attempt += 1) {
+    const remaining = Math.min(SNIFF_ATTEMPT_MS, deadline - Date.now())
+    if (remaining <= 0) break
+    try {
+      return await probeModelType(target, url, remaining)
+    } catch {
+      // Timed out or the gateway dropped it; fall through to the retry, if there is time.
+    }
+  }
+  return null
+}
+
+// Only ever a second pass. Anything the document labelled has already been claimed, and a URL
+// that carries an extension has told us what it is even when that answer is "not a model" —
+// so a collection with well-formed metadata never spends a request here.
+const sniffModel = async (urls) => {
+  const candidates = urls.filter((url) => url && typeof url === 'string' && !isInlineDataUri(url) && !extensionOf(url)).slice(0, MAX_SNIFFED_ASSETS)
+  if (candidates.length === 0) return null
+
+  const deadline = Date.now() + SNIFF_BUDGET_MS
+  const results = await Promise.all(candidates.map((url) => sniffModelType(url, deadline)))
+  // Document order decides, not whichever gateway answered first — the collection listed its
+  // primary asset first and that shouldn't depend on CDN warmth.
+  const index = results.findIndex(Boolean)
+  return index === -1 ? null : { url: candidates[index], fileType: results[index] }
+}
+
 // LSP4 `assets` is a flat list of {url, fileType} files — but it also carries asset
 // *references* ({address, tokenId}) that have no url, and a few collections nest it the way
 // `images` is nested, hence the flatten.
-const pickLsp4Model = (lsp4) => {
+const pickLsp4Model = async (lsp4) => {
   const assets = Array.isArray(lsp4?.assets) ? lsp4.assets.flat() : []
   for (const asset of assets) {
     const model = toModel(asset?.url, asset?.fileType)
     if (model) return model
   }
-  return null
+  return sniffModel(assets.filter((asset) => !asset?.fileType).map((asset) => asset?.url))
 }
 
 // `animation_url` is a grab-bag — mp4, interactive HTML and glb all share it — so it only
 // counts once it actually names a model format.
-const pickErc721Model = (json) => {
+const pickErc721Model = async (json) => {
   const candidates = [
     [json?.model_url, json?.model_type],
     [json?.glb_url, 'glb'],
@@ -126,7 +206,7 @@ const pickErc721Model = (json) => {
     const model = toModel(url, declared)
     if (model) return model
   }
-  return null
+  return sniffModel(candidates.filter(([, declared]) => !declared).map(([url]) => url))
 }
 
 // Traits come in two dialects: ERC721's [{trait_type, value}] and LSP4's [{key, value, type}].
@@ -218,7 +298,7 @@ export const resolveNftMetadata = async ({ publicClient, collection, tokenId, is
       collectionName,
       description: lsp4?.description || null,
       image: pickLsp4Image(lsp4),
-      model: pickLsp4Model(lsp4),
+      model: await pickLsp4Model(lsp4),
       attributes: normalizeAttributes(json, lsp4),
       source: json ? source : null,
     }
@@ -236,7 +316,7 @@ export const resolveNftMetadata = async ({ publicClient, collection, tokenId, is
     collectionName,
     description: json?.description || null,
     image: json?.image || json?.image_url || null,
-    model: pickErc721Model(json),
+    model: await pickErc721Model(json),
     attributes: normalizeAttributes(json, null),
     // tokenURI is inherently per-token
     source: json ? 'token' : null,
