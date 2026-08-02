@@ -1,0 +1,56 @@
+.moderation {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--border);
+
+  &__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #888);
+    margin-right: auto;
+  }
+
+  &__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.68rem;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+      background-color: var(--surface-muted);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Embedding is currently granted — the button revokes it */
+    &--active {
+      border-color: var(--success-600, #16a34a);
+      color: var(--success-600, #16a34a);
+    }
+
+    /* Listing is currently hidden — the button restores it */
+    &--hidden {
+      border-color: var(--warning-500, #f59e0b);
+      color: var(--warning-600, #d97706);
+    }
+  }
+}

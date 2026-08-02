@@ -1,9 +1,31 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { ArrowSquareOutIcon, CodeIcon, GlobeIcon, LinkSimpleIcon, MagnifyingGlassIcon, SquaresFourIcon } from '@phosphor-icons/react'
+import { useConnection } from 'wagmi'
+import {
+  ArrowSquareOutIcon,
+  BookOpenTextIcon,
+  CaretRightIcon,
+  CheckIcon,
+  CodeIcon,
+  CopyIcon,
+  FileJsIcon,
+  EyeSlashIcon,
+  GlobeIcon,
+  LinkSimpleIcon,
+  MagnifyingGlassIcon,
+  PencilSimpleIcon,
+  PlusIcon,
+  PuzzlePieceIcon,
+  SealCheckIcon,
+  SquaresFourIcon,
+  StarIcon,
+} from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
+import ListAppDialog from '@/components/ListAppDialog'
+import AppModerationBar from '@/components/AppModerationBar'
+import { useAppsModerator } from '@/hooks/useAppsModerator'
 import clsx from 'clsx'
 import styles from './page.module.scss'
 
@@ -28,7 +50,22 @@ export default function AppsPage() {
   const [networkId, setNetworkId] = useState('all')
   const [query, setQuery] = useState('')
 
-  const { data, error, isLoading } = useSWR('/api/v1/apps', fetcher)
+  const listDialogRef = useRef(null)
+  const editDialogRef = useRef(null)
+  const [editingApp, setEditingApp] = useState(null)
+  const [showHidden, setShowHidden] = useState(false)
+
+  // The edit dialog mounts on demand, so it can only be shown after the render that creates it
+  useEffect(() => {
+    if (editingApp) editDialogRef.current?.open()
+  }, [editingApp])
+
+  // Hidden listings are only reachable through a moderator's own view — otherwise hiding would
+  // be a one-way door, since a hidden card takes its moderation controls with it
+  const { canModerate } = useAppsModerator()
+  const canSeeHidden = canModerate && showHidden
+
+  const { data, error, isLoading, mutate } = useSWR(canSeeHidden ? '/api/v1/apps?includeHidden=1' : '/api/v1/apps', fetcher)
 
   const apps = useMemo(() => data?.data || [], [data])
   const categories = data?.meta?.categories || []
@@ -66,9 +103,22 @@ export default function AppsPage() {
                 aria-label="Search apps"
               />
             </label>
+
+            {/* aria-label because the text span is display:none at narrow widths */}
+            <button
+              type="button"
+              className={clsx(styles.page__list, 'rounded-full')}
+              onClick={() => listDialogRef.current?.open()}
+              aria-label="List your app"
+            >
+              <PlusIcon size={16} aria-hidden="true" />
+              <span>List your app</span>
+            </button>
           </header>
         </div>
         <div className={`__container ${styles.page__container}`} data-width="medium">
+          <BuildSection />
+
           <div className={styles.filterbar}>
             <nav className={styles.filters} aria-label="App categories">
               <button
@@ -118,6 +168,20 @@ export default function AppsPage() {
                 ))}
               </nav>
             )}
+
+            {canModerate && (
+              <nav className={styles.filters} aria-label="Moderation">
+                <button
+                  type="button"
+                  className={clsx(styles.filters__chip, showHidden && styles['filters__chip--active'])}
+                  onClick={() => setShowHidden((value) => !value)}
+                  title="Show listings you have hidden, so they can be restored"
+                >
+                  <EyeSlashIcon size={14} aria-hidden="true" />
+                  <span>Hidden</span>
+                </button>
+              </nav>
+            )}
           </div>
 
           {error ? (
@@ -133,27 +197,139 @@ export default function AppsPage() {
           ) : (
             <ul className={styles.grid}>
               {filteredApps.map((app) => (
-                <AppCard key={app.id} app={app} />
+                <AppCard key={app.id} app={app} onChanged={() => mutate()} onEdit={setEditingApp} />
               ))}
             </ul>
           )}
         </div>
       </div>
+
+      <ListAppDialog ref={listDialogRef} categories={categories} onListed={() => mutate()} />
+
+      {/* key remounts the dialog per listing — the form prefills in state initializers, which
+          would otherwise keep the first-opened app's values forever */}
+      {editingApp && (
+        <ListAppDialog
+          key={`${editingApp.network.id}-${editingApp.appId}`}
+          ref={editDialogRef}
+          categories={categories}
+          app={editingApp}
+          onListed={() => {
+            setEditingApp(null)
+            mutate()
+          }}
+        />
+      )}
     </>
   )
 }
 
-function AppCard({ app }) {
+/**
+ * Developer on-ramp aimed at agent-assisted building: the copy button hands an AI agent one
+ * self-contained instruction, and /miniapp-skill.md carries everything it needs from there.
+ */
+function BuildSection() {
+  const [copied, setCopied] = useState(false)
+  // Resolved after mount so dev copies a localhost URL while SSR markup stays origin-neutral
+  const [origin, setOrigin] = useState('https://hup.social')
+
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
+
+  const prompt = `Read ${origin}/miniapp-skill.md and build a Hup mini app`
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* clipboard denied — the text stays selectable */
+    }
+  }
+
+  return (
+    <section className={styles.build} aria-label="Build a mini app">
+      <div className={styles.build__intro}>
+        <h2>
+          <CodeIcon size={16} aria-hidden="true" />
+          Build a mini app
+        </h2>
+        <p>
+          Mini apps run inside posts and use the viewer&apos;s Hup wallet — mint, play, trade without leaving the feed. Building one is a single
+          HTML page plus the SDK. Vibe coding? Paste this into your agent:
+        </p>
+      </div>
+
+      <div className={styles.build__prompt}>
+        <code>{prompt}</code>
+        <button type="button" onClick={copyPrompt} className={styles.build__copy} aria-label="Copy the build instruction">
+          {copied ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
+          <span>{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+
+      <div className={styles.build__links}>
+        <a className={styles.build__link} href="/miniapp-skill.md" target="_blank" rel="noopener noreferrer">
+          <BookOpenTextIcon size={20} aria-hidden="true" className={styles.build__linkIcon} />
+          <span className={styles.build__linkText}>
+            <strong>Read the docs</strong>
+            <small>Build, test &amp; list your app</small>
+          </span>
+          <CaretRightIcon size={16} aria-hidden="true" className={styles.build__linkCaret} />
+        </a>
+
+        <a className={styles.build__link} href="/miniapp-sdk.js" target="_blank" rel="noopener noreferrer">
+          <FileJsIcon size={20} aria-hidden="true" className={styles.build__linkIcon} />
+          <span className={styles.build__linkText}>
+            <strong>SDK source</strong>
+            <small>miniapp-sdk.js — the wallet bridge</small>
+          </span>
+          <CaretRightIcon size={16} aria-hidden="true" className={styles.build__linkCaret} />
+        </a>
+      </div>
+    </section>
+  )
+}
+
+function AppCard({ app, onChanged, onEdit }) {
+  const { address } = useConnection()
+  // Ownership comes from the indexed onchain owner; the contract re-checks it on updateApp
+  // anyway, so a stale row can only show a button that reverts, never a working exploit
+  const isOwner = Boolean(app.source === 'onchain' && address && app.owner && app.owner.toLowerCase() === address.toLowerCase())
+
   return (
     <li className={styles.card}>
       <div className={styles.card__header}>
         <AppLogo name={app.name} logo={app.logo} />
 
         <div className={styles.card__title}>
-          <h3>{app.name}</h3>
+          <h3>
+            {app.name}
+            {app.featured && <StarIcon size={13} weight="fill" className={styles.card__featured} aria-label="Featured" />}
+          </h3>
           <div className={styles.card__badges}>
             <span className={styles.card__category}>{app.category.name}</span>
             {app.network.name && <span className={styles.card__network}>{app.network.name}</span>}
+            {app.source === 'onchain' && (
+              <span className={styles.card__registered} title="Registered onchain in the Hup apps registry">
+                <SealCheckIcon size={11} weight="fill" aria-hidden="true" />
+                <span>Registered</span>
+              </span>
+            )}
+            {app.embeddable && (
+              <span className={styles.card__embeddable} title="Reviewed — this app can run inside a post">
+                <PuzzlePieceIcon size={11} weight="fill" aria-hidden="true" />
+                <span>Embeddable</span>
+              </span>
+            )}
+            {app.hidden && (
+              <span className={styles.card__hidden} title="Hidden from the directory — only moderators see this">
+                <EyeSlashIcon size={11} aria-hidden="true" />
+                <span>Hidden</span>
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -174,7 +350,21 @@ function AppCard({ app }) {
             <span>Open</span>
           </a>
         )}
+
+        {isOwner && (
+          <button
+            type="button"
+            className={clsx(styles.card__edit, 'rounded-full')}
+            onClick={() => onEdit(app)}
+            title="Edit your listing — saving pauses embedding until re-review"
+          >
+            <PencilSimpleIcon size={13} aria-hidden="true" />
+            <span>Edit</span>
+          </button>
+        )}
       </div>
+
+      {app.source === 'onchain' && <AppModerationBar app={app} onChanged={onChanged} />}
     </li>
   )
 }

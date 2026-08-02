@@ -41,6 +41,7 @@ import TipModal from './TipModal'
 import BuyButton from './BuyButton'
 import TradeCard from './TradeCard'
 import PredictCard from './PredictCard'
+import MiniAppEmbed from './MiniAppEmbed'
 import NewPost from './NewPost'
 import { checkIsEnglish } from '@/lib/languageHelper'
 import Like from './ui/Like'
@@ -335,6 +336,10 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               )}
 
               {displayItem?.content?.predictMarket && <PredictCard marketRef={displayItem.content.predictMarket} />}
+
+              {/* Nothing loads until the viewer presses launch, so a veiled post never runs
+                  third-party code — the inert wrapper blocks the launch button outright */}
+              {displayItem?.content?.miniApp && <MiniAppEmbed reference={displayItem.content.miniApp} />}
 
               <BuyButton item={displayItem || item} />
             </div>
@@ -840,6 +845,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
         <TradeCard listing={quotedPost.content.nftListing} referral={quotedBy} />
       )}
       {quotedPost?.content?.predictMarket && <PredictCard marketRef={quotedPost.content.predictMarket} />}
+      {quotedPost?.content?.miniApp && <MiniAppEmbed reference={quotedPost.content.miniApp} />}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConnection, usePublicClient, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ChartLineUpIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -19,6 +19,7 @@ import NativeDialog from '@/components/ui/NativeDialog'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
+import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
@@ -282,6 +283,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     actionType === 'edit' ? getContentPayload(existingPost)?.predictMarket ?? null : null
   )
   const [showAttachMarket, setShowAttachMarket] = useState(false)
+  // Mini apps travel the same way: a thin { appId, chainId } reference, never the frame URL, so
+  // a moderator revoking an app takes effect in every post that embedded it
+  const [miniApp, setMiniApp] = useState(() => (actionType === 'edit' ? getContentPayload(existingPost)?.miniApp ?? null : null))
+  const attachMiniAppRef = useRef(null)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -351,8 +356,17 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     // Encrypted membership types (Request-Based, Private, NFT/Token/NFT+Token/Follower-Gated)
     // with an initialized key get sealed; plaintext communities just carry the tag.
     const isEncryptedType = [1, 2, 3, 4, 5, 8].includes(membershipType)
-    if (!isEncryptedType || currentKeyVersion === 0) {
+    if (!isEncryptedType) {
       return { ...plainContent, communityId: Number(communityId) }
+    }
+
+    // Encrypted type but keyVersion 0: the creator switched the type but the follow-up
+    // initializeKey tx never confirmed. Publishing now would leak plaintext into a community
+    // that presents itself as private — block until the creator finishes encryption setup
+    // (the community card offers them a "Finish encryption setup" action).
+    if (currentKeyVersion === 0) {
+      toast("This community's encryption setup isn't finished yet — posting is paused until the creator completes it", 'error')
+      return null
     }
 
     const privKeyHex = getCachedIdentityPrivKeyHex()
@@ -376,7 +390,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const postText = postContent.elements[0].data.text
   const mediaItems = postContent.elements[1].data.items
   const isBusy = isSigning || isConfirming || isUploading || isSubmitting
-  const hasPostBody = postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing) || Boolean(predictMarket)
+  const hasPostBody =
+    postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing) || Boolean(predictMarket) || Boolean(miniApp)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
   // Every submission is pinned to one chain: an edit updates the post where it already lives,
@@ -952,6 +967,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       // the reference from the indexed API
       if (predictMarket) serializableContent.predictMarket = predictMarket
 
+      // Mini apps as well — MiniAppEmbed resolves the frame URL at render time, so an app
+      // that later loses its embeddable grant stops rendering without touching stored posts
+      if (miniApp) serializableContent.miniApp = miniApp
+
       // Edits rebuild the payload from the composer's text/media state, so reference keys
       // that only exist in the stored JSON must be carried over or the edit erases them
       if (actionType === 'edit') {
@@ -1256,6 +1275,18 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                   <span>Predict</span>
                 </button>
               )}
+              {canAttachNft && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => attachMiniAppRef.current?.open()}
+                  aria-label="Attach a mini app"
+                  disabled={isBusy || Boolean(miniApp)}
+                >
+                  <PuzzlePieceIcon size={20} />
+                  <span>Mini app</span>
+                </button>
+              )}
             </div>
 
             {nftListing && (
@@ -1273,6 +1304,16 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
                 <ChartLineUpIcon size={16} />
                 <span>Prediction market attached (market #{predictMarket.marketId})</span>
                 <button type="button" onClick={() => setPredictMarket(null)} aria-label="Detach prediction market" disabled={isBusy}>
+                  <XIcon size={14} />
+                </button>
+              </div>
+            )}
+
+            {miniApp && (
+              <div className={styles.nftAttachment}>
+                <PuzzlePieceIcon size={16} />
+                <span>Mini app attached (app #{miniApp.appId})</span>
+                <button type="button" onClick={() => setMiniApp(null)} aria-label="Detach mini app" disabled={isBusy}>
                   <XIcon size={14} />
                 </button>
               </div>
@@ -1443,6 +1484,8 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
           onClose={() => setShowAttachMarket(false)}
         />
       )}
+
+      <AttachMiniAppDialog ref={attachMiniAppRef} onAttached={(reference) => setMiniApp(reference)} />
     </NativeDialog>
   )
 }

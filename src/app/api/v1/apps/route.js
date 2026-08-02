@@ -3,11 +3,19 @@ import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request) {
+  // Moderators need to see what they hid in order to unhide it — hiding drops status to '0',
+  // which would otherwise remove the listing and its moderation controls together, leaving no
+  // way back. Not a confidentiality boundary: the same state is readable onchain by anyone.
+  const includeHidden = new URL(request.url).searchParams.get('includeHidden') === '1'
+
   try {
-    const [appRows] = await pool.execute(`
+    const [appRows] = await pool.execute(
+      `
       SELECT
         a.id,
+        a.source,
+        a.app_id,
         a.network_id,
         a.app_category_id,
         a.owner,
@@ -16,6 +24,12 @@ export async function GET() {
         a.repo,
         a.links,
         a.url,
+        a.frame_url,
+        a.aspect_ratio,
+        a.embeddable,
+        a.featured,
+        a.hidden,
+        a.delisted,
         a.logo,
         a.description,
         ac.name AS category_name,
@@ -23,8 +37,8 @@ export async function GET() {
       FROM apps a
       LEFT JOIN apps_category ac ON ac.id = a.app_category_id
       LEFT JOIN networks n ON n.id = a.network_id
-      WHERE a.status = '1'
-      ORDER BY a.name ASC
+      ${includeHidden ? "WHERE (a.status = '1' OR a.hidden = 1)" : "WHERE a.status = '1'"}
+      ORDER BY a.featured DESC, a.name ASC
     `)
 
     const [categoryRows] = await pool.execute(`
@@ -78,9 +92,21 @@ export async function GET() {
 function serializeApp(row) {
   return {
     id: row.id,
+    // Registry listings carry their onchain id; curated rows predate the registry and have none
+    source: row.source || 'curated',
+    appId: row.app_id != null ? Number(row.app_id) : null,
     name: row.name || 'Untitled app',
     description: row.description || '',
     url: row.url || null,
+    frameUrl: row.frame_url || null,
+    aspectRatio: row.aspect_ratio || '1:1',
+    // Only a moderator grant sets this, and any metadata edit clears it — posts must not embed
+    // an app on any weaker signal than this flag.
+    embeddable: row.embeddable === 1,
+    featured: row.featured === 1,
+    hidden: row.hidden === 1,
+    // Owner-set and permanent — the contract has no un-delist, so moderators cannot restore it
+    delisted: row.delisted === 1,
     logo: row.logo || null,
     repo: row.repo || null,
     owner: row.owner || null,

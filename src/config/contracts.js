@@ -47,6 +47,7 @@ export const CONTRACTS = {
     trade: '0x7eb333Ad710d398A38c45d49A6A96568c8276b5f',
     events: '',
     predict: '0xc77372d05ccc2d30938aa58686671625769f88bd',
+    apps: '',
   },
   chain42: {
     name: 'lukso',
@@ -61,6 +62,7 @@ export const CONTRACTS = {
     trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
     predict: '0xD76dcBB664a002247269c1fBB161B0440674C570',
+    apps: '0xe30350Cf486210C299Aef91De61799Daed1Df6C5',
   },
   chain143: {
     name: 'monad',
@@ -75,6 +77,7 @@ export const CONTRACTS = {
     trade: '0x80218c06A00316687957951036bbD1326a6790C1',
     events: '0x39CB4342C425Cdc8576fa593988E5a4980db9853',
     predict: '0xf9df0275821dbcCBd7Fe461c4224F1ccAC46ae20',
+    apps: '',
   },
   chain42220: {
     name: 'celo',
@@ -88,6 +91,7 @@ export const CONTRACTS = {
     trade: '0x94D81b00b1e4596343e84298dD705e93E36eAb14',
     events: '0x10feacEEDDB387112f9a484EfB2df9FB197934E4',
     predict: '0xb0F3D16De2B029Bb18d44C35AB811E23C4FC1B87',
+    apps: '',
   },
   chain8453: {
     name: 'base',
@@ -100,6 +104,7 @@ export const CONTRACTS = {
     trade: '0x7E14bB18b370b59e0b70759C915f5E3A79599091',
     events: '0x6dB2352e9921F46F005449FcA36938e7cb5A29f5',
     predict: '0x70DBfbb6E64f2e246A83d3Ae0262CC9588c31472',
+    apps: '',
   },
   chain56: {
     name: 'bnb',
@@ -112,6 +117,7 @@ export const CONTRACTS = {
     trade: '0x594d084D863446cd1618244de695d574a5DfADD5',
     events: '0xD479950963A8F87d9Cd44Ad3983C96A5A4b3c14d',
     predict: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
+    apps: '',
   },
   chain4663: {
     name: 'robinhood',
@@ -125,6 +131,7 @@ export const CONTRACTS = {
     trade: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
     events: '0x735A8352036B953F8AC0Ae421DaEf8f2978EcC91',
     predict: '0x08c4631B621959468770c3C9831E867aF9014780',
+    apps: '',
   },
   chain10143: {
     name: 'monad-testnet',
@@ -138,6 +145,7 @@ export const CONTRACTS = {
     trade: '0xC2b7f6eDecE9E5aB04C296a02bf61054487812e5',
     events: '0x4A6D88aBd0fd9049c1adD6757D382c1bb5bbC1D9',
     predict: '0x15C42Cf47D0Fe1D5314A91E5B23da35c72b129D9',
+    apps: '0x16D02878DEA645209D64e1AC2b22131C7ee128FB',
   },
   chain42161: {
     name: 'arbitrum',
@@ -151,5 +159,6 @@ export const CONTRACTS = {
     trade: '0x71Ce7aF80996AB5a9c265E2048c5759435131631',
     events: '0x88C0963857049368470E2851aFf5EDFc2D32346C',
     predict: '0x81369e32F31DDAb46F9BF3269e523A440822C748',
+    apps: '',
   },
 }
