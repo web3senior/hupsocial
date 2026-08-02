@@ -9,6 +9,7 @@ import PageTitle from '@/components/PageTitle'
 import { config, CONTRACTS } from '@/config/wagmi'
 import storeAbi from '@/abis/HupBazaar.json'
 import eventsAbi from '@/abis/HupEvents.json'
+import appsAbi from '@/abis/HupApps.json'
 import predictAbi from '@/abis/HupPredict.json'
 import tradeAbi from '@/abis/HupTrade.json'
 import tipperAbi from '@/abis/HupTipper.json'
@@ -92,6 +93,11 @@ export default function Page() {
   const [eventsFeeTxStates, setEventsFeeTxStates] = useState({})
   const [eventsReceiverInputs, setEventsReceiverInputs] = useState({})
   const [eventsWithdrawStates, setEventsWithdrawStates] = useState({})
+  const [appsFees, setAppsFees] = useState({})
+  const [appsFeeInputs, setAppsFeeInputs] = useState({})
+  const [appsFeeTxStates, setAppsFeeTxStates] = useState({})
+  const [appsReceiverInputs, setAppsReceiverInputs] = useState({})
+  const [appsWithdrawStates, setAppsWithdrawStates] = useState({})
   const [predictConfigs, setPredictConfigs] = useState({})
   const [predictInputs, setPredictInputs] = useState({})
   const [predictTxStates, setPredictTxStates] = useState({})
@@ -468,6 +474,102 @@ export default function Page() {
     } catch (err) {
       console.error(`Events withdrawal error on chain ${chain.id}:`, err)
       setEventsWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Read current listing/featured fees from a chain's HupApps deployment. HupApps exposes the
+  // same fee surface as HupEvents by design, so this section mirrors the events one.
+  const loadAppsFees = async (chain, appsAddress) => {
+    setAppsFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const [listingFee, featuredFee] = await Promise.all([
+        client.readContract({ address: appsAddress, abi: appsAbi, functionName: 'listingFee' }),
+        client.readContract({ address: appsAddress, abi: appsAbi, functionName: 'featuredFee' }),
+      ])
+
+      setAppsFees((prev) => ({ ...prev, [chain.id]: { loading: false, listingFee, featuredFee } }))
+    } catch (err) {
+      console.error(`Apps fee read error for chain ${chain.id}:`, err)
+      setAppsFees((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read fees' },
+      }))
+    }
+  }
+
+  // Load current fees for every chain with a HupApps deployment once the admin is in
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const appsAddress = CONTRACTS[`chain${chain.id}`]?.apps
+      if (appsAddress) loadAppsFees(chain, appsAddress)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  // Set the flat listing fee or the featured surcharge on a chain's HupApps (admin wallet signs)
+  const handleSetAppsFee = async (chain, appsAddress, which) => {
+    const draft = appsFeeInputs[chain.id]?.[which]?.trim()
+    let value
+    try {
+      value = parseEther(draft || '')
+    } catch {
+      setAppsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid amount in native units' } }))
+      return
+    }
+
+    setAppsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: appsAddress,
+        abi: appsAbi,
+        functionName: which === 'listing' ? 'setListingFee' : 'setFeaturedFee',
+        args: [value],
+        chainId: chain.id,
+      })
+
+      setAppsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: false, success: true, hash: txHash } }))
+
+      // Refresh the displayed fees shortly after so the card reflects the new values
+      setTimeout(() => loadAppsFees(chain, appsAddress), 3000)
+    } catch (err) {
+      console.error(`Apps ${which} fee update error on chain ${chain.id}:`, err)
+      setAppsFeeTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Withdraw the HupApps contract's full native balance (accumulated listing fees)
+  const handleWithdrawApps = async (chain, appsAddress) => {
+    const receiver = appsReceiverInputs[chain.id]?.trim()
+    if (!isAddress(receiver)) {
+      setAppsWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver address' } }))
+      return
+    }
+
+    setAppsWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: appsAddress,
+        abi: appsAbi,
+        functionName: 'withdrawAll',
+        args: [receiver],
+        chainId: chain.id,
+      })
+
+      setAppsWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+    } catch (err) {
+      console.error(`Apps withdrawal error on chain ${chain.id}:`, err)
+      setAppsWithdrawStates((prev) => ({
         ...prev,
         [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
@@ -1440,6 +1542,199 @@ export default function Page() {
                         className={styles['admin-contracts__input']}
                         value={receiverDraft}
                         onChange={(e) => setEventsReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    {withdrawState && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Withdrawal</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {withdrawState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {withdrawState.error && <span style={{ color: '#ef4444' }}>❌ {withdrawState.error}</span>}
+                          {withdrawState.success && <span style={{ color: '#10b981' }}>🚀 Withdrawn.</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!receiverDraft.trim() || withdrawState?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        {withdrawState?.loading ? 'Withdrawing...' : 'Withdraw Native Balance'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupApps Fees</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Set the flat listing fee and the featured surcharge (both in the chain&apos;s native coin) on HupApps
+              deployments, and withdraw accumulated fees.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.apps) return null
+
+              const fees = appsFees[chain.id]
+              const feeInputs = appsFeeInputs[chain.id] ?? {}
+              const feeTx = appsFeeTxStates[chain.id]
+              const receiverDraft = appsReceiverInputs[chain.id] ?? ''
+              const withdrawState = appsWithdrawStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+              const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+
+              return (
+                <div
+                  key={`apps-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPAPPS</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Apps Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.apps}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.apps}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.apps}</code>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Current Fees</span>
+                      <div className={styles['admin-contracts__detail-value']}>
+                        {(!fees || fees.loading) && <span>Loading…</span>}
+                        {fees?.error && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                            {fees.error}
+                          </div>
+                        )}
+                        {fees && !fees.loading && !fees.error && (
+                          <strong>
+                            Listing {formatEther(fees.listingFee)} {symbol} · Featured +{formatEther(fees.featuredFee)} {symbol}
+                          </strong>
+                        )}
+                      </div>
+                    </div>
+
+                    {feeTx && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {feeTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {feeTx.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
+                          {feeTx.success && (
+                            <span style={{ color: '#10b981' }}>🚀 {feeTx.which === 'listing' ? 'Listing fee' : 'Featured fee'} updated.</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetAppsFee(chain, deployment.apps, 'listing')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Listing Fee ({symbol})</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={feeInputs.listing ?? ''}
+                        onChange={(e) =>
+                          setAppsFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], listing: e.target.value } }))
+                        }
+                        placeholder="e.g. 0.5"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!feeInputs.listing?.trim() || feeTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {feeTx?.loading && feeTx.which === 'listing' ? 'Writing...' : 'Set Listing Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetAppsFee(chain, deployment.apps, 'featured')
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Featured Surcharge ({symbol})</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={styles['admin-contracts__input']}
+                        value={feeInputs.featured ?? ''}
+                        onChange={(e) =>
+                          setAppsFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], featured: e.target.value } }))
+                        }
+                        placeholder="e.g. 1.0"
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!feeInputs.featured?.trim() || feeTx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {feeTx?.loading && feeTx.which === 'featured' ? 'Writing...' : 'Set Featured Fee'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleWithdrawApps(chain, deployment.apps)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Withdraw Receiver</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={receiverDraft}
+                        onChange={(e) => setAppsReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
                         placeholder="0x..."
                       />
                     </div>
