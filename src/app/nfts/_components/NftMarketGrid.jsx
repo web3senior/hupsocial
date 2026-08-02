@@ -18,8 +18,8 @@ import styles from './NftMarketGrid.module.scss'
 const PAGE_SIZE = 24
 
 const STATUS_OPTIONS = [
-  { value: 'default', label: 'Active + sold' },
   { value: 'active', label: 'Active' },
+  { value: 'active_sold', label: 'Active + sold' },
   { value: 'sold', label: 'Sold' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'all', label: 'All statuses' },
@@ -43,7 +43,7 @@ const REFERRAL_OPTIONS = [
 const DEFAULT_FILTERS = {
   networkId: '',
   collection: '',
-  status: 'default',
+  status: 'active',
   standard: '',
   token: '',
   referral: '',
@@ -122,7 +122,7 @@ function buildApiFilters(filters, priceDecimals) {
   const api = {}
   if (filters.networkId) api.networkId = filters.networkId
   if (filters.collection) api.collection = filters.collection
-  if (filters.status && filters.status !== 'default') api.status = filters.status
+  if (filters.status && filters.status !== 'active') api.status = filters.status
   if (filters.standard) api.standard = filters.standard
   if (filters.token) api.token = filters.token
   if (filters.referral) api.referral = filters.referral
@@ -388,7 +388,7 @@ export default function NftMarketGrid() {
             <QuickSelect
               label="Status"
               value={filters.status}
-              defaultValue="default"
+              defaultValue="active"
               options={STATUS_OPTIONS}
               onChange={(value) => setFilters((f) => ({ ...f, status: value }))}
             />

@@ -12,7 +12,7 @@ import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
 
-const STATUS_BY_KEY = { active: [1], sold: [2], cancelled: [3], all: [1, 2, 3] }
+const STATUS_BY_KEY = { active: [1], sold: [2], cancelled: [3], active_sold: [1, 2], all: [1, 2, 3] }
 
 /**
  * Attach each row's most recent onchain sale, in place.
@@ -70,9 +70,9 @@ export async function GET(request) {
     const seller = searchParams.get('seller') // address or username fragment
     const referral = searchParams.get('referral') // 'any' (>0) | 'none' (=0) | minimum bps, e.g. '500' for 5%+
     const sort = searchParams.get('sort') || 'newest' // 'newest' | 'price_asc' | 'price_desc'
-    const statusKey = searchParams.get('status') || 'default'
-    // Default mirrors the old NFT-market feed: active + sold, cancelled hidden
-    const statuses = statusKey === 'default' ? [1, 2] : STATUS_BY_KEY[statusKey] || [1, 2]
+    const statusKey = searchParams.get('status') || 'active'
+    // Defaults to what's still buyable; 'active_sold' restores the old feed's active + sold mix
+    const statuses = STATUS_BY_KEY[statusKey] || STATUS_BY_KEY.active
 
     let whereClause = ` WHERE l.status IN (${statuses.map(() => '?').join(',')})`
     const whereParams = [...statuses]
