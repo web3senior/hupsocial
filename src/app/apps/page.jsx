@@ -229,7 +229,8 @@ export default function AppsPage() {
  * self-contained instruction, and /miniapp-skill.md carries everything it needs from there.
  */
 function BuildSection() {
-  const [copied, setCopied] = useState(false)
+  // Which copy button just fired — the rows share one timer so labels can't stick
+  const [copiedKey, setCopiedKey] = useState(null)
   // Resolved after mount so dev copies a localhost URL while SSR markup stays origin-neutral
   const [origin, setOrigin] = useState('https://hup.social')
 
@@ -238,12 +239,13 @@ function BuildSection() {
   }, [])
 
   const prompt = `Read ${origin}/miniapp-skill.md and build a Hup mini app`
+  const clawInstall = 'openclaw skills install hup-miniapp-skill'
 
-  const copyPrompt = async () => {
+  const copyText = async (key, text) => {
     try {
-      await navigator.clipboard.writeText(prompt)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(text)
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey(null), 2000)
     } catch {
       /* clipboard denied — the text stays selectable */
     }
@@ -264,9 +266,29 @@ function BuildSection() {
 
       <div className={styles.build__prompt}>
         <code>{prompt}</code>
-        <button type="button" onClick={copyPrompt} className={styles.build__copy} aria-label="Copy the build instruction">
-          {copied ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
-          <span>{copied ? 'Copied' : 'Copy'}</span>
+        <button type="button" onClick={() => copyText('prompt', prompt)} className={styles.build__copy} aria-label="Copy the build instruction">
+          {copiedKey === 'prompt' ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
+          <span>{copiedKey === 'prompt' ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+
+      <div className={styles.build__prompt}>
+        <code>
+          {/* Running an OpenClaw agent? One install teaches it this skill permanently */}
+          {clawInstall}
+        </code>
+        <a
+          className={styles.build__clawLink}
+          href="https://clawhub.ai/web3senior/skills/hup-miniapp-skill"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View the skill on ClawHub"
+        >
+          ClawHub
+        </a>
+        <button type="button" onClick={() => copyText('claw', clawInstall)} className={styles.build__copy} aria-label="Copy the OpenClaw install command">
+          {copiedKey === 'claw' ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
+          <span>{copiedKey === 'claw' ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
 

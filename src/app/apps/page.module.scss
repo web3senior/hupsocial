@@ -107,6 +107,18 @@
     }
   }
 
+  &__clawLink {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: underline;
+
+    &:hover {
+      color: var(--color);
+    }
+  }
+
   &__copy {
     display: inline-flex;
     align-items: center;
