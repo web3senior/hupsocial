@@ -252,6 +252,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
   const [isGrantingBatch, setIsGrantingBatch] = useState(false)
   const [isTogglingHistory, setIsTogglingHistory] = useState(false)
   const [isBackfilling, setIsBackfilling] = useState(false)
+  const [isInitializingKey, setIsInitializingKey] = useState(false)
   // Three-dot menu view: 'root' (Members/Modify/Archive) or 'members' (the member list)
   const [menuView, setMenuView] = useState('root')
 
@@ -712,6 +713,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
       try {
         await writeVaultAsync({
           address: CONTRACT_ADDRESS,
+          chainId,
           abi: HupCommunityABI,
           functionName: 'initializeKey',
           args: [id, wrapContentKey(generateContentKey(), vault.identity.pubKeyHex)],
@@ -723,6 +725,34 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
     }
     run()
   }, [isUpdateConfirmed, updateHash, isOwner, isEncryptionInitialized, editMembershipType, vault.identity])
+
+  // Recovery for the two-tx type-change flow: updateCommunity confirmed but the follow-up
+  // initializeKey above never did (rejected wallet prompt, closed tab, relocked vault). Until
+  // the key epoch exists the composer blocks all posting in this community, so the creator
+  // gets a banner with this handler to finish the setup at any later time.
+  const handleFinishEncryptionSetup = async () => {
+    if (!vault.identity) {
+      vault.setShowPinPrompt(true)
+      return
+    }
+    setIsInitializingKey(true)
+    try {
+      const hash = await writeVaultAsync({
+        address: CONTRACT_ADDRESS,
+        chainId,
+        abi: HupCommunityABI,
+        functionName: 'initializeKey',
+        args: [id, wrapContentKey(generateContentKey(), vault.identity.pubKeyHex)],
+      })
+      await publicClient.waitForTransactionReceipt({ hash })
+      refetchKeyVersion()
+      refetchMyWrappedKey()
+    } catch (err) {
+      console.error('Failed to finish the community encryption setup:', err)
+    } finally {
+      setIsInitializingKey(false)
+    }
+  }
 
   // Member/whitelist lists are read directly from the contract's paginated getMembers/getWhitelist
   // (backed by the enumerable on-chain arrays) rather than cidex's indexed copy — correctness never
@@ -1870,6 +1900,39 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
           )}
 
           {payToJoinError && <div className={styles.card__error}>Error: {payToJoinError.shortMessage || payToJoinError.message}</div>}
+
+          {/* Encrypted type chosen but initializeKey never confirmed: the composer refuses to
+              post into this half-configured state (it would leak plaintext), so the creator gets
+              an in-place recovery action. keyVersionData is awaited so the banner doesn't flash
+              while the key version is still loading. */}
+          {isOwner && isEncryptedType && keyVersionData !== undefined && !isEncryptionInitialized && (
+            <div className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')} style={{ marginTop: '1rem' }}>
+              <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Encryption setup unfinished</h5>
+              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem' }}>
+                This community uses an encrypted membership type, but its content key was never initialized — posting is paused for
+                everyone until you finish this step.
+              </p>
+              {vault.identity ? (
+                <button
+                  type="button"
+                  className={styles.card__submit}
+                  style={{ width: 'auto', padding: '0.65rem 1.5rem' }}
+                  disabled={isInitializingKey}
+                  onClick={handleFinishEncryptionSetup}
+                >
+                  {isInitializingKey ? 'Confirming...' : 'Finish encryption setup'}
+                </button>
+              ) : (
+                <Link
+                  href="/settings?tab=security"
+                  className={styles.card__submit}
+                  style={{ display: 'inline-block', width: 'auto', padding: '0.65rem 1.5rem', textAlign: 'center', textDecoration: 'none' }}
+                >
+                  Unlock your Security Vault to continue
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* Sub-Feed Component Layer — detail page (hideHeader) only; the directory grid doesn't need it */}
           {hideHeader && (
