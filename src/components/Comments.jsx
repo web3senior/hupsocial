@@ -67,7 +67,7 @@ export default function Comments({ networkId, postId, viewerAddress }) {
                 'share',
                 'tip',
                 'bookmark',
-              ]} // Simplified actions matrix for reply nodes
+              ].filter(Boolean)} // Simplified actions matrix for reply nodes
             />
             {i < comments.length - 1 && <hr className={styles.commentsList__divider} />}
           </section>

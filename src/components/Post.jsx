@@ -258,7 +258,9 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
           <div
             className={clsx(styles.post__header__actions, 'flex align-items-center justify-content-start gap-050')}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              if (e.target.closest('button, a, [popover]')) e.stopPropagation()
+            }}
           >
             {displayItem.is_edited === 1 && (
               <div className={clsx(styles['post__edited'])}>
@@ -363,7 +365,11 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
         <footer className={`${styles.post__footer}`}>
           <div
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              // Only real controls (and open popover panels) keep their clicks — blank
+              // action-bar space still opens the details view like the rest of the card
+              if (e.target.closest('button, a, [popover]')) e.stopPropagation()
+            }}
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-between`}
           >
             <div className="flex flex-row align-items-center justify-content-start`" style={{ gap: `4px` }}>

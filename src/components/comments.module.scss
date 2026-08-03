@@ -3,4 +3,17 @@
     &__empty {
         padding: 1rem;
     }
+
+    &__item {
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+
+        &:hover {
+            background-color: var(--surface-muted);
+        }
+    }
+
+    &__divider {
+        margin: 0;
+    }
 }
