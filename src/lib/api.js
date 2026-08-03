@@ -132,6 +132,26 @@ export const getNftPaymentTokens = async (networkId) => {
 }
 
 /**
+ * Get NFT Sellers
+ * Seller suggestions for the NFT Market's "Seller" typeahead — wallets that actually have
+ * listings, matched by display name or wallet-address prefix. An empty query returns the
+ * most active sellers. Rows carry `wallet_address`, `display_name`, `profile_image` and
+ * `listing_count`.
+ * @param {string} [q] Name fragment or wallet-address prefix.
+ * @param {string|number} [networkId] Restrict to one chain; omitted searches every chain.
+ */
+export const getNftSellers = async (q, networkId) => {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (networkId) params.set('networkId', networkId)
+
+  const response = await fetch(`/api/v1/nfts/sellers?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch NFT sellers')
+
+  return response.json()
+}
+
+/**
  * Collections with live HupTrade listings, for the NFT Market hero. Names and artwork are
  * resolved client-side from the sample token ids each row carries — collection metadata
  * isn't indexed anywhere server-side.

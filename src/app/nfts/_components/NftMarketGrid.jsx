@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConnection, useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
-import { FunnelIcon, MagnifyingGlassIcon, StorefrontIcon } from '@phosphor-icons/react'
-import { getNftListings, getNftPaymentTokens } from '@/lib/api'
+import { FunnelIcon, MagnifyingGlassIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
+import { getNftListings, getNftPaymentTokens, getNftSellers } from '@/lib/api'
+import { handleBrokenImage } from '@/lib/utils'
 import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
@@ -47,6 +48,7 @@ const DEFAULT_FILTERS = {
   standard: '',
   token: '',
   referral: '',
+  seller: '',
   minPrice: '',
   maxPrice: '',
   sort: 'newest',
@@ -126,6 +128,7 @@ function buildApiFilters(filters, priceDecimals) {
   if (filters.standard) api.standard = filters.standard
   if (filters.token) api.token = filters.token
   if (filters.referral) api.referral = filters.referral
+  if (filters.seller) api.seller = filters.seller
   if (filters.sort && filters.sort !== 'newest') api.sort = filters.sort
   if (filters.minPrice) {
     try {
@@ -147,7 +150,22 @@ function buildApiFilters(filters, priceDecimals) {
 // Counts only what the popover still hides — network/status/referral/sort live in the
 // always-visible quick row, so badging them would flag filters the user can already see
 const hiddenFilterCount = (filters) =>
-  [filters.collection, filters.standard, filters.token, filters.minPrice, filters.maxPrice].filter(Boolean).length
+  [filters.collection, filters.standard, filters.token, filters.seller, filters.minPrice, filters.maxPrice].filter(Boolean).length
+
+const sellerLabel = (user) => user.display_name || shortAddress(user.wallet_address)
+
+// Suggestion rows and the selected chip share this — profile_image comes straight off the
+// sellers API (users table or Universal Profile), with an initial standing in when absent
+function SellerAvatar({ user }) {
+  if (user.profile_image) {
+    return <img className={styles.filtersPanel__sellerAvatar} src={user.profile_image} alt="" loading="lazy" onError={handleBrokenImage} />
+  }
+  return (
+    <span className={clsx(styles.filtersPanel__sellerAvatar, styles['filtersPanel__sellerAvatar--fallback'])} aria-hidden="true">
+      {sellerLabel(user).slice(0, 1).toUpperCase()}
+    </span>
+  )
+}
 
 /**
  * Quick Select
@@ -175,8 +193,8 @@ function QuickSelect({ label, value, defaultValue, options, onChange }) {
 /**
  * NFT Market Grid
  * Search + filter toolbar over a responsive grid of NftMarketCard tiles, replacing the old
- * post-feed rendering on the NFT Market page. Status/network/standard/payment-token/price/sort
- * all resolve server-side against the indexed nft_listings table (see GET /api/v1/nfts).
+ * post-feed rendering on the NFT Market page. Status/network/standard/payment-token/seller/
+ * price/sort all resolve server-side against the indexed nft_listings table (see GET /api/v1/nfts).
  * Name/seller search stays client-side over the currently loaded page — NFT metadata (name,
  * image) is resolved live per token, not indexed, so there's nothing to search server-side.
  */
@@ -184,6 +202,14 @@ export default function NftMarketGrid() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  // Seller is a typeahead: typing only queries suggestions (name or wallet prefix, served
+  // from wallets that actually have listings) — the grid itself refetches only once a user
+  // is picked, which puts their exact address into filters.seller
+  const [sellerQuery, setSellerQuery] = useState('')
+  const [sellerOptions, setSellerOptions] = useState([])
+  const [isLoadingSellers, setIsLoadingSellers] = useState(false)
+  const [isSellerFocused, setIsSellerFocused] = useState(false)
+  const [selectedSeller, setSelectedSeller] = useState(null)
 
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
@@ -244,6 +270,42 @@ export default function NftMarketGrid() {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 400)
     return () => clearTimeout(timer)
   }, [searchInput])
+
+  // An empty query still fetches — it returns the market's most active sellers, so the
+  // list has something to offer the moment the field is focused. Scoped to the browsed
+  // network so the listing counts match what the grid can actually show.
+  useEffect(() => {
+    if (selectedSeller) return
+    let cancelled = false
+
+    const timer = setTimeout(async () => {
+      setIsLoadingSellers(true)
+      try {
+        const res = await getNftSellers(sellerQuery.trim(), filters.networkId)
+        if (!cancelled) setSellerOptions(res.data || [])
+      } catch {
+        if (!cancelled) setSellerOptions([])
+      } finally {
+        if (!cancelled) setIsLoadingSellers(false)
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [sellerQuery, filters.networkId, selectedSeller, refreshKey])
+
+  const handleSellerSelect = useCallback((user) => {
+    setSelectedSeller(user)
+    setSellerQuery('')
+    setFilters((f) => ({ ...f, seller: user.wallet_address }))
+  }, [])
+
+  const handleSellerClear = useCallback(() => {
+    setSelectedSeller(null)
+    setFilters((f) => ({ ...f, seller: '' }))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -440,6 +502,69 @@ export default function NftMarketGrid() {
                   )}
                 </div>
 
+                <div className={clsx(styles.filtersPanel__field, styles['filtersPanel__field--seller'])}>
+                  <label htmlFor="nftFilterSeller">Seller</label>
+                  {selectedSeller ? (
+                    <div className={styles.filtersPanel__sellerPick}>
+                      <SellerAvatar user={selectedSeller} />
+                      <span className={styles.filtersPanel__sellerName}>{sellerLabel(selectedSeller)}</span>
+                      <button
+                        type="button"
+                        className={styles.filtersPanel__sellerClear}
+                        aria-label="Clear seller filter"
+                        onClick={handleSellerClear}
+                      >
+                        <XIcon size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        id="nftFilterSeller"
+                        type="text"
+                        autoComplete="off"
+                        placeholder="Name or wallet address"
+                        value={sellerQuery}
+                        onChange={(e) => setSellerQuery(e.target.value)}
+                        onFocus={() => setIsSellerFocused(true)}
+                        onBlur={() => setIsSellerFocused(false)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && sellerOptions.length > 0) {
+                            e.preventDefault()
+                            handleSellerSelect(sellerOptions[0])
+                          }
+                        }}
+                      />
+                      {/* Overlays the fields below instead of pushing them down. The filters
+                          panel is already in the top layer, so absolute positioning inside it
+                          needs no nested popover. preventDefault on mousedown keeps the input
+                          focused while clicking inside — otherwise blur hides the dropdown
+                          before the option's click can land. */}
+                      {(isSellerFocused || sellerQuery.trim()) && (
+                        <div className={styles.filtersPanel__sellerDropdown} onMouseDown={(e) => e.preventDefault()}>
+                          {sellerOptions.length > 0 ? (
+                            <ul className={styles.filtersPanel__sellerList} aria-label="Matching sellers">
+                              {sellerOptions.map((user) => (
+                                <li key={user.wallet_address}>
+                                  <button type="button" className={styles.filtersPanel__sellerOption} onClick={() => handleSellerSelect(user)}>
+                                    <SellerAvatar user={user} />
+                                    <span className={styles.filtersPanel__sellerName}>{sellerLabel(user)}</span>
+                                    <small>{user.listing_count}</small>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <small className={styles.filtersPanel__hint}>
+                              {isLoadingSellers ? 'Searching sellers...' : 'No sellers match'}
+                            </small>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
                 <div className={styles.filtersPanel__field}>
                   <label htmlFor="nftFilterStandard">NFT standard</label>
                   <select id="nftFilterStandard" value={filters.standard} onChange={(e) => setFilters((f) => ({ ...f, standard: e.target.value }))}>
@@ -500,7 +625,15 @@ export default function NftMarketGrid() {
                 </div>
 
                 {isFiltered && (
-                  <button type="button" className={styles.filtersPanel__reset} onClick={() => setFilters(DEFAULT_FILTERS)}>
+                  <button
+                    type="button"
+                    className={styles.filtersPanel__reset}
+                    onClick={() => {
+                      setSellerQuery('')
+                      setSelectedSeller(null)
+                      setFilters(DEFAULT_FILTERS)
+                    }}
+                  >
                     Reset filters
                   </button>
                 )}

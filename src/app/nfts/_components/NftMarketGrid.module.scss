@@ -209,6 +209,11 @@
     flex-direction: column;
     gap: 0.3rem;
 
+    /* Anchor for the seller typeahead's dropdown overlay */
+    &--seller {
+      position: relative;
+    }
+
     label {
       color: var(--text-muted);
       font-size: var(--font-size-12, 0.78rem);
@@ -251,6 +256,119 @@
   &__hint {
     color: var(--text-muted);
     font-size: var(--font-size-10, 10px);
+  }
+
+  /* Seller typeahead — the dropdown overlays the fields below the input rather than
+     pushing them down. The filters panel already sits in the top layer, so a plain
+     absolutely-positioned box inside it overlays cleanly; the z-index only orders it
+     against the panel's own fields. */
+  &__sellerDropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    margin-top: 4px;
+    padding: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: var(--background);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 18%, transparent);
+
+    /* The searching/no-match hint rendered inside the dropdown box */
+    > small {
+      display: block;
+      padding: 0.35rem 0.45rem;
+    }
+  }
+
+  &__sellerList {
+    display: flex;
+    flex-direction: column;
+    max-height: 168px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  &__sellerOption {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.4rem 0.45rem;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background-color: color-mix(in srgb, var(--text) 7%, transparent);
+    }
+
+    small {
+      flex-shrink: 0;
+      margin-left: auto;
+      color: var(--text-muted);
+    }
+  }
+
+  &__sellerAvatar {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    object-fit: cover;
+
+    &--fallback {
+      display: grid;
+      place-items: center;
+      background-color: color-mix(in srgb, var(--text) 10%, transparent);
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+  }
+
+  &__sellerName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The picked seller — the input collapses into this chip until cleared */
+  &__sellerPick {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 38px;
+    padding: 0 0.45rem;
+    border: 1px solid var(--network-color-primary, var(--color-primary));
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 10%, transparent);
+  }
+
+  &__sellerClear {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 0.15rem;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--text) 10%, transparent);
+    }
   }
 
   &__reset {
