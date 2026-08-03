@@ -69,6 +69,9 @@ export default function AppsPage() {
 
   const apps = useMemo(() => data?.data || [], [data])
   const categories = data?.meta?.categories || []
+  // The API now returns every category so the listing dialog can offer them all;
+  // the filter bar still only shows ones with live apps to avoid dead-end chips.
+  const filterCategories = useMemo(() => categories.filter((category) => category.app_count > 0), [categories])
   const networks = data?.meta?.networks || []
   const total = data?.meta?.total || 0
 
@@ -131,7 +134,7 @@ export default function AppsPage() {
                 <small>{total}</small>
               </button>
 
-              {categories.map((category) => (
+              {filterCategories.map((category) => (
                 <button
                   key={category.id}
                   type="button"

@@ -46,7 +46,6 @@ export async function GET(request) {
       FROM apps_category ac
       LEFT JOIN apps a ON a.app_category_id = ac.id AND a.status = '1'
       GROUP BY ac.id, ac.name
-      HAVING app_count > 0
       ORDER BY ac.name ASC
     `)
 
