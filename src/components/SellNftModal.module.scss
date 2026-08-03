@@ -444,6 +444,57 @@
     font-weight: 700;
   }
 
+  // Trigger for the attach-from-market popover — same visual weight as the collapsed
+  // "Your active listings" details box it sits next to
+  &__marketTrigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+
+    span {
+      flex: 1;
+    }
+
+    svg {
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    &:hover {
+      background-color: var(--hover);
+    }
+
+    &[disabled] {
+      opacity: 0.7;
+      cursor: default;
+    }
+  }
+
+  // The referral-share explainer at the top of the market popover — the panel has no
+  // padding of its own (the list manages it), so the hint brings its own
+  &__marketHint {
+    margin: 0;
+    padding: 0.6rem 0.75rem 0.2rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+
+  &__marketReferral {
+    color: var(--color-success, #17914d);
+    font-weight: 700;
+  }
+
   &__tokenChips {
     display: flex;
     flex-wrap: wrap;

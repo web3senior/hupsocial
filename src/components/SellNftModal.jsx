@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useConnection, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
 import clsx from 'clsx'
-import { CaretDownIcon, WarningIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, StorefrontIcon, WarningIcon } from '@phosphor-icons/react'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
@@ -171,6 +171,65 @@ const normalizeTokenId = (raw) => {
 }
 
 /**
+ * Market Listing Row
+ * One attachable listing inside the "Attach from the market" popover — artwork and name
+ * resolve live from the same per-token metadata source TradeCard uses, so the seller's
+ * image is what the attaching user actually sees. The whole row is the attach action.
+ * @param {Object} props
+ * @param {Object} props.row Listing row from GET /api/v1/nfts.
+ * @param {number} props.chainId
+ * @param {Object} [props.nativeCurrency] Chain's native currency, for native-priced rows.
+ * @param {boolean} props.enabled Metadata only loads once the popover has been opened —
+ *   24 rows must not fire 24 token reads while the panel is still closed.
+ * @param {Function} props.onAttach
+ */
+function MarketListingRow({ row, chainId, nativeCurrency, enabled, onAttach }) {
+  const metadata = useNftMetadata({
+    chainId,
+    collection: row.collection,
+    tokenId: row.token_id,
+    isLsp8: Boolean(Number(row.is_lsp8)),
+    enabled,
+  })
+
+  const referralBps = Number(row.referral_bps) || 0
+  const formattedPrice = new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(
+    Number(formatUnits(BigInt(row.price), row.decimals ?? 18)),
+  )
+  const symbol = row.symbol || (row.payment_token === zeroAddress ? nativeCurrency?.symbol : 'tokens')
+
+  return (
+    <li>
+      <button type="button" onClick={onAttach}>
+        <span className={styles.sellNftModal__suggestionArt}>
+          {metadata.image ? (
+            <img src={metadata.image} alt="" />
+          ) : (
+            <span>{(metadata.name || row.collection.slice(2)).slice(0, 1).toUpperCase()}</span>
+          )}
+        </span>
+        <span className={styles.sellNftModal__suggestionMain}>
+          <span className={styles.sellNftModal__suggestionName}>{metadata.name || shortTokenId(row.token_id)}</span>
+          <span className={styles.sellNftModal__suggestionAddress}>
+            {shortAddress(row.collection)} {shortTokenId(row.token_id)}
+          </span>
+        </span>
+        <span className={styles.sellNftModal__suggestionMeta}>
+          <span>
+            {formattedPrice} {symbol}
+          </span>
+          <span className={clsx(referralBps > 0 && styles.sellNftModal__marketReferral)}>
+            {referralBps > 0
+              ? `${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100)}% referral`
+              : 'no referral'}
+          </span>
+        </span>
+      </button>
+    </li>
+  )
+}
+
+/**
  * Sell NFT Modal
  * Lists an ERC721 or LSP8 token on HupTrade (approve → list, non-custodial). Opened from the
  * composer it hands the listing reference back so it can travel inside the post's content
@@ -212,6 +271,8 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   // Other sellers' active listings on this chain — attachable repost-style: buys made
   // through the resulting post credit its author with the seller-set referral share
   const [marketListings, setMarketListings] = useState([])
+  // Rows only load their NFT artwork once the popover has actually been opened
+  const [marketOpened, setMarketOpened] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
   const { address, chain: walletChain } = useConnection()
   const switchChain = useSwitchChain({ config })
@@ -706,47 +767,39 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
 
         {!isStandalone && marketListings.length > 0 && (
           // Any active listing can anchor a post, not just your own — attaching works like
-          // reposting: buys made through your post pay you the seller-set referral share
-          <details className={styles.sellNftModal__existing}>
-            <summary className={styles.sellNftModal__existingSummary}>
-              <span>Attach from the market ({marketListings.length})</span>
-              <CaretDownIcon size={14} />
-            </summary>
-            <p className={styles.sellNftModal__hint}>
+          // reposting: buys made through your post pay you the seller-set referral share.
+          // A popover (not a details block) so the rows can carry live NFT artwork without
+          // pushing the sell form below the fold.
+          <NativePopover
+            placement="bottom-start"
+            className={styles.sellNftModal__suggestionsPanel}
+            onToggle={(e) => {
+              if (e.newState === 'open') setMarketOpened(true)
+            }}
+            trigger={
+              <button type="button" className={styles.sellNftModal__marketTrigger} disabled={isBusy}>
+                <StorefrontIcon size={16} />
+                <span>Attach from the market ({marketListings.length})</span>
+                <CaretDownIcon size={14} />
+              </button>
+            }
+          >
+            <p className={styles.sellNftModal__marketHint}>
               Attach anyone&apos;s listing to your post — when someone buys through it, you earn the listing&apos;s referral share.
             </p>
-            {marketListings.map((row) => {
-              const referralBps = Number(row.referral_bps) || 0
-              return (
-                <div key={row.listing_id} className={styles.sellNftModal__existingRow}>
-                  <div className={styles.sellNftModal__existingInfo}>
-                    <strong>
-                      {shortAddress(row.collection)} {shortTokenId(row.token_id)}
-                    </strong>
-                    <span>
-                      {new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(
-                        Number(formatUnits(BigInt(row.price), row.decimals ?? 18)),
-                      )}{' '}
-                      {row.symbol || (row.payment_token === zeroAddress ? nativeCurrency?.symbol : 'tokens')}
-                      {referralBps > 0
-                        ? ` — ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100)}% referral`
-                        : ' — no referral'}
-                    </span>
-                  </div>
-                  <div className={styles.sellNftModal__existingActions}>
-                    <button
-                      type="button"
-                      className={styles.sellNftModal__existingAttach}
-                      onClick={() => handleAttachExisting(row)}
-                      disabled={isBusy}
-                    >
-                      Attach
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </details>
+            <ul className={styles.sellNftModal__suggestions}>
+              {marketListings.map((row) => (
+                <MarketListingRow
+                  key={row.listing_id}
+                  row={row}
+                  chainId={chainId}
+                  nativeCurrency={nativeCurrency}
+                  enabled={marketOpened}
+                  onAttach={() => handleAttachExisting(row)}
+                />
+              ))}
+            </ul>
+          </NativePopover>
         )}
 
         {isLukso && (
