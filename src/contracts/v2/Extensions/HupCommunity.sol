@@ -68,6 +68,18 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     mapping(uint256 => PaymentRequirement) public paymentRequirements;
     mapping(uint256 => address) public pendingCreator;
 
+    // --- DAO governance ---
+    // Optional per-community governor: a contract address (Governor+Timelock, Safe, or any
+    // executor) that holds creator-level authority ALONGSIDE the creator ("soft DAO"). For a
+    // full handover where power no longer derives from the creator wallet at all ("hard DAO"),
+    // transfer the creator role itself to the governance contract via the existing two-step
+    // transferCommunityOwnership/acceptCommunityOwnership flow — the executor calls accept.
+    // Note for encrypted communities: a contract can never hold identity-key material, so key
+    // grants/rotations remain the job of human moderators the governor appoints.
+
+    /// @notice communityId => governance executor with creator-level powers (0 = none).
+    mapping(uint256 => address) public governors;
+
     /// @notice communityId => wallet => pre-approved to self-service join a WhitelistGated community.
     mapping(uint256 => mapping(address => bool)) public whitelist;
 
@@ -123,17 +135,26 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     }
 
     modifier onlyCreator(uint256 communityId) {
-        if (communities[communityId].creator != _msgSender()) {
+        address sender = _msgSender();
+        // The community's governor (when set) carries full creator authority — see the
+        // DAO governance storage section for the soft/hard governance split.
+        if (communities[communityId].creator != sender && governors[communityId] != sender) {
             revert Unauthorized();
         }
         _;
     }
 
     modifier onlyModerator(uint256 communityId) {
-        MemberStatus storage callerStatus = registry[communityId][_msgSender()];
+        address sender = _msgSender();
+        MemberStatus storage callerStatus = registry[communityId][sender];
         // A banned moderator has no powers — without this, a freshly banned moderator could
         // simply unban themselves via setBanStatus (their isModerator flag alone would pass).
-        if (communities[communityId].creator != _msgSender() && (!callerStatus.isModerator || callerStatus.isBanned)) {
+        // The governor passes: creator-level authority is a superset of moderation.
+        if (
+            communities[communityId].creator != sender &&
+            governors[communityId] != sender &&
+            (!callerStatus.isModerator || callerStatus.isBanned)
+        ) {
             revert Unauthorized();
         }
         _;
@@ -578,6 +599,20 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     function cancelCommunityOwnershipTransfer(uint256 _id) external communityExists(_id) onlyCreator(_id) {
         delete pendingCreator[_id];
+    }
+
+    /**
+     * @notice Sets (or clears, with address(0)) the community's governance executor. While set,
+     *         the governor passes every onlyCreator/onlyModerator gate alongside the creator.
+     * @dev Callable by the creator or the current governor — so a DAO can replace or renounce
+     *      itself by proposal. The creator keeping this power is deliberate ("soft DAO"); a
+     *      community wanting authority to derive purely from governance should follow up by
+     *      transferring the creator role to the governor via transferCommunityOwnership.
+     */
+    function setGovernor(uint256 _id, address _governor) external communityExists(_id) onlyCreator(_id) {
+        governors[_id] = _governor;
+
+        emit CommunityGovernorUpdated(_id, _governor);
     }
 
     /**

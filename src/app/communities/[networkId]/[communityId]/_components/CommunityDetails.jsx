@@ -8,7 +8,7 @@ import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
-import { CommunityCard } from '../../../page'
+import { CommunityCard, CreatorName } from '../../../page'
 import styles from './CommunityDetails.module.scss'
 
 const membershipLabels = ['Public', 'Request-Based', 'Private', 'NFT-Gated', 'Token-Gated']
@@ -94,7 +94,7 @@ export default function CommunityDetails({ networkId, communityId, initialName }
                 <UserIcon size={13} />
                 By{' '}
                 <Link href={`/${community.creator_address}`} className={styles.details__creatorLink}>
-                  {community.creator_address?.slice(0, 6)}...{community.creator_address?.slice(-4)}
+                  <CreatorName address={community.creator_address} />
                 </Link>
               </span>
               <span className={styles.details__metaItem}>

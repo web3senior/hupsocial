@@ -384,6 +384,48 @@ In practice the weakest link is none of the above: it's a member leaking plainte
 
 Member rosters are hidden from non-moderators: `getMembers`/`memberCount` (and the whitelist getters) are moderator-gated on the contract, the cidex-backed members API only serves the moderator list, and the Members panel in the UI is moderator-only. This is **best-effort hiding, not cryptographic privacy** — view-function gating can be bypassed by spoofing `from` in `eth_call`, contract storage is publicly readable, and every member's `join()` transaction and `MemberStatusUpdated` event is on-chain forever. It raises the bar from "one click" to "deliberate chain analysis." Genuinely hidden membership (ZK commitments in a Merkle tree, Semaphore-style, with relayed joins) is planned as a separate contract; per-address checks (`registry`, `canPost`) stay public because content gating and indexing depend on them.
 
+# Membership Consent (Two-Step Invites)
+
+Membership is a public, indexed, permanent signal (`MemberStatusUpdated` events live in the chain log forever), so being listed on a roster must be the wallet owner's own choice — otherwise a moderator could conscript any address into any community, including ones whose association is reputationally damaging.
+
+The contract makes consent structural, not procedural:
+
+- **`inviteMember` grants nothing.** It only records an invite and emits `MemberInvited`. Membership happens exclusively when the invitee calls **`acceptInvite`** themselves (`declineInvite` and the moderator's `cancelInvite` clean up unaccepted invites). Bans and archived status are re-checked at accept time, since either may have changed while the invite sat open.
+- **`approveRequest` requires an actual request.** It reverts with `NoPendingRequest` unless the wallet itself filed a join request (`join()` set `isPending`) — without this guard, approving arbitrary addresses would have been a consentless `addMember` by another name. The old `addMember` is removed entirely.
+- **Encrypted communities deliver keys only after acceptance.** The invite carries no key material; once the invitee accepts, their client files a key request through the existing lazy grant queue and a moderator delivers the envelope. Granting at invite time would hand content access to someone who never agreed to join.
+
+The remaining self-service paths are unchanged because consent is inherent to them: `join()` for Public/Whitelisted/Pay-to-Join, and request-then-approve for the gated types.
+
+# DAO-Governed Communities
+
+Community authority in `HupCommunity` is just addresses — `onlyCreator` and moderator flags. DAO mode exploits that: nothing requires the creator to be a human wallet.
+
+## The two modes
+
+- **Soft DAO** — the creator calls `setGovernor(id, executor)`, pointing the community at a governance contract (an OpenZeppelin Governor + Timelock, a Safe, or any executor). The governor passes every `onlyCreator` and `onlyModerator` gate *alongside* the creator. The creator keeps their powers, including the power to remove the governor — good for trying governance without burning the ships.
+- **Hard DAO** — power derives purely from governance, not from being creator: transfer the creator role itself to the governance contract via the existing two-step `transferCommunityOwnership` → `acceptCommunityOwnership` flow (the executor calls `accept` by proposal, mirroring Ownable2Step so a typo'd address can't strand the community). After that, every creator-level action — membership rule changes, archiving, moderator appointments, replacing the governor — requires a passed proposal.
+
+`setGovernor` is callable by the creator *or the current governor*, so a DAO can replace or renounce itself by proposal. Setting `address(0)` clears DAO mode. Every change emits `CommunityGovernorUpdated` for the indexer.
+
+## The operating pattern: two lanes
+
+Voting on every ban is unusable — onchain governance is slow by design. The intended shape:
+
+- **Slow lane (the DAO):** elects and removes moderators, changes the membership rule, archives/reactivates, replaces itself.
+- **Fast lane (elected moderators):** ban/unban, approve requests, grant keys — instant, individual transactions, exactly as today.
+
+Power then comes from the electorate rather than from being creator, while day-to-day moderation stays usable.
+
+## Honest limits
+
+- **Encryption doesn't decentralize.** A contract can never hold identity-key material, so it can't unwrap or re-wrap community content keys. Encrypted communities under DAO rule still need *human* key stewards — the moderators the DAO appoints — for key grants and rotations, and stewardship changes should trigger a key rotation. This is inherent to E2EE, not a gap in the governance design.
+- **Sybil resistance is the electorate's problem.** One-member-one-vote only means something where joining costs something (Pay-to-Join, NFT/Token gates, Follower gate). Public communities wanting DAO rule should use token-weighted voting with snapshots (flash-loan-proof) on the governor side.
+- **The voting mechanics are deliberately out of scope.** `HupCommunity` stays agnostic — the governor slot accepts anything that can send a transaction. Which Governor implementation, votes token, quorum, and timelock delay a community uses is its own business, and each chain's deployment is its own governance instance (no cross-chain voting).
+
+## Indexing
+
+`CommunityGovernorUpdated`, `CommunityOwnershipTransferStarted`, and `CommunityOwnershipTransferred` are cidex's to index (the app reads `governors(id)` live from chain in the meantime — pre-governor deployments simply revert the read, which the UI treats as "no governor"). A `governor` column on the indexed `communities` table unlocks a directory-level "DAO" filter later.
+
 ## 🏷️ Version Management (SemVer)
 
 This project strictly adheres to [Semantic Versioning (SemVer)](https://semver.org/) via the `MAJOR.MINOR.PATCH` format to ensure predictable deployments and reliable cross-chain indexing.

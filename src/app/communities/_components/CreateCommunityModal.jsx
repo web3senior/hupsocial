@@ -1,23 +1,35 @@
 'use client'
 
-// Community creation popup — presented like the NewPost composer (fixed centered panel,
-// Cancel + title header) but entirely separate from it: this one deploys a community on
-// HupCommunity, NewPost publishes content to Hup core.
+// Community creation modal — same NativeDialog primitive as the app's other modals (true
+// top-layer modality: click-blocking backdrop, focus trap, native Esc). Entirely separate
+// from the NewPost composer: this one deploys a community on HupCommunity, NewPost
+// publishes content to Hup core.
 
-import { useState, useEffect, useRef } from 'react'
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi'
 import { formatEther, parseEther, decodeEventLog } from 'viem'
 import clsx from 'clsx'
+import NativeDialog from '@/components/ui/NativeDialog'
+import DialogHeader from '@/components/ui/DialogHeader'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getActiveChain } from '@/lib/communication'
 import { uploadObjectToIPFS } from '@/lib/ipfs'
 import { generateContentKey, wrapContentKey, isEncryptedMembershipType } from '@/lib/communityVault'
 import ImagePicker from './ImagePicker'
+import { MEMBERSHIP_OPTIONS, COMMUNITY_TYPE_OPTIONS } from '../membershipOptions'
 import styles from '../page.module.scss'
 
-export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCreated }) {
+const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, vaultPrompt, onClose, onCreated }, ref) {
   const [, activeChainContracts] = getActiveChain()
   const CONTRACT_ADDRESS = activeChainContracts?.community
+
+  // Stays mounted for the whole page life (like the app's other modals) so a half-filled
+  // form survives close/reopen — the parent opens and closes it through this handle
+  const dialogRef = useRef(null)
+  useImperativeHandle(ref, () => ({
+    open: () => dialogRef.current?.open(),
+    close: () => dialogRef.current?.close(),
+  }))
 
   const [name, setName] = useState('')
   const [summary, setSummary] = useState('')
@@ -51,6 +63,35 @@ export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCr
     functionName: 'fee',
   })
   const creationFee = creationFeeData ?? 0n
+
+  // Anti-spam creation cooldown (contract-enforced, per wallet — 1 hour by default): surfaced
+  // proactively so the user learns about it from a note instead of a reverted transaction
+  const { address: accountAddress } = useAccount()
+  const { data: creationCooldownData } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: HupCommunityABI,
+    functionName: 'creationCooldown',
+  })
+  const { data: lastCreatedAtData } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: HupCommunityABI,
+    functionName: 'lastCommunityCreatedAt',
+    args: [accountAddress],
+    query: { enabled: !!accountAddress },
+  })
+
+  // Minute-level tick so the remaining-time note counts down while the modal sits open
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNowTick(Date.now()), 30000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const cooldownRemainingSec = (() => {
+    if (!creationCooldownData || !lastCreatedAtData) return 0
+    const readyAtMs = (Number(lastCreatedAtData) + Number(creationCooldownData)) * 1000
+    return Math.max(0, Math.ceil((readyAtMs - nowTick) / 1000))
+  })()
 
   const { mutate: writeContract, data: hash, isPending, error: createError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed, data: receipt } = useWaitForTransactionReceipt({ hash })
@@ -131,14 +172,17 @@ export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCr
     run()
   }, [isConfirmed, receipt, hash])
 
-  // Same dismissal affordance as the NewPost composer popup
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose?.()
-    }
-    window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [onClose])
+  // Known createCommunity reverts, translated to something a user can act on — the raw
+  // shortMessage for a custom error is just the error name (or worse, hex)
+  const friendlyCreateError = (() => {
+    if (!createError) return null
+    const raw = `${createError.shortMessage || ''} ${createError.message || ''}`
+    if (raw.includes('CreationCooldownActive'))
+      return 'You created a community recently — the anti-spam cooldown is 1 hour per wallet. Try again in a few minutes.'
+    if (raw.includes('MaxCommunitiesReached')) return 'This wallet has reached the maximum number of communities it can create.'
+    if (raw.includes('InsufficientFee')) return 'The transaction value does not match the current creation fee.'
+    return createError.shortMessage || createError.message
+  })()
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -182,13 +226,8 @@ export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCr
   }
 
   return (
-    <section className={styles.createModal} aria-label="New community form" onClick={(e) => e.stopPropagation()}>
-      <header className={styles.createModal__header}>
-        <button type="button" className={styles.createModal__cancel} onClick={onClose}>
-          Cancel
-        </button>
-        <h2>New community</h2>
-      </header>
+    <NativeDialog ref={dialogRef} className={styles.createModal} aria-label="New community form" onClose={onClose}>
+      <DialogHeader title="New community" onCancel={() => dialogRef.current?.close()} />
 
       <div className={styles.createModal__body}>
         <p className={styles.manager__subtitle} style={{ marginBottom: '1.25rem' }}>
@@ -204,16 +243,13 @@ export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCr
                 value={membershipType}
                 onChange={(e) => setMembershipType(Number(e.target.value))}
               >
-                <option value={0}>Public</option>
-                <option value={1}>Request-Based</option>
-                <option value={2}>Private (Invite Only)</option>
-                <option value={3}>NFT-Gated</option>
-                <option value={4}>Token-Gated</option>
-                <option value={5}>NFT + Token Gated</option>
-                <option value={6}>Whitelisted</option>
-                <option value={7}>Pay to Join</option>
-                <option value={8}>Follower-Gated</option>
+                {MEMBERSHIP_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              <p className={styles.optionNote}>{MEMBERSHIP_OPTIONS[membershipType]?.note}</p>
             </div>
 
             <div className={styles.manager__field}>
@@ -223,9 +259,13 @@ export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCr
                 value={communityType}
                 onChange={(e) => setCommunityType(Number(e.target.value))}
               >
-                <option value={0}>Discussion (Members can post)</option>
-                <option value={1}>Broadcast (Read-only for members)</option>
+                {COMMUNITY_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              <p className={styles.optionNote}>{COMMUNITY_TYPE_OPTIONS[communityType]?.note}</p>
             </div>
           </div>
 
@@ -388,10 +428,17 @@ export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCr
             </p>
           )}
 
+          {cooldownRemainingSec > 0 && (
+            <div className="alert alert--info" style={{ fontSize: '0.85rem' }}>
+              ⏳ Anti-spam cooldown: each wallet can create one community per hour. You can create your next one{' '}
+              {new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }).format(Math.ceil(cooldownRemainingSec / 60), 'minute')}.
+            </div>
+          )}
+
           <button
             type="submit"
             className={clsx(styles.manager__submit, { [styles['manager__submit--loading']]: isPending || isConfirming })}
-            disabled={isPending || isConfirming || (isCreatingEncrypted && !vault.identity)}
+            disabled={isPending || isConfirming || (isCreatingEncrypted && !vault.identity) || cooldownRemainingSec > 0}
           >
             {isPending
               ? 'Confirm in Wallet...'
@@ -412,14 +459,12 @@ export default function CreateCommunityModal({ vault, vaultPrompt, onClose, onCr
           </div>
         )}
 
-        {createError && (
-          <div className={styles.manager__error}>
-            Error: {createError?.shortMessage || createError?.message}
-          </div>
-        )}
+        {friendlyCreateError && <div className={styles.manager__error}>Error: {friendlyCreateError}</div>}
 
         {configError && <div className={styles.manager__error}>{configError}</div>}
       </div>
-    </section>
+    </NativeDialog>
   )
-}
+})
+
+export default CreateCommunityModal

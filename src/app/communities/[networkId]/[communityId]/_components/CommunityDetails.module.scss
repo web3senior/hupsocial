@@ -57,6 +57,9 @@
   &__cover {
     display: block;
     width: calc(100% + 4rem);
+    // The global reset clamps img to max-width 100%, which silently defeats the full-bleed
+    // width above and leaves the cover short of the header's right edge
+    max-width: none;
     height: 200px;
     object-fit: cover;
     background: var(--surface-muted);

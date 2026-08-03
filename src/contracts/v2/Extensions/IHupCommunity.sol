@@ -72,6 +72,9 @@ interface IHupCommunity {
     event CommunityStatusUpdated(uint256 indexed id, bool isActive);
     event CommunityOwnershipTransferStarted(uint256 indexed id, address indexed oldCreator, address indexed newCreator);
     event CommunityOwnershipTransferred(uint256 indexed id, address indexed oldCreator, address indexed newCreator);
+    event CommunityGovernorUpdated(uint256 indexed id, address indexed governor);
+    event MemberInvited(uint256 indexed id, address indexed actor);
+    event InviteRevoked(uint256 indexed id, address indexed actor);
     event Withdrawal(address indexed recipient, uint256 amount);
     event IdentityKeyRegistered(address indexed user);
     event KeyInitialized(uint256 indexed communityId);
@@ -108,6 +111,8 @@ interface IHupCommunity {
     error ArrayLengthMismatch();
     error InvalidKeyVersion();
     error BacklinkAlreadyPublished();
+    error NotInvited();
+    error NoPendingRequest();
 
     // --- SHARED HOOKS ---
 

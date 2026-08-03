@@ -16,8 +16,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
-import NativePopover from '@/components/ui/NativePopover'
-import { DotsThreeIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import NativeDialog from '@/components/ui/NativeDialog'
+import DialogHeader from '@/components/ui/DialogHeader'
+import { GearSixIcon, MagnifyingGlassIcon, UsersIcon } from '@phosphor-icons/react'
 import { PostCard } from '@/components/Post'
 import HupCommunityABI from '@/abis/HupCommunity'
 import NewPost from '@/components/NewPost'
@@ -35,12 +36,14 @@ import {
   isEncryptedMembershipType,
 } from '@/lib/communityVault'
 import { getActiveChain } from '@/lib/communication'
+import { useProfile } from '@/hooks/useProfile'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { getPosts } from '@/lib/api'
 import { getIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
+import { MEMBERSHIP_OPTIONS, COMMUNITY_TYPE_OPTIONS } from './membershipOptions'
 import styles from './page.module.scss'
 
 // Metadata JSON uploads share lib/ipfs.js's uploadObjectToIPFS; the historical local name is
@@ -160,6 +163,33 @@ function VaultUnlockPrompt({ vault }) {
   )
 }
 
+// Modal wrapper for the card's management panels (Modify / Manage Members): the open/closed
+// decision stays plain state while NativeDialog supplies real modality. Content mounts only
+// while open, so a directory full of cards doesn't pay for idle panels.
+function CardDialog({ open, onClose, className, label, children }) {
+  const dialogRef = useRef(null)
+
+  useEffect(() => {
+    if (open) dialogRef.current?.open()
+    else dialogRef.current?.close()
+  }, [open])
+
+  return (
+    <NativeDialog ref={dialogRef} className={className} aria-label={label} onClose={onClose}>
+      {open ? children : null}
+    </NativeDialog>
+  )
+}
+
+// Byline helper: shows the creator's profile name once resolved, truncated wallet until then —
+// same name precedence as the Profile component so bylines match the rest of the app
+export function CreatorName({ address }) {
+  const { profile } = useProfile(address)
+  if (!address) return null
+  const truncated = `${address.slice(0, 6)}...${address.slice(-4)}`
+  return profile ? profile.fullName || profile.name || truncated : truncated
+}
+
 // Dedicated presentation sub-component to isolate ERC-721 naming hooks safely
 function NftTag({ tokenAddress, minBalance }) {
   const { data: nftName } = useReadContract({
@@ -184,7 +214,7 @@ function NftTag({ tokenAddress, minBalance }) {
 // detail page instead of duplicating all of its state/logic. hideHeader skips the logo/title/
 // summary/tags block (the detail page renders its own, indexed-data-backed version of that) but
 // keeps the action buttons/feed/forms.
-export function CommunityCard({ id, networkId = null, hideHeader = false }) {
+export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null }) {
   const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
   const activeChainId = useChainId()
@@ -239,6 +269,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
   // Member management state
   const [pendingRequests, setPendingRequests] = useState([])
   const [members, setMembers] = useState([])
+  const [inviteAddress, setInviteAddress] = useState('')
   const [approvingAddress, setApprovingAddress] = useState(null)
   const [rejectingAddress, setRejectingAddress] = useState(null)
   const [banningAddress, setBanningAddress] = useState(null)
@@ -253,8 +284,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
   const [isTogglingHistory, setIsTogglingHistory] = useState(false)
   const [isBackfilling, setIsBackfilling] = useState(false)
   const [isInitializingKey, setIsInitializingKey] = useState(false)
-  // Three-dot menu view: 'root' (Members/Modify/Archive) or 'members' (the member list)
-  const [menuView, setMenuView] = useState('root')
 
   // Contract data query hook
   const {
@@ -365,6 +394,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
   })
   const historyVisible = Boolean(historyVisibleData)
 
+  // DAO mode: the community's optional governance executor (creator-level powers onchain).
+  // Reverts on pre-governor deployments — wagmi surfaces that as undefined, i.e. "no governor".
+  const { data: governorData, refetch: refetchGovernor } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    chainId,
+    abi: HupCommunityABI,
+    functionName: 'governors',
+    args: [id],
+  })
+  const governor = governorData && governorData !== '0x0000000000000000000000000000000000000000' ? governorData : null
+
   // The viewer's own wrapped copy of the current content key
   const { data: myWrappedKeyData, refetch: refetchMyWrappedKey } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -431,6 +471,55 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
 
   const { mutate: banMember, data: banHash, isPending: isBanPending, error: banError } = useWriteContract()
   const { isSuccess: isBanConfirmed } = useWaitForTransactionReceipt({ hash: banHash })
+
+  // Unban lives on its own hook: banMember's confirmation effect rotates the encryption key
+  // (correct after removing someone), which must NOT fire when a moderator readmits someone
+  const { mutate: unbanMember, data: unbanHash, isPending: isUnbanPending, error: unbanError } = useWriteContract()
+  const { isSuccess: isUnbanConfirmed } = useWaitForTransactionReceipt({ hash: unbanHash })
+
+  // --- Two-step invites (consent is structural: invite → the wallet itself accepts) ---
+
+  const { mutate: inviteMemberWrite, data: inviteHash, isPending: isInvitePending, error: inviteError } = useWriteContract()
+  const { isSuccess: isInviteConfirmed } = useWaitForTransactionReceipt({ hash: inviteHash })
+
+  useEffect(() => {
+    if (isInviteConfirmed) setInviteAddress('')
+  }, [isInviteConfirmed])
+
+  // The viewer's own outstanding invite (if any) + their accept/decline response. Reverts on
+  // pre-invite deployments — wagmi surfaces that as undefined, i.e. "no invite".
+  const { data: myInviteData, refetch: refetchMyInvite } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    chainId,
+    abi: HupCommunityABI,
+    functionName: 'invites',
+    args: [id, activeAccountAddress],
+    query: { enabled: !!activeAccountAddress },
+  })
+
+  const { mutate: respondInvite, data: inviteRespHash, isPending: isInviteRespPending, error: inviteRespError } = useWriteContract()
+  const { isSuccess: isInviteRespConfirmed } = useWaitForTransactionReceipt({ hash: inviteRespHash })
+
+  useEffect(() => {
+    if (isInviteRespConfirmed) {
+      refetchMyInvite()
+      refetchMyStatus()
+      refetchMyCanPost()
+    }
+  }, [isInviteRespConfirmed])
+
+  // --- DAO governance (set/clear the community's governance executor) ---
+
+  const [newGovernorAddress, setNewGovernorAddress] = useState('')
+  const { mutate: setGovernorWrite, data: governorHash, isPending: isGovernorPending, error: governorError } = useWriteContract()
+  const { isLoading: isGovernorConfirming, isSuccess: isGovernorConfirmed } = useWaitForTransactionReceipt({ hash: governorHash })
+
+  useEffect(() => {
+    if (isGovernorConfirmed) {
+      refetchGovernor()
+      setNewGovernorAddress('')
+    }
+  }, [isGovernorConfirmed])
 
   const { mutate: bumpKeyVersion, data: bumpHash, isPending: isBumpPending } = useWriteContract()
   const { isLoading: isBumpConfirming, isSuccess: isBumpConfirmed } = useWaitForTransactionReceipt({ hash: bumpHash })
@@ -825,7 +914,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
         if (membershipType === 6) refetchWhitelist()
       }
     }
-  }, [isManagingMembers, id, isApproveConfirmed, isBanConfirmed, membershipType, isModerator])
+  }, [isManagingMembers, id, isApproveConfirmed, isBanConfirmed, isUnbanConfirmed, membershipType, isModerator])
+
+  // Readmission is roster-only — clear the row's busy state once it confirms (the member list
+  // refresh itself is handled by the effect above via isUnbanConfirmed)
+  useEffect(() => {
+    if (isUnbanConfirmed) setBanningAddress(null)
+  }, [isUnbanConfirmed])
 
   // After a join request is approved on-chain: drop it from the discovery index, and if this
   // community is encrypted, grant the new member the current content key
@@ -1225,7 +1320,24 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
   }, [data, id])
 
   if (isLoading || !data || !metadata) {
-    return <div className={clsx(styles.card, styles['card--loading'])}>Loading space #{id}...</div>
+    return (
+      <div className={clsx(styles.card, styles.cardSkeleton)} aria-busy="true" aria-label={`Loading space #${id}`}>
+        <div className={styles.cardSkeleton__cover} />
+        <div className={styles.cardSkeleton__header}>
+          <div className={styles.cardSkeleton__logo} />
+          <div className={styles.cardSkeleton__titleGroup}>
+            <div className={clsx(styles.cardSkeleton__line, styles['cardSkeleton__line--title'])} />
+            <div className={clsx(styles.cardSkeleton__line, styles['cardSkeleton__line--sub'])} />
+          </div>
+        </div>
+        <div className={clsx(styles.cardSkeleton__line, styles['cardSkeleton__line--summary'])} />
+        <div className={styles.cardSkeleton__tags}>
+          <div className={styles.cardSkeleton__pill} />
+          <div className={styles.cardSkeleton__pill} />
+          <div className={styles.cardSkeleton__pill} />
+        </div>
+      </div>
+    )
   }
 
   const membershipLabels = [
@@ -1392,6 +1504,39 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
       abi: HupCommunityABI,
       functionName: 'setBanStatus',
       args: [id, memberAddress, true],
+    })
+  }
+
+  const handleUnban = (memberAddress) => {
+    setBanningAddress(memberAddress)
+    unbanMember({
+      address: CONTRACT_ADDRESS,
+      chainId,
+      abi: HupCommunityABI,
+      functionName: 'setBanStatus',
+      args: [id, memberAddress, false],
+    })
+  }
+
+  const handleSetGovernor = (e) => {
+    e.preventDefault()
+    if (!newGovernorAddress) return
+    setGovernorWrite({
+      address: CONTRACT_ADDRESS,
+      chainId,
+      abi: HupCommunityABI,
+      functionName: 'setGovernor',
+      args: [id, newGovernorAddress],
+    })
+  }
+
+  const handleClearGovernor = () => {
+    setGovernorWrite({
+      address: CONTRACT_ADDRESS,
+      chainId,
+      abi: HupCommunityABI,
+      functionName: 'setGovernor',
+      args: [id, '0x0000000000000000000000000000000000000000'],
     })
   }
 
@@ -1691,116 +1836,42 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
       {/* Post.jsx-style three-dot menu holding the management actions; the Members item swaps
           the popover to the member-list view (AddTabMenu's view-switching pattern) */}
       {isModerator && (
-        <NativePopover
-          placement="bottom-end"
-          trigger={
-            <button type="button" className={styles.card__editBtn} aria-label="Community options">
-              <DotsThreeIcon size={16} />
-            </button>
-          }
-          onToggle={(e) => {
-            if (e.newState === 'closed') setMenuView('root')
+        // Moderation surfaces are first-class icon buttons rather than a hidden menu:
+        // Members opens the management modal, the gear opens community settings (Modify).
+        <button
+          type="button"
+          className={styles.card__editBtn}
+          aria-label="Members & moderation"
+          title="Members & moderation"
+          onClick={() => {
+            refetchMembers()
+            setIsManagingMembers(true)
+            setIsEditing(false)
+            setIsPosting(false)
           }}
         >
-          {({ close }) => (
-            <div className={styles.card__membersPopover}>
-              {menuView === 'root' && (
-                <>
-                  <button
-                    type="button"
-                    className={styles.card__menuItem}
-                    onClick={() => {
-                      refetchMembers()
-                      setMenuView('members')
-                    }}
-                  >
-                    Members
-                  </button>
-                  {isOwner && (
-                    <button
-                      type="button"
-                      className={styles.card__menuItem}
-                      onClick={() => {
-                        close()
-                        handleStartEditing()
-                      }}
-                    >
-                      Modify
-                    </button>
-                  )}
-                  {isOwner && (
-                    <button
-                      type="button"
-                      className={styles.card__menuItem}
-                      disabled={isStatusPending || isStatusConfirming}
-                      onClick={() => {
-                        close()
-                        handleToggleStatus()
-                      }}
-                    >
-                      {isStatusPending || isStatusConfirming ? 'Confirm Wallet...' : isActive ? 'Archive' : 'Reactivate'}
-                    </button>
-                  )}
-                </>
-              )}
-
-              {menuView === 'members' && (
-                <>
-                  <button type="button" className={styles.card__menuItem} onClick={() => setMenuView('root')}>
-                    ← Back
-                  </button>
-                  {members.length === 0 ? (
-                    <p className={styles.feed__empty}>No members found yet.</p>
-                  ) : (
-                    members.map((member) => (
-                      <div
-                        key={member.address}
-                        className="flex justify-content-between align-items-center gap-050"
-                        style={{ padding: '0.35rem 0' }}
-                      >
-                        <Profile creator={member.address} networkId={chainId} variant="fullWithoutTime" />
-                        {member.address.toLowerCase() !== creator.toLowerCase() && (
-                          <button
-                            type="button"
-                            className={styles.card__cancelBtn}
-                            disabled={isBanPending && banningAddress === member.address}
-                            onClick={() => handleBan(member.address)}
-                          >
-                            {isBanPending && banningAddress === member.address ? 'Banning...' : 'Ban'}
-                          </button>
-                        )}
-                      </div>
-                    ))
-                  )}
-                  <button
-                    type="button"
-                    className={styles.card__editBtn}
-                    style={{ width: '100%', marginTop: '0.5rem' }}
-                    onClick={() => {
-                      close()
-                      setIsManagingMembers(true)
-                      setIsEditing(false)
-                      setIsPosting(false)
-                    }}
-                  >
-                    Manage community
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </NativePopover>
+          <UsersIcon size={16} />
+        </button>
+      )}
+      {isOwner && (
+        <button
+          type="button"
+          className={styles.card__editBtn}
+          aria-label="Community settings"
+          title="Community settings"
+          onClick={handleStartEditing}
+        >
+          <GearSixIcon size={16} />
+        </button>
       )}
     </>
   )
 
-  // isPosting no longer expands the card — the composer is the app-wide NewPost fixed popup
-  const isExpanded = isEditing || isManagingMembers
-
+  // Modify and Manage Members open as NativeDialog modals (CardDialog below) rather than
+  // expanding the card inline, so the card itself never stretches the directory grid
   return (
-    <div className={hideHeader ? undefined : styles.card} style={!hideHeader && isExpanded ? { gridColumn: '1 / -1' } : undefined}>
-      {!isEditing && !isManagingMembers && (
-        <>
+    <div className={hideHeader ? undefined : styles.card}>
+      <>
           {hideHeader ? (
             <div className={styles.card__actionRow} style={{ marginBottom: '1.25rem' }}>
               {actionButtons}
@@ -1847,7 +1918,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                         }
                       }}
                     >
-                      By {creator.slice(0, 6)}...{creator.slice(-4)}
+                      By <CreatorName address={creator} />
                     </span>
                   </div>
                 </div>
@@ -1857,6 +1928,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                 <div className={styles.card__tags} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                   <span className={styles.card__tag}>{membershipLabels[membershipType]}</span>
                   <span className={styles.card__tag}>{typeLabels[cType]}</span>
+                  {/* Indexed member count, passed down from the directory's API rows (the card
+                      itself never queries it — the on-chain getters are moderator-gated) */}
+                  {memberCount !== null && (
+                    <span className={styles.card__tag}>
+                      {new Intl.NumberFormat(undefined, { notation: 'compact' }).format(memberCount)}{' '}
+                      {Number(memberCount) === 1 ? 'member' : 'members'}
+                    </span>
+                  )}
                   {!isActive && (
                     <span className={styles.card__tag} title="This space is archived — no new posts or joins until reactivated">
                       Archived
@@ -1865,6 +1944,11 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                   {isEncryptedType && (
                     <span className={styles.card__tag} title="Post content is end-to-end encrypted for members">
                       {isEncryptionInitialized ? '🔒 Encrypted' : '🔒 Encryption pending'}
+                    </span>
+                  )}
+                  {governor && (
+                    <span className={styles.card__tag} title={`Governed by ${governor} — creator-level powers are held by a governance contract`}>
+                      🏛 DAO
                     </span>
                   )}
 
@@ -1900,6 +1984,55 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
           )}
 
           {payToJoinError && <div className={styles.card__error}>Error: {payToJoinError.shortMessage || payToJoinError.message}</div>}
+
+          {/* Two-step invite, invitee side: a moderator invited this wallet, but membership is a
+              public onchain signal — it only happens if the viewer accepts here themselves */}
+          {Boolean(myInviteData) && !isMember && (
+            <div className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')} style={{ marginTop: '1rem' }}>
+              <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>You're invited to this community</h5>
+              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem' }}>
+                A moderator invited you. Nothing happens unless you accept — declining removes the invite.
+              </p>
+              <div className="flex align-items-center gap-050">
+                <button
+                  type="button"
+                  className={styles.card__submit}
+                  style={{ width: 'auto', padding: '0.5rem 1.1rem' }}
+                  disabled={isInviteRespPending}
+                  onClick={() =>
+                    respondInvite({
+                      address: CONTRACT_ADDRESS,
+                      chainId,
+                      abi: HupCommunityABI,
+                      functionName: 'acceptInvite',
+                      args: [id],
+                    })
+                  }
+                >
+                  {isInviteRespPending ? 'Confirm Wallet...' : 'Accept & Join'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.card__cancelBtn}
+                  disabled={isInviteRespPending}
+                  onClick={() =>
+                    respondInvite({
+                      address: CONTRACT_ADDRESS,
+                      chainId,
+                      abi: HupCommunityABI,
+                      functionName: 'declineInvite',
+                      args: [id],
+                    })
+                  }
+                >
+                  Decline
+                </button>
+              </div>
+              {inviteRespError && (
+                <div className={styles.card__error}>Error: {inviteRespError?.shortMessage || inviteRespError?.message}</div>
+              )}
+            </div>
+          )}
 
           {/* Encrypted type chosen but initializeKey never confirmed: the composer refuses to
               post into this half-configured state (it would leak plaintext), so the creator gets
@@ -1957,17 +2090,149 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
               )}
             </div>
           )}
-        </>
-      )}
+      </>
 
-      {isManagingMembers && (
-        <div className={styles.card__form}>
-          <div className={styles.card__formHeader}>
-            <h4 className={styles.card__formTitle}>Manage Members — {metadata.name || `Space #${id}`}</h4>
-            <button type="button" className={styles.card__cancelBtn} onClick={() => setIsManagingMembers(false)}>
-              Close
-            </button>
+      <CardDialog
+        open={isManagingMembers}
+        onClose={() => setIsManagingMembers(false)}
+        className={styles.cardDialog}
+        label={`Manage members of ${metadata.name || `Space #${id}`}`}
+      >
+        <DialogHeader
+          title={`Manage Members — ${metadata.name || `Space #${id}`}`}
+          cancelLabel="Close"
+          onCancel={() => setIsManagingMembers(false)}
+        />
+        <div className={clsx(styles.cardDialog__body, styles.card__form)}>
+
+          {/* The member roster itself — previously this panel only held the type-specific
+              sections (encryption/whitelist/requests), so for e.g. a Public community it
+              rendered completely empty despite being titled "Manage Members" */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h5 style={{ fontSize: '0.95rem' }}>
+              Members{members.length > 0 ? ` (${new Intl.NumberFormat(undefined, { notation: 'compact' }).format(members.length)})` : ''}
+            </h5>
+            {/* Two-step invite — the join path for Private (invite-only) communities. The invite
+                grants nothing by itself: the wallet must accept it from the community card, so
+                nobody can be conscripted onto a public roster. For encrypted communities the key
+                envelope is delivered after acceptance via the lazy grant-request queue below. */}
+            <form
+              className="flex align-items-center gap-050"
+              style={{ margin: '0.5rem 0 0.75rem' }}
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!inviteAddress) return
+                inviteMemberWrite({
+                  address: CONTRACT_ADDRESS,
+                  chainId,
+                  abi: HupCommunityABI,
+                  functionName: 'inviteMember',
+                  args: [id, inviteAddress.trim()],
+                })
+              }}
+            >
+              <input
+                className={styles.card__input}
+                placeholder="0x... wallet to invite"
+                value={inviteAddress}
+                onChange={(e) => setInviteAddress(e.target.value)}
+              />
+              <button
+                type="submit"
+                className={styles.card__submit}
+                style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
+                disabled={!inviteAddress || isInvitePending}
+              >
+                {isInvitePending ? 'Confirm Wallet...' : 'Invite'}
+              </button>
+            </form>
+            {isInviteConfirmed && (
+              <p style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                ✓ Invite sent — they become a member once they accept it from this community's card.
+              </p>
+            )}
+            {inviteError && <div className={styles.card__error}>Error: {inviteError?.shortMessage || inviteError?.message}</div>}
+            {members.length === 0 ? (
+              <p className={styles.feed__empty}>No members found yet.</p>
+            ) : (
+              members.map((member) => (
+                <div key={member.address} className="flex justify-content-between align-items-center gap-050" style={{ padding: '0.5rem 0' }}>
+                  <div className="flex align-items-center gap-050">
+                    <Profile creator={member.address} networkId={chainId} variant="fullWithoutTime" />
+                    {member.address.toLowerCase() === creator.toLowerCase() && <span className={styles.card__tag}>Creator</span>}
+                    {member.isBanned && <span className={styles.card__tag}>Banned</span>}
+                  </div>
+                  {member.address.toLowerCase() !== creator.toLowerCase() &&
+                    (member.isBanned ? (
+                      <button
+                        type="button"
+                        className={styles.card__editBtn}
+                        disabled={isUnbanPending && banningAddress === member.address}
+                        onClick={() => handleUnban(member.address)}
+                      >
+                        {isUnbanPending && banningAddress === member.address ? 'Unbanning...' : 'Unban'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.card__cancelBtn}
+                        disabled={isBanPending && banningAddress === member.address}
+                        onClick={() => handleBan(member.address)}
+                      >
+                        {isBanPending && banningAddress === member.address ? 'Banning...' : 'Ban'}
+                      </button>
+                    ))}
+                </div>
+              ))
+            )}
           </div>
+
+          {/* DAO governance: point creator-level authority at a governance executor. UI writes
+              are creator-only in practice (a governor is a contract executing by proposal). */}
+          {isOwner && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h5 style={{ fontSize: '0.95rem' }}>Governance</h5>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0.75rem' }}>
+                Hand this community's controls to a governance contract (a Governor timelock or Safe) to run it as a DAO — it gains
+                creator-level powers alongside you. For a full handover, transfer the creator role to it afterwards.
+              </p>
+              {governor ? (
+                <div className="flex justify-content-between align-items-center" style={{ padding: '0.5rem 0' }}>
+                  <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }} title={governor}>
+                    🏛 {governor.slice(0, 8)}...{governor.slice(-6)}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.card__cancelBtn}
+                    disabled={isGovernorPending || isGovernorConfirming}
+                    onClick={handleClearGovernor}
+                  >
+                    {isGovernorPending ? 'Confirm Wallet...' : isGovernorConfirming ? 'Removing...' : 'Remove Governor'}
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSetGovernor} className="flex align-items-center gap-050">
+                  <input
+                    className={styles.card__input}
+                    placeholder="0x... governance contract"
+                    value={newGovernorAddress}
+                    onChange={(e) => setNewGovernorAddress(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className={styles.card__submit}
+                    style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
+                    disabled={isGovernorPending || isGovernorConfirming || !newGovernorAddress}
+                  >
+                    {isGovernorPending ? 'Confirm Wallet...' : isGovernorConfirming ? 'Setting...' : 'Set Governor'}
+                  </button>
+                </form>
+              )}
+              {governorError && (
+                <div className={styles.card__error}>Error: {governorError?.shortMessage || governorError?.message}</div>
+              )}
+            </div>
+          )}
 
           {isModerator && isEncryptionInitialized && (
             <div style={{ marginBottom: '1.5rem' }}>
@@ -2122,22 +2387,28 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
             </div>
           )}
 
-          {(approveError || banError) && (
+          {(approveError || banError || unbanError) && (
             <div className={styles.card__error}>
-              Error: {approveError?.shortMessage || approveError?.message || banError?.shortMessage || banError?.message}
+              Error:{' '}
+              {approveError?.shortMessage ||
+                approveError?.message ||
+                banError?.shortMessage ||
+                banError?.message ||
+                unbanError?.shortMessage ||
+                unbanError?.message}
             </div>
           )}
         </div>
-      )}
+      </CardDialog>
 
-      {isEditing && (
-        <form className={styles.card__form} onSubmit={handleUpdateSubmit}>
-          <div className={styles.card__formHeader}>
-            <h4 className={styles.card__formTitle}>Modify {metadata.name || `Space #${id}`}</h4>
-            <button type="button" className={styles.card__cancelBtn} onClick={() => setIsEditing(false)}>
-              Cancel
-            </button>
-          </div>
+      <CardDialog
+        open={isEditing}
+        onClose={() => setIsEditing(false)}
+        className={styles.cardDialog}
+        label={`Modify ${metadata.name || `Space #${id}`}`}
+      >
+        <DialogHeader title={`Modify ${metadata.name || `Space #${id}`}`} onCancel={() => setIsEditing(false)} />
+        <form className={clsx(styles.cardDialog__body, styles.card__form)} onSubmit={handleUpdateSubmit}>
 
           <div className={styles.card__row}>
             <div className={styles.card__field}>
@@ -2147,16 +2418,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                 value={editMembershipType}
                 onChange={(e) => setEditMembershipType(Number(e.target.value))}
               >
-                <option value={0}>Public</option>
-                <option value={1}>Request-Based</option>
-                <option value={2}>Private (Invite Only)</option>
-                <option value={3}>NFT-Gated</option>
-                <option value={4}>Token-Gated</option>
-                <option value={5}>NFT + Token Gated</option>
-                <option value={6}>Whitelisted</option>
-                <option value={7}>Pay to Join</option>
-                <option value={8}>Follower-Gated</option>
+                {MEMBERSHIP_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              <p className={styles.optionNote}>{MEMBERSHIP_OPTIONS[editMembershipType]?.note}</p>
             </div>
 
             <div className={styles.card__field}>
@@ -2166,9 +2434,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                 value={editCommunityType}
                 onChange={(e) => setEditCommunityType(Number(e.target.value))}
               >
-                <option value={0}>Discussion (Members can post)</option>
-                <option value={1}>Broadcast (Read-only for members)</option>
+                {COMMUNITY_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              <p className={styles.optionNote}>{COMMUNITY_TYPE_OPTIONS[editCommunityType]?.note}</p>
             </div>
           </div>
 
@@ -2339,6 +2611,22 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
                 : 'Save Configuration'}
           </button>
 
+          {/* Archive is a reversible freeze (lived in the old three-dot menu): posting and
+              joining stop for everyone, content/members/keys stay, and the community is
+              delisted from the public directory until reactivated */}
+          <button
+            type="button"
+            className={styles.card__cancelBtn}
+            disabled={isStatusPending || isStatusConfirming}
+            onClick={handleToggleStatus}
+          >
+            {isStatusPending || isStatusConfirming
+              ? 'Confirm Wallet...'
+              : isActive
+                ? 'Archive community (reversible)'
+                : 'Reactivate community'}
+          </button>
+
           {(updateHash || nftHash || tokenReqHash || paymentReqHash) && (
             <div className={styles.card__monitor}>
               {updateHash && (
@@ -2388,7 +2676,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false }) {
             </div>
           )}
         </form>
-      )}
+      </CardDialog>
 
       {/* One editor for the whole app: the same NewPost composer used everywhere, in community
           mode — it seals/tags content for this community and submits on this community's chain */}
@@ -2420,7 +2708,9 @@ export default function CommunitiesPage() {
   const vault = useCommunityVault()
   const { address: activeAccountAddress } = useAccount()
 
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  // Always-mounted creation modal (matches the app's other modals): opening and closing go
+  // through this handle, so a half-filled form survives an accidental close
+  const createModalRef = useRef(null)
 
   // Chains that actually have a HupCommunity deployment — the network filter's option list
   const communityChains = config.chains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.community)
@@ -2439,6 +2729,9 @@ export default function CommunitiesPage() {
   // reads it directly for anything that actually needs live/authoritative data.
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  // Public/Private split: 'public' = plaintext-content types, 'private' = encrypted membership
+  // types (the isEncryptedMembershipType partition) — resolved by the API's visibility param
+  const [visibilityFilter, setVisibilityFilter] = useState('all')
   const [communityRows, setCommunityRows] = useState([])
   const [directoryPage, setDirectoryPage] = useState(1)
   const [totalCommunities, setTotalCommunities] = useState(0)
@@ -2472,6 +2765,7 @@ export default function CommunitiesPage() {
         params.set('contract_address', directoryContractAddress)
       }
       if (searchQuery) params.set('search', searchQuery)
+      if (visibilityFilter !== 'all') params.set('visibility', visibilityFilter)
       // Default sort brings communities the connected wallet created to the top of the directory
       if (activeAccountAddress) params.set('viewer_address', activeAccountAddress)
 
@@ -2496,7 +2790,7 @@ export default function CommunitiesPage() {
 
   useEffect(() => {
     fetchDirectory(1, false)
-  }, [selectedNetworkId, directoryContractAddress, searchQuery, activeAccountAddress])
+  }, [selectedNetworkId, directoryContractAddress, searchQuery, visibilityFilter, activeAccountAddress])
 
   return (
     <>
@@ -2534,11 +2828,33 @@ export default function CommunitiesPage() {
                   </option>
                 ))}
               </select>
+              <div className={styles.directory__visibilityTabs} role="group" aria-label="Filter communities by visibility">
+                {[
+                  ['all', 'All'],
+                  ['public', 'Public'],
+                  ['private', 'Private'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={clsx(
+                      styles.directory__visibilityTab,
+                      visibilityFilter === value && styles['directory__visibilityTab--active']
+                    )}
+                    aria-pressed={visibilityFilter === value}
+                    onClick={() => setVisibilityFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="flex align-items-center gap-050">
+                {/* "Syncing..." only before the very first response — on later refetches the
+                    previous total stays put so the header row doesn't resize and shift */}
                 <span className={styles.directory__count}>
-                  {isDirectoryLoading && directoryPage === 1 ? 'Syncing...' : `${totalCommunities} Total`}
+                  {isDirectoryLoading && communityRows.length === 0 && totalCommunities === 0 ? 'Syncing...' : `${totalCommunities} Total`}
                 </span>
-                <button type="button" className={styles.createTrigger} onClick={() => setShowCreateModal(true)}>
+                <button type="button" className={styles.createTrigger} onClick={() => createModalRef.current?.open()}>
                   New Community
                 </button>
               </div>
@@ -2546,14 +2862,23 @@ export default function CommunitiesPage() {
 
             {directoryError && <div className={styles.manager__error}>Failed to load community directory: {directoryError}</div>}
 
-            <div className={styles.directory__grid}>
+            <div className={clsx(styles.directory__grid, isDirectoryLoading && styles['directory__grid--loading'])}>
               {communityRows.length === 0 && !isDirectoryLoading ? (
                 <p className={styles.directory__empty}>
-                  {searchQuery ? 'No communities match your search.' : 'No communities found. Be the first to create one!'}
+                  {searchQuery
+                    ? 'No communities match your search.'
+                    : visibilityFilter !== 'all'
+                      ? `No ${visibilityFilter} communities here yet.`
+                      : 'No communities found. Be the first to create one!'}
                 </p>
               ) : (
                 communityRows.map((row) => (
-                  <CommunityCard key={`${row.network_id}-${row.id}`} id={Number(row.id)} networkId={Number(row.network_id)} />
+                  <CommunityCard
+                    key={`${row.network_id}-${row.id}`}
+                    id={Number(row.id)}
+                    networkId={Number(row.network_id)}
+                    memberCount={Number(row.member_count ?? 0)}
+                  />
                 ))
               )}
             </div>
@@ -2573,19 +2898,17 @@ export default function CommunitiesPage() {
             )}
           </div>
 
-          {showCreateModal && (
-            <CreateCommunityModal
-              vault={vault}
-              vaultPrompt={<VaultUnlockPrompt vault={vault} />}
-              onClose={() => setShowCreateModal(false)}
-              onCreated={() => {
-                // Best-effort directory refresh — subject to cidex's indexing lag, same as the
-                // global post feed, so the new entry may take a few seconds to show
-                fetchDirectory(1, false)
-                setShowCreateModal(false)
-              }}
-            />
-          )}
+          <CreateCommunityModal
+            ref={createModalRef}
+            vault={vault}
+            vaultPrompt={<VaultUnlockPrompt vault={vault} />}
+            onCreated={() => {
+              // Best-effort directory refresh — subject to cidex's indexing lag, same as the
+              // global post feed, so the new entry may take a few seconds to show
+              fetchDirectory(1, false)
+              createModalRef.current?.close()
+            }}
+          />
         </div>
       </div>
     </>
