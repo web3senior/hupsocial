@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { FunnelIcon, MagnifyingGlassIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
 import { getNftListings, getNftPaymentTokens, getNftSellers } from '@/lib/api'
 import { handleBrokenImage } from '@/lib/utils'
+import { useProfile } from '@/hooks/useProfile'
 import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
@@ -154,17 +155,21 @@ const hiddenFilterCount = (filters) =>
 
 const sellerLabel = (user) => user.display_name || shortAddress(user.wallet_address)
 
-// Suggestion rows and the selected chip share this — profile_image comes straight off the
-// sellers API (users table or Universal Profile), with an initial standing in when absent
+// Suggestion rows and the selected chip share this. The image resolves through the shared
+// useProfile hook (SWR-cached, Universal Profile first, DB fallback, default pfp for plain
+// EOAs) — the sellers API's own profile_image is DB/UP-only and left EOA sellers pointing
+// at a broken image. An initial stands in while the profile is still resolving.
 function SellerAvatar({ user }) {
-  if (user.profile_image) {
-    return <img className={styles.filtersPanel__sellerAvatar} src={user.profile_image} alt="" loading="lazy" onError={handleBrokenImage} />
+  const { profile } = useProfile(user.wallet_address)
+
+  if (!profile?.profileImage) {
+    return (
+      <span className={clsx(styles.filtersPanel__sellerAvatar, styles['filtersPanel__sellerAvatar--fallback'])} aria-hidden="true">
+        {sellerLabel(user).slice(0, 1).toUpperCase()}
+      </span>
+    )
   }
-  return (
-    <span className={clsx(styles.filtersPanel__sellerAvatar, styles['filtersPanel__sellerAvatar--fallback'])} aria-hidden="true">
-      {sellerLabel(user).slice(0, 1).toUpperCase()}
-    </span>
-  )
+  return <img className={styles.filtersPanel__sellerAvatar} src={profile.profileImage} alt="" loading="lazy" onError={handleBrokenImage} />
 }
 
 /**
