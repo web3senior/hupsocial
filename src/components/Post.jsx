@@ -327,12 +327,14 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               {displayItem?.content?.nftListing && (
                 <TradeCard
                   listing={displayItem.content.nftListing}
-                  // Buying through someone's repost credits the reposter with the listing's
-                  // referral share — HupTrade rejects self- and seller-referrals onchain
+                  // Referral attribution works repost-style: the reposter when there is one,
+                  // otherwise the post's author — anyone can attach any listing to a post, and
+                  // buys made through it credit them with the listing's referral share.
+                  // HupTrade rejects self- and seller-referrals onchain (TradeCard zeroes those).
                   referral={
                     isRepost && item.wallet_address?.toLowerCase() !== displayItem?.wallet_address?.toLowerCase()
                       ? item.wallet_address
-                      : null
+                      : displayItem?.wallet_address
                   }
                 />
               )}

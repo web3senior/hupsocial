@@ -209,6 +209,9 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   // Listings that exist onchain but may never have made it into a post (listed, then the
   // composer was abandoned) — offered for re-attach or cancel so they're never stranded
   const [myListings, setMyListings] = useState([])
+  // Other sellers' active listings on this chain — attachable repost-style: buys made
+  // through the resulting post credit its author with the seller-set referral share
+  const [marketListings, setMarketListings] = useState([])
   const [cancellingId, setCancellingId] = useState(null)
   const { address, chain: walletChain } = useConnection()
   const switchChain = useSwitchChain({ config })
@@ -257,6 +260,7 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
     setCustomToken('')
     setTokenSearchResults([])
     setMyListings([])
+    setMarketListings([])
   }
 
   // Debounced name search for the custom-token field — a pasted address never triggers a
@@ -463,6 +467,26 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
       cancelled = true
     }
   }, [address, chainId])
+
+  // Composer mode only: everyone else's active listings, newest first. The API row shape
+  // matches /api/v1/trade/listings, so handleAttachExisting serves both sections.
+  useEffect(() => {
+    if (isStandalone || !chainId) return
+
+    let cancelled = false
+    fetch(`/api/v1/nfts?networkId=${chainId}&status=active&sort=newest&limit=24`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled || !json?.success) return
+        // Own listings already have their section above (with cancel), so keep them out
+        setMarketListings((json.data || []).filter((row) => row.wallet_address?.toLowerCase() !== address?.toLowerCase()))
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [isStandalone, chainId, address])
 
   useEffect(() => {
     if (!submitError) return
@@ -677,6 +701,51 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
                 </div>
               </div>
             ))}
+          </details>
+        )}
+
+        {!isStandalone && marketListings.length > 0 && (
+          // Any active listing can anchor a post, not just your own — attaching works like
+          // reposting: buys made through your post pay you the seller-set referral share
+          <details className={styles.sellNftModal__existing}>
+            <summary className={styles.sellNftModal__existingSummary}>
+              <span>Attach from the market ({marketListings.length})</span>
+              <CaretDownIcon size={14} />
+            </summary>
+            <p className={styles.sellNftModal__hint}>
+              Attach anyone&apos;s listing to your post — when someone buys through it, you earn the listing&apos;s referral share.
+            </p>
+            {marketListings.map((row) => {
+              const referralBps = Number(row.referral_bps) || 0
+              return (
+                <div key={row.listing_id} className={styles.sellNftModal__existingRow}>
+                  <div className={styles.sellNftModal__existingInfo}>
+                    <strong>
+                      {shortAddress(row.collection)} {shortTokenId(row.token_id)}
+                    </strong>
+                    <span>
+                      {new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(
+                        Number(formatUnits(BigInt(row.price), row.decimals ?? 18)),
+                      )}{' '}
+                      {row.symbol || (row.payment_token === zeroAddress ? nativeCurrency?.symbol : 'tokens')}
+                      {referralBps > 0
+                        ? ` — ${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100)}% referral`
+                        : ' — no referral'}
+                    </span>
+                  </div>
+                  <div className={styles.sellNftModal__existingActions}>
+                    <button
+                      type="button"
+                      className={styles.sellNftModal__existingAttach}
+                      onClick={() => handleAttachExisting(row)}
+                      disabled={isBusy}
+                    >
+                      Attach
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
           </details>
         )}
 
