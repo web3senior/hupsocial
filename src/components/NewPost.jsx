@@ -16,6 +16,7 @@ import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
+import DialogHeader from '@/components/ui/DialogHeader'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
@@ -1120,12 +1121,20 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       }}
       onClose={handleClose}
     >
-      <header className={styles.header}>
-        <button type="button" className={styles.cancelButton} onClick={(e) => handleClose(e)}>
-          Cancel
-        </button>
-        <h2>{actionType === 'edit' ? 'Edit post' : isComment ? 'Reply' : isQuote ? 'Quote post' : communityTarget ? `Post to ${communityTarget.name || 'community'}` : 'New post'}</h2>
-      </header>
+      <DialogHeader
+        title={
+          actionType === 'edit'
+            ? 'Edit post'
+            : isComment
+              ? 'Reply'
+              : isQuote
+                ? 'Quote post'
+                : communityTarget
+                  ? `Post to ${communityTarget.name || 'community'}`
+                  : 'New post'
+        }
+        onCancel={(e) => handleClose(e)}
+      />
 
       {isWrongChain && (
         <div className={styles.chainWarning} role="alert">

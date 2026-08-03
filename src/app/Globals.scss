@@ -13,14 +13,15 @@
   --shimmer-glint: rgba(255, 255, 255, 0.55);
   --liked-color: #ff007a;
   --batch-like-color: #facc15;
-  --shimmer-bg: #F4F5F7;
+  --shimmer-bg: #f4f5f7;
 
   --scrollbarBG: #f4f4f4;
   --thumbBG: var(--gray);
   --network-color-primary-light: color-mix(in srgb, var(--network-color-primary) 35%, transparent);
 
   --fingerprint-border: var(--white, #fff);
-  --beta-badge-background: var(--gray-400);
+  --beta-badge-background: var(--gray-100);
+  --beta-badge-color: var(--gray-400);
 
   --footer-link-color: var(--white);
   --color-icon-muted: #4b5563;
@@ -49,6 +50,7 @@
 
   --fingerprint-border: var(--surface-muted);
   --beta-badge-background: var(--black-400);
+  --beta-badge-color: var(--white);
 
   --footer-link-color: #a1a1aa;
   --color-icon-muted: #52525b;
@@ -77,6 +79,7 @@
 
   --fingerprint-border: var(--surface-muted);
   --beta-badge-background: var(--green-400);
+  --beta-badge-color: var(--white);
 
   --footer-link-color: #6ee77d;
   --color-icon-muted: #4ade80;
