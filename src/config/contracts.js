@@ -138,7 +138,7 @@ export const CONTRACTS = {
     forwarder: '0x46a3dfCb1F4ec29dB7F96C0D3962DF20E6EdB259',
     hup: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
     status: '0xd5f02276c28E1F134BfA0b423381CE740ccb644E',
-    community: '0xfFDA0b6c9CA897cf05f87cC087c88A85C23C20f9',
+    community: '',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '0x85765350FF07802155a35fFf261DFfaAb0ffA366',
     tipper: '0x487aE425f90425a3376F3bC8A016aA1Fb6bec96f',
@@ -146,6 +146,7 @@ export const CONTRACTS = {
     events: '0x4A6D88aBd0fd9049c1adD6757D382c1bb5bbC1D9',
     predict: '0x15C42Cf47D0Fe1D5314A91E5B23da35c72b129D9',
     apps: '0x16D02878DEA645209D64e1AC2b22131C7ee128FB',
+    miner: '',
   },
   chain42161: {
     name: 'arbitrum',
@@ -160,5 +161,22 @@ export const CONTRACTS = {
     events: '0x88C0963857049368470E2851aFf5EDFc2D32346C',
     predict: '0x81369e32F31DDAb46F9BF3269e523A440822C748',
     apps: '',
+  },
+}
+
+/**
+ * Contracts an embedded mini app may call with the viewer's burner session key via the bridge's
+ * hup_sessionCall method — value-less, rate-limited, and gated behind a one-time per-app consent.
+ * Keyed by chainId, then the app's onchain registry appId, listing the ONLY `to` addresses that
+ * app may target. An app absent here cannot session-call at all.
+ *
+ * Keep this list host-owned and explicit: the session key can act as the viewer on Hup Core, so
+ * a wildcard or app-supplied target would hand every embedded frame the viewer's identity.
+ */
+export const SESSION_CALL_ALLOWLIST = {
+  10143: {
+    // Hup Miner — fill in the registry appId assigned when the game is listed on /apps, and the
+    // deployed HupMiner address above (chain10143.miner):
+    // 1: [CONTRACTS.chain10143.miner],
   },
 }

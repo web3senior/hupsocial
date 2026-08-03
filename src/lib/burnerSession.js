@@ -58,6 +58,63 @@ export const getBurnerSigner = async (chain, password = null) => {
 }
 
 /**
+ * Silent variant of getBurnerSigner for host-mediated signing (the mini app bridge). It must
+ * never open a password prompt — a third-party frame's request is not a place to ask for the
+ * vault PIN — so a locked vault throws a coded error for the caller to surface instead.
+ *
+ * @throws {Error} code 'NO_SESSION_KEY' when this device holds no burner key.
+ * @throws {Error} code 'VAULT_LOCKED' when the key is encrypted and not unlocked this tab.
+ */
+export const getBurnerSignerSilent = (chain) => {
+  const storedAddress = localStorage.getItem(localStorageBurnerAddress)
+  const storedKey = localStorage.getItem(localStorageBurnerKey)
+
+  if (!storedKey || !storedAddress) {
+    const err = new Error('No session key found on this device')
+    err.code = 'NO_SESSION_KEY'
+    throw err
+  }
+
+  let privateKey = sessionStorage.getItem(sessionStorageUnlockedKey)
+
+  if (!privateKey) {
+    if (isPrivateKeyEncrypted(storedKey)) {
+      const err = new Error('Security Vault is locked')
+      err.code = 'VAULT_LOCKED'
+      throw err
+    }
+    // Legacy unencrypted key
+    privateKey = storedKey
+  }
+
+  const rpcUrl = getRpcUrl(chain)
+  if (!rpcUrl) throw new Error('Missing RPC URL for burner transaction')
+
+  const provider = new ethers.JsonRpcProvider(rpcUrl)
+  const wallet = new ethers.Wallet(privateKey, provider)
+
+  if (wallet.address.toLowerCase() !== storedAddress.toLowerCase()) {
+    throw new Error('Stored burner private key does not match stored burner address')
+  }
+
+  return wallet
+}
+
+/**
+ * Sends a raw calldata transaction with the burner session key, without prompting. Used by the
+ * mini app bridge for host-approved gasless calls — value is pinned to zero on purpose: session
+ * calls may spend gas, never funds.
+ *
+ * Returns the transaction hash as soon as the node accepts it; callers poll the receipt
+ * themselves so a slow block never stalls the bridge.
+ */
+export const sendRawWithBurnerSession = async ({ chain, to, data }) => {
+  const wallet = getBurnerSignerSilent(chain)
+  const tx = await wallet.sendTransaction({ to, data, value: 0n })
+  return tx.hash
+}
+
+/**
  * Writes a transaction with the burner session key.
  * Bubbles up 'PASSWORD_REQUIRED' if the key needs to be unlocked.
  */

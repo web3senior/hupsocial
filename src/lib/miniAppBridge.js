@@ -41,6 +41,22 @@ const AUTO_APPROVED_READS = new Set([
 const SIGNING_METHODS = new Set(['eth_sendTransaction', 'personal_sign', 'eth_signTypedData_v4', 'eth_signTypedData'])
 
 /**
+ * Host-mediated session-key call. Unlike SIGNING_METHODS this signs with the viewer's burner
+ * session key (Settings → In App Wallet), not their primary wallet, and shows no per-call
+ * confirmation — that is the entire point. The safety comes from policy, not prompts, and the
+ * policy is enforced by the host's onSessionCall handler, which MUST hold four lines:
+ *
+ *   1. `to` is on the host's allowlist for this specific app (never app-supplied).
+ *   2. No value ever moves — session calls spend gas, not funds.
+ *   3. The viewer consented once, explicitly, per app.
+ *   4. Calls are rate limited.
+ *
+ * The session key can act as the user on Hup Core, so an unscoped version of this method would
+ * hand every embedded frame the viewer's identity. Do not loosen the handler.
+ */
+const SESSION_CALL_METHOD = 'hup_sessionCall'
+
+/**
  * eth_sign hands the wallet an opaque 32-byte digest with no human-readable content, so a user
  * cannot meaningfully consent to it and it has been used to trick people into signing
  * transactions. There is no legitimate mini app use for it; it is refused outright rather than
@@ -70,10 +86,13 @@ const RPC_ERRORS = {
  *        the user and resolve with the result, or reject to decline. Never auto-resolve this.
  * @param {(request: object) => Promise<any>} options.onRead Performs a read-only RPC call.
  * @param {(chainId: number) => Promise<any>} options.onSwitchChain Host-mediated chain switch.
+ * @param {(request: object) => Promise<any>} [options.onSessionCall] Signs an allowlisted call
+ *        with the viewer's burner session key — see SESSION_CALL_METHOD for the policy it must
+ *        enforce. Omitting it disables hup_sessionCall entirely (error 4200).
  * @param {(event: string, detail: object) => void} [options.onEvent] Observability hook.
  * @returns {() => void} Detach function — call on unmount.
  */
-export function createMiniAppBridge({ iframe, app, getSession, onSignatureRequest, onRead, onSwitchChain, onEvent }) {
+export function createMiniAppBridge({ iframe, app, getSession, onSignatureRequest, onRead, onSwitchChain, onSessionCall, onEvent }) {
   if (!iframe) throw new Error('createMiniAppBridge requires an iframe')
 
   let detached = false
@@ -124,6 +143,27 @@ export function createMiniAppBridge({ iframe, app, getSession, onSignatureReques
         return reply(id, null)
       } catch (err) {
         return fail(id, { code: 4001, message: err?.message || 'Chain switch rejected' })
+      }
+    }
+
+    if (method === SESSION_CALL_METHOD) {
+      if (!onSessionCall) {
+        emit('sessionCall:unavailable')
+        return fail(id, RPC_ERRORS.unsupported)
+      }
+
+      try {
+        emit('sessionCall:requested')
+        const result = await onSessionCall({ params, app })
+        emit('sessionCall:sent')
+        return reply(id, result)
+      } catch (err) {
+        emit('sessionCall:failed', { reason: err?.message, code: err?.code })
+        // String codes (NO_SESSION_KEY, VAULT_LOCKED, NOT_ALLOWED, …) ride along in the message
+        // so the app can present the right fix; numeric codes pass through as-is.
+        const code = typeof err?.code === 'number' ? err.code : 4100
+        const message = typeof err?.code === 'string' ? `${err.code}: ${err?.message || 'Session call failed'}` : err?.message || 'Session call failed'
+        return fail(id, { code, message })
       }
     }
 
@@ -225,4 +265,4 @@ export function pushSessionUpdate(iframe, session) {
   )
 }
 
-export const __testing = { AUTO_APPROVED_READS, SIGNING_METHODS, FORBIDDEN_METHODS, RPC_ERRORS }
+export const __testing = { AUTO_APPROVED_READS, SIGNING_METHODS, FORBIDDEN_METHODS, RPC_ERRORS, SESSION_CALL_METHOD }
