@@ -11,25 +11,24 @@ const openai = new OpenAI({
 export async function POST(req) {
   try {
     // 1. Extract prompt from the request body
-    const { profile, posts, poaps } = await req.json()
+    const { profile, posts } = await req.json()
 
     if (!profile || !posts) {
       return NextResponse.json({ error: 'Profile and posts are required' }, { status: 400 })
     }
 
     const systemPrompt = `
-  You are an expert Web3 Cultural Analyst. Your task is to analyze a user's on-chain persona based on their profile, social activity, and POAP history.
+  You are an expert Web3 Cultural Analyst. Your task is to analyze a user's onchain persona based on their profile and social activity.
 
   ### DATA TO ANALYZE:
   - Name: ${profile.name}
   - Bio: ${profile.bio}
   - Recent Activity: ${posts}
-  - POAP History: ${poaps} (What is POAP? POAP, short for Proof of Attendance Protocol, allows you to mint memories as digital mementos we call POAPs.)
 
   ### SCORING LOGIC:
   1. **Degen (0-100):** High scores for memecoin mentions, high-frequency trading, NFT flipping, "apeing" into new projects, and use of slang like "LFG", "GM", or "Moon".
-  2. **Builder (0-100):** High scores for technical terms (Solidity, Rust, SDKs), hackathon POAPs (ETHGlobal), mentions of building/shipping, and GitHub activity.
-  3. **Researcher (0-100):** High scores for long-form analysis, governance voting, whitepaper discussions, DAO participation, and educational POAPs.
+  2. **Builder (0-100):** High scores for technical terms (Solidity, Rust, SDKs), hackathon participation (ETHGlobal), mentions of building/shipping, and GitHub activity.
+  3. **Researcher (0-100):** High scores for long-form analysis, governance voting, whitepaper discussions, DAO participation, and educational content.
 
   ### OUTPUT REQUIREMENTS:
   - **Summary:** A sharp, insightful 2-sentence breakdown of who they are in the ecosystem. Avoid generic "This user is active" filler.

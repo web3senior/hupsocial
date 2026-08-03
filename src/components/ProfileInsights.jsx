@@ -7,7 +7,7 @@ import { SparkleIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useProfile } from '@/hooks/useProfile'
 
-export default function ProfileInsights({ addr, posts, poaps }) {
+export default function ProfileInsights({ addr, posts }) {
   const { profile, isLoading: isProfileLoading } = useProfile(addr)
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -44,7 +44,6 @@ export default function ProfileInsights({ addr, posts, poaps }) {
         body: JSON.stringify({
           profile,
           posts: postText,
-          poaps,
         }),
       })
 
@@ -95,7 +94,7 @@ export default function ProfileInsights({ addr, posts, poaps }) {
             <span className={styles.insights__badge}>Beta</span>
           </div>
           <p className={styles.insights__subtitle}>
-            An AI-powered read of this profile&apos;s posts, bio, and POAPs — their Web3 personality at a glance.
+            An AI-powered read of this profile&apos;s posts and bio — their Web3 personality at a glance.
           </p>
         </header>
 

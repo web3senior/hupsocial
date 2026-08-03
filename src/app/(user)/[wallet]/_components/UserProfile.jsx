@@ -15,7 +15,7 @@ import { getActiveChain } from '@/lib/communication'
 import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
-import { InfoIcon, POAPIcon, ThreeDotIcon } from '@/components/Icons'
+import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
 import ProfileInsights from '@/components/ProfileInsights'
 import UPlogo from '@/../public/up.png'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
@@ -61,7 +61,6 @@ export default function UserProfile() {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
-  const [POAPs, setPOAPs] = useState()
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const router = useRouter()
@@ -142,27 +141,8 @@ export default function UserProfile() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [activeTab, loadMorePosts])
 
-  // Example of how a component fetches data from your new API route
-  async function getPoapsForAddress(address) {
-    const res = await fetch(`/api/poap-scan/${address}`)
-
-    if (!res.ok) {
-      // Handle error on the client side
-      throw new Error('Failed to fetch POAPs')
-    }
-
-    return res.json()
-  }
-
-  // In a component:
-  // const data = await getPoapsForAddress('atenyun.eth');
-
   useEffect(() => {
     recordProfileView(params.wallet, address || null)
-
-    getPoapsForAddress(params.wallet).then((res) => {
-      setPOAPs(res)
-    })
   }, [params.wallet])
 
   // Re-runs when the viewer connects so has_liked/has_bookmarked flags reflect their wallet.
@@ -208,25 +188,8 @@ export default function UserProfile() {
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={params.wallet} />
 
-            {/* Ensure posts, the list, and POAPs exist before mounting */}
-            {posts?.list?.length > 0 && POAPs && <ProfileInsights addr={params.wallet} posts={posts} poaps={POAPs} />}
-
-            <details className="mt-10">
-              <summary>View POAPs</summary>
-              <div className={`grid grid--fill gap-1 mt-10`} style={{ '--data-width': `64px` }} role="list">
-                {POAPs &&
-                  POAPs.length > 0 &&
-                  POAPs.map((POAP, i) => {
-                    return (
-                      <figure key={i} className={``}>
-                        <img src={POAP.event.image_url} style={{ width: `64px` }} className={`rounded-full`} />
-                        <figcaption style={{ color: `black` }}>{POAP.event.name}</figcaption>
-                        <small className={`lable lable-dark`}>{POAP.event.year}</small>
-                      </figure>
-                    )
-                  })}
-              </div>
-            </details>
+            {/* Ensure posts and the list exist before mounting */}
+            {posts?.list?.length > 0 && <ProfileInsights addr={params.wallet} posts={posts} />}
           </div>
 
           <section className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
