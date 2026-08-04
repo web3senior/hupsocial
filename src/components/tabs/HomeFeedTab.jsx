@@ -37,6 +37,8 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
 
   const scopedNetworkId = feedMode === 'network' ? networkId : null
   const feedType = feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : null
+  // Home-style feeds hide NFT-sale posts — those live in the dedicated NFTs tab.
+  const excludeNft = feedMode === 'foryou' || feedMode === 'network'
   const feedCacheKey =
     feedMode === 'network' ? `network-${networkId}` : feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : 'foryou'
   const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
@@ -178,7 +180,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       if (isFetchingRef.current) return
 
       try {
-        const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
+        const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
         if (!cancelled) {
           setInitialData(postsRes)
           appliedParamsRef.current = params
@@ -210,7 +212,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     const pollingInterval = setInterval(async () => {
       try {
         const latestKnownId = posts.list[0]?.id
-        const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
+        const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
 
         if (response.success && response.data.length > 0) {
           const newItemsIndex = response.data.findIndex((item) => item.id === latestKnownId)
@@ -227,7 +229,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     }, 30000)
 
     return () => clearInterval(pollingInterval)
-  }, [mounted, hasInitialized, posts.list, address, scopedNetworkId, feedType])
+  }, [mounted, hasInitialized, posts.list, address, scopedNetworkId, feedType, excludeNft])
 
   const handlePostPrefetch = (item) => {
     router.prefetch(`/networks/${item.network_id}/${item.id}`)
@@ -252,7 +254,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     const nextPage = page + 1
 
     try {
-      const response = await getPosts(nextPage, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
+      const response = await getPosts(nextPage, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
 
       if (response.success && response.data.length > 0) {
         appendPosts(response)
@@ -263,7 +265,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     } finally {
       setIsFetching(false)
     }
-  }, [page, appendPosts, address, scopedNetworkId, feedType])
+  }, [page, appendPosts, address, scopedNetworkId, feedType, excludeNft])
 
   useEffect(() => {
     loadMorePostsRef.current = loadMorePosts
@@ -287,7 +289,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     setIsRefreshing(true)
     setIsFetching(true)
     try {
-      const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType)
+      const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
       setInitialData(postsRes)
       setPage(1)
       setNewPostsQueue([])
@@ -298,7 +300,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       setIsFetching(false)
       setIsRefreshing(false)
     }
-  }, [newPostsQueue, handleMergeNewPosts, address, scopedNetworkId, feedType, setInitialData])
+  }, [newPostsQueue, handleMergeNewPosts, address, scopedNetworkId, feedType, excludeNft, setInitialData])
 
   // Refresh requested from outside (Aside home link while already at top).
   // Nonce ref guard: only fire on an actual bump, not on callback identity changes.

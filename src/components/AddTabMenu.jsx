@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BroadcastIcon, CaretLeftIcon, CaretRightIcon, CheckIcon, FlameIcon, PlusIcon, UserCheckIcon } from '@phosphor-icons/react'
+import { BroadcastIcon, CaretLeftIcon, CaretRightIcon, CheckIcon, FlameIcon, PlusIcon, StorefrontIcon, UserCheckIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { useHomeTabsStore } from '@/stores/useHomeTabsStore'
@@ -46,6 +46,7 @@ export default function AddTabMenu() {
               {!hasTab('following') && <MenuItem icon={UserCheckIcon} label="Following" onClick={() => handleSelect(close, 'following')} />}
               {!hasTab('trending') && <MenuItem icon={FlameIcon} label="Trending" onClick={() => handleSelect(close, 'trending')} />}
               {!hasTab('status') && <MenuItem icon={BroadcastIcon} label="Status" onClick={() => handleSelect(close, 'status')} />}
+              {!hasTab('nft') && <MenuItem icon={StorefrontIcon} label="NFTs" onClick={() => handleSelect(close, 'nft')} />}
               <MenuItem label="Networks" onClick={() => setView('networks')} trailing={<CaretRightIcon size={16} />} />
             </>
           )}

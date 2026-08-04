@@ -96,6 +96,13 @@ export async function GET(request) {
       )`
     }
 
+    // Home-tab feeds pass exclude_nft=1 so posts carrying a HupTrade NFT listing live only
+    // in the dedicated NFT tab. nft_listing_id is a generated column, so this is a plain
+    // per-row predicate inside the paginated derived table — no join, no JSON parsing here.
+    if (searchParams.get('exclude_nft') === '1' && feedType !== 'nft') {
+      whereClause += ` AND p.nft_listing_id IS NULL`
+    }
+
     // Apply dynamic filters using the direct performance indexes set on the posts table
     if (networkId) {
       whereClause += ` AND p.network_id = ?`

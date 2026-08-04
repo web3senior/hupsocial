@@ -33,6 +33,7 @@ export default function Page() {
           cache and snapshots its own state on exit. */}
       {activeTab?.type === 'foryou' && <HomeFeedTab key={activeTab.id} feedMode="foryou" title="For you" />}
       {activeTab?.type === 'network' && <HomeFeedTab key={activeTab.id} feedMode="network" networkId={activeTab.chainId} title={activeTab.label} />}
+      {activeTab?.type === 'nft' && <HomeFeedTab key={activeTab.id} feedMode="nft" title="NFTs" />}
       {activeTab?.type === 'following' && <FollowingFeedTab />}
       {activeTab?.type === 'trending' && <TrendingFeedTab />}
       {activeTab?.type === 'status' && <StatusFeedTab />}

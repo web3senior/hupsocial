@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { BroadcastIcon, FlameIcon, HouseIcon, UserCheckIcon } from '@phosphor-icons/react'
+import { BroadcastIcon, FlameIcon, HouseIcon, StorefrontIcon, UserCheckIcon } from '@phosphor-icons/react'
 import { config } from '@/config/wagmi'
 
 // Static schema for non-network tab types. Icons/labels stay out of localStorage
@@ -12,6 +12,7 @@ export const TAB_TYPE_SCHEMA = {
   following: { label: 'Following', icon: UserCheckIcon },
   trending: { label: 'Trending', icon: FlameIcon },
   status: { label: 'Status', icon: BroadcastIcon },
+  nft: { label: 'NFTs', icon: StorefrontIcon },
 }
 
 const DEFAULT_TABS = [{ id: 'foryou', type: 'foryou' }]
