@@ -8,12 +8,22 @@
  * Hup's origin, the only case where that flag would grant parent access) plus the bridge, which
  * never proxies a signature without an explicit user confirmation.
  *
- * `frame-ancestors 'self'` is the part that matters defensively and is new: it stops Hup itself
- * from being framed by anyone, which is what would otherwise let a hostile page wrap the app and
- * harvest clicks on the very confirmation dialogs the bridge relies on.
+ * `frame-ancestors` is the part that matters defensively: it stops Hup from being framed by
+ * arbitrary pages, which is what would otherwise let a hostile page wrap the app and harvest
+ * clicks on the very confirmation dialogs the bridge relies on. universaleverything.io is the
+ * deliberate exception — Hup runs as a mini app on LUKSO Grid profiles, where the Grid host
+ * hands Hup the visitor's wallet over up-provider (see src/lib/upProviderClient.js). Localhost
+ * ancestors are allowed in dev only, so the Grid-host harness can frame the dev server.
  */
+const FRAME_ANCESTORS = [
+  "'self'",
+  'https://universaleverything.io',
+  'https://*.universaleverything.io',
+  ...(process.env.NODE_ENV === 'development' ? ['http://localhost:*', 'https://localhost:*'] : []),
+].join(' ')
+
 const CONTENT_SECURITY_POLICY = [
-  "frame-ancestors 'self'",
+  `frame-ancestors ${FRAME_ANCESTORS}`,
   'frame-src *',
   "object-src 'none'",
   "base-uri 'self'",

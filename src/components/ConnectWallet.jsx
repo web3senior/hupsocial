@@ -6,6 +6,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { config, setNetworkColor } from '@/config/wagmi'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
+import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
 import clsx from 'clsx'
@@ -126,9 +127,13 @@ export function WalletOptions({ onConnected }) {
   const connectors = useConnectors()
   const { mutate: connect, isPending, variables, error } = useConnect()
 
+  // Inside a LUKSO Grid frame the host's Universal Profile is the connector that actually works
+  // (extensions don't inject into cross-origin iframes), so it leads the list there
+  const ordered = isFramedByGridHost() ? [...connectors].sort((a, b) => (b.id === UP_PROVIDER_RDNS) - (a.id === UP_PROVIDER_RDNS)) : connectors
+
   return (
     <div className={styles.options}>
-      {connectors.map((connector) => {
+      {ordered.map((connector) => {
         const isConnectingThis = isPending && variables?.connector?.uid === connector.uid
 
         return (
