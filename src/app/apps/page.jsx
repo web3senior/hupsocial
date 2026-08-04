@@ -230,6 +230,7 @@ export default function AppsPage() {
 /**
  * Developer on-ramp aimed at agent-assisted building: the copy button hands an AI agent one
  * self-contained instruction, and /miniapp-skill.md carries everything it needs from there.
+ * Framed as build → test → list; the listing action itself lives in the page header.
  */
 function BuildSection() {
   // Which copy button just fired — the rows share one timer so labels can't stick
@@ -261,39 +262,80 @@ function BuildSection() {
           <CodeIcon size={16} aria-hidden="true" />
           Build a mini app
         </h2>
+        {/* The compatibility story is the differentiator — chips read faster than prose */}
+        <ul className={styles.build__badges} aria-label="Supported mini app SDKs">
+          <li className={styles.build__badge}>Hup SDK</li>
+          <li className={styles.build__badge}>Farcaster</li>
+          <li className={styles.build__badge}>LUKSO Grid</li>
+        </ul>
         <p>
-          Mini apps run inside posts and use the viewer&apos;s Hup wallet — mint, play, trade without leaving the feed. Building one is a single
-          HTML page plus the SDK. Vibe coding? Paste this into your agent:
+          Mini apps run inside posts and use the viewer&apos;s Hup wallet — mint, play, trade without leaving the feed. One HTML page plus the
+          SDK, and apps built for Farcaster or the LUKSO Grid (up-provider) run unmodified.
         </p>
       </div>
 
-      <div className={styles.build__prompt}>
-        <code>{prompt}</code>
-        <button type="button" onClick={() => copyText('prompt', prompt)} className={styles.build__copy} aria-label="Copy the build instruction">
-          {copiedKey === 'prompt' ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
-          <span>{copiedKey === 'prompt' ? 'Copied' : 'Copy'}</span>
-        </button>
-      </div>
+      <ol className={styles.build__steps}>
+        <li className={styles.build__step}>
+          <span className={styles.build__stepNum} aria-hidden="true">
+            1
+          </span>
+          <div className={styles.build__stepBody}>
+            <strong>Build</strong>
+            <p>Paste this into any AI agent — or read the docs below and hand-code it.</p>
 
-      <div className={styles.build__prompt}>
-        <code>
-          {/* Running an OpenClaw agent? One install teaches it this skill permanently */}
-          {clawInstall}
-        </code>
-        <a
-          className={styles.build__clawLink}
-          href="https://clawhub.ai/web3senior/skills/hup-miniapp-skill"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="View the skill on ClawHub"
-        >
-          ClawHub
-        </a>
-        <button type="button" onClick={() => copyText('claw', clawInstall)} className={styles.build__copy} aria-label="Copy the OpenClaw install command">
-          {copiedKey === 'claw' ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
-          <span>{copiedKey === 'claw' ? 'Copied' : 'Copy'}</span>
-        </button>
-      </div>
+            <div className={styles.build__prompt}>
+              <code>{prompt}</code>
+              <button type="button" onClick={() => copyText('prompt', prompt)} className={styles.build__copy} aria-label="Copy the build instruction">
+                {copiedKey === 'prompt' ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
+                <span>{copiedKey === 'prompt' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+
+            <div className={styles.build__prompt}>
+              <code>
+                {/* Running an OpenClaw agent? One install teaches it this skill permanently */}
+                {clawInstall}
+              </code>
+              <a
+                className={styles.build__clawLink}
+                href="https://clawhub.ai/web3senior/skills/hup-miniapp-skill"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View the skill on ClawHub"
+              >
+                ClawHub
+              </a>
+              <button type="button" onClick={() => copyText('claw', clawInstall)} className={styles.build__copy} aria-label="Copy the OpenClaw install command">
+                {copiedKey === 'claw' ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
+                <span>{copiedKey === 'claw' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+          </div>
+        </li>
+
+        <li className={styles.build__step}>
+          <span className={styles.build__stepNum} aria-hidden="true">
+            2
+          </span>
+          <div className={styles.build__stepBody}>
+            <strong>Test</strong>
+            <p>Run your page standalone — the SDK degrades gracefully outside a post. The example apps below show every wallet call working.</p>
+          </div>
+        </li>
+
+        <li className={styles.build__step}>
+          <span className={styles.build__stepNum} aria-hidden="true">
+            3
+          </span>
+          <div className={styles.build__stepBody}>
+            <strong>List</strong>
+            <p>
+              One onchain transaction via <em>List your app</em> above puts it in this directory; a moderator review then enables embedding in
+              posts.
+            </p>
+          </div>
+        </li>
+      </ol>
 
       <div className={styles.build__links}>
         <a className={styles.build__link} href="/miniapp-skill.md" target="_blank" rel="noopener noreferrer">
@@ -310,6 +352,25 @@ function BuildSection() {
           <span className={styles.build__linkText}>
             <strong>SDK source</strong>
             <small>miniapp-sdk.js — the wallet bridge</small>
+          </span>
+          <CaretRightIcon size={16} aria-hidden="true" className={styles.build__linkCaret} />
+        </a>
+
+        {/* Grid apps speak @lukso/up-provider, which the embed serves natively — no porting step */}
+        <a className={styles.build__link} href="https://docs.lukso.tech/learn/mini-apps/" target="_blank" rel="noopener noreferrer">
+          <SquaresFourIcon size={20} aria-hidden="true" className={styles.build__linkIcon} />
+          <span className={styles.build__linkText}>
+            <strong>Bring your Grid app</strong>
+            <small>up-provider served natively</small>
+          </span>
+          <CaretRightIcon size={16} aria-hidden="true" className={styles.build__linkCaret} />
+        </a>
+
+        <a className={styles.build__link} href="/examples/miniapp-demo.html" target="_blank" rel="noopener noreferrer">
+          <PuzzlePieceIcon size={20} aria-hidden="true" className={styles.build__linkIcon} />
+          <span className={styles.build__linkText}>
+            <strong>Example apps</strong>
+            <small>view-source diagnostic pages</small>
           </span>
           <CaretRightIcon size={16} aria-hidden="true" className={styles.build__linkCaret} />
         </a>
