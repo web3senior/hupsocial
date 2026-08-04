@@ -8,6 +8,27 @@ const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
 })
 
+/* Detect HEIC/HEIF by container magic ("ftyp" box + brand) — browsers frequently
+   report an empty or generic mime for .heic files, so headers can't be trusted */
+const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1'])
+
+function isHeic(buffer) {
+  if (buffer.length < 12 || buffer.toString('latin1', 4, 8) !== 'ftyp') return false
+  const brand = buffer.toString('latin1', 8, 12)
+  /* mif1/msf1 are generic HEIF brands some AVIF encoders reuse as the major brand —
+     sharp decodes AVIF natively, so leave those alone */
+  if ((brand === 'mif1' || brand === 'msf1') && buffer.toString('latin1', 0, Math.min(buffer.length, 64)).includes('avif')) return false
+  return HEIC_BRANDS.has(brand)
+}
+
+/* Prebuilt sharp binaries ship libheif without HEVC for licensing reasons, and raw
+   HEIC only renders in Safari — decode with the wasm-based heic-convert instead.
+   Dynamically imported so non-HEIC requests never pay its startup cost. */
+async function heicToJpeg(buffer) {
+  const { default: convert } = await import('heic-convert')
+  return Buffer.from(await convert({ buffer, format: 'JPEG', quality: 0.9 }))
+}
+
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -41,13 +62,23 @@ async function uploadToPinata(file) {
 export async function POST(request) {
   try {
     const data = await request.formData()
-    const file = data.get('file')
+    let file = data.get('file')
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
     console.log(`Uploading file: ${file.name}`)
+
+    /* iPhone photos arrive as HEIC, which only Safari can render — transcode to
+       JPEG before pinning so the CID is viewable on every device and gateway */
+    const head = Buffer.from(await file.slice(0, 64).arrayBuffer())
+    if (isHeic(head)) {
+      const jpeg = await heicToJpeg(Buffer.from(await file.arrayBuffer()))
+      const jpegName = `${(file.name || 'upload').replace(/\.(heic|heif)$/i, '')}.jpg`
+      file = new File([jpeg], jpegName, { type: 'image/jpeg' })
+      console.log(`[heic] transcoded to JPEG before pinning: ${jpegName}`)
+    }
 
     let rawCID
     try {
@@ -107,14 +138,14 @@ export async function GET(req) {
       return NextResponse.redirect(gatewayUrl, 302)
     }
 
-    /* HEIC/HEIF decoding needs a libheif build with HEVC support, which prebuilt
-       sharp binaries omit for licensing reasons — stream the original instead */
-    if (/^image\/hei[cf](-sequence)?$/i.test(contentType)) {
-      return NextResponse.redirect(gatewayUrl, 302)
-    }
-
     const arrayBuffer = await upstream.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    let buffer = Buffer.from(arrayBuffer)
+
+    /* CIDs pinned before uploads transcoded HEIC are still raw HEIC on IPFS —
+       decode them here so they render outside Safari like everything else */
+    if (isHeic(buffer)) {
+      buffer = await heicToJpeg(buffer)
+    }
 
     /* still=1 decodes/encodes only the first frame — skips the expensive per-frame
        resize+encode animated GIFs/WEBPs otherwise need, for thumbnail contexts that

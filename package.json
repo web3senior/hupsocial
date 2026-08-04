@@ -40,6 +40,7 @@
     "ethereum-blockies-base64": "^1.0.2",
     "ethers": "^6.16.0",
     "framer-motion": "^12.40.0",
+    "heic-convert": "^2.1.0",
     "jdenticon": "^3.3.0",
     "marked": "^18.0.3",
     "moment": "^2.30.1",
