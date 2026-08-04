@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useConnection, useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
@@ -56,6 +57,41 @@ const DEFAULT_FILTERS = {
 }
 
 const COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+const FILTER_KEYS = Object.keys(DEFAULT_FILTERS)
+
+const isOption = (options, value) => options.some((o) => o.value === value)
+
+/**
+ * The URL query string is the source of truth for the grid's filters — that's what lets the
+ * browser's back button return from a listing detail into the exact collection view the user
+ * left, instead of a reset market page. Enum-ish params are checked against their option
+ * lists so a hand-edited URL degrades to the default rather than a confusing empty grid;
+ * addresses pass through (lowercased where the grid compares them lowercased).
+ */
+function filtersFromParams(params, networkOptions) {
+  const filters = { ...DEFAULT_FILTERS }
+  for (const key of FILTER_KEYS) {
+    const value = params.get(key)
+    if (value) filters[key] = value
+  }
+  if (!isOption(networkOptions, filters.networkId)) filters.networkId = DEFAULT_FILTERS.networkId
+  if (!isOption(STATUS_OPTIONS, filters.status)) filters.status = DEFAULT_FILTERS.status
+  if (!isOption(SORT_OPTIONS, filters.sort)) filters.sort = DEFAULT_FILTERS.sort
+  if (!isOption(REFERRAL_OPTIONS, filters.referral)) filters.referral = DEFAULT_FILTERS.referral
+  if (filters.standard && !['erc721', 'lsp8'].includes(filters.standard)) filters.standard = DEFAULT_FILTERS.standard
+  filters.collection = filters.collection.toLowerCase()
+  return filters
+}
+
+function buildQueryString(filters, search) {
+  const params = new URLSearchParams()
+  for (const key of FILTER_KEYS) {
+    if (filters[key] !== DEFAULT_FILTERS[key]) params.set(key, filters[key])
+  }
+  if (search) params.set('q', search)
+  return params.toString()
+}
 
 // Only chains with HupTrade actually deployed are worth offering as a filter
 const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)
@@ -204,9 +240,37 @@ function QuickSelect({ label, value, defaultValue, options, onChange }) {
  * image) is resolved live per token, not indexed, so there's nothing to search server-side.
  */
 export default function NftMarketGrid() {
-  const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const searchParams = useSearchParams()
+
+  // Filters live in the URL, not component state — coming back from a listing detail
+  // remounts this grid, and the query string is the only thing that survives the trip
+  const filters = useMemo(() => filtersFromParams(searchParams, NETWORK_OPTIONS), [searchParams])
+  const filtersRef = useRef(filters)
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
+
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('q') || '')
+  const [search, setSearch] = useState(() => (searchParams.get('q') || '').trim())
+  const searchRef = useRef(search)
+
+  /**
+   * Drop-in replacement for the old useState setter — same updater-function call sites,
+   * but the result is written to the URL and flows back in through useSearchParams.
+   * Picking or clearing a collection is a drill-in/out navigation, so it PUSHES a history
+   * entry (back steps detail → collection → market); every other tweak — status, sort,
+   * price, seller — REPLACES in place so filter fiddling doesn't bloat history.
+   */
+  const setFilters = useCallback((updater) => {
+    const current = filtersRef.current
+    const next = typeof updater === 'function' ? updater(current) : updater
+    filtersRef.current = next
+    const query = buildQueryString(next, searchRef.current)
+    const url = query ? `${window.location.pathname}?${query}` : window.location.pathname
+    if (next.collection !== current.collection) window.history.pushState(null, '', url)
+    else window.history.replaceState(null, '', url)
+  }, [])
+
   // Seller is a typeahead: typing only queries suggestions (name or wallet prefix, served
   // from wallets that actually have listings) — the grid itself refetches only once a user
   // is picked, which puts their exact address into filters.seller
@@ -214,7 +278,12 @@ export default function NftMarketGrid() {
   const [sellerOptions, setSellerOptions] = useState([])
   const [isLoadingSellers, setIsLoadingSellers] = useState(false)
   const [isSellerFocused, setIsSellerFocused] = useState(false)
-  const [selectedSeller, setSelectedSeller] = useState(null)
+  // Re-seeded from the URL so the chip survives the detail-page round trip — the avatar
+  // and display name resolve from the address alone (useProfile / shortAddress fallback)
+  const [selectedSeller, setSelectedSeller] = useState(() => {
+    const seller = searchParams.get('seller')
+    return seller ? { wallet_address: seller } : null
+  })
 
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
@@ -276,6 +345,15 @@ export default function NftMarketGrid() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
+  // q rides along in the URL so the name search also survives the detail round trip.
+  // Always a replace — typing is not a navigation step.
+  useEffect(() => {
+    searchRef.current = search
+    const query = buildQueryString(filtersRef.current, search)
+    if (query === window.location.search.replace(/^\?/, '')) return
+    window.history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname)
+  }, [search])
+
   // An empty query still fetches — it returns the market's most active sellers, so the
   // list has something to offer the moment the field is focused. Scoped to the browsed
   // network so the listing counts match what the grid can actually show.
@@ -301,16 +379,19 @@ export default function NftMarketGrid() {
     }
   }, [sellerQuery, filters.networkId, selectedSeller, refreshKey])
 
-  const handleSellerSelect = useCallback((user) => {
-    setSelectedSeller(user)
-    setSellerQuery('')
-    setFilters((f) => ({ ...f, seller: user.wallet_address }))
-  }, [])
+  const handleSellerSelect = useCallback(
+    (user) => {
+      setSelectedSeller(user)
+      setSellerQuery('')
+      setFilters((f) => ({ ...f, seller: user.wallet_address }))
+    },
+    [setFilters],
+  )
 
   const handleSellerClear = useCallback(() => {
     setSelectedSeller(null)
     setFilters((f) => ({ ...f, seller: '' }))
-  }, [])
+  }, [setFilters])
 
   useEffect(() => {
     let cancelled = false
@@ -404,7 +485,7 @@ export default function NftMarketGrid() {
         ...(heroNetworkId === f.networkId ? {} : { token: '', minPrice: '', maxPrice: '' }),
       }))
     },
-    [handleCollectionResolved],
+    [handleCollectionResolved, setFilters],
   )
 
   const handleSell = () => {
