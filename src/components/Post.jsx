@@ -343,7 +343,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
               {/* Nothing loads until the viewer presses launch, so a veiled post never runs
                   third-party code — the inert wrapper blocks the launch button outright */}
-              {displayItem?.content?.miniApp && <MiniAppEmbed reference={displayItem.content.miniApp} />}
+              {displayItem?.content?.miniApp && <MiniAppEmbed reference={displayItem.content.miniApp} contextAddress={displayItem?.wallet_address} />}
 
               <BuyButton item={displayItem || item} />
             </div>
@@ -853,7 +853,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
         <TradeCard listing={quotedPost.content.nftListing} referral={quotedBy} />
       )}
       {quotedPost?.content?.predictMarket && <PredictCard marketRef={quotedPost.content.predictMarket} />}
-      {quotedPost?.content?.miniApp && <MiniAppEmbed reference={quotedPost.content.miniApp} />}
+      {quotedPost?.content?.miniApp && <MiniAppEmbed reference={quotedPost.content.miniApp} contextAddress={quotedPost?.wallet_address} />}
     </div>
   )
 }

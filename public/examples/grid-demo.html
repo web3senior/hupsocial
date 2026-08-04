@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Grid Mini App Demo (up-provider)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #111827;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --surface: #f9fafb;
+        --primary: #7c3aed;
+        --ok: #16a34a;
+        --bad: #dc2626;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0f19;
+          --fg: #e5e7eb;
+          --muted: #9ca3af;
+          --border: #1f2937;
+          --surface: #111827;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1rem;
+        font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      h1 {
+        font-size: 1rem;
+        margin: 0 0 0.25rem;
+      }
+      p.sub {
+        margin: 0 0 1rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.2rem 0;
+        font-size: 0.8rem;
+      }
+      .row span:first-child {
+        color: var(--muted);
+      }
+      .row span:last-child {
+        font-family: ui-monospace, Menlo, monospace;
+        overflow-wrap: anywhere;
+        text-align: right;
+      }
+      button {
+        width: 100%;
+        padding: 0.6rem;
+        margin-bottom: 0.5rem;
+        border: none;
+        border-radius: 8px;
+        background: var(--primary);
+        color: #fff;
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      #log {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 0.72rem;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 12rem;
+        overflow-y: auto;
+        color: var(--muted);
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .bad {
+        color: var(--bad);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Grid Mini App Demo</h1>
+    <p class="sub">Uses the real @lukso/up-provider client — the SDK Grid apps on universaleverything.io are built with. No Hup SDK on this page.</p>
+
+    <div class="panel">
+      <div class="row"><span>connected account</span><span id="account">—</span></div>
+      <div class="row"><span>context account (post author)</span><span id="context">—</span></div>
+      <div class="row"><span>chainId</span><span id="chain">—</span></div>
+      <div class="row"><span>block (eth_blockNumber via bridge)</span><span id="block">—</span></div>
+    </div>
+
+    <button id="sign" disabled>personal_sign a message</button>
+    <button id="send" disabled>eth_sendTransaction (0 value, to self)</button>
+
+    <div class="panel"><div id="log"></div></div>
+
+    <script type="module">
+      import { createClientUPProvider } from 'https://esm.sh/@lukso/up-provider@0.3.7'
+
+      const $ = (id) => document.getElementById(id)
+      const log = (msg, cls = '') => {
+        const line = document.createElement('div')
+        if (cls) line.className = cls
+        line.textContent = `${new Date().toLocaleTimeString()} ${msg}`
+        $('log').prepend(line)
+      }
+
+      const provider = createClientUPProvider()
+
+      const render = () => {
+        const [account] = provider.accounts
+        const [context] = provider.contextAccounts
+        $('account').textContent = account || 'not connected'
+        $('context').textContent = context || '—'
+        $('chain').textContent = provider.chainId ? `${provider.chainId} (0x${provider.chainId.toString(16)})` : '—'
+        $('sign').disabled = !account
+        $('send').disabled = !account
+      }
+
+      provider.on('accountsChanged', (accounts) => {
+        log(`accountsChanged: ${JSON.stringify(accounts)}`, 'ok')
+        render()
+      })
+      provider.on('contextAccountsChanged', (accounts) => {
+        log(`contextAccountsChanged: ${JSON.stringify(accounts)}`, 'ok')
+        render()
+      })
+      provider.on('chainChanged', (chainId) => {
+        log(`chainChanged: ${chainId}`)
+        render()
+      })
+      provider.on('connect', ({ chainId }) => log(`connect: ${chainId}`, 'ok'))
+      provider.on('disconnect', () => {
+        log('disconnect', 'bad')
+        render()
+      })
+
+      // Give the handshake a moment, then show whatever the init payload carried and prove a
+      // round trip through the bridge with an auto-approved read
+      setTimeout(async () => {
+        render()
+        try {
+          const block = await provider.request('eth_blockNumber', [])
+          $('block').textContent = parseInt(block, 16).toLocaleString()
+          log(`eth_blockNumber ok: ${block}`, 'ok')
+        } catch (err) {
+          log(`eth_blockNumber failed: ${err?.message || err}`, 'bad')
+        }
+      }, 1500)
+
+      $('sign').onclick = async () => {
+        try {
+          const [account] = provider.accounts
+          const message = `Grid demo signature ${Date.now()}`
+          const hex = `0x${Array.from(new TextEncoder().encode(message), (b) => b.toString(16).padStart(2, '0')).join('')}`
+          const signature = await provider.request('personal_sign', [hex, account])
+          log(`personal_sign ok: ${signature.slice(0, 26)}…`, 'ok')
+        } catch (err) {
+          log(`personal_sign rejected: ${err?.message || err}`, 'bad')
+        }
+      }
+
+      $('send').onclick = async () => {
+        try {
+          const [account] = provider.accounts
+          const hash = await provider.request('eth_sendTransaction', [{ from: account, to: account, value: '0x0' }])
+          log(`eth_sendTransaction ok: ${hash}`, 'ok')
+        } catch (err) {
+          log(`eth_sendTransaction rejected: ${err?.message || err}`, 'bad')
+        }
+      }
+
+      log('up-provider client created, waiting for host handshake…')
+    </script>
+  </body>
+</html>

@@ -4,12 +4,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useConnection, usePublicClient, useSendTransaction, useSignMessage, useSignTypedData, useSwitchChain } from 'wagmi'
 import { config } from '@/config/wagmi'
-import { appChains } from '@/config/contracts'
+import { appChains, SESSION_CALL_ALLOWLIST } from '@/config/contracts'
 import { createMiniAppBridge, pushSessionUpdate } from '@/lib/miniAppBridge'
+import { createUpProviderBridge } from '@/lib/upProviderBridge'
+import { sendRawWithBurnerSession, unlockBurnerWithMaster } from '@/lib/burnerSession'
+import { clearMasterSecret, unlockMaster } from '@/lib/securityVault'
 import { ArrowClockwiseIcon, ArrowSquareOutIcon, CornersInIcon, CornersOutIcon, PlayIcon, PuzzlePieceIcon, WarningIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import MiniAppTxDialog from './MiniAppTxDialog'
+import MiniAppSessionDialog from './MiniAppSessionDialog'
+import MiniAppVaultUnlockDialog from './MiniAppVaultUnlockDialog'
 import styles from './MiniAppEmbed.module.scss'
+
+const STORAGE_PREFIX = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
+
+// hup_sessionCall budget per embed: enough for aggressive gameplay, useless for spam.
+const SESSION_CALL_WINDOW_MS = 60_000
+const SESSION_CALL_MAX_PER_WINDOW = 10
 
 const fetcher = async (url) => {
   const res = await fetch(url)
@@ -28,13 +39,22 @@ const fetcher = async (url) => {
  *
  * Nothing loads until the viewer presses play. A post should not silently run third-party code
  * (or leak the viewer's IP to it) just by scrolling past.
+ *
+ * The frame is served two wallet protocols at once: the Hup SDK bridge (which also carries the
+ * Farcaster-compatible surface) and the LUKSO up-provider protocol, so Grid mini apps built for
+ * universaleverything.io run unmodified. `contextAddress` is the post author's wallet — Grid
+ * semantics for "the profile hosting this widget".
  */
-export default function MiniAppEmbed({ reference }) {
+export default function MiniAppEmbed({ reference, contextAddress }) {
   const appId = Number(reference?.appId)
   const chainId = Number(reference?.chainId)
 
   const iframeRef = useRef(null)
+  const upBridgeRef = useRef(null)
   const txDialogRef = useRef(null)
+  const sessionDialogRef = useRef(null)
+  const vaultDialogRef = useRef(null)
+  const sessionCallTimesRef = useRef([])
   const containerRef = useRef(null)
   const [isRunning, setIsRunning] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -101,26 +121,120 @@ export default function MiniAppEmbed({ reference }) {
 
   const handleSwitchChain = useCallback(async (target) => switchChain.mutateAsync({ chainId: target }), [switchChain])
 
-  // Attach the bridge for as long as the frame is mounted
+  /**
+   * hup_sessionCall policy enforcement — the four lines the bridge trusts this handler to hold:
+   * host-owned target allowlist, zero value, one-time per-app consent, rate limit. Signing uses
+   * the viewer's burner session key and never prompts; a locked vault or missing key surfaces as
+   * a coded error the app is expected to handle (see the bridge's SESSION_CALL_METHOD notes).
+   */
+  const handleSessionCall = useCallback(
+    async ({ params }) => {
+      const call = params?.[0] || {}
+      const to = typeof call.to === 'string' ? call.to.toLowerCase() : ''
+      const allowed = (SESSION_CALL_ALLOWLIST[chainId]?.[appId] || []).filter(Boolean).map((a) => String(a).toLowerCase())
+
+      if (!to || !allowed.includes(to)) {
+        const err = new Error('This app is not allowed to session-call that contract')
+        err.code = 'NOT_ALLOWED'
+        throw err
+      }
+
+      if (call.value && BigInt(call.value) !== 0n) {
+        const err = new Error('Session calls can never carry value')
+        err.code = 'NOT_ALLOWED'
+        throw err
+      }
+
+      if (typeof call.data !== 'string' || !call.data.startsWith('0x')) {
+        const err = new Error('Invalid calldata')
+        err.code = -32602
+        throw err
+      }
+
+      const now = Date.now()
+      sessionCallTimesRef.current = sessionCallTimesRef.current.filter((t) => now - t < SESSION_CALL_WINDOW_MS)
+      if (sessionCallTimesRef.current.length >= SESSION_CALL_MAX_PER_WINDOW) {
+        const err = new Error('Too many session calls — try again in a minute')
+        err.code = -32005
+        throw err
+      }
+
+      const consentKey = `${STORAGE_PREFIX}miniapp_session_consent_${chainId}_${appId}`
+      if (localStorage.getItem(consentKey) !== 'granted') {
+        // Rejects with code 4001 on decline, which aborts the call before anything signs
+        await sessionDialogRef.current.confirm({ app, to: call.to })
+        localStorage.setItem(consentKey, 'granted')
+      }
+
+      sessionCallTimesRef.current.push(now)
+
+      const sendCall = () => sendRawWithBurnerSession({ chain: chainInfo, to: call.to, data: call.data })
+
+      try {
+        return await sendCall()
+      } catch (err) {
+        if (err?.code !== 'VAULT_LOCKED') throw err
+
+        // The vault PIN is never asked on a frame's behalf silently — but the host may ask in
+        // its own UI. One PIN + one signature here unlocks the whole tab, then retry once.
+        await vaultDialogRef.current.unlock({
+          app,
+          execute: async (pin) => {
+            if (!address) throw new Error('Connect your wallet first')
+            const masterHex = await unlockMaster(address, pin, signMessageAsync)
+            try {
+              await unlockBurnerWithMaster(masterHex)
+            } catch (unlockErr) {
+              // A wrong PIN yields a wrong master — drop it from the cache or every later
+              // vault feature in this tab would silently use the bad one
+              if (unlockErr?.code === 'WRONG_PIN') clearMasterSecret()
+              throw unlockErr
+            }
+          },
+        })
+
+        return sendCall()
+      }
+    },
+    [app, appId, chainId, chainInfo, address, signMessageAsync],
+  )
+
+  // Attach both bridges for as long as the frame is mounted — same iframe, same policy handlers,
+  // two wire protocols (messages are discriminated by shape, so they never collide)
   useEffect(() => {
     if (!isRunning || !app || !iframeRef.current) return
 
-    const detach = createMiniAppBridge({
+    const shared = {
       iframe: iframeRef.current,
       app,
       getSession: () => session.current,
       onSignatureRequest: handleSignatureRequest,
       onRead: handleRead,
       onSwitchChain: handleSwitchChain,
-    })
+      onSessionCall: handleSessionCall,
+    }
 
-    return detach
-  }, [isRunning, app, reloadKey, handleSignatureRequest, handleRead, handleSwitchChain])
+    const detachHup = createMiniAppBridge(shared)
+    const upBridge = createUpProviderBridge({
+      ...shared,
+      chainId,
+      rpcUrls: [...(chainInfo?.rpcUrls?.default?.http ?? [])],
+      contextAccounts: contextAddress ? [contextAddress] : [],
+    })
+    upBridgeRef.current = upBridge
+
+    return () => {
+      detachHup()
+      upBridge.detach()
+      upBridgeRef.current = null
+    }
+  }, [isRunning, app, reloadKey, chainId, chainInfo, contextAddress, handleSignatureRequest, handleRead, handleSwitchChain, handleSessionCall])
 
   // Let a running app react to the viewer connecting or switching networks
   useEffect(() => {
     if (!isRunning || !iframeRef.current) return
     pushSessionUpdate(iframeRef.current, session.current)
+    upBridgeRef.current?.pushSession(session.current)
   }, [isRunning, address, isConnected, walletChain?.id])
 
   // Track fullscreen from the document, not from the click — Esc and the browser's own controls
@@ -252,6 +366,8 @@ export default function MiniAppEmbed({ reference }) {
       </div>
 
       <MiniAppTxDialog ref={txDialogRef} />
+      <MiniAppSessionDialog ref={sessionDialogRef} />
+      <MiniAppVaultUnlockDialog ref={vaultDialogRef} />
     </div>
   )
 }

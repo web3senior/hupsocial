@@ -76,6 +76,115 @@ const RPC_ERRORS = {
 }
 
 /**
+ * The method policy itself, shared by every transport the host speaks — the Hup/Farcaster bridge
+ * below and the LUKSO up-provider bridge (upProviderBridge.js) that serves Grid mini apps. One
+ * policy, several wire formats: whatever protocol a frame arrived on, the same rules decide what
+ * a method may do, so the protocols can never drift apart.
+ *
+ * Resolves with the RPC result, or throws an `{ code, message }` object ready to be serialized
+ * as a JSON-RPC error.
+ *
+ * @param {object} options
+ * @param {string} options.method RPC method name.
+ * @param {Array} options.params RPC params.
+ * @param {object} options.session Live { address, chainId, isConnected } snapshot.
+ * @param {string[]} [options.contextAccounts] Answer for `up_contextAccounts` (Grid apps ask this
+ *        for the profile hosting them; Hup maps it to the post author).
+ * @param {object} options.app Resolved registry record, passed through to handlers.
+ * @param {(request: object) => Promise<any>} options.onSignatureRequest User-confirmed signing.
+ * @param {(request: object) => Promise<any>} options.onRead Read-only RPC.
+ * @param {(chainId: number) => Promise<any>} options.onSwitchChain Host-mediated chain switch.
+ * @param {(request: object) => Promise<any>} [options.onSessionCall] Burner-session-key call.
+ * @param {(event: string, detail: object) => void} [options.emit] Observability hook.
+ */
+export async function executeWalletMethod({ method, params, session = {}, contextAccounts = [], app, onSignatureRequest, onRead, onSwitchChain, onSessionCall, emit = () => {} }) {
+  if (FORBIDDEN_METHODS.has(method)) {
+    emit('method:forbidden', { method })
+    throw RPC_ERRORS.unsupported
+  }
+
+  if (method === 'eth_requestAccounts' || method === 'eth_accounts') {
+    // The viewer's connection to Hup is the app's connection — there is no separate approval,
+    // but an app still cannot see an address when nobody is connected.
+    if (!session.isConnected || !session.address) return []
+    return [session.address]
+  }
+
+  if (method === 'eth_chainId') {
+    if (!session.chainId) throw RPC_ERRORS.disconnected
+    return `0x${Number(session.chainId).toString(16)}`
+  }
+
+  if (method === 'up_contextAccounts') {
+    return Array.isArray(contextAccounts) ? contextAccounts : []
+  }
+
+  if (method === 'wallet_switchEthereumChain') {
+    const target = Number(params?.[0]?.chainId)
+    if (!Number.isSafeInteger(target)) throw RPC_ERRORS.invalidParams
+    try {
+      await onSwitchChain?.(target)
+      return null
+    } catch (err) {
+      throw { code: 4001, message: err?.message || 'Chain switch rejected' }
+    }
+  }
+
+  if (method === SESSION_CALL_METHOD) {
+    if (!onSessionCall) {
+      emit('sessionCall:unavailable')
+      throw RPC_ERRORS.unsupported
+    }
+
+    try {
+      emit('sessionCall:requested')
+      const result = await onSessionCall({ params, app })
+      emit('sessionCall:sent')
+      return result
+    } catch (err) {
+      emit('sessionCall:failed', { reason: err?.message, code: err?.code })
+      // String codes (NO_SESSION_KEY, VAULT_LOCKED, NOT_ALLOWED, …) ride along in the message
+      // so the app can present the right fix; numeric codes pass through as-is.
+      const code = typeof err?.code === 'number' ? err.code : 4100
+      const message = typeof err?.code === 'string' ? `${err.code}: ${err?.message || 'Session call failed'}` : err?.message || 'Session call failed'
+      throw { code, message }
+    }
+  }
+
+  if (AUTO_APPROVED_READS.has(method)) {
+    try {
+      return await onRead({ method, params })
+    } catch (err) {
+      throw { code: RPC_ERRORS.internal.code, message: err?.shortMessage || err?.message || 'Read failed' }
+    }
+  }
+
+  if (SIGNING_METHODS.has(method)) {
+    if (!session.isConnected || !session.address) throw RPC_ERRORS.disconnected
+
+    // A frame must not be able to sign as somebody else, nor spoof the `from` on a transaction.
+    const claimedFrom = method === 'eth_sendTransaction' ? params?.[0]?.from : method === 'personal_sign' ? params?.[1] : params?.[0]
+    if (claimedFrom && String(claimedFrom).toLowerCase() !== String(session.address).toLowerCase()) {
+      emit('signature:wrongAccount', { method, claimedFrom })
+      throw RPC_ERRORS.unauthorized
+    }
+
+    try {
+      emit('signature:requested', { method })
+      const result = await onSignatureRequest({ method, params, app })
+      emit('signature:approved', { method })
+      return result
+    } catch (err) {
+      emit('signature:rejected', { method, reason: err?.message })
+      throw err?.code === 4001 ? RPC_ERRORS.userRejected : { code: 4001, message: err?.message || 'Request rejected' }
+    }
+  }
+
+  emit('method:unsupported', { method })
+  throw RPC_ERRORS.unsupported
+}
+
+/**
  * Wires a sandboxed iframe to the viewer's wallet.
  *
  * @param {object} options
@@ -116,88 +225,22 @@ export function createMiniAppBridge({ iframe, app, getSession, onSignatureReques
   const fail = (id, error) => post({ type: 'rpc:error', id, error })
 
   const handleRpc = async (id, method, params) => {
-    const session = getSession() || {}
-
-    if (FORBIDDEN_METHODS.has(method)) {
-      emit('method:forbidden', { method })
-      return fail(id, RPC_ERRORS.unsupported)
+    try {
+      const result = await executeWalletMethod({
+        method,
+        params,
+        session: getSession() || {},
+        app,
+        onSignatureRequest,
+        onRead,
+        onSwitchChain,
+        onSessionCall,
+        emit,
+      })
+      return reply(id, result)
+    } catch (err) {
+      return fail(id, { code: typeof err?.code === 'number' ? err.code : RPC_ERRORS.internal.code, message: err?.message || RPC_ERRORS.internal.message })
     }
-
-    if (method === 'eth_requestAccounts' || method === 'eth_accounts') {
-      // The viewer's connection to Hup is the app's connection — there is no separate approval,
-      // but an app still cannot see an address when nobody is connected.
-      if (!session.isConnected || !session.address) return reply(id, [])
-      return reply(id, [session.address])
-    }
-
-    if (method === 'eth_chainId') {
-      if (!session.chainId) return fail(id, RPC_ERRORS.disconnected)
-      return reply(id, `0x${Number(session.chainId).toString(16)}`)
-    }
-
-    if (method === 'wallet_switchEthereumChain') {
-      const target = Number(params?.[0]?.chainId)
-      if (!Number.isSafeInteger(target)) return fail(id, RPC_ERRORS.invalidParams)
-      try {
-        await onSwitchChain?.(target)
-        return reply(id, null)
-      } catch (err) {
-        return fail(id, { code: 4001, message: err?.message || 'Chain switch rejected' })
-      }
-    }
-
-    if (method === SESSION_CALL_METHOD) {
-      if (!onSessionCall) {
-        emit('sessionCall:unavailable')
-        return fail(id, RPC_ERRORS.unsupported)
-      }
-
-      try {
-        emit('sessionCall:requested')
-        const result = await onSessionCall({ params, app })
-        emit('sessionCall:sent')
-        return reply(id, result)
-      } catch (err) {
-        emit('sessionCall:failed', { reason: err?.message, code: err?.code })
-        // String codes (NO_SESSION_KEY, VAULT_LOCKED, NOT_ALLOWED, …) ride along in the message
-        // so the app can present the right fix; numeric codes pass through as-is.
-        const code = typeof err?.code === 'number' ? err.code : 4100
-        const message = typeof err?.code === 'string' ? `${err.code}: ${err?.message || 'Session call failed'}` : err?.message || 'Session call failed'
-        return fail(id, { code, message })
-      }
-    }
-
-    if (AUTO_APPROVED_READS.has(method)) {
-      try {
-        return reply(id, await onRead({ method, params }))
-      } catch (err) {
-        return fail(id, { code: RPC_ERRORS.internal.code, message: err?.shortMessage || err?.message || 'Read failed' })
-      }
-    }
-
-    if (SIGNING_METHODS.has(method)) {
-      if (!session.isConnected || !session.address) return fail(id, RPC_ERRORS.disconnected)
-
-      // A frame must not be able to sign as somebody else, nor spoof the `from` on a transaction.
-      const claimedFrom = method === 'eth_sendTransaction' ? params?.[0]?.from : method === 'personal_sign' ? params?.[1] : params?.[0]
-      if (claimedFrom && String(claimedFrom).toLowerCase() !== String(session.address).toLowerCase()) {
-        emit('signature:wrongAccount', { method, claimedFrom })
-        return fail(id, RPC_ERRORS.unauthorized)
-      }
-
-      try {
-        emit('signature:requested', { method })
-        const result = await onSignatureRequest({ method, params, app })
-        emit('signature:approved', { method })
-        return reply(id, result)
-      } catch (err) {
-        emit('signature:rejected', { method, reason: err?.message })
-        return fail(id, err?.code === 4001 ? RPC_ERRORS.userRejected : { code: 4001, message: err?.message || 'Request rejected' })
-      }
-    }
-
-    emit('method:unsupported', { method })
-    return fail(id, RPC_ERRORS.unsupported)
   }
 
   const onMessage = (event) => {

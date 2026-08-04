@@ -71,6 +71,24 @@ Load `https://hup.social/miniapp-sdk.js`. It defines two globals over one transp
 `sdk.actions.close()`. Same transport as `hup.*`; `context.user` carries an `address` (wallet-based
 identity), not an `fid`. Apps written for Farcaster/Base App generally run unmodified.
 
+### LUKSO up-provider (Grid Mini App compatible)
+
+The host also speaks the `@lukso/up-provider` wire protocol, so mini apps built for the Grid on
+universaleverything.io run unmodified — `createClientUPProvider()` connects to the viewer's Hup
+session exactly as it would to the Grid host. Semantics inside Hup:
+
+- `accounts` — the viewer's connected wallet (EOA or Universal Profile; whatever they connected
+  to Hup). Empty until they connect; listen for `accountsChanged`.
+- `contextAccounts` / `up_contextAccounts` — the wallet of the **post author** hosting the embed,
+  Hup's equivalent of the Grid owner.
+- `chainId` — the app's registered chain, with public RPC URLs supplied so client-side `eth_call`
+  short-circuiting works.
+- The same wallet method policy applies as for the Hup SDK: signatures and transactions are
+  user-confirmed in Hup's UI, `eth_sign` is refused, `from` spoofing is rejected.
+
+Note that Hup does not guarantee the connected account is a Universal Profile contract — apps
+that unconditionally fetch LSP3 profile data should degrade gracefully for EOA viewers.
+
 ## Wallet method policy (enforced by the host)
 
 | Method | Result |
@@ -82,6 +100,34 @@ identity), not an `fid`. Apps written for Farcaster/Base App generally run unmod
 | `eth_sign`, `eth_signTransaction`, `wallet_addEthereumChain` | **Refused always**, error code 4200. Do not retry. |
 | `wallet_switchEthereumChain` | Host-mediated; only chains Hup supports. |
 | `from` spoofing | Any `from` not matching the connected account is rejected with 4100. |
+| `hup_sessionCall` | **Popup-free session-key call** — see below. Allowlisted apps only. |
+
+## Gasless session calls (`hup_sessionCall`)
+
+Apps approved for it can submit transactions signed by the viewer's **burner session key**
+(Settings → In App Wallet) with no per-call confirmation — the pattern behind fully-onchain
+games that play at tap speed:
+
+```js
+const hash = await provider.request({
+  method: 'hup_sessionCall',
+  params: [{ to: '0xYourApprovedContract', data: '0xYourCalldata' }],
+})
+```
+
+Host-enforced policy — none of this is negotiable from inside the frame:
+
+- `to` must be on Hup's per-app allowlist (requested during app review); anything else fails.
+- Value is always zero. Session calls spend gas, never funds.
+- The first call shows the viewer a one-time consent for your app; declining returns 4001.
+- Calls are rate limited per embed.
+- Failures carry a coded prefix in the message: `NO_SESSION_KEY` / `VAULT_LOCKED` (viewer needs
+  to set up or unlock their in-app wallet — point them at Settings), `NOT_ALLOWED` (target not
+  allowlisted). Handle them; don't retry blindly.
+
+The returned hash is submitted, not mined — poll `eth_getTransactionReceipt` (auto-approved)
+yourself. Your contract should resolve the acting player via Hup Core's `userSessions(owner)`
+mapping, the way `HupMiner.play(owner)` does, so activity credits the viewer's primary wallet.
 
 ## Rules that differ from a normal dapp
 
@@ -101,8 +147,10 @@ identity), not an `fid`. Apps written for Farcaster/Base App generally run unmod
 - **Standalone** (your dev server, Live Server, etc.): the SDK loads but `ready()` rejects with
   "not embedded in a host frame". Correct behavior — UI should degrade gracefully.
 - **Inside Hup**: register the app (below), have a moderator grant embedding, attach it to a post.
-- Reference implementation: `examples/miniapp-demo/` in the Hup repo — a diagnostic page that
-  exercises connect, sign, send, and verifies `eth_sign` is refused.
+- Reference implementations (live, view-source friendly):
+  https://hup.social/examples/miniapp-demo.html — a diagnostic page that exercises connect, sign,
+  send, and verifies `eth_sign` is refused; https://hup.social/examples/grid-demo.html — the same
+  idea built on the real `@lukso/up-provider` client, for testing Grid app compatibility.
 
 ## Listing your app
 
