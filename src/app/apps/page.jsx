@@ -357,7 +357,7 @@ function BuildSection() {
         </a>
 
         {/* Grid apps speak @lukso/up-provider, which the embed serves natively — no porting step */}
-        <a className={styles.build__link} href="https://docs.lukso.tech/learn/mini-apps/" target="_blank" rel="noopener noreferrer">
+        <a className={styles.build__link} href="https://docs.lukso.tech/learn/mini-apps/setting-your-grid/" target="_blank" rel="noopener noreferrer">
           <SquaresFourIcon size={20} aria-hidden="true" className={styles.build__linkIcon} />
           <span className={styles.build__linkText}>
             <strong>Bring your Grid app</strong>
