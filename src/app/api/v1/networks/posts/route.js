@@ -97,10 +97,22 @@ export async function GET(request) {
     }
 
     // Home-tab feeds pass exclude_nft=1 so posts carrying a HupTrade NFT listing live only
-    // in the dedicated NFT tab. nft_listing_id is a generated column, so this is a plain
-    // per-row predicate inside the paginated derived table — no join, no JSON parsing here.
+    // in the dedicated NFT tab. nft_listing_id is a generated column, so the first predicate
+    // is a plain per-row check inside the paginated derived table. Reposts and quotes render
+    // the ORIGINAL post's listing module client-side, so the sale leaks through them too:
+    // the EXISTS resolves the referenced post (is_repost holds its id; quotes keep it in
+    // content.quoteOf, mirroring the nft_listing_id column's own JSON_VALUE extraction) via
+    // a primary-key point lookup and hides the wrapper when the target sells an NFT.
     if (searchParams.get('exclude_nft') === '1' && feedType !== 'nft') {
-      whereClause += ` AND p.nft_listing_id IS NULL`
+      whereClause += ` AND p.nft_listing_id IS NULL AND NOT EXISTS (
+        SELECT 1 FROM posts orig
+        WHERE orig.network_id = p.network_id
+          AND orig.id = COALESCE(
+            NULLIF(p.is_repost, 0),
+            CASE WHEN JSON_VALID(p.content) THEN CAST(JSON_VALUE(p.content, '$.quoteOf') AS UNSIGNED) ELSE NULL END
+          )
+          AND orig.nft_listing_id IS NOT NULL
+      )`
     }
 
     // Apply dynamic filters using the direct performance indexes set on the posts table
