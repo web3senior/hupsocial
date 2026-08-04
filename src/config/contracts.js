@@ -138,7 +138,7 @@ export const CONTRACTS = {
     forwarder: '0x46a3dfCb1F4ec29dB7F96C0D3962DF20E6EdB259',
     hup: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
     status: '0xd5f02276c28E1F134BfA0b423381CE740ccb644E',
-    community: '',
+    community: '0x1586fDf0fb821D1c9758f4Bec6B92F46c4398f04',
     followerSystem:'0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '0x85765350FF07802155a35fFf261DFfaAb0ffA366',
     tipper: '0x487aE425f90425a3376F3bC8A016aA1Fb6bec96f',
@@ -146,7 +146,7 @@ export const CONTRACTS = {
     events: '0x4A6D88aBd0fd9049c1adD6757D382c1bb5bbC1D9',
     predict: '0x15C42Cf47D0Fe1D5314A91E5B23da35c72b129D9',
     apps: '0x16D02878DEA645209D64e1AC2b22131C7ee128FB',
-    miner: '',
+    miner: '0x859F3cC26446f39Bc68DBA31197824f05716465D',
   },
   chain42161: {
     name: 'arbitrum',
@@ -175,8 +175,8 @@ export const CONTRACTS = {
  */
 export const SESSION_CALL_ALLOWLIST = {
   10143: {
-    // Hup Miner — fill in the registry appId assigned when the game is listed on /apps, and the
-    // deployed HupMiner address above (chain10143.miner):
-    // 1: [CONTRACTS.chain10143.miner],
+    // Hup Miner — currently embedded through the appId 2 listing (local Live Server frame).
+    // When the game gets its own registry listing, move the grant to that appId.
+    2: [CONTRACTS.chain10143.miner],
   },
 }

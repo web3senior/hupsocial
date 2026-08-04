@@ -1,0 +1,112 @@
+/* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+.sessionDialog {
+  padding: var(--native-popover-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    width: min(420px, calc(100vw - 6px - 2em - 2px - 2 * var(--native-popover-padding, 1rem)));
+    max-height: 82svh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: var(--font-size-16, 1rem);
+      margin: 0;
+    }
+  }
+
+  &__close {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__source {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    strong {
+      color: var(--color);
+    }
+  }
+
+  &__facts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.75rem 0.75rem 0.75rem 1.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background-color: var(--surface-muted);
+    font-size: var(--font-size-12);
+
+    li {
+      overflow-wrap: anywhere;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.72rem;
+    }
+  }
+
+  &__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 0.6rem;
+  }
+
+  &__decline,
+  &__allow {
+    border-radius: var(--global-border-radius);
+    padding: 0.6rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  &__decline {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__allow {
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+}

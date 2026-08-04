@@ -1,6 +1,7 @@
 import { ethers } from 'ethers'
 import { getUserSessions } from './communication'
-import { decryptData, isPrivateKeyEncrypted } from './cryptoHelper'
+import { decryptData, encryptData, isPrivateKeyEncrypted } from './cryptoHelper'
+import { deriveChildKeyBytes, CHILD_KEY_LABELS } from './securityVault'
 
 const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
 
@@ -98,6 +99,50 @@ export const getBurnerSignerSilent = (chain) => {
   }
 
   return wallet
+}
+
+/**
+ * Unlocks the burner key for this tab using an already-unlocked vault master: decrypts the
+ * stored key and caches the plaintext in sessionStorage so silent signing works from then on.
+ * Mirrors the settings page's recovery path — a vault-derived wallet whose blob at rest was
+ * encrypted under the legacy per-feature password is simply re-derived from the master and
+ * re-encrypted. A decrypt AND re-derive failure means the master is wrong, i.e. a wrong PIN
+ * (or a foreign imported key from the old scheme, which needs a re-import in Settings).
+ *
+ * @throws {Error} code 'NO_SESSION_KEY' when this device holds no burner key.
+ * @throws {Error} code 'WRONG_PIN' when the master cannot open or reproduce the stored key.
+ */
+export const unlockBurnerWithMaster = async (masterHex) => {
+  const storedKey = localStorage.getItem(localStorageBurnerKey)
+  const storedAddress = localStorage.getItem(localStorageBurnerAddress)
+
+  if (!storedKey || !storedAddress) {
+    const err = new Error('No session key found on this device')
+    err.code = 'NO_SESSION_KEY'
+    throw err
+  }
+
+  if (!isPrivateKeyEncrypted(storedKey)) {
+    sessionStorage.setItem(sessionStorageUnlockedKey, storedKey)
+    return storedKey
+  }
+
+  try {
+    const privateKey = await decryptData(storedKey, masterHex)
+    sessionStorage.setItem(sessionStorageUnlockedKey, privateKey)
+    return privateKey
+  } catch {
+    const seedBytes = await deriveChildKeyBytes(masterHex, CHILD_KEY_LABELS.inAppWallet)
+    const derived = new ethers.Wallet(ethers.hexlify(seedBytes))
+    if (derived.address.toLowerCase() === storedAddress.toLowerCase()) {
+      localStorage.setItem(localStorageBurnerKey, await encryptData(derived.privateKey, masterHex))
+      sessionStorage.setItem(sessionStorageUnlockedKey, derived.privateKey)
+      return derived.privateKey
+    }
+    const err = new Error('That PIN does not open this session key')
+    err.code = 'WRONG_PIN'
+    throw err
+  }
 }
 
 /**
