@@ -4,10 +4,17 @@ import ListingDetail from './_components/ListingDetail'
 import styles from './page.module.scss'
 
 // Server-side listing fetch for generateMetadata, mirroring the predict detail page; cache()
-// deduplicates if a future server read joins the render
+// deduplicates if a future server read joins the render. Hard-capped: the listing API can
+// stall on a cold Universal Profile fulfillment, and that must cost the <title> its name,
+// not hold the whole navigation — the page body fetches its own data client-side.
+const METADATA_FETCH_TIMEOUT_MS = 2500
+
 const fetchListing = cache(async (networkId, listingId) => {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000'
-  const response = await fetch(`${baseUrl}/api/v1/nfts/${listingId}?networkId=${networkId}`, { next: { revalidate: 30 } })
+  const response = await fetch(`${baseUrl}/api/v1/nfts/${listingId}?networkId=${networkId}`, {
+    next: { revalidate: 30 },
+    signal: AbortSignal.timeout(METADATA_FETCH_TIMEOUT_MS),
+  })
   if (!response.ok) throw new Error('Listing fetch failed')
   return response.json()
 })

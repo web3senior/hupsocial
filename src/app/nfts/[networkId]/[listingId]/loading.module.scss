@@ -1,0 +1,65 @@
+/* Route-level fallback skeleton for the listing detail page.
+   Mirrors .page/.page__container from page.module.scss (and ListingDetail's
+   media/info split) so the swap to the real page doesn't cause a layout jump. */
+.loading {
+  min-height: 85svh;
+
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    padding: 1.25rem;
+
+    @media (max-width: 600px) {
+      border: none;
+      border-radius: 0;
+      padding: 1rem;
+    }
+  }
+
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 2.4rem;
+
+    @media (max-width: 800px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  &__media {
+    aspect-ratio: 1;
+    border-radius: 16px;
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
+  }
+
+  &__line {
+    height: 20px;
+    border-radius: 999px;
+
+    &--badges {
+      max-width: 260px;
+    }
+
+    &--title {
+      height: 36px;
+      max-width: 420px;
+    }
+  }
+
+  &__block {
+    height: 180px;
+    border-radius: 16px;
+  }
+}

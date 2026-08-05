@@ -1,0 +1,59 @@
+/* Route-level fallback skeleton for the collection page.
+   Mirrors .page/.page__container from page.module.scss so the swap to the real
+   page doesn't cause a layout jump. */
+.loading {
+  min-height: 85svh;
+
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    padding: 1.25rem;
+
+    @media (max-width: 600px) {
+      border: none;
+      border-radius: 0;
+      padding: 1rem;
+    }
+  }
+
+  &__banner {
+    aspect-ratio: 4 / 1;
+    min-height: 110px;
+    max-height: 260px;
+    margin-top: 2.4rem;
+    border-radius: 16px;
+  }
+
+  &__identity {
+    height: 56px;
+    margin-top: 1rem;
+    border-radius: 14px;
+  }
+
+  &__address {
+    height: 36px;
+    max-width: 420px;
+    margin-top: 1rem;
+    border-radius: 12px;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 0.85rem;
+    margin-top: 1.5rem;
+
+    @media (min-width: 640px) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  &__tile {
+    aspect-ratio: 1;
+    border-radius: 16px;
+  }
+}

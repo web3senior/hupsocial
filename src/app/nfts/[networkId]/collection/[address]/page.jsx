@@ -4,10 +4,18 @@ import CollectionView from './_components/CollectionView'
 import styles from './page.module.scss'
 
 // Server-side collection fetch for generateMetadata, mirroring the listing detail page;
-// cache() deduplicates if a future server read joins the render
+// cache() deduplicates if a future server read joins the render. Hard-capped: a cold
+// collection resolves through an RPC fan-out plus an IPFS document fetch, and a slow
+// gateway must cost the <title> its name, not hold the whole navigation — the visible
+// header fetches its own data client-side behind the route's loading shell.
+const METADATA_FETCH_TIMEOUT_MS = 2500
+
 const fetchCollection = cache(async (networkId, address) => {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000'
-  const response = await fetch(`${baseUrl}/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}`, { next: { revalidate: 300 } })
+  const response = await fetch(`${baseUrl}/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}`, {
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(METADATA_FETCH_TIMEOUT_MS),
+  })
   if (!response.ok) throw new Error('Collection fetch failed')
   return response.json()
 })
