@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useConnection, useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
@@ -92,6 +92,45 @@ function buildQueryString(filters, search) {
   if (search) params.set('q', search)
   return params.toString()
 }
+
+/**
+ * Back/forward cache for the grid, keyed by the query string. The URL work above restores
+ * WHICH view the user was in; this restores what was on screen — the loaded pages and the
+ * scroll offset — so returning from a listing detail doesn't reset to a page-1 skeleton
+ * with the browser's scroll restore landing in the wrong place. Module scope survives
+ * client-side navigation and empties on a full reload, which is exactly a bfcache's
+ * lifetime. Snapshots are only re-applied to a query string they were captured under.
+ */
+const GRID_CACHE_LIMIT = 20
+const gridCache = new Map()
+
+function writeGridCache(key, snapshot) {
+  gridCache.delete(key)
+  gridCache.set(key, snapshot)
+  if (gridCache.size > GRID_CACHE_LIMIT) gridCache.delete(gridCache.keys().next().value)
+}
+
+/**
+ * Scroll is only re-applied for history traversals — a nav-link push must land at the top.
+ * Telling the two apart is ordering-sensitive: browser-chrome back fires popstate BEFORE
+ * the new page commits, while router.back() (the in-page Back button) commits first and
+ * its popstate lands a few ms later. So the restore effect below handles both: it applies
+ * directly when a popstate just fired, otherwise it arms pendingScrollRestore and lets the
+ * imminent popstate pull the trigger. A push never gets a popstate — the armed restore
+ * disarms on a short timer (or unmount) and the page stays wherever the router put it.
+ */
+let lastPopstateAt = Number.NEGATIVE_INFINITY
+let pendingScrollRestore = null
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    lastPopstateAt = performance.now()
+    if (pendingScrollRestore != null) {
+      window.scrollTo({ top: pendingScrollRestore, behavior: 'instant' })
+      pendingScrollRestore = null
+    }
+  })
+}
+
 
 // Only chains with HupTrade actually deployed are worth offering as a filter
 const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)
@@ -285,10 +324,24 @@ export default function NftMarketGrid() {
     return seller ? { wallet_address: seller } : null
   })
 
-  const [items, setItems] = useState([])
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  // The bfcache key comes from Next, not window.location — during a router.back() commit
+  // the address bar still shows the page being left, but searchParams already carry the
+  // target route's query, and they track this page's own pushState/replaceState updates too
+  const cacheKey = searchParams.toString()
+  const cacheKeyRef = useRef(cacheKey)
+  useEffect(() => {
+    cacheKeyRef.current = cacheKey
+  }, [cacheKey])
+
+  // Snapshot of this exact view from the bfcache, if the user has been here this session.
+  // Only client-side navigations can hit (a full load starts with an empty module cache),
+  // so seeding initial state from it can never diverge from server-rendered HTML.
+  const [restoredSnapshot] = useState(() => (typeof window === 'undefined' ? null : gridCache.get(searchParams.toString()) || null))
+
+  const [items, setItems] = useState(() => restoredSnapshot?.items || [])
+  const [page, setPage] = useState(() => restoredSnapshot?.page || 1)
+  const [hasMore, setHasMore] = useState(() => restoredSnapshot?.hasMore || false)
+  const [isLoading, setIsLoading] = useState(() => !restoredSnapshot)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
 
   // Selling from here needs no post — the listing goes straight onchain and reaches this
@@ -301,7 +354,7 @@ export default function NftMarketGrid() {
   // visible card's live metadata resolves, so the "Collection" filter only ever offers
   // collections that actually showed up on screen. Cleared whenever the server-side
   // filters change (a fresh page 1), since a network switch invalidates prior entries.
-  const [collectionOptions, setCollectionOptions] = useState(new Map())
+  const [collectionOptions, setCollectionOptions] = useState(() => restoredSnapshot?.collectionOptions || new Map())
 
   const handleCollectionResolved = useCallback((collectionAddress, collectionName) => {
     setCollectionOptions((prev) => (prev.has(collectionAddress) ? prev : new Map(prev).set(collectionAddress, collectionName)))
@@ -318,6 +371,42 @@ export default function NftMarketGrid() {
 
   const selectedToken = tokenOptions.find((o) => o.value === filters.token)
   const priceDecimals = usePriceDecimals(filters.networkId, filters.token, selectedToken?.decimals)
+
+  // One entry per distinct fetch input — lets the fetch effect below no-op when its result
+  // is already on screen. Seeded with the mount inputs on a restore, so the initial run
+  // doesn't refetch page 1 and throw away every loaded page beyond the first (idempotent
+  // under StrictMode's replayed mount, unlike a consumable boolean).
+  const lastFetchKeyRef = useRef(restoredSnapshot ? JSON.stringify([filters, priceDecimals, 0]) : null)
+
+  // Snap back to where the user was. The restored rows are already in this render's DOM
+  // with their final height (fixed aspect-ratio tiles), and 'instant' overrides the app's
+  // global scroll-behavior: smooth — an animated restore is itself the "scroll shows the
+  // wrong place" drift this cache exists to fix. See the pendingScrollRestore block above
+  // for why a traversal is detected two different ways.
+  useLayoutEffect(() => {
+    if (!restoredSnapshot) return
+    if (performance.now() - lastPopstateAt < 1000) {
+      // Browser-chrome back: its popstate already fired, restore right now, pre-paint
+      window.scrollTo({ top: restoredSnapshot.scrollY, behavior: 'instant' })
+      return
+    }
+    // router.back(): the matching popstate lands a few ms after this commit — arm it.
+    // If none comes (this was a plain push), disarm and stay at the top.
+    pendingScrollRestore = restoredSnapshot.scrollY
+    const timer = setTimeout(() => {
+      pendingScrollRestore = null
+    }, 500)
+    return () => {
+      clearTimeout(timer)
+      pendingScrollRestore = null
+    }
+  }, [restoredSnapshot])
+
+  // Snapshot whatever the grid last settled on; the scroll listener keeps scrollY current
+  useEffect(() => {
+    if (isLoading) return
+    writeGridCache(cacheKey, { items, page, hasMore, collectionOptions, scrollY: window.scrollY })
+  }, [items, page, hasMore, collectionOptions, isLoading, cacheKey])
 
   useEffect(() => {
     let cancelled = false
@@ -394,6 +483,12 @@ export default function NftMarketGrid() {
   }, [setFilters])
 
   useEffect(() => {
+    // Same inputs as the result already on screen (a restored snapshot, or StrictMode
+    // replaying the mount) — refetching would truncate the list back to page 1
+    const fetchKey = JSON.stringify([filters, priceDecimals, refreshKey])
+    if (fetchKey === lastFetchKeyRef.current) return
+    lastFetchKeyRef.current = fetchKey
+
     let cancelled = false
 
     const fetchFirstPage = async () => {
@@ -424,6 +519,9 @@ export default function NftMarketGrid() {
 
     return () => {
       cancelled = true
+      // This run's result never landed (cancelled) — forget its key so the next run,
+      // even with identical inputs, fetches instead of skipping
+      lastFetchKeyRef.current = null
     }
   }, [filters, priceDecimals, refreshKey])
 
@@ -452,6 +550,8 @@ export default function NftMarketGrid() {
   useEffect(() => {
     const onScroll = () => {
       const { scrollTop, clientHeight, scrollHeight } = document.documentElement
+      const cached = gridCache.get(cacheKeyRef.current)
+      if (cached) cached.scrollY = scrollTop
       if (scrollTop + clientHeight >= scrollHeight - 400 && hasMoreRef.current && !isFetchingRef.current) loadMore()
     }
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -656,7 +756,9 @@ export default function NftMarketGrid() {
                   <select id="nftFilterStandard" value={filters.standard} onChange={(e) => setFilters((f) => ({ ...f, standard: e.target.value }))}>
                     <option value="">Any</option>
                     <option value="erc721">ERC721</option>
-                    <option value="lsp8">LSP8</option>
+                    <option value="lsp8" title="LSP8">
+                      NFT 2.0
+                    </option>
                   </select>
                 </div>
 
