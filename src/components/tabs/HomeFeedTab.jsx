@@ -77,10 +77,20 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   // Cached scroll position to restore; consumed once the posts render.
   const pendingScrollRestoreRef = useRef(initialCache ? initialCache.scrollY ?? 0 : null)
   const cacheSnapshotRef = useRef(null)
+  // Feed container height, tracked live like the scroll position (the ref is
+  // already null in the unmount cleanup where the snapshot is saved).
+  const containerRef = useRef(null)
+  const lastFeedHeightRef = useRef(initialCache?.feedHeight ?? 0)
+  // Height reserved on the container while restoring from cache: media hasn't
+  // loaded yet on the first frames, so without it the document is too short
+  // for the scroll target — the browser clamps scrollTo and the page visibly
+  // crawls down as images stream in instead of restoring in one jump.
+  const [reservedHeight, setReservedHeight] = useState(initialCache ? initialCache.feedHeight ?? null : null)
 
   // Snapshot the cacheable state every render for the save-on-exit cleanup below.
   useEffect(() => {
     cacheSnapshotRef.current = { list: posts.list, page, hasMore, address: address ?? null }
+    lastFeedHeightRef.current = containerRef.current?.offsetHeight || lastFeedHeightRef.current
   })
 
   useEffect(() => {
@@ -97,6 +107,8 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       const SCROLL_THRESHOLD = 300
 
       lastScrollYRef.current = scrollTop
+      // Media loads change the height without a re-render, so re-measure here too.
+      lastFeedHeightRef.current = containerRef.current?.offsetHeight || lastFeedHeightRef.current
 
       if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
         if (hasMoreRef.current && !isFetchingRef.current) {
@@ -144,24 +156,34 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     return () => {
       const snapshot = cacheSnapshotRef.current
       if (!snapshot || snapshot.list.length === 0) return
-      saveFeedCache(feedCacheKey, { ...snapshot, scrollY: lastScrollYRef.current })
+      saveFeedCache(feedCacheKey, { ...snapshot, scrollY: lastScrollYRef.current, feedHeight: lastFeedHeightRef.current || null })
     }
   }, [feedCacheKey, saveFeedCache])
 
   // Restore the cached scroll position once the hydrated posts have rendered.
-  // Media may still be loading, leaving the document too short for the target
-  // on the first frames (the browser clamps scrollTo), so keep re-applying
-  // briefly until the position sticks. The pending ref is only cleared on
-  // success/deadline, so a StrictMode remount restarts the loop cleanly.
+  // Reaching the target once is not enough to stop: Next's layout-router
+  // scrolls the new segment to top AFTER this effect (parent layout effects
+  // run after children's), and media loads can still clamp the position. So
+  // keep re-asserting until the target survives two consecutive frames —
+  // rAF callbacks fire before the pending paint, so a reset that lands
+  // pre-paint gets corrected pre-paint and never shows. The pending ref is
+  // only cleared on success/deadline, so a StrictMode remount restarts the
+  // loop cleanly.
   useLayoutEffect(() => {
     const target = pendingScrollRestoreRef.current
     if (target === null || posts.list.length === 0) return
 
     const deadline = performance.now() + 1500
     let frame = 0
+    let stableFrames = 0
     const apply = () => {
-      window.scrollTo(0, target)
-      if (Math.abs(window.scrollY - target) < 2 || performance.now() > deadline) {
+      if (Math.abs(window.scrollY - target) < 2) {
+        stableFrames += 1
+      } else {
+        stableFrames = 0
+        window.scrollTo(0, target)
+      }
+      if (stableFrames >= 2 || performance.now() > deadline) {
         pendingScrollRestoreRef.current = null
         return
       }
@@ -276,6 +298,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
 
     setInitialData({ success: true, data: [...newPostsQueue, ...posts.list] })
     setNewPostsQueue([])
+    setReservedHeight(null)
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [newPostsQueue, posts.list, setInitialData])
@@ -293,6 +316,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
       setInitialData(postsRes)
       setPage(1)
       setNewPostsQueue([])
+      setReservedHeight(null)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (error) {
       console.error('Refresh error:', error)
@@ -312,7 +336,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   }, [feedRefreshNonce, handleManualRefresh])
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={containerRef} style={reservedHeight ? { minHeight: reservedHeight } : undefined}>
       <PageTitle name={title} changeDocumentTitle={changeDocumentTitle} spacer={false} showInHeader={false} />
 
       <div className={clsx('__container')} data-width="small">
@@ -353,7 +377,8 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
             {posts?.list?.map((item, i) => (
               <section
                 key={item.id}
-                className={clsx(styles.post, 'animate', 'fade')}
+                // Restored feeds must repaint identically in place — no entrance replay.
+                className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
                 onClick={(e) => {
                   e.stopPropagation()
                   handlePostClick(item)
