@@ -1,0 +1,168 @@
+.collection {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &__back {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    align-self: flex-start;
+  }
+
+  &__market {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  &__tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  &__tab {
+    height: 34px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--text-muted);
+    }
+
+    &--active {
+      border-color: var(--network-color-primary, var(--color-primary));
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 12%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    color: var(--text-muted, #888);
+    background: transparent;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
+    }
+
+    &:disabled {
+      cursor: progress;
+      opacity: 0.7;
+    }
+
+    &--spinning {
+      animation: collectionRefreshSpin 0.9s linear infinite;
+    }
+  }
+
+  &__grid {
+    display: grid;
+    /* minmax(0, …), not a bare 1fr — a long collection name's min-content width would
+       otherwise widen the track and overflow the row, same as the market grid */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 0.85rem;
+  }
+
+  &__skeletonTile {
+    aspect-ratio: 1;
+    border-radius: 16px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: collectionGridPulse 1.4s ease-in-out infinite;
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--text-muted, #888);
+  }
+
+  &__loadMoreWrap {
+    display: flex;
+    justify-content: center;
+    padding-top: 0.5rem;
+  }
+
+  &__loadMore {
+    padding: 0.6rem 1.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--text-muted);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+  }
+
+  @media (min-width: 640px) {
+    &__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+}
+
+@keyframes collectionGridPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes collectionRefreshSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import clsx from 'clsx'
 import { StackIcon } from '@phosphor-icons/react'
 import { getNftCollections } from '@/lib/api'
@@ -66,15 +67,15 @@ function CoverTile({ networkId, collection, sample, onName, className }) {
  * Collection Card
  * A single showcased collection: a mosaic of its most recent listings, the collection name
  * once it resolves onchain, and the two numbers a buyer scans for — how many are up, and
- * what the cheapest one costs.
+ * what the cheapest one costs. Links through to the collection's own page.
  */
-function CollectionCard({ collection, isActive, onSelect }) {
+function CollectionCard({ collection }) {
   const networkId = Number(collection.network_id)
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)
 
   // Collection names live onchain, not in the index — the first cover tile to resolve one
-  // names the card, and the grid's Collection filter borrows it (see onSelect)
+  // names the card
   const [name, setName] = useState(null)
 
   const samples = collection.samples || []
@@ -88,12 +89,7 @@ function CollectionCard({ collection, isActive, onSelect }) {
   const floorPrice = formatStake(collection.floor_price, floorDecimals)
 
   return (
-    <button
-      type="button"
-      className={clsx(styles.hero__card, isActive && styles['hero__card--active'])}
-      aria-pressed={isActive}
-      onClick={() => onSelect(collection, name)}
-    >
+    <Link href={`/nfts/${networkId}/collection/${collection.collection.toLowerCase()}`} className={styles.hero__card}>
       <div className={clsx(styles.hero__mosaic, samples.length < 2 && styles['hero__mosaic--single'])}>
         <CoverTile networkId={networkId} collection={collection.collection} sample={samples[0]} onName={setName} />
         {samples.length > 1 && (
@@ -123,21 +119,19 @@ function CollectionCard({ collection, isActive, onSelect }) {
         {/* Reserved even when empty so every card in the rail keeps a common baseline */}
         <span className={styles.hero__sold}>{soldCount > 0 ? `${COMPACT.format(soldCount)} sold` : ''}</span>
       </div>
-    </button>
+    </Link>
   )
 }
 
 /**
  * NFT Market Hero
  * The showcase rail above the grid: collections that currently have something listed, ranked
- * by how many. Selecting a card filters the grid to that collection on its own chain;
- * selecting it again clears back to everything.
+ * by how many. Each card links to the collection's own page — banner, description, creators
+ * and every listing. Filtering the grid in place stays available through the funnel.
  * @param {Object} props
  * @param {string} [props.networkId] The grid's network filter — scopes the rail to match.
- * @param {string} [props.activeCollection] Lower-cased address the grid is filtered to.
- * @param {Function} props.onSelectCollection Called with (networkId, address, name|null).
  */
-export default function MarketHero({ networkId, activeCollection, onSelectCollection }) {
+export default function MarketHero({ networkId }) {
   const [collections, setCollections] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -167,32 +161,18 @@ export default function MarketHero({ networkId, activeCollection, onSelectCollec
   // rail of skeletons that never fills would just be noise
   if (!isLoading && collections.length === 0) return null
 
-  const handleSelect = (collection, name) => {
-    const address = collection.collection.toLowerCase()
-    if (address === activeCollection) {
-      onSelectCollection(null, null, null)
-      return
-    }
-    onSelectCollection(String(collection.network_id), address, name)
-  }
-
   return (
     <section className={styles.hero} aria-label="Listed collections">
       <header className={styles.hero__header}>
         <h2 className={styles.hero__heading}>Collections on the market</h2>
-        <p className={styles.hero__subheading}>Tap a collection to filter the market</p>
+        <p className={styles.hero__subheading}>Tap a collection to open its page</p>
       </header>
 
       <div className={styles.hero__rail}>
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => <div key={i} className={styles.hero__skeleton} />)
           : collections.map((collection) => (
-              <CollectionCard
-                key={`${collection.network_id}-${collection.collection}`}
-                collection={collection}
-                isActive={collection.collection.toLowerCase() === activeCollection}
-                onSelect={handleSelect}
-              />
+              <CollectionCard key={`${collection.network_id}-${collection.collection}`} collection={collection} />
             ))}
       </div>
     </section>

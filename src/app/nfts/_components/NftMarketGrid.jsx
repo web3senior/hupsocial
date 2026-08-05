@@ -587,28 +587,6 @@ export default function NftMarketGrid() {
     tradeChains[0]?.id ??
     null
 
-  // A hero pick carries its own chain, so it sets the network filter too — the same
-  // collection address can exist on several. It also hands over the name it resolved
-  // onchain, otherwise the funnel's Collection <select> would point at a missing option
-  // until a card below happened to resolve the same collection.
-  const handleHeroSelect = useCallback(
-    (heroNetworkId, collectionAddress, collectionName) => {
-      if (!collectionAddress) {
-        setFilters((f) => ({ ...f, collection: '' }))
-        return
-      }
-      if (collectionName) handleCollectionResolved(collectionAddress, collectionName)
-      // Payment token and price bounds are network-scoped, so a chain change drops them
-      setFilters((f) => ({
-        ...f,
-        networkId: heroNetworkId,
-        collection: collectionAddress,
-        ...(heroNetworkId === f.networkId ? {} : { token: '', minPrice: '', maxPrice: '' }),
-      }))
-    },
-    [handleCollectionResolved, setFilters],
-  )
-
   const handleSell = () => {
     if (!address) {
       toast('Connect your wallet to list an NFT', 'error')
@@ -628,7 +606,7 @@ export default function NftMarketGrid() {
   return (
     <div className={clsx('__container')} data-width="large">
       <div className={styles.market}>
-        <MarketHero networkId={filters.networkId} activeCollection={filters.collection} onSelectCollection={handleHeroSelect} />
+        <MarketHero networkId={filters.networkId} />
 
         <label className={clsx(styles.search, 'rounded-full')}>
           <MagnifyingGlassIcon size={18} aria-hidden="true" />

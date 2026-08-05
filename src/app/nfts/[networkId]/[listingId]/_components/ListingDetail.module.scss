@@ -338,6 +338,128 @@
     }
   }
 
+  // "About the collection" strip — the shared LSP4 identity of the whole contract,
+  // in one bordered card with a drill-in to the collection page
+  &__collection {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  &__collectionIcon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    object-fit: cover;
+    background-color: var(--surface-muted);
+
+    &[data-broken] {
+      object-fit: contain;
+      padding: 22%;
+    }
+
+    &--fallback {
+      display: grid;
+      place-items: center;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__collectionBody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+    flex: 1;
+
+    small {
+      font-size: var(--font-size-10, 0.65rem);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__collectionName {
+    align-self: flex-start;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__collectionMeta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 0;
+    font-size: var(--font-size-12, 0.75rem);
+    color: var(--text-muted, #888);
+
+    a {
+      color: inherit;
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+  }
+
+  &__collectionDescription {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    margin: 0.2rem 0 0;
+    font-size: var(--font-size-12, 0.75rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  // Mirrors __seller: small-caps label over shared Profile rows
+  &__collectionCreators {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+
+    small {
+      font-size: var(--font-size-10, 0.65rem);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__collectionOpen {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    align-self: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-muted, #888);
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+  }
+
   &__actions {
     display: flex;
     align-items: center;

@@ -173,6 +173,26 @@ export const getNftCollections = async (limit = 12, networkId) => {
 }
 
 /**
+ * Get NFT Collection Info
+ * Collection-level display metadata for one contract — name, symbol, banner, icon,
+ * description, LSP4Creators[] addresses and total supply — from the server-side
+ * nft_collection_cache. Powers the collection page header and the listing page's
+ * "about the collection" strip.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ * @param {boolean} [isLsp8] Standard hint when the caller holds a listing row; omitted,
+ * the server infers it from the listings index or an onchain probe.
+ */
+export const getNftCollectionInfo = async (networkId, address, isLsp8) => {
+  const suffix = typeof isLsp8 === 'boolean' ? `?isLsp8=${isLsp8 ? '1' : '0'}` : ''
+
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}${suffix}`)
+  if (!response.ok) throw new Error('Failed to fetch collection info')
+
+  return response.json()
+}
+
+/**
  * Refresh Collection Metadata
  * Re-reads a batch of one collection's cached tokens from chain, for a collection that changed
  * its onchain metadata. One call does not necessarily finish the job — the returned

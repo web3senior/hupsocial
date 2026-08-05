@@ -1,0 +1,225 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  // Wide LSP4 backgroundImage, profile-banner style. A fixed aspect keeps the layout from
+  // jumping between collections that ship different banner sizes.
+  &__banner {
+    aspect-ratio: 4 / 1;
+    min-height: 110px;
+    max-height: 260px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is
+      // line-art, so contain it at icon scale rather than cover-crop it
+      &[data-broken] {
+        object-fit: contain;
+        padding: 5%;
+      }
+    }
+
+    &--fallback {
+      display: grid;
+      place-items: center;
+      color: var(--text-muted, #888);
+      background: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 8%, transparent);
+    }
+
+    &--skeleton {
+      border: none;
+      background-color: color-mix(in srgb, var(--text) 6%, transparent);
+      animation: collectionHeaderPulse 1.4s ease-in-out infinite;
+    }
+  }
+
+  &__skeletonRow {
+    height: 56px;
+    border-radius: 14px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: collectionHeaderPulse 1.4s ease-in-out infinite;
+  }
+
+  &__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    object-fit: cover;
+    background-color: var(--surface-muted);
+
+    &[data-broken] {
+      object-fit: contain;
+      padding: 22%;
+    }
+
+    &--fallback {
+      display: grid;
+      place-items: center;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__titleBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  &__titleRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.6rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  &__symbol {
+    color: var(--text-muted, #888);
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #888);
+  }
+
+  &__stats {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 0;
+    font-size: var(--font-size-12, 0.75rem);
+    color: var(--text-muted, #888);
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    b {
+      color: var(--text);
+      font-family: var(--ff-mono);
+    }
+  }
+
+  &__creators {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    small {
+      font-size: var(--font-size-10, 0.65rem);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__creatorList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  // Full contract address in a mono pill, with copy/explorer riding along — the one fact
+  // a buyer verifies against the chain, so it never truncates behind a tooltip alone
+  &__address {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: flex-start;
+    max-width: 100%;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+
+    code {
+      overflow: hidden;
+      font-family: var(--ff-mono);
+      font-size: 0.78rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    button,
+    a {
+      all: unset;
+      cursor: pointer;
+      display: inline-flex;
+      flex-shrink: 0;
+      color: var(--text-muted, #888);
+      transition: color 0.15s ease;
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+  }
+
+  &__description {
+    margin: 0;
+    max-width: 70ch;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.55;
+    color: var(--text-muted, #888);
+    white-space: pre-line;
+  }
+}
+
+@keyframes collectionHeaderPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}

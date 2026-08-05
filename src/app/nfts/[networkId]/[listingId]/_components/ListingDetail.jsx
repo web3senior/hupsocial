@@ -12,6 +12,7 @@ import { handleBrokenImage } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
+import useCollectionInfo from '@/hooks/useCollectionInfo'
 import useCollectionMetadataRefresh, { collectionRefreshLabel, describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
@@ -24,6 +25,7 @@ import {
   ArrowsClockwiseIcon,
   ArrowSquareOutIcon,
   CaretLeftIcon,
+  CaretRightIcon,
   ChatCircleIcon,
   CubeIcon,
   ImageIcon,
@@ -60,6 +62,14 @@ const formatTokenId = (tokenId) => {
     // Non-numeric (bytes32 hex) — fall through to shortening
   }
   return raw.length > 12 ? `${raw.slice(0, 4)}…${raw.slice(-4)}` : raw
+}
+
+const formatSupply = (value) => {
+  try {
+    return new Intl.NumberFormat().format(BigInt(value))
+  } catch {
+    return String(value)
+  }
 }
 
 // Inline referral credit — resolves the wallet to a profile name (Universal Profile or
@@ -123,6 +133,10 @@ export default function ListingDetail({ networkId, listingId }) {
   // their own collection a listing at a time.
   const collectionRefresh = useCollectionMetadataRefresh({ chainId, collection: listing?.collection })
 
+  // Collection-level identity (icon, description, creators, supply) for the "about the
+  // collection" strip — one cached fetch, shared with the collection page itself
+  const collectionInfo = useCollectionInfo({ chainId, collection: listing?.collection, isLsp8, enabled: Boolean(listing?.collection) })
+
   const handleRefreshMetadata = async () => {
     try {
       await metadata.refresh()
@@ -173,6 +187,9 @@ export default function ListingDetail({ networkId, listingId }) {
     tokenId: listing.token_id,
     isLsp8,
   })
+
+  // In-app collection page; the external explorer link stays on the details rows below
+  const collectionHref = `/nfts/${chainId}/collection/${listing.collection.toLowerCase()}`
 
   return (
     <div className={`${styles.listing} animate fade`}>
@@ -281,14 +298,11 @@ export default function ListingDetail({ networkId, listingId }) {
             )}
           </div>
 
-          {metadata.collectionName &&
-            (collectionUrl ? (
-              <a href={collectionUrl} target="_blank" rel="noopener noreferrer" className={styles.listing__eyebrow}>
-                {metadata.collectionName}
-              </a>
-            ) : (
-              <span className={styles.listing__eyebrow}>{metadata.collectionName}</span>
-            ))}
+          {metadata.collectionName && (
+            <Link href={collectionHref} className={styles.listing__eyebrow}>
+              {metadata.collectionName}
+            </Link>
+          )}
 
           <h1 className={styles.listing__title}>{title}</h1>
 
@@ -368,6 +382,50 @@ export default function ListingDetail({ networkId, listingId }) {
               </dd>
             </div>
           </dl>
+
+          {/* About the collection — the identity every token of this contract shares
+              (LSP4 collection metadata), linking through to the collection's own page */}
+          {(collectionInfo.name || collectionInfo.description) && (
+            <aside className={styles.listing__collection} aria-label="About the collection">
+              {collectionInfo.icon ? (
+                <img className={styles.listing__collectionIcon} src={collectionInfo.icon} alt="" loading="lazy" onError={handleBrokenImage} />
+              ) : (
+                <span className={clsx(styles.listing__collectionIcon, styles['listing__collectionIcon--fallback'])}>
+                  <HupMark size={20} />
+                </span>
+              )}
+
+              <div className={styles.listing__collectionBody}>
+                <small>Collection</small>
+                <Link href={collectionHref} className={styles.listing__collectionName}>
+                  {collectionInfo.name || metadata.collectionName || shortAddress(listing.collection)}
+                </Link>
+
+                {collectionInfo.totalSupply !== null && (
+                  <p className={styles.listing__collectionMeta}>
+                    <span>{formatSupply(collectionInfo.totalSupply)} items</span>
+                  </p>
+                )}
+
+                {collectionInfo.description && <p className={styles.listing__collectionDescription}>{collectionInfo.description}</p>}
+
+                {/* LSP4Creators[] through the shared Profile component, exactly like the
+                    seller block above — avatar, resolved name, hover card, profile link */}
+                {collectionInfo.creators.length > 0 && (
+                  <div className={styles.listing__collectionCreators}>
+                    <small>Created by</small>
+                    {collectionInfo.creators.map((creator) => (
+                      <Profile key={creator} variant="fullWithoutTime" creator={creator} networkId={chainId} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Link href={collectionHref} className={styles.listing__collectionOpen} aria-label="View the collection page">
+                <CaretRightIcon size={16} />
+              </Link>
+            </aside>
+          )}
 
           <div className={styles.listing__actions}>
             {postId && (
