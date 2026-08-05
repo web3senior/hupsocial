@@ -5,10 +5,11 @@ import { useSearchParams } from 'next/navigation'
 import { useConnection, useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
-import { FunnelIcon, MagnifyingGlassIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowsClockwiseIcon, FunnelIcon, MagnifyingGlassIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
 import { getNftListings, getNftPaymentTokens, getNftSellers } from '@/lib/api'
 import { handleBrokenImage } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
+import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
@@ -558,6 +559,26 @@ export default function NftMarketGrid() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [loadMore])
 
+  // Drilling into a collection is the one place a whole-collection metadata refresh makes
+  // sense — every tile on screen belongs to it. The funnel's Collection <select> offers a bare
+  // address with no network attached, so when the network filter is empty the chain is taken
+  // from the loaded rows themselves; the same collection can exist on several.
+  const activeCollectionChainId = filters.collection
+    ? Number(filters.networkId) || Number(items.find((item) => item.collection?.toLowerCase() === filters.collection)?.network_id) || null
+    : null
+
+  const collectionRefresh = useCollectionMetadataRefresh({ chainId: activeCollectionChainId, collection: filters.collection })
+
+  const handleRefreshCollection = async () => {
+    try {
+      const result = await collectionRefresh.refresh()
+      if (!result) return
+      toast(...describeCollectionRefresh(result))
+    } catch (error) {
+      toast(error.message || 'Could not refresh the collection', 'error')
+    }
+  }
+
   // The sell modal opens on the network being browsed, else the wallet's own chain when
   // HupTrade lives there, else the first chain it's deployed on — and stays switchable inside
   const sellChainId =
@@ -655,6 +676,21 @@ export default function NftMarketGrid() {
               onChange={(value) => setFilters((f) => ({ ...f, sort: value }))}
             />
           </div>
+
+          {/* Only while a collection is the view — a sweep of "everything on the market" is
+              not something a button should be able to start */}
+          {activeCollectionChainId && (
+            <button
+              type="button"
+              className={styles.market__refreshButton}
+              aria-label="Refresh this collection's metadata"
+              title="Re-read every NFT in this collection from the blockchain"
+              onClick={handleRefreshCollection}
+              disabled={collectionRefresh.isRefreshing}
+            >
+              <ArrowsClockwiseIcon size={16} className={clsx(collectionRefresh.isRefreshing && styles['market__refreshButton--spinning'])} />
+            </button>
+          )}
 
           <NativePopover
             placement="bottom-end"

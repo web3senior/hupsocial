@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
 import { toMetadataPayload } from '@/lib/nftMetadataPayload'
+import { mapWithConcurrency } from '@/lib/concurrency'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,20 +23,6 @@ const CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidat
 // Resolving a whole grid at once must not open 30 simultaneous RPC/gateway conversations.
 const BATCH_CONCURRENCY = 8
 const MAX_BATCH = 60
-
-/** Maps over items with a bounded number of in-flight workers, preserving input order. */
-const mapWithConcurrency = async (items, limit, worker) => {
-  const results = new Array(items.length)
-  let cursor = 0
-  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++
-      results[index] = await worker(items[index], index)
-    }
-  })
-  await Promise.all(runners)
-  return results
-}
 
 /**
  * Batch form of the GET below. The market grid resolves ~30 tokens at once, and the dev

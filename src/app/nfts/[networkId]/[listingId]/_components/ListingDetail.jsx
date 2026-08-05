@@ -12,6 +12,7 @@ import { handleBrokenImage } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
+import useCollectionMetadataRefresh, { collectionRefreshLabel, describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import TradeCard, { buildAssetLinks } from '@/components/TradeCard'
@@ -29,6 +30,7 @@ import {
   ReceiptIcon,
   RepeatIcon,
   ShareNetworkIcon,
+  StackIcon,
   TimerIcon,
   UserIcon,
   WarningIcon,
@@ -116,12 +118,27 @@ export default function ListingDetail({ networkId, listingId }) {
 
   const { symbol, decimals } = useStakeToken(chainId, listing?.payment_token, Boolean(Number(listing?.is_lsp7)))
 
+  // A collection that re-pointed its artwork changed every token, not just this one — so the
+  // page offers the sweep next to the single-token refresh rather than making the owner walk
+  // their own collection a listing at a time.
+  const collectionRefresh = useCollectionMetadataRefresh({ chainId, collection: listing?.collection })
+
   const handleRefreshMetadata = async () => {
     try {
       await metadata.refresh()
       toast('Metadata refreshed from the blockchain', 'success')
     } catch (refreshError) {
       toast(refreshError.message || 'Could not refresh metadata', 'error')
+    }
+  }
+
+  const handleRefreshCollection = async () => {
+    try {
+      const result = await collectionRefresh.refresh()
+      if (!result) return
+      toast(...describeCollectionRefresh(result))
+    } catch (refreshError) {
+      toast(refreshError.message || 'Could not refresh the collection', 'error')
     }
   }
 
@@ -212,6 +229,23 @@ export default function ListingDetail({ networkId, listingId }) {
             >
               <ArrowsClockwiseIcon size={14} className={clsx(metadata.isRefreshing && styles['listing__refresh--spinning'])} />
               {metadata.isRefreshing ? 'Refreshing…' : 'Refresh metadata'}
+            </button>
+
+            {/* The same escape hatch widened to every token of the collection this app has
+                cached — what a change made across a whole drop actually needs */}
+            <button
+              type="button"
+              className={styles.listing__refresh}
+              onClick={handleRefreshCollection}
+              disabled={collectionRefresh.isRefreshing}
+              title="Re-read every NFT in this collection from the blockchain"
+            >
+              {collectionRefresh.isRefreshing ? (
+                <ArrowsClockwiseIcon size={14} className={styles['listing__refresh--spinning']} />
+              ) : (
+                <StackIcon size={14} />
+              )}
+              {collectionRefresh.isRefreshing ? collectionRefreshLabel(collectionRefresh.progress) : 'Refresh collection'}
             </button>
 
             {model && !model.isRenderable && (

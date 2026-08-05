@@ -16,6 +16,7 @@ import pool from '@/lib/db'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
 import { resolveNftMetadata } from '@/lib/nftMetadata'
 import { isLuksoIndexerChain, fetchLuksoTokenMetadata } from '@/lib/luksoIndexer'
+import { mapWithConcurrency } from '@/lib/concurrency'
 
 // Onchain-rendered collections can be dynamic (Burnt Pix artwork evolves as it is refined),
 // so entries expire rather than being treated as permanent the way an IPFS CID could be.
@@ -47,6 +48,18 @@ const ttlFor = (source) => {
 // from the row's own fetched_at rather than an in-memory counter, which keeps it correct
 // across serverless instances without any shared state to provision.
 const REFRESH_COOLDOWN_MS = 60 * 1000
+
+// Sweeping a collection is orders of magnitude heavier than one token, so it gets a longer
+// cooldown — applied per row, exactly like the single-token one. That single rule does double
+// duty: it rate limits the sweep, and it makes the sweep resumable, because a call that
+// refreshed the stalest rows leaves the rest still eligible for the call right behind it.
+const COLLECTION_REFRESH_COOLDOWN_MS = 5 * 60 * 1000
+
+// How much of a collection one call takes on. Bounded so the request answers well inside a
+// serverless timeout however large the collection is; the caller repeats until nothing is
+// left, which is also what turns the sweep into something it can show progress for.
+const COLLECTION_REFRESH_BATCH = 24
+const COLLECTION_REFRESH_CONCURRENCY = 8
 
 // Guards a hostile or broken contract from writing an unbounded blob into the row.
 // MEDIUMTEXT tops out at 16MB; refuse well before that.
@@ -269,4 +282,94 @@ export const refreshNftMetadata = async ({ chainId, collection, tokenId, isLsp8,
   if (!result) return { throttled: false, metadata: null }
 
   return { throttled: false, metadata: result.metadata }
+}
+
+/**
+ * Re-reads a batch of one collection's cached tokens from chain — the whole-collection form of
+ * refreshNftMetadata, for when a change was made to every token rather than one of them.
+ *
+ * "The collection" is the set of its tokens this app has cached, which is precisely the set
+ * that can be showing something stale. A token nobody has viewed has no row, and resolves from
+ * chain the first time somebody does.
+ *
+ * One call handles at most COLLECTION_REFRESH_BATCH tokens, stalest first, skipping any row
+ * refreshed within the cooldown. Repeat until `remaining` is zero to walk a whole collection;
+ * each call is guaranteed to advance, because every row it touches gets a new fetched_at even
+ * when the re-read failed.
+ *
+ * @param {Object} params
+ * @param {number|string} params.chainId Chain the collection lives on.
+ * @param {string} params.collection NFT contract address.
+ * @param {string} [params.baseUrl] Absolute origin, for resolving proxy-relative storage URLs.
+ * @returns {Promise<{total: number, processed: number, refreshed: number, failed: number, remaining: number}>}
+ * `total` counts every cached token in the collection; `remaining` counts those still stale
+ * after this batch.
+ */
+export const refreshCollectionMetadata = async ({ chainId, collection, baseUrl }) => {
+  const networkId = Number(chainId)
+  const address = String(collection).toLowerCase()
+  // Inlined rather than bound: it is a module constant, never caller input, and an INTERVAL
+  // unit takes a literal more predictably than a prepared-statement placeholder.
+  const staleCutoff = `NOW() - INTERVAL ${Math.ceil(COLLECTION_REFRESH_COOLDOWN_MS / 1000)} SECOND`
+
+  // Both numbers come from one pass: how much of this collection is cached at all, and how
+  // much of it the cooldown still lets us touch.
+  const [[counts]] = await pool.execute(
+    `SELECT COUNT(*) AS total,
+            SUM(fetched_at < ${staleCutoff}) AS pending
+       FROM nft_metadata_cache
+      WHERE network_id = ? AND collection = ?`,
+    [networkId, address],
+  )
+
+  const total = Number(counts?.total) || 0
+  const pending = Number(counts?.pending) || 0
+
+  if (pending === 0) return { total, processed: 0, refreshed: 0, failed: 0, remaining: 0 }
+
+  const [rows] = await pool.execute(
+    `SELECT token_id, is_lsp8
+       FROM nft_metadata_cache
+      WHERE network_id = ? AND collection = ? AND fetched_at < ${staleCutoff}
+      ORDER BY fetched_at ASC
+      LIMIT ?`,
+    [networkId, address, COLLECTION_REFRESH_BATCH],
+  )
+
+  const results = await mapWithConcurrency(rows, COLLECTION_REFRESH_CONCURRENCY, async (row) => {
+    try {
+      const result = await getNftMetadata({
+        chainId: networkId,
+        collection: address,
+        tokenId: row.token_id,
+        isLsp8: Boolean(row.is_lsp8),
+        baseUrl,
+        forceRefresh: true,
+      })
+      if (result) return true
+    } catch (error) {
+      console.warn('[nft-metadata-cache] collection refresh failed for token', row.token_id, '-', error.message)
+    }
+
+    // Nothing was written for this token, so its fetched_at is still whatever it was — and
+    // since the batch is picked stalest-first, the next call would select the very same token
+    // and the sweep would never move past it. Stamping it here backs a dead contract or
+    // unreachable gateway off with everything else instead of blocking the collection.
+    try {
+      await touchRow({ networkId, collection: address, tokenId: String(row.token_id).toLowerCase() })
+    } catch (error) {
+      console.warn('[nft-metadata-cache] collection refresh touch failed:', error.message)
+    }
+    return false
+  })
+
+  const refreshed = results.filter(Boolean).length
+
+  return {
+    total,
+    processed: rows.length,
+    refreshed,
+    failed: rows.length - refreshed,
+    remaining: Math.max(0, pending - rows.length),
+  }
 }

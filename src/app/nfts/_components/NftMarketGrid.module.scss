@@ -71,6 +71,34 @@
     }
   }
 
+  /* Shares the funnel's shape — both are icon-only affordances flanking the pill row, and a
+     second silhouette there would read as a third kind of control */
+  &__refreshButton {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--text-muted);
+    }
+
+    &:disabled {
+      cursor: progress;
+      color: var(--text-muted);
+    }
+
+    &--spinning {
+      animation: nftMarketRefreshSpin 0.9s linear infinite;
+    }
+  }
+
   &__sellButton {
     display: inline-flex;
     align-items: center;
@@ -435,6 +463,12 @@
 :global([data-theme='terminal']) {
   .search {
     --search-bg: #12301c;
+  }
+}
+
+@keyframes nftMarketRefreshSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

@@ -172,6 +172,30 @@ export const getNftCollections = async (limit = 12, networkId) => {
   return response.json()
 }
 
+/**
+ * Refresh Collection Metadata
+ * Re-reads a batch of one collection's cached tokens from chain, for a collection that changed
+ * its onchain metadata. One call does not necessarily finish the job — the returned
+ * `remaining` says how many stale tokens are still queued, and the caller repeats until it is
+ * zero. Use the useCollectionMetadataRefresh hook rather than calling this directly; it owns
+ * the loop and the cache invalidation that has to follow.
+ * @param {number|string} chainId
+ * @param {string} collection NFT contract address.
+ * @returns {Promise<{total: number, processed: number, refreshed: number, failed: number, remaining: number}>}
+ */
+export const refreshNftCollectionMetadata = async (chainId, collection) => {
+  const response = await fetch('/api/v1/nfts/metadata/refresh/collection', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chainId: Number(chainId), collection }),
+  })
+
+  const body = await response.json().catch(() => null)
+  if (!response.ok || !body?.success) throw new Error(body?.error || `Collection refresh failed (${response.status})`)
+
+  return body.data
+}
+
 export const getFollowingPosts = async (networkId, viewerAddress, page = 1, limit = 20) => {
   const url = `/api/v1/networks/posts?feed_type=following&page=${page}&limit=${limit}&network_id=${networkId}&viewer_address=${viewerAddress}`
 
