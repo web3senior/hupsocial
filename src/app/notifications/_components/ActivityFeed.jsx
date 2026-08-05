@@ -15,31 +15,57 @@ const PAGE_SIZE = 40
 const EMPTY_COUNTS = { inbox: 0, mentions: 0, money: 0, you: 0 }
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
+// Session-lifetime cache of loaded rows per wallet+filter: a revisit (or tab
+// return) paints the previous data instantly and revalidates silently in the
+// background — the skeleton only ever shows on the first visit. Same pattern
+// as the home feed's useFeedCacheStore; module scope survives route unmounts,
+// a full reload starts fresh.
+const CACHE_TTL_MS = 10 * 60 * 1000
+const sessionCache = new Map()
+
+const readSessionCache = (key) => {
+  const entry = sessionCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.savedAt > CACHE_TTL_MS) return null
+  return entry
+}
+
 export default function ActivityFeed() {
   const { address, isConnected, chain } = useConnection()
   const { mutateAsync: signMessageAsync } = useSignMessage()
 
+  // Snapshot from an earlier visit this session, if any. Safe to read in an
+  // initializer: wagmi resolves the address synchronously on client-side
+  // navigations, and after a hard reload the module cache is empty anyway.
+  const [initialEntry] = useState(() => (address ? readSessionCache(`${address}|${FILTERS[0].id}`) : null))
+
   const [filter, setFilter] = useState(FILTERS[0].id)
-  const [notifications, setNotifications] = useState([])
-  const [nextPage, setNextPage] = useState(null)
-  const [unreadByFilter, setUnreadByFilter] = useState(EMPTY_COUNTS)
+  const [notifications, setNotifications] = useState(() => initialEntry?.notifications ?? [])
+  const [nextPage, setNextPage] = useState(() => initialEntry?.nextPage ?? null)
+  const [unreadByFilter, setUnreadByFilter] = useState(() => initialEntry?.unreadByFilter ?? EMPTY_COUNTS)
   const [isLoading, setIsLoading] = useState(false)
   const [isPaging, setIsPaging] = useState(false)
   const [error, setError] = useState(null)
 
   const pendingReadIds = useRef(new Set())
   const readBatchTimer = useRef(null)
+  // Cache key the on-screen rows belong to. During a tab switch the previous
+  // tab's rows stay visible until the new data lands, so cache writes must
+  // target the key that was applied, not the freshly selected one.
+  const appliedKeyRef = useRef(initialEntry ? `${address}|${FILTERS[0].id}` : null)
 
   // Every notification is either something you did or something somebody else did, so those two
   // tabs already cover the table — Mentions and Money overlap them and must not be added in.
   const totalUnread = unreadByFilter.inbox + unreadByFilter.you
 
   const loadNotifications = useCallback(
-    async ({ page = 1, append = false, signal } = {}) => {
+    async ({ page = 1, append = false, silent = false, signal } = {}) => {
       if (!address) return
 
+      // Silent revalidation: cached rows are already on screen, so no skeleton
+      // and no busy-dim — fresh data just replaces them when it lands.
       if (append) setIsPaging(true)
-      else setIsLoading(true)
+      else if (!silent) setIsLoading(true)
       setError(null)
 
       try {
@@ -60,6 +86,7 @@ export default function ActivityFeed() {
         setNotifications((current) => (append ? [...current, ...payload.data] : payload.data))
         setNextPage(payload.nextPage)
         setUnreadByFilter(payload.meta?.unread_by_filter || EMPTY_COUNTS)
+        appliedKeyRef.current = `${address}|${filter}`
       } catch (err) {
         if (err.name === 'AbortError') return
         console.error('Notifications fetch error:', err)
@@ -77,15 +104,27 @@ export default function ActivityFeed() {
   useEffect(() => {
     if (!isConnected || !address) return
 
+    // Rows for this wallet+filter already on screen (mount hydration or a tab
+    // switch that hit the cache) — revalidate without the skeleton or dim.
+    const silent = appliedKeyRef.current === `${address}|${filter}`
+
     const controller = new AbortController()
     // Deferred by a tick so the fetch's own setState lands outside the effect body.
-    const timer = setTimeout(() => loadNotifications({ signal: controller.signal }), 0)
+    const timer = setTimeout(() => loadNotifications({ signal: controller.signal, silent }), 0)
 
     return () => {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [address, isConnected, loadNotifications])
+  }, [address, isConnected, filter, loadNotifications])
+
+  // Keep the cache in step with whatever the rows currently show — including
+  // local read-state flips — so a revisit never resurrects unread badges the
+  // user already cleared.
+  useEffect(() => {
+    if (!appliedKeyRef.current) return
+    sessionCache.set(appliedKeyRef.current, { notifications, nextPage, unreadByFilter, savedAt: Date.now() })
+  }, [notifications, nextPage, unreadByFilter])
 
   // A row can belong to several tabs at once (a reply counts under All and Mentions), so the tab
   // counters are re-read from the server after a write instead of guessed locally.
@@ -106,12 +145,21 @@ export default function ActivityFeed() {
   }, [address])
 
   // The previous tab's rows stay on screen, dimmed, until the new ones land — clearing first made
-  // the feed collapse to skeletons and snap back on every tab press.
+  // the feed collapse to skeletons and snap back on every tab press. A cached tab swaps in its
+  // rows immediately instead (event handler, so direct setState is fine) and revalidates silently.
   const selectFilter = (next) => {
     if (next === filter) return
 
     setFilter(next)
     setNextPage(null)
+
+    const cached = address ? readSessionCache(`${address}|${next}`) : null
+    if (cached) {
+      setNotifications(cached.notifications)
+      setNextPage(cached.nextPage)
+      setUnreadByFilter(cached.unreadByFilter)
+      appliedKeyRef.current = `${address}|${next}`
+    }
   }
 
   const markAsRead = useCallback(
