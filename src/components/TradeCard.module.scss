@@ -16,6 +16,7 @@
   }
 
   &__media {
+    position: relative;
     width: 88px;
     aspect-ratio: 1;
     flex-shrink: 0;
@@ -29,6 +30,22 @@
       height: 100%;
       object-fit: cover;
     }
+  }
+
+  // Sold ribbon over the artwork — the same red badge the market grid tile wears, so a
+  // sold listing reads at a glance before the status chips do
+  &__mediaSold {
+    position: absolute;
+    top: 0.35rem;
+    left: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background-color: var(--red-500);
+    color: var(--white);
+    font-size: var(--font-size-10, 10px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   &__mediaFallback {
@@ -216,6 +233,15 @@
 
     &__media {
       width: 44px;
+    }
+
+    // The 44px thumb can't carry the full-size pill — shrink it so the artwork
+    // stays recognizable underneath
+    &__mediaSold {
+      top: 0.2rem;
+      left: 0.2rem;
+      padding: 0.1rem 0.35rem;
+      font-size: 8px;
     }
 
     // The row must be able to wrap — price + View + Buy are all nowrap pills, and

@@ -371,6 +371,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
                 <HupMark size={22} />
               </div>
             )}
+            {isSold && <span className={styles.tradeCard__mediaSold}>Sold</span>}
           </div>
 
           <div className={styles.tradeCard__info}>
