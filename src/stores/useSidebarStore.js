@@ -26,6 +26,7 @@ import {
 // Keeps components out of localStorage to prevent serialization crashes.
 export const NAV_ITEMS_SCHEMA = [
   { id: 'foryou', name: 'For you', path: '/', icon: HouseIcon },
+  { id: 'new-post', name: 'New post', component: 'new-post', icon: PlusIcon },
   { id: 'search', name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
   { id: 'notifications', name: 'Notifications', path: '/notifications', icon: BellIcon, hasBadge: true },
   { id: 'divider-primary', type: 'divider' },
@@ -43,7 +44,6 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'batch-like', name: 'Like', path: '/batch-like', icon: HeartIcon, hasBadge: true },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
-  { id: 'new-post', name: 'New post', component: 'new-post', icon: PlusIcon },
 ]
 
 // Baskets migrated from the pre-wallet era live under this key until the
