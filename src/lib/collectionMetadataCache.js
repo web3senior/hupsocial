@@ -24,6 +24,10 @@ const TTL_MS = 24 * 60 * 60 * 1000
 // it didn't come back — transient, so it backs off briefly instead of holding the TTL.
 const NEGATIVE_TTL_MS = 10 * 60 * 1000
 
+// Manual refresh triggers real RPC work, so it is rate limited — derived from the row's
+// own fetched_at rather than an in-memory counter, same as the token cache's refresh.
+const REFRESH_COOLDOWN_MS = 60 * 1000
+
 const isComplete = (row) => Boolean(row.source)
 
 const normalizeKey = ({ chainId, collection }) => ({
@@ -31,7 +35,7 @@ const normalizeKey = ({ chainId, collection }) => ({
   collection: String(collection).toLowerCase(),
 })
 
-const parseCreators = (raw) => {
+const parseJsonArray = (raw) => {
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)
@@ -47,7 +51,8 @@ const rowToMetadata = (row) => ({
   description: row.description || null,
   banner: row.banner_uri || null,
   icon: row.icon_uri || null,
-  creators: parseCreators(row.creators),
+  creators: parseJsonArray(row.creators),
+  links: parseJsonArray(row.links),
   totalSupply: row.total_supply || null,
   source: row.source || null,
   isLsp8: Boolean(row.is_lsp8),
@@ -55,7 +60,7 @@ const rowToMetadata = (row) => ({
 
 const readRow = async (key) => {
   const [rows] = await pool.execute(
-    `SELECT is_lsp8, name, symbol, description, banner_uri, icon_uri, creators, total_supply, source, fetched_at
+    `SELECT is_lsp8, name, symbol, description, banner_uri, icon_uri, creators, links, total_supply, source, fetched_at
        FROM nft_collection_cache
       WHERE network_id = ? AND collection = ?
       LIMIT 1`,
@@ -71,8 +76,8 @@ const storableUri = (uri) => (uri && !uri.startsWith('data:') ? uri : null)
 const writeRow = async (key, isLsp8, metadata) => {
   await pool.execute(
     `INSERT INTO nft_collection_cache
-       (network_id, collection, is_lsp8, name, symbol, description, banner_uri, icon_uri, creators, total_supply, source, fetched_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+       (network_id, collection, is_lsp8, name, symbol, description, banner_uri, icon_uri, creators, links, total_supply, source, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE
        is_lsp8 = VALUES(is_lsp8),
        name = VALUES(name),
@@ -81,6 +86,7 @@ const writeRow = async (key, isLsp8, metadata) => {
        banner_uri = VALUES(banner_uri),
        icon_uri = VALUES(icon_uri),
        creators = VALUES(creators),
+       links = VALUES(links),
        total_supply = VALUES(total_supply),
        source = VALUES(source),
        fetched_at = VALUES(fetched_at)`,
@@ -94,6 +100,7 @@ const writeRow = async (key, isLsp8, metadata) => {
       storableUri(metadata.banner),
       storableUri(metadata.icon),
       JSON.stringify(metadata.creators || []),
+      JSON.stringify(metadata.links || []),
       metadata.totalSupply,
       metadata.source,
     ],
@@ -139,10 +146,13 @@ const detectIsLsp8 = async (key, publicClient) => {
  * @param {boolean|null} [params.isLsp8] True/false when the caller knows the standard;
  * null/undefined to infer it (from the listings index, then an onchain probe).
  * @param {string} [params.baseUrl] Absolute origin, for resolving proxy-relative storage URLs.
+ * @param {boolean} [params.forceRefresh=false] Ignore the cached row's freshness and
+ * re-read from chain. The row is still loaded, because it is what protects a good banner
+ * from being demoted if this read comes back empty.
  * @returns {Promise<{metadata: Object, cached: boolean}|null>} null when the chain is
  * unconfigured or the read failed outright. metadata always carries isLsp8.
  */
-export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null, baseUrl }) => {
+export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null, baseUrl, forceRefresh = false }) => {
   const key = normalizeKey({ chainId, collection })
 
   let row = null
@@ -152,7 +162,7 @@ export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null
     console.warn('[collection-metadata-cache] read failed, falling back to RPC:', error.message)
   }
 
-  if (row) {
+  if (row && !forceRefresh) {
     const age = Date.now() - new Date(row.fetched_at).getTime()
     if (age < (isComplete(row) ? TTL_MS : NEGATIVE_TTL_MS)) {
       return { metadata: rowToMetadata(row), cached: true }
@@ -193,4 +203,33 @@ export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null
   }
 
   return { metadata: { ...metadata, banner: storableUri(metadata.banner), icon: storableUri(metadata.icon), isLsp8: resolvedIsLsp8 }, cached: false }
+}
+
+/**
+ * Forces a collection's metadata to be re-read from chain, for when a collection updated
+ * its banner, description or links and would otherwise wait out the 24h TTL. Throttled per
+ * collection off the row's own timestamp — a collection nobody touched refreshes instantly,
+ * repeated clicks on the same one are refused.
+ * @param {Object} params Same shape as getCollectionMetadata.
+ * @returns {Promise<{throttled: true, retryAfterSeconds: number} | {throttled: false, metadata: Object|null}>}
+ */
+export const refreshCollectionMetadata = async ({ chainId, collection, baseUrl }) => {
+  const key = normalizeKey({ chainId, collection })
+
+  let row = null
+  try {
+    row = await readRow(key)
+  } catch (error) {
+    console.warn('[collection-metadata-cache] refresh read failed:', error.message)
+  }
+
+  if (row) {
+    const age = Date.now() - new Date(row.fetched_at).getTime()
+    if (age < REFRESH_COOLDOWN_MS) {
+      return { throttled: true, retryAfterSeconds: Math.max(1, Math.ceil((REFRESH_COOLDOWN_MS - age) / 1000)) }
+    }
+  }
+
+  const result = await getCollectionMetadata({ chainId, collection, baseUrl, forceRefresh: true })
+  return { throttled: false, metadata: result ? result.metadata : null }
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback, useState } from 'react'
 import useSWRImmutable from 'swr/immutable'
 import { getNftCollectionInfo } from '@/lib/api'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
@@ -21,10 +22,34 @@ import { resolveStorageImageUrl } from '@/lib/storageHelper'
 export default function useCollectionInfo({ chainId, collection, isLsp8, enabled = true, bannerWidth = 1600, iconWidth = 128 }) {
   const ready = Boolean(enabled && chainId && collection)
 
-  const { data, error, isLoading } = useSWRImmutable(
+  const { data, error, isLoading, mutate } = useSWRImmutable(
     ready ? ['nft-collection-info', Number(chainId), collection.toLowerCase()] : null,
     () => getNftCollectionInfo(chainId, collection, typeof isLsp8 === 'boolean' ? isLsp8 : undefined),
   )
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Re-reads the collection's identity (banner, description, links, supply) from chain and
+  // writes the result straight into the SWR cache, so the header updates in place. Quiet by
+  // design: a server-side throttle (60s per collection) or a transient failure returns null
+  // rather than throwing — callers usually run this alongside the heavier token sweep, whose
+  // toast carries the outcome.
+  const refresh = useCallback(async () => {
+    if (!ready || isRefreshing) return null
+    setIsRefreshing(true)
+    try {
+      const response = await fetch(`/api/v1/nfts/collections/${Number(chainId)}/${collection.toLowerCase()}`, { method: 'POST' })
+      const body = await response.json().catch(() => null)
+      if (!response.ok || !body?.success) return null
+
+      await mutate(body, { revalidate: false })
+      return body.data
+    } catch {
+      return null
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [ready, isRefreshing, chainId, collection, mutate])
 
   const info = data?.data || null
 
@@ -37,10 +62,16 @@ export default function useCollectionInfo({ chainId, collection, isLsp8, enabled
     banner: info?.banner ? resolveStorageImageUrl(info.banner, { width: bannerWidth }) : null,
     icon: info?.icon ? resolveStorageImageUrl(info.icon, { width: iconWidth, still: true }) : null,
     creators: info?.creators || [],
+    // [{title, url}] from LSP4Metadata links — title may be null, consumers fall back
+    // to the URL's hostname
+    links: info?.links || [],
     totalSupply: info?.totalSupply || null,
     isLsp8: typeof info?.isLsp8 === 'boolean' ? info.isLsp8 : null,
     source: info?.source || null,
     isLoading: ready && isLoading,
     error,
+    // Re-reads the collection identity from chain, for a collection that changed onchain.
+    refresh,
+    isRefreshing,
   }
 }

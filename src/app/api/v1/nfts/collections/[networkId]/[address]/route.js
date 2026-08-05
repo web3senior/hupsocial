@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getCollectionMetadata } from '@/lib/collectionMetadataCache'
+import { getCollectionMetadata, refreshCollectionMetadata } from '@/lib/collectionMetadataCache'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,6 +39,40 @@ export async function GET(request, { params }) {
     return NextResponse.json({ success: true, data: result.metadata }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (error) {
     console.error('[GET_NFT_COLLECTION_ERROR]:', error.message)
+    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
+  }
+}
+
+/**
+ * Force re-read of the collection's identity from chain, for a collection that changed its
+ * banner, description or links onchain. Throttled server-side per collection; the token
+ * sweep (metadata/refresh/collection) is a separate, heavier endpoint.
+ */
+export async function POST(request, { params }) {
+  try {
+    const { networkId, address } = await params
+    const { origin } = new URL(request.url)
+
+    if (!/^\d+$/.test(String(networkId)) || !/^0x[0-9a-fA-F]{40}$/.test(String(address))) {
+      return NextResponse.json({ success: false, error: 'A numeric networkId and a collection address are required' }, { status: 400 })
+    }
+
+    const result = await refreshCollectionMetadata({ chainId: networkId, collection: address, baseUrl: origin })
+
+    if (result.throttled) {
+      return NextResponse.json(
+        { success: false, error: `Collection was just refreshed — try again in ${result.retryAfterSeconds}s` },
+        { status: 429, headers: { 'Retry-After': String(result.retryAfterSeconds) } },
+      )
+    }
+
+    if (!result.metadata) {
+      return NextResponse.json({ success: false, error: 'Unable to resolve the collection' }, { status: 502 })
+    }
+
+    return NextResponse.json({ success: true, data: result.metadata })
+  } catch (error) {
+    console.error('[POST_NFT_COLLECTION_REFRESH_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
   }
 }

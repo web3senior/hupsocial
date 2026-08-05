@@ -13,9 +13,12 @@ import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, erc725yGetDataAbi, decodeVerifi
 const LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756'
 const LSP4_CREATORS_ARRAY_KEY = '0x114bd03b3a46d48759680d81ebb2b414fda7d030a7105a851867accf1c2352e7'
 
-// Creators beyond this stay onchain-only — the UI shows a couple of profile chips, not a
+// Creators beyond this stay onchain-only — the UI shows a few profile chips, not a
 // registry, and each extra creator is another storage read plus a profile resolution.
-const MAX_CREATORS = 4
+const MAX_CREATORS = 6
+
+// LSP4Metadata `links` is author-controlled JSON — cap it and keep only http(s) targets.
+const MAX_LINKS = 6
 
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`
 
@@ -55,6 +58,17 @@ const decodeCreatorAddress = (bytes) => {
   return /^0x[0-9a-f]{40}$/.test(address) && address !== ZERO_ADDRESS ? address : null
 }
 
+// {title, url} pairs, kept only when the target is a web URL — `links` also carries
+// entries with empty titles (the UI falls back to the hostname) and, being author-written
+// JSON, anything else imaginable.
+const sanitizeLinks = (value) => {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((link) => link && typeof link.url === 'string' && /^https?:\/\//i.test(link.url.trim()))
+    .slice(0, MAX_LINKS)
+    .map((link) => ({ title: String(link.title || '').trim() || null, url: link.url.trim() }))
+}
+
 // LSP4/LSP3 image fields arrive flat ([{url, width}]) or nested ([[{…}]]) depending on the
 // minter — flatten either shape, then take the widest variant so a banner never upscales a
 // thumbnail. Consumers shrink through the image proxy anyway.
@@ -77,7 +91,8 @@ const pickWidestImage = (value) => {
  * @param {string} [params.baseUrl] Absolute origin for resolving proxy-relative metadata
  * URLs — required server-side, where fetch has no document origin.
  * @returns {Promise<{name: string|null, symbol: string|null, description: string|null,
- * banner: string|null, icon: string|null, creators: string[], totalSupply: string|null,
+ * banner: string|null, icon: string|null, creators: string[],
+ * links: Array<{title: string|null, url: string}>, totalSupply: string|null,
  * source: string|null}>}
  */
 export const resolveCollectionMetadata = async ({ publicClient, collection, isLsp8, baseUrl }) => {
@@ -95,6 +110,7 @@ export const resolveCollectionMetadata = async ({ publicClient, collection, isLs
       banner: null,
       icon: null,
       creators: [],
+      links: [],
       totalSupply: totalSupply === null ? null : totalSupply.toString(),
       // ERC721 keeps no offchain document at the collection level — the contract reads are
       // the whole story, so they count as complete whenever anything answered
@@ -143,6 +159,7 @@ export const resolveCollectionMetadata = async ({ publicClient, collection, isLs
     banner: pickWidestImage(lsp4?.backgroundImage) || pickWidestImage(firstImageVariants),
     icon: pickWidestImage(lsp4?.icon),
     creators,
+    links: sanitizeLinks(lsp4?.links),
     totalSupply: totalSupply === null ? null : totalSupply.toString(),
     source,
   }

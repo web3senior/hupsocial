@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import clsx from 'clsx'
-import { ArrowSquareOutIcon, CheckIcon, CopyIcon, StackIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, CheckIcon, CopyIcon, LinkSimpleIcon, StackIcon } from '@phosphor-icons/react'
 import { buildAssetLinks } from '@/components/TradeCard'
 import { handleBrokenImage } from '@/lib/utils'
 import Profile from '@/components/Profile'
@@ -15,6 +15,16 @@ const formatSupply = (value) => {
     return new Intl.NumberFormat().format(BigInt(value))
   } catch {
     return String(value)
+  }
+}
+
+// Untitled links still need a label the user can read — the hostname is the honest one
+const linkLabel = (link) => {
+  if (link.title) return link.title
+  try {
+    return new URL(link.url).hostname.replace(/^www\./, '')
+  } catch {
+    return link.url
   }
 }
 
@@ -132,6 +142,18 @@ export default function CollectionHeader({ chainId, chainInfo, address, info }) 
           </a>
         )}
       </div>
+
+      {/* The collection's own links from LSP4Metadata — community, socials, website */}
+      {info.links.length > 0 && (
+        <div className={styles.header__links}>
+          {info.links.map((link) => (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className={styles.header__link} title={link.url}>
+              <LinkSimpleIcon size={13} />
+              {linkLabel(link)}
+            </a>
+          ))}
+        </div>
+      )}
 
       {info.description && <p className={styles.header__description}>{info.description}</p>}
     </header>

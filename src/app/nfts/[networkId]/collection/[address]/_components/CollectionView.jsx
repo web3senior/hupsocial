@@ -101,8 +101,15 @@ export default function CollectionView({ networkId, address }) {
   // tile on this page belongs to the collection, so it earns the sweep button
   const collectionRefresh = useCollectionMetadataRefresh({ chainId, collection })
 
+  const isRefreshing = collectionRefresh.isRefreshing || info.isRefreshing
+
+  // On this page "the collection" is more than its tokens: the identity header (banner,
+  // description, links, supply) re-reads first — it's one row and updates in place — then
+  // the token sweep walks the cached artwork. The sweep's toast carries the outcome; a
+  // throttled identity refresh stays quiet rather than aborting the sweep.
   const handleRefreshCollection = async () => {
     try {
+      await info.refresh()
       const result = await collectionRefresh.refresh()
       if (!result) return
       toast(...describeCollectionRefresh(result))
@@ -144,11 +151,11 @@ export default function CollectionView({ networkId, address }) {
               type="button"
               className={styles.collection__tool}
               onClick={handleRefreshCollection}
-              disabled={collectionRefresh.isRefreshing}
-              title="Re-read every NFT in this collection from the blockchain"
+              disabled={isRefreshing}
+              title="Re-read the collection's banner, description, links and every NFT from the blockchain"
             >
-              <ArrowsClockwiseIcon size={14} className={clsx(collectionRefresh.isRefreshing && styles['collection__tool--spinning'])} />
-              Refresh metadata
+              <ArrowsClockwiseIcon size={14} className={clsx(isRefreshing && styles['collection__tool--spinning'])} />
+              Refresh collection
             </button>
 
             {/* The market grid's full funnel (price, currency, seller) pre-filtered to
