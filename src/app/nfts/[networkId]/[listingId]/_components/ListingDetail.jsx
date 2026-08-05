@@ -142,7 +142,9 @@ export default function ListingDetail({ networkId, listingId }) {
   const referralBps = Number(listing.referral_bps) || 0
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
   const title = metadata.name || `NFT listing #${listing.listing_id}`
-  const standard = isLsp8 ? 'LSP8' : 'ERC721'
+  // LUKSO's standard reads as "NFT 2.0" in the UI; the literal LSP8 name lives in the tooltip
+  const standard = isLsp8 ? 'NFT 2.0' : 'ERC721'
+  const standardTitle = isLsp8 ? 'LSP8' : undefined
   // {url, fileType, isRenderable}, for the collections whose metadata carries a 3D file
   // next to the artwork
   const model = metadata.model
@@ -228,7 +230,9 @@ export default function ListingDetail({ networkId, listingId }) {
           <div className={styles.listing__badges}>
             <span className={clsx(styles.listing__badge, styles[`listing__badge--${status.key}`])}>{status.label}</span>
             {chainInfo?.name && <span className={styles.listing__chip}>{chainInfo.name}</span>}
-            <span className={styles.listing__chip}>{standard}</span>
+            <span className={styles.listing__chip} title={standardTitle}>
+              {standard}
+            </span>
             {model && (
               <span className={styles.listing__chip}>
                 <CubeIcon size={12} />
@@ -304,7 +308,7 @@ export default function ListingDetail({ networkId, listingId }) {
             </div>
             <div>
               <dt>NFT standard</dt>
-              <dd>{standard}</dd>
+              <dd title={standardTitle}>{standard}</dd>
             </div>
             <div>
               <dt>Token id</dt>
