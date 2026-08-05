@@ -181,7 +181,9 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
         stableFrames += 1
       } else {
         stableFrames = 0
-        window.scrollTo(0, target)
+        // 'instant' overrides the app's global scroll-behavior: smooth — a plain
+        // scrollTo animates the restore, which IS the visible top-to-position crawl.
+        window.scrollTo({ top: target, behavior: 'instant' })
       }
       if (stableFrames >= 2 || performance.now() > deadline) {
         pendingScrollRestoreRef.current = null
