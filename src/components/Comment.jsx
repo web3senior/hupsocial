@@ -25,8 +25,7 @@ import {
   BlueCheckMarkIcon,
   ViewIcon,
 } from '@/components/Icons'
-import DOMPurify from 'dompurify'
-import { marked } from 'marked'
+import { renderMarkdown } from '@/lib/markdown'
 import { getIPFS } from '@/lib/ipfs'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import MediaGallery from './Gallery'
@@ -50,43 +49,6 @@ moment.defineLocale('en-short', {
     yy: '%dy',
   },
 })
-
-/**
- * Converts Markdown to sanitized HTML with links set to open in a new tab.
- * @param {string} markdown - The markdown content to process.
- * @returns {string} The sanitized HTML.
- */
-function renderMarkdown(markdown) {
-  // 1. Create a custom renderer
-  const renderer = new marked.Renderer()
-
-  // 2. Override the link method to add target="_blank" and rel attributes
-  renderer.link = (href, title, text) => {
-    // Use the default marked behavior, but insert the desired attributes
-    const link = marked.Renderer.prototype.link.call(renderer, href, title, text)
-
-    // Add target="_blank" to open in a new tab
-    // Add rel="noopener noreferrer" for security and performance best practices
-    return link.replace(/^<a /, '<a  rel="noopener noreferrer" target="_blank"')
-  }
-
-  // 3. Configure marked to use the custom renderer
-  marked.setOptions({
-    renderer: renderer,
-    gfm: true, // Generally good to enable GitHub Flavored Markdown
-  })
-
-  // 4. Render the markdown to HTML using the custom renderer
-  const dirtyHtml = marked.parse(markdown)
-
-  // 5. Sanitize the HTML using DOMPurify
-  // DOMPurify is crucial for preventing XSS attacks from the rendered content
-  const cleanHtml = DOMPurify.sanitize(dirtyHtml, {
-    ADD_ATTR: ['target', 'rel'],
-  })
-
-  return cleanHtml
-}
 
 export default function Comment({ item, showContent, actions, chainId }) {
   console.log(item)
