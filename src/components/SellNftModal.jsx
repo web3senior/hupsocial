@@ -9,7 +9,9 @@ import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
+import { formatBps, splitSalePrice } from '@/lib/tradeFee'
 import tradeAbi from '@/abis/HupTrade.json'
+import useTradeFee from '@/hooks/useTradeFee'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import useCollectionSuggestions from '@/hooks/useCollectionSuggestions'
 import useOwnedTokenIds from '@/hooks/useOwnedTokenIds'
@@ -37,6 +39,7 @@ const COLLECTION_GROUP_LABELS = {
 }
 
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+const amountFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
 
 // Popularity line for a search result — the signal that separates the real token from
 // same-name copycats (LUKSO returns holder counts, GeckoTerminal pool liquidity)
@@ -503,6 +506,13 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   const parsedReferral = Number(referralPercent)
   const isValidReferral = Number.isFinite(parsedReferral) && parsedReferral >= 0 && parsedReferral <= MAX_REFERRAL_PERCENT
   const referralBps = isValidReferral ? Math.round(parsedReferral * 100) : null
+
+  // The platform's cut is set per chain and can change — quote the live one so the seller
+  // signs against the split HupTrade will actually run at buy time
+  const { feeBps, feePercent } = useTradeFee({ chainId, tradeAddress })
+  const split = splitSalePrice(isValidPrice ? parsedPrice : 0, feeBps, referralBps)
+  const hasDeductions = Boolean(feeBps > 0 || referralBps > 0)
+  const showSplit = isValidPrice && referralBps !== null && hasDeductions
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
@@ -1071,6 +1081,52 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
             Share of the price paid to whoever's repost leads to the sale (0–{MAX_REFERRAL_PERCENT}%)
           </p>
         </div>
+
+        {/* The settlement HupTrade runs when someone buys: platform fee off the top, the
+            referral share next, the rest lands in the seller's wallet. Hidden until the fee
+            read resolves so the panel never quotes a rate of zero it hasn't confirmed. */}
+        {feeBps !== null && (
+          <div className={styles.sellNftModal__split}>
+            {showSplit ? (
+              <>
+                <p className={styles.sellNftModal__splitRow}>
+                  <span>Buyer pays</span>
+                  <strong>
+                    {amountFormat.format(parsedPrice)} {symbol}
+                  </strong>
+                </p>
+                {feeBps > 0 && (
+                  <p className={styles.sellNftModal__splitRow}>
+                    <span>Platform fee ({feePercent})</span>
+                    <span>
+                      −{amountFormat.format(split.fee)} {symbol}
+                    </span>
+                  </p>
+                )}
+                {referralBps > 0 && (
+                  <p className={styles.sellNftModal__splitRow}>
+                    <span>Referral ({formatBps(referralBps)})</span>
+                    <span>
+                      −{amountFormat.format(split.referral)} {symbol}
+                    </span>
+                  </p>
+                )}
+                <p className={clsx(styles.sellNftModal__splitRow, styles['sellNftModal__splitRow--total'])}>
+                  <span>You receive</span>
+                  <strong>
+                    {amountFormat.format(split.seller)} {symbol}
+                  </strong>
+                </p>
+              </>
+            ) : (
+              <p className={styles.sellNftModal__splitHint}>
+                {feeBps > 0
+                  ? `Platform fee: ${feePercent} of the sale price, taken from your proceeds.`
+                  : 'No platform fee on this network — you receive the full sale price.'}
+              </p>
+            )}
+          </div>
+        )}
       </main>
 
       <footer className={styles.sellNftModal__footer}>
@@ -1089,7 +1145,7 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
             {isBusy
               ? 'Confirming...'
               : isValidPrice
-              ? `List for ${new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(parsedPrice)} ${symbol}`
+              ? `List for ${amountFormat.format(parsedPrice)} ${symbol}`
               : 'List for sale'}
           </button>
         )}

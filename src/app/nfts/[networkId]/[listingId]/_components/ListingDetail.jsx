@@ -8,6 +8,7 @@ import clsx from 'clsx'
 import { zeroAddress } from 'viem'
 import { appChains } from '@/config/contracts'
 import { toRelative } from '@/lib/predict'
+import { formatFeeShare } from '@/lib/tradeFee'
 import { handleBrokenImage } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
@@ -472,6 +473,9 @@ export default function ListingDetail({ networkId, listingId }) {
           <ul className={styles.listing__salesList}>
             {trades.map((trade) => {
               const hasReferral = trade.referral && trade.referral !== zeroAddress && BigInt(trade.referral_amount || '0') > 0n
+              // Rows store the fee as an amount; the rate it was charged at is what a reader
+              // is actually after, and the fee could have been different on an older sale
+              const feeShare = formatFeeShare(trade.fee_amount, trade.price)
 
               return (
                 <li key={trade.tx_hash} className={styles.listing__sale}>
@@ -490,6 +494,7 @@ export default function ListingDetail({ networkId, listingId }) {
                     {BigInt(trade.fee_amount || '0') > 0n && (
                       <span>
                         Fee {formatStake(trade.fee_amount, decimals) ?? '…'} {symbol}
+                        {feeShare ? ` (${feeShare})` : ''}
                       </span>
                     )}
                     {hasReferral && (

@@ -659,6 +659,46 @@
     color: var(--text-muted);
   }
 
+  // Receipt-style panel mirroring the payment split HupTrade runs at buy time
+  &__split {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background-color: color-mix(in srgb, var(--text) 3%, transparent);
+  }
+
+  &__splitRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+
+    strong {
+      color: var(--text);
+    }
+
+    // The line the seller actually cares about, ruled off from the deductions above it
+    &--total {
+      padding-top: 0.45rem;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 600;
+    }
+  }
+
+  &__splitHint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
   &__footer {
     display: flex;
     flex-direction: column;

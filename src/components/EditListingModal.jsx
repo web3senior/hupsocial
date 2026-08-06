@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
 import clsx from 'clsx'
+import { formatBps, splitSalePrice } from '@/lib/tradeFee'
 import tradeAbi from '@/abis/HupTrade.json'
+import useTradeFee from '@/hooks/useTradeFee'
 import { toast } from '@/components/NextToast'
 import NativeDialog from './ui/NativeDialog'
 import styles from './EditListingModal.module.scss'
@@ -13,6 +15,8 @@ const LUKSO_CHAIN_IDS = [42, 4201]
 
 // Listing terms live onchain; HupTrade caps the referral share at 50% (MAX_REFERRAL_BPS)
 const MAX_REFERRAL_PERCENT = 50
+
+const amountFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
 
 // LSP7 has no symbol() — LSP4 metadata lives in ERC725Y storage, read via getData
 // with the keccak256('LSP4TokenSymbol') data key
@@ -138,6 +142,12 @@ const EditListingModal = ({
   const isValidReferral = Number.isFinite(parsedReferral) && parsedReferral >= 0 && parsedReferral <= MAX_REFERRAL_PERCENT
   const referralBps = isValidReferral ? Math.round(parsedReferral * 100) : null
 
+  // Repricing changes what actually lands in the seller's wallet — quote the live split
+  // rather than making them work the fee out from the new price
+  const { feeBps, feePercent } = useTradeFee({ chainId, tradeAddress })
+  const split = splitSalePrice(isValidPrice ? parsedPrice : 0, feeBps, referralBps)
+  const showSplit = isValidPrice && referralBps !== null && Boolean(feeBps > 0 || referralBps > 0)
+
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
   const isBusy = isPending || isConfirming
@@ -259,6 +269,50 @@ const EditListingModal = ({
             Share of the price paid to whoever's repost leads to the sale (0–{MAX_REFERRAL_PERCENT}%)
           </p>
         </div>
+
+        {/* Same split panel the listing form shows — platform fee, referral, then the rest */}
+        {feeBps !== null && (
+          <div className={styles.editListingModal__split}>
+            {showSplit ? (
+              <>
+                <p className={styles.editListingModal__splitRow}>
+                  <span>Buyer pays</span>
+                  <strong>
+                    {amountFormat.format(parsedPrice)} {symbol}
+                  </strong>
+                </p>
+                {feeBps > 0 && (
+                  <p className={styles.editListingModal__splitRow}>
+                    <span>Platform fee ({feePercent})</span>
+                    <span>
+                      −{amountFormat.format(split.fee)} {symbol}
+                    </span>
+                  </p>
+                )}
+                {referralBps > 0 && (
+                  <p className={styles.editListingModal__splitRow}>
+                    <span>Referral ({formatBps(referralBps)})</span>
+                    <span>
+                      −{amountFormat.format(split.referral)} {symbol}
+                    </span>
+                  </p>
+                )}
+                <p className={clsx(styles.editListingModal__splitRow, styles['editListingModal__splitRow--total'])}>
+                  <span>You receive</span>
+                  <strong>
+                    {amountFormat.format(split.seller)} {symbol}
+                  </strong>
+                </p>
+              </>
+            ) : (
+              <p className={styles.editListingModal__splitHint}>
+                {feeBps > 0
+                  ? `Platform fee: ${feePercent} of the sale price, taken from your proceeds.`
+                  : 'No platform fee on this network — you receive the full sale price.'}
+              </p>
+            )}
+          </div>
+        )}
       </main>
 
       <footer className={styles.editListingModal__footer}>

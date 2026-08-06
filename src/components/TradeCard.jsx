@@ -10,11 +10,15 @@ import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { splitSalePrice } from '@/lib/tradeFee'
 import tradeAbi from '@/abis/HupTrade.json'
+import useTradeFee from '@/hooks/useTradeFee'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { toast } from '@/components/NextToast'
 import EditListingModal from './EditListingModal'
 import styles from './TradeCard.module.scss'
+
+const amountFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
 
 // IHupTrade.ListingStatus
 const STATUS_ACTIVE = 1
@@ -137,6 +141,9 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
     query: { enabled: Boolean(tradeAddress && listingId) },
   })
 
+  // Read above the card's early return — the fee it quotes is only used further down
+  const { feeBps, feePercent } = useTradeFee({ chainId, tradeAddress })
+
   const metadata = useNftMetadata({
     chainId,
     collection: listing?.collection,
@@ -199,10 +206,8 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
 
   const symbol = isNativePrice ? nativeCurrency?.symbol || '' : curatedToken?.symbol || (isTokenLsp7 ? lsp4Symbol : erc20Symbol) || 'tokens'
   const decimals = isNativePrice ? nativeCurrency?.decimals ?? 18 : tokenDecimals
-  const formattedPrice =
-    price !== undefined && decimals !== undefined
-      ? new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(Number(formatUnits(price, decimals)))
-      : null
+  const priceNumber = price !== undefined && decimals !== undefined ? Number(formatUnits(price, decimals)) : null
+  const formattedPrice = priceNumber !== null ? amountFormat.format(priceNumber) : null
 
   // Token purchases pull the price via operator rights — same approval dance as TipModal
   const { data: erc20Allowance, refetch: refetchErc20Allowance } = useReadContract({
@@ -359,6 +364,17 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
   const referralBps = liveListing ? Number(liveListing.referralBps) : 0
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
 
+  // The buyer pays the listed price exactly — the platform fee comes out of what the seller
+  // receives. Say which of those a reader is looking at rather than leaving the cut implied.
+  const sellerProceeds =
+    isSeller && priceNumber !== null && feeBps !== null ? amountFormat.format(splitSalePrice(priceNumber, feeBps, referralBps).seller) : null
+  const feeNote =
+    feeBps > 0
+      ? sellerProceeds
+        ? `You receive ${sellerProceeds} ${symbol} after the ${feePercent} fee${referralBps > 0 ? ' and referral' : ''}`
+        : `Includes a ${feePercent} platform fee`
+      : null
+
   return (
     <div className={clsx(styles.tradeCard, { [styles['tradeCard--compact']]: compact })} onClick={(e) => e.stopPropagation()}>
       {!compact && (
@@ -434,6 +450,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
             {isActive && !isUnavailable && referralPercent && (
               <small className={styles.tradeCard__referralNote}>{referralPercent}% referral</small>
             )}
+            {isActive && !isUnavailable && feeNote && <small className={styles.tradeCard__feeNote}>{feeNote}</small>}
           </div>
         )}
 

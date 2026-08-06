@@ -175,11 +175,17 @@
     }
   }
 
-  // Small muted line under the price — the referral % is informational, not a pitch
+  // Small muted lines under the price — the referral % and the platform's cut are
+  // informational, not a pitch. The fee note wraps: it carries a full sentence.
   &__referralNote {
     color: var(--text-muted);
     font-size: 0.68rem;
     white-space: nowrap;
+  }
+
+  &__feeNote {
+    color: var(--text-muted);
+    font-size: 0.68rem;
   }
 
   &__badge {
