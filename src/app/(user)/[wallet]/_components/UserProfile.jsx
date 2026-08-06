@@ -801,9 +801,20 @@ const Status = ({ addr, profile, selfView }) => {
   const [expirationTimestamp, setExpirationTimestamp] = useState(24)
   const [maxLength, setMaxLength] = useState()
   const { web3, contract } = initHupContract()
+  const { chain: walletChain, isConnected } = useConnection()
   const [activeChain, setActiveChain] = useState(getActiveChain())
   const { contract: statusContract } = initStatusContract()
   const statusRef = useRef(``)
+  const activeChainId = activeChain?.[0]?.id
+  const statusAddress = activeChain?.[1]?.status
+
+  // getActiveChain() resolves to the wallet's chain (or the stored selection when
+  // disconnected), and NetworkSwitcher switches chains without remounting the profile —
+  // so this must be re-read on every switch, otherwise the write below keeps targeting
+  // the status contract of whichever chain was active when the profile first mounted.
+  useEffect(() => {
+    setActiveChain(getActiveChain())
+  }, [walletChain?.id, isConnected, panelOpened])
 
   /* Error during submission (e.g., user rejected)  */
   const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
@@ -829,10 +840,18 @@ const Status = ({ addr, profile, selfView }) => {
   }
 
   const clearStatus = () => {
+    if (!statusAddress) {
+      toast(`Status isn't available on ${activeChain?.[0]?.name ?? 'this network'}`, 'error')
+      return
+    }
+
     try {
+      // chainId pins the tx to the chain the address belongs to — without it wagmi signs on
+      // whatever chain the wallet happens to be on, against another chain's contract address.
       const result = writeContract({
         abi: statusAbi,
-        address: activeChain[1].status,
+        address: statusAddress,
+        chainId: activeChainId,
         functionName: 'clearStatus',
         args: [],
       })
@@ -843,9 +862,20 @@ const Status = ({ addr, profile, selfView }) => {
   }
 
   const updateStatus = (e) => {
+    if (!statusAddress) {
+      toast(`Status isn't available on ${activeChain?.[0]?.name ?? 'this network'}`, 'error')
+      return
+    }
+
+    if (!statusContent.trim()) {
+      toast(`Write a status first`, 'error')
+      return
+    }
+
     writeContract({
       abi: statusAbi,
-      address: activeChain[1].status,
+      address: statusAddress,
+      chainId: activeChainId,
       functionName: 'updateStatus',
       args: [statusContent, 'public', '', Number(expirationTimestamp)],
     })
@@ -864,6 +894,8 @@ const Status = ({ addr, profile, selfView }) => {
   //   statusContract
   // }
 
+  // Both reads hit the status contract of the active chain, so they re-run on every switch
+  // and once a write confirms.
   useEffect(() => {
     getStatus(addr).then((res) => {
       if (res?.error) {
@@ -871,6 +903,9 @@ const Status = ({ addr, profile, selfView }) => {
         return
       }
       setStatus(res)
+      // Only seed the editor from the profile being viewed when it is the viewer's own —
+      // otherwise Update would copy someone else's status onto the viewer's.
+      if (selfView) setStatusContent(res?.content ?? '')
     })
 
     getMaxLength().then((res) => {
@@ -880,7 +915,12 @@ const Status = ({ addr, profile, selfView }) => {
       }
       setMaxLength(web3.utils.toNumber(res))
     })
-  }, [panelOpened])
+  }, [addr, selfView, panelOpened, activeChainId, isConfirmed])
+
+  useEffect(() => {
+    const error = submitError || receiptError
+    if (error) toast(error.shortMessage || error.message || 'Failed to update status', 'error')
+  }, [submitError, receiptError])
 
   const handleToggle = useCallback((e) => setPanelOpened(e.newState === 'open'), [])
   return (
@@ -933,8 +973,8 @@ const Status = ({ addr, profile, selfView }) => {
               >
                 <textarea
                   autoFocus
-                  defaultValue={status && status !== '' ? status.content : statusContent}
-                  onInput={(e) => setStatusContent(e.target.value)}
+                  value={statusContent}
+                  onChange={(e) => setStatusContent(e.target.value)}
                   placeholder={`${getRandomPlaceholder()}`}
                   maxLength={maxLength ? maxLength : 60}
                 />
