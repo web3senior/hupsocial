@@ -3,8 +3,11 @@
   align-items: center;
   gap: 12px;
   padding: 8px 16px;
-  background: var(--white, #fff);
-  border: 1px solid var(--gray-200);
+  // --white/--black are fixed palette values, not theme tokens — the card has to
+  // read from --surface/--border/--text or it stays white in the dark themes.
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 8px;
   width: fit-content;
   transition: border-color 0.3s ease;
@@ -17,14 +20,14 @@
 
   .label {
     font-size: 10px;
-    color: #71717a;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
   .symbol {
     font-weight: 700;
-    color: var(--black);
+    color: var(--text);
     font-size: 14px;
   }
 }

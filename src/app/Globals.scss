@@ -17,6 +17,8 @@
   --liked-color: #ff007a;
   --batch-like-color: #facc15;
   --shimmer-bg: #f4f5f7;
+  // A shade deeper than the dark-theme blue — #1d9bf0 only clears 3:1 on white.
+  --cashtag-color: #1a8cd8;
 
   --scrollbarBG: #f4f4f4;
   --thumbBG: var(--gray);
@@ -47,6 +49,7 @@
   --tag: var(--black-800);
   --shimmer-glint: rgba(255, 255, 255, 0.12);
   --shimmer-bg: #23262c;
+  --cashtag-color: #1d9bf0;
 
   --scrollbarBG: #101114;
   --thumbBG: var(--black);
@@ -76,6 +79,8 @@
   --tag: var(--black-800);
   --shimmer-glint: rgba(163, 255, 173, 0.16);
   --shimmer-bg: #12301c;
+  // Blue is off-palette here — a saturated green still reads apart from the body text.
+  --cashtag-color: #4ade80;
 
   --scrollbarBG: #0d1c12;
   --thumbBG: var(--black);

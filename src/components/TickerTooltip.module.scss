@@ -9,7 +9,7 @@
 
 /* Make the $TICKER blue like X.com */
 :global(.ticker-trigger) {
-  color: #1d9bf0;
+  color: var(--cashtag-color, #1d9bf0);
   cursor: pointer;
   font-weight: 600;
   text-decoration: none;
