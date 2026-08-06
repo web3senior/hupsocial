@@ -76,8 +76,75 @@
 }
 
 // Shimmer
-.shimmer {
-  height: 200px;
+// Skeleton for the profile block. Widths are proportional and the avatar inherits
+// .profile__pfp's own sizing, so the placeholder tracks the real block across
+// breakpoints instead of hardcoding a height that only fits one of them.
+.profileSkeleton {
+  &__name {
+    width: 38%;
+    height: 20px;
+  }
+
+  &__wallet {
+    width: 22%;
+    height: 13px;
+    margin-top: 6px;
+  }
+
+  &__bio {
+    width: 70%;
+    min-height: 40px;
+    margin-top: 20px;
+  }
+
+  &__bioLine {
+    width: 100%;
+    height: 12px;
+
+    &--short {
+      width: 62%;
+    }
+  }
+
+  &__tags {
+    margin-top: 4px;
+  }
+
+  &__tag {
+    width: 58px;
+    height: 20px;
+  }
+
+  &__pfp {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+  }
+
+  // Footer rows are boxed to the real ones' line heights so the bars can stay
+  // text-weight without the block coming up short and shifting the page.
+  &__row {
+    display: flex;
+    align-items: center;
+
+    &--stats {
+      height: 24px;
+    }
+
+    &--link {
+      height: 26px;
+    }
+  }
+
+  &__stats {
+    width: 46%;
+    height: 14px;
+  }
+
+  &__link {
+    width: 34%;
+    height: 14px;
+  }
 }
 
 .form-tag {
@@ -1045,6 +1112,18 @@
     &:hover {
       opacity: 0.85;
     }
+
+    &--ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+
+      &:hover {
+        opacity: 1;
+        color: var(--text);
+        background: var(--hover);
+      }
+    }
   }
 
   // Tags
@@ -1105,6 +1184,10 @@
     background: var(--surface-muted);
     border: 1px solid var(--border);
     border-radius: 0.6rem;
+
+    &--editing {
+      border-color: var(--color-primary);
+    }
   }
 
   &__linkInfo {
@@ -1127,6 +1210,28 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  &__linkEdit {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    line-height: 1;
+    padding: 0.35rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
+
+    &:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
   }
 
   &__linkRemove {

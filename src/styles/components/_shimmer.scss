@@ -16,6 +16,11 @@
     );
     animation: shimmer-sweep 2s infinite;
     pointer-events: none;
+
+    // The muted base still reads as "loading" once the sweep is gone.
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
   }
 }
 

@@ -355,6 +355,50 @@ const Nav = ({ item }) => {
   )
 }
 /**
+ * Loading state for the profile block. It mirrors the real markup below — same
+ * containers, same avatar sizing — so the block occupies its final footprint and
+ * the page doesn't jump when the profile resolves. Bars use the global `shimmer`
+ * treatment, matching the post skeleton.
+ */
+const ProfileSkeleton = () => (
+  <section
+    className={clsx(styles.profile, styles.profileSkeleton, 'relative flex flex-column align-items-start justify-content-start gap-1')}
+    aria-hidden="true"
+  >
+    <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
+      <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
+        <div className={clsx('shimmer rounded', styles.profileSkeleton__name)} />
+        <div className={clsx('shimmer rounded', styles.profileSkeleton__wallet)} />
+
+        <div className={clsx(styles.profileSkeleton__bio, 'flex flex-column gap-025')}>
+          <div className={clsx('shimmer rounded', styles.profileSkeleton__bioLine)} />
+          <div className={clsx('shimmer rounded', styles.profileSkeleton__bioLine, styles['profileSkeleton__bioLine--short'])} />
+        </div>
+
+        <div className={clsx(styles.profileSkeleton__tags, 'flex flex-row align-items-center flex-wrap gap-050')}>
+          <span className={clsx('shimmer rounded', styles.profileSkeleton__tag)} />
+          <span className={clsx('shimmer rounded', styles.profileSkeleton__tag)} />
+          <span className={clsx('shimmer rounded', styles.profileSkeleton__tag)} />
+        </div>
+      </div>
+
+      <div className={clsx(styles.profile__pfp, 'rounded relative')}>
+        <div className={clsx('shimmer', styles.profileSkeleton__pfp)} />
+      </div>
+    </header>
+
+    <footer className="w-100 flex flex-column gap-1">
+      <div className={clsx(styles.profileSkeleton__row, styles['profileSkeleton__row--stats'])}>
+        <div className={clsx('shimmer rounded', styles.profileSkeleton__stats)} />
+      </div>
+      <div className={clsx(styles.profileSkeleton__row, styles['profileSkeleton__row--link'])}>
+        <div className={clsx('shimmer rounded', styles.profileSkeleton__link)} />
+      </div>
+    </footer>
+  </section>
+)
+
+/**
  * Detailed Profile View Layer
  * Handles data mapping for local profiles and native LUKSO Universal Profiles.
  */
@@ -500,7 +544,7 @@ const Profile = ({ addr }) => {
     )
   }
 
-  if (isLoading) return <div className={`shimmer ${styles.shimmer}`} />
+  if (isLoading) return <ProfileSkeleton />
 
   const targetWallet = params?.wallet || addr || ''
   const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 6)}…${targetWallet.slice(-4)}` : targetWallet

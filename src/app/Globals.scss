@@ -10,7 +10,10 @@
   --border: var(--gray-300, #e5e7eb);
   --hover: #f3f4f6;
   --tag: var(--gray-50, #f3f4f6);
-  --shimmer-glint: rgba(255, 255, 255, 0.55);
+  // Sweeps DARKER than the base here — a white glint over a #f7f7f8 surface lands
+  // ~5 values above it, so the animation read as a static grey block. Dark themes
+  // keep a light glint, which contrasts against their own base just fine.
+  --shimmer-glint: rgba(15, 23, 42, 0.07);
   --liked-color: #ff007a;
   --batch-like-color: #facc15;
   --shimmer-bg: #f4f5f7;
