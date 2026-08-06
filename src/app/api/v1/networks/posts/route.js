@@ -38,6 +38,7 @@ export async function GET(request) {
     const communityId = searchParams.get('community_id')
     const viewerAddress = searchParams.get('viewer_address')
     const feedType = searchParams.get('feed_type')
+    const postType = searchParams.get('post_type')
 
     // Trending is viewer-independent in its ranking, so it short-circuits into
     // its own cached pipeline before the per-viewer query below.
@@ -113,6 +114,17 @@ export async function GET(request) {
           )
           AND orig.nft_listing_id IS NOT NULL
       )`
+    }
+
+    // The profile splits a wallet's timeline across two tabs: `original` drops repost rows
+    // (Posts), `repost` keeps only them (Reposts). Quote posts carry the author's own
+    // commentary, so they stay with the originals. is_repost is NULL on a normal post, but
+    // older indexed rows can hold 0 — both mean "not a repost". Living in whereClause keeps
+    // the tab's meta.total count in step with the list it labels.
+    if (postType === 'repost') {
+      whereClause += ` AND COALESCE(p.is_repost, 0) <> 0`
+    } else if (postType === 'original') {
+      whereClause += ` AND COALESCE(p.is_repost, 0) = 0`
     }
 
     // Apply dynamic filters using the direct performance indexes set on the posts table

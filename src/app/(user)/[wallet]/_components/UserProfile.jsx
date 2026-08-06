@@ -55,21 +55,18 @@ const formatBirthday = (birthday) => {
 // so mixing page sizes shifts the offset and re-fetches an already-loaded window.
 const POSTS_PAGE_SIZE = 20
 
-export default function UserProfile() {
+/**
+ * Posts and Reposts are the same wallet-scoped feed under a different post_type filter,
+ * so both tabs ride this hook. Both fetch on mount — their tab badges carry the totals,
+ * so deferring one until its tab opens would leave that count blank until first click.
+ */
+const useProfileFeed = ({ wallet, viewer, postType }) => {
   const [posts, setPosts] = useState({ list: [] })
-  const [totalPosts, setTotalPosts] = useState(0)
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
-  const [activeTab, setActiveTab] = useState('posts') // New state for active tab
-  const params = useParams()
-  const router = useRouter()
-  const { address, isConnected } = useConnection()
-  const { web3, contract } = initHupContract()
-  const activeChain = getActiveChain()
-  const balance = useBalance({
-    address: address,
-  })
+  const [isLoaded, setIsLoaded] = useState(false)
 
   // Refs mirror the pagination state so the scroll handler never acts on a stale closure.
   const isFetchingRef = useRef(false)
@@ -81,28 +78,15 @@ export default function UserProfile() {
     hasMoreRef.current = hasMore
     pageRef.current = page
   }, [isFetching, hasMore, page])
-  const TABS_DATA = [
-    { id: 'posts', label: 'Posts', count: totalPosts },
-    { id: 'assets', label: 'Assets' },
-    { id: 'reposts', label: 'Reposts' },
-    { id: 'links', label: 'Links' },
-  ]
-  const TabContentMap = {
-    events: <></>,
-    //  jobs: JobsTab,
-    apps: <></>,
-    // feed: FeedTab,
-  }
-  const ActiveComponent = TabContentMap[activeTab]
 
-  const loadMorePosts = useCallback(async () => {
+  const loadMore = useCallback(async () => {
     if (isFetchingRef.current || !hasMoreRef.current) return
 
     setIsFetching(true)
     const nextPage = pageRef.current + 1
 
     try {
-      const response = await getPosts(nextPage, POSTS_PAGE_SIZE, null, params.wallet, address)
+      const response = await getPosts(nextPage, POSTS_PAGE_SIZE, null, wallet, viewer, null, null, false, postType)
 
       if (response.success && response.data.length > 0) {
         setPosts((prev) => {
@@ -119,52 +103,87 @@ export default function UserProfile() {
     } finally {
       setIsFetching(false)
     }
-  }, [params.wallet, address])
-
-  // Same infinite-scroll trigger as the home feed: load the next page when the
-  // viewport nears the bottom of the document.
-  useEffect(() => {
-    if (activeTab !== 'posts') return
-
-    const handleScroll = () => {
-      const { scrollTop, clientHeight, scrollHeight } = document.documentElement
-      const SCROLL_THRESHOLD = 300
-
-      if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
-        if (hasMoreRef.current && !isFetchingRef.current) {
-          loadMorePosts()
-        }
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [activeTab, loadMorePosts])
-
-  useEffect(() => {
-    recordProfileView(params.wallet, address || null)
-  }, [params.wallet])
+  }, [wallet, viewer, postType])
 
   // Re-runs when the viewer connects so has_liked/has_bookmarked flags reflect their wallet.
   useEffect(() => {
     let cancelled = false
 
-    getPosts(1, POSTS_PAGE_SIZE, null, params.wallet, address)
+    getPosts(1, POSTS_PAGE_SIZE, null, wallet, viewer, null, null, false, postType)
       .then((res) => {
         if (cancelled) return
-        setTotalPosts(res.meta?.total ?? res.meta?.count ?? 0)
-        setPosts({ list: res.data })
+        setTotal(res.meta?.total ?? res.meta?.count ?? 0)
+        setPosts({ list: res.data || [] })
         setPage(1)
         setHasMore(res.meta?.hasMore || false)
       })
       .catch((error) => {
         console.error('Error loading posts:', error)
       })
+      .finally(() => {
+        if (!cancelled) setIsLoaded(true)
+      })
 
     return () => {
       cancelled = true
     }
-  }, [params.wallet, address])
+  }, [wallet, viewer, postType])
+
+  return { posts, total, hasMore, isFetching, isLoaded, loadMore }
+}
+
+export default function UserProfile() {
+  const [activeTab, setActiveTab] = useState('posts') // New state for active tab
+  const params = useParams()
+  const router = useRouter()
+  const { address, isConnected } = useConnection()
+  const { web3, contract } = initHupContract()
+  const activeChain = getActiveChain()
+  const balance = useBalance({
+    address: address,
+  })
+
+  const postsFeed = useProfileFeed({ wallet: params.wallet, viewer: address, postType: 'original' })
+  const repostsFeed = useProfileFeed({ wallet: params.wallet, viewer: address, postType: 'repost' })
+
+  const TABS_DATA = [
+    { id: 'posts', label: 'Posts', count: postsFeed.total },
+    { id: 'assets', label: 'Assets' },
+    { id: 'reposts', label: 'Reposts', count: repostsFeed.total },
+    { id: 'links', label: 'Links' },
+  ]
+  const TabContentMap = {
+    events: <></>,
+    //  jobs: JobsTab,
+    apps: <></>,
+    // feed: FeedTab,
+  }
+  const ActiveComponent = TabContentMap[activeTab]
+
+  // Only the two post feeds paginate; the other tabs opt out of the scroll listener entirely.
+  const activeFeedLoadMore = activeTab === 'posts' ? postsFeed.loadMore : activeTab === 'reposts' ? repostsFeed.loadMore : null
+
+  // Same infinite-scroll trigger as the home feed: load the next page when the
+  // viewport nears the bottom of the document.
+  useEffect(() => {
+    if (!activeFeedLoadMore) return
+
+    const handleScroll = () => {
+      const { scrollTop, clientHeight, scrollHeight } = document.documentElement
+      const SCROLL_THRESHOLD = 300
+
+      if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
+        activeFeedLoadMore()
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [activeFeedLoadMore])
+
+  useEffect(() => {
+    recordProfileView(params.wallet, address || null)
+  }, [params.wallet])
 
   const handlePostPrefetch = (postId, chainId) => {
     router.prefetch(`/networks/${chainId}/${postId}`)
@@ -189,7 +208,7 @@ export default function UserProfile() {
             <Profile addr={params.wallet} />
 
             {/* Ensure posts and the list exist before mounting */}
-            {posts?.list?.length > 0 && <ProfileInsights addr={params.wallet} posts={posts} />}
+            {postsFeed.posts?.list?.length > 0 && <ProfileInsights addr={params.wallet} posts={postsFeed.posts} />}
           </div>
 
           <section className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
@@ -201,7 +220,7 @@ export default function UserProfile() {
                   onClick={() => setActiveTab(tab.id)}
                 >
                   <span>{tab.label}</span>
-                  {tab.count && (
+                  {tab.count > 0 && (
                     <span
                       className={`lable lable-pill`}
                       style={{
@@ -212,7 +231,7 @@ export default function UserProfile() {
                       {new Intl.NumberFormat('en', {
                         notation: 'compact',
                         maximumFractionDigits: 1,
-                      }).format(totalPosts)}
+                      }).format(tab.count)}
                     </span>
                   )}
                 </button>
@@ -222,31 +241,7 @@ export default function UserProfile() {
 
           {activeTab === 'posts' && (
             <div className={`${styles.tabContent} ${styles.postTab} relative`}>
-              <div className={`${styles.grid} flex flex-column`}>
-                {posts.list.length > 0 &&
-                  posts.list.map((item, i) => {
-                    return (
-                      <section
-                        key={`${item.network_id}:${item.id}`}
-                        className={`${styles.post} animate fade`}
-                        onClick={() => handlePostClick(item.id, item.network_id)}
-                        onMouseEnter={() => handlePostPrefetch(item.id, item.network_id)}
-                        onTouchStart={() => handlePostPrefetch(item.id, item.network_id)}
-                      >
-                        <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`, `bookmark`]} />
-                        {i < posts.list.length - 1 && <hr />}
-                      </section>
-                    )
-                  })}
-              </div>
-
-              {hasMore && (
-                <div className="flex justify-content-center p-100">
-                  <button className={styles.loadMore} onClick={loadMorePosts} disabled={isFetching}>
-                    {isFetching ? 'Loading...' : 'Load More'}
-                  </button>
-                </div>
-              )}
+              <PostFeed feed={postsFeed} emptyLabel={`posts`} onPostClick={handlePostClick} onPostPrefetch={handlePostPrefetch} />
             </div>
           )}
 
@@ -263,8 +258,8 @@ export default function UserProfile() {
           )}
 
           {activeTab === 'reposts' && (
-            <div className={`${styles.tabContent} ${styles.reposts} relative`}>
-              <NoData name={`reposts`} />
+            <div className={`${styles.tabContent} ${styles.postTab} ${styles.reposts} relative`}>
+              <PostFeed feed={repostsFeed} emptyLabel={`reposts`} onPostClick={handlePostClick} onPostPrefetch={handlePostPrefetch} />
             </div>
           )}
 
@@ -275,6 +270,46 @@ export default function UserProfile() {
           )}
         </div>
       </div>
+    </>
+  )
+}
+
+/**
+ * Paginated post list shared by the Posts and Reposts tabs — a repost row renders
+ * through the same <Post>, which resolves it to the original it points at.
+ * @param {*} param0
+ * @returns
+ */
+const PostFeed = ({ feed, emptyLabel, onPostClick, onPostPrefetch }) => {
+  // Stay blank until the first page settles so the empty state can't flash mid-fetch.
+  if (feed.posts.list.length === 0) return feed.isLoaded ? <NoData name={emptyLabel} /> : null
+
+  return (
+    <>
+      <div className={`${styles.grid} flex flex-column`}>
+        {feed.posts.list.map((item, i) => {
+          return (
+            <section
+              key={`${item.network_id}:${item.id}`}
+              className={`${styles.post} animate fade`}
+              onClick={() => onPostClick(item.id, item.network_id)}
+              onMouseEnter={() => onPostPrefetch(item.id, item.network_id)}
+              onTouchStart={() => onPostPrefetch(item.id, item.network_id)}
+            >
+              <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`, `bookmark`]} />
+              {i < feed.posts.list.length - 1 && <hr />}
+            </section>
+          )
+        })}
+      </div>
+
+      {feed.hasMore && (
+        <div className="flex justify-content-center p-100">
+          <button className={styles.loadMore} onClick={feed.loadMore} disabled={feed.isFetching}>
+            {feed.isFetching ? 'Loading...' : 'Load More'}
+          </button>
+        </div>
+      )}
     </>
   )
 }
@@ -927,6 +962,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const [isPending, setIsPending] = useState(false)
   const [tags, setTags] = useState({ list: parseSafeList(profile?.tags, false) })
   const [links, setLinks] = useState({ list: parseSafeList(profile?.links, true) })
+  const [editingLinkIndex, setEditingLinkIndex] = useState(null)
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
 
@@ -1030,16 +1066,45 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     const newLinkURL = linkURLRef.current.value.trim()
     if (newLinkName === '' || newLinkURL === '') return
 
-    const isRedundant = links.list.some((link) => link.name.toLowerCase() === newLinkName.toLowerCase())
+    // The row currently under edit is exempt from the duplicate-name check
+    const isRedundant = links.list.some((link, i) => i !== editingLinkIndex && link.name.toLowerCase() === newLinkName.toLowerCase())
     if (!isRedundant) {
-      setLinks({ list: [...links.list, { name: newLinkName, url: newLinkURL }] })
+      if (editingLinkIndex !== null) {
+        setLinks({
+          list: links.list.map((link, i) => (i === editingLinkIndex ? { name: newLinkName, url: newLinkURL } : link)),
+        })
+      } else {
+        setLinks({ list: [...links.list, { name: newLinkName, url: newLinkURL }] })
+      }
     }
+    setEditingLinkIndex(null)
     linkNameRef.current.value = ''
     linkURLRef.current.value = ''
   }
 
-  const removeLink = (e, linkToRemove) => {
-    setLinks({ list: links.list.filter((link) => link.name !== linkToRemove.name) })
+  const startEditLink = (e, index) => {
+    const link = links.list[index]
+    linkNameRef.current.value = link.name
+    linkURLRef.current.value = link.url
+    setEditingLinkIndex(index)
+    linkNameRef.current.focus()
+  }
+
+  const cancelEditLink = () => {
+    setEditingLinkIndex(null)
+    linkNameRef.current.value = ''
+    linkURLRef.current.value = ''
+  }
+
+  const removeLink = (e, indexToRemove) => {
+    setLinks({ list: links.list.filter((_, i) => i !== indexToRemove) })
+    if (editingLinkIndex !== null) {
+      if (indexToRemove === editingLinkIndex) {
+        cancelEditLink()
+      } else if (indexToRemove < editingLinkIndex) {
+        setEditingLinkIndex(editingLinkIndex - 1)
+      }
+    }
   }
 
   // Effects
@@ -1191,14 +1256,27 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                   {links.list.length > 0 && (
                     <div className={styles.profileModal__linkList}>
                       {links.list.map((link, i) => (
-                        <div key={`link-${i}`} className={styles.profileModal__linkItem}>
+                        <div
+                          key={`link-${i}`}
+                          className={clsx(styles.profileModal__linkItem, i === editingLinkIndex && styles['profileModal__linkItem--editing'])}
+                        >
                           <div className={styles.profileModal__linkInfo}>
                             <span className={styles.profileModal__linkName}>{link.name}</span>
                             <span className={styles.profileModal__linkUrl}>{link.url}</span>
                           </div>
                           <button
                             type="button"
-                            onClick={(e) => removeLink(e, link)}
+                            onClick={(e) => startEditLink(e, i)}
+                            aria-label={`Edit ${link.name}`}
+                            className={styles.profileModal__linkEdit}
+                          >
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => removeLink(e, i)}
                             aria-label={`Remove ${link.name}`}
                             className={styles.profileModal__linkRemove}
                           >
@@ -1212,8 +1290,17 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                     <input ref={linkNameRef} type="text" placeholder="Label" className={styles.profileModal__input} />
                     <input ref={linkURLRef} type="text" placeholder="https://…" className={styles.profileModal__input} />
                     <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>
-                      Add
+                      {editingLinkIndex !== null ? 'Update' : 'Add'}
                     </button>
+                    {editingLinkIndex !== null && (
+                      <button
+                        type="button"
+                        onClick={cancelEditLink}
+                        className={clsx(styles.profileModal__addBtn, styles['profileModal__addBtn--ghost'])}
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
                 </div>
               </>

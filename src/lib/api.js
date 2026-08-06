@@ -51,12 +51,17 @@ export async function ensureProfile(address) {
 
   return res.json()
 }
-export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null, communityId = null, feedType = null, excludeNft = false) => {
+export const getPosts = async (page = 1, limit = 20, networkId = null, walletAddress = null, viewerAddress = null, communityId = null, feedType = null, excludeNft = false, postType = null) => {
   /* Construct the URL with query parameters */
   let url = `/api/v1/networks/posts?page=${page}&limit=${limit}`
 
   if (feedType) {
     url += `&feed_type=${feedType}`
+  }
+
+  /* 'original' drops repost rows, 'repost' keeps only them — the profile's Posts/Reposts split */
+  if (postType) {
+    url += `&post_type=${postType}`
   }
 
   if (excludeNft) {
