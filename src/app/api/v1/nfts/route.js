@@ -3,8 +3,10 @@
  * @description Lists HupTrade NFT listings straight from the cidex-indexed nft_listings
  * table for the NFT Market grid — status/network/standard/payment-token/price/seller and
  * sort all resolve here in SQL. Name/collection search stays client-side (TradeCard-style
- * metadata — image, name, traits — is fetched live per token, not indexed), so this route
- * has no `search` param; the client filters the resolved grid by name itself.
+ * metadata — image, name — is fetched live per token, not indexed), so this route has no
+ * `search` param; the client filters the resolved grid by name itself. Traits are the one
+ * piece of token metadata that IS queryable here, because the read-through cache already
+ * persisted them — see the `traits` param below.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
@@ -13,6 +15,45 @@ import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 export const runtime = 'nodejs'
 
 const STATUS_BY_KEY = { active: [1], sold: [2], cancelled: [3], active_sold: [1, 2], all: [1, 2, 3] }
+
+// A hand-edited URL shouldn't be able to hand MariaDB a hundred JSON_CONTAINS calls
+const MAX_TRAIT_PAIRS = 20
+
+/**
+ * Parse the `traits` param — a JSON array of {label, value} — into label → values.
+ *
+ * Grouping is what defines the filter's semantics: values under the same label are ORed
+ * (Eyes: Laser *or* Blue), and the groups are ANDed (…*and* Hat: Cap). That's what every
+ * NFT marketplace's trait panel does, and the only reading where ticking a second value in
+ * a group can widen the result instead of emptying it.
+ */
+function parseTraitFilters(raw) {
+  if (!raw) return []
+
+  let pairs
+  try {
+    pairs = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(pairs)) return []
+
+  const groups = new Map()
+  for (const pair of pairs.slice(0, MAX_TRAIT_PAIRS)) {
+    const label = typeof pair?.label === 'string' ? pair.label.trim() : ''
+    const value = typeof pair?.value === 'string' ? pair.value.trim() : ''
+    if (!label || !value) continue
+
+    const values = groups.get(label)
+    if (values) {
+      if (!values.includes(value)) values.push(value)
+    } else {
+      groups.set(label, [value])
+    }
+  }
+
+  return [...groups.entries()]
+}
 
 /**
  * Attach each row's most recent onchain sale, in place.
@@ -69,6 +110,7 @@ export async function GET(request) {
     const maxPrice = searchParams.get('maxPrice')
     const seller = searchParams.get('seller') // address or username fragment
     const referral = searchParams.get('referral') // 'any' (>0) | 'none' (=0) | minimum bps, e.g. '500' for 5%+
+    const traits = parseTraitFilters(searchParams.get('traits')) // JSON [{label, value}] — see above
     const sort = searchParams.get('sort') || 'newest' // 'newest' | 'price_asc' | 'price_desc'
     const statusKey = searchParams.get('status') || 'active'
     // Defaults to what's still buyable; 'active_sold' restores the old feed's active + sold mix
@@ -130,6 +172,26 @@ export async function GET(request) {
         whereClause += ` AND EXISTS (SELECT 1 FROM users us WHERE us.wallet_address = l.seller AND us.name LIKE ?)`
         whereParams.push(`%${seller}%`)
       }
+    }
+
+    // Traits live in the app's own read-through metadata cache, not in the indexed listing
+    // row — an EXISTS keeps that a per-row lookup on nft_metadata_cache's primary key
+    // instead of a join that would have to be de-duplicated afterwards. A token nobody has
+    // rendered yet has no cached row and therefore no known traits, so it drops out of a
+    // trait-filtered view; the collection page's panel reports that coverage.
+    if (traits.length > 0) {
+      const conditions = []
+      for (const [label, values] of traits) {
+        conditions.push(`(${values.map(() => 'JSON_CONTAINS(m.attributes, ?)').join(' OR ')})`)
+        // Object containment, so key order doesn't matter and a value can't match under
+        // another label the way a bare LIKE over the document would allow
+        for (const value of values) whereParams.push(JSON.stringify({ label, value }))
+      }
+
+      whereClause +=
+        ` AND EXISTS (SELECT 1 FROM nft_metadata_cache m` +
+        ` WHERE m.network_id = l.network_id AND m.collection = l.collection AND m.token_id = l.token_id` +
+        ` AND ${conditions.join(' AND ')})`
     }
 
     const orderBy =

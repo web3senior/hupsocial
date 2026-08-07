@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import clsx from 'clsx'
-import { ArrowSquareOutIcon, CheckIcon, CopyIcon, LinkSimpleIcon, StackIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, CheckIcon, CopyIcon, CubeIcon, LinkSimpleIcon, StackIcon } from '@phosphor-icons/react'
 import { buildAssetLinks } from '@/components/TradeCard'
 import { handleBrokenImage } from '@/lib/utils'
 import Profile from '@/components/Profile'
@@ -10,12 +10,25 @@ import HupMark from '@/components/ui/HupMark'
 import { toast } from '@/components/NextToast'
 import styles from './CollectionHeader.module.scss'
 
+const COUNT_FORMAT = new Intl.NumberFormat('en')
+
 const formatSupply = (value) => {
   try {
     return new Intl.NumberFormat().format(BigInt(value))
   } catch {
     return String(value)
   }
+}
+
+/**
+ * What the 3D chip promises, spelled out. The badge can only speak for the tokens this app
+ * has already resolved, so the tooltip says how many that is rather than letting a single
+ * mesh in a 900-piece drop read as "this collection is 3D".
+ */
+const describeModels = ({ models, cached, types }) => {
+  const formats = types.length > 0 ? ` (${types.map((type) => `.${type}`).join(', ')})` : ''
+  const scope = models === cached ? 'Every NFT loaded from this collection ships' : `${COUNT_FORMAT.format(models)} of the NFTs loaded from this collection ship`
+  return `${scope} a 3D file${formats}`
 }
 
 // Untitled links still need a label the user can read — the hostname is the honest one
@@ -104,6 +117,14 @@ export default function CollectionHeader({ chainId, chainInfo, address, info }) 
                 </span>
               )}
               {chainInfo?.name && <span className={styles.header__chip}>{chainInfo.name}</span>}
+              {/* Same badge its tiles carry, raised to the collection: this drop has NFTs
+                  you can turn around, not just look at */}
+              {info.models?.models > 0 && (
+                <span className={clsx(styles.header__chip, styles['header__chip--model'])} title={describeModels(info.models)}>
+                  <CubeIcon size={12} weight="fill" />
+                  3D
+                </span>
+              )}
             </div>
 
             {info.totalSupply !== null && (

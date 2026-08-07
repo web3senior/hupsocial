@@ -126,6 +126,14 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--text-muted, #888);
+
+    // The one chip that describes what the artwork does rather than how it is stored, so
+    // it carries the network accent instead of sitting in the muted row
+    &--model {
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 45%, var(--border));
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 10%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+    }
   }
 
   &__stats {

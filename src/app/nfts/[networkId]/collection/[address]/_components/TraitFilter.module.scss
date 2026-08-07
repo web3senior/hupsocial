@@ -1,0 +1,218 @@
+// Attribute funnel for the collection page. NativePopover owns the panel's position,
+// animation and modality; everything below is this consumer's chrome.
+.traitFilter {
+  width: min(300px, calc(100vw - 32px));
+  padding: 0.85rem;
+  border-radius: 16px;
+
+  &__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted, #888);
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
+    }
+
+    &--active {
+      border-color: var(--network-color-primary, var(--color-primary));
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--white, #fff);
+    font-size: var(--font-size-10, 10px);
+    font-weight: 700;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: var(--background);
+    color: var(--text-muted);
+
+    input {
+      width: 100%;
+      height: 34px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.85rem;
+      outline: none;
+    }
+  }
+
+  // Bounded so a 40-trait collection scrolls inside the panel instead of running off the
+  // viewport; the popover itself is positioned once and never re-measured mid-scroll
+  &__groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    max-height: min(52vh, 380px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__group {
+    border-radius: 8px;
+
+    &[open] > summary {
+      color: var(--text);
+
+      &::after {
+        transform: translateY(1px) rotate(-135deg);
+      }
+    }
+  }
+
+  // The native disclosure triangle is dropped for a chevron that can sit after the count
+  // and rotate with the group, the way every other expander in the app reads
+  &__groupSummary {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.45rem;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::after {
+      content: '';
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      margin-right: 2px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: translateY(-2px) rotate(45deg);
+      transition: transform 0.15s ease;
+    }
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    }
+  }
+
+  &__groupLabel {
+    min-width: 0; // flex items default to min-width:auto, which defeats the ellipsis
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__groupCount {
+    display: inline-grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 16%, transparent);
+    color: var(--network-color-primary, var(--color-primary));
+    font-size: var(--font-size-10, 10px);
+    font-weight: 700;
+  }
+
+  &__values {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.1rem 0 0.35rem 0.45rem;
+    list-style: none;
+  }
+
+  &__value {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.45rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    }
+
+    input {
+      flex-shrink: 0;
+      accent-color: var(--network-color-primary, var(--color-primary));
+      cursor: pointer;
+    }
+
+    small {
+      flex-shrink: 0;
+      color: var(--text-muted);
+      font-family: var(--ff-mono);
+      font-size: var(--font-size-10, 10px);
+    }
+  }
+
+  &__valueName {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+    line-height: 1.5;
+  }
+
+  &__reset {
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--text) 7%, transparent);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--text) 12%, transparent);
+    }
+  }
+}

@@ -108,6 +108,10 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
  * @param {string} [filters.seller] Wallet address or username fragment.
  * @param {'any'|'none'|string} [filters.referral] Referral share: 'any' (pays anything),
  * 'none' (pays nothing), or a minimum in basis points ('500' for 5%+).
+ * @param {string} [filters.traits] JSON array of {label, value} trait pairs, e.g.
+ * `[{"label":"Eyes","value":"Laser"}]`. Values sharing a label are ORed, labels are ANDed.
+ * Matches against the cached token metadata, so tokens nobody has viewed yet are excluded —
+ * getNftCollectionTraits reports that coverage alongside the options.
  * @param {'newest'|'price_asc'|'price_desc'} [filters.sort]
  */
 export const getNftListings = async (page = 1, limit = 24, filters = {}) => {
@@ -234,6 +238,31 @@ export const getNftCollectionInfo = async (networkId, address, isLsp8) => {
 
   const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}${suffix}`)
   if (!response.ok) throw new Error('Failed to fetch collection info')
+
+  return response.json()
+}
+
+/**
+ * Get NFT Collection Traits
+ * The trait facets for one collection's listed tokens — `[{label, values: [{value, count}]}]`,
+ * labels sorted alphabetically and values by how many tokens carry them. Powers the collection
+ * page's attribute filter, whose selections go back to getNftListings as `filters.traits`.
+ *
+ * Traits come from the cached token metadata, which fills in as tokens are rendered, so the
+ * response's `meta` carries `listed` (tokens the view can show) and `resolved` (of those, how
+ * many have metadata cached) — the panel says so rather than implying the list is complete.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ * @param {'active'|'sold'|'cancelled'|'active_sold'|'all'} [status] Scope the counts to the
+ * same listing status the grid is showing; defaults to active.
+ */
+export const getNftCollectionTraits = async (networkId, address, status) => {
+  const params = new URLSearchParams()
+  if (status) params.set('status', status)
+  const query = params.toString()
+
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/traits${query ? `?${query}` : ''}`)
+  if (!response.ok) throw new Error('Failed to fetch collection traits')
 
   return response.json()
 }

@@ -66,6 +66,9 @@ export default function useCollectionInfo({ chainId, collection, isLsp8, enabled
     // to the URL's hostname
     links: info?.links || [],
     totalSupply: info?.totalSupply || null,
+    // {cached, models, types} — how many of this collection's resolved tokens ship a 3D
+    // file, and in which formats. The badge is a claim about those, not the whole supply.
+    models: info?.models || null,
     isLsp8: typeof info?.isLsp8 === 'boolean' ? info.isLsp8 : null,
     source: info?.source || null,
     isLoading: ready && isLoading,

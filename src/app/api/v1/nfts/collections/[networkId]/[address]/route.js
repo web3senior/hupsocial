@@ -8,13 +8,18 @@
 
 import { NextResponse } from 'next/server'
 import { getCollectionMetadata, refreshCollectionMetadata } from '@/lib/collectionMetadataCache'
+import { getCollectionModelStats } from '@/lib/nftMetadataCache'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Collection identity changes rarely; supply during a mint is the freshest thing here and
-// the DB row already re-resolves daily, so edge caching stays modest.
-const CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400'
+// Collection identity changes rarely, but this payload is no longer only identity: `models`
+// is a rollup of the token cache, which fills in as the app resolves the collection. A
+// day-long stale-while-revalidate window let a browser paint a body from before a token's
+// 3D file was known — and since a stale hit renders first and revalidates behind it, the
+// badge stayed missing for a whole extra page view. Freshness now matches the fastest-moving
+// field in the response; the edge still absorbs the RPC-backed part.
+const CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
 
 export async function GET(request, { params }) {
   try {
@@ -30,13 +35,18 @@ export async function GET(request, { params }) {
     const isLsp8Param = searchParams.get('isLsp8')
     const isLsp8 = isLsp8Param === null ? null : isLsp8Param === '1'
 
-    const result = await getCollectionMetadata({ chainId: networkId, collection: address, isLsp8, baseUrl: origin })
+    // The collection's identity comes from its own contract; whether it ships 3D is a fact
+    // about its tokens, so it is rolled up from the token cache alongside it
+    const [result, models] = await Promise.all([
+      getCollectionMetadata({ chainId: networkId, collection: address, isLsp8, baseUrl: origin }),
+      getCollectionModelStats({ chainId: networkId, collection: address }),
+    ])
 
     if (!result) {
       return NextResponse.json({ success: false, error: 'Unable to resolve the collection' }, { status: 502 })
     }
 
-    return NextResponse.json({ success: true, data: result.metadata }, { headers: { 'Cache-Control': CACHE_CONTROL } })
+    return NextResponse.json({ success: true, data: { ...result.metadata, models } }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (error) {
     console.error('[GET_NFT_COLLECTION_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
@@ -70,7 +80,11 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, error: 'Unable to resolve the collection' }, { status: 502 })
     }
 
-    return NextResponse.json({ success: true, data: result.metadata })
+    // Same shape as GET — this body is written straight into the client's cache, so a field
+    // missing here would blank the badge on every refresh
+    const models = await getCollectionModelStats({ chainId: networkId, collection: address })
+
+    return NextResponse.json({ success: true, data: { ...result.metadata, models } })
   } catch (error) {
     console.error('[POST_NFT_COLLECTION_REFRESH_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })

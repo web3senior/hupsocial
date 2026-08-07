@@ -95,6 +95,64 @@
     }
   }
 
+  // Applied trait filters. Sits between the toolbar and the grid so what is narrowing the
+  // results reads in the same column the results do.
+  &__chips {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 100%;
+    padding: 5px 10px;
+    border: 1px solid color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 45%, var(--border));
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 10%, transparent);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    small {
+      flex-shrink: 0;
+      color: var(--text-muted);
+    }
+
+    span {
+      min-width: 0; // flex items default to min-width:auto, which defeats the ellipsis
+      overflow: hidden;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    svg {
+      flex-shrink: 0;
+      color: var(--text-muted);
+    }
+  }
+
+  &__chipsClear {
+    all: unset;
+    cursor: pointer;
+    padding: 0 0.35rem;
+    color: var(--text-muted, #888);
+    font-size: 0.78rem;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
   &__grid {
     display: grid;
     /* minmax(0, …), not a bare 1fr — a long collection name's min-content width would

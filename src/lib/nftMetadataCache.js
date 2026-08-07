@@ -285,6 +285,47 @@ export const refreshNftMetadata = async ({ chainId, collection, tokenId, isLsp8,
 }
 
 /**
+ * How much of a collection ships a 3D file, for the collection page's 3D badge.
+ *
+ * Token-derived on purpose: LSP4 hangs the mesh off the token, not the contract, so "this
+ * collection is 3D" is only ever a statement about its tokens. And it is a statement about
+ * the ones this app has resolved — a collection nobody has browsed has no rows here — so the
+ * caller gets `cached` alongside `models` and can say which it means.
+ *
+ * @param {Object} params
+ * @param {number|string} params.chainId Chain the collection lives on.
+ * @param {string} params.collection NFT contract address.
+ * @returns {Promise<{cached: number, models: number, types: string[]}>} Zeroed when the
+ * collection has no cached tokens, and when the database is unreachable — a badge is not
+ * worth failing a page load over.
+ */
+export const getCollectionModelStats = async ({ chainId, collection }) => {
+  const empty = { cached: 0, models: 0, types: [] }
+
+  try {
+    const [[row]] = await pool.execute(
+      `SELECT COUNT(*) AS cached,
+              SUM(model_uri IS NOT NULL) AS models,
+              GROUP_CONCAT(DISTINCT model_type ORDER BY model_type SEPARATOR ',') AS types
+         FROM nft_metadata_cache
+        WHERE network_id = ? AND collection = ?`,
+      [Number(chainId), String(collection).toLowerCase()],
+    )
+
+    return {
+      cached: Number(row?.cached) || 0,
+      models: Number(row?.models) || 0,
+      // model_type is never null while model_uri is set, so this lists exactly the formats
+      // the collection ships — usually one
+      types: row?.types ? String(row.types).split(',').filter(Boolean) : [],
+    }
+  } catch (error) {
+    console.warn('[nft-metadata-cache] model stats failed:', error.message)
+    return empty
+  }
+}
+
+/**
  * Re-reads a batch of one collection's cached tokens from chain — the whole-collection form of
  * refreshNftMetadata, for when a change was made to every token rather than one of them.
  *

@@ -4,16 +4,19 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import clsx from 'clsx'
-import { ArrowsClockwiseIcon, CaretLeftIcon, StorefrontIcon } from '@phosphor-icons/react'
+import { ArrowsClockwiseIcon, CaretLeftIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
+import useCollectionTraits from '@/hooks/useCollectionTraits'
 import { toast } from '@/components/NextToast'
 import PageTitle from '@/components/PageTitle'
 import NftMarketCard from '@/components/NftMarketCard'
 import CollectionHeader from './CollectionHeader'
 import FloorChart from './FloorChart'
+import OwnedTokens from './OwnedTokens'
+import TraitFilter from './TraitFilter'
 import styles from './CollectionView.module.scss'
 
 const PAGE_SIZE = 24
@@ -43,15 +46,27 @@ export default function CollectionView({ networkId, address }) {
   const info = useCollectionInfo({ chainId, collection })
 
   const [status, setStatus] = useState('active')
+  // [{label, value}] — values sharing a label widen the result, different labels narrow it.
+  // The server does the matching against cached token metadata; see the traits API route.
+  const [traits, setTraits] = useState([])
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
 
+  // The facet list is scoped to the same status the grid shows, so a count next to a value
+  // is always the number of NFTs ticking it would leave on screen
+  const traitFacets = useCollectionTraits({ chainId, collection, status })
+
   const buildFilters = useCallback(
-    () => ({ networkId: String(chainId), collection, status: status === 'active' ? '' : status }),
-    [chainId, collection, status],
+    () => ({
+      networkId: String(chainId),
+      collection,
+      status: status === 'active' ? '' : status,
+      traits: traits.length > 0 ? JSON.stringify(traits) : '',
+    }),
+    [chainId, collection, status, traits],
   )
 
   useEffect(() => {
@@ -131,6 +146,10 @@ export default function CollectionView({ networkId, address }) {
 
       <CollectionHeader chainId={chainId} chainInfo={chainInfo} address={collection} info={info} />
 
+      {/* Above the market, because what you already hold is the more immediate thing —
+          renders nothing at all when disconnected or holding none here */}
+      <OwnedTokens chainId={chainId} collection={collection} collectionName={info.name} isLsp8={info.isLsp8} />
+
       {/* What the floor has done, before the listings that make it up */}
       <FloorChart chainId={chainId} collection={collection} chainInfo={chainInfo} />
 
@@ -151,6 +170,15 @@ export default function CollectionView({ networkId, address }) {
           </div>
 
           <div className={styles.collection__tools}>
+            <TraitFilter
+              traits={traitFacets.traits}
+              selected={traits}
+              onChange={setTraits}
+              isLoading={traitFacets.isLoading}
+              listed={traitFacets.listed}
+              resolved={traitFacets.resolved}
+            />
+
             <button
               type="button"
               className={styles.collection__tool}
@@ -171,6 +199,30 @@ export default function CollectionView({ networkId, address }) {
           </div>
         </div>
 
+        {/* Applied traits, each removable on its own — the panel behind the funnel is where
+            they were picked, but a filtered grid has to show what is filtering it */}
+        {traits.length > 0 && (
+          <div className={styles.collection__chips}>
+            {traits.map((trait) => (
+              <button
+                key={`${trait.label}:${trait.value}`}
+                type="button"
+                className={styles.collection__chip}
+                onClick={() => setTraits((current) => current.filter((pair) => !(pair.label === trait.label && pair.value === trait.value)))}
+                aria-label={`Remove the ${trait.label} ${trait.value} filter`}
+              >
+                <small>{trait.label}</small>
+                <span>{trait.value}</span>
+                <XIcon size={12} />
+              </button>
+            ))}
+
+            <button type="button" className={styles.collection__chipsClear} onClick={() => setTraits([])}>
+              Clear all
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className={styles.collection__grid}>
             {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
@@ -180,7 +232,11 @@ export default function CollectionView({ networkId, address }) {
           </div>
         ) : items.length === 0 ? (
           <p className={styles.collection__empty}>
-            {status === 'active' ? 'Nothing from this collection is up for sale right now.' : 'No listings match this view.'}
+            {traits.length > 0
+              ? 'No NFT here matches those traits — try removing one.'
+              : status === 'active'
+              ? 'Nothing from this collection is up for sale right now.'
+              : 'No listings match this view.'}
           </p>
         ) : (
           <div className={styles.collection__grid}>
