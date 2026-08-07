@@ -1,8 +1,16 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useConnection, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { erc20Abi, formatUnits, hexToString, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
+import {
+  useConnection,
+  useReadContract,
+  useSendCalls,
+  useSwitchChain,
+  useWaitForCallsStatus,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from 'wagmi'
+import { encodeFunctionData, erc20Abi, formatUnits, hexToString, isAddress, pad, parseEventLogs, parseUnits, toHex, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { CaretDownIcon, StorefrontIcon, WarningIcon } from '@phosphor-icons/react'
 import { CONTRACTS, config } from '@/config/wagmi'
@@ -29,6 +37,10 @@ const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.t
 const MAX_REFERRAL_PERCENT = 50
 
 const shortAddress = (value) => `${value.slice(0, 6)}…${value.slice(-4)}`
+
+// Queue identity for a token — collection + bytes32 id, case-folded so pasted uppercase
+// hex and checksummed addresses can't smuggle in a duplicate
+const batchKey = (collection, tokenId) => `${collection}:${tokenId}`.toLowerCase()
 
 // Collection suggestions are headed by where they came from — proven onchain ownership is a
 // very different claim from "a collection by this name exists"
@@ -156,6 +168,35 @@ const lsp8Abi = [
   },
 ]
 
+// ERC725X — the execution interface every Universal Profile exposes. Detecting it on the
+// connected account is what separates "smart account that can executeBatch" from a plain
+// EOA that happens to be on LUKSO.
+const ERC725X_INTERFACE_ID = '0x7545acac'
+const erc165Abi = [
+  {
+    type: 'function',
+    name: 'supportsInterface',
+    stateMutability: 'view',
+    inputs: [{ name: 'interfaceId', type: 'bytes4' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+]
+
+const erc725xAbi = [
+  {
+    type: 'function',
+    name: 'executeBatch',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'operationsType', type: 'uint256[]' },
+      { name: 'targets', type: 'address[]' },
+      { name: 'values', type: 'uint256[]' },
+      { name: 'datas', type: 'bytes[]' },
+    ],
+    outputs: [{ name: '', type: 'bytes[]' }],
+  },
+]
+
 // ERC721 ids are decimal-ish numbers, LSP8 ids are bytes32 — normalize both to the bytes32
 // form HupTrade stores. Invalid/incomplete input resolves to null and keeps everything disabled.
 const normalizeTokenId = (raw) => {
@@ -277,6 +318,9 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   // Rows only load their NFT artwork once the popover has actually been opened
   const [marketOpened, setMarketOpened] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
+  // Standalone-only batch queue — fully priced listings waiting to settle together in one
+  // submission (a Universal Profile executeBatch on LUKSO, wallet_sendCalls elsewhere)
+  const [batchItems, setBatchItems] = useState([])
   const { address, chain: walletChain } = useConnection()
   const switchChain = useSwitchChain({ config })
   const dialogRef = useRef(null)
@@ -325,6 +369,9 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
     setTokenSearchResults([])
     setMyListings([])
     setMarketListings([])
+    // Queued items encode collection/token/payment addresses that only exist on the
+    // chain they were added on
+    setBatchItems([])
   }
 
   // Debounced name search for the custom-token field — a pasted address never triggers a
@@ -446,6 +493,10 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
     ? Boolean(isOperator)
     : approvedFor?.toLowerCase() === tradeAddress?.toLowerCase() || Boolean(approvedForAll)
 
+  // Approval state must be read, not guessed, before a token can join a batch — a
+  // redundant authorizeOperator reverts on LSP8 and would take the whole batch with it
+  const transferRightsKnown = isLsp8 ? isOperator !== undefined : approvedFor !== undefined && approvedForAll !== undefined
+
   // decimals() shares the same selector on ERC20 and LSP7 — one read covers both
   const { data: tokenDecimals } = useReadContract({
     abi: erc20Abi,
@@ -514,9 +565,29 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   const hasDeductions = Boolean(feeBps > 0 || referralBps > 0)
   const showSplit = isValidPrice && referralBps !== null && hasDeductions
 
+  // A Universal Profile is an ERC725X executor — when the connected account itself
+  // supports the interface, queued listings can settle as one executeBatch through it
+  const { data: supportsErc725x } = useReadContract({
+    abi: erc165Abi,
+    address,
+    functionName: 'supportsInterface',
+    args: [ERC725X_INTERFACE_ID],
+    chainId,
+    query: { enabled: Boolean(isStandalone && isLukso && address) },
+  })
+  const canBatchViaProfile = Boolean(isLukso && supportsErc725x)
+
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = isPending || isConfirming
+  // Batch path for EOA wallets — EIP-5792 wallet_sendCalls where supported, falling back
+  // to one transaction per call everywhere else
+  const { data: sentCalls, isPending: isSendingCalls, mutate: sendCalls, error: sendCallsError, reset: resetSendCalls } = useSendCalls()
+  const { data: callsStatus } = useWaitForCallsStatus({
+    id: sentCalls?.id,
+    query: { enabled: Boolean(sentCalls?.id) },
+  })
+  const isWaitingCalls = Boolean(sentCalls?.id) && (!callsStatus || callsStatus.status === 'pending')
+  const isBusy = isPending || isConfirming || isSendingCalls || isWaitingCalls
 
   // Mount = open / unmount = close, matching the NewPost dialog contract
   useEffect(() => {
@@ -565,6 +636,38 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   }, [submitError])
 
   useEffect(() => {
+    if (!sendCallsError) return
+    toast(sendCallsError.shortMessage || sendCallsError.message || 'Transaction rejected', 'error')
+  }, [sendCallsError])
+
+  // Shared tail of both batch paths (UP executeBatch receipt, wallet_sendCalls bundle) —
+  // the receipts' Listed events are the source of truth for what actually settled
+  const finishBatch = (logs) => {
+    let listedEvents = []
+    try {
+      listedEvents = parseEventLogs({ abi: tradeAbi, logs, eventName: 'Listed' })
+    } catch {
+      listedEvents = []
+    }
+    const listings = listedEvents.map(({ args }) => ({
+      listingId: args.listingId.toString(),
+      chainId,
+      collection: args.collection,
+      tokenId: args.tokenId,
+      isLsp8: args.isLsp8,
+      token: args.token,
+      isTokenLsp7: args.isTokenLsp7,
+      price: args.price.toString(),
+      referralBps: Number(args.referralBps),
+    }))
+    const count = listings.length || batchItems.length
+    toast(`${count} NFT${count === 1 ? '' : 's'} listed — they appear in the market once indexed`, 'success')
+    setBatchItems([])
+    onListed?.(listings)
+    dialogRef.current?.close()
+  }
+
+  useEffect(() => {
     if (!isConfirmed) return
     if (lastActionRef.current === 'approve') {
       toast('Transfer approved — you can list your NFT now', 'success')
@@ -577,6 +680,10 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
       toast('Listing cancelled', 'success')
       setMyListings((prev) => prev.filter((row) => String(row.listing_id) !== cancellingId))
       setCancellingId(null)
+      return
+    }
+    if (lastActionRef.current === 'batch') {
+      finishBatch(receipt?.logs ?? [])
       return
     }
 
@@ -612,6 +719,38 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
     dialogRef.current?.close()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
+
+  // wallet_sendCalls settlement — success closes out the batch; the non-atomic fallback
+  // can stop partway, so a failure still credits whatever landed before the stop
+  useEffect(() => {
+    if (!callsStatus || callsStatus.status === 'pending') return
+
+    const logs = (callsStatus.receipts ?? []).flatMap((r) => r.logs ?? [])
+    if (callsStatus.status === 'success') {
+      // The bundle settling IS the external event this effect subscribes to — the state
+      // updates here are its one-shot consequences, not a derivation of other state
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      finishBatch(logs)
+      return
+    }
+
+    let listedEvents = []
+    try {
+      listedEvents = parseEventLogs({ abi: tradeAbi, logs, eventName: 'Listed' })
+    } catch {
+      listedEvents = []
+    }
+    if (listedEvents.length > 0) {
+      // Drop what settled; the rest stays queued for another attempt
+      const settled = new Set(listedEvents.map(({ args }) => batchKey(args.collection, args.tokenId)))
+      setBatchItems((prev) => prev.filter((item) => !settled.has(item.key)))
+      toast(`${listedEvents.length} listed before your wallet stopped — the rest are still queued`, 'error')
+    } else {
+      toast('Batch listing failed — no listings were created', 'error')
+    }
+    resetSendCalls()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callsStatus])
 
   const handleApprove = (e) => {
     e.stopPropagation()
@@ -652,6 +791,92 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   }
 
   const needsApproval = hasToken && isOwner && !hasTransferRights
+  const canQueueCurrent = hasToken && isOwner && transferRightsKnown && priceUnits !== null && referralBps !== null
+
+  const handleAddToBatch = (e) => {
+    e.stopPropagation()
+    if (!canQueueCurrent) return
+
+    const key = batchKey(collectionAddress, tokenId)
+    if (batchItems.some((item) => item.key === key)) {
+      toast('That NFT is already in the batch', 'error')
+      return
+    }
+    // list() reverts DuplicateListing on the seller's own active listing — one already-listed
+    // token would take the whole atomic batch down with it
+    if (myListings.some((row) => batchKey(row.collection, normalizeTokenId(row.token_id) ?? row.token_id) === key)) {
+      toast('This NFT already has an active listing — cancel it first', 'error')
+      return
+    }
+
+    setBatchItems((prev) => [
+      ...prev,
+      {
+        key,
+        collection: collectionAddress,
+        tokenId,
+        isLsp8,
+        token: tokenAddress ?? zeroAddress,
+        isTokenLsp7,
+        priceUnits,
+        referralBps,
+        needsApproval: !hasTransferRights,
+        name: metadata.name || null,
+        image: metadata.image || null,
+        priceText: `${amountFormat.format(parsedPrice)} ${symbol}`,
+      },
+    ])
+    // Same collection, next token — the id is the only field that must not carry over
+    setTokenIdInput('')
+  }
+
+  const handleRemoveFromBatch = (key) => {
+    setBatchItems((prev) => prev.filter((item) => item.key !== key))
+  }
+
+  const handleBatchList = (e) => {
+    e.stopPropagation()
+    if (batchItems.length === 0) return
+
+    // The same non-custodial approve → list pair the single flow runs, packed per item —
+    // an approval must precede its own list() inside the batch, so they interleave
+    const calls = batchItems.flatMap((item) => {
+      const itemCalls = []
+      if (item.needsApproval) {
+        itemCalls.push({
+          to: item.collection,
+          data: item.isLsp8
+            ? encodeFunctionData({ abi: lsp8Abi, functionName: 'authorizeOperator', args: [tradeAddress, item.tokenId, '0x'] })
+            : encodeFunctionData({ abi: erc721Abi, functionName: 'approve', args: [tradeAddress, BigInt(item.tokenId)] }),
+        })
+      }
+      itemCalls.push({
+        to: tradeAddress,
+        data: encodeFunctionData({
+          abi: tradeAbi,
+          functionName: 'list',
+          args: [address, item.collection, item.tokenId, item.isLsp8, item.token, item.isTokenLsp7, item.priceUnits, BigInt(item.referralBps)],
+        }),
+      })
+      return itemCalls
+    })
+
+    if (canBatchViaProfile) {
+      // The profile is the seller — executeBatch makes it msg.sender of every sub-call,
+      // so each list() sees the UP exactly as the single flow does
+      lastActionRef.current = 'batch'
+      writeContract({
+        abi: erc725xAbi,
+        address,
+        functionName: 'executeBatch',
+        args: [calls.map(() => 0n), calls.map((call) => call.to), calls.map(() => 0n), calls.map((call) => call.data)],
+        chainId,
+      })
+      return
+    }
+
+    sendCalls({ chainId, calls, experimental_fallback: true })
+  }
 
   // Re-attach an onchain listing that never made it into a post — the DB row carries every
   // field the content payload needs, no new transaction required
@@ -1127,11 +1352,54 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
             )}
           </div>
         )}
+
+        {batchItems.length > 0 && (
+          <section className={styles.sellNftModal__batch} aria-label="Batch listings">
+            <p className={styles.sellNftModal__batchTitle}>Ready to list ({batchItems.length})</p>
+            {batchItems.map((item) => (
+              <div key={item.key} className={styles.sellNftModal__batchRow}>
+                <span className={styles.sellNftModal__suggestionArt}>
+                  {item.image ? (
+                    <img src={item.image} alt="" />
+                  ) : (
+                    <span>{(item.name || item.collection.slice(2)).slice(0, 1).toUpperCase()}</span>
+                  )}
+                </span>
+                <div className={styles.sellNftModal__batchInfo}>
+                  <strong>{item.name || `${shortAddress(item.collection)} ${shortTokenId(item.tokenId)}`}</strong>
+                  <span>
+                    {item.priceText}
+                    {item.needsApproval && ' · includes approval'}
+                  </span>
+                </div>
+                <button type="button" onClick={() => handleRemoveFromBatch(item.key)} disabled={isBusy}>
+                  Remove
+                </button>
+              </div>
+            ))}
+            <p className={styles.sellNftModal__hint}>
+              {canBatchViaProfile
+                ? 'Approvals and listings settle together in one Universal Profile transaction.'
+                : 'Wallets that support batching confirm everything at once — others ask per step.'}
+            </p>
+          </section>
+        )}
       </main>
 
       <footer className={styles.sellNftModal__footer}>
         {!tradeAddress && <p className={styles.sellNftModal__hint}>NFT selling isn&apos;t available on this network yet</p>}
-        {needsApproval ? (
+        {isStandalone && tradeAddress && (
+          <button type="button" className={styles.sellNftModal__batchAdd} onClick={handleAddToBatch} disabled={isBusy || !canQueueCurrent}>
+            {batchItems.length > 0 ? 'Add to batch' : 'Start a batch — sell several at once'}
+          </button>
+        )}
+        {batchItems.length > 0 ? (
+          <button type="button" className={clsx(styles.sellNftModal__submit)} onClick={handleBatchList} disabled={isBusy}>
+            {isBusy
+              ? 'Confirming...'
+              : `List ${batchItems.length} NFT${batchItems.length === 1 ? '' : 's'}${canBatchViaProfile ? ' in one transaction' : ''}`}
+          </button>
+        ) : needsApproval ? (
           <button type="button" className={clsx(styles.sellNftModal__submit)} onClick={handleApprove} disabled={isBusy}>
             {isBusy ? 'Confirming...' : 'Approve transfer'}
           </button>
