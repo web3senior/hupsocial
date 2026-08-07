@@ -11,6 +11,7 @@ import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { splitSalePrice } from '@/lib/tradeFee'
+import { handleBrokenImage } from '@/lib/utils'
 import tradeAbi from '@/abis/HupTrade.json'
 import useTradeFee from '@/hooks/useTradeFee'
 import useNftMetadata from '@/hooks/useNftMetadata'
@@ -381,7 +382,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
         <>
           <div className={styles.tradeCard__media}>
             {metadata.image ? (
-              <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" />
+              <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" onError={handleBrokenImage} />
             ) : (
               <div className={clsx(styles.tradeCard__mediaFallback, { [styles['tradeCard__mediaFallback--loading']]: isMetaLoading })}>
                 <HupMark size={22} />
