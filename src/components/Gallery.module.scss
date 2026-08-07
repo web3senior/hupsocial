@@ -209,7 +209,9 @@
   display: flex;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  touch-action: pan-y;
+  /* pan-x keeps the swipe-between-slides gesture with the browser while leaving
+     multi-finger touches to the pinch-zoom handlers */
+  touch-action: pan-x;
   cursor: grab;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -218,6 +220,20 @@
   }
   &:active {
     cursor: grabbing;
+  }
+
+  /* Zoomed in, every gesture belongs to the image: freeze the strip so a pan
+     can't slide to the neighbouring media halfway through. */
+  &[data-zoomed] {
+    overflow: hidden;
+    touch-action: none;
+    cursor: default;
+    .fullscreenImage {
+      cursor: grab;
+    }
+    &:active .fullscreenImage {
+      cursor: grabbing;
+    }
   }
 }
 
@@ -229,6 +245,8 @@
   align-items: center;
   justify-content: center;
   padding: 40px;
+  /* Clip the zoomed image to its own slide instead of over its neighbours */
+  overflow: hidden;
 }
 
 .fullscreenImage,
@@ -237,6 +255,12 @@
   max-height: 90vh;
   object-fit: contain;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+.fullscreenImage {
+  cursor: zoom-in;
+  transform-origin: center;
+  will-change: transform;
 }
 
 /* Shared circular control (dark disc + subtle icon, per design reference) */
@@ -254,6 +278,9 @@
   cursor: pointer;
   backdrop-filter: blur(4px);
   z-index: 10001;
+  /* A pinch that starts with a thumb on a control belongs to the image, not to
+     the browser's page zoom */
+  touch-action: none;
   transition: background 0.2s, color 0.2s;
   &:hover {
     background: rgba(255, 255, 255, 0.16);

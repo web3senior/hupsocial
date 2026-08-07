@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { ArrowLeftIcon, ArrowRightIcon, PauseIcon, PlayIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
+import useMediaZoom from '@/hooks/useMediaZoom'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 
 // Reserve the media's natural ratio so the whole image is always visible
@@ -117,8 +118,17 @@ export default function MediaGallery({ data = [] }) {
   }
 
   // Lightbox Carousel (native scroll-snap)
+  const lightboxRef = useRef(null)
   const lightboxScrollRef = useRef(null)
   const lightboxSlideRefs = useRef([])
+
+  // Pinch / wheel / double-tap zoom on the image currently filling the lightbox.
+  // Videos keep their native controls, so they are left out of the gesture layer.
+  const zoom = useMediaZoom({
+    containerRef: lightboxRef,
+    enabled: isLightboxOpen && visualData[selectedIndex]?.type !== 'video',
+    resetKey: selectedIndex,
+  })
 
   const scrollLightboxTo = (index, behavior = 'smooth') => {
     const container = lightboxScrollRef.current
@@ -160,6 +170,7 @@ export default function MediaGallery({ data = [] }) {
     }
     const onDown = (e) => {
       if (e.pointerType === 'touch') return // let native touch scrolling handle this
+      if (zoom.zoomedRef.current) return // a zoomed image pans instead of scrolling the strip
       isDown = true
       dragged = false
       startX = e.clientX
@@ -205,11 +216,13 @@ export default function MediaGallery({ data = [] }) {
 
   const handlePrev = (e) => {
     e.stopPropagation()
+    zoom.reset(false) // release the frozen scroller before moving the strip
     scrollLightboxTo((selectedIndex - 1 + visualData.length) % visualData.length)
   }
 
   const handleNext = (e) => {
     e.stopPropagation()
+    zoom.reset(false)
     scrollLightboxTo((selectedIndex + 1) % visualData.length)
   }
 
@@ -311,6 +324,8 @@ export default function MediaGallery({ data = [] }) {
     const isPaused = isGif(item) && supportsStill(item) && !isFullscreen && !playingGifs[i]
     const url = resolveUrl(item, isPaused)
     const isBlurred = item.spoiler && !revealedItems[i] && !isFullscreen
+    // Only the image on the visible lightbox slide carries the zoom transform
+    const isZoomTarget = isFullscreen && !isVideo && i === selectedIndex
 
     if (item?.storage === '0G' && !url) {
       return <div className={styles.loadingPlaceholder} />
@@ -340,10 +355,11 @@ export default function MediaGallery({ data = [] }) {
           />
         ) : (
           <img
+            ref={isZoomTarget ? zoom.targetRef : undefined}
             src={url}
             alt={item.alt || `Gallery item ${i}`}
             className={isFullscreen ? styles.fullscreenImage : styles.displayImage}
-            style={{ filter: isBlurred ? 'blur(40px)' : 'none' }}
+            style={{ filter: isBlurred ? 'blur(40px)' : 'none', ...(isZoomTarget ? zoom.style : null) }}
             draggable={false}
           />
         )}
@@ -424,7 +440,7 @@ export default function MediaGallery({ data = [] }) {
 
       {/* Lightbox Overlay */}
       {selectedIndex !== null && (
-        <div className={styles.lightbox} onClick={(e) => { e.stopPropagation(); closeLightbox() }}>
+        <div className={styles.lightbox} ref={lightboxRef} onClick={(e) => { e.stopPropagation(); closeLightbox() }}>
           <button className={styles.closeBtn} onClick={(e) => { e.stopPropagation(); closeLightbox() }} aria-label={`Close fullscreen view`}>
             <XIcon size={20} />
           </button>
@@ -442,6 +458,7 @@ export default function MediaGallery({ data = [] }) {
           <div
             className={styles.lightboxScroll}
             ref={lightboxScrollRef}
+            data-zoomed={zoom.isZoomed ? '' : undefined}
             onClick={(e) => {
               e.stopPropagation()
               // Close on backdrop clicks; the slides fill the viewport, so
