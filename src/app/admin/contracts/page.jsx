@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useConnection, useWriteContract } from 'wagmi' // Hook added here
 import { createPublicClient, http, isAddress, keccak256, stringToHex, formatEther, parseEther, zeroAddress } from 'viem'
+import Link from 'next/link'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { config, CONTRACTS } from '@/config/wagmi'
@@ -13,6 +14,7 @@ import appsAbi from '@/abis/HupApps.json'
 import predictAbi from '@/abis/HupPredict.json'
 import tradeAbi from '@/abis/HupTrade.json'
 import tipperAbi from '@/abis/HupTipper.json'
+import communityAbi from '@/abis/HupCommunity.json'
 import { TIP_TOKENS } from '@/lib/tokens'
 import styles from './page.module.scss'
 
@@ -72,6 +74,34 @@ const CHAT_UPDATE_FORWARDER_ABI = [
   },
 ]
 
+// Contracts whose native balance the overview tracks, in display order. Keys map to the
+// per-chain entries in CONTRACTS — anything unset on a given chain is skipped.
+const BALANCE_CONTRACTS = [
+  { key: 'hup', label: 'Hup' },
+  { key: 'status', label: 'HupStatus' },
+  { key: 'chat', label: 'HupChat' },
+  { key: 'store', label: 'HupBazaar' },
+  { key: 'tipper', label: 'HupTipper' },
+  { key: 'trade', label: 'HupTrade' },
+  { key: 'events', label: 'HupEvents' },
+  { key: 'predict', label: 'HupPredict' },
+  { key: 'apps', label: 'HupApps' },
+  { key: 'community', label: 'HupCommunity' },
+  { key: 'miner', label: 'HupMiner' },
+  { key: 'forwarder', label: 'Forwarder' },
+  { key: 'followerSystem', label: 'Follower System' },
+]
+
+// Native amounts span ETH and MON-sized units, so cap the decimals with Intl rather than
+// printing raw ether strings — but never round dust down to a flat "0", which would read
+// as an empty contract.
+const formatNative = (wei) => {
+  const value = Number(formatEther(wei ?? 0n))
+  if (value === 0) return '0'
+  if (value < 0.0001) return '<0.0001'
+  return new Intl.NumberFormat('en', { maximumFractionDigits: 4 }).format(value)
+}
+
 export default function Page() {
   const { address, isConnected } = useConnection()
   const { mutateAsync: writeContractAsync, isPending: isWritePending } = useWriteContract()
@@ -115,8 +145,64 @@ export default function Page() {
   const [erc677Inputs, setErc677Inputs] = useState({})
   const [erc677Checks, setErc677Checks] = useState({})
   const [erc677TxStates, setErc677TxStates] = useState({})
+  const [contractBalances, setContractBalances] = useState({})
+  const [communityFollowerSystems, setCommunityFollowerSystems] = useState({})
+  const [followerSystemInputs, setFollowerSystemInputs] = useState({})
+  const [followerSystemTxStates, setFollowerSystemTxStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
+
+  // Read the native-coin balance of every deployed contract on a chain. This is the money the
+  // withdraw forms further down move out, so it doubles as a pre-flight check before signing.
+  const loadChainBalances = async (chain) => {
+    const deployment = CONTRACTS[`chain${chain.id}`]
+    if (!deployment) return
+
+    const targets = BALANCE_CONTRACTS.map(({ key, label }) => ({ key, label, address: deployment[key] })).filter((target) =>
+      isAddress(target.address ?? '')
+    )
+    if (targets.length === 0) return
+
+    setContractBalances((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], loading: true, error: null } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const values = await Promise.all(targets.map((target) => client.getBalance({ address: target.address })))
+      const items = targets.map((target, index) => ({ ...target, value: values[index] }))
+      const total = items.reduce((sum, item) => sum + item.value, 0n)
+
+      setContractBalances((prev) => ({ ...prev, [chain.id]: { loading: false, items, total } }))
+    } catch (err) {
+      console.error(`Balance read error for chain ${chain.id}:`, err)
+      setContractBalances((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read balances' },
+      }))
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => loadChainBalances(chain))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  // Pull a single contract's balance out of the overview so the withdraw cards can show what
+  // they are about to move without issuing their own RPC call
+  const balanceOf = (chainId, contractAddress) => contractBalances[chainId]?.items?.find((item) => item.address === contractAddress)?.value
+
+  // Render that balance for a withdraw card — an em dash when the chain's read failed, so a
+  // dead RPC reads as "unknown" instead of spinning forever
+  const renderBalance = (chainId, contractAddress, symbol) => {
+    const value = balanceOf(chainId, contractAddress)
+    if (value === undefined) return <span>{contractBalances[chainId]?.error ? '—' : 'Loading…'}</span>
+
+    return (
+      <strong>
+        {formatNative(value)} {symbol}
+      </strong>
+    )
+  }
 
   // Load initial overrides on client load
   useEffect(() => {
@@ -344,6 +430,8 @@ export default function Page() {
       })
 
       setNativeWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadChainBalances(chain), 3000)
     } catch (err) {
       console.error(`Native withdrawal error on chain ${chain.id}:`, err)
       setNativeWithdrawStates((prev) => ({
@@ -471,6 +559,8 @@ export default function Page() {
       })
 
       setEventsWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadChainBalances(chain), 3000)
     } catch (err) {
       console.error(`Events withdrawal error on chain ${chain.id}:`, err)
       setEventsWithdrawStates((prev) => ({
@@ -567,6 +657,8 @@ export default function Page() {
       })
 
       setAppsWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadChainBalances(chain), 3000)
     } catch (err) {
       console.error(`Apps withdrawal error on chain ${chain.id}:`, err)
       setAppsWithdrawStates((prev) => ({
@@ -695,7 +787,10 @@ export default function Page() {
 
       setPredictWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
 
-      setTimeout(() => loadPredictConfig(chain, predictAddress), 3000)
+      setTimeout(() => {
+        loadPredictConfig(chain, predictAddress)
+        loadChainBalances(chain)
+      }, 3000)
     } catch (err) {
       console.error(`Predict fee withdrawal error on chain ${chain.id}:`, err)
       setPredictWithdrawStates((prev) => ({
@@ -785,6 +880,8 @@ export default function Page() {
       })
 
       setTradeWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      if (!asToken) setTimeout(() => loadChainBalances(chain), 3000)
     } catch (err) {
       console.error(`Trade withdrawal error on chain ${chain.id}:`, err)
       setTradeWithdrawStates((prev) => ({
@@ -895,6 +992,79 @@ export default function Page() {
     }
   }
 
+  // Read the LSP26 follower registry a chain's HupCommunity is currently wired to. It is not a
+  // constructor arg, so every fresh deployment starts at address(0).
+  const loadCommunityFollowerSystem = async (chain, communityAddress) => {
+    setCommunityFollowerSystems((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const followerSystem = await client.readContract({
+        address: communityAddress,
+        abi: communityAbi,
+        functionName: 'followerSystem',
+      })
+
+      setCommunityFollowerSystems((prev) => ({ ...prev, [chain.id]: { loading: false, followerSystem } }))
+    } catch (err) {
+      console.error(`Community follower system read error for chain ${chain.id}:`, err)
+      setCommunityFollowerSystems((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read follower system' },
+      }))
+    }
+  }
+
+  // Load the live wiring per chain, and seed each input with that chain's configured registry so
+  // the ordinary case (point a fresh deployment at the known LSP26 address) is one click
+  useEffect(() => {
+    if (!isAdmin) return
+
+    const seeds = {}
+    config.chains.forEach((chain) => {
+      const deployment = CONTRACTS[`chain${chain.id}`]
+      if (!deployment?.community) return
+
+      loadCommunityFollowerSystem(chain, deployment.community)
+      if (deployment.followerSystem) seeds[chain.id] = deployment.followerSystem
+    })
+
+    setFollowerSystemInputs((prev) => ({ ...seeds, ...prev }))
+  }, [isAdmin])
+
+  // Wire the follower registry into a chain's HupCommunity (admin wallet signs). Until this is
+  // set, every FollowsCreator requirement fails closed — follower-gated communities silently
+  // reject joins and block posting with nothing in the UI explaining why.
+  const handleSetFollowerSystem = async (chain, communityAddress) => {
+    const registry = followerSystemInputs[chain.id]?.trim()
+    if (!isAddress(registry)) {
+      setFollowerSystemTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid registry address' } }))
+      return
+    }
+
+    setFollowerSystemTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: communityAddress,
+        abi: communityAbi,
+        functionName: 'setFollowerSystem',
+        args: [registry],
+        chainId: chain.id,
+      })
+
+      setFollowerSystemTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadCommunityFollowerSystem(chain, communityAddress), 3000)
+    } catch (err) {
+      console.error(`Follower system update error on chain ${chain.id}:`, err)
+      setFollowerSystemTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
   if (!isConnected) {
     return (
       <>
@@ -926,6 +1096,103 @@ export default function Page() {
       <PageTitle name="Admin Contracts" />
       <div className={clsx(styles['admin-contracts'], 'ms-motion-slideDownIn')}>
         <div className={styles['admin-contracts__container']}>
+          <nav className={styles['admin-contracts__tools']}>
+            <Link href="/admin/deploy-lsp7" className={styles['admin-contracts__tool-link']}>
+              <span className={styles['admin-contracts__tool-name']}>🧪 Deploy HupTestLSP7</span>
+              <span className={styles['admin-contracts__tool-hint']}>
+                Throwaway LSP7 faucet token for testing the authorizeOperator payment path
+              </span>
+            </Link>
+          </nav>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>Contract Balances</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Native coin held by every deployed contract, per chain — the funds the withdraw forms below move out.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment) return null
+
+              const balances = contractBalances[chain.id]
+              const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+
+              return (
+                <div
+                  key={`balances-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>{symbol}</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    {!balances && <span className={styles['admin-contracts__detail-value']}>Loading…</span>}
+
+                    {balances?.error && (
+                      <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                        {balances.error}
+                      </div>
+                    )}
+
+                    {balances?.items?.map((item) => (
+                      <div key={item.key} className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>
+                          {explorerUrl ? (
+                            <a href={`${explorerUrl}/address/${item.address}`} target="_blank" rel="noopener noreferrer">
+                              {item.label} ↗
+                            </a>
+                          ) : (
+                            item.label
+                          )}
+                        </span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {formatNative(item.value)} {symbol}
+                        </div>
+                      </div>
+                    ))}
+
+                    {balances?.items && (
+                      <div className={clsx(styles['admin-contracts__detail-row'], styles['admin-contracts__detail-row--total'])}>
+                        <span className={styles['admin-contracts__detail-label']}>Total</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          <strong>
+                            {formatNative(balances.total)} {symbol}
+                          </strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={styles['admin-contracts__actions']}>
+                    <button
+                      type="button"
+                      disabled={balances?.loading}
+                      onClick={() => loadChainBalances(chain)}
+                      className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                    >
+                      {balances?.loading ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
           <header className={styles['admin-contracts__header']}>
             <h1 className={styles['admin-contracts__title']}>Forwarder Configurations</h1>
             <p className={styles['admin-contracts__subtitle']}>Manage signing domain names for EIP-2771 Meta-Transaction Forwarders.</p>
@@ -1251,6 +1518,8 @@ export default function Page() {
               const nativeState = nativeWithdrawStates[chain.id]
               const tokenState = tokenWithdrawStates[chain.id]
               const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+              const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+              const nativeBalance = renderBalance(chain.id, deployment.store, symbol)
 
               return (
                 <div
@@ -1283,6 +1552,11 @@ export default function Page() {
                           <code>{deployment.store}</code>
                         )}
                       </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Native Balance</span>
+                      <div className={styles['admin-contracts__detail-value']}>{nativeBalance}</div>
                     </div>
                   </div>
 
@@ -1399,6 +1673,7 @@ export default function Page() {
               const withdrawState = eventsWithdrawStates[chain.id]
               const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
               const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+              const nativeBalance = renderBalance(chain.id, deployment.events, symbol)
 
               return (
                 <div
@@ -1431,6 +1706,11 @@ export default function Page() {
                           <code>{deployment.events}</code>
                         )}
                       </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Native Balance</span>
+                      <div className={styles['admin-contracts__detail-value']}>{nativeBalance}</div>
                     </div>
 
                     <div className={styles['admin-contracts__detail-row']}>
@@ -1592,6 +1872,7 @@ export default function Page() {
               const withdrawState = appsWithdrawStates[chain.id]
               const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
               const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+              const nativeBalance = renderBalance(chain.id, deployment.apps, symbol)
 
               return (
                 <div
@@ -1624,6 +1905,11 @@ export default function Page() {
                           <code>{deployment.apps}</code>
                         )}
                       </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Native Balance</span>
+                      <div className={styles['admin-contracts__detail-value']}>{nativeBalance}</div>
                     </div>
 
                     <div className={styles['admin-contracts__detail-row']}>
@@ -1787,6 +2073,7 @@ export default function Page() {
               const withdrawState = predictWithdrawStates[chain.id]
               const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
               const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+              const nativeBalance = renderBalance(chain.id, deployment.predict, symbol)
 
               return (
                 <div
@@ -1819,6 +2106,15 @@ export default function Page() {
                           <code>{deployment.predict}</code>
                         )}
                       </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Native Balance</span>
+                      <div className={styles['admin-contracts__detail-value']}>
+                        {nativeBalance}
+                        {/* Escrowed stakes live in the same balance — only the accrued fee ledger is withdrawable */}
+                        <span className={styles['admin-contracts__detail-label']}> incl. escrowed stakes</span>
+                      </div>
                     </div>
 
                     <div className={styles['admin-contracts__detail-row']}>
@@ -2066,6 +2362,8 @@ export default function Page() {
               const isLsp7 = Boolean(tradeTokenIsLsp7[chain.id])
               const withdrawState = tradeWithdrawStates[chain.id]
               const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+              const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+              const nativeBalance = renderBalance(chain.id, deployment.trade, symbol)
 
               return (
                 <div
@@ -2098,6 +2396,11 @@ export default function Page() {
                           <code>{deployment.trade}</code>
                         )}
                       </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Native Balance</span>
+                      <div className={styles['admin-contracts__detail-value']}>{nativeBalance}</div>
                     </div>
 
                     <div className={styles['admin-contracts__detail-row']}>
@@ -2384,6 +2687,143 @@ export default function Page() {
                         className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
                       >
                         {check?.loading ? 'Checking...' : 'Check Status'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )
+            })}
+          </div>
+
+          <header className={styles['admin-contracts__header']}>
+            <h1 className={styles['admin-contracts__title']}>HupCommunity Follower System</h1>
+            <p className={styles['admin-contracts__subtitle']}>
+              Wire the LSP26 follower registry into HupCommunity. It is not a constructor argument, so a fresh deployment starts
+              unset — and while it is unset every FollowsCreator requirement fails closed, silently rejecting joins and blocking
+              posts in follower-gated communities.
+            </p>
+          </header>
+
+          <div className={styles['admin-contracts__grid']}>
+            {config.chains.map((chain) => {
+              const deployment = CONTRACTS[`chain${chain.id}`]
+              if (!deployment?.community) return null
+
+              const registryDraft = followerSystemInputs[chain.id] ?? ''
+              const state = communityFollowerSystems[chain.id]
+              const tx = followerSystemTxStates[chain.id]
+              const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+              const onChain = state?.followerSystem
+              const isUnset = onChain && onChain.toLowerCase() === zeroAddress
+              const matchesConfig =
+                onChain && deployment.followerSystem && onChain.toLowerCase() === deployment.followerSystem.toLowerCase()
+
+              return (
+                <div
+                  key={`community-${chain.id}`}
+                  className={styles['admin-contracts__card']}
+                  style={{
+                    '--network-color-primary': chain.primaryColor || '#f97316',
+                    '--network-color-text': chain.textColor || '#0d0d0d',
+                  }}
+                >
+                  <div className={styles['admin-contracts__card-header']}>
+                    <div className={styles['admin-contracts__network-info']}>
+                      <div className={styles['admin-contracts__card-icon']}>
+                        <img src={chain.iconUrl} alt="" />
+                      </div>
+                      <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                    </div>
+                    <span className={styles['admin-contracts__badge']}>HUPCOMMUNITY</span>
+                  </div>
+
+                  <div className={styles['admin-contracts__details']}>
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>Community Address</span>
+                      <span className={styles['admin-contracts__detail-value']}>
+                        {explorerUrl ? (
+                          <a href={`${explorerUrl}/address/${deployment.community}`} target="_blank" rel="noopener noreferrer">
+                            <code>{deployment.community}</code> ↗
+                          </a>
+                        ) : (
+                          <code>{deployment.community}</code>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className={styles['admin-contracts__detail-row']}>
+                      <span className={styles['admin-contracts__detail-label']}>On-Chain Follower System</span>
+                      <div className={styles['admin-contracts__detail-value']}>
+                        {(!state || state.loading) && <span>Loading…</span>}
+                        {state?.error && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                            {state.error}
+                          </div>
+                        )}
+                        {isUnset && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                            ⚠️ Unset (address zero) — FollowsCreator gating fails closed on this chain
+                          </div>
+                        )}
+                        {onChain && !isUnset && matchesConfig && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
+                            ✓ Wired to the configured registry <code>{onChain}</code>
+                          </div>
+                        )}
+                        {onChain && !isUnset && !matchesConfig && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                            ⚠️ Set to <code>{onChain}</code>, which is not this chain&apos;s configured registry
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {tx && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {tx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {tx.error && <span style={{ color: '#ef4444' }}>❌ {tx.error}</span>}
+                          {tx.success && <span style={{ color: '#10b981' }}>🚀 Follower system updated.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form
+                    className={styles['admin-contracts__edit-form']}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSetFollowerSystem(chain, deployment.community)
+                    }}
+                  >
+                    <div className={styles['admin-contracts__input-group']}>
+                      <label className={styles['admin-contracts__detail-label']}>Follower Registry Address</label>
+                      <input
+                        type="text"
+                        className={styles['admin-contracts__input']}
+                        value={registryDraft}
+                        onChange={(e) => setFollowerSystemInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                        placeholder="0x..."
+                      />
+                    </div>
+
+                    <div className={styles['admin-contracts__actions']}>
+                      <button
+                        type="submit"
+                        disabled={!registryDraft.trim() || tx?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                      >
+                        {tx?.loading ? 'Writing...' : 'Set Follower System'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => loadCommunityFollowerSystem(chain, deployment.community)}
+                        disabled={state?.loading}
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                      >
+                        {state?.loading ? 'Reading...' : 'Refresh'}
                       </button>
                     </div>
                   </form>
