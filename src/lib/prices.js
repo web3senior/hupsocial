@@ -3,6 +3,7 @@
 // an empty result and the UI renders token amounts without USD.
 
 const LLAMA_ENDPOINT = 'https://coins.llama.fi/prices/current/'
+const LLAMA_PERCENTAGE_ENDPOINT = 'https://coins.llama.fi/percentage/'
 const CACHE_TTL_MS = 5 * 60 * 1000
 const FETCH_TIMEOUT_MS = 2500
 
@@ -33,6 +34,7 @@ const NATIVE_KEYS = {
 }
 
 let cache = { at: 0, prices: new Map() }
+let changeCache = { at: 0, changes: new Map() }
 
 /** DefiLlama key for a (chainId, token address) pair, or null when unpriceable. */
 export function priceKeyFor(networkId, token) {
@@ -71,4 +73,37 @@ export async function fetchUsdPrices(keys) {
   }
 
   return new Map(wanted.filter((key) => cache.prices.has(key)).map((key) => [key, cache.prices.get(key)]))
+}
+
+/**
+ * 24h price movement for a set of DefiLlama keys, as a signed percentage (-0.37 means -0.37%).
+ * Returns Map<key, percent>. Same best-effort contract as fetchUsdPrices — a failure just means
+ * the caller renders no change badge.
+ */
+export async function fetchUsdChange24h(keys) {
+  const wanted = [...new Set(keys.filter(Boolean))]
+  if (wanted.length === 0) return new Map()
+
+  const fresh = Date.now() - changeCache.at < CACHE_TTL_MS
+  const missing = fresh ? wanted.filter((key) => !changeCache.changes.has(key)) : wanted
+
+  if (missing.length > 0) {
+    try {
+      const response = await fetch(`${LLAMA_PERCENTAGE_ENDPOINT}${missing.join(',')}?period=24h`, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      })
+      if (response.ok) {
+        const { coins } = await response.json()
+        if (!fresh) changeCache = { at: Date.now(), changes: new Map() }
+        for (const [key, percent] of Object.entries(coins || {})) {
+          if (typeof percent === 'number') changeCache.changes.set(key, percent)
+        }
+        changeCache.at = Date.now()
+      }
+    } catch (e) {
+      // Network hiccup or timeout — serve whatever the cache has.
+    }
+  }
+
+  return new Map(wanted.filter((key) => changeCache.changes.has(key)).map((key) => [key, changeCache.changes.get(key)]))
 }

@@ -405,6 +405,15 @@
   padding: 0;
 }
 
+// The Assets tab previously applied a `.balance` class that was never defined here, which put a
+// literal "undefined" in the class list. Rows carry their own chrome, so this only tightens the
+// gutter where the default 1.5em is too generous.
+.assets {
+  @include responsive.md-down {
+    padding: 1rem;
+  }
+}
+
 .profileWrapper {
   position: relative;
   padding: 2rem;

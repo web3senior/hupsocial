@@ -10,7 +10,6 @@ import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
-import Balance from './balance'
 import { getActiveChain } from '@/lib/communication'
 import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
@@ -21,6 +20,7 @@ import UPlogo from '@/../public/up.png'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS } from '@/lib/ipfs'
 import LinksTab from '@/components/tabs/LinksTab'
+import AssetsTab from '@/components/tabs/AssetsTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
 import clsx from 'clsx'
@@ -246,8 +246,8 @@ export default function UserProfile() {
           )}
 
           {activeTab === 'assets' && (
-            <div className={`${styles.tabContent} ${styles.balance} relative`}>
-              <Balance addr={params.wallet} />
+            <div className={`${styles.tabContent} ${styles.assets} relative`}>
+              <AssetsTab />
             </div>
           )}
 

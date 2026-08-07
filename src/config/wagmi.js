@@ -149,7 +149,10 @@ export const config = createConfig({
   // connectors only exist in the browser.
   connectors: typeof window === 'undefined' ? [] : [injected(), walletConnect({ projectId }), safe()],
   transports: {
-    [mainnet.id]: http(),
+    // viem's default mainnet endpoint (eth.merkle.io) sends no Access-Control-Allow-Origin, so
+    // every browser read on chain 1 fails CORS — the profile Assets tab showed no Ethereum row
+    // at all until this was pinned to an endpoint that allows cross-origin calls.
+    [mainnet.id]: http('https://ethereum-rpc.publicnode.com'),
     [lukso.id]: http(),
     [bsc.id]: http(),
     [monad.id]: http(),
