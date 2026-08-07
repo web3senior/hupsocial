@@ -81,8 +81,9 @@ session exactly as it would to the Grid host. Semantics inside Hup:
   to Hup). Empty until they connect; listen for `accountsChanged`.
 - `contextAccounts` / `up_contextAccounts` — the wallet of the **post author** hosting the embed,
   Hup's equivalent of the Grid owner.
-- `chainId` — the app's registered chain, with public RPC URLs supplied so client-side `eth_call`
-  short-circuiting works.
+- `chainId` — **LUKSO (42)**, the Grid's home chain, with LUKSO RPC URLs supplied so client-side
+  `eth_call` short-circuiting works. Transactions submitted over this protocol are LUKSO-bound.
+  (The Hup SDK surface, by contrast, serves the chain the app was registered on.)
 - The same wallet method policy applies as for the Hup SDK: signatures and transactions are
   user-confirmed in Hup's UI, `eth_sign` is refused, `from` spoofing is rejected.
 

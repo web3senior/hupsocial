@@ -117,7 +117,17 @@ export function createUpProviderBridge({ iframe, app, chainId, rpcUrls = [], con
 
     if (data.type === 'upProvider:windowInitialized') {
       emit('frame:ready')
-      // The client buffers notifications until its listeners attach, so this is never lost
+      // Mirror universaleverything's channel-enable choreography: the init payload carried NO
+      // accounts, and the real values arrive as this notification burst. The distinction
+      // matters because the client only re-emits events to the app for values that CHANGE —
+      // the standard Grid template (LUKSO's UpProvider.jsx, used by Dracos and co) drives all
+      // of its state from these events and deadlocks on a spinner if they never fire.
+      // chainChanged is unconditional client-side and is what unlocks that template's init.
+      // The client buffers notifications until the app's listeners attach, so none are lost.
+      lastAccounts = sessionAccounts()
+      notify('chainChanged', [Number(chainId)])
+      notify('accountsChanged', lastAccounts)
+      notify('contextAccountsChanged', [...contextAccounts])
       if (lastAccounts.length > 0) notify('connect', [{ chainId: chainHex }])
       return
     }
@@ -150,11 +160,15 @@ export function createUpProviderBridge({ iframe, app, chainId, rpcUrls = [], con
       port.addEventListener('message', onPortMessage)
       port.start()
 
-      lastAccounts = sessionAccounts()
+      // UE parity: accounts are deliberately EMPTY here and delivered as an accountsChanged
+      // notification after the client ACKs — the client dedupes events against its current
+      // state, so values baked into the init would suppress the very events Grid template
+      // apps wait for (see the windowInitialized handler below).
+      lastAccounts = []
       const init = {
         type: 'upProvider:windowInitialize',
         chainId: Number(chainId),
-        allowedAccounts: lastAccounts,
+        allowedAccounts: [],
         contextAccounts: [...contextAccounts],
         rpcUrls: [...rpcUrls],
       }

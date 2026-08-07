@@ -175,8 +175,7 @@ export const CONTRACTS = {
  */
 export const SESSION_CALL_ALLOWLIST = {
   10143: {
-    // Hup Miner — currently embedded through the appId 2 listing (local Live Server frame).
-    // When the game gets its own registry listing, move the grant to that appId.
-    2: [CONTRACTS.chain10143.miner],
+    // Hup Miner — its own registry listing (frame served from localhost/hupminer).
+    4: [CONTRACTS.chain10143.miner],
   },
 }

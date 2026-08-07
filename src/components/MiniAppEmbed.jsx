@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useConnection, usePublicClient, useSendTransaction, useSignMessage, useSignTypedData, useSwitchChain } from 'wagmi'
+import { lukso } from 'wagmi/chains'
 import { config } from '@/config/wagmi'
 import { appChains, SESSION_CALL_ALLOWLIST } from '@/config/contracts'
 import { createMiniAppBridge, pushSessionUpdate } from '@/lib/miniAppBridge'
@@ -24,8 +25,14 @@ const SESSION_CALL_MAX_PER_WINDOW = 10
 
 const fetcher = async (url) => {
   const res = await fetch(url)
-  const json = await res.json()
-  if (!res.ok || !json.success) throw new Error(json.error || 'App unavailable')
+  // A proxy or crash can answer with HTML, and a SyntaxError here would read as a network fault
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok || !json.success) {
+    const error = new Error(json.error || 'App unavailable')
+    // The retry policy below reads this to tell a verdict apart from bad luck
+    error.status = res.status
+    throw error
+  }
   return json.data
 }
 
@@ -71,45 +78,70 @@ export default function MiniAppEmbed({ reference, contextAddress }) {
 
   // The endpoint only returns apps that are embeddable, unhidden, and not delisted — a revoked
   // app 404s here and the embed degrades to the unavailable state on the next load.
-  const { data: app, error, isLoading } = useSWR(valid ? `/api/v1/apps/${chainId}/${appId}` : null, fetcher)
+  const {
+    data: app,
+    error,
+    isLoading,
+  } = useSWR(valid ? `/api/v1/apps/${chainId}/${appId}` : null, fetcher, {
+    // A 4xx is a verdict — the app is hidden, delisted, or was never granted embedding, and no
+    // amount of retrying changes that. Only server faults are worth a second look.
+    shouldRetryOnError: (err) => !(err?.status >= 400 && err?.status < 500),
+    errorRetryCount: 2,
+    // A registry row is near-static, and a feed can mount a dozen of these — refetching them all
+    // on every tab focus buys nothing
+    revalidateOnFocus: false,
+  })
 
   const chainInfo = useMemo(() => appChains.find((c) => c.id === chainId), [chainId])
+
+  // The up-provider protocol is the LUKSO Grid SDK, so its side of the bridge serves LUKSO —
+  // the registry only records where an app is LISTED (Monad testnet), which is not the chain
+  // Grid apps run against. Reads, the client's eth_call short-circuit, and transactions on
+  // this protocol are all LUKSO-bound; the Hup SDK side keeps the registry chain.
+  const upChainInfo = useMemo(() => appChains.find((c) => c.id === lukso.id), [])
+  const upPublicClient = usePublicClient({ chainId: lukso.id })
 
   const session = useRef({ address, chainId: walletChain?.id, isConnected })
   session.current = { address, chainId: walletChain?.id ?? chainId, isConnected }
 
-  const handleSignatureRequest = useCallback(
-    async ({ method, params, app: requestingApp }) =>
-      txDialogRef.current.confirm({
-        method,
-        params,
-        app: requestingApp,
-        address,
-        chainId,
-        networkName: chainInfo?.name,
-        currencySymbol: chainInfo?.nativeCurrency?.symbol,
-        // Executed only after the user approves in the dialog
-        execute: async () => {
-          if (method === 'eth_sendTransaction') {
-            const tx = params[0] || {}
-            return sendTransactionAsync({
-              to: tx.to,
-              data: tx.data,
-              value: tx.value ? BigInt(tx.value) : undefined,
-              gas: tx.gas ? BigInt(tx.gas) : undefined,
-              chainId,
-            })
-          }
-          if (method === 'personal_sign') {
-            const raw = params[0]
-            return signMessageAsync({ message: { raw } })
-          }
-          const typed = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1]
-          return signTypedDataAsync(typed)
-        },
-      }),
-    [address, chainId, chainInfo, sendTransactionAsync, signMessageAsync, signTypedDataAsync],
+  // Signing is chain-parameterized because the two protocols served to a frame target
+  // different networks: the Hup SDK transacts on the registry chain, up-provider on LUKSO
+  const makeSignatureHandler = useCallback(
+    (targetChainId, targetChainInfo) =>
+      async ({ method, params, app: requestingApp }) =>
+        txDialogRef.current.confirm({
+          method,
+          params,
+          app: requestingApp,
+          address,
+          chainId: targetChainId,
+          networkName: targetChainInfo?.name,
+          currencySymbol: targetChainInfo?.nativeCurrency?.symbol,
+          // Executed only after the user approves in the dialog
+          execute: async () => {
+            if (method === 'eth_sendTransaction') {
+              const tx = params[0] || {}
+              return sendTransactionAsync({
+                to: tx.to,
+                data: tx.data,
+                value: tx.value ? BigInt(tx.value) : undefined,
+                gas: tx.gas ? BigInt(tx.gas) : undefined,
+                chainId: targetChainId,
+              })
+            }
+            if (method === 'personal_sign') {
+              const raw = params[0]
+              return signMessageAsync({ message: { raw } })
+            }
+            const typed = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1]
+            return signTypedDataAsync(typed)
+          },
+        }),
+    [address, sendTransactionAsync, signMessageAsync, signTypedDataAsync],
   )
+
+  const handleSignatureRequest = useMemo(() => makeSignatureHandler(chainId, chainInfo), [makeSignatureHandler, chainId, chainInfo])
+  const handleUpSignatureRequest = useMemo(() => makeSignatureHandler(lukso.id, upChainInfo), [makeSignatureHandler, upChainInfo])
 
   const handleRead = useCallback(
     async ({ method, params }) => {
@@ -117,6 +149,14 @@ export default function MiniAppEmbed({ reference, contextAddress }) {
       return publicClient.request({ method, params })
     },
     [publicClient],
+  )
+
+  const handleUpRead = useCallback(
+    async ({ method, params }) => {
+      if (!upPublicClient) throw new Error('No RPC client for this network')
+      return upPublicClient.request({ method, params })
+    },
+    [upPublicClient],
   )
 
   const handleSwitchChain = useCallback(async (target) => switchChain.mutateAsync({ chainId: target }), [switchChain])
@@ -217,9 +257,11 @@ export default function MiniAppEmbed({ reference, contextAddress }) {
     const detachHup = createMiniAppBridge(shared)
     const upBridge = createUpProviderBridge({
       ...shared,
-      chainId,
-      rpcUrls: [...(chainInfo?.rpcUrls?.default?.http ?? [])],
+      chainId: lukso.id,
+      rpcUrls: [...(upChainInfo?.rpcUrls?.default?.http ?? [])],
       contextAccounts: contextAddress ? [contextAddress] : [],
+      onSignatureRequest: handleUpSignatureRequest,
+      onRead: handleUpRead,
     })
     upBridgeRef.current = upBridge
 
@@ -228,7 +270,7 @@ export default function MiniAppEmbed({ reference, contextAddress }) {
       upBridge.detach()
       upBridgeRef.current = null
     }
-  }, [isRunning, app, reloadKey, chainId, chainInfo, contextAddress, handleSignatureRequest, handleRead, handleSwitchChain, handleSessionCall])
+  }, [isRunning, app, reloadKey, chainId, upChainInfo, contextAddress, handleSignatureRequest, handleUpSignatureRequest, handleRead, handleUpRead, handleSwitchChain, handleSessionCall])
 
   // Let a running app react to the viewer connecting or switching networks
   useEffect(() => {
@@ -268,7 +310,10 @@ export default function MiniAppEmbed({ reference, contextAddress }) {
   const [ratioW, ratioH] = (app?.aspectRatio || '1:1').split(':').map(Number)
   const aspectRatio = ratioW > 0 && ratioH > 0 ? `${ratioW} / ${ratioH}` : '1 / 1'
 
-  if (isLoading) return <div className={clsx(styles.embed, styles['embed--skeleton'])} />
+  // Error outranks loading: SWR keeps `error` set while it retries but flips `isLoading` back to
+  // true for each attempt, so checking loading first would swap the tall skeleton for the short
+  // unavailable row and back on every retry — shoving every post below it down the page.
+  if (isLoading && !error) return <div className={clsx(styles.embed, styles['embed--skeleton'])} />
 
   if (error || !app) {
     return (
