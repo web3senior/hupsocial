@@ -17,6 +17,8 @@ import { APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, unlockAppKeyFr
 import { decryptData } from '@/lib/cryptoHelper'
 import { getActiveChain } from '@/lib/communication'
 import { resolveIPFSUrl } from '@/lib/storageHelper'
+import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
+import RecipientField from '@/components/ui/RecipientField'
 import { ConversationList } from './ConversationList'
 import styles from './Chat.module.scss'
 import abiChat from '@/abis/Chat.json'
@@ -183,7 +185,7 @@ export default function Chat() {
   const [isAddingContact, setIsAddingContact] = useState(false)
   const [isSubmittingContact, setIsSubmittingContact] = useState(false)
   const [deletingContact, setDeletingContact] = useState(null)
-  const [contactInput, setContactInput] = useState('')
+  const [contactInput, setContactInput] = useState(EMPTY_RECIPIENT)
   const [contactError, setContactError] = useState('')
   const contactsInitializedRef = useRef(false)
   const prevAddressRef = useRef(null)
@@ -1031,8 +1033,8 @@ export default function Chat() {
     setContactError('')
     setIsSubmittingContact(true)
     try {
-      await newChat(contactInput)
-      setContactInput('')
+      await newChat(contactInput.address)
+      setContactInput(EMPTY_RECIPIENT)
       setIsAddingContact(false)
     } catch (error) {
       setContactError(error.message || 'Failed to add contact.')
@@ -1359,14 +1361,17 @@ export default function Chat() {
         <div className={styles['aside__body']}>
           {isAddingContact && (
             <form onSubmit={handleAddContactSubmit} className={styles['add-contact']}>
-              <input
-                type="text"
+              <RecipientField
+                className={styles['add-contact__field']}
+                label={null}
                 value={contactInput}
-                onChange={(e) => setContactInput(e.target.value)}
-                placeholder="0x... wallet address"
+                onChange={setContactInput}
+                viewer={address ?? null}
+                exclude={[address, ...contacts.map((item) => item.contactAddress)]}
+                placeholder="Name, ENS, or 0x… wallet address"
                 autoFocus
               />
-              <button type="submit" disabled={isSubmittingContact}>
+              <button type="submit" disabled={isSubmittingContact || !contactInput.address}>
                 {isSubmittingContact ? <ContentSpinner /> : 'Add'}
               </button>
             </form>

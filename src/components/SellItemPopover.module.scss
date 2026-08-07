@@ -110,6 +110,22 @@
       }
     }
 
+    // The shared RecipientField brings its own field chrome; nesting these under .form outranks it
+    // so the payout wallet sits flush with the plain inputs around it
+    .payoutField {
+      gap: 0.25rem;
+      font-size: var(--font-size-12);
+
+      input {
+        border: 1px solid var(--border);
+        border-radius: var(--global-border-radius);
+        padding: 0.5rem 0.75rem;
+        background-color: var(--background);
+        font-family: inherit;
+        font-size: var(--font-size-14, 0.875rem);
+      }
+    }
+
     .gatedContentBox {
       display: flex;
       flex-direction: column;

@@ -14,6 +14,8 @@ import predictAbi from '@/abis/HupPredict.json'
 import { toast } from '@/components/NextToast'
 import { PlusIcon, StarIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
+import RecipientField from './ui/RecipientField'
+import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
 import ConnectedNetwork from './ConnectedNetwork'
 import styles from './CreateMarketDialog.module.scss'
 
@@ -64,7 +66,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
   // The creator renders as an explicit, removable first judge instead of invisible
   // default behavior; extra judges are typed below it
   const [includeSelfAsJudge, setIncludeSelfAsJudge] = useState(true)
-  const [judgeInputs, setJudgeInputs] = useState([''])
+  const [judgeInputs, setJudgeInputs] = useState([EMPTY_RECIPIENT])
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
   const [category, setCategory] = useState('')
@@ -224,11 +226,13 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
       return
     }
 
-    const extraJudges = judgeInputs.map((input) => input.trim()).filter(Boolean)
-    if (extraJudges.some((judge) => !isAddress(judge))) {
+    // A row that resolved gives an address; a row with text that never resolved is an error, and
+    // an untouched row is simply not a judge
+    if (judgeInputs.some((judge) => judge.input.trim() && !judge.address)) {
       toast('One of the judge addresses is invalid', 'error')
       return
     }
+    const extraJudges = judgeInputs.map((judge) => judge.address).filter(Boolean)
 
     // The creator's entry travels explicitly; an entirely empty list still means the
     // contract defaults to the creator as sole judge
@@ -458,16 +462,21 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
                 </button>
               </div>
             )}
-            {judgeInputs.map((input, index) => (
+            {judgeInputs.map((judge, index) => (
               <div key={index} className={styles.marketDialog__listRow}>
-                <input
-                  type="text"
-                  placeholder="0x…"
-                  value={input}
-                  onChange={(e) => setJudgeInput(index, e.target.value)}
+                <RecipientField
+                  className={styles.marketDialog__listField}
+                  label={null}
+                  value={judge}
+                  onChange={(next) => setJudgeInput(index, next)}
+                  viewer={address ?? null}
+                  // Nobody can judge twice, and the creator's own row is added separately
+                  exclude={[
+                    address,
+                    ...judgeInputs.filter((_, i) => i !== index).map((other) => other.address),
+                  ]}
+                  placeholder="Name, ENS, or 0x…"
                   disabled={isBusy}
-                  spellCheck={false}
-                  autoComplete="off"
                 />
                 {judgeInputs.length > 1 && (
                   <button
@@ -483,7 +492,12 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
             ))}
             <div className={styles.marketDialog__listActions}>
               {judgeInputs.length + (includeSelfAsJudge ? 1 : 0) < MAX_JUDGES && (
-                <button type="button" className={styles.marketDialog__listAdd} onClick={() => setJudgeInputs((inputs) => [...inputs, ''])} disabled={isBusy}>
+                <button
+                  type="button"
+                  className={styles.marketDialog__listAdd}
+                  onClick={() => setJudgeInputs((inputs) => [...inputs, EMPTY_RECIPIENT])}
+                  disabled={isBusy}
+                >
                   <PlusIcon size={12} />
                   Add judge
                 </button>
@@ -495,7 +509,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
                 </button>
               )}
             </div>
-            {!includeSelfAsJudge && judgeInputs.every((input) => !input.trim()) && (
+            {!includeSelfAsJudge && judgeInputs.every((judge) => !judge.input.trim()) && (
               <small>No judges picked — the contract will make you the sole judge anyway.</small>
             )}
             <small>

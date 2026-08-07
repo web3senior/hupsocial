@@ -217,8 +217,15 @@
 
 .add-contact {
   display: flex;
+  // The recipient field grows downwards as it resolves a name; the Add button stays put
+  align-items: flex-start;
   gap: 0.5rem;
   padding: 0.6rem 0.7rem 0;
+
+  &__field {
+    flex: 1;
+    min-width: 0;
+  }
 
   input {
     flex: 1;

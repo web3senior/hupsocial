@@ -12,6 +12,8 @@ import { toast } from '@/components/NextToast'
 import { normalizeEnvelope } from '@/lib/gatedContent'
 import { CaretLeftIcon, CaretRightIcon, LockIcon, PlusIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
+import RecipientField from './ui/RecipientField'
+import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
 import ConnectedNetwork from './ConnectedNetwork'
 import Profile from './Profile'
 import styles from './SellItemPopover.module.scss'
@@ -51,7 +53,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
 
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [vaultAddress, setVaultAddress] = useState('')
+  const [vaultAddress, setVaultAddress] = useState(EMPTY_RECIPIENT)
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
   const [contentName, setContentName] = useState('')
@@ -379,12 +381,11 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     }
 
     // Optional payout vault — proceeds go to the seller's wallet when left empty
-    const trimmedVault = vaultAddress.trim()
-    if (trimmedVault && !isAddress(trimmedVault)) {
+    if (vaultAddress.input.trim() && !vaultAddress.address) {
       toast('Enter a valid payout wallet address', 'error')
       return
     }
-    const vault = trimmedVault || zeroAddress
+    const vault = vaultAddress.address || zeroAddress
 
     // Keep the existing gated content pointer unless the seller uploaded something new
     let metadata = listing?.metadata || ''
@@ -566,10 +567,13 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                 <span>Status</span>
                 <strong>{listing.isActive ? 'Active' : 'Inactive'}</strong>
               </div>
-              {vaultAddress && (
+              {vaultAddress.address && (
                 <div className={styles.summaryRow}>
                   <span>Payout wallet</span>
-                  <strong>{`${vaultAddress.slice(0, 6)}…${vaultAddress.slice(-4)}`}</strong>
+                  <strong>
+                    {vaultAddress.profile?.name ||
+                      `${vaultAddress.address.slice(0, 6)}…${vaultAddress.address.slice(-4)}`}
+                  </strong>
                 </div>
               )}
 
@@ -656,16 +660,15 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
               />
             </label>
 
-            <label>
-              <span>Payout wallet (optional) — sale proceeds go here instead of your wallet</span>
-              <input
-                type="text"
-                placeholder="0x... (leave empty to receive funds yourself)"
-                value={vaultAddress}
-                onChange={(e) => setVaultAddress(e.target.value)}
-                disabled={isBusy || !storeAddress}
-              />
-            </label>
+            <RecipientField
+              className={styles.payoutField}
+              label="Payout wallet (optional) — sale proceeds go here instead of your wallet"
+              value={vaultAddress}
+              onChange={setVaultAddress}
+              viewer={address ?? null}
+              placeholder="Name, ENS, or 0x… (leave empty to receive funds yourself)"
+              disabled={isBusy || !storeAddress}
+            />
 
             <div className={styles.gatedContentBox}>
               <div className={styles.gatedContentHeader}>

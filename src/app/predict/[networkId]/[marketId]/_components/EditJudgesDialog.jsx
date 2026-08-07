@@ -1,10 +1,11 @@
 'use client'
 
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
-import { isAddress } from 'viem'
 import { PlusIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import Profile from '@/components/Profile'
 import NativeDialog from '@/components/ui/NativeDialog'
+import RecipientField from '@/components/ui/RecipientField'
+import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
 import { toast } from '@/components/NextToast'
 import styles from './EditJudgesDialog.module.scss'
 
@@ -29,7 +30,7 @@ const EditJudgesDialog = forwardRef(function EditJudgesDialog(
   ref,
 ) {
   const dialogRef = useRef(null)
-  const [newJudge, setNewJudge] = useState('')
+  const [newJudge, setNewJudge] = useState(EMPTY_RECIPIENT)
 
   useImperativeHandle(ref, () => ({
     open: () => dialogRef.current?.open(),
@@ -37,8 +38,8 @@ const EditJudgesDialog = forwardRef(function EditJudgesDialog(
   }))
 
   const handleAdd = () => {
-    const judge = newJudge.trim()
-    if (!isAddress(judge)) {
+    const judge = newJudge.address
+    if (!judge) {
       toast('Enter a valid judge address', 'error')
       return
     }
@@ -52,7 +53,7 @@ const EditJudgesDialog = forwardRef(function EditJudgesDialog(
     }
 
     onAction('addJudge', [viewer, BigInt(marketId), judge], 'Judge added')
-    setNewJudge('')
+    setNewJudge(EMPTY_RECIPIENT)
   }
 
   return (
@@ -89,16 +90,17 @@ const EditJudgesDialog = forwardRef(function EditJudgesDialog(
       </ul>
 
       <div className={styles.editJudges__add}>
-        <input
-          type="text"
+        <RecipientField
+          className={styles.editJudges__addField}
+          label={null}
           value={newJudge}
-          onChange={(e) => setNewJudge(e.target.value)}
-          placeholder="0x… judge address"
-          spellCheck={false}
-          autoComplete="off"
+          onChange={setNewJudge}
+          viewer={viewer}
+          exclude={judges}
+          placeholder="Name, ENS, or 0x… judge address"
           disabled={isBusy}
         />
-        <button type="button" onClick={handleAdd} disabled={isBusy || !newJudge.trim() || judges.length >= MAX_JUDGES}>
+        <button type="button" onClick={handleAdd} disabled={isBusy || !newJudge.address || judges.length >= MAX_JUDGES}>
           <PlusIcon size={14} />
           Add
         </button>

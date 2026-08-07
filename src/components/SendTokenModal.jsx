@@ -6,8 +6,10 @@ import { erc20Abi, formatUnits, parseUnits } from 'viem'
 import clsx from 'clsx'
 import { appChains } from '@/config/contracts'
 import { lsp7Abi, normalizeAddress } from '@/lib/walletAssets'
+import { EMPTY_RECIPIENT, rememberRecipient } from '@/lib/recipientSearch'
 import { toast } from '@/components/NextToast'
 import NativeDialog from './ui/NativeDialog'
+import RecipientField from './ui/RecipientField'
 import styles from './SendTokenModal.module.scss'
 
 /**
@@ -26,7 +28,7 @@ export default function SendTokenModal({ asset, owner, onSent, onClose }) {
   const { sendTransactionAsync } = useSendTransaction()
   const { writeContractAsync } = useWriteContract()
 
-  const [recipient, setRecipient] = useState('')
+  const [recipient, setRecipient] = useState(EMPTY_RECIPIENT)
   const [amount, setAmount] = useState('')
   const [hash, setHash] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -35,7 +37,7 @@ export default function SendTokenModal({ asset, owner, onSent, onClose }) {
 
   const chain = useMemo(() => appChains.find((item) => item.id === asset.chainId), [asset.chainId])
   const balance = useMemo(() => BigInt(asset.balance), [asset.balance])
-  const recipientAddress = normalizeAddress(recipient)
+  const recipientAddress = recipient.address
 
   // parseUnits throws on anything that isn't a clean decimal, which is just "not a number yet"
   const amountUnits = useMemo(() => {
@@ -49,7 +51,6 @@ export default function SendTokenModal({ asset, owner, onSent, onClose }) {
 
   const wrongChain = Boolean(walletChain) && walletChain.id !== asset.chainId
   const overBalance = amountUnits !== null && amountUnits > balance
-  const recipientInvalid = recipient.trim().length > 0 && !recipientAddress
   const isBusy = isSubmitting || isSwitching || isConfirming
   const canSubmit = Boolean(recipientAddress) && amountUnits !== null && amountUnits > 0n && !overBalance && !isBusy
 
@@ -60,6 +61,8 @@ export default function SendTokenModal({ asset, owner, onSent, onClose }) {
   useEffect(() => {
     if (!isConfirmed) return
     toast(`Sent ${amount} ${asset.symbol}`, 'success')
+    // Only a confirmed transfer earns a place in the recipient shortlist
+    rememberRecipient(owner, { address: recipientAddress, ...recipient.profile })
     onSent?.()
     dialogRef.current?.close()
     // Firing on confirmation only — re-running on the amount/symbol identity would double-toast
@@ -136,20 +139,15 @@ export default function SendTokenModal({ asset, owner, onSent, onClose }) {
           </span>
         </p>
 
-        <div className={styles.sendToken__field}>
-          <label htmlFor="sendTokenRecipient">Recipient address</label>
-          <input
-            type="text"
-            id="sendTokenRecipient"
-            value={recipient}
-            onChange={(event) => setRecipient(event.target.value)}
-            placeholder="0x..."
-            autoComplete="off"
-            spellCheck={false}
-            disabled={isBusy}
-          />
-          {recipientInvalid && <span className={styles.sendToken__error}>That isn&apos;t a valid wallet address.</span>}
-        </div>
+        <RecipientField
+          id="sendTokenRecipient"
+          label="Recipient"
+          value={recipient}
+          onChange={setRecipient}
+          viewer={owner}
+          exclude={[owner]}
+          disabled={isBusy}
+        />
 
         <div className={styles.sendToken__field}>
           <label htmlFor="sendTokenAmount">Amount</label>

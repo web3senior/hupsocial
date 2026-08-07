@@ -97,7 +97,15 @@
 
   &__add {
     display: flex;
+    // The recipient field grows downwards as it resolves a name; the Add button stays put
+    align-items: flex-start;
     gap: 0.5rem;
+
+    // Wrapper for the shared RecipientField — the input rule below still reaches its input
+    &Field {
+      flex: 1;
+      min-width: 0;
+    }
 
     input {
       flex: 1;
