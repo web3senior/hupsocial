@@ -39,6 +39,7 @@ const Tooltip = forwardRef(function Tooltip({ children, content, placement = 'to
   const openTimerRef = useRef(null)
   const closeTimerRef = useRef(null)
   const detachRef = useRef(null)
+  const pointerFocusRef = useRef(false)
 
   const clearTimers = useCallback(() => {
     clearTimeout(openTimerRef.current)
@@ -155,14 +156,21 @@ const Tooltip = forwardRef(function Tooltip({ children, content, placement = 'to
         closeTimerRef.current = setTimeout(close, TOUCH_DURATION)
         return
       }
-      // A click means the user is acting on the control, not reading about it
+      // A click means the user is acting on the control, not reading about it. The
+      // flag lives just long enough to reach the focus this same press causes —
+      // mouse focus lands synchronously inside the press, before a 0ms timeout.
+      pointerFocusRef.current = true
+      setTimeout(() => {
+        pointerFocusRef.current = false
+      }, 0)
       close()
     },
     onFocus: (e) => {
       rest.onFocus?.(e)
       childProps.onFocus?.(e)
-      // Keyboard arrivals only — a click focuses too, and it just dismissed above
-      if (e.target.matches(':focus-visible')) open()
+      // Keyboard arrivals only — :focus-visible alone can't tell: Chromium grants it
+      // to form controls (selects included) even when the focus came from a click
+      if (!pointerFocusRef.current && e.target.matches(':focus-visible')) open()
     },
     onBlur: (e) => {
       rest.onBlur?.(e)
