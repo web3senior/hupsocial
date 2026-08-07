@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import clsx from 'clsx'
 import { getStatuses } from '@/lib/api'
 import Profile from '@/components/Profile'
+import PostSkeletonGrid from '@/components/ui/PostSkeleton'
+import FeedError from '@/components/ui/FeedError'
 import pageStyles from '@/app/page.module.scss'
 import styles from './StatusFeedTab.module.scss'
 
@@ -21,6 +23,8 @@ export default function StatusFeedTab() {
   const [hasMore, setHasMore] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -31,8 +35,13 @@ export default function StatusFeedTab() {
         setStatuses(res?.data || [])
         setHasMore(res?.meta?.hasMore || false)
         setPage(1)
+        setLoadError(false)
       })
-      .catch((error) => console.error('Status feed error:', error))
+      .catch((error) => {
+        console.error('Status feed error:', error)
+        // Otherwise a failed load falls through to the "no statuses right now" copy.
+        if (!cancelled) setLoadError(true)
+      })
       .finally(() => {
         if (!cancelled) setIsLoaded(true)
       })
@@ -40,6 +49,12 @@ export default function StatusFeedTab() {
     return () => {
       cancelled = true
     }
+  }, [retryNonce])
+
+  const handleRetry = useCallback(() => {
+    setLoadError(false)
+    setIsLoaded(false)
+    setRetryNonce((nonce) => nonce + 1)
   }, [])
 
   const loadMore = useCallback(async () => {
@@ -61,13 +76,27 @@ export default function StatusFeedTab() {
     }
   }, [isFetching, hasMore, page])
 
-  if (isLoaded && statuses.length === 0) {
+  if (loadError) {
     return (
-      <div className={clsx('__container')} data-width="small">
-        <div className={clsx('__container', pageStyles.page__container)} data-width="medium">
-          <p className={clsx('text-center', 'p-100')}>No statuses right now. Statuses last as long as their creators choose.</p>
-        </div>
-      </div>
+      <FeedPanel>
+        <FeedError onRetry={handleRetry} />
+      </FeedPanel>
+    )
+  }
+
+  if (!isLoaded) {
+    return (
+      <FeedPanel>
+        <PostSkeletonGrid count={8} />
+      </FeedPanel>
+    )
+  }
+
+  if (statuses.length === 0) {
+    return (
+      <FeedPanel>
+        <p className={clsx('text-center', 'p-100')}>No statuses right now. Statuses last as long as their creators choose.</p>
+      </FeedPanel>
     )
   }
 
@@ -94,3 +123,13 @@ export default function StatusFeedTab() {
     </div>
   )
 }
+
+// Shared column chrome, so the skeleton, the retry card and the empty copy all land in the same
+// place the statuses would have.
+const FeedPanel = ({ children }) => (
+  <div className={clsx('__container')} data-width="small">
+    <div className={clsx('__container', pageStyles.page__container)} data-width="medium">
+      {children}
+    </div>
+  </div>
+)

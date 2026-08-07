@@ -8,6 +8,8 @@ import { getFollowingPosts } from '@/lib/api'
 import { getActiveChain } from '@/lib/communication'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
+import PostSkeletonGrid from '@/components/ui/PostSkeleton'
+import FeedError from '@/components/ui/FeedError'
 import styles from '@/app/page.module.scss'
 
 const POSTS_PAGE_SIZE = 20
@@ -29,6 +31,8 @@ export default function FollowingFeedTab() {
   const [isFetching, setIsFetching] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [followingSupported, setFollowingSupported] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   useEffect(() => {
     if (!mounted || !isConnected || !address || !activeChain) return
@@ -42,8 +46,14 @@ export default function FollowingFeedTab() {
         setHasMore(res?.meta?.hasMore || false)
         setFollowingSupported(res?.meta?.followingSupported !== false)
         setPage(1)
+        setLoadError(false)
       })
-      .catch((error) => console.error('Following feed error:', error))
+      .catch((error) => {
+        console.error('Following feed error:', error)
+        // Distinguishes a failed load from a genuinely empty one — both end with an empty list,
+        // but only one of them should read as "nobody you follow has posted".
+        if (!cancelled) setLoadError(true)
+      })
       .finally(() => {
         if (!cancelled) setIsLoaded(true)
       })
@@ -51,7 +61,13 @@ export default function FollowingFeedTab() {
     return () => {
       cancelled = true
     }
-  }, [mounted, isConnected, address, activeChain?.id])
+  }, [mounted, isConnected, address, activeChain?.id, retryNonce])
+
+  const handleRetry = useCallback(() => {
+    setLoadError(false)
+    setIsLoaded(false)
+    setRetryNonce((nonce) => nonce + 1)
+  }, [])
 
   const loadMore = useCallback(async () => {
     if (isFetching || !hasMore || !activeChain) return
@@ -84,6 +100,22 @@ export default function FollowingFeedTab() {
     return <EmptyState message="Connect your wallet to see posts from people you follow." />
   }
 
+  if (loadError) {
+    return (
+      <FeedPanel>
+        <FeedError onRetry={handleRetry} />
+      </FeedPanel>
+    )
+  }
+
+  if (!isLoaded) {
+    return (
+      <FeedPanel>
+        <PostSkeletonGrid count={8} />
+      </FeedPanel>
+    )
+  }
+
   if (isLoaded && !followingSupported) {
     return <EmptyState message={`Following isn't available on ${activeChain?.name ?? 'this network'} yet. Try switching networks.`} />
   }
@@ -114,10 +146,18 @@ export default function FollowingFeedTab() {
   )
 }
 
-const EmptyState = ({ message }) => (
+// Shared column chrome, so the skeleton, the retry card and the empty copy all land in the same
+// place the posts would have.
+const FeedPanel = ({ children }) => (
   <div className={clsx('__container')} data-width="small">
     <div className={clsx('__container', styles.page__container)} data-width="medium">
-      <p className={clsx('text-center', 'p-100')}>{message}</p>
+      {children}
     </div>
   </div>
+)
+
+const EmptyState = ({ message }) => (
+  <FeedPanel>
+    <p className={clsx('text-center', 'p-100')}>{message}</p>
+  </FeedPanel>
 )

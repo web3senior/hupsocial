@@ -1,3 +1,86 @@
+// --- Cache configuration ---
+
+// Bump when the strategies below change: activate deletes every cache not listed here.
+const CACHE_VERSION = 'v1'
+const SHELL_CACHE = `hup-shell-${CACHE_VERSION}`
+const ASSET_CACHE = `hup-assets-${CACHE_VERSION}`
+const CURRENT_CACHES = [SHELL_CACHE, ASSET_CACHE]
+
+const OFFLINE_URL = '/offline'
+const APP_SHELL_URL = '/'
+
+// `next dev` rebuilds chunks behind stable URLs, so cache-first would hand an HMR session a
+// stale bundle. Dev stays network-first everywhere and only reads the cache when the network
+// is genuinely gone.
+const IS_DEV = ['localhost', '127.0.0.1'].includes(self.location.hostname)
+
+// Non-hashed static files (icons, fonts). Hashed build output is matched by path instead.
+const ASSET_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf)$/i
+
+// --- Cache helpers ---
+
+// Redirected responses are excluded deliberately: replaying one for a navigation whose redirect
+// mode isn't "follow" makes the browser fail the whole FetchEvent.
+const isCacheable = (response) => Boolean(response) && response.status === 200 && response.type === 'basic' && !response.redirected
+
+const putInCache = async (cacheName, request, response) => {
+  if (!isCacheable(response)) return
+  const cache = await caches.open(cacheName)
+  await cache.put(request, response)
+}
+
+const networkFirst = async (event, cacheName) => {
+  try {
+    const response = await fetch(event.request)
+    event.waitUntil(putInCache(cacheName, event.request, response.clone()))
+    return response
+  } catch (error) {
+    const cached = await caches.match(event.request)
+    if (cached) return cached
+    throw error
+  }
+}
+
+const cacheFirst = async (event, cacheName) => {
+  const cached = await caches.match(event.request)
+  if (cached) return cached
+
+  const response = await fetch(event.request)
+  event.waitUntil(putInCache(cacheName, event.request, response.clone()))
+  return response
+}
+
+const staleWhileRevalidate = async (event, cacheName) => {
+  const cached = await caches.match(event.request)
+  const fromNetwork = fetch(event.request).then(async (response) => {
+    await putInCache(cacheName, event.request, response.clone())
+    return response
+  })
+
+  event.waitUntil(fromNetwork.catch(() => {}))
+  return cached || fromNetwork
+}
+
+/**
+ * Navigations are network-first with a cached-document fallback. Offline, the fallback paints
+ * the app chrome and whatever skeletons the route renders; the client fetches behind them still
+ * fail, and each feed surfaces its own retry card (see components/ui/FeedError.jsx).
+ */
+const handleNavigation = async (event) => {
+  try {
+    const response = await fetch(event.request)
+    event.waitUntil(putInCache(SHELL_CACHE, event.request, response.clone()))
+    return response
+  } catch (error) {
+    const cached =
+      (await caches.match(event.request, { ignoreSearch: true })) ||
+      (await caches.match(APP_SHELL_URL)) ||
+      (await caches.match(OFFLINE_URL))
+
+    return cached || Response.error()
+  }
+}
+
 // Background Service Worker Listener
 self.addEventListener('push', (event) => {
   if (!event.data) return
@@ -52,16 +135,55 @@ self.addEventListener('notificationclick', (event) => {
 })
 
 self.addEventListener('install', (event) => {
+  // Best-effort only — a failed precache must not block activation, and the runtime caches
+  // below fill in on the first online visit anyway. A first-ever visit made offline still has
+  // nothing to paint: /offline's own CSS and JS have never been fetched at that point.
+  event.waitUntil(
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) => cache.addAll([OFFLINE_URL]))
+      .catch(() => {})
+  )
   self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim())
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => !CURRENT_CACHES.includes(key)).map((key) => caches.delete(key))))
+      .then(() => clients.claim())
+  )
 })
 
-// Intercept network requests to satisfy the Chromium PWA installability criteria
-// You can expand this later to implement caching strategies like Cache-First or Network-First
+// Serves the offline app shell, and satisfies the Chromium PWA installability criteria.
 self.addEventListener('fetch', (event) => {
-  // A minimal pass-through listener is sufficient to trigger the install prompt
-  return
+  const { request } = event
+  if (request.method !== 'GET') return
+
+  const url = new URL(request.url)
+  if (url.origin !== self.location.origin) return
+
+  // Never cached. API responses are the feeds' live data — a stale timeline is worse than an
+  // honest retry card. RSC payloads belong to Next's router, and one from a previous build
+  // desyncs it from the running client.
+  if (url.pathname.startsWith('/api/')) return
+  if (request.headers.get('RSC') === '1' || url.searchParams.has('_rsc')) return
+
+  if (request.mode === 'navigate') {
+    event.respondWith(handleNavigation(event))
+    return
+  }
+
+  // Build output is content-hashed, so in production the cached copy is the correct copy.
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(IS_DEV ? networkFirst(event, ASSET_CACHE) : cacheFirst(event, ASSET_CACHE))
+    return
+  }
+
+  // Post media (/_next/image) is left uncached on purpose: it would grow the cache without
+  // bound, and the posts it belongs to can't load offline regardless.
+  if (ASSET_EXTENSIONS.test(url.pathname) || url.pathname === '/manifest.webmanifest') {
+    event.respondWith(staleWhileRevalidate(event, ASSET_CACHE))
+  }
 })

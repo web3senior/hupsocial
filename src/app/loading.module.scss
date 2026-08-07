@@ -1,0 +1,51 @@
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-top: 1.25rem;
+
+  &__header {
+    padding: 0 1.25rem;
+  }
+
+  &__title {
+    width: 30%;
+    height: 20px;
+  }
+
+  &__row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0 1.25rem;
+  }
+
+  &__avatar {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+
+  &__lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+  }
+
+  &__line {
+    width: 90%;
+    height: 12px;
+
+    &--short {
+      width: 20%;
+    }
+  }
+
+  &__status {
+    margin: 0;
+    padding: 0.5rem 1.25rem;
+    text-align: center;
+    color: var(--gray-400);
+  }
+}

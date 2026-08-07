@@ -2,6 +2,8 @@ import Image from 'next/image'
 import logo from '@/../public/logo.svg'
 import styles from './SplashScreen.module.scss'
 
+// Purely a boot curtain: it fades itself out in CSS and never intercepts input, so the shell
+// behind it is reachable on schedule whether or not hydration has landed.
 export default function SplashScreen() {
   return (
     <div

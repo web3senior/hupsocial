@@ -10,6 +10,8 @@ import { PostCard } from '@/components/Post'
 import { usePostStore } from '@/stores/usePostStore'
 import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 import PageTitle from '@/components/PageTitle'
+import PostSkeletonGrid from '@/components/ui/PostSkeleton'
+import FeedError from '@/components/ui/FeedError'
 import styles from '@/app/page.module.scss'
 
 // Must stay consistent across all getPosts() calls: the API's offset is (page - 1) * limit,
@@ -56,6 +58,10 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [page, setPage] = useState(initialCache?.page ?? 1)
   const [newPostsQueue, setNewPostsQueue] = useState([])
+  // First page failed. Without it a dead request leaves the skeleton shimmering forever, since
+  // client fetch() is outside the framework's offline retry.
+  const [loadError, setLoadError] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   const isFetchingRef = useRef(false)
   const hasMoreRef = useRef(false)
@@ -207,10 +213,13 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
         const postsRes = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
         if (!cancelled) {
           setInitialData(postsRes)
+          setLoadError(false)
           appliedParamsRef.current = params
         }
       } catch (error) {
         console.error('Initialization error:', error)
+        // appliedParamsRef stays unset, so a retryNonce bump re-runs this effect and refetches.
+        if (!cancelled) setLoadError(true)
       }
     }
 
@@ -227,7 +236,14 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     }
     // Re-initializes whenever this tab's scope changes (e.g. mounted fresh per tab switch).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, address, scopedNetworkId])
+  }, [mounted, address, scopedNetworkId, retryNonce])
+
+  // Clearing the error first swaps the retry card back to the skeleton, so a retry looks like
+  // the original load rather than a frozen button.
+  const handleRetry = useCallback(() => {
+    setLoadError(false)
+    setRetryNonce((nonce) => nonce + 1)
+  }, [])
 
   // Background polling for new posts
   useEffect(() => {
@@ -374,7 +390,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
               </div>
             )}
 
-            {postsLoaded === 0 && <PostSkeletonGrid count={14} />}
+            {postsLoaded === 0 && (loadError ? <FeedError onRetry={handleRetry} /> : <PostSkeletonGrid count={14} />)}
 
             {posts?.list?.map((item, i) => (
               <section
@@ -414,23 +430,3 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     </div>
   )
 }
-
-const PostSkeletonGrid = ({ count = 5 }) => (
-  <div className={clsx('flex', 'flex-column', 'gap-2', 'mb-10')}>
-    {Array.from({ length: count }).map((_, i) => (
-      <PostShimmer key={i} />
-    ))}
-  </div>
-)
-
-const PostShimmer = () => (
-  <div className={clsx(styles.pageShimmer)}>
-    <div className={clsx('flex', 'flex-row', 'align-items-start', 'gap-1')}>
-      <div className={clsx('shimmer', 'rounded')} style={{ width: `36px`, height: `36px` }} />
-      <div className={clsx('flex', 'flex-column', 'gap-025', 'flex-1')}>
-        <div className={clsx('shimmer', 'rounded')} style={{ width: `20%`, height: `12px` }} />
-        <div className={clsx('shimmer', 'rounded')} style={{ width: `90%`, height: `12px` }} />
-      </div>
-    </div>
-  </div>
-)

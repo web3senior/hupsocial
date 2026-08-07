@@ -7,6 +7,8 @@ import clsx from 'clsx'
 import { getTrendingPosts } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
+import PostSkeletonGrid from '@/components/ui/PostSkeleton'
+import FeedError from '@/components/ui/FeedError'
 import styles from '@/app/page.module.scss'
 
 const POSTS_PAGE_SIZE = 20
@@ -32,6 +34,8 @@ export default function TrendingFeedTab() {
   const [isFetching, setIsFetching] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [windowHours, setWindowHours] = useState(null)
+  const [loadError, setLoadError] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   useEffect(() => {
     if (!mounted) return
@@ -45,8 +49,13 @@ export default function TrendingFeedTab() {
         setHasMore(res?.meta?.hasMore || false)
         setWindowHours(res?.meta?.trending_window_hours ?? null)
         setPage(1)
+        setLoadError(false)
       })
-      .catch((error) => console.error('Trending feed error:', error))
+      .catch((error) => {
+        console.error('Trending feed error:', error)
+        // Otherwise a failed load falls through to the "nothing is trending" copy.
+        if (!cancelled) setLoadError(true)
+      })
       .finally(() => {
         if (!cancelled) setIsLoaded(true)
       })
@@ -54,7 +63,13 @@ export default function TrendingFeedTab() {
     return () => {
       cancelled = true
     }
-  }, [mounted, address])
+  }, [mounted, address, retryNonce])
+
+  const handleRetry = useCallback(() => {
+    setLoadError(false)
+    setIsLoaded(false)
+    setRetryNonce((nonce) => nonce + 1)
+  }, [])
 
   const loadMore = useCallback(async () => {
     if (isFetching || !hasMore) return
@@ -82,6 +97,22 @@ export default function TrendingFeedTab() {
   }
 
   if (!mounted) return null
+
+  if (loadError) {
+    return (
+      <FeedPanel>
+        <FeedError onRetry={handleRetry} />
+      </FeedPanel>
+    )
+  }
+
+  if (!isLoaded) {
+    return (
+      <FeedPanel>
+        <PostSkeletonGrid count={8} />
+      </FeedPanel>
+    )
+  }
 
   if (isLoaded && posts.list.length === 0) {
     return <EmptyState message="Nothing is trending right now. Check back soon." />
@@ -113,10 +144,18 @@ export default function TrendingFeedTab() {
   )
 }
 
-const EmptyState = ({ message }) => (
+// Shared column chrome, so the skeleton, the retry card and the empty copy all land in the same
+// place the posts would have.
+const FeedPanel = ({ children }) => (
   <div className={clsx('__container')} data-width="small">
     <div className={clsx('__container', styles.page__container)} data-width="medium">
-      <p className={clsx('text-center', 'p-100')}>{message}</p>
+      {children}
     </div>
   </div>
+)
+
+const EmptyState = ({ message }) => (
+  <FeedPanel>
+    <p className={clsx('text-center', 'p-100')}>{message}</p>
+  </FeedPanel>
 )

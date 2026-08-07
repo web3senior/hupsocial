@@ -1,0 +1,37 @@
+.offline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 4rem 1.25rem;
+  text-align: center;
+
+  &__title {
+    margin: 0;
+  }
+
+  &__message {
+    margin: 0;
+    max-width: 32rem;
+    color: var(--gray-400);
+  }
+
+  &__retry {
+    padding: 0.5rem 1.5rem;
+    border: unset;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
+    color: oklch(from var(--network-color-primary) clamp(0, calc((0.623 - l) * infinity), 1) 0 0);
+    background-color: var(--network-color-primary);
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.025);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+}

@@ -10,6 +10,27 @@
   overflow: hidden;
   background-color: var(--background);
   color: var(--foreground);
+
+  // Decorative only — never swallow a click on the shell rendered underneath, including during
+  // the window between the fade finishing and React unmounting this.
+  pointer-events: none;
+
+  // Runs off first paint rather than a state change, so the shell is revealed on schedule even
+  // when hydration is slow or never lands (offline boot from the cached document). Hold + fade
+  // is mirrored by SPLASH_FADE_MS in ClientLayout.jsx, which then unmounts it.
+  animation: splash-out 300ms ease 600ms forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    // No cross-fade, but it still has to clear itself on the same schedule: an offline boot
+    // whose JS never runs would otherwise sit under an opaque curtain indefinitely.
+    animation: splash-out 1ms linear 900ms forwards;
+  }
+}
+
+@keyframes splash-out {
+  to {
+    opacity: 0;
+  }
 }
 
 .logo {

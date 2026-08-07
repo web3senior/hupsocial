@@ -31,6 +31,13 @@ const CONTENT_SECURITY_POLICY = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // A navigation, prefetch or Server Action that hits a dead network no longer throws to
+    // error.jsx — Next keeps it pending and replays it once connectivity returns, so the route
+    // sits on its loading.jsx skeleton the way X's timeline does. Also exposes next/offline.
+    // Client-side fetch() (the feeds' getPosts) is NOT covered: those keep their own retry state.
+    useOffline: true,
+  },
   async headers() {
     return [
       {
@@ -39,6 +46,15 @@ const nextConfig = {
           { key: 'Content-Security-Policy', value: CONTENT_SECURITY_POLICY },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+      {
+        // The worker now owns the offline app shell, so it must never come from a stale HTTP
+        // cache — otherwise a shipped strategy change can't reach already-installed clients.
+        source: '/sw.js',
+        headers: [
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
         ],
       },
       {
