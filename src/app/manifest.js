@@ -12,6 +12,8 @@ export default function manifest() {
     start_url: '/',
     scope: '/',
     display: 'standalone',
+    lang: 'en',
+    dir: 'ltr',
     background_color: '#ffffff',
     theme_color: '#000000',
     categories: ['social', 'finance'],
@@ -47,5 +49,19 @@ export default function manifest() {
         label: 'The Hup feed on desktop',
       },
     ],
+    // Long-press / right-click jump list on the installed icon. Only routed
+    // destinations belong here — "New post" is a composer modal, not a URL, so it
+    // is deliberately absent. Android surfaces at most four, in this order.
+    shortcuts: [
+      { name: 'Search', short_name: 'Search', description: 'Search posts and people', url: '/search' },
+      { name: 'Notifications', short_name: 'Alerts', description: 'See what you missed', url: '/notifications' },
+      { name: 'Chat', short_name: 'Chat', description: 'Open your conversations', url: '/chat' },
+      { name: 'Saved', short_name: 'Saved', description: 'Posts you bookmarked', url: '/saved' },
+    ],
+    // Reuse the running window and route it to the shortcut target instead of
+    // spawning a second app window
+    launch_handler: {
+      client_mode: 'navigate-existing',
+    },
   }
 }
