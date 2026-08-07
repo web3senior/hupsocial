@@ -38,7 +38,7 @@ export default function ProfileInsights({ addr, posts }) {
         .filter(Boolean)
         .join(' | ')
 
-      const response = await fetch('/api/ai/openai', {
+      const response = await fetch('/api/ai/kimi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
