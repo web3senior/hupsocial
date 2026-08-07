@@ -32,6 +32,12 @@ const FLIP = {
   'right-end': 'left-end',
   'left-start': 'right-start',
   'left-end': 'right-end',
+  // Side-centered placements: a panel narrower than its trigger (a tooltip over a
+  // wide control, say) reads as mis-hung when edge-aligned, so it centers instead
+  top: 'bottom',
+  bottom: 'top',
+  left: 'right',
+  right: 'left',
 }
 
 function computePosition(triggerRect, pw, ph, placement) {
@@ -62,6 +68,10 @@ function computePosition(triggerRect, pw, ph, placement) {
       case 'right-end':    return { top: ty + th - ph,  left: tx + tw + GAP }
       case 'left-start':   return { top: ty,            left: tx - pw - GAP }
       case 'left-end':     return { top: ty + th - ph,  left: tx - pw - GAP }
+      case 'top':          return { top: ty - ph - GAP,      left: tx + tw / 2 - pw / 2 }
+      case 'bottom':       return { top: ty + th + GAP,      left: tx + tw / 2 - pw / 2 }
+      case 'left':         return { top: ty + th / 2 - ph / 2, left: tx - pw - GAP }
+      case 'right':        return { top: ty + th / 2 - ph / 2, left: tx + tw + GAP }
       case 'bottom-start':
       default:             return { top: ty + th + GAP, left: tx }
     }
@@ -96,6 +106,30 @@ function computePosition(triggerRect, pw, ph, placement) {
   return { top: top + 'px', left: left + 'px', bottom: 'auto', right: 'auto', transform: '', placement: resolved }
 }
 
+/**
+ * Measure an already-laid-out panel against its trigger and write its coords —
+ * page coordinates (absolute) for in-flow triggers, viewport coordinates (fixed)
+ * for triggers living in fixed/sticky UI and for trigger-independent placements.
+ * Exported so other top-layer primitives (Tooltip) anchor by the same rules
+ * instead of carrying a second copy of this math.
+ */
+export function anchorElement(panelEl, triggerEl, placement) {
+  if (!panelEl || !triggerEl) return
+  const rect = triggerEl.getBoundingClientRect()
+  const anchored = placement !== 'center' && !placement.endsWith('-corner')
+  const { placement: resolvedPlacement, ...pos } = computePosition(rect, panelEl.offsetWidth, panelEl.offsetHeight, placement)
+  // Keep the transform-origin of the open animation on the side actually used
+  panelEl.dataset.placement = resolvedPlacement
+  if (anchored && !isViewportAnchored(triggerEl)) {
+    panelEl.style.position = 'absolute'
+    pos.top = `${parseFloat(pos.top) + window.scrollY}px`
+    pos.left = `${parseFloat(pos.left) + window.scrollX}px`
+  } else {
+    panelEl.style.position = 'fixed'
+  }
+  Object.assign(panelEl.style, pos)
+}
+
 const NativePopover = forwardRef(function NativePopover({
   trigger,
   children,
@@ -111,26 +145,8 @@ const NativePopover = forwardRef(function NativePopover({
   const popoverRef = useRef(null)
   const triggerRef = useRef(null)
 
-  // Measure the (already laid out) popover against its trigger and set its coords —
-  // page coordinates (absolute) for in-flow triggers, viewport coordinates (fixed)
-  // for triggers living in fixed/sticky UI and for trigger-independent placements
   const reposition = useCallback(() => {
-    const triggerEl = triggerRef.current
-    const popoverEl = popoverRef.current
-    if (!triggerEl || !popoverEl) return
-    const rect = triggerEl.getBoundingClientRect()
-    const anchored = placement !== 'center' && !placement.endsWith('-corner')
-    const { placement: resolvedPlacement, ...pos } = computePosition(rect, popoverEl.offsetWidth, popoverEl.offsetHeight, placement)
-    // Keep the transform-origin of the open animation on the side actually used
-    popoverEl.dataset.placement = resolvedPlacement
-    if (anchored && !isViewportAnchored(triggerEl)) {
-      popoverEl.style.position = 'absolute'
-      pos.top = `${parseFloat(pos.top) + window.scrollY}px`
-      pos.left = `${parseFloat(pos.left) + window.scrollX}px`
-    } else {
-      popoverEl.style.position = 'fixed'
-    }
-    Object.assign(popoverEl.style, pos)
+    anchorElement(popoverRef.current, triggerRef.current, placement)
   }, [placement])
 
   const applyPosition = useCallback(() => {

@@ -1,0 +1,103 @@
+/* A tooltip has to read against whatever it covers, so it carries its own lifted
+   surface rather than --surface: on light it inverts, on dark it sits a step above
+   the page instead of blending into it. */
+.tooltip {
+  --tooltip-scale: 0.96;
+  --tooltip-background: #1c1d21;
+  --tooltip-color: #f4f4f5;
+  --tooltip-border: transparent;
+  --tooltip-shadow: 0 12px 28px rgba(15, 23, 42, 0.28);
+
+  // JS writes top/left; these keep the UA popover defaults from fighting it
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  max-width: min(320px, calc(100vw - 2rem));
+  border: 1px solid var(--tooltip-border);
+  border-radius: 18px;
+  background-color: var(--tooltip-background);
+  color: var(--tooltip-color);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: start;
+  text-wrap: pretty;
+  -webkit-font-smoothing: antialiased;
+  box-shadow: var(--tooltip-shadow);
+
+  // Describes only — it must never intercept the hover that keeps it open, or a click
+  // meant for what it covers
+  pointer-events: none;
+  user-select: none;
+
+  opacity: 0;
+  transform: scale(var(--tooltip-scale));
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease,
+    overlay 0.14s ease allow-discrete,
+    display 0.14s ease allow-discrete;
+
+  &:global(:popover-open) {
+    --tooltip-scale: 1;
+    opacity: 1;
+    display: block;
+  }
+
+  // Grow out of the edge facing the trigger — the flipped placement is written back
+  // onto data-placement, so this follows the side actually used
+  &[data-placement^='top'] {
+    transform-origin: bottom center;
+  }
+  &[data-placement^='bottom'] {
+    transform-origin: top center;
+  }
+  &[data-placement^='left'] {
+    transform-origin: right center;
+  }
+  &[data-placement^='right'] {
+    transform-origin: left center;
+  }
+}
+
+:global([data-theme='dark']) .tooltip {
+  --tooltip-background: #2b2d33;
+  --tooltip-color: #ededed;
+  --tooltip-border: #3a3d45;
+  --tooltip-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+:global([data-theme='terminal']) .tooltip {
+  --tooltip-background: #0d1c12;
+  --tooltip-color: #a3ffad;
+  --tooltip-border: var(--green-500, #1f7a3a);
+  --tooltip-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* Only used when the child isn't an element to clone — inline-flex so the wrapper
+   has a box to measure without changing how the child lays out inside it */
+.anchor {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    --tooltip-scale: 1;
+    transition:
+      opacity 0.01s linear,
+      overlay 0.01s linear allow-discrete,
+      display 0.01s linear allow-discrete;
+  }
+}
+
+@supports (transition-behavior: allow-discrete) {
+  @starting-style {
+    .tooltip:global(:popover-open) {
+      --tooltip-scale: 0.96;
+      opacity: 0;
+    }
+  }
+}

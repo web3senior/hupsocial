@@ -14,6 +14,7 @@ import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
 import NativePopover from '@/components/ui/NativePopover'
+import Tooltip from '@/components/ui/Tooltip'
 import NftMarketCard from '@/components/NftMarketCard'
 import SellNftModal from '@/components/SellNftModal'
 import MarketHero from './MarketHero'
@@ -252,22 +253,25 @@ function SellerAvatar({ user }) {
  * Quick Select
  * One pill in the always-visible filter row. Carries no label of its own — the selected
  * option is the label — so it needs an aria-label to stay announceable, and highlights
- * itself whenever it holds something other than its default.
+ * itself whenever it holds something other than its default. The tooltip is where the
+ * label went: what the pill filters on, in a sentence, without a word of chrome in the row.
  */
-function QuickSelect({ label, value, defaultValue, options, onChange }) {
+function QuickSelect({ label, value, defaultValue, options, onChange, tooltip }) {
   return (
-    <select
-      aria-label={label}
-      className={clsx(styles.market__quickSelect, value !== defaultValue && styles['market__quickSelect--active'])}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <Tooltip content={tooltip}>
+      <select
+        aria-label={label}
+        className={clsx(styles.market__quickSelect, value !== defaultValue && styles['market__quickSelect--active'])}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Tooltip>
   )
 }
 
@@ -627,6 +631,7 @@ export default function NftMarketGrid() {
           <div className={styles.market__quickFilters}>
             <QuickSelect
               label="Network"
+              tooltip="Show only listings on one chain. Collections and payment tokens are chain-specific, so switching networks clears both."
               value={filters.networkId}
               defaultValue=""
               options={NETWORK_OPTIONS}
@@ -634,6 +639,7 @@ export default function NftMarketGrid() {
             />
             <QuickSelect
               label="Status"
+              tooltip="Where a listing stands onchain. Active is what you can buy right now — widen it to see what already sold or was cancelled."
               value={filters.status}
               defaultValue="active"
               options={STATUS_OPTIONS}
@@ -641,6 +647,7 @@ export default function NftMarketGrid() {
             />
             <QuickSelect
               label="Referral reward"
+              tooltip="The cut of the sale a listing pays whoever brings the buyer. Filter for listings that pay at least a set share."
               value={filters.referral}
               defaultValue=""
               options={REFERRAL_OPTIONS}
@@ -648,6 +655,7 @@ export default function NftMarketGrid() {
             />
             <QuickSelect
               label="Sort"
+              tooltip="Order the grid — newest listings first, or by price. Price order only lines up across listings priced in the same token."
               value={filters.sort}
               defaultValue="newest"
               options={SORT_OPTIONS}
@@ -674,10 +682,21 @@ export default function NftMarketGrid() {
             placement="bottom-end"
             className={styles.filtersPanel}
             trigger={
-              <button type="button" className={styles.market__filterButton} aria-label="More filters">
-                <FunnelIcon size={16} />
-                {hiddenCount > 0 && <span className={styles.market__filterBadge}>{hiddenCount}</span>}
-              </button>
+              // Tooltip passes the popover's trigger props through to the button, so the
+              // funnel still toggles the panel while describing what's behind it
+              <Tooltip
+                placement="top-end"
+                content={
+                  hiddenCount > 0
+                    ? `${hiddenCount} more ${hiddenCount === 1 ? 'filter is' : 'filters are'} set here — collection, seller, NFT standard, payment token and price range.`
+                    : 'The narrower filters: collection, seller, NFT standard, payment token and price range.'
+                }
+              >
+                <button type="button" className={styles.market__filterButton} aria-label="More filters">
+                  <FunnelIcon size={16} />
+                  {hiddenCount > 0 && <span className={styles.market__filterBadge}>{hiddenCount}</span>}
+                </button>
+              </Tooltip>
             }
           >
             {() => (

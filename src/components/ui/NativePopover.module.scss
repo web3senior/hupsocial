@@ -52,6 +52,18 @@
   &[data-placement='left-end'] {
     transform-origin: right center;
   }
+  &[data-placement='top'] {
+    transform-origin: bottom center;
+  }
+  &[data-placement='bottom'] {
+    transform-origin: top center;
+  }
+  &[data-placement='left'] {
+    transform-origin: right center;
+  }
+  &[data-placement='right'] {
+    transform-origin: left center;
+  }
   &[data-placement='center'] {
     transform-origin: center;
     translate: -50% -50%;
