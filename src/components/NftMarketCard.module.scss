@@ -73,6 +73,24 @@
     color: var(--text);
   }
 
+  // Bottom-right, so it never collides with the sold/referral pair along the top edge
+  &__model {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(4px);
+    color: var(--text);
+    font-size: var(--font-size-10, 10px);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
   &__body {
     display: flex;
     flex-direction: column;

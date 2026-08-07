@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { DiamondIcon } from '@phosphor-icons/react'
+import { CubeIcon, DiamondIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
 import { formatStake } from '@/hooks/useStakeToken'
 import { handleBrokenImage } from '@/lib/utils'
@@ -98,6 +98,18 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
         )}
         {isSold && <span className={styles.nftCard__sold}>Sold</span>}
         {!isSold && referralPercent && <span className={styles.nftCard__referral}>{referralPercent}% ref</span>}
+        {/* Same badge the listing page carries, so a collection that ships meshes reads as
+            one at grid scale. Every model counts, renderable or not — the detail page is
+            where a glb becomes a viewer and an fbx becomes a download. */}
+        {metadata.model && (
+          <span
+            className={styles.nftCard__model}
+            title={metadata.model.fileType ? `Ships a 3D file (.${metadata.model.fileType})` : 'Ships a 3D file'}
+          >
+            <CubeIcon size={11} weight="fill" />
+            3D
+          </span>
+        )}
       </div>
 
       <div className={styles.nftCard__body}>
