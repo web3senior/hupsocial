@@ -11,8 +11,11 @@ import { formatTokenDisplay } from '@/app/communities/tokenUnits'
 import { useWalletAssets } from '@/hooks/useWalletAssets'
 import { useTokenMarket } from '@/hooks/useTokenMarket'
 import useTokenIcon from '@/hooks/useTokenIcon'
+import { CaretDownIcon } from '@phosphor-icons/react'
+import NativePopover from '../ui/NativePopover'
 import AddTokenDialog from '../AddTokenDialog'
 import SendTokenModal from '../SendTokenModal'
+import NftGallery from './NftGallery'
 import NoData from '../NoData'
 import styles from './AssetsTab.module.scss'
 
@@ -134,6 +137,67 @@ function AssetRow({ asset, chain, market, isOwner, onSend, onUnpin }) {
 }
 
 /**
+ * The network filter's own trigger and menu. Offers only chains this wallet actually holds
+ * something on — a list of every supported network would mostly be options that filter to
+ * nothing — each with what it is worth, so the choice is informative before it is made.
+ */
+function NetworkFilter({ options, value, total, onChange }) {
+  const selected = options.find((option) => option.chainId === value)
+  const selectedIcon = chainIconFor(selected?.chain)
+
+  return (
+    <NativePopover
+      placement="bottom-start"
+      className={styles.assets__networkPanel}
+      trigger={
+        <button type="button" className={styles.assets__networkFilter}>
+          {selectedIcon && <img src={selectedIcon} alt="" />}
+          {selected ? selected.chain?.name ?? `Chain ${selected.chainId}` : 'All networks'}
+          <CaretDownIcon size={13} />
+        </button>
+      }
+    >
+      {({ close }) => (
+        <ul className={styles.assets__networkList}>
+          <li>
+            <button
+              type="button"
+              data-selected={value === null ? 'true' : undefined}
+              onClick={() => {
+                onChange(null)
+                close()
+              }}
+            >
+              <span className={styles.assets__networkName}>All networks</span>
+              {formatUsd(total) && <span className={styles.assets__networkValue}>{formatUsd(total)}</span>}
+            </button>
+          </li>
+          {options.map((option) => {
+            const icon = chainIconFor(option.chain)
+            return (
+              <li key={option.chainId}>
+                <button
+                  type="button"
+                  data-selected={option.chainId === value ? 'true' : undefined}
+                  onClick={() => {
+                    onChange(option.chainId)
+                    close()
+                  }}
+                >
+                  {icon ? <img src={icon} alt="" /> : <span className={styles.assets__networkDot} aria-hidden="true" />}
+                  <span className={styles.assets__networkName}>{option.chain?.name ?? `Chain ${option.chainId}`}</span>
+                  {formatUsd(option.usd) && <span className={styles.assets__networkValue}>{formatUsd(option.usd)}</span>}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </NativePopover>
+  )
+}
+
+/**
  * AssetsTab
  * Fungible token holdings for the wallet whose profile is open, across every supported chain.
  * The owner gets a Send action per row; everyone else sees the same list read-only.
@@ -148,6 +212,7 @@ export default function AssetsTab() {
 
   const [sendAsset, setSendAsset] = useState(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [networkFilter, setNetworkFilter] = useState(null)
 
   const chainsById = useMemo(() => new Map(appChains.map((chain) => [chain.id, chain])), [])
 
@@ -162,77 +227,114 @@ export default function AssetsTab() {
     return valued.map((entry) => entry.asset)
   }, [assets, market])
 
+  // Built from the unfiltered holdings so choosing a network never changes what the menu offers
+  const networkOptions = useMemo(() => {
+    const byChain = new Map()
+    for (const asset of assets) {
+      const usd = usdValueOf(asset, market[asset.id]?.usd) ?? 0
+      byChain.set(asset.chainId, (byChain.get(asset.chainId) ?? 0) + usd)
+    }
+    return [...byChain.entries()]
+      .sort(([chainA, usdA], [chainB, usdB]) => usdB - usdA || chainA - chainB)
+      .map(([chainId, usd]) => ({ chainId, usd, chain: chainsById.get(chainId) }))
+  }, [assets, market, chainsById])
+
+  // Spending the last of a chain's holdings would otherwise strand the tab on a filter that can
+  // never match again. Adjusted during render rather than in an effect so no frame shows the
+  // dead filter; the load guard keeps a mid-refresh blank from clearing a deliberate choice.
+  if (networkFilter && !isLoading && assets.length > 0 && !assets.some((asset) => asset.chainId === networkFilter)) {
+    setNetworkFilter(null)
+  }
+
+  const visible = useMemo(
+    () => (networkFilter ? ordered.filter((asset) => asset.chainId === networkFilter) : ordered),
+    [ordered, networkFilter]
+  )
+
+  // The total follows the filter — a figure that outlived the list it describes is worse than none
   const total = useMemo(
+    () => visible.reduce((sum, asset) => sum + (usdValueOf(asset, market[asset.id]?.usd) ?? 0), 0),
+    [visible, market]
+  )
+  const grandTotal = useMemo(
     () => assets.reduce((sum, asset) => sum + (usdValueOf(asset, market[asset.id]?.usd) ?? 0), 0),
     [assets, market]
   )
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-column gap-1">
-        <div className={clsx('shimmer', styles.assets__shimmer)} />
-        <div className={clsx('shimmer', styles.assets__shimmer)} />
-        <div className={clsx('shimmer', styles.assets__shimmer)} />
-      </div>
-    )
-  }
+  const filteredChain = networkFilter ? chainsById.get(networkFilter) : null
 
-  const addTokenButton = (
-    <button type="button" className={styles.assets__action} onClick={() => setIsAddOpen(true)}>
-      Add token
-    </button>
-  )
-
-  if (isError) {
-    return (
-      <div className={styles.assets}>
-        <div className={styles.assets__toolbar}>{addTokenButton}</div>
-        <p className={styles.assets__error}>Could not load balances. Check your connection and try again.</p>
-        {isAddOpen && <AddTokenDialog onPin={pinToken} onClose={() => setIsAddOpen(false)} />}
-      </div>
-    )
-  }
-
-  if (assets.length === 0) {
-    return (
-      <div className={styles.assets}>
-        <div className={styles.assets__toolbar}>{addTokenButton}</div>
-        <NoData name="assets" />
-        <p className={styles.assets__hint}>
-          Outside LUKSO only well-known tokens are found automatically. Add a token address to track anything else.
-        </p>
-        {isAddOpen && <AddTokenDialog onPin={pinToken} onClose={() => setIsAddOpen(false)} />}
-      </div>
-    )
-  }
-
+  // One render path rather than early returns: the NFT gallery is independent of the token
+  // read, so a wallet holding only NFTs must not be short-circuited by an empty or
+  // still-loading balance list
   return (
     <div className={styles.assets}>
       <div className={styles.assets__toolbar}>
         {total > 0 && (
           <div className={styles.assets__total}>
-            <span className={styles.assets__totalLabel}>Total</span>
+            <span className={styles.assets__totalLabel}>{filteredChain ? filteredChain.name : 'Total'}</span>
             {/* formatUsd, not the raw formatter — a dust portfolio reading "$0.00" claims the
                 holdings are worthless rather than small */}
             <span className={styles.assets__totalValue}>{formatUsd(total)}</span>
           </div>
         )}
-        {addTokenButton}
+        <div className={styles.assets__actions}>
+          {networkOptions.length > 1 && (
+            <NetworkFilter options={networkOptions} value={networkFilter} total={grandTotal} onChange={setNetworkFilter} />
+          )}
+          <button type="button" className={styles.assets__action} onClick={() => setIsAddOpen(true)}>
+            Add token
+          </button>
+        </div>
       </div>
 
-      <ul className={styles.assets__list}>
-        {ordered.map((asset) => (
-          <AssetRow
-            key={asset.id}
-            asset={asset}
-            chain={chainsById.get(asset.chainId)}
-            market={market[asset.id]}
-            isOwner={isOwner}
-            onSend={setSendAsset}
-            onUnpin={unpinToken}
-          />
-        ))}
-      </ul>
+      {isLoading && (
+        <div className="flex flex-column gap-1">
+          <div className={clsx('shimmer', styles.assets__shimmer)} />
+          <div className={clsx('shimmer', styles.assets__shimmer)} />
+          <div className={clsx('shimmer', styles.assets__shimmer)} />
+        </div>
+      )}
+
+      {!isLoading && isError && (
+        <p className={styles.assets__error}>Could not load balances. Check your connection and try again.</p>
+      )}
+
+      {!isLoading && !isError && assets.length === 0 && (
+        <>
+          <NoData name="tokens" />
+          <p className={styles.assets__hint}>
+            Outside LUKSO only well-known tokens are found automatically. Add a token address to track anything else.
+          </p>
+        </>
+      )}
+
+      {/* A filter that matches nothing is a dead end unless it says how to get out of it */}
+      {!isLoading && !isError && assets.length > 0 && visible.length === 0 && filteredChain && (
+        <p className={styles.assets__hint}>
+          Nothing held on {filteredChain.name}.{' '}
+          <button type="button" className={styles.assets__reset} onClick={() => setNetworkFilter(null)}>
+            Show all networks
+          </button>
+        </p>
+      )}
+
+      {visible.length > 0 && (
+        <ul className={styles.assets__list}>
+          {visible.map((asset) => (
+            <AssetRow
+              key={asset.id}
+              asset={asset}
+              chain={chainsById.get(asset.chainId)}
+              market={market[asset.id]}
+              isOwner={isOwner}
+              onSend={setSendAsset}
+              onUnpin={unpinToken}
+            />
+          ))}
+        </ul>
+      )}
+
+      <NftGallery owner={normalizeAddress(walletAddress)} isOwner={isOwner} chainId={networkFilter} />
 
       {sendAsset && (
         <SendTokenModal

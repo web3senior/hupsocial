@@ -1,0 +1,136 @@
+.sendNft {
+  width: min(400px, calc(100vw - 28px));
+  max-height: calc(100vh - 40px);
+  // iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--background);
+  border-radius: 22px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  flex-direction: column;
+
+  // Only style the open state's display — a bare `display: flex` would override the
+  // UA's `display: none` on the closed dialog and flash it before showModal() runs
+  &[open] {
+    display: flex;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 60px;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__title {
+    margin: 0 auto;
+    padding-right: 3.5rem; // Balances the cancel button so the title stays optically centred
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  &__cancel {
+    padding: 0;
+    font-size: 0.9rem;
+    color: var(--color);
+    background: none;
+    border: none;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem 1rem 1.5rem;
+    overflow-y: auto;
+  }
+
+  &__preview {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+  }
+
+  &__art {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    background: var(--surface);
+    border-radius: 12px;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__artFallback {
+    width: 100%;
+    height: 100%;
+    background: var(--surface);
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__name {
+    font-weight: 600;
+    color: var(--color);
+    // Collection-controlled strings — never let one stretch the dialog
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__collection,
+  &__tokenId {
+    font-size: 0.8rem;
+    color: var(--gray-400);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // The recipient field brings its own chrome (components/ui/RecipientField.module.scss) — this
+  // dialog has no other text input, so there is nothing left here to style.
+
+  &__hint {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--gray-400);
+  }
+
+  &__submit {
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--network-color-text);
+    background: var(--network-color-primary);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+}

@@ -33,8 +33,14 @@
     color: var(--color);
   }
 
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto; // Holds the controls right even when no total is shown
+  }
+
   &__action {
-    margin-left: auto; // Holds the button right even when no total is shown
     padding: 0.375rem 0.75rem;
     font-size: 0.85rem;
     color: var(--color);
@@ -49,6 +55,107 @@
     }
   }
 
+  // Same pill as the Add token action, carrying the chosen network's mark
+  &__networkFilter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.85rem;
+    color: var(--color);
+    background-color: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: var(--surface);
+    }
+
+    img {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      object-fit: contain;
+    }
+  }
+
+  // The NativePopover panel brings border, background and shadow; this only sizes it
+  &__networkPanel {
+    min-width: 220px;
+    padding: 0.35rem;
+  }
+
+  &__networkList {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.45rem 0.5rem;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--color);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+
+      &:hover,
+      &[data-selected='true'] {
+        background-color: var(--hover);
+      }
+
+      img {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        object-fit: contain;
+      }
+    }
+  }
+
+  // Stands in for a chain with no bundled mark, so every row keeps the same left edge
+  &__networkDot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--hover);
+  }
+
+  &__networkName {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__networkValue {
+    flex-shrink: 0;
+    color: var(--gray-400);
+    font-size: 0.8rem;
+  }
+
+  // A link, not a button, in everything but semantics — it sits inside a sentence
+  &__reset {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--network-color-primary);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
   &__list {
     display: flex;
     flex-direction: column;
@@ -56,6 +163,14 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    // Around six rows before it scrolls: a typical wallet never hits the cap, while a long tail
+    // stops pushing the NFT grid off the bottom of the page
+    max-height: min(60vh, 27rem);
+    overflow-y: auto;
+    // The global 12px scrollbar would otherwise sit on top of the row borders
+    padding-right: 0.35rem;
+    // Hitting the end of the list shouldn't start scrolling the profile behind it
+    overscroll-behavior: contain;
   }
 
   &__row {
