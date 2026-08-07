@@ -178,6 +178,47 @@ export const getNftCollections = async (limit = 12, networkId) => {
 }
 
 /**
+ * Daily floor series for several collections at once, for the market rail's card sparklines.
+ * Batched deliberately — a request per card would be a dozen round trips on every page load.
+ *
+ * Each row carries `points` (`[{date, floor}]`, floor null on days nothing was live) and
+ * `change_pct` over the window, both quoted in the collection's dominant payment token. The
+ * floor is reconstructed from listing lifetimes, not snapshotted — see lib/nftFloorHistory.
+ * @param {Array<{network_id: number|string, collection: string}>} collections Rows as the
+ * collections rollup returns them; server caps the batch at 24.
+ * @param {number} [days=30] Window length (server clamps to 2–180).
+ */
+export const getNftCollectionsHistory = async (collections, days = 30) => {
+  if (!collections?.length) return { success: true, data: [] }
+
+  const params = new URLSearchParams({
+    collections: collections.map((row) => `${row.network_id}:${row.collection.toLowerCase()}`).join(','),
+    days,
+  })
+
+  const response = await fetch(`/api/v1/nfts/collections/history?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch NFT collection history')
+
+  return response.json()
+}
+
+/**
+ * One collection's daily floor series, for the collection page's floor chart. Same shape as a
+ * row from getNftCollectionsHistory, over whatever window the chart's range picker is on.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ * @param {number} [days=30] Window length (server clamps to 2–180).
+ */
+export const getNftCollectionHistory = async (networkId, address, days = 30) => {
+  const params = new URLSearchParams({ days })
+
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/history?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch collection floor history')
+
+  return response.json()
+}
+
+/**
  * Get NFT Collection Info
  * Collection-level display metadata for one contract — name, symbol, banner, icon,
  * description, LSP4Creators[] addresses and total supply — from the server-side

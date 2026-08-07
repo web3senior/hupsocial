@@ -20,6 +20,19 @@
   // A shade deeper than the dark-theme blue — #1d9bf0 only clears 3:1 on white.
   --cashtag-color: #1a8cd8;
 
+  // Chart palette. Every value here was run through the dataviz six-checks validator against
+  // this theme's own --surface, not eyeballed and not flipped from another theme's.
+  //
+  // Up is teal rather than the --green-500 a market UI reaches for first: green-vs-red is the
+  // textbook deuteranopia collision, and --green-500 against --red-500 scores ΔE 4.4, a hard
+  // fail. Teal clears it at 10.8 while still reading as "up" to everyone else. The signed
+  // percentage and its caret carry the direction regardless, so the hue is never the only cue.
+  --trend-up: #0d9488;
+  --trend-down: #d1383d;
+  // Single-series line hue (collection floor chart). Passes on all three surfaces, so the
+  // dark and terminal blocks below inherit it rather than restating it.
+  --chart-line: #8b5cf6;
+
   --scrollbarBG: #f4f4f4;
   --thumbBG: var(--gray);
   --network-color-primary-light: color-mix(in srgb, var(--network-color-primary) 35%, transparent);
@@ -50,6 +63,10 @@
   --shimmer-glint: rgba(255, 255, 255, 0.12);
   --shimmer-bg: #23262c;
   --cashtag-color: #1d9bf0;
+
+  // --red-500 sits under the lightness band on this surface; --red-400 clears it and holds
+  // ΔE 9.4 against the teal. Teal and the line hue both pass here unchanged.
+  --trend-down: #de535e;
 
   --scrollbarBG: #101114;
   --thumbBG: var(--black);

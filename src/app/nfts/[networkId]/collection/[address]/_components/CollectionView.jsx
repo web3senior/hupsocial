@@ -13,6 +13,7 @@ import { toast } from '@/components/NextToast'
 import PageTitle from '@/components/PageTitle'
 import NftMarketCard from '@/components/NftMarketCard'
 import CollectionHeader from './CollectionHeader'
+import FloorChart from './FloorChart'
 import styles from './CollectionView.module.scss'
 
 const PAGE_SIZE = 24
@@ -129,6 +130,9 @@ export default function CollectionView({ networkId, address }) {
       </button>
 
       <CollectionHeader chainId={chainId} chainInfo={chainInfo} address={collection} info={info} />
+
+      {/* What the floor has done, before the listings that make it up */}
+      <FloorChart chainId={chainId} collection={collection} chainInfo={chainInfo} />
 
       <section className={styles.collection__market} aria-label="Collection listings">
         <div className={styles.collection__toolbar}>

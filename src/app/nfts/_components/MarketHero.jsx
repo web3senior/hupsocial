@@ -3,17 +3,21 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
-import { StackIcon } from '@phosphor-icons/react'
-import { getNftCollections } from '@/lib/api'
+import { CaretDownIcon, CaretUpIcon, MinusIcon, StackIcon } from '@phosphor-icons/react'
+import { getNftCollections, getNftCollectionsHistory } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
 import { handleBrokenImage } from '@/lib/utils'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import HupMark from '@/components/ui/HupMark'
+import Sparkline from '@/components/ui/Sparkline'
 import styles from './MarketHero.module.scss'
 
 const HERO_LIMIT = 12
 const COMPACT = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+// Named on the card ("30d") so the delta is never a percentage of an unstated period
+const TREND_DAYS = 30
+const PERCENT = new Intl.NumberFormat(undefined, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 })
 
 // Same derivation NftMarketCard uses — wagmi's config stamps iconUrl onto the shared chain
 // objects as a side effect, so don't depend on that module having been evaluated first
@@ -64,12 +68,52 @@ function CoverTile({ networkId, collection, sample, onName, className }) {
 }
 
 /**
+ * Where the floor has been, as a stat tile's trend line.
+ *
+ * Days with nothing live carry a null floor, and those are dropped rather than zero-filled or
+ * carried forward — a flat run at zero would read as "the floor collapsed" when what actually
+ * happened is that nobody was selling. The line then spans only the days that had a price.
+ *
+ * Values go in as raw base units: every point is quoted in one currency (see
+ * lib/nftFloorHistory), and the sparkline normalizes to the series' own min/max, so scaling
+ * them down by decimals first would redraw exactly the same shape.
+ */
+function TrendLine({ trend }) {
+  const values = (trend?.points || []).filter((point) => point.floor !== null).map((point) => Number(point.floor))
+  const change = trend?.change_pct
+
+  // One quoted day is a price, not a trend — and change_pct is null in that case anyway
+  if (values.length < 2 || change === null || change === undefined) return null
+
+  // A floor that held all window is its own outcome, not a weak rise: an up caret over "0%"
+  // claims a direction the number denies, so flat gets a dash and the muted ink
+  const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'flat'
+  const Caret = direction === 'up' ? CaretUpIcon : direction === 'down' ? CaretDownIcon : MinusIcon
+
+  return (
+    <div className={clsx(styles.hero__trend, styles[`hero__trend--${direction}`])}>
+      {/* The caret and the sign both say which way this went, so the hue never carries the
+          direction alone — teal/red sit in the CVD floor band (see globals.scss) */}
+      <span className={styles.hero__delta}>
+        <Caret size={11} weight="bold" aria-hidden="true" />
+        {PERCENT.format(change / 100)}
+        <small>{TREND_DAYS}d</small>
+      </span>
+      <Sparkline className={styles.hero__spark} values={values} from="currentColor" />
+    </div>
+  )
+}
+
+/**
  * Collection Card
  * A single showcased collection: a mosaic of its most recent listings, the collection name
  * once it resolves onchain, and the two numbers a buyer scans for — how many are up, and
  * what the cheapest one costs. Links through to the collection's own page.
+ * @param {Object} props
+ * @param {Object} [props.trend] This collection's floor series, once the batch resolves.
+ * Absent until then, and absent for good on collections with under two priced days.
  */
-function CollectionCard({ collection }) {
+function CollectionCard({ collection, trend }) {
   const networkId = Number(collection.network_id)
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)
@@ -114,10 +158,13 @@ function CollectionCard({ collection }) {
               Floor <b>{floorPrice}</b> {floorSymbol}
             </span>
           )}
+          {soldCount > 0 && <span className={styles.hero__stat}>{COMPACT.format(soldCount)} sold</span>}
         </div>
 
         {/* Reserved even when empty so every card in the rail keeps a common baseline */}
-        <span className={styles.hero__sold}>{soldCount > 0 ? `${COMPACT.format(soldCount)} sold` : ''}</span>
+        <div className={styles.hero__trendRow}>
+          <TrendLine trend={trend} />
+        </div>
       </div>
     </Link>
   )
@@ -133,6 +180,7 @@ function CollectionCard({ collection }) {
  */
 export default function MarketHero({ networkId }) {
   const [collections, setCollections] = useState([])
+  const [trends, setTrends] = useState({})
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -157,6 +205,35 @@ export default function MarketHero({ networkId }) {
     }
   }, [networkId])
 
+  // Deliberately a second pass rather than part of the rollup above: rebuilding 30 days of
+  // floor history is the slow half of this screen, and the cards have everything they need to
+  // paint without it. The trend lands in behind them.
+  useEffect(() => {
+    if (!collections.length) return
+
+    let cancelled = false
+
+    getNftCollectionsHistory(collections, TREND_DAYS)
+      .then((res) => {
+        if (cancelled) return
+        // Merged into what's already there rather than replacing it. Entries are keyed by chain
+        // and address, so one left over from a previous filter can only ever be missed by a
+        // lookup, never mismatched — and switching the chain filter back finds it still loaded.
+        setTrends((current) => {
+          const next = { ...current }
+          for (const row of res.data || []) next[`${row.network_id}-${row.collection}`] = row
+          return next
+        })
+      })
+      // A card without its sparkline is still a usable card, so a failure here stays silent
+      // rather than taking the rail down with it
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [collections])
+
   // Nothing listed on the selected chain — the grid's own empty state already says so, and a
   // rail of skeletons that never fills would just be noise
   if (!isLoading && collections.length === 0) return null
@@ -172,7 +249,11 @@ export default function MarketHero({ networkId }) {
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => <div key={i} className={styles.hero__skeleton} />)
           : collections.map((collection) => (
-              <CollectionCard key={`${collection.network_id}-${collection.collection}`} collection={collection} />
+              <CollectionCard
+                key={`${collection.network_id}-${collection.collection}`}
+                collection={collection}
+                trend={trends[`${collection.network_id}-${collection.collection.toLowerCase()}`]}
+              />
             ))}
       </div>
     </section>

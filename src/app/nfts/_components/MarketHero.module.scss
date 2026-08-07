@@ -185,10 +185,71 @@
     }
   }
 
-  &__sold {
-    min-height: 0.95rem;
-    color: var(--text-muted);
-    font-size: var(--font-size-10, 10px);
+  // Holds its height whether or not the collection has a trend, so cards in the rail keep a
+  // common baseline while the batched history is still in flight
+  &__trendRow {
+    display: flex;
+    align-items: center;
+    min-height: 1.35rem;
+  }
+
+  &__trend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+
+    &--up {
+      --trend-color: var(--trend-up);
+    }
+
+    &--down {
+      --trend-color: var(--trend-down);
+    }
+
+    // Unchanged over the whole window — a status hue here would overstate a non-event
+    &--flat {
+      --trend-color: var(--text-muted);
+    }
+  }
+
+  // The number wears a text token, never the series hue — a light chart color is illegible as
+  // text. The caret beside it is the mark that carries the direction.
+  &__delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    color: var(--text);
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    svg {
+      color: var(--trend-color);
+    }
+
+    small {
+      margin-inline-start: 0.15rem;
+      color: var(--text-muted);
+      font-size: var(--font-size-10, 10px);
+      font-weight: 500;
+    }
+  }
+
+  // Set through a CSS rule rather than Sparkline's own from/to props: a var() inside a
+  // presentation attribute is not reliably substituted, and the stroke has to follow the
+  // theme's validated step on all three surfaces.
+  &__spark {
+    flex-shrink: 0;
+    width: 62px;
+    height: 22px;
+    color: var(--trend-color);
+
+    stop {
+      stop-color: currentColor;
+    }
   }
 
   &__skeleton {

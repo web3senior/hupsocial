@@ -1,0 +1,232 @@
+// Floor history for one collection, sitting between the collection's onchain identity and its
+// listing grid. One series, so the chrome stays quiet: hairline grid, muted axes, and the only
+// saturated ink on the card is the line itself.
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background-color: var(--surface);
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  &__headline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  &__summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+  }
+
+  // The endpoint value, called out here rather than labelled inside the plot where it would
+  // sit on top of the line. Proportional figures — tabular-nums makes a large standalone
+  // number look loose.
+  &__current {
+    color: var(--text);
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  &__delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    // The number stays in ink; the caret beside it wears the direction hue, so the change is
+    // never encoded in color alone
+    color: var(--text);
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    svg {
+      color: var(--trend-color);
+    }
+
+    small {
+      margin-inline-start: 0.15rem;
+      color: var(--text-muted);
+      font-size: var(--font-size-10, 10px);
+      font-weight: 500;
+    }
+
+    &--up {
+      --trend-color: var(--trend-up);
+    }
+
+    &--down {
+      --trend-color: var(--trend-down);
+    }
+
+    // Unchanged over the whole window — a status hue here would overstate a non-event
+    &--flat {
+      --trend-color: var(--text-muted);
+    }
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  &__ranges {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+  }
+
+  &__range {
+    padding: 0.22rem 0.6rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      background-color: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+    }
+  }
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--text-muted);
+      color: var(--text);
+    }
+  }
+
+  &__body {
+    transition: opacity 0.18s ease;
+
+    // Refetching a range dims what is already drawn instead of collapsing to a skeleton, so
+    // the plot never jumps out from under the pointer
+    &--refreshing {
+      opacity: 0.55;
+    }
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 2rem 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+    text-align: center;
+  }
+
+  &__tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--surface);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 12%);
+  }
+
+  &__tooltipDate {
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+  }
+
+  &__tooltipValue {
+    color: var(--text);
+    font-size: var(--font-size-12, 0.78rem);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // The chart's WCAG-clean twin — every plotted value is readable here without hovering
+  // anything, and it scrolls in its own box rather than widening the card
+  &__tableWrap {
+    max-height: 220px;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-12, 0.78rem);
+
+    caption {
+      padding-block-end: 0.5rem;
+      color: var(--text-muted);
+      font-size: var(--font-size-10, 10px);
+      text-align: start;
+    }
+
+    th,
+    td {
+      padding: 0.35rem 0.5rem;
+      border-block-end: 1px solid var(--border);
+      text-align: start;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background-color: var(--surface);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    tbody th {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    td {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
