@@ -58,6 +58,26 @@ export default function manifest() {
       { name: 'Chat', short_name: 'Chat', description: 'Open your conversations', url: '/chat' },
       { name: 'Saved', short_name: 'Saved', description: 'Posts you bookmarked', url: '/saved' },
     ],
+    // Puts Hup in the OS share sheet. The POST is answered by the service worker, which
+    // keeps the shared files client-side and hands them to the composer at /share;
+    // /api/share is the server fallback for a share that lands before the worker is in
+    // control. Android/Chromium only — iOS has no Web Share Target support.
+    share_target: {
+      action: '/api/share',
+      method: 'POST',
+      enctype: 'multipart/form-data',
+      params: {
+        title: 'title',
+        text: 'text',
+        url: 'url',
+        files: [
+          {
+            name: 'media',
+            accept: ['image/*', 'video/*', 'audio/*'],
+          },
+        ],
+      },
+    },
     // Reuse the running window and route it to the shortcut target instead of
     // spawning a second app window
     launch_handler: {

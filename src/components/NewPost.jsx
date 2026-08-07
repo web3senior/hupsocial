@@ -104,6 +104,14 @@ const getReplyTargetText = (target) => {
 const getReplyTargetMedia = (target) =>
   target?.content?.elements?.length > 1 ? target.content.elements[1]?.data?.items || [] : []
 
+// Map a file's MIME type onto the composer's media taxonomy
+const getMediaType = (file) => {
+  if (file.type.startsWith('image/')) return 'image'
+  if (file.type.startsWith('video/')) return 'video'
+  if (file.type.startsWith('audio/')) return 'audio'
+  return null
+}
+
 const getMediaPreviewSrc = (item) =>
   item.localUrl || (item.type === 'image' ? resolveIPFSImageUrl(item.cid, { width: 800 }) : resolveIPFSUrl(item.cid))
 
@@ -253,7 +261,7 @@ const restoreCaretState = (editor, caret) => {
 
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({ text = '', url = '', close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed }) {
+export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed }) {
   const mounted = useClientMounted()
 
   const initialPostContent = useMemo(
@@ -302,6 +310,7 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   const fileInputRef = useRef(null)
   const gifPickerRef = useRef(null)
   const mediaItemsRef = useRef([])
+  const seededRef = useRef(false)
   // Undo/redo history for the contenteditable editor. The paste handler and applyFormat
   // mutate the DOM programmatically (no execCommand), which the browser's native undo
   // stack can't track — so Ctrl+Z is backed by these snapshots instead.
@@ -758,9 +767,10 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
     })
   }
 
-  const handleFileSelect = async (event) => {
-    const files = Array.from(event.target.files || [])
-    event.target.value = ''
+  // The one ingest path for attachments, whether the author picked them or the OS share
+  // sheet handed them over. `expectedType` holds the picker to the kind it asked for; a
+  // share passes null, so each file is classified by its own MIME type instead.
+  const ingestFiles = async (files, expectedType) => {
     if (!files.length) return
 
     const remainingSlots = MAX_MEDIA_ITEMS - mediaItems.length
@@ -782,33 +792,31 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
         continue
       }
 
-      const isImage = file.type.startsWith('image/')
-      const isVideo = file.type.startsWith('video/')
-      const isAudio = file.type.startsWith('audio/')
-      const isExpectedType =
-        (isImage && selectedMediaType === 'image') ||
-        (isVideo && selectedMediaType === 'video') ||
-        (isAudio && selectedMediaType === 'audio')
-      if (!isExpectedType) {
-        toast(`Please select a ${selectedMediaType} file`, 'error')
+      const mediaType = getMediaType(file)
+      if (!mediaType) {
+        toast(`"${file.name}" isn't an image, video, or audio file`, 'error')
+        continue
+      }
+      if (expectedType && mediaType !== expectedType) {
+        toast(`Please select a ${expectedType} file`, 'error')
         continue
       }
 
-      const dimensions = await getMediaDimensions(file, selectedMediaType)
+      const dimensions = await getMediaDimensions(file, mediaType)
       const cid = await uploadFileToIPFS(file)
       if (!cid) continue
 
       const localUrl = URL.createObjectURL(file)
       newItems.push({
-        type: selectedMediaType,
+        type: mediaType,
         cid,
-        alt: `Hup asset ${selectedMediaType} | ${postText.slice(0, 30)}...`,
+        alt: `Hup asset ${mediaType} | ${postText.slice(0, 30)}...`,
         storage: 'IPFS',
         mimeType: file.type,
         localUrl,
         width: dimensions.width,
         height: dimensions.height,
-        duration: selectedMediaType !== 'image' ? (dimensions.duration || 0) : undefined,
+        duration: mediaType !== 'image' ? (dimensions.duration || 0) : undefined,
         spoiler: false,
       })
     }
@@ -824,6 +832,12 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
       }
       return { ...prevContent, elements: nextElements }
     })
+  }
+
+  const handleFileSelect = async (event) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    await ingestFiles(files, selectedMediaType)
   }
 
   const openGifPicker = () => {
@@ -1080,6 +1094,15 @@ export default function NewPost({ text = '', url = '', close, onClose, existingP
   useEffect(() => {
     mediaItemsRef.current = mediaItems
   }, [mediaItems])
+
+  // Files handed over by the OS share sheet (app/share/page.jsx) attach themselves once the
+  // composer mounts. Guarded by a ref, not the dependency list: ingesting uploads to IPFS,
+  // and a second pass would pin every file twice.
+  useEffect(() => {
+    if (seededRef.current || !seedFiles?.length) return
+    seededRef.current = true
+    ingestFiles(Array.from(seedFiles), null)
+  }, [seedFiles]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist the draft so an accidental refresh doesn't lose it — restored via loadDraftContent()
   useEffect(() => {

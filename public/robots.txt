@@ -3,4 +3,5 @@ Disallow: /cgi-bin/
 Disallow: /tmp/
 Disallow: /junk/
 Disallow: /terminal/
+Disallow: /share
 Sitemap: http://hup.social/sitemap.xml

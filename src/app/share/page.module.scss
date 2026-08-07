@@ -1,0 +1,14 @@
+// The composer covers this route as a modal — all that shows behind it is the resolving
+// state, and the empty space the dialog is centered over.
+.share {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4rem 1.25rem;
+  text-align: center;
+
+  &__status {
+    margin: 0;
+    color: var(--gray-400);
+  }
+}

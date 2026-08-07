@@ -471,3 +471,34 @@ HupPredict escrows real stakes, so its trust posture is stricter than the other 
 4. **Judges must consent onchain.** Being named a judge attaches a name but no power; only calling `confirmJudging` — with the judge's own key — grants the ability to act. Judges can step down at any time, and the last judge leaving a funded market opens refunds immediately.
 
 Residual trust assumptions: the `ADMIN_ROLE` holder can pause new activity, change fees for future markets, adjust the resolve window within 1–90 days, and moderate market visibility. Holding that role with a multisig or timelock is the recommended posture.
+
+# Web Share Target (PWA)
+
+Installed on Android, Hup appears in the OS share sheet: share a photo from the gallery or a link from any browser, pick Hup, and the composer opens with it already attached.
+
+## Why the payload never touches the server
+
+The manifest declares a `POST`/`multipart-form-data` share target pointing at `/api/share`, but that endpoint is the fallback, not the main path. `public/sw.js` intercepts the POST before it leaves the device:
+
+```txt
+share sheet → POST /api/share → [service worker] → parks payload in Cache Storage → 303 → /share → composer
+```
+
+Two reasons the worker owns this:
+
+- **Files cannot survive a redirect.** A share target must answer the POST with a redirect to a page — form data does not carry across it, so the files have to be stashed somewhere the landing page can read. Cache Storage is that place.
+- **A share is not a publish.** Uploading to IPFS on arrival would pin media for every share the author then abandons. Nothing leaves the device until the composer's normal upload path runs.
+
+The worker writes one JSON envelope (`/__share-payload`) plus one entry per file (`/__share-file-N`) into a `hup-share-v1` cache, listed in `CURRENT_CACHES` so `activate` does not sweep it. `src/lib/shareTarget.js` drains and deletes that cache in a single move — a refresh of `/share` must not re-attach media the author already dismissed. The cache name and keys are declared in both files because `sw.js` is served raw and cannot import from `src/`; changing one means changing the other.
+
+## The fallback path
+
+`src/app/api/share/route.js` only ever runs when no worker controls the client — the first launch after install, or service workers disabled. It cannot keep files, so it preserves the text half in the query string and redirects with `media=dropped`, which `/share` surfaces as a toast rather than silently losing attachments.
+
+## Composer entry point
+
+Shared files enter through the same `ingestFiles()` used by the composer's own file picker (`src/components/NewPost.jsx`), so size limits, the 8-item cap, dimension probing, and IPFS upload behave identically. The picker pins ingestion to the media type it asked for; a share passes `null` and each file is classified by its own MIME type instead.
+
+## Limits
+
+iOS has no Web Share Target support — this is Android/Chromium and desktop Chrome only. Accepted types are `image/*`, `video/*`, and `audio/*`.

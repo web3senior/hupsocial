@@ -4,10 +4,20 @@
 const CACHE_VERSION = 'v1'
 const SHELL_CACHE = `hup-shell-${CACHE_VERSION}`
 const ASSET_CACHE = `hup-assets-${CACHE_VERSION}`
-const CURRENT_CACHES = [SHELL_CACHE, ASSET_CACHE]
+// Holds one incoming OS share between the POST and /share reading it. Listed below so
+// `activate` treats it as a live cache instead of sweeping it.
+const SHARE_CACHE = 'hup-share-v1'
+const CURRENT_CACHES = [SHELL_CACHE, ASSET_CACHE, SHARE_CACHE]
 
 const OFFLINE_URL = '/offline'
 const APP_SHELL_URL = '/'
+
+// Web Share Target. `SHARE_ACTION_PATH` is what the manifest points at; the last three
+// constants are mirrored in src/lib/shareTarget.js, which reads what this file writes.
+const SHARE_ACTION_PATH = '/api/share'
+const SHARE_LANDING_URL = '/share'
+const SHARE_PAYLOAD_KEY = '/__share-payload'
+const SHARE_FILE_PREFIX = '/__share-file-'
 
 // `next dev` rebuilds chunks behind stable URLs, so cache-first would hand an HMR session a
 // stale bundle. Dev stays network-first everywhere and only reads the cache when the network
@@ -78,6 +88,55 @@ const handleNavigation = async (event) => {
       (await caches.match(OFFLINE_URL))
 
     return cached || Response.error()
+  }
+}
+
+// --- Web Share Target ---
+
+/**
+ * The OS share sheet POSTs the shared content here. Shared files cannot ride through the
+ * redirect that follows, and pushing them at the server first would burn an upload the
+ * author may never publish — so the whole payload is parked in SHARE_CACHE and /share
+ * picks it up from there. Nothing leaves the device until the composer uploads it.
+ */
+const handleShare = async (request) => {
+  try {
+    const formData = await request.formData()
+    const files = formData.getAll('media').filter((entry) => typeof entry === 'object' && entry && entry.size > 0)
+
+    // Dropping the whole cache first clears any share the author abandoned earlier
+    await caches.delete(SHARE_CACHE)
+    const cache = await caches.open(SHARE_CACHE)
+
+    const entries = files.map((file, index) => ({
+      key: `${SHARE_FILE_PREFIX}${index}`,
+      name: file.name || `shared-${index}`,
+      type: file.type || '',
+    }))
+
+    await Promise.all(
+      files.map((file, index) =>
+        cache.put(entries[index].key, new Response(file, { headers: { 'Content-Type': entries[index].type || 'application/octet-stream' } }))
+      )
+    )
+
+    await cache.put(
+      SHARE_PAYLOAD_KEY,
+      new Response(
+        JSON.stringify({
+          title: formData.get('title') || '',
+          text: formData.get('text') || '',
+          url: formData.get('url') || '',
+          files: entries,
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+    )
+
+    return Response.redirect(SHARE_LANDING_URL, 303)
+  } catch (error) {
+    console.error('Failed to receive the share:', error)
+    return Response.redirect(`${SHARE_LANDING_URL}?error=1`, 303)
   }
 }
 
@@ -159,10 +218,18 @@ self.addEventListener('activate', (event) => {
 // Serves the offline app shell, and satisfies the Chromium PWA installability criteria.
 self.addEventListener('fetch', (event) => {
   const { request } = event
-  if (request.method !== 'GET') return
-
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
+
+  // Caught ahead of the GET guard below: the share sheet's payload is a POST, and it is the
+  // only one this worker answers. Missing it would send the files to /api/share's fallback,
+  // which can only keep the text.
+  if (request.method === 'POST' && url.pathname === SHARE_ACTION_PATH) {
+    event.respondWith(handleShare(request))
+    return
+  }
+
+  if (request.method !== 'GET') return
 
   // Never cached. API responses are the feeds' live data — a stale timeline is worse than an
   // honest retry card. RSC payloads belong to Next's router, and one from a previous build
