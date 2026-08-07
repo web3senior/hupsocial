@@ -118,7 +118,7 @@ export function anchorElement(panelEl, triggerEl, placement) {
   const rect = triggerEl.getBoundingClientRect()
   const anchored = placement !== 'center' && !placement.endsWith('-corner')
   const { placement: resolvedPlacement, ...pos } = computePosition(rect, panelEl.offsetWidth, panelEl.offsetHeight, placement)
-  // Keep the transform-origin of the open animation on the side actually used
+  // Publish the side actually used — centering and the backdrop are styled off it
   panelEl.dataset.placement = resolvedPlacement
   if (anchored && !isViewportAnchored(triggerEl)) {
     panelEl.style.position = 'absolute'

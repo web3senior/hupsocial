@@ -23,19 +23,20 @@
     transform: none;
   }
 
+  // The blur is at full strength from the first frame. Ramping it 0→2px re-softens
+  // every edge behind the dialog for the length of the transition, and that reads as
+  // the page moving even though nothing behind the dialog changes position.
   &::backdrop {
     background: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(0);
+    backdrop-filter: blur(2px);
     transition:
       background 0.18s ease,
-      backdrop-filter 0.18s ease,
       overlay 0.18s ease allow-discrete,
       display 0.18s ease allow-discrete;
   }
 
   &[open]::backdrop {
     background: rgba(0, 0, 0, 0.36);
-    backdrop-filter: blur(2px);
   }
 }
 
@@ -48,7 +49,6 @@
 
     .dialog[open]::backdrop {
       background: rgba(0, 0, 0, 0);
-      backdrop-filter: blur(0);
     }
   }
 }

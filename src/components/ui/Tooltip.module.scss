@@ -2,7 +2,6 @@
    surface rather than --surface: on light it inverts, on dark it sits a step above
    the page instead of blending into it. */
 .tooltip {
-  --tooltip-scale: 0.96;
   --tooltip-background: #1c1d21;
   --tooltip-color: #f4f4f5;
   --tooltip-border: transparent;
@@ -32,33 +31,17 @@
   pointer-events: none;
   user-select: none;
 
+  // Fade only, no scale: a tooltip growing out of its anchored edge sweeps its far side
+  // several pixels across whatever it covers, which reads as that content moving.
   opacity: 0;
-  transform: scale(var(--tooltip-scale));
   transition:
     opacity 0.14s ease,
-    transform 0.14s ease,
     overlay 0.14s ease allow-discrete,
     display 0.14s ease allow-discrete;
 
   &:global(:popover-open) {
-    --tooltip-scale: 1;
     opacity: 1;
     display: block;
-  }
-
-  // Grow out of the edge facing the trigger — the flipped placement is written back
-  // onto data-placement, so this follows the side actually used
-  &[data-placement^='top'] {
-    transform-origin: bottom center;
-  }
-  &[data-placement^='bottom'] {
-    transform-origin: top center;
-  }
-  &[data-placement^='left'] {
-    transform-origin: right center;
-  }
-  &[data-placement^='right'] {
-    transform-origin: left center;
   }
 }
 
@@ -85,7 +68,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tooltip {
-    --tooltip-scale: 1;
     transition:
       opacity 0.01s linear,
       overlay 0.01s linear allow-discrete,
@@ -96,7 +78,6 @@
 @supports (transition-behavior: allow-discrete) {
   @starting-style {
     .tooltip:global(:popover-open) {
-      --tooltip-scale: 0.96;
       opacity: 0;
     }
   }

@@ -1,6 +1,4 @@
 .panel {
-  --popover-scale: 0.96;
-
   padding: var(--native-popover-padding);
   min-width: 220px;
   border: 1px solid var(--border);
@@ -13,82 +11,36 @@
   inset: auto;
   margin: 0;
 
+  // Fade only, no scale. A panel scaling up from its anchored corner sweeps its far
+  // edges ~10px across the static content behind it, and that sweep reads as the page
+  // itself moving — nothing under the panel actually shifts.
   opacity: 0;
-  transform-origin: top left;
-  transform: scale(var(--popover-scale));
-
-  border:1px solid var(--border);
 
   transition:
-    opacity .18s ease,
-    transform 0.18s ease,
+    opacity 0.18s ease,
     overlay 0.18s ease allow-discrete,
     display 0.18s ease allow-discrete;
 
   &:global(:popover-open) {
-    --popover-scale: 1;
     opacity: 1;
     display: block !important;
   }
 
-  // Transform origins per placement — JS sets position, CSS sets the scale origin
-  &[data-placement='bottom-start'] {
-    transform-origin: top left;
-  }
-  &[data-placement='bottom-end'] {
-    transform-origin: top right;
-  }
-  &[data-placement='top-start'] {
-    transform-origin: bottom left;
-  }
-  &[data-placement='top-end'] {
-    transform-origin: bottom right;
-  }
-  &[data-placement='right-start'],
-  &[data-placement='right-end'] {
-    transform-origin: left center;
-  }
-  &[data-placement='left-start'],
-  &[data-placement='left-end'] {
-    transform-origin: right center;
-  }
-  &[data-placement='top'] {
-    transform-origin: bottom center;
-  }
-  &[data-placement='bottom'] {
-    transform-origin: top center;
-  }
-  &[data-placement='left'] {
-    transform-origin: right center;
-  }
-  &[data-placement='right'] {
-    transform-origin: left center;
-  }
+  // JS writes the resolved placement back onto data-placement; the trigger-independent
+  // placements below hang their centering and backdrop off it
   &[data-placement='center'] {
-    transform-origin: center;
     translate: -50% -50%;
   }
-  &[data-placement='bottom-right-corner'] {
-    transform-origin: bottom right;
-  }
-  &[data-placement='bottom-left-corner'] {
-    transform-origin: bottom left;
-  }
-  &[data-placement='top-right-corner'] {
-    transform-origin: top right;
-  }
-  &[data-placement='top-left-corner'] {
-    transform-origin: top left;
-  }
 
-  // Backdrop for center + corner placements
+  // Backdrop for center + corner placements. The blur is at full strength from the
+  // first frame — ramping it 0→2px re-softens every edge behind the panel for the
+  // length of the transition, which looks like the page settling into a new position.
   &[data-placement='center']::backdrop,
   &[data-placement$='-corner']::backdrop {
     background: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(0);
+    backdrop-filter: blur(2px);
     transition:
       background 0.18s ease,
-      backdrop-filter 0.18s ease,
       overlay 0.18s ease allow-discrete,
       display 0.18s ease allow-discrete;
   }
@@ -96,7 +48,6 @@
   &[data-placement='center']:global(:popover-open)::backdrop,
   &[data-placement$='-corner']:global(:popover-open)::backdrop {
     background: rgba(0, 0, 0, 0.36);
-    backdrop-filter: blur(2px);
   }
 }
 
@@ -108,14 +59,12 @@
 @supports (transition-behavior: allow-discrete) {
   @starting-style {
     .panel:global(:popover-open) {
-      --popover-scale: 0.96;
       opacity: 0;
     }
 
     .panel[data-placement='center']:global(:popover-open)::backdrop,
     .panel[data-placement$='-corner']:global(:popover-open)::backdrop {
       background: rgba(0, 0, 0, 0);
-      backdrop-filter: blur(0);
     }
   }
 }
