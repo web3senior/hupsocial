@@ -5,7 +5,7 @@ import { formatEther } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { getStoredBurner, isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { uploadObjectToIPFS } from '@/lib/ipfs'
 import appsAbi from '@/abis/HupApps.json'
 import { toast } from '@/components/NextToast'
@@ -43,6 +43,18 @@ const ListAppDialog = forwardRef(function ListAppDialog({ categories = [], app =
   const appRegistryChains = useMemo(() => appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.apps), [])
   // An edit is pinned to the chain the listing already lives on
   const [chainId, setChainId] = useState(() => app?.network?.id ?? appRegistryChains[0]?.id ?? null)
+  // Whether the user explicitly chose a network — once they have, stop following the wallet
+  const [chainPicked, setChainPicked] = useState(false)
+
+  // A new listing defaults to whatever network the wallet is already on, when the registry is
+  // deployed there — otherwise the dialog opens on a chain the wallet isn't connected to and
+  // immediately demands a switch the user never asked for.
+  useEffect(() => {
+    if (isEdit || chainPicked || !walletChain) return
+    if (appRegistryChains.some((chain) => chain.id === walletChain.id)) {
+      setChainId(walletChain.id)
+    }
+  }, [walletChain?.id, isEdit, chainPicked, appRegistryChains])
 
   const chainInfo = appRegistryChains.find((chain) => chain.id === chainId)
   const appsAddress = CONTRACTS[`chain${chainId}`]?.apps
@@ -163,25 +175,46 @@ const ListAppDialog = forwardRef(function ListAppDialog({ categories = [], app =
     const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
     if (session.active) {
-      setIsSubmittingBurner(true)
-      try {
-        await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: appsAddress,
-          abi: appsAbi,
-          functionName,
-          args: [...args, { value: totalFee }],
-        })
-
-        toast(successMessage, 'success')
-        dialogRef.current?.close()
-        onListed?.()
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsSubmittingBurner(false)
+      // The burner pays the listing fee out of its own balance. When it can't cover it, fall
+      // through to the main wallet instead of surfacing a raw node error after the upload.
+      let burnerCanPay = true
+      if (totalFee > 0n) {
+        const burnerAddress = getStoredBurner()?.address
+        const burnerBalance = burnerAddress ? await publicClient?.getBalance({ address: burnerAddress }).catch(() => null) : null
+        // Balance must cover fee + gas; an unknown balance still tries the burner first
+        if (burnerBalance != null && burnerBalance <= totalFee) burnerCanPay = false
       }
-      return
+
+      if (burnerCanPay) {
+        setIsSubmittingBurner(true)
+        try {
+          await writeWithBurnerSession({
+            chain: chainInfo,
+            contractAddress: appsAddress,
+            abi: appsAbi,
+            functionName,
+            args: [...args, { value: totalFee }],
+          })
+
+          toast(successMessage, 'success')
+          dialogRef.current?.close()
+          onListed?.()
+          return
+        } catch (err) {
+          // The pre-check can miss gas costs or a stale balance — recover the same way
+          if (!/insufficient (balance|funds)/i.test(err?.message || '')) {
+            toast(err.message || 'Transaction rejected or encountered an error.', 'error')
+            return
+          }
+          burnerCanPay = false
+        } finally {
+          setIsSubmittingBurner(false)
+        }
+      }
+
+      if (!burnerCanPay) {
+        toast(`Your session wallet can't cover the ${formatEther(totalFee)} ${currencySymbol} fee — confirm with your main wallet instead.`, 'info')
+      }
     }
 
     writeContract({
@@ -237,7 +270,14 @@ const ListAppDialog = forwardRef(function ListAppDialog({ categories = [], app =
           {!isEdit && appRegistryChains.length > 1 ? (
             <label>
               <span>Network</span>
-              <select value={chainId ?? ''} onChange={(e) => setChainId(Number(e.target.value))} disabled={isBusy}>
+              <select
+                value={chainId ?? ''}
+                onChange={(e) => {
+                  setChainPicked(true)
+                  setChainId(Number(e.target.value))
+                }}
+                disabled={isBusy}
+              >
                 {appRegistryChains.map((chain) => (
                   <option key={chain.id} value={chain.id}>
                     {chain.name}
