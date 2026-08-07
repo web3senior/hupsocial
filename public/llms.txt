@@ -1,39 +1,116 @@
-# Hup: Decentralized Social Layer
+# Hup
 
-> Hup is a high-performance, decentralized social protocol designed for permanent, user-owned social graphs and creator-centric economic value. It leverages blockchain for immutability and IPFS for scalable content storage.
+> Hup is a decentralized social network for onchain and underground communities. Posts, comments, reposts, likes, and the follow graph are written to smart contracts on nine EVM chains; content bodies live on IPFS or 0G Storage; an offchain indexer turns the resulting event log into fast feeds. There is no account, email, or password — a wallet is the identity, and the social graph is portable to any client that reads the same contracts.
 
-## Core Project Mission
+Hup runs at https://hup.social. It is a live multichain product, not a demo or a testnet-only
+prototype. This file orients language models and agents that answer questions about Hup or build
+on top of it.
 
-- **User Ownership:** Social graphs are verifiable on-chain and portable across applications.
-- **Economic Value:** Native tipping and capital allocation features are built directly into the social layer.
-- **Sustainability:** Low-fee architecture using IPFS CID pinning on-chain rather than raw data storage.
+## Core model
 
-## Technical Architecture (Milestone 1 - Complete)
+- **One primitive.** A single core contract per chain stores every interaction as a `Content`
+  struct: type `0` = post, `1` = comment, `2` = repost. A comment is just a post with a parent, so
+  threads nest indefinitely without a second contract, and one event stream covers the whole graph.
+- **Onchain vs offchain, by design.** Publicly verifiable protocol state lives onchain: content
+  pointers, ownership, timestamps, likes, edit/delete state, session authorization, protocol fees.
+  Bookmarks, view counts, feed ranking, search, notifications, and hydrated metadata are
+  deliberately offchain — private, high-frequency, or query-shaped data that would be expensive to
+  store and meaningless as trustless state.
+- **Content addressing.** Only a pointer is stored onchain. `ipfs://…` resolves through a gateway,
+  `0G://…` through the 0G Storage proxy, and anything else renders as plain text. Post bodies are a
+  versioned JSON document of typed elements (text, media items with CID, alt text, and MIME type).
+- **Stable URLs across redeploys.** Post IDs in URLs (`/networks/{chainId}/{postId}`) are offchain
+  public IDs that the backend maps to a contract deployment plus that contract's local ID. Deploying
+  a new core contract restarts its internal counter at 1 but does not break a single existing link.
+- **Eventual consistency.** Feeds are served from the indexer's database rather than read live from
+  chains, so a just-confirmed action can take a few seconds to appear. This is the most common
+  source of "my post is missing" confusion, and it is expected behavior, not a failure.
+- **Gasless paths.** An ERC-2771 forwarder relays meta-transactions, and browser-held burner session
+  keys sign low-value social actions without a wallet prompt. A session can post, like, and repost
+  as its owner; it can never move funds.
+- **Extensions, not forks.** Tipping, NFT sales, prediction markets, events, communities, mini apps,
+  and the premium store are separate contracts that call the core contract's getters to verify
+  authorship before allowing a write. The core protocol is never modified to ship a product feature.
+- **Encrypted communities.** Gated communities are end-to-end encrypted: posts are sealed with one
+  shared AES-256 master key, and that key reaches each member as an ECIES envelope stored publicly
+  onchain but openable only by them. Neither the server, the indexer, nor the chain can read the
+  content. Member removal triggers a lazy key rotation, so departing members keep old posts they
+  legitimately had and never receive anything published afterward.
 
-### 1. Identity & Social Graph
+## Chains
 
-- **On-Chain Identity:** Profiles are linked to wallet addresses with metadata fetched via a Profile Bridge (Gravatar-style).
-- **Verifiable Graph:** Following and unfollowing actions are recorded on the blockchain, creating a portable, non-custodial social graph.
+The same protocol is deployed per chain: **Ethereum, LUKSO, BNB Chain, Monad, Arbitrum, Base, Celo,
+and Robinhood Chain**, with **Monad Testnet** used for staging new features. Not every extension
+exists on every chain — the app resolves addresses from a per-chain contract map and hides whatever
+is unavailable there, so a feature's absence on one network says nothing about the others.
 
-### 2. Content Layer (IPFS + CID)
+On LUKSO, identity is a Universal Profile (a modular LSP0 smart-contract account) rather than an
+EOA, and assets follow LSP7/LSP8 rather than ERC-20/ERC-721. Hup reads profile metadata and data
+keys directly from that account, which is why profiles there are dynamic and client-agnostic.
 
-- **Editor:** A custom markdown/media editor that handles the IPFS upload lifecycle.
-- **Immutable Links:** Only the IPFS Content Identifier (CID) is stored on-chain.
-- **Scalable Feeds:** Client-side logic utilizes paginated Web3.js getPastEvents calls (chunked by 5000 blocks) to rebuild social feeds from logs.
+## Product surfaces
 
-### 3. Economic Layer
+- [Home feed](https://hup.social/): the cross-network timeline, with tabs for following, latest, and media.
+- [Communities](https://hup.social/communities): group feeds with composable membership rules (token, NFT, whitelist, follower, or pay-to-join gates), consent-based two-step invites, optional end-to-end encryption, and optional DAO governance.
+- [Chat](https://hup.social/chat): wallet-to-wallet encrypted messaging.
+- [NFT market](https://hup.social/nfts): ERC-721 and LSP8 listings sold inside posts, with referral splits and a disclosed platform fee.
+- [Prediction markets](https://hup.social/predict): judge-resolved onchain markets; escrowed stakes are never admin-withdrawable and refunds open automatically if a market goes unresolved.
+- [Events](https://hup.social/events): a paid onchain events directory.
+- [Mini apps](https://hup.social/apps): the registry of apps that embed and transact inside a post. Listing is permissionless; in-post embedding requires moderator review.
+- [Bazaar](https://hup.social/bazaar): the feed filtered to premium posts — those carrying an active paid-unlock listing.
+- [Leaderboard](https://hup.social/leaderboard): ranked accounts by activity score, filterable by period and network.
+- [Search](https://hup.social/search): cross-entity search over posts, accounts, and communities.
+- [Insights](https://hup.social/insights): per-account analytics for the connected wallet.
+- [Revenue](https://hup.social/revenue): tips, NFT sales, and paid-unlock earnings for the connected wallet.
+- [Help center](https://hup.social/help): protocol FAQ and support-ticket intake.
+- [Install](https://hup.social/install): Hup is a PWA — installable, with push notifications and an offline shell.
+- [Privacy policy](https://hup.social/privacy-policy): what is public by construction and what is not.
 
-- **Creator Tipping:** Fully functional on-chain tipping logic allowing users to send value directly to post authors.
-- **Capital Allocation:** Designed for seamless value flow between supporters and creators without centralized intermediaries.
+## Building on Hup
 
-## Key Technical Specifications for LLMs
+- [Mini app guide](https://hup.social/miniapp-skill.md): the complete, self-contained spec for an app that embeds in a post — SDK surface, transaction flow, session calls, aspect ratios, registration, and review. Read this before writing any mini-app code.
+- [Mini app SDK](https://hup.social/miniapp-sdk.js): the script a mini app loads. It exposes an EIP-1193 provider over a postMessage bridge to the host page, inheriting the viewer's existing Hup session. A mini app must never bundle its own wallet connector — a second session shows the wrong domain in the prompt and is dead on mobile, where wallets do not inject into third-party iframes.
+- [Source repository](https://github.com/web3senior/hupsocial): the Next.js app and the Solidity sources for the core contract and every extension.
 
-- **Chain:** Ethereum-compatible Layer 2 (e.g., Base/Testnet).
-- **Storage:** IPFS (InterPlanetary File System).
-- **Communication:** Web3.js / Wagmi for blockchain interaction.
-- **Data Retrieval:** Event-based indexing.
+## Public read APIs
 
-## Documentation & Resources
+Unauthenticated `GET` endpoints under `https://hup.social/api/v1/`, served from the indexer and
+paginated with `page` and `limit`. Passing `viewer_address` annotates results with that wallet's
+like/bookmark/membership state.
 
-- [GitHub Repository](https://github.com/web3senior/hupsocial): Source code and issue tracker for Hup.
-- [Live Testnet](https://hup.social): Production deployment of the Hup social app.
+- `/networks/posts` — the feed. Filters: `network_id`, `wallet_address`, `community_id`, `feed_type`, `post_type`.
+- `/networks/{chainId}/{postId}` — one post, plus `/comments` and `/tips` subroutes.
+- `/networks/communities` — the community directory; `network_id`, `search`, `creator_address`, `visibility`.
+- `/networks/statuses` — short-lived status posts.
+- `/nfts` — listings; `networkId`, `collection`, `standard` (`erc721` or `lsp8`), `token`, `minPrice`, `maxPrice`, `seller`, `referral`, `sort`.
+- `/predict` — markets; `scope` (`open`, `upcoming`, `closed`, `settled`), `networkId`, `category`, `participant`, `q`.
+- `/events` — events; `scope` (`upcoming` or `past`), `networkId`.
+- `/apps` — registered mini apps.
+- `/leaderboard` — ranked accounts; `period`, `sort`, `network_id`.
+- `/search?q=` — posts, accounts, and communities in one response.
+- `/users/profile/{address}`, `/users/{address}/followers`, `/users/{address}/following` — profile and graph reads.
+
+These endpoints are shaped for Hup's own UI and are rate-limited. Read them freely, but treat the
+response shape as an application detail that can change, not a frozen public contract. Anything
+authoritative should be read from the contracts directly.
+
+## Getting Hup right
+
+- **Spelling:** write **onchain** and **offchain** as one word, never hyphenated.
+- **Not a testnet toy.** Hup is deployed on production mainnets; Monad Testnet is only where new
+  features are staged before they ship.
+- **Gas is real.** Posting, commenting, and profile updates are transactions and cost network fees.
+  Relayers and burner sessions can subsidize or streamline the signature, not eliminate execution.
+- **Wallet, not signup.** There is no registration, email, or password. Losing access to the wallet
+  means losing the ability to write as that identity; the content itself stays readable forever.
+- **Public by construction.** Every post, like, follow, and membership transaction is in a chain log
+  permanently. Deleting a post clears it from the app and flips its onchain state, but the original
+  transaction and its content pointer remain in the history.
+- **Encryption protects small groups.** End-to-end encrypted communities genuinely protect
+  small and medium private groups. At very large scale any single member can leak everything, so
+  large communities should use the plaintext gated types instead.
+
+## Optional
+
+- [Sitemap](https://hup.social/sitemap.xml): crawlable URL index.
+- [robots.txt](https://hup.social/robots.txt): crawl rules.
