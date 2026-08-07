@@ -575,6 +575,154 @@
   }
 }
 
+// The post's three-dots menu. Deliberately a separate block from .post__dropdown — the saved
+// page reuses that one for its folder menu with the older label-left/icon-right rows, and
+// widening these rules would silently restyle it.
+.post__menu {
+  width: 100%;
+
+  > ul {
+    width: 100%;
+  }
+
+  li {
+    width: 100%;
+
+    // Hairlines between rows, as on the row itself rather than the panel, so the expanded
+    // assistant rows slot into the rhythm without a separator of their own.
+    + li > button,
+    + li > a {
+      border-top: 1px solid var(--border);
+    }
+  }
+
+  button,
+  a {
+    // .post__actions button applies `all: unset` (icon-ripple reset), which drops box-sizing
+    // back to content-box — restore it or width:100% + padding overflows
+    box-sizing: border-box;
+    background-color: transparent;
+    border: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--text);
+    border-radius: calc(var(--global-border-radius) - var(--native-popover-padding));
+    transition: background-color 0.12s ease;
+
+    &:hover,
+    &:focus-visible {
+      background-color: var(--surface-muted);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+  }
+}
+
+.post__menuIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  // Icons and brand logos sit back at rest and come forward with the row — the row's label is
+  // what identifies it, so a full-strength mark on every line just competes for attention.
+  color: var(--color-icon-muted);
+
+  img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    filter: grayscale(1);
+    opacity: 0.75;
+    transition:
+      filter 0.12s ease,
+      opacity 0.12s ease;
+  }
+}
+
+.post__menuText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.post__menuLabel {
+  font-size: var(--font-size-14);
+  line-height: 1.25;
+}
+
+.post__menuDescription {
+  font-size: var(--font-size-12);
+  line-height: 1.25;
+  color: var(--text-muted);
+  text-wrap: nowrap;
+}
+
+// Stand-in for a logo file that hasn't been dropped into /public/logos yet
+.post__menuFallbackMark {
+  font-size: var(--font-size-10);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.post__menuCaret {
+  flex: 0 0 auto;
+  color: var(--color-icon-muted);
+  transition: rotate 0.15s ease;
+
+  &[data-expanded='true'] {
+    rotate: 180deg;
+  }
+}
+
+// Assistant rows are children of "Summarize with AI", so they carry the indent that says so.
+.post__menuItem--nested {
+  > button {
+    padding-left: 1.6rem;
+  }
+}
+
+// Colour returns on hover — the row you are pointing at is the one that gets its brand back.
+.post__menu li:hover .post__menuIcon img,
+.post__menu li:focus-within .post__menuIcon img {
+  filter: none;
+  opacity: 1;
+}
+
+// Solid-black marks (OpenAI, Grok) vanish into a dark panel, at rest and on hover alike, so on
+// dark themes they stay inverted throughout. Multi-colour marks carry their own contrast and
+// are left to the rules above — inverting those would only make them the wrong brand colour.
+[data-theme='dark'],
+[data-theme='terminal'] {
+  .post__menuIcon img[data-ink='mono'] {
+    filter: grayscale(1) invert(1);
+  }
+
+  .post__menu li:hover .post__menuIcon img[data-ink='mono'],
+  .post__menu li:focus-within .post__menuIcon img[data-ink='mono'] {
+    filter: invert(1);
+  }
+}
+
+.post__menu li:hover .post__menuIcon,
+.post__menu li:focus-within .post__menuIcon {
+  color: var(--text);
+}
+
 button.btnPostMenu {
   @extend %icon-ripple-button;
   padding: 6px;

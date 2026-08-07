@@ -18,21 +18,27 @@ import Profile from '@/components/Profile'
 import { CommentIcon, ShareIcon } from '@/components/Icons'
 import MediaGallery from './Gallery'
 import {
+  CaretDownIcon,
   ChartLineDownIcon,
+  ClipboardTextIcon,
   DotsThreeIcon,
   EyeIcon,
   FlagIcon,
+  MarkdownLogoIcon,
   NotePencilIcon,
   PackageIcon,
   PaperPlaneRightIcon,
   PenIcon,
   RepeatIcon,
+  SparkleIcon,
   TagIcon,
   TrashSimpleIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
 import { renderMarkdown } from '@/lib/markdown'
+import { postToMarkdown, getPostMarkdownUrl } from '@/lib/postMarkdown'
+import { AI_TARGETS, buildPostAiUrl } from '@/lib/aiTargets'
 import useSWR, { useSWRConfig } from 'swr'
 import { getPostStatsKey } from '@/hooks/usePostStats'
 import NativePopover from './ui/NativePopover'
@@ -430,6 +436,116 @@ const LastCommentShimmer = () => (
   </aside>
 )
 
+// Assistant logos live in /public/logos and are dropped in per brand. A missing file must not
+// leave an empty slot, so a failed load falls back to the assistant's short mark.
+const AiTargetLogo = ({ target }) => {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) return <span className={styles.post__menuFallbackMark}>{target.short}</span>
+
+  return <img src={target.logo} alt="" width={20} height={20} loading="lazy" data-ink={target.ink} onError={() => setFailed(true)} />
+}
+
+/**
+ * One row of the post menu: a muted icon, the action, and a line saying what it does. Renders
+ * as a link when `href` is set and a button otherwise — both share the same row shape, so it
+ * lives here instead of being restated on every entry.
+ */
+const MenuItem = ({ icon, label, description, trailing, href, className, ...rest }) => {
+  const body = (
+    <>
+      <span className={styles.post__menuIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <span className={styles.post__menuText}>
+        <span className={styles.post__menuLabel}>{label}</span>
+        {description && <small className={styles.post__menuDescription}>{description}</small>}
+      </span>
+      {trailing}
+    </>
+  )
+
+  return (
+    <li className={className}>
+      {href ? (
+        <a href={href} {...rest}>
+          {body}
+        </a>
+      ) : (
+        <button type="button" {...rest}>
+          {body}
+        </button>
+      )}
+    </li>
+  )
+}
+
+/**
+ * Document actions for a post — the same handoffs a docs page offers: take the content as
+ * markdown, read it as plain text, or hand it to an assistant. Rendered inline inside the
+ * post menu rather than as a nested popover: NativePopover panels are siblings of their
+ * trigger, so a nested `auto` popover would light-dismiss the menu that opened it.
+ */
+const PostDocumentActions = ({ item, close }) => {
+  const [showAiTargets, setShowAiTargets] = useState(false)
+
+  const copyAsMarkdown = async (e) => {
+    e.stopPropagation()
+
+    try {
+      await navigator.clipboard.writeText(postToMarkdown(item, { origin: window.location.origin }))
+      toast('Post copied as markdown', 'success')
+    } catch {
+      toast('Failed to copy', 'error')
+    }
+    close()
+  }
+
+  const openAiTarget = (e, target) => {
+    e.stopPropagation()
+    window.open(buildPostAiUrl(target, item, { origin: window.location.origin }), '_blank', 'noopener,noreferrer')
+    close()
+  }
+
+  return (
+    <>
+      <MenuItem icon={<ClipboardTextIcon size={20} />} label="Copy post" description="Copy the post as Markdown" onClick={copyAsMarkdown} />
+      <MenuItem
+        icon={<MarkdownLogoIcon size={20} />}
+        label="View as markdown"
+        description="View this post as plain text"
+        href={getPostMarkdownUrl(item)}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="View this post as plain markdown"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <MenuItem
+        icon={<SparkleIcon size={20} />}
+        label="Summarize with AI"
+        description="Hand this post to an assistant"
+        trailing={<CaretDownIcon size={14} className={styles.post__menuCaret} data-expanded={showAiTargets} />}
+        aria-expanded={showAiTargets}
+        onClick={(e) => {
+          e.stopPropagation()
+          setShowAiTargets((prev) => !prev)
+        }}
+      />
+      {showAiTargets &&
+        AI_TARGETS.map((target) => (
+          <MenuItem
+            key={target.id}
+            className={styles['post__menuItem--nested']}
+            icon={<AiTargetLogo target={target} />}
+            label={`Open in ${target.label}`}
+            description="Ask questions about this post"
+            onClick={(e) => openAiTarget(e, target)}
+          />
+        ))}
+    </>
+  )
+}
+
 const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -516,83 +632,75 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
         placement="bottom-end"
       >
         {({ close }) => (
-          <div className={`${styles.post__dropdown} flex flex-column align-items-center justify-content-start gap-050`}>
+          <div className={clsx(styles.post__menu, 'flex flex-column align-items-center justify-content-start')}>
             <ul>
-              <li>
-                <button
+              <MenuItem
+                icon={<EyeIcon size={20} />}
+                label="View"
+                description="Open the full post"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCurrentPost(item)
+                  router.push(`/networks/${item.network_id}/${item.id}`)
+                }}
+              />
+              {item.tx_hash && (
+                <MenuItem
+                  icon={<PackageIcon size={20} />}
+                  label="Proof"
+                  description="See the onchain receipt"
+                  href={`${item.explorer_url}/tx/${item.tx_hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="View transaction proof on block explorer"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+              <PostDocumentActions item={item} close={close} />
+              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
+                <MenuItem
+                  icon={<TagIcon size={20} />}
+                  label="Sell"
+                  description="List this post for sale"
                   onClick={(e) => {
                     e.stopPropagation()
-                    setCurrentPost(item)
-                    router.push(`/networks/${item.network_id}/${item.id}`)
+                    sellPopoverRef.current?.open()
+                    close()
                   }}
-                >
-                  <span>View</span>
-                  <EyeIcon size={18} />
-                </button>
-              </li>
-              {item.tx_hash && (
-                <li>
-                  <a
-                    href={`${item.explorer_url}/tx/${item.tx_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="View transaction proof on block explorer"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span>Proof</span>
-                    <PackageIcon size={18} />
-                  </a>
-                </li>
-              )}
-              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
-                <li>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      sellPopoverRef.current?.open()
-                      close()
-                    }}
-                  >
-                    <span>Sell</span>
-                    <TagIcon size={18} />
-                  </button>
-                </li>
+                />
               )}
               {address?.toLowerCase() === item.wallet_address?.toLowerCase() && item.is_repost < 1 && (
-                <li>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowEditModal(true)
-                      close()
-                    }}
-                  >
-                    <span>Edit</span>
-                    <NotePencilIcon size={18} />
-                  </button>
-                </li>
+                <MenuItem
+                  icon={<NotePencilIcon size={20} />}
+                  label="Edit"
+                  description="Change what this post says"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowEditModal(true)
+                    close()
+                  }}
+                />
               )}
               {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
-                <li>
-                  <button onClick={(e) => deletePost(e, item.id)} disabled={isDeleting || isPending || isConfirming}>
-                    <span>{isDeleting || isPending || isConfirming ? 'Deleting…' : 'Delete'}</span>
-                    <TrashSimpleIcon size={18} />
-                  </button>
-                </li>
+                <MenuItem
+                  icon={<TrashSimpleIcon size={20} />}
+                  label={isDeleting || isPending || isConfirming ? 'Deleting…' : 'Delete'}
+                  description="Remove this post onchain"
+                  disabled={isDeleting || isPending || isConfirming}
+                  onClick={(e) => deletePost(e, item.id)}
+                />
               )}
               {address?.toLowerCase() !== item.wallet_address?.toLowerCase() && (
-                <li>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowReportModal(item)
-                      close()
-                    }}
-                  >
-                    <span>Report</span>
-                    <FlagIcon size={16} />
-                  </button>
-                </li>
+                <MenuItem
+                  icon={<FlagIcon size={20} />}
+                  label="Report"
+                  description="Flag this post for review"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowReportModal(item)
+                    close()
+                  }}
+                />
               )}
             </ul>
           </div>
