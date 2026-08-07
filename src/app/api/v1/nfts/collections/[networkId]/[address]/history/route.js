@@ -6,6 +6,10 @@
  *
  * Same reconstruction, same currency rule, same caveats as lib/nftFloorHistory — read that
  * file's header before trusting a cancelled listing's end date.
+ *
+ * Unlike the batch sibling, this one asks for sales too: a reader who came to study the trend
+ * wants to know which asks actually cleared, and one collection can afford the second query.
+ * The rail draws a dozen sparklines with no room to mark a sale on any of them, so it doesn't.
  */
 
 import { NextResponse } from 'next/server'
@@ -33,6 +37,7 @@ export async function GET(request, { params }) {
     const [data] = await getFloorHistory({
       keys: [[Number(networkId), address.toLowerCase()]],
       days: searchParams.get('days') || DEFAULT_WINDOW,
+      withSales: true,
     })
 
     return NextResponse.json({ success: true, data }, { headers: { 'Cache-Control': CACHE_CONTROL } })

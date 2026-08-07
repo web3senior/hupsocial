@@ -29,9 +29,15 @@
   // percentage and its caret carry the direction regardless, so the hue is never the only cue.
   --trend-up: #0d9488;
   --trend-down: #d1383d;
-  // Single-series line hue (collection floor chart). Passes on all three surfaces, so the
-  // dark and terminal blocks below inherit it rather than restating it.
+  // Floor-line hue (collection floor chart). Passes on all three surfaces, so the dark and
+  // terminal blocks below inherit it rather than restating it.
   --chart-line: #8b5cf6;
+  // Settled-sale markers over that line. Amber clears the line hue by ΔE 32.9 under protanopia
+  // — pink was the runner-up at 15.4 — and is the only candidate that held the lightness band
+  // on all three surfaces, so it too is declared once. It sits ΔE 14.1 from --trend-down, which
+  // is close, but the two never share a region: the sale is a diamond inside the plot, the
+  // trend hue is a caret in the header, and both carry a shape and a label besides.
+  --chart-sale: #d97706;
 
   --scrollbarBG: #f4f4f4;
   --thumbBG: var(--gray);

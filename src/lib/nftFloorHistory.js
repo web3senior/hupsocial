@@ -13,6 +13,13 @@
  * indexer's own write time stands in. cidex runs continuously, so in normal operation that
  * lands within one poll of the real event — but a backfilled range would date every
  * cancellation to the backfill instead of to the chain.
+ *
+ * With `withSales`, the same window also comes back as what actually *cleared* — daily sale
+ * prices from nft_trades. Floor and sales are different measures and neither substitutes for
+ * the other: the floor is the cheapest open ask (forward-looking, what you could buy at), a
+ * sale is a settled trade (backward-looking, what someone paid). The collection page draws
+ * sales as discrete markers over the floor line; the market rail's sparkline never asks for
+ * them, so the flag defaults off and its batch query is unchanged.
  */
 
 import pool from './db'
@@ -41,22 +48,26 @@ const dayKey = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10)
  * already follows, so a card's sparkline can never end up in a different currency than the
  * floor printed beside it. A collection with nothing live falls back to whichever token holds
  * the most listings in the window.
+ *
+ * @param {Array<Object>} rows Priced rows carrying `payment_token` and, for listings, `status`.
+ * Trade rows have no status, so their tally never scores an "active" and the count of rows
+ * decides — which is what picking a currency off sales alone should mean anyway.
  */
-function dominantToken(listings) {
+function dominantToken(rows) {
   const tally = new Map()
 
-  for (const listing of listings) {
-    const entry = tally.get(listing.payment_token) || { active: 0, total: 0, listing }
-    if (listing.status === STATUS_ACTIVE) entry.active += 1
+  for (const row of rows) {
+    const entry = tally.get(row.payment_token) || { active: 0, total: 0, row }
+    if (row.status === STATUS_ACTIVE) entry.active += 1
     entry.total += 1
-    tally.set(listing.payment_token, entry)
+    tally.set(row.payment_token, entry)
   }
 
   let best = null
   for (const entry of tally.values()) {
     if (!best || entry.active > best.active || (entry.active === best.active && entry.total > best.total)) best = entry
   }
-  return best?.listing || null
+  return best?.row || null
 }
 
 /**
@@ -78,6 +89,41 @@ function buildSeries(listings, buckets) {
 
     return { date: dayKey(start), floor: floor === null ? null : floor.toString() }
   })
+}
+
+/**
+ * Sales collapsed to one entry per calendar day. Only days that had a trade appear — unlike
+ * the floor, which carries a point for every bucket, a sale is an event and the days without
+ * one are not gaps to be filled.
+ *
+ * The x axis is day-bucketed, so two sales on one day would land on the same tick: the marker
+ * plots the day's mean, and `count`/`low`/`high` ride along so a busy day is never silently
+ * flattened to a single number in the tooltip. Averaged in BigInt — wei-scale prices overflow
+ * a Number long before they reach the client.
+ */
+function buildSaleSeries(sales) {
+  const byDay = new Map()
+
+  for (const sale of sales) {
+    const date = dayKey(sale.sold_at)
+    const price = BigInt(sale.price)
+    const entry = byDay.get(date) || { date, count: 0, sum: 0n, low: price, high: price }
+
+    entry.count += 1
+    entry.sum += price
+    if (price < entry.low) entry.low = price
+    if (price > entry.high) entry.high = price
+    byDay.set(date, entry)
+  }
+
+  // Rows arrive ordered by sold_at and Map keeps insertion order, so this comes out chronological
+  return Array.from(byDay.values(), ({ date, count, sum, low, high }) => ({
+    date,
+    count,
+    avg: (sum / BigInt(count)).toString(),
+    low: low.toString(),
+    high: high.toString(),
+  }))
 }
 
 /**
@@ -103,10 +149,18 @@ function changePercent(points) {
  * addresses must already be lowercased to match the index.
  * @param {number|string} [params.days] Window length, clamped to [2, 180].
  * @param {number} [params.now] Unix seconds to treat as "today"; injectable for tests.
+ * @param {boolean} [params.withSales] Also return `sales` (one entry per day that traded) and
+ * `last_sale`. Costs a second query, so only the collection page asks for it — see the file
+ * header. Both fields are omitted entirely when off, leaving the rail's payload untouched.
  * @returns {Promise<Array<Object>>} One row per requested key, in the order asked for. Rows for
  * collections with no listings in the window still come back, with an empty `points`.
  */
-export async function getFloorHistory({ keys, days = DEFAULT_DAYS, now = Math.floor(Date.now() / 1000) }) {
+export async function getFloorHistory({
+  keys,
+  days = DEFAULT_DAYS,
+  now = Math.floor(Date.now() / 1000),
+  withSales = false,
+}) {
   if (!keys.length) return []
 
   const span = Math.min(Math.max(parseInt(days) || DEFAULT_DAYS, MIN_DAYS), MAX_DAYS)
@@ -132,6 +186,34 @@ export async function getFloorHistory({ keys, days = DEFAULT_DAYS, now = Math.fl
     [...keys.flat(), today + DAY_SECONDS, STATUS_ACTIVE, windowStart],
   )
 
+  // nft_trades carries its own collection and payment_token, so sales need no join back to
+  // the listing they settled — a trade is a fact about the collection, not about the ask
+  const salesByCollection = new Map()
+  if (withSales) {
+    const [saleRows] = await pool.execute(
+      `SELECT t.network_id, t.collection, t.payment_token, t.sold_at,
+              CAST(t.price AS CHAR) AS price, st.symbol, st.decimals
+         FROM nft_trades t
+         LEFT JOIN store_tokens st ON st.network_id = t.network_id AND st.token = t.payment_token
+        WHERE (t.network_id, t.collection) IN (${keys.map(() => '(?,?)').join(',')})
+          AND t.sold_at >= ? AND t.sold_at < ?
+        ORDER BY t.sold_at`,
+      [...keys.flat(), windowStart, today + DAY_SECONDS],
+    )
+
+    for (const row of saleRows) {
+      const key = `${row.network_id}-${row.collection}`
+      if (!salesByCollection.has(key)) salesByCollection.set(key, [])
+      salesByCollection.get(key).push({
+        payment_token: row.payment_token,
+        sold_at: Number(row.sold_at),
+        price: row.price,
+        symbol: row.symbol,
+        decimals: row.decimals,
+      })
+    }
+  }
+
   const byCollection = new Map()
   for (const row of rows) {
     const key = `${row.network_id}-${row.collection}`
@@ -151,15 +233,33 @@ export async function getFloorHistory({ keys, days = DEFAULT_DAYS, now = Math.fl
   }
 
   return keys.map(([networkId, collection]) => {
-    const listings = byCollection.get(`${networkId}-${collection}`) || []
-    const dominant = dominantToken(listings)
+    const key = `${networkId}-${collection}`
+    const listings = byCollection.get(key) || []
+    const sales = salesByCollection.get(key) || []
+
+    // Listings are the currency authority, because the floor is the anchor everything else is
+    // read against. Sales only get to name it when nothing was listed in the window at all —
+    // which still leaves "last sale" quotable on a collection whose listings have all aged out.
+    const dominant = dominantToken(listings) || dominantToken(sales)
 
     if (!dominant) {
-      return { network_id: Number(networkId), collection, days: span, points: [], change_pct: null }
+      return {
+        network_id: Number(networkId),
+        collection,
+        days: span,
+        points: [],
+        change_pct: null,
+        ...(withSales ? { sales: [], last_sale: null } : {}),
+      }
     }
 
     const priced = listings.filter((listing) => listing.payment_token === dominant.payment_token)
     const points = buildSeries(priced, buckets)
+
+    // Same rule the floor lives by: a sale in another token is dropped rather than plotted
+    // against an axis denominated in this one. Better a missing marker than a wrong one.
+    const quotedSales = sales.filter((sale) => sale.payment_token === dominant.payment_token)
+    const latest = quotedSales[quotedSales.length - 1]
 
     return {
       network_id: Number(networkId),
@@ -172,6 +272,14 @@ export async function getFloorHistory({ keys, days = DEFAULT_DAYS, now = Math.fl
       decimals: dominant.decimals,
       points,
       change_pct: changePercent(points),
+      ...(withSales
+        ? {
+            sales: buildSaleSeries(quotedSales),
+            // Bounded by the window like everything else here, so this going null on a short
+            // range is itself the answer: nothing traded in those days
+            last_sale: latest ? { date: dayKey(latest.sold_at), sold_at: latest.sold_at, price: latest.price } : null,
+          }
+        : {}),
     }
   })
 }

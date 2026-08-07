@@ -1,6 +1,6 @@
 // Floor history for one collection, sitting between the collection's onchain identity and its
-// listing grid. One series, so the chrome stays quiet: hairline grid, muted axes, and the only
-// saturated ink on the card is the line itself.
+// listing grid. The chrome stays quiet — hairline grid, muted axes — so the only saturated ink
+// on the card is the floor line and the sale markers riding over it.
 .chart {
   display: flex;
   flex-direction: column;
@@ -29,6 +29,14 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
+  }
+
+  // Names whose order book this is. Muted and small — it qualifies the title, it isn't a
+  // second title.
+  &__scope {
+    margin: 0 0 0.1rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
   }
 
   &__summary {
@@ -86,10 +94,56 @@
     }
   }
 
+  // The other headline number: what someone actually paid, beside what someone is asking.
+  // Stays in muted ink at label size — the floor is the card's subject, this is its company.
+  &__lastSale {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+    white-space: nowrap;
+
+    strong {
+      color: var(--text);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    small {
+      font-size: var(--font-size-10, 10px);
+    }
+  }
+
   &__controls {
     display: flex;
     align-items: center;
     gap: 0.4rem;
+  }
+
+  // Two series means identity can never rest on hue alone. The swatches carry the actual
+  // marks — a 2px line and the sale diamond — so the key matches what is drawn rather than
+  // approximating it with a pair of colored squares.
+  &__legend {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-block-start: -0.25rem;
+  }
+
+  &__legendItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+    font-weight: 600;
+  }
+
+  &__legendMark {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
   }
 
   &__ranges {
@@ -184,6 +238,26 @@
     font-variant-numeric: tabular-nums;
   }
 
+  // The sale line wears text ink like everything else; the amber dot beside it is what ties
+  // the row to the diamond on the plot
+  &__tooltipSale {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+    font-variant-numeric: tabular-nums;
+
+    &::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      flex-shrink: 0;
+      background-color: var(--chart-sale);
+      transform: rotate(45deg);
+    }
+  }
+
   // The chart's WCAG-clean twin — every plotted value is readable here without hovering
   // anything, and it scrolls in its own box rather than widening the card
   &__tableWrap {
@@ -195,7 +269,21 @@
   &__table {
     width: 100%;
     border-collapse: collapse;
+    // styles/components/_table.scss paints a global 1px #ccc frame; the card already has its
+    // own border and the rows carry their own rules
+    border: 0;
     font-size: var(--font-size-12, 0.78rem);
+
+    // That same global sets `table tr { background-color: #fff }` with no theme awareness,
+    // which inside this card leaves --text on white — invisible in dark and terminal. Class
+    // specificity beats the bare element selector, so the row simply keeps the card's surface.
+    tr {
+      background-color: transparent;
+
+      &:hover {
+        background-color: var(--hover);
+      }
+    }
 
     caption {
       padding-block-end: 0.5rem;
@@ -228,5 +316,13 @@
       color: var(--text);
       font-variant-numeric: tabular-nums;
     }
+  }
+
+  // How many trades the day's average stands for — the chart says this in its tooltip, so the
+  // table has to say it too
+  &__tableCount {
+    margin-inline-start: 0.25rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
   }
 }

@@ -207,8 +207,11 @@ export const getNftCollectionsHistory = async (collections, days = 30) => {
 }
 
 /**
- * One collection's daily floor series, for the collection page's floor chart. Same shape as a
- * row from getNftCollectionsHistory, over whatever window the chart's range picker is on.
+ * One collection's daily floor series, for the collection page's floor chart. A row from
+ * getNftCollectionsHistory plus what actually traded, over whatever window the range picker
+ * is on: `sales` (`[{date, avg, low, high, count}]`, only days that had a trade) and
+ * `last_sale` (`{date, sold_at, price}` or null). Sales are quoted in the same dominant token
+ * as the floor — one in another currency is dropped rather than mixed into the axis.
  * @param {string|number} networkId Chain the collection lives on.
  * @param {string} address Collection contract address.
  * @param {number} [days=30] Window length (server clamps to 2–180).
