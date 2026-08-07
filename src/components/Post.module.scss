@@ -487,8 +487,6 @@
 .post__edited {
   @extend %circle-chip;
   display: inline-flex;
-  font-size: var(--font-size-10);
-  gap: 4px;
   color: var(--text-muted);
   border-radius: 1000px;
 }

@@ -28,7 +28,7 @@ import {
   NotePencilIcon,
   PackageIcon,
   PaperPlaneRightIcon,
-  PenIcon,
+  PencilSimpleIcon,
   RepeatIcon,
   SparkleIcon,
   TagIcon,
@@ -278,7 +278,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
                       data-tooltip="Edited"
                       aria-label="Post has been edited"
                     >
-                      <PenIcon size={10} />
+                      <PencilSimpleIcon size={13} weight="fill" />
                     </button>
                   }
                   placement="bottom-end"
