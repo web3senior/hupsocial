@@ -184,17 +184,125 @@
     }
   }
 
-  // Small muted lines under the price — the referral % and the platform's cut are
-  // informational, not a pitch. The fee note wraps: it carries a full sentence.
-  &__referralNote {
-    color: var(--text-muted);
-    font-size: 0.68rem;
-    white-space: nowrap;
+  // Settlement breakdown (compact/detail page only) — the divider under the price doubles
+  // as its toggle, so the panel costs one rule's worth of space while closed
+  &__breakdown {
+    width: 100%;
   }
 
-  &__feeNote {
+  &__breakdownSummary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    list-style: none;
+    cursor: pointer;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    // Rules either side of the label, so the control reads as a section divider rather
+    // than one more button competing with Buy
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background-color: var(--border);
+    }
+
+    // Bare label at rest — the pill is a hover affordance, so a closed panel reads as one
+    // continuous rule rather than a button parked in the middle of it
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    &:hover span,
+    &:focus-visible span {
+      background-color: color-mix(in srgb, var(--text) 8%, transparent);
+      color: var(--text);
+    }
+  }
+
+  // Caret pair while closed, ✕ while open — the glyph says what the click does next
+  &__breakdownGlyph {
+    &--open {
+      display: none;
+    }
+  }
+
+  &__breakdown[open] &__breakdownGlyph {
+    display: none;
+
+    &--open {
+      display: inline-block;
+    }
+  }
+
+  &__breakdownBody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+  }
+
+  &__breakdownRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0;
     color: var(--text-muted);
-    font-size: 0.68rem;
+    font-size: 0.8rem;
+
+    strong {
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    // The label side carries the info affordance next to its text
+    > span:first-child {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    // What the seller actually walks away with, ruled off from the deductions above it
+    &--total {
+      padding-top: 0.45rem;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 600;
+    }
+  }
+
+  // Describes, never acts — the button element is only there so touch and keyboard can
+  // reach the tooltip that hover already gets
+  &__breakdownInfo {
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    cursor: help;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  &__breakdownHint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.72rem;
   }
 
   &__badge {

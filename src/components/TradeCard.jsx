@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
+import { CaretUpDownIcon, InfoIcon, XIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
+import Tooltip from '@/components/ui/Tooltip'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { splitSalePrice } from '@/lib/tradeFee'
+import { formatBps, splitSalePrice } from '@/lib/tradeFee'
 import { handleBrokenImage } from '@/lib/utils'
 import tradeAbi from '@/abis/HupTrade.json'
 import useTradeFee from '@/hooks/useTradeFee'
@@ -365,16 +367,12 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
   const referralBps = liveListing ? Number(liveListing.referralBps) : 0
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
 
-  // The buyer pays the listed price exactly — the platform fee comes out of what the seller
-  // receives. Say which of those a reader is looking at rather than leaving the cut implied.
-  const sellerProceeds =
-    isSeller && priceNumber !== null && feeBps !== null ? amountFormat.format(splitSalePrice(priceNumber, feeBps, referralBps).seller) : null
-  const feeNote =
-    feeBps > 0
-      ? sellerProceeds
-        ? `You receive ${sellerProceeds} ${symbol} after the ${feePercent} fee${referralBps > 0 ? ' and referral' : ''}`
-        : `Includes a ${feePercent} platform fee`
-      : null
+  // The buyer pays the listed price exactly — the platform fee and the seller's referral
+  // share both come out of what lands in the seller's wallet. The detail panel spells that
+  // settlement out row by row rather than leaving the cut implied; with nothing deducted
+  // there's no split to show and the panel stays away.
+  const split = compact && priceNumber !== null && feeBps !== null ? splitSalePrice(priceNumber, feeBps, referralBps) : null
+  const showBreakdown = Boolean(split) && (feeBps > 0 || referralBps > 0)
 
   return (
     <div className={clsx(styles.tradeCard, { [styles['tradeCard--compact']]: compact })} onClick={(e) => e.stopPropagation()}>
@@ -448,11 +446,77 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
             <strong>
               {formattedPrice} {symbol}
             </strong>
-            {isActive && !isUnavailable && referralPercent && (
-              <small className={styles.tradeCard__referralNote}>{referralPercent}% referral</small>
-            )}
-            {isActive && !isUnavailable && feeNote && <small className={styles.tradeCard__feeNote}>{feeNote}</small>}
           </div>
+        )}
+
+        {/* Collapsed by default — the price is the headline, and how it splits is what a
+            reader opens when they want it. The divider itself is the toggle. */}
+        {compact && isActive && !isUnavailable && showBreakdown && (
+          <details className={styles.tradeCard__breakdown}>
+            {/* Both glyphs render and CSS picks one off [open] — the label stays a plain
+                summary with no open-state to mirror in React */}
+            <summary className={styles.tradeCard__breakdownSummary}>
+              <span>
+                Details
+                <CaretUpDownIcon size={12} weight="bold" className={styles.tradeCard__breakdownGlyph} />
+                <XIcon size={12} weight="bold" className={clsx(styles.tradeCard__breakdownGlyph, styles['tradeCard__breakdownGlyph--open'])} />
+              </span>
+            </summary>
+
+            <div className={styles.tradeCard__breakdownBody}>
+              <div className={styles.tradeCard__breakdownRow}>
+                <span>{!isSeller && address ? 'You pay' : 'Buyer pays'}</span>
+                <strong>
+                  {formattedPrice} {symbol}
+                </strong>
+              </div>
+
+              {feeBps > 0 && (
+                <div className={styles.tradeCard__breakdownRow}>
+                  <span>
+                    Platform fee ({feePercent})
+                    <Tooltip content="Hup's cut of the sale. It comes out of the seller's proceeds — the buyer pays the listed price exactly.">
+                      <button type="button" className={styles.tradeCard__breakdownInfo} aria-label="About the platform fee">
+                        <InfoIcon size={12} />
+                      </button>
+                    </Tooltip>
+                  </span>
+                  <span>
+                    −{amountFormat.format(split.fee)} {symbol}
+                  </span>
+                </div>
+              )}
+
+              {referralBps > 0 && (
+                <div className={styles.tradeCard__breakdownRow}>
+                  <span>
+                    Referral ({formatBps(referralBps)})
+                    <Tooltip content="Paid to whoever's repost leads to the sale. Also taken from the seller's proceeds, and only when a buyer actually arrives through a share.">
+                      <button type="button" className={styles.tradeCard__breakdownInfo} aria-label="About the referral share">
+                        <InfoIcon size={12} />
+                      </button>
+                    </Tooltip>
+                  </span>
+                  <span>
+                    −{amountFormat.format(split.referral)} {symbol}
+                  </span>
+                </div>
+              )}
+
+              <div className={clsx(styles.tradeCard__breakdownRow, styles['tradeCard__breakdownRow--total'])}>
+                <span>{isSeller ? 'You receive' : 'Seller receives'}</span>
+                <strong>
+                  {amountFormat.format(split.seller)} {symbol}
+                </strong>
+              </div>
+
+              {referralBps > 0 && (
+                <p className={styles.tradeCard__breakdownHint}>
+                  With no referral, the seller keeps {amountFormat.format(split.seller + split.referral)} {symbol}.
+                </p>
+              )}
+            </div>
+          </details>
         )}
 
         {showDetailsLink && (

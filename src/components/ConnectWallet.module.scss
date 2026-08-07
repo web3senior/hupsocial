@@ -141,7 +141,9 @@ figure.pfp {
 
   &__hint {
     margin: 0 0 0.65rem;
-    font-size: var(--font-size-9, 0.85rem);
+    // --font-size-9 really is 9px in the token scale, far too small for body
+    // copy - the hint was near-illegible before
+    font-size: var(--font-size-12, 12px);
     color: var(--text-muted, var(--gray-400));
   }
 }
@@ -240,7 +242,7 @@ figure.pfp {
     border-radius: var(--global-border-radius);
     background-color: rgba(220, 53, 69, 0.08);
     color: var(--color-error, #dc3545);
-    font-size: var(--font-size-9, 0.85rem);
+    font-size: var(--font-size-12, 12px);
     overflow-wrap: anywhere;
   }
 }
