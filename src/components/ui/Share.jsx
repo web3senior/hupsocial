@@ -18,9 +18,21 @@ import styles from './Share.module.scss'
  * @param {string} [props.copyLabel] Label for the copy-link entry.
  * @param {string} [props.copiedToast] Toast shown after a successful copy.
  */
+// encodeURIComponent throws URIError on lone UTF-16 surrogates, which real post data can
+// contain (e.g. an emoji mangled by storage truncation) — one bad post must not crash the
+// route through this component, so share text is always sanitized first.
+const sanitizeShareText = (value) => {
+  if (typeof value !== 'string') return ''
+  return value.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+}
+
 export const Share = ({ item, url, title, creator, trigger, copyLabel = 'Copy post link', copiedToast = 'Post link copied' }) => {
   const shareUrl = url ?? `${location.protocol}//${window.location.host}/networks/${item.network_id}/${item.id}`
-  const sharePostTitle = title ?? (item?.content?.elements?.[0]?.data?.text || item?.content || '')
+  // Encrypted posts carry an envelope object as content — share the lock placeholder, never
+  // the object (or its ciphertext)
+  const rawTitle =
+    title ?? (item?.content?.encrypted ? '🔒 Encrypted community post' : item?.content?.elements?.[0]?.data?.text ?? '')
+  const sharePostTitle = sanitizeShareText(rawTitle)
   const creatorWallet = item?.wallet_address ?? creator
   const shareHupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
   const shareContent = `${sharePostTitle}\n\n${creatorWallet ? ` Creator: ${creatorWallet} \n\n` : ''}`

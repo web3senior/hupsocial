@@ -42,10 +42,16 @@ const normalizePrefillValue = (value) => {
   return typeof value === 'string' ? value : ''
 }
 
+// Lone UTF-16 surrogates (half an emoji, e.g. from an interrupted paste or a buggy input
+// method) are invalid Unicode: encodeURIComponent throws on them and they publish as
+// permanently broken text — strip them before the content ever reaches IPFS.
+const stripLoneSurrogates = (text) =>
+  typeof text === 'string' ? text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '') : ''
+
 const createPostContent = (text = '', mediaItems = []) => ({
   version: '1',
   elements: [
-    { type: 'text', data: { text } },
+    { type: 'text', data: { text: stripLoneSurrogates(text) } },
     { type: 'media', data: { items: mediaItems } },
   ],
 })
@@ -968,6 +974,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     setIsSubmitting(true)
     try {
       const serializableContent = getSerializablePostContent(postContent)
+
+      // Sanitize at the last exit before publication: typed/pasted text can carry lone
+      // surrogates the initial-state factory never sees
+      if (serializableContent?.elements?.[0]?.data) {
+        serializableContent.elements[0].data.text = stripLoneSurrogates(serializableContent.elements[0].data.text)
+      }
 
       // Quotes are regular posts carrying a `quoteOf` key in their content JSON —
       // the contract rejects metadata on reposts and parent ids on posts, so the
