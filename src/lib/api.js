@@ -227,6 +227,23 @@ export const getNftCollectionHistory = async (networkId, address, days = 30) => 
 }
 
 /**
+ * Get NFT Collection Stats
+ * Lifetime HupTrade market stats for one collection — `volume` and `highest_sale` in base
+ * units, `sale_count`, `items_sold` (distinct NFTs that changed hands) and `currencies`.
+ * Volume and the high sale are quoted in the collection's dominant payment token, never
+ * summed across currencies; `symbol`/`decimals` are null for the native coin, so fill both
+ * in from the chain config like the floor chart does. Powers the collection header's stat row.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ */
+export const getNftCollectionStats = async (networkId, address) => {
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/stats`)
+  if (!response.ok) throw new Error('Failed to fetch collection stats')
+
+  return response.json()
+}
+
+/**
  * Get NFT Collection Info
  * Collection-level display metadata for one contract — name, symbol, banner, icon,
  * description, LSP4Creators[] addresses and total supply — from the server-side
@@ -267,6 +284,26 @@ export const getNftCollectionTraits = async (networkId, address, status) => {
 
   const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/traits${query ? `?${query}` : ''}`)
   if (!response.ok) throw new Error('Failed to fetch collection traits')
+
+  return response.json()
+}
+
+/**
+ * Get NFT Collection Tokens
+ * The tokens of one collection this app has seen (nft_metadata_cache rows), each with its live
+ * listing when it has one — the whole-collection browse's fallback source for contracts that
+ * can't enumerate themselves. `meta.total` counts every cached token, so the view can say how
+ * much of the supply it covers.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ * @param {number} [page] 1-based page.
+ * @param {number} [limit] Tokens per page, capped server-side at 60.
+ */
+export const getNftCollectionTokens = async (networkId, address, page = 1, limit = 24) => {
+  const params = new URLSearchParams({ page, limit })
+
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/tokens?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch collection tokens')
 
   return response.json()
 }

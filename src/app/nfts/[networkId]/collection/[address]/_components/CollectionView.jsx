@@ -1,18 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import clsx from 'clsx'
-import { ArrowsClockwiseIcon, CaretLeftIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
+import { StorefrontIcon, XIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
+import useCollectionStats from '@/hooks/useCollectionStats'
 import useCollectionTraits from '@/hooks/useCollectionTraits'
 import { toast } from '@/components/NextToast'
 import PageTitle from '@/components/PageTitle'
 import NftMarketCard from '@/components/NftMarketCard'
+import CollectionBrowser from './CollectionBrowser'
 import CollectionHeader from './CollectionHeader'
 import FloorChart from './FloorChart'
 import OwnedTokens from './OwnedTokens'
@@ -21,10 +22,14 @@ import styles from './CollectionView.module.scss'
 
 const PAGE_SIZE = 24
 
+// The first three slice this app's listings — 'all' is everything still on the market, since
+// cancelled listings are never served; 'collection' leaves the order book entirely and browses
+// the collection's tokens themselves — see CollectionBrowser
 const STATUS_TABS = [
   { value: 'active', label: 'For sale' },
   { value: 'sold', label: 'Sold' },
   { value: 'all', label: 'Everything' },
+  { value: 'collection', label: 'Whole collection' },
 ]
 
 /**
@@ -37,13 +42,12 @@ const STATUS_TABS = [
  * @param {string} props.address Collection contract address, from the URL segment.
  */
 export default function CollectionView({ networkId, address }) {
-  const router = useRouter()
-
   const chainId = Number(networkId)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
   const collection = address.toLowerCase()
 
   const info = useCollectionInfo({ chainId, collection })
+  const stats = useCollectionStats({ chainId, collection, chainInfo })
 
   const [status, setStatus] = useState('active')
   // [{label, value}] — values sharing a label widen the result, different labels narrow it.
@@ -55,9 +59,13 @@ export default function CollectionView({ networkId, address }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
 
+  const isBrowsingCollection = status === 'collection'
+
   // The facet list is scoped to the same status the grid shows, so a count next to a value
-  // is always the number of NFTs ticking it would leave on screen
-  const traitFacets = useCollectionTraits({ chainId, collection, status })
+  // is always the number of NFTs ticking it would leave on screen. The browse tab has no
+  // listing status — the panel is hidden there, so what this fetches doesn't matter, but the
+  // API only speaks listing statuses.
+  const traitFacets = useCollectionTraits({ chainId, collection, status: isBrowsingCollection ? 'active' : status })
 
   const buildFilters = useCallback(
     () => ({
@@ -70,6 +78,10 @@ export default function CollectionView({ networkId, address }) {
   )
 
   useEffect(() => {
+    // The browse tab doesn't read listings at all — CollectionBrowser owns its own fetching,
+    // and skipping here keeps the listing grid warm for the tab the user switches back to
+    if (isBrowsingCollection) return
+
     let cancelled = false
 
     const load = async () => {
@@ -94,7 +106,7 @@ export default function CollectionView({ networkId, address }) {
     return () => {
       cancelled = true
     }
-  }, [buildFilters])
+  }, [buildFilters, isBrowsingCollection])
 
   const loadMore = async () => {
     if (isFetchingMore || !hasMore) return
@@ -139,12 +151,16 @@ export default function CollectionView({ networkId, address }) {
       {/* Fixed-header + document title carry the collection's name; the clearance spacer
           already renders at page level, outside the container */}
       <PageTitle name={info.name || 'NFT collection'} spacer={false} />
-      <button type="button" className={styles.collection__back} onClick={() => router.back()}>
-        <CaretLeftIcon size={16} />
-        Back
-      </button>
 
-      <CollectionHeader chainId={chainId} chainInfo={chainInfo} address={collection} info={info} />
+      <CollectionHeader
+        chainId={chainId}
+        chainInfo={chainInfo}
+        address={collection}
+        info={info}
+        stats={stats}
+        onRefresh={handleRefreshCollection}
+        isRefreshing={isRefreshing}
+      />
 
       {/* Above the market, because what you already hold is the more immediate thing —
           renders nothing at all when disconnected or holding none here */}
@@ -170,25 +186,18 @@ export default function CollectionView({ networkId, address }) {
           </div>
 
           <div className={styles.collection__tools}>
-            <TraitFilter
-              traits={traitFacets.traits}
-              selected={traits}
-              onChange={setTraits}
-              isLoading={traitFacets.isLoading}
-              listed={traitFacets.listed}
-              resolved={traitFacets.resolved}
-            />
-
-            <button
-              type="button"
-              className={styles.collection__tool}
-              onClick={handleRefreshCollection}
-              disabled={isRefreshing}
-              title="Re-read the collection's banner, description, links and every NFT from the blockchain"
-            >
-              <ArrowsClockwiseIcon size={14} className={clsx(isRefreshing && styles['collection__tool--spinning'])} />
-              Refresh collection
-            </button>
+            {/* Traits filter listings; the browse tab shows tokens whether or not they were
+                ever listed, so the panel would claim a scope it doesn't have */}
+            {!isBrowsingCollection && (
+              <TraitFilter
+                traits={traitFacets.traits}
+                selected={traits}
+                onChange={setTraits}
+                isLoading={traitFacets.isLoading}
+                listed={traitFacets.listed}
+                resolved={traitFacets.resolved}
+              />
+            )}
 
             {/* The market grid's full funnel (price, currency, seller) pre-filtered to
                 this collection */}
@@ -201,7 +210,7 @@ export default function CollectionView({ networkId, address }) {
 
         {/* Applied traits, each removable on its own — the panel behind the funnel is where
             they were picked, but a filtered grid has to show what is filtering it */}
-        {traits.length > 0 && (
+        {traits.length > 0 && !isBrowsingCollection && (
           <div className={styles.collection__chips}>
             {traits.map((trait) => (
               <button
@@ -223,7 +232,16 @@ export default function CollectionView({ networkId, address }) {
           </div>
         )}
 
-        {isLoading ? (
+        {isBrowsingCollection ? (
+          <CollectionBrowser
+            chainId={chainId}
+            collection={collection}
+            collectionName={info.name}
+            isLsp8={info.isLsp8}
+            totalSupply={info.totalSupply}
+            chainInfo={chainInfo}
+          />
+        ) : isLoading ? (
           <div className={styles.collection__grid}>
             {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
             {Array.from({ length: 12 }).map((_, i) => (
@@ -246,7 +264,7 @@ export default function CollectionView({ networkId, address }) {
           </div>
         )}
 
-        {hasMore && !isLoading && (
+        {hasMore && !isLoading && !isBrowsingCollection && (
           <div className={styles.collection__loadMoreWrap}>
             <button type="button" className={styles.collection__loadMore} onClick={loadMore} disabled={isFetchingMore}>
               {isFetchingMore ? 'Loading...' : 'Load more'}

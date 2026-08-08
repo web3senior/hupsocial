@@ -1,0 +1,162 @@
+// The whole-collection token grid. Tiles borrow the OwnedTokens shape (art over caption) at
+// the listing grid's density; the coverage line above the grid is the view's honesty label
+// and stays in muted ink so the artwork carries the page.
+.browser {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__coverage {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+  }
+
+  &__item {
+    position: relative; // Anchors the price badge over the artwork
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--background);
+    color: inherit;
+    text-decoration: none;
+
+    // Only listed tokens render as links, so the affordance can live on the selector itself
+    &:is(a):hover {
+      border-color: var(--text-muted);
+    }
+  }
+
+  &__art {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--surface);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__artFallback {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: var(--surface);
+  }
+
+  // What the token is asking right now — the one saturated mark on an unlisted-heavy grid,
+  // and the visible difference between a tile that goes somewhere and one on display
+  &__price {
+    position: absolute;
+    bottom: 0.4rem;
+    left: 0.4rem;
+    max-width: calc(100% - 0.8rem);
+    overflow: hidden;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: var(--network-color-primary);
+    color: var(--network-color-text);
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__caption {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 0 0.125rem 0.125rem;
+  }
+
+  &__name {
+    color: var(--color);
+    font-size: 0.85rem;
+    font-weight: 500;
+    // Collection-controlled strings, so never let one widen the grid column
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tokenId {
+    color: var(--gray-400);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__skeleton {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: browserGridPulse 1.4s ease-in-out infinite;
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 3rem 1rem;
+    color: var(--text-muted, #888);
+    text-align: center;
+  }
+
+  &__loadMoreWrap {
+    display: flex;
+    justify-content: center;
+    padding-block-start: 0.5rem;
+  }
+
+  &__loadMore {
+    padding: 0.6rem 1.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--text-muted);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+  }
+
+  @media (max-width: 640px) {
+    &__grid {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+  }
+}
+
+@keyframes browserGridPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}

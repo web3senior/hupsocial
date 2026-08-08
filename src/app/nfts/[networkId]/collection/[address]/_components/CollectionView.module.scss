@@ -3,17 +3,6 @@
   flex-direction: column;
   gap: 1.25rem;
 
-  &__back {
-    all: unset;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: var(--font-size-14, 0.875rem);
-    font-weight: 600;
-    align-self: flex-start;
-  }
-
   &__market {
     display: flex;
     flex-direction: column;
@@ -88,10 +77,6 @@
     &:disabled {
       cursor: progress;
       opacity: 0.7;
-    }
-
-    &--spinning {
-      animation: collectionRefreshSpin 0.9s linear infinite;
     }
   }
 
@@ -206,6 +191,14 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
+
+  // Four across on a wide container, like the market grid — the tiles carry a name, a price
+  // and a chain icon, which stay legible down to a quarter of this column
+  @media (min-width: 900px) {
+    &__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
 }
 
 @keyframes collectionGridPulse {
@@ -216,11 +209,5 @@
 
   50% {
     opacity: 0.45;
-  }
-}
-
-@keyframes collectionRefreshSpin {
-  to {
-    transform: rotate(360deg);
   }
 }
