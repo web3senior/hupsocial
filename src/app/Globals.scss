@@ -229,7 +229,7 @@ body {
   // Colors are set on the `html, body` rule above, not repeated here — html has to carry them
   // so the overscroll area past the end of the page is painted too.
   //
-  // --font-sans resolves to the Inter that app/layout.jsx self-hosts through next/font; no
+  // --font-sans resolves to the Archivo that app/layout.jsx self-hosts through next/font; no
   // !important needed, since this is the only font-family declaration on body in the app.
   font-family: var(--font-sans);
   font-size: var(--system-16-font-size);

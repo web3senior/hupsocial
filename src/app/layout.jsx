@@ -1,15 +1,19 @@
-import { Inter } from 'next/font/google'
+import { Archivo } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
 import './Globals.scss'
 import './../styles/Global.scss'
 
+// Archivo stands in for X's Chirp, which is licensed and can't be self-hosted — same
+// grotesque lineage, tall x-height, slightly narrow. It's a variable font, so no `weight`
+// is passed; only the wght axis ships by default, leaving wdth out to keep the file small.
+//
 // Self-hosted by next/font, so no request ever leaves for Google. The variable is named
-// --font-inter rather than --font-sans because next/font declares it through a class on
+// --font-archivo rather than --font-sans because next/font declares it through a class on
 // <html>, and a class ties :root on specificity — which of the two won would come down to
 // stylesheet injection order. --font-sans consumes this one in abstract/_variables.scss,
 // keeping the system stack behind it as the fallback.
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
+const archivo = Archivo({ subsets: ['latin'], variable: '--font-archivo', display: 'swap' })
 
 export const metadata = {
   // Base URL for absolute paths
@@ -108,7 +112,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" className={archivo.variable} suppressHydrationWarning>
       <body>
         <ServiceWorkerRegistry />
         <ClientLayout>{children}</ClientLayout>

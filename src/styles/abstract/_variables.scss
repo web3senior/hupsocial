@@ -300,11 +300,11 @@ $secondary-color: #9e481d;
   // Don't add sibling sans tokens; the old --font-family-system / --ff-sans / --ff-segoe
   // duplicates were removed on purpose.
   //
-  // --font-inter is declared by next/font in app/layout.jsx and self-hosted; everything after
+  // --font-archivo is declared by next/font in app/layout.jsx and self-hosted; everything after
   // it is the fallback chain, which also covers the paint before the file lands. The inline
   // ui-sans-serif fallback inside var() matters: an undefined custom property with no fallback
   // invalidates the whole font-family declaration rather than just skipping that one entry.
-  --font-sans: var(--font-inter, ui-sans-serif), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+  --font-sans: var(--font-archivo, ui-sans-serif), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
     "Segoe UI Symbol", "Noto Color Emoji";
   --font-mono: "InputMono-Regular", monospace;
   --font-family-serif: ui-serif, New York Small, New York, Georgia, Times New Roman, Times, serif;
