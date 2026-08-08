@@ -212,6 +212,11 @@ details[open]::details-content {
 html {
   scroll-behavior: smooth;
   overflow: hidden scroll;
+  // Keeps the scrollbar's track reserved when something locks the page (lib/scrollLock.js
+  // flips overflow-y to hidden). Without it the track is reclaimed, documentElement gets
+  // wider, and both the page and the position:fixed header jog sideways as a modal opens.
+  // A no-op while unlocked, since `overflow: hidden scroll` already shows the scrollbar.
+  scrollbar-gutter: stable;
   min-height: 100%;
 }
 
@@ -221,13 +226,15 @@ html {
 // }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-family-system) !important;
+  // Colors are set on the `html, body` rule above, not repeated here — html has to carry them
+  // so the overscroll area past the end of the page is painted too.
+  //
+  // --font-sans resolves to the Inter that app/layout.jsx self-hosts through next/font; no
+  // !important needed, since this is the only font-family declaration on body in the app.
+  font-family: var(--font-sans);
   font-size: var(--system-16-font-size);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  // cursor: url('./../public/awesome-face.cur') 4 12, auto;
 }
 
 a {

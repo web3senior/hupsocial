@@ -1,7 +1,15 @@
+import { Inter } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
 import './Globals.scss'
 import './../styles/Global.scss'
+
+// Self-hosted by next/font, so no request ever leaves for Google. The variable is named
+// --font-inter rather than --font-sans because next/font declares it through a class on
+// <html>, and a class ties :root on specificity — which of the two won would come down to
+// stylesheet injection order. --font-sans consumes this one in abstract/_variables.scss,
+// keeping the system stack behind it as the fallback.
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 
 export const metadata = {
   // Base URL for absolute paths
@@ -100,10 +108,9 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body>
         <ServiceWorkerRegistry />
-
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
