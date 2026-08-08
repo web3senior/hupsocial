@@ -51,7 +51,8 @@ import TradeCard from './TradeCard'
 import PredictCard from './PredictCard'
 import MiniAppEmbed from './MiniAppEmbed'
 import NewPost from './NewPost'
-import { checkIsEnglish } from '@/lib/languageHelper'
+import { shouldOfferTranslation } from '@/lib/languageHelper'
+import { usePreferredLanguage } from '@/hooks/usePreferredLanguage'
 import Like from './ui/Like'
 import CommentAction from './ui/CommentAction'
 import Repost from './ui/Repost'
@@ -1206,11 +1207,16 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
   const [canShowMore, setCanShowMore] = useState(false)
 
   // Verify language profile to optimize translation button visibility using external helper
-  const isEnglish = useMemo(() => checkIsEnglish(sourceText), [sourceText])
+  const canTranslate = useMemo(() => shouldOfferTranslation(sourceText, preferredLanguage), [sourceText, preferredLanguage])
 
-  // Execute external translation pipeline via cached hooks infrastructure
+  // Execute external translation pipeline via cached hooks infrastructure. The target
+  // language is part of the SWR key, so switching it in Settings re-translates and caches
+  // each language separately instead of serving the previous one.
+  // The reader's own choice from Settings → Language, defaulting to their browser language
+  const preferredLanguage = usePreferredLanguage()
+
   const { data: translatedText, isValidating: isTranslating } = useSWR(
-    showTranslation && sourceText ? [sourceText, 'en'] : null,
+    showTranslation && sourceText ? [sourceText, preferredLanguage] : null,
     translationFetcher,
     {
       revalidateOnFocus: false,
@@ -1273,8 +1279,8 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
         </button>
       )}
 
-      {/* Conditionally suppress translation controls if the original content is English */}
-      {!isEnglish && (
+      {/* Conditionally suppress translation controls if the post already reads in the chosen language */}
+      {canTranslate && (
         <div className="flex align-items-center mt-2" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"

@@ -2,13 +2,15 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AtIcon, BroadcastIcon, CaretLeftIcon, CaretRightIcon, FadersHorizontalIcon, FadersIcon, KeyIcon, LockIcon, PaperPlaneTiltIcon, ProhibitIcon, QuestionIcon, UserCheckIcon, UserMinusIcon, WalletIcon } from '@phosphor-icons/react'
+import { AtIcon, BroadcastIcon, CaretLeftIcon, CaretRightIcon, FadersHorizontalIcon, FadersIcon, GlobeIcon, KeyIcon, LockIcon, PaperPlaneTiltIcon, ProhibitIcon, QuestionIcon, UserCheckIcon, UserMinusIcon, WalletIcon } from '@phosphor-icons/react'
 import styles from './SettingsNav.module.scss'
 import InAppWallet from './InAppWallet'
 import SecurityVault from './SecurityVault'
+import LanguagePreference from './LanguagePreference'
 import PushNotificationManager from '@/components/ui/PushNotificationManager'
 
-const VALID_TABS = ['security', 'in-app-wallet', 'notification']
+// The tabs that render a real pane — everything else in navItems is a disabled placeholder
+const VALID_TABS = ['security', 'in-app-wallet', 'notification', 'language']
 
 export default function SettingsNav() {
   // Deep-linkable: other pages send users here with /settings?tab=security instead of
@@ -40,6 +42,12 @@ export default function SettingsNav() {
       desc: 'Get notifications',
       label: 'Push Notification',
       icon: <LockIcon size={20} />,
+    },
+    {
+      id: 'language',
+      label: 'Language',
+      desc: 'Pick the language posts are translated into.',
+      icon: <GlobeIcon size={20} />,
     },
         {
       id: 'privacy',
@@ -128,6 +136,7 @@ export default function SettingsNav() {
         {activeTab === 'security' && <SecurityVault />}
         {activeTab === 'in-app-wallet' && <InAppWallet onOpenSecurity={() => handleTabSelect('security')} />}
         {activeTab === 'notification' && <PushNotificationManager />}
+        {activeTab === 'language' && <LanguagePreference />}
 
         <div className={styles.subMenuList}>
           {subMenuContent[activeTab]?.map((subItem) => (
@@ -148,7 +157,8 @@ export default function SettingsNav() {
               </div>
             </button>
           ))}
-          {!subMenuContent[activeTab] && <div className={styles.emptyState}>Content for this tab is coming soon.</div>}
+          {/* Tabs that render their own pane above are already showing content, so the placeholder is only for the disabled ones */}
+          {!subMenuContent[activeTab] && !VALID_TABS.includes(activeTab) && <div className={styles.emptyState}>Content for this tab is coming soon.</div>}
         </div>
       </main>
     </div>
