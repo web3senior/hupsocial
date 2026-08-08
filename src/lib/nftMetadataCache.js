@@ -14,7 +14,7 @@
 
 import pool from '@/lib/db'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
-import { resolveNftMetadata } from '@/lib/nftMetadata'
+import { resolveNftMetadata, tokenExists } from '@/lib/nftMetadata'
 import { isLuksoIndexerChain, fetchLuksoTokenMetadata } from '@/lib/luksoIndexer'
 import { mapWithConcurrency } from '@/lib/concurrency'
 
@@ -140,6 +140,16 @@ const writeRow = async (key, isLsp8, metadata) => {
   )
 }
 
+// Rows are normally never deleted — the set only grows. The exception is a row that turned
+// out not to be a token of this collection at all; see the sweep at the bottom of the file.
+const deleteRow = async (key) => {
+  await pool.execute(`DELETE FROM nft_metadata_cache WHERE network_id = ? AND collection = ? AND token_id = ?`, [
+    key.networkId,
+    key.collection,
+    key.tokenId,
+  ])
+}
+
 // Restarts the backoff clock without touching the row's contents, so a re-resolution that
 // came back empty can't demote artwork we already have.
 const touchRow = async (key) => {
@@ -241,6 +251,16 @@ export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, bas
     return { metadata: rowToMetadata(row), cached: true }
   }
 
+  // This table doubles as the collection browse's token list — every row in it is presented as
+  // part of the collection. Metadata alone can't tell a token from a typo (the LSP8 fallback
+  // describes the collection for any id you ask about), so previewing a mistyped id in the sell
+  // modal would otherwise plant a permanent ghost on somebody's collection page. Only the
+  // ambiguous resolutions pay for the ownership read: a token-specific document is proof enough,
+  // and a row that already exists isn't being introduced by this read.
+  if (!row && metadata.source !== 'token' && (await tokenExists({ publicClient, collection: key.collection, tokenId, isLsp8 })) === false) {
+    return { metadata, cached: false }
+  }
+
   try {
     await writeRow(key, isLsp8, metadata)
   } catch (error) {
@@ -338,13 +358,17 @@ export const getCollectionModelStats = async ({ chainId, collection }) => {
  * each call is guaranteed to advance, because every row it touches gets a new fetched_at even
  * when the re-read failed.
  *
+ * It is also the cache's only garbage collection: a row whose token has no owner onchain is
+ * deleted rather than re-read, which is what takes a burned token — or an id that was cached
+ * from a mistyped preview and never existed — back out of the collection's browse grid.
+ *
  * @param {Object} params
  * @param {number|string} params.chainId Chain the collection lives on.
  * @param {string} params.collection NFT contract address.
  * @param {string} [params.baseUrl] Absolute origin, for resolving proxy-relative storage URLs.
- * @returns {Promise<{total: number, processed: number, refreshed: number, failed: number, remaining: number}>}
- * `total` counts every cached token in the collection; `remaining` counts those still stale
- * after this batch.
+ * @returns {Promise<{total: number, processed: number, refreshed: number, removed: number,
+ * failed: number, remaining: number}>} `total` counts every cached token in the collection
+ * (before this batch's removals); `remaining` counts those still stale after it.
  */
 export const refreshCollectionMetadata = async ({ chainId, collection, baseUrl }) => {
   const networkId = Number(chainId)
@@ -366,7 +390,7 @@ export const refreshCollectionMetadata = async ({ chainId, collection, baseUrl }
   const total = Number(counts?.total) || 0
   const pending = Number(counts?.pending) || 0
 
-  if (pending === 0) return { total, processed: 0, refreshed: 0, failed: 0, remaining: 0 }
+  if (pending === 0) return { total, processed: 0, refreshed: 0, removed: 0, failed: 0, remaining: 0 }
 
   const [rows] = await pool.execute(
     `SELECT token_id, is_lsp8
@@ -377,7 +401,27 @@ export const refreshCollectionMetadata = async ({ chainId, collection, baseUrl }
     [networkId, address, COLLECTION_REFRESH_BATCH],
   )
 
+  const publicClient = getServerPublicClient(networkId)
+
   const results = await mapWithConcurrency(rows, COLLECTION_REFRESH_CONCURRENCY, async (row) => {
+    const key = { networkId, collection: address, tokenId: String(row.token_id).toLowerCase() }
+
+    // The sweep is also the collection's chance to shed rows that were never its tokens — an id
+    // resolved once from a typo, or a token burned since it was cached. Nothing else takes them
+    // out, and the browse grid presents every row here as part of the collection. Only a
+    // definite "no owner" removes anything; an RPC that simply didn't answer leaves the row be.
+    if (publicClient) {
+      const exists = await tokenExists({ publicClient, collection: address, tokenId: row.token_id, isLsp8: Boolean(row.is_lsp8) })
+      if (exists === false) {
+        try {
+          await deleteRow(key)
+          return 'removed'
+        } catch (error) {
+          console.warn('[nft-metadata-cache] ghost row delete failed for token', row.token_id, '-', error.message)
+        }
+      }
+    }
+
     try {
       const result = await getNftMetadata({
         chainId: networkId,
@@ -397,20 +441,22 @@ export const refreshCollectionMetadata = async ({ chainId, collection, baseUrl }
     // and the sweep would never move past it. Stamping it here backs a dead contract or
     // unreachable gateway off with everything else instead of blocking the collection.
     try {
-      await touchRow({ networkId, collection: address, tokenId: String(row.token_id).toLowerCase() })
+      await touchRow(key)
     } catch (error) {
       console.warn('[nft-metadata-cache] collection refresh touch failed:', error.message)
     }
     return false
   })
 
-  const refreshed = results.filter(Boolean).length
+  const refreshed = results.filter((result) => result === true).length
+  const removed = results.filter((result) => result === 'removed').length
 
   return {
     total,
     processed: rows.length,
     refreshed,
-    failed: rows.length - refreshed,
+    removed,
+    failed: rows.length - refreshed - removed,
     remaining: Math.max(0, pending - rows.length),
   }
 }

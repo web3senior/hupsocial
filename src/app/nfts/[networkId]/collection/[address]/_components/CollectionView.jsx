@@ -50,6 +50,10 @@ export default function CollectionView({ networkId, address }) {
   const stats = useCollectionStats({ chainId, collection, chainInfo })
 
   const [status, setStatus] = useState('active')
+  // Bumped after a sweep, to remount the browse grid. Its token list is a plain fetch, not an
+  // SWR key, so a sweep that dropped rows for tokens that don't exist would otherwise keep
+  // showing them until a reload — the one refresh outcome the user can actually see.
+  const [browseKey, setBrowseKey] = useState(0)
   // [{label, value}] — values sharing a label widen the result, different labels narrow it.
   // The server does the matching against cached token metadata; see the traits API route.
   const [traits, setTraits] = useState([])
@@ -140,6 +144,7 @@ export default function CollectionView({ networkId, address }) {
       await info.refresh()
       const result = await collectionRefresh.refresh()
       if (!result) return
+      if (result.removed > 0) setBrowseKey((key) => key + 1)
       toast(...describeCollectionRefresh(result))
     } catch (error) {
       toast(error.message || 'Could not refresh the collection', 'error')
@@ -234,6 +239,7 @@ export default function CollectionView({ networkId, address }) {
 
         {isBrowsingCollection ? (
           <CollectionBrowser
+            key={browseKey}
             chainId={chainId}
             collection={collection}
             collectionName={info.name}

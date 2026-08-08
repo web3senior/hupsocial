@@ -57,7 +57,9 @@ export const displayTokenId = (raw) => {
   if (!value.startsWith('0x')) return value
   try {
     const asNumber = BigInt(value)
-    if (asNumber > 0n && asNumber < 10n ** 12n) return asNumber.toString()
+    // Zero is a token id like any other. Excluding it printed a collection's token 0 as a
+    // shortened bytes32 — "0x0000…0000" — which reads as a broken row rather than a number.
+    if (asNumber < 10n ** 12n) return asNumber.toString()
   } catch {
     // Falls through to the shortened form
   }

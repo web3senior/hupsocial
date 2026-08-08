@@ -5,7 +5,7 @@
  * path in hooks/useNftMetadata), so both tiers agree on what a token's artwork is.
  */
 
-import { hexToString } from 'viem'
+import { ContractFunctionRevertedError, ExecutionRevertedError, hexToString, zeroAddress } from 'viem'
 import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, decodeVerifiableUri, pickLsp4Image, fetchMetadataJson } from '@/lib/lsp4'
 import { resolveStorageUrl } from '@/lib/storageHelper'
 
@@ -50,6 +50,63 @@ export const lsp8MetadataAbi = [
     outputs: [{ name: '', type: 'bytes' }],
   },
 ]
+
+// Ownership is the one question both standards answer identically, and the only one that
+// distinguishes a token from an id somebody made up: an id that was never minted has no owner.
+export const nftOwnerAbi = [
+  {
+    type: 'function',
+    name: 'ownerOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'tokenOwnerOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+]
+
+/**
+ * Whether a token id actually exists in its collection.
+ *
+ * Metadata cannot answer this. An id that was never minted still resolves to something —
+ * resolveNftMetadata's last LSP8 tier is the collection's own document, which describes the
+ * collection whatever id you hand it, and an ERC721 tokenURI is free to serve anything. Only
+ * ownership is a statement about the token itself, and both standards revert when there is
+ * no owner to name.
+ *
+ * Three-valued on purpose: a timed-out or rate-limited RPC is not evidence of absence, and
+ * callers use this to decide what to cache and what to delete.
+ *
+ * @param {Object} params
+ * @param {Object} params.publicClient viem client already bound to the right chain.
+ * @param {string} params.collection NFT contract address.
+ * @param {string} params.tokenId bytes32 hex for LSP8, decimal/bigint-ish for ERC721.
+ * @param {boolean} params.isLsp8 True for LSP8 collections, false for ERC721.
+ * @returns {Promise<boolean|null>} true or false when the chain answered, null when it didn't.
+ */
+export const tokenExists = async ({ publicClient, collection, tokenId, isLsp8 }) => {
+  try {
+    const owner = await publicClient.readContract({
+      abi: nftOwnerAbi,
+      address: collection,
+      functionName: isLsp8 ? 'tokenOwnerOf' : 'ownerOf',
+      args: [isLsp8 ? tokenId : BigInt(tokenId)],
+    })
+    // Reverting is the standard behaviour, but an ERC721 that hands back the zero address
+    // instead is saying the same thing
+    return owner !== zeroAddress
+  } catch (error) {
+    // A revert IS an answer. Anything else — a transport failure, a contract with no such
+    // getter, an id that isn't even a number — leaves the question open.
+    const reverted = error?.walk?.((cause) => cause instanceof ContractFunctionRevertedError || cause instanceof ExecutionRevertedError)
+    return reverted ? false : null
+  }
+}
 
 /**
  * True when an image reference carries its bytes inline rather than pointing at storage.

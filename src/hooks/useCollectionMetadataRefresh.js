@@ -22,9 +22,10 @@ const MAX_ROUNDS = 25
  * @param {number|string} params.chainId Chain the collection lives on.
  * @param {string} params.collection NFT contract address.
  * @returns {{refresh: Function, isRefreshing: boolean, progress: {done: number, total: number}|null}}
- * `refresh` resolves to {total, done, failed, remaining} — `total` is how many tokens of this
- * collection are cached, `done` how many this run re-read. It resolves to null when the inputs
- * are incomplete or a sweep is already running.
+ * `refresh` resolves to {total, done, failed, removed, remaining} — `total` is how many tokens
+ * of this collection are cached, `done` how many this run re-read, `removed` how many rows it
+ * dropped because the token has no owner onchain. It resolves to null when the inputs are
+ * incomplete or a sweep is already running.
  */
 export default function useCollectionMetadataRefresh({ chainId, collection }) {
   const { mutate } = useSWRConfig()
@@ -44,6 +45,7 @@ export default function useCollectionMetadataRefresh({ chainId, collection }) {
     try {
       let done = 0
       let failed = 0
+      let removed = 0
       let summary = null
 
       for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -51,6 +53,7 @@ export default function useCollectionMetadataRefresh({ chainId, collection }) {
         summary = result
         done += result.processed
         failed += result.failed
+        removed += result.removed || 0
         setProgress({ done, total: done + result.remaining })
         // A batch that processed nothing means the cooldown holds every remaining row — there
         // is no point spinning through the rest of the rounds to be told the same thing.
@@ -62,7 +65,7 @@ export default function useCollectionMetadataRefresh({ chainId, collection }) {
         (key) => Array.isArray(key) && key[0] === 'nft-metadata' && Number(key[1]) === Number(chainId) && key[2] === address,
       )
 
-      return { total: summary?.total ?? 0, done, failed, remaining: summary?.remaining ?? 0 }
+      return { total: summary?.total ?? 0, done, failed, removed, remaining: summary?.remaining ?? 0 }
     } finally {
       isRunningRef.current = false
       setIsRefreshing(false)
@@ -83,9 +86,15 @@ export const describeCollectionRefresh = (result) => {
   if (result.done === 0) return ['This collection was refreshed a moment ago', 'error']
 
   const noun = result.done === 1 ? 'NFT' : 'NFTs'
-  if (result.remaining > 0) return [`Refreshed ${result.done} ${noun} — ${result.remaining} still to go`, 'success']
 
-  return [`Refreshed ${result.done} ${noun} in this collection`, 'success']
+  // Dropping a row changes what the collection contains, not just how fresh it looks — that
+  // earns its own clause rather than being folded into the refreshed count
+  const dropped =
+    result.removed > 0 ? `, dropped ${result.removed} ${result.removed === 1 ? 'token that no longer exists' : 'tokens that no longer exist'}` : ''
+
+  if (result.remaining > 0) return [`Refreshed ${result.done} ${noun}${dropped} — ${result.remaining} still to go`, 'success']
+
+  return [`Refreshed ${result.done} ${noun} in this collection${dropped}`, 'success']
 }
 
 /** Button label for a sweep in flight, counting up as batches land. */
