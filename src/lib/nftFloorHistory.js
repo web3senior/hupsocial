@@ -107,22 +107,26 @@ function buildSaleSeries(sales) {
   for (const sale of sales) {
     const date = dayKey(sale.sold_at)
     const price = BigInt(sale.price)
-    const entry = byDay.get(date) || { date, count: 0, sum: 0n, low: price, high: price }
+    const entry = byDay.get(date) || { date, count: 0, sum: 0n, low: price, high: price, trades: [] }
 
     entry.count += 1
     entry.sum += price
     if (price < entry.low) entry.low = price
     if (price > entry.high) entry.high = price
+    // The individual settlements behind the day's aggregate, so a marker can link back to
+    // the NFT that traded rather than dead-ending on an average
+    entry.trades.push({ listing_id: sale.listing_id, token_id: sale.token_id, price: sale.price, sold_at: sale.sold_at })
     byDay.set(date, entry)
   }
 
   // Rows arrive ordered by sold_at and Map keeps insertion order, so this comes out chronological
-  return Array.from(byDay.values(), ({ date, count, sum, low, high }) => ({
+  return Array.from(byDay.values(), ({ date, count, sum, low, high, trades }) => ({
     date,
     count,
     avg: (sum / BigInt(count)).toString(),
     low: low.toString(),
     high: high.toString(),
+    trades,
   }))
 }
 
@@ -191,7 +195,7 @@ export async function getFloorHistory({
   const salesByCollection = new Map()
   if (withSales) {
     const [saleRows] = await pool.execute(
-      `SELECT t.network_id, t.collection, t.payment_token, t.sold_at,
+      `SELECT t.network_id, t.collection, t.listing_id, t.token_id, t.payment_token, t.sold_at,
               CAST(t.price AS CHAR) AS price, st.symbol, st.decimals
          FROM nft_trades t
          LEFT JOIN store_tokens st ON st.network_id = t.network_id AND st.token = t.payment_token
@@ -205,6 +209,10 @@ export async function getFloorHistory({
       const key = `${row.network_id}-${row.collection}`
       if (!salesByCollection.has(key)) salesByCollection.set(key, [])
       salesByCollection.get(key).push({
+        // listing_id is the sale's address in the app — /nfts/[networkId]/[listingId] is the
+        // page the settled listing still renders on, so it is what a chart marker links to
+        listing_id: Number(row.listing_id),
+        token_id: row.token_id,
         payment_token: row.payment_token,
         sold_at: Number(row.sold_at),
         price: row.price,
@@ -277,7 +285,15 @@ export async function getFloorHistory({
             sales: buildSaleSeries(quotedSales),
             // Bounded by the window like everything else here, so this going null on a short
             // range is itself the answer: nothing traded in those days
-            last_sale: latest ? { date: dayKey(latest.sold_at), sold_at: latest.sold_at, price: latest.price } : null,
+            last_sale: latest
+              ? {
+                  date: dayKey(latest.sold_at),
+                  sold_at: latest.sold_at,
+                  price: latest.price,
+                  listing_id: latest.listing_id,
+                  token_id: latest.token_id,
+                }
+              : null,
           }
         : {}),
     }

@@ -113,6 +113,16 @@
     small {
       font-size: var(--font-size-10, 10px);
     }
+
+    // As a link it keeps the exact same ink as the text form — the underline on hover is
+    // the affordance, not a hue that would compete with the floor number beside it
+    &--link {
+      text-decoration: none;
+
+      &:hover strong {
+        text-decoration: underline;
+      }
+    }
   }
 
   &__controls {
@@ -324,5 +334,132 @@
     margin-inline-start: 0.25rem;
     color: var(--text-muted);
     font-size: var(--font-size-10, 10px);
+  }
+
+  // The last tooltip line: an instruction, quieter even than the labels above it
+  &__tooltipHint {
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+    font-style: italic;
+  }
+
+  // The marker's interactive shell — the SVG group around the diamond and its hit circle
+  &__saleHit {
+    cursor: pointer;
+    outline: none;
+
+    &:focus-visible circle {
+      stroke: var(--chart-sale);
+      stroke-width: 1.5;
+    }
+  }
+
+  // A sold cell that goes somewhere: same ink and figures as its plain siblings, the
+  // underline carrying the difference. One class covers the Link and the picker button.
+  &__tableSale {
+    display: inline-flex;
+    align-items: baseline;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-decoration: underline;
+    text-decoration-color: var(--text-muted);
+    text-underline-offset: 2px;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration-color: var(--text);
+    }
+  }
+
+  // The multi-sale day's picker. NativeDialog owns centering and modality; everything the
+  // eye sees is styled here, on the open state only.
+  &__salesDialog {
+    &[open] {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      width: min(320px, calc(100vw - 2rem));
+      padding: 0.9rem 1rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background-color: var(--surface);
+      color: var(--text);
+    }
+  }
+
+  &__salesHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  &__salesTitle {
+    margin: 0;
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 700;
+  }
+
+  &__salesClose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--hover);
+      color: var(--text);
+    }
+  }
+
+  &__salesList {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: 260px;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
+  &__salesItem {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.4rem 0.2rem;
+    border-block-end: 1px solid var(--border);
+    color: var(--text);
+    font-size: var(--font-size-12, 0.78rem);
+    text-decoration: none;
+
+    &:hover {
+      background-color: var(--hover);
+    }
+  }
+
+  &__salesToken {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  &__salesPrice {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__salesTime {
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+    font-variant-numeric: tabular-nums;
   }
 }

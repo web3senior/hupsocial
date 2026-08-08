@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import clsx from 'clsx'
 import { formatUnits } from 'viem'
 import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts'
-import { CaretDownIcon, CaretUpIcon, ChartLineIcon, MinusIcon, TableIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, CaretUpIcon, ChartLineIcon, MinusIcon, TableIcon, XIcon } from '@phosphor-icons/react'
 import { getNftCollectionHistory } from '@/lib/api'
 import { formatStake } from '@/hooks/useStakeToken'
+import { displayTokenId } from '@/lib/walletNfts'
+import NativeDialog from '@/components/ui/NativeDialog'
 import styles from './FloorChart.module.scss'
 
 const RANGES = [
@@ -22,6 +26,7 @@ const DEFAULT_RANGE = 30
 const SALE_RADIUS = 4.5
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: 'numeric' })
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 2 })
 const percent = new Intl.NumberFormat(undefined, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 })
 
@@ -58,6 +63,12 @@ function FloorTooltip({ active, payload, label, symbol }) {
             : `Sold ${compact.format(row.sale)} ${symbol}`}
         </span>
       )}
+
+      {/* The diamond is a doorway now, but nothing about a diamond says so — one muted line
+          here is what makes the affordance discoverable without decorating the plot */}
+      {hasSale && row.saleTrades?.length > 0 && (
+        <span className={styles.chart__tooltipHint}>{row.saleCount > 1 ? 'Click the marker to see each sale' : 'Click the marker to open the NFT'}</span>
+      )}
     </div>
   )
 }
@@ -65,17 +76,49 @@ function FloorTooltip({ active, payload, label, symbol }) {
 /**
  * A settled trade, as a diamond over the floor line. Shape carries the distinction, not hue
  * alone, so the two series stay apart in greyscale and under CVD.
+ *
+ * Also the doorway to the sale itself: activating it hands the day's row to `onOpen`, which
+ * either navigates to the sold NFT's listing page or, on a multi-sale day, opens the picker.
+ * The transparent circle underneath is the hit target — a 9px diamond is a caret, not a
+ * button, and the extra radius costs the plot nothing visible.
  */
-function SaleMarker({ cx, cy }) {
+function SaleMarker({ cx, cy, payload, symbol, onOpen }) {
   if (cx === null || cx === undefined || cy === null || cy === undefined) return null
 
-  return (
+  const diamond = (
     <path
       d={`M${cx} ${cy - SALE_RADIUS}L${cx + SALE_RADIUS} ${cy}L${cx} ${cy + SALE_RADIUS}L${cx - SALE_RADIUS} ${cy}Z`}
       fill="var(--chart-sale)"
       stroke="var(--surface)"
       strokeWidth={1.5}
     />
+  )
+
+  // A payload without trades is a response from before the API carried them (or one still
+  // cached from then) — the marker stays a plain mark rather than a button that goes nowhere
+  if (!payload?.saleTrades?.length) return diamond
+
+  const label =
+    payload.saleCount > 1
+      ? `View the ${payload.saleCount} sales on ${formatDay(payload.date)}`
+      : `View the NFT that sold for ${compact.format(payload.sale)} ${symbol} on ${formatDay(payload.date)}`
+
+  return (
+    <g
+      className={styles.chart__saleHit}
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      onClick={() => onOpen(payload)}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onOpen(payload)
+      }}
+    >
+      <circle cx={cx} cy={cy} r={9} fill="transparent" />
+      {diamond}
+    </g>
   )
 }
 
@@ -101,11 +144,31 @@ function SaleMarker({ cx, cy }) {
  * symbol and decimals, which store_tokens does not always carry a row for.
  */
 export default function FloorChart({ chainId, collection, chainInfo }) {
+  const router = useRouter()
+
   const [days, setDays] = useState(DEFAULT_RANGE)
   const [history, setHistory] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasFailed, setHasFailed] = useState(false)
   const [showTable, setShowTable] = useState(false)
+  // The day whose sales the picker dialog is showing — null while it is closed
+  const [salesDay, setSalesDay] = useState(null)
+  const salesDialogRef = useRef(null)
+
+  useEffect(() => {
+    if (salesDay) salesDialogRef.current?.open()
+  }, [salesDay])
+
+  // One sale is one NFT, so the marker goes straight to its listing page; a multi-sale day
+  // has no single destination and opens the picker instead of guessing one
+  const handleOpenSales = (row) => {
+    if (!row?.saleTrades?.length) return
+    if (row.saleTrades.length === 1) {
+      router.push(`/nfts/${chainId}/${row.saleTrades[0].listing_id}`)
+      return
+    }
+    setSalesDay(row)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -158,6 +221,9 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
         saleCount: sale?.count ?? 0,
         saleLow: sale ? toNumber(sale.low) : null,
         saleHigh: sale ? toNumber(sale.high) : null,
+        // The settlements behind the aggregate, base units untouched — links and the picker
+        // format them with the row's own decimals rather than the plot's Numbers
+        saleTrades: sale?.trades ?? [],
       }
     })
   }, [history, decimals])
@@ -218,16 +284,26 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
               )}
 
               {/* Rendered on its own condition, so a collection whose listings have all aged
-                  out still gets to say what it last traded for */}
-              {lastSale && (
-                <span className={styles.chart__lastSale}>
-                  Last sale
-                  <strong>
-                    {formatStake(lastSale.price, decimals)} {symbol}
-                  </strong>
-                  <small>{formatDay(lastSale.date)}</small>
-                </span>
-              )}
+                  out still gets to say what it last traded for. Links to the NFT that traded
+                  when the payload names it — cached pre-listing_id responses fall back to text */}
+              {lastSale &&
+                (lastSale.listing_id ? (
+                  <Link href={`/nfts/${chainId}/${lastSale.listing_id}`} className={clsx(styles.chart__lastSale, styles['chart__lastSale--link'])}>
+                    Last sale
+                    <strong>
+                      {formatStake(lastSale.price, decimals)} {symbol}
+                    </strong>
+                    <small>{formatDay(lastSale.date)}</small>
+                  </Link>
+                ) : (
+                  <span className={styles.chart__lastSale}>
+                    Last sale
+                    <strong>
+                      {formatStake(lastSale.price, decimals)} {symbol}
+                    </strong>
+                    <small>{formatDay(lastSale.date)}</small>
+                  </span>
+                ))}
             </p>
           )}
         </div>
@@ -309,9 +385,26 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
                     <tr key={point.date}>
                       <th scope="row">{formatDay(point.date)}</th>
                       <td>{point.floor === null ? '—' : compact.format(point.floor)}</td>
+                      {/* The chart's marker is a doorway, so its text twin has to be one too:
+                          one sale links straight to the NFT, several open the same picker */}
                       <td>
-                        {point.sale === null ? '—' : compact.format(point.sale)}
-                        {point.saleCount > 1 && <small className={styles.chart__tableCount}>×{point.saleCount}</small>}
+                        {point.sale === null ? (
+                          '—'
+                        ) : point.saleTrades.length === 1 ? (
+                          <Link href={`/nfts/${chainId}/${point.saleTrades[0].listing_id}`} className={styles.chart__tableSale}>
+                            {compact.format(point.sale)}
+                          </Link>
+                        ) : point.saleTrades.length > 1 ? (
+                          <button type="button" className={styles.chart__tableSale} onClick={() => handleOpenSales(point)}>
+                            {compact.format(point.sale)}
+                            <small className={styles.chart__tableCount}>×{point.saleCount}</small>
+                          </button>
+                        ) : (
+                          <>
+                            {compact.format(point.sale)}
+                            {point.saleCount > 1 && <small className={styles.chart__tableCount}>×{point.saleCount}</small>}
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -361,12 +454,54 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
                 />
                 {/* After the line, so a sale that landed on the floor it cleared sits on top of
                     it rather than under it */}
-                <Scatter dataKey="sale" name="Sale" shape={<SaleMarker />} isAnimationActive={false} />
+                <Scatter dataKey="sale" name="Sale" shape={<SaleMarker symbol={symbol} onOpen={handleOpenSales} />} isAnimationActive={false} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
       )}
+
+      {/* The multi-sale day's picker: the marker plotted one average, this is the list of
+          actual settlements behind it, each a door to the NFT that traded */}
+      <NativeDialog
+        ref={salesDialogRef}
+        className={styles.chart__salesDialog}
+        lightDismiss
+        onClose={() => setSalesDay(null)}
+        aria-label={salesDay ? `Sales on ${formatDay(salesDay.date)}` : 'Sales'}
+      >
+        {salesDay && (
+          <>
+            <header className={styles.chart__salesHeader}>
+              <h4 className={styles.chart__salesTitle}>
+                {salesDay.saleCount} sales on {formatDay(salesDay.date)}
+              </h4>
+              <button
+                type="button"
+                className={styles.chart__salesClose}
+                onClick={() => salesDialogRef.current?.close()}
+                aria-label="Close"
+              >
+                <XIcon size={16} />
+              </button>
+            </header>
+
+            <ul className={styles.chart__salesList}>
+              {salesDay.saleTrades.map((trade) => (
+                <li key={trade.listing_id}>
+                  <Link href={`/nfts/${chainId}/${trade.listing_id}`} className={styles.chart__salesItem}>
+                    <span className={styles.chart__salesToken}>#{displayTokenId(trade.token_id)}</span>
+                    <strong className={styles.chart__salesPrice}>
+                      {formatStake(trade.price, decimals)} {symbol}
+                    </strong>
+                    <small className={styles.chart__salesTime}>{timeFormatter.format(new Date(trade.sold_at * 1000))}</small>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </NativeDialog>
     </section>
   )
 }

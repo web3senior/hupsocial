@@ -47,6 +47,23 @@ export const normalizeTokenId = (raw) => {
   }
 }
 
+/**
+ * The reverse direction, for labels: LSP8 ids are bytes32 and unreadable raw. Number-format
+ * collections pack a plain integer into those 32 bytes, so show the number when it looks like
+ * one and fall back to a shortened hex. Decimal ERC721 ids pass straight through.
+ */
+export const displayTokenId = (raw) => {
+  const value = String(raw)
+  if (!value.startsWith('0x')) return value
+  try {
+    const asNumber = BigInt(value)
+    if (asNumber > 0n && asNumber < 10n ** 12n) return asNumber.toString()
+  } catch {
+    // Falls through to the shortened form
+  }
+  return `${value.slice(0, 6)}…${value.slice(-4)}`
+}
+
 // Envio hands back UP-cloud CDN URLs, whose ?method/&data pair is a verification hash rather
 // than content selection — the CID alone identifies the artwork. That CDN silently ignores
 // ?width on animated GIFs (it returned the full 4.9MB ORBS file either way, and enough of those

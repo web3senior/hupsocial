@@ -4,26 +4,9 @@ import { useState } from 'react'
 import useOwnedTokenIds from '@/hooks/useOwnedTokenIds'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { useConnection } from 'wagmi'
-import { normalizeTokenId } from '@/lib/walletNfts'
+import { displayTokenId, normalizeTokenId } from '@/lib/walletNfts'
 import SendNftModal from '@/components/SendNftModal'
 import styles from './OwnedTokens.module.scss'
-
-/**
- * LSP8 ids are bytes32 and unreadable raw. Number-format collections pack a plain integer into
- * those 32 bytes, so show the number when it looks like one and fall back to a shortened hex —
- * the profile gallery gets a properly formatted id from the index, but onchain reads don't.
- */
-const displayTokenId = (raw) => {
-  const value = String(raw)
-  if (!value.startsWith('0x')) return value
-  try {
-    const asNumber = BigInt(value)
-    if (asNumber > 0n && asNumber < 10n ** 12n) return asNumber.toString()
-  } catch {
-    // Falls through to the shortened form
-  }
-  return `${value.slice(0, 6)}…${value.slice(-4)}`
-}
 
 function OwnedTile({ chainId, collection, collectionName, rawId, isLsp8, onSend }) {
   const meta = useNftMetadata({ chainId, collection, tokenId: rawId, isLsp8, imageWidth: 320, still: true })
