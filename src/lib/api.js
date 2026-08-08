@@ -100,7 +100,8 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
  * @param {Object} [filters]
  * @param {number|string} [filters.networkId]
  * @param {string} [filters.collection] Collection contract address.
- * @param {'active'|'sold'|'cancelled'|'all'} [filters.status]
+ * @param {'active'|'sold'|'active_sold'|'all'} [filters.status] Cancelled listings are never
+ * served — 'all' means everything still on the market (active + sold).
  * @param {'lsp8'|'erc721'} [filters.standard]
  * @param {'native'|string} [filters.token] Payment token address, or 'native'.
  * @param {string} [filters.minPrice] Base units (decimal string).
@@ -256,8 +257,8 @@ export const getNftCollectionInfo = async (networkId, address, isLsp8) => {
  * many have metadata cached) — the panel says so rather than implying the list is complete.
  * @param {string|number} networkId Chain the collection lives on.
  * @param {string} address Collection contract address.
- * @param {'active'|'sold'|'cancelled'|'active_sold'|'all'} [status] Scope the counts to the
- * same listing status the grid is showing; defaults to active.
+ * @param {'active'|'sold'|'active_sold'|'all'} [status] Scope the counts to the same listing
+ * status the grid is showing; defaults to active. Cancelled listings are never counted.
  */
 export const getNftCollectionTraits = async (networkId, address, status) => {
   const params = new URLSearchParams()

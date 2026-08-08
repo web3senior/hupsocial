@@ -22,12 +22,12 @@ import styles from './NftMarketGrid.module.scss'
 
 const PAGE_SIZE = 24
 
+// Cancelled listings are off the market entirely — the API won't serve them under any key,
+// so there is nothing here to widen to. A stale ?status=cancelled URL falls back to Active.
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
   { value: 'active_sold', label: 'Active + sold' },
   { value: 'sold', label: 'Sold' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'all', label: 'All statuses' },
 ]
 
 const SORT_OPTIONS = [
@@ -639,7 +639,7 @@ export default function NftMarketGrid() {
             />
             <QuickSelect
               label="Status"
-              tooltip="Where a listing stands onchain. Active is what you can buy right now — widen it to see what already sold or was cancelled."
+              tooltip="Where a listing stands onchain. Active is what you can buy right now — widen it to see what already sold."
               value={filters.status}
               defaultValue="active"
               options={STATUS_OPTIONS}

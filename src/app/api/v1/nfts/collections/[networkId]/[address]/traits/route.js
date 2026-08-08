@@ -17,8 +17,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // Same keys the listings route takes, so the panel and the grid always agree on what
-// "this view" means
-const STATUS_BY_KEY = { active: [1], sold: [2], cancelled: [3], active_sold: [1, 2], all: [1, 2, 3] }
+// "this view" means — including that cancelled (3) is never one of them
+const STATUS_BY_KEY = { active: [1], sold: [2], active_sold: [1, 2], all: [1, 2] }
 
 // A ceiling on how many cached tokens one call reads. Attributes are longtext, so an
 // unbounded scan of a large collection would pull megabytes to build a filter panel; past

@@ -14,7 +14,12 @@ import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
 
-const STATUS_BY_KEY = { active: [1], sold: [2], cancelled: [3], active_sold: [1, 2], all: [1, 2, 3] }
+// IHupTrade.ListingStatus. Cancelled (3) is deliberately absent from every key: a seller who
+// pulled an NFT back off the market took it off the shelf, and no browse view should be able
+// to ask for those rows. The listing page still resolves one by id (see nfts/[id]) so a
+// bookmarked link can say the listing was cancelled instead of 404ing, and the floor history
+// still reads cancel times to close out an ask — both are history, not inventory.
+const STATUS_BY_KEY = { active: [1], sold: [2], active_sold: [1, 2], all: [1, 2] }
 
 // A hand-edited URL shouldn't be able to hand MariaDB a hundred JSON_CONTAINS calls
 const MAX_TRAIT_PAIRS = 20
@@ -113,7 +118,8 @@ export async function GET(request) {
     const traits = parseTraitFilters(searchParams.get('traits')) // JSON [{label, value}] — see above
     const sort = searchParams.get('sort') || 'newest' // 'newest' | 'price_asc' | 'price_desc'
     const statusKey = searchParams.get('status') || 'active'
-    // Defaults to what's still buyable; 'active_sold' restores the old feed's active + sold mix
+    // Defaults to what's still buyable; 'active_sold'/'all' widen to the sold rows too. An
+    // unknown key (a hand-edited URL, or the retired 'cancelled') degrades to active.
     const statuses = STATUS_BY_KEY[statusKey] || STATUS_BY_KEY.active
 
     let whereClause = ` WHERE l.status IN (${statuses.map(() => '?').join(',')})`

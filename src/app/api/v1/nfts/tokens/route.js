@@ -6,8 +6,8 @@
  *
  * Symbol and decimals come from store_tokens (the same join the listings route uses); tokens the
  * indexer hasn't named yet come back with a null symbol and are labelled by address client-side.
- * Every status counts — a token whose only listings sold or were cancelled is still a currency
- * someone can filter the market by.
+ * Sold listings still count — that token is a currency the market's sold view can be filtered
+ * by — but cancelled ones don't, so the filter can't offer a currency with nothing behind it.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
@@ -16,16 +16,19 @@ export const runtime = 'nodejs'
 
 const NATIVE = '0x0000000000000000000000000000000000000000'
 
+// Active + sold — the same rows GET /api/v1/nfts will serve; cancelled is off the market
+const MARKET_STATUSES = [1, 2]
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const networkId = searchParams.get('networkId')
 
-    let whereClause = ''
-    const whereParams = []
+    let whereClause = ` WHERE l.status IN (${MARKET_STATUSES.map(() => '?').join(',')})`
+    const whereParams = [...MARKET_STATUSES]
 
     if (networkId) {
-      whereClause = ` WHERE l.network_id = ?`
+      whereClause += ` AND l.network_id = ?`
       whereParams.push(networkId)
     }
 
