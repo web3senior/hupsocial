@@ -10,15 +10,8 @@ import {
   CheckIcon,
   CopyIcon,
   CubeIcon,
-  DiscordLogoIcon,
   DotsThreeIcon,
-  GithubLogoIcon,
-  GlobeSimpleIcon,
-  InstagramLogoIcon,
-  MediumLogoIcon,
-  TelegramLogoIcon,
-  XLogoIcon,
-  YoutubeLogoIcon,
+  LinkSimpleIcon,
 } from '@phosphor-icons/react'
 import { buildAssetLinks } from '@/components/TradeCard'
 import { formatStake } from '@/hooks/useStakeToken'
@@ -64,25 +57,15 @@ const linkLabel = (link) => {
   }
 }
 
-// The links row is icon-only in this layout, so each one has to be recognisable without its
-// label; anything unrecognised keeps the generic globe rather than guessing
-const LINK_ICONS = [
-  [/(^|\.)x\.com$|(^|\.)twitter\.com$/, XLogoIcon],
-  [/(^|\.)discord\.(gg|com)$/, DiscordLogoIcon],
-  [/(^|\.)t\.me$|(^|\.)telegram\.(me|org)$/, TelegramLogoIcon],
-  [/(^|\.)instagram\.com$/, InstagramLogoIcon],
-  [/(^|\.)github\.com$/, GithubLogoIcon],
-  [/(^|\.)medium\.com$/, MediumLogoIcon],
-  [/(^|\.)youtube\.com$|(^|\.)youtu\.be$/, YoutubeLogoIcon],
-]
-
-const linkIcon = (url) => {
+// Every link in this row is a plain link icon — a collection can point anywhere, and guessing a
+// brand from the hostname mislabels more links than it helps. X is the one exception, because
+// 𝕏 is a character rather than a logo we have to recognise.
+const isXLink = (url) => {
   try {
     const { hostname } = new URL(url)
-    const match = LINK_ICONS.find(([pattern]) => pattern.test(hostname))
-    return match ? match[1] : GlobeSimpleIcon
+    return /(^|\.)x\.com$|(^|\.)twitter\.com$/.test(hostname)
   } catch {
-    return GlobeSimpleIcon
+    return false
   }
 }
 
@@ -203,22 +186,26 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
               {/* The collection's own links from LSP4Metadata, plus the maintenance menu —
                   right-aligned icon buttons, out of the title's way */}
               <div className={styles.header__actions}>
-                {info.links.map((link) => {
-                  const Icon = linkIcon(link.url)
-                  return (
-                    <a
-                      key={link.url}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.header__action}
-                      title={linkLabel(link)}
-                      aria-label={linkLabel(link)}
-                    >
-                      <Icon size={16} weight="fill" />
-                    </a>
-                  )
-                })}
+                {info.links.map((link) => (
+                  <a
+                    key={link.url}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.header__action}
+                    title={linkLabel(link)}
+                    aria-label={linkLabel(link)}
+                  >
+                    {/* The label above is what a screen reader announces, so the mark itself is decorative */}
+                    {isXLink(link.url) ? (
+                      <span className={styles.header__actionGlyph} aria-hidden="true">
+                        𝕏
+                      </span>
+                    ) : (
+                      <LinkSimpleIcon size={16} weight="bold" />
+                    )}
+                  </a>
+                ))}
 
                 <NativePopover
                   placement="bottom-end"

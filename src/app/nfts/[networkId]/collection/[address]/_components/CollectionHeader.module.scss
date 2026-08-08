@@ -233,6 +233,13 @@
     }
   }
 
+  // 𝕏 is a character, not an icon — size it to sit on the same optical circle as the 16px marks
+  // next to it, and keep the line box from adding its own vertical slack
+  &__actionGlyph {
+    font-size: 15px;
+    line-height: 1;
+  }
+
   &__menu {
     display: flex;
     flex-direction: column;
