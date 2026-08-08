@@ -14,7 +14,7 @@ import { CaretLeftIcon, CaretRightIcon, LockIcon, PlusIcon, WarningIcon, XIcon }
 import NativeDialog from './ui/NativeDialog'
 import RecipientField from './ui/RecipientField'
 import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
-import ConnectedNetwork from './ConnectedNetwork'
+import NetworkSelect from '@/components/ui/NetworkSelect'
 import Profile from './Profile'
 import styles from './SellItemPopover.module.scss'
 
@@ -525,7 +525,9 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
             </button>
           </header>
 
-          <ConnectedNetwork className={styles.connectedNetwork} />
+          <div className={styles.connectedNetwork}>
+            <NetworkSelect />
+          </div>
 
           {isWrongChain && (
             <div className={styles.chainWarning}>

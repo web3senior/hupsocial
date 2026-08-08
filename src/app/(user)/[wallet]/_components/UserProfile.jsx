@@ -809,7 +809,7 @@ const Status = ({ addr, profile, selfView }) => {
   const statusAddress = activeChain?.[1]?.status
 
   // getActiveChain() resolves to the wallet's chain (or the stored selection when
-  // disconnected), and NetworkSwitcher switches chains without remounting the profile —
+  // disconnected), and NetworkSelect switches chains without remounting the profile —
   // so this must be re-read on every switch, otherwise the write below keeps targeting
   // the status contract of whichever chain was active when the profile first mounted.
   useEffect(() => {

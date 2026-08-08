@@ -12,7 +12,7 @@ import eventsAbi from '@/abis/HupEvents.json'
 import { toast } from '@/components/NextToast'
 import { StarIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
-import ConnectedNetwork from './ConnectedNetwork'
+import NetworkSelect from '@/components/ui/NetworkSelect'
 import styles from './ListEventDialog.module.scss'
 
 // IANA zone options — supportedValuesOf is available in every browser this app targets;
@@ -206,7 +206,9 @@ const ListEventDialog = forwardRef(function ListEventDialog({ onListed }, ref) {
           </button>
         </header>
 
-        <ConnectedNetwork className={styles.eventDialog__network} />
+        <div className={styles.eventDialog__network}>
+          <NetworkSelect />
+        </div>
 
         {isWrongChain && (
           <div className={styles.eventDialog__chainWarning}>

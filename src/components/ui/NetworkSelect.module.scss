@@ -1,0 +1,162 @@
+.network-select {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--surface);
+  color: var(--color);
+  cursor: pointer;
+  user-select: none;
+  will-change: transform;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    transform: scale(1.025);
+    border-color: var(--network-color-primary, var(--border));
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &__stack {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  &__icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    overflow: hidden;
+    background-color: var(--surface-muted);
+    box-shadow: 0 0 0 2px var(--surface);
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+
+    // The stack overlaps, so each icon needs the ring above to cut it out of its neighbour
+    & + & {
+      margin-left: -6px;
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+    }
+
+    &--active {
+      box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--network-color-primary, var(--color));
+    }
+  }
+
+  &__more {
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--text-muted);
+  }
+
+  &__caret {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+  }
+
+  &--open &__caret {
+    transform: rotate(180deg);
+  }
+}
+
+// Sizing only — never a bare `display` here. NativePopover owns the panel's display
+// (block when open, the UA's none when closed); an author `display` on this element
+// overrides the UA rule and leaves the panel permanently on screen.
+.network-select-panel {
+  width: min(220px, 90vw);
+  max-height: 60svh;
+  overflow-y: auto;
+
+  // The items are block-level flex containers, so they stack without the panel
+  // itself being a flex column
+  &__item {
+    all: unset;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    color: var(--color);
+    border-radius: calc(var(--global-border-radius) - var(--native-popover-padding));
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+
+    &--current {
+      font-weight: 600;
+    }
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    overflow: hidden;
+    background-color: var(--surface-muted);
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+
+    img {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  &__check {
+    flex-shrink: 0;
+    color: var(--color);
+  }
+
+  &__footer {
+    margin: 0.4rem 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    text-align: center;
+    color: var(--blue-400);
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+  }
+}

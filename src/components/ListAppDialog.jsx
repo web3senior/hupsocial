@@ -11,7 +11,7 @@ import appsAbi from '@/abis/HupApps.json'
 import { toast } from '@/components/NextToast'
 import { InfoIcon, StarIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
-import ConnectedNetwork from './ConnectedNetwork'
+import NetworkSelect from '@/components/ui/NetworkSelect'
 import styles from './ListAppDialog.module.scss'
 
 // Mirrors the embed container hints the indexer accepts — anything wider than 3:1 is clamped
@@ -246,7 +246,9 @@ const ListAppDialog = forwardRef(function ListAppDialog({ categories = [], app =
           </button>
         </header>
 
-        <ConnectedNetwork className={styles.appDialog__network} />
+        <div className={styles.appDialog__network}>
+          <NetworkSelect />
+        </div>
 
         {isWrongChain && (
           <div className={styles.appDialog__chainWarning}>

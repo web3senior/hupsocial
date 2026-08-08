@@ -16,7 +16,7 @@ import { PlusIcon, StarIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-ico
 import NativeDialog from './ui/NativeDialog'
 import RecipientField from './ui/RecipientField'
 import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
-import ConnectedNetwork from './ConnectedNetwork'
+import NetworkSelect from '@/components/ui/NetworkSelect'
 import styles from './CreateMarketDialog.module.scss'
 
 const LUKSO_CHAIN_IDS = [42, 4201]
@@ -333,7 +333,9 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
           </button>
         </header>
 
-        <ConnectedNetwork className={styles.marketDialog__network} />
+        <div className={styles.marketDialog__network}>
+          <NetworkSelect />
+        </div>
 
         {isWrongChain && (
           <div className={styles.marketDialog__chainWarning}>
