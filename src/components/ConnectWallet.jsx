@@ -3,35 +3,22 @@
 import Link from 'next/link'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { config, setNetworkColor } from '@/config/wagmi'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
-import { getActiveChain } from '@/lib/communication'
 import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
 import clsx from 'clsx'
 import NativeDialog from '@/components/ui/NativeDialog'
-import NativePopover from '@/components/ui/NativePopover'
-import NetworkSwitcher from '@/components/NetworkSwitcher'
+import NetworkSelect from '@/components/ui/NetworkSelect'
 import styles from './ConnectWallet.module.scss'
 
 export const ConnectWallet = () => {
   const dialogRef = useRef(null)
   const mounted = useClientMounted()
 
-  const { address, isConnected, chain: walletChain } = useConnection()
+  const { address, isConnected } = useConnection()
 
   const ensuredProfileRef = useRef(null)
-
-  const [activeChainId, setActiveChainId] = useState(() => getActiveChain()[0]?.id)
-
-  // When connected, the wallet chain is the source of truth
-  const effectiveChainId = isConnected && walletChain ? walletChain.id : activeChainId
-  const effectiveChainData = config.chains.find((c) => c.id === effectiveChainId)
-
-  useEffect(() => {
-    if (effectiveChainData) setNetworkColor(effectiveChainData)
-  }, [effectiveChainId])
 
   useEffect(() => {
     if (!isConnected || !address) return
@@ -49,23 +36,7 @@ export const ConnectWallet = () => {
 
   return !mounted ? null : (
     <>
-      {effectiveChainData && (
-        <div className={`${styles.networks}`}>
-          <NativePopover
-            placement="bottom-end"
-            type="auto"
-            trigger={
-              <button type="button" className={`${styles.btnNetwork}`} title={`${effectiveChainData.name}`}>
-                <span className={`rounded`}>
-                  <img src={effectiveChainData.iconUrl} alt="" />
-                </span>
-              </button>
-            }
-          >
-            {({ close }) => <NetworkSwitcher currentNetwork={effectiveChainId} onChainChange={setActiveChainId} onSelect={close} />}
-          </NativePopover>
-        </div>
-      )}
+      <NetworkSelect />
 
       {isConnected && <Profile addr={address} />}
 
