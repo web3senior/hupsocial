@@ -1206,15 +1206,15 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
   const [isExpanded, setIsExpanded] = useState(false)
   const [canShowMore, setCanShowMore] = useState(false)
 
+  // The reader's own choice from Settings → Language, defaulting to their browser language
+  const preferredLanguage = usePreferredLanguage()
+
   // Verify language profile to optimize translation button visibility using external helper
   const canTranslate = useMemo(() => shouldOfferTranslation(sourceText, preferredLanguage), [sourceText, preferredLanguage])
 
   // Execute external translation pipeline via cached hooks infrastructure. The target
   // language is part of the SWR key, so switching it in Settings re-translates and caches
   // each language separately instead of serving the previous one.
-  // The reader's own choice from Settings → Language, defaulting to their browser language
-  const preferredLanguage = usePreferredLanguage()
-
   const { data: translatedText, isValidating: isTranslating } = useSWR(
     showTranslation && sourceText ? [sourceText, preferredLanguage] : null,
     translationFetcher,
