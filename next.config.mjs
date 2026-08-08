@@ -29,6 +29,21 @@ const CONTENT_SECURITY_POLICY = [
   "base-uri 'self'",
 ].join('; ')
 
+/**
+ * Post embeds are the deliberate hole in the policy above, and only for the embed document at
+ * /networks/{networkId}/{postId}/embed. Framing the app is dangerous because a hostile wrapper
+ * could harvest clicks on the bridge's confirmation dialogs; that document has nothing to
+ * harvest — no wallet, no session, no forms, no app shell, just a rendered post and outbound
+ * links (see src/app/networks/[networkId]/[postId]/embed/route.js). It frames nothing itself,
+ * which is why frame-src drops to 'none' here.
+ */
+const EMBED_CONTENT_SECURITY_POLICY = [
+  'frame-ancestors *',
+  "frame-src 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+].join('; ')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -55,6 +70,20 @@ const nextConfig = {
         headers: [
           { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
           { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+        ],
+      },
+      {
+        // Must stay after the catch-all: matching rules apply in order, and for a repeated key
+        // the last value wins — this is what lifts frame-ancestors for the embed document alone.
+        source: '/networks/:networkId/:postId/embed',
+        headers: [{ key: 'Content-Security-Policy', value: EMBED_CONTENT_SECURITY_POLICY }],
+      },
+      {
+        // The embed loader runs on the pages that host embeds, i.e. anyone's origin
+        source: '/embed.js',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cache-Control', value: 'public, max-age=3600' },
         ],
       },
       {

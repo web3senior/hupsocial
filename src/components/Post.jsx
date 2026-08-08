@@ -21,6 +21,7 @@ import {
   CaretDownIcon,
   ChartLineDownIcon,
   ClipboardTextIcon,
+  CodeIcon,
   DotsThreeIcon,
   EyeIcon,
   FlagIcon,
@@ -43,6 +44,7 @@ import useSWR, { useSWRConfig } from 'swr'
 import { getPostStatsKey } from '@/hooks/usePostStats'
 import NativePopover from './ui/NativePopover'
 import SellItemPopover from './SellItemPopover'
+import EmbedPostDialog from './EmbedPostDialog'
 import TipModal from './TipModal'
 import BuyButton from './BuyButton'
 import TradeCard from './TradeCard'
@@ -550,6 +552,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showEmbedModal, setShowEmbedModal] = useState(false)
   const isMounted = useClientMounted()
   const router = useRouter()
   const { setCurrentPost } = usePostStore()
@@ -657,6 +660,19 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                 />
               )}
               <PostDocumentActions item={item} close={close} />
+              {/* Sealed community content would embed as nothing but the lock placeholder */}
+              {!item.content?.encrypted && (
+                <MenuItem
+                  icon={<CodeIcon size={20} />}
+                  label="Embed"
+                  description="Show this post on your own site"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowEmbedModal(true)
+                    close()
+                  }}
+                />
+              )}
               {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
                 <MenuItem
                   icon={<TagIcon size={20} />}
@@ -707,6 +723,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
         )}
       </NativePopover>
       <SellItemPopover ref={sellPopoverRef} item={item} />
+      {showEmbedModal && <EmbedPostDialog item={item} onClose={() => setShowEmbedModal(false)} />}
     </>
   )
 }

@@ -1,0 +1,164 @@
+.embedPost {
+  width: min(520px, calc(100vw - 28px));
+  max-height: calc(100vh - 40px);
+  // iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--background);
+  border-radius: 22px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  flex-direction: column;
+
+  // Only style the open state's display — a bare `display: flex` would override the
+  // UA's `display: none` on the closed dialog and flash it before showModal() runs
+  &[open] {
+    display: flex;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 60px;
+    padding: 0 1.25rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+
+    h3 {
+      flex: 1;
+      margin: 0;
+      text-align: center;
+      // offset the cancel button's width so the title stays optically centered
+      padding-inline-end: 3.5rem;
+    }
+  }
+
+  &__cancel {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.125rem;
+    width: 100%;
+    padding: 1.25rem;
+    overflow-y: auto;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  &__label {
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+
+  &__hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  &__themes {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-muted);
+  }
+
+  &__theme {
+    flex: 1;
+    padding: 0.4rem 0.75rem;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      background-color: var(--background);
+      color: var(--text);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    }
+  }
+
+  &__preview {
+    display: block;
+    width: 100%;
+    // Height comes inline from the frame's own report — no max-height, or a long post would be
+    // clipped inside a frame that cannot scroll. The dialog body scrolls instead.
+    border: 0;
+    border-radius: 16px;
+    background-color: var(--surface-muted);
+  }
+
+  &__code {
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    font-size: 0.75rem;
+    line-height: 1.55;
+    // Snippet lines are long; wrapping beats a horizontal scrollbar in a narrow dialog
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 9.5rem;
+    overflow-y: auto;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  &__copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.1rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: var(--text);
+    color: var(--background);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+}
