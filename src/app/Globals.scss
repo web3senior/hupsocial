@@ -39,8 +39,8 @@
   // trend hue is a caret in the header, and both carry a shape and a label besides.
   --chart-sale: #d97706;
 
-  --scrollbarBG: #f4f4f4;
-  --thumbBG: var(--gray);
+  --scrollbarBG: var(--gray-50);
+  --thumbBG: var(--gray-200);
   --network-color-primary-light: color-mix(in srgb, var(--network-color-primary) 35%, transparent);
 
   --fingerprint-border: var(--white, #fff);
