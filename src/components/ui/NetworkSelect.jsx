@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
-import { CaretDownIcon, CheckCircleIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, CheckCircleIcon, CheckFatIcon } from '@phosphor-icons/react'
 import { useSwitchChain } from 'wagmi'
 import { config, setNetworkColor } from '@/config/wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -87,7 +87,9 @@ export default function NetworkSelect({ className, placement = 'bottom-end', max
             ))}
           </span>
 
-          {overflow > 0 && <span className={styles['network-select__more']}>+{overflow}</span>}
+          <span className={styles['network-select__stack__number']}>
+            {chain.name.split(' ')[0]}
+          </span>
 
           <CaretDownIcon size={14} weight="bold" className={styles['network-select__caret']} />
         </button>
@@ -95,22 +97,27 @@ export default function NetworkSelect({ className, placement = 'bottom-end', max
     >
       {({ close }) => (
         <>
-          {config.chains.map((item) => {
-            const isCurrent = item.id === chainId
+          <div className={clsx(styles['network-select-panel__container'])}>
+            {config.chains.map((item) => {
+              const isCurrent = item.id === chainId
 
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleSelect(item, close)}
-                className={clsx(styles['network-select-panel__item'], isCurrent && styles['network-select-panel__item--current'])}
-              >
-                <span className={styles['network-select-panel__icon']}>{item.iconUrl ? <img src={item.iconUrl} alt="" /> : item.name.charAt(0)}</span>
-                <span className={styles['network-select-panel__name']}>{item.name}</span>
-                {isCurrent && <CheckCircleIcon size={15} className={styles['network-select-panel__check']} />}
-              </button>
-            )
-          })}
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelect(item, close)}
+                  className={clsx(styles['network-select-panel__item'], isCurrent && styles['network-select-panel__item--current'])}
+                >
+                  <span className={styles['network-select-panel__icon']}>
+                    {item.iconUrl ? <img src={item.iconUrl} alt="" /> : item.name.charAt(0)}
+                  </span>
+                  <span className={styles['network-select-panel__name']}>{item.name}</span>
+                  {item.isNew && <span className={styles['network-select-panel__new']}>New</span>}
+                  {isCurrent && <CheckCircleIcon size={18} weight="fill" className={styles['network-select-panel__check']} />}
+                </button>
+              )
+            })}
+          </div>
 
           <p
             className={styles['network-select-panel__footer']}

@@ -3,8 +3,9 @@
     color: var(--white, #fff);
     background-color: var(--color-primary);
     font-weight: 500;
-    border-radius: 999px;
-    padding: 0.5rem 1rem;
+    border-radius: var(--radius-12);
+    padding-block: 0.5rem;
+    padding-inline: calc(var(--spacing) * 3);
     box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
     will-change: transform;
     transition: transform 0.2s ease;
@@ -23,11 +24,11 @@ button.btnConnect {
   border: none;
   background-color: var(--black);
   color: var(--white, #fff);
-  padding: 0.2rem 0.7rem;
-  border-radius: 1000px;
-  font-size: 12px;
+  padding-block: 0.5rem;
+  padding-inline: calc(var(--spacing) * 3);
+  border-radius: var(--radius-12);
+  font-size: var(--font-size-13);
   cursor: pointer;
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
   will-change: transform;
   transition: transform 0.2s ease;
 
@@ -37,39 +38,6 @@ button.btnConnect {
 
   &:active {
     transform: scale(0.95);
-  }
-}
-
-button.btnNetwork {
-  --r: 18px;
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  width: var(--r);
-  height: var(--r);
-  will-change: transform;
-  transition: all 0.2s ease;
-  border-radius: 1000px;
-  cursor: pointer;
-
-  &:hover {
-    transform: scale(1.025);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-
-  span {
-    overflow: hidden;
-  }
-
-  svg,
-  img {
-    width: var(--r);
-    height: var(--r);
   }
 }
 
@@ -86,168 +54,83 @@ figure.pfp {
   }
 
   img {
-    --r: 32px;
+    --r: 38px;
     width: var(--r);
     height: var(--r);
     aspect-ratio: 1/1;
   }
 }
 
-.dialog {
-  // Never set display unconditionally on a <dialog>: author styles override the
-  // UA's `dialog:not([open]) { display: none }`, leaving the closed dialog in
-  // the page flow as an invisible click-blocking box.
-  &[open] {
-    display: flex;
-  }
-  flex-direction: column;
-  gap: 0.35rem;
-  width: min(380px, calc(100vw - 2rem));
-  padding: 1.25rem;
-  border: none;
-  border-radius: 20px;
-  background-color: var(--surface, var(--background));
-  color: var(--foreground, inherit);
+// The anchored panel above sm. Doubled class on purpose: this and NativePopover's own .panel
+// land on the same element at equal specificity, so bundle order would otherwise decide who
+// wins on padding, radius and background.
+.walletPanel.walletPanel {
+  --dialog-padding: 1rem;
+
+  // No display here: NativePopover sets `display: block !important` on the open panel, and
+  // block layout is what these children want anyway.
+  width: 360px;
+  max-height: calc(100dvh - 5rem);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-24);
+  background: var(--surface);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
+  // x hidden so rows run edge to edge inside the rounded outline; y auto so a long connector
+  // list scrolls instead of pushing the footnote off the bottom of the panel
+  overflow: hidden auto;
 
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
+  // A 2px settle downward under the fade — nothing else. No scale out of the button, no
+  // diagonal: at this size the movement is felt rather than watched, which is the point.
+  //
+  // Written as the independent `translate` property, not `transform`: NativePopover writes
+  // `style.transform` inline while anchoring, and would wipe a transform-based version.
+  opacity: 0;
+  translate: 0 -2px;
+  transition:
+    opacity 0.2s ease-out,
+    translate 0.2s ease-out,
+    overlay 0.2s ease allow-discrete,
+    display 0.2s ease allow-discrete;
 
-  &__title {
-    margin: 0;
-    font-size: var(--font-size-17, 17px);
-    font-weight: var(--font-weight-semibold, 600);
-  }
-
-  &__close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 1000px;
-    background: transparent;
-    color: var(--text-muted, var(--gray-400));
-    cursor: pointer;
-
-    &:hover {
-      background-color: var(--hover, var(--gray-100));
-    }
-  }
-
-  &__hint {
-    margin: 0 0 0.65rem;
-    // --font-size-9 really is 9px in the token scale, far too small for body
-    // copy - the hint was near-illegible before
-    font-size: var(--font-size-12, 12px);
-    color: var(--text-muted, var(--gray-400));
+  &:global(:popover-open) {
+    opacity: 1;
+    translate: none;
   }
 }
 
-.options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-  max-width: 380px;
-
-  &__item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    width: 100%;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid var(--border, var(--gray-200));
-    border-radius: var(--global-border-radius);
-    background-color: transparent;
-    color: inherit;
-    font-size: 14px;
-    font-weight: var(--font-weight-semibold, 600);
-    text-align: left;
-    cursor: pointer;
-    will-change: transform;
-    transition:
-      transform 0.2s ease,
-      background-color 0.2s ease;
-
-    &:hover {
-      background-color: var(--hover, var(--gray-100));
-      transform: scale(1.015);
+@supports (transition-behavior: allow-discrete) {
+  @starting-style {
+    .walletPanel.walletPanel:global(:popover-open) {
+      opacity: 0;
+      translate: 0 -2px;
     }
-
-    &:active {
-      transform: scale(0.97);
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: default;
-      transform: none;
-    }
-
-    &--pending {
-      opacity: 1;
-      border-color: var(--color-primary);
-    }
-  }
-
-  &__icon {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    object-fit: contain;
-
-    &--fallback {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: var(--color-primary);
-      color: var(--white, #fff);
-      font-weight: var(--font-weight-bold, 700);
-      text-transform: uppercase;
-    }
-  }
-
-  &__name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__chevron {
-    flex-shrink: 0;
-    color: var(--text-muted, var(--gray-400));
-  }
-
-  &__spinner {
-    flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-    border: 2px solid var(--border, var(--gray-200));
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: options-spin 0.8s linear infinite;
-  }
-
-  &__error {
-    margin: 0;
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--global-border-radius);
-    background-color: rgba(220, 53, 69, 0.08);
-    color: var(--color-error, #dc3545);
-    font-size: var(--font-size-12, 12px);
-    overflow-wrap: anywhere;
   }
 }
 
-@keyframes options-spin {
+// The sheet, header and connector rows all come from DialogSheet now — only the two pieces
+// with no equivalent there remain.
+.spinner {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border, var(--gray-200));
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: connect-spin 0.8s linear infinite;
+}
+
+.error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--global-border-radius);
+  background-color: rgba(220, 53, 69, 0.08);
+  color: var(--color-error, #dc3545);
+  font-size: var(--font-size-12, 12px);
+  overflow-wrap: anywhere;
+}
+
+@keyframes connect-spin {
   to {
     transform: rotate(360deg);
   }

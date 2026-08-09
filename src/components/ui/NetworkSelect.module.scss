@@ -4,19 +4,22 @@
   align-items: center;
   gap: 0.4rem;
   flex-shrink: 0;
-  padding: 0.25rem 0.5rem;
+  padding-inline: calc(var(--spacing) * 3);
+  height: 38px;
+  border-radius: var(--radius-12);
   border: 1px solid var(--border);
-  border-radius: 999px;
   background-color: var(--surface);
   color: var(--color);
   cursor: pointer;
   user-select: none;
   will-change: transform;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease;
 
   &:hover {
     transform: scale(1.025);
-    border-color: var(--network-color-primary, var(--border));
+    background-color: var(--gray-50);
   }
 
   &:active {
@@ -24,8 +27,12 @@
   }
 
   &__stack {
-    display: inline-flex;
+    max-width: 20px;
+    flex-wrap: wrap;
+    display: flex;
+    flex-direction: row;
     align-items: center;
+    gap: 1px;
   }
 
   &__icon {
@@ -34,20 +41,19 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 18px;
-    height: 18px;
+    width: 9px;
+    height: 9px;
     border-radius: 999px;
     overflow: hidden;
     background-color: var(--surface-muted);
-    box-shadow: 0 0 0 2px var(--surface);
     font-size: 0.6rem;
     font-weight: 600;
     text-transform: uppercase;
 
-    // The stack overlaps, so each icon needs the ring above to cut it out of its neighbour
-    & + & {
-      margin-left: -6px;
-    }
+    // // The stack overlaps, so each icon needs the ring above to cut it out of its neighbour
+    // & + & {
+    //   margin-left: -6px;
+    // }
 
     img {
       width: 100%;
@@ -55,7 +61,7 @@
     }
 
     &--active {
-      box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--network-color-primary, var(--color));
+      // box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--network-color-primary, var(--color));
     }
   }
 
@@ -83,7 +89,21 @@
 .network-select-panel {
   width: min(220px, 90vw);
   max-height: 60svh;
-  overflow-y: auto;
+  overflow: hidden;
+  flex-direction: column;
+  padding: 0.2rem;
+  &:global(:popover-open) {
+    display: flex !important;
+  }
+
+  &__container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 0.5rem;
+  }
 
   // The items are block-level flex containers, so they stack without the panel
   // itself being a flex column
@@ -91,10 +111,11 @@
     all: unset;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.6rem;
     padding: 0.5rem 0.6rem;
     color: var(--color);
-    border-radius: calc(var(--global-border-radius) - var(--native-popover-padding));
+    border-radius: var(--global-border-radius);
     cursor: pointer;
     user-select: none;
 
@@ -118,7 +139,6 @@
     flex-shrink: 0;
     width: 18px;
     height: 18px;
-    border-radius: 999px;
     overflow: hidden;
     background-color: var(--surface-muted);
     font-size: 0.6rem;
@@ -142,12 +162,21 @@
 
   &__check {
     flex-shrink: 0;
+    color: var(--black);
+  }
+    &__new {
+font-size: var(--font-size-9);
     color: var(--color);
+    background-color: var(--surface-muted);
+    border-radius: var(--radius-4);
+    padding: 0.1rem 0.3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   &__footer {
-    margin: 0.4rem 0 0;
-    padding-top: 0.5rem;
+    padding: 0.5rem;
     border-top: 1px solid var(--border);
     font-size: 0.75rem;
     text-align: center;

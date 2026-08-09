@@ -1,20 +1,69 @@
 'use client'
 
 import Link from 'next/link'
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
 import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
-import clsx from 'clsx'
-import NativeDialog from '@/components/ui/NativeDialog'
+import DialogSheet from '@/components/ui/DialogSheet'
+import NativePopover from '@/components/ui/NativePopover'
 import NetworkSelect from '@/components/ui/NetworkSelect'
 import styles from './ConnectWallet.module.scss'
+
+// Matches the sm breakpoint in styles/components/_responsive.scss
+const COMPACT_QUERY = '(max-width: 639px)'
+
+/**
+ * Below sm the wallet list is a bottom sheet — a modal, since it covers the page. At wider
+ * widths it hangs off the Connect button as a panel that leaves the page live behind it,
+ * which per AGENTS.md makes it a popover rather than a dialog.
+ */
+function useCompactViewport() {
+  const [isCompact, setIsCompact] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia(COMPACT_QUERY)
+    setIsCompact(mql.matches)
+
+    const handleChange = (event) => setIsCompact(event.matches)
+    mql.addEventListener('change', handleChange)
+
+    return () => mql.removeEventListener('change', handleChange)
+  }, [])
+
+  return isCompact
+}
+
+/** Shared between both surfaces; NativePopover clones it to attach its popovertarget. */
+const ConnectTrigger = forwardRef(function ConnectTrigger(props, ref) {
+  return (
+    <button ref={ref} type="button" className={`${styles.btnConnect} flex align-items-center gap-025 `} {...props}>
+      Connect
+    </button>
+  )
+})
+
+/** Title, connector list and footnote — identical in the sheet and the anchored panel. */
+function WalletPanelContent({ onConnected, onClose, session }) {
+  return (
+    <>
+      <DialogSheet.Header title="Connect a wallet" onClose={onClose} />
+
+      <WalletOptions key={session} onConnected={onConnected} />
+
+      <DialogSheet.Footer>
+        By connecting a wallet, you consent to Hup&rsquo;s <Link href="/privacy-policy">Privacy Policy</Link>.
+      </DialogSheet.Footer>
+    </>
+  )
+}
 
 export const ConnectWallet = () => {
   const dialogRef = useRef(null)
   const mounted = useClientMounted()
+  const isCompact = useCompactViewport()
 
   const { address, isConnected } = useConnection()
 
@@ -40,29 +89,47 @@ export const ConnectWallet = () => {
 
       {isConnected && <Profile addr={address} />}
 
-      {!isConnected && (
-        <button className={`${styles.btnConnect} flex align-items-center gap-025 `} onClick={() => dialogRef.current?.open()}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#fff">
-            <path d="M224.62-160q-27.62 0-46.12-18.5Q160-197 160-224.62v-510.76q0-27.62 18.5-46.12Q197-800 224.62-800h510.76q27.62 0 46.12 18.5Q800-763 800-735.38V-680H544.62q-47.93 0-76.27 28.35Q440-623.31 440-575.38v190.76q0 47.93 28.35 76.27Q496.69-280 544.62-280H800v55.38q0 27.62-18.5 46.12Q763-160 735.38-160H224.62Zm320-160q-27.62 0-46.12-18.5Q480-357 480-384.62v-190.76q0-27.62 18.5-46.12Q517-640 544.62-640h230.76q27.62 0 46.12 18.5Q840-603 840-575.38v190.76q0 27.62-18.5 46.12Q803-320 775.38-320H544.62ZM640-420q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Z" />
-          </svg>
-          Connect
-        </button>
-      )}
-
-      <WalletConnectDialog ref={dialogRef} />
+      {!isConnected &&
+        (isCompact ? (
+          <>
+            <ConnectTrigger onClick={() => dialogRef.current?.open()} />
+            <WalletConnectDialog ref={dialogRef} />
+          </>
+        ) : (
+          <WalletConnectPanel />
+        ))}
     </>
   )
 }
 
 /**
- * Top-layer connect-wallet modal built on the shared NativeDialog primitive.
- * The previous fixed-position div lived inside the fixed header and lost the
- * stacking-context battle with the page content, so it never showed.
+ * Wide-viewport surface: a panel hanging off the Connect button, with the page still visible
+ * and usable behind it. No close button — popover=auto light-dismisses on an outside click
+ * or Esc, and a dismiss affordance on unblocking UI is just clutter.
+ */
+export function WalletConnectPanel() {
+  // Bumped on every close so WalletOptions remounts with fresh mutation state
+  // (no stale "connection rejected" error on the next open).
+  const [session, setSession] = useState(0)
+
+  // Stable identity: NativePopover re-subscribes its listeners whenever this changes
+  const handleToggle = useCallback((event) => {
+    if (event.newState === 'closed') setSession((s) => s + 1)
+  }, [])
+
+  return (
+    <NativePopover trigger={<ConnectTrigger />} placement="bottom-end" className={styles.walletPanel} onToggle={handleToggle}>
+      {({ close }) => <WalletPanelContent session={session} onConnected={close} />}
+    </NativePopover>
+  )
+}
+
+/**
+ * Compact-viewport surface: the bottom sheet. Modal, because it covers the page — so it keeps
+ * the backdrop, the scroll lock and a close button.
  */
 export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, ref) {
   const dialogRef = useRef(null)
-  // Bumped on every close so WalletOptions remounts with fresh mutation state
-  // (no stale "connection rejected" error on the next open).
   const [session, setSession] = useState(0)
 
   useImperativeHandle(
@@ -77,22 +144,23 @@ export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, re
   const close = () => dialogRef.current?.close()
 
   return (
-    <NativeDialog ref={dialogRef} lightDismiss className={styles.dialog} aria-label="Connect wallet" onClose={() => setSession((s) => s + 1)}>
-      <header className={styles.dialog__header}>
-        <h2 className={styles.dialog__title}>Connect wallet</h2>
-        <button type="button" className={styles.dialog__close} onClick={close} aria-label="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor">
-            <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" />
-          </svg>
-        </button>
-      </header>
-
-      <p className={styles.dialog__hint}>Choose a wallet to continue.</p>
-
-      <WalletOptions key={session} onConnected={close} />
-    </NativeDialog>
+    <DialogSheet ref={dialogRef} lightDismiss aria-label="Connect wallet" onClose={() => setSession((s) => s + 1)}>
+      <WalletPanelContent session={session} onConnected={close} onClose={close} />
+    </DialogSheet>
   )
 })
+
+/** Scannable-code glyph for connectors that pair by QR rather than by an installed provider. */
+function QrGlyph() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <path d="M14 14h3.5v3.5H14zM19.5 19.5H21V21h-1.5z" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
 
 export function WalletOptions({ onConnected }) {
   const connectors = useConnectors()
@@ -102,40 +170,54 @@ export function WalletOptions({ onConnected }) {
   // (extensions don't inject into cross-origin iframes), so it leads the list there
   const ordered = isFramedByGridHost() ? [...connectors].sort((a, b) => (b.id === UP_PROVIDER_RDNS) - (a.id === UP_PROVIDER_RDNS)) : connectors
 
+  const handleConnect = (connector) => {
+    connect({ connector }, { onSuccess: () => onConnected?.() })
+
+    // WalletConnect draws its QR sheet as a <w3m-modal> inside the page, but this list lives in
+    // the top layer either way (showModal() sheet, or popover), and the top layer paints above
+    // every z-index — the QR sheet opens buried underneath and the row just spins forever. Hand
+    // the screen over to any connector that brings its own UI; the rest resolve in place.
+    if (connector.type === 'walletConnect') onConnected?.()
+  }
+
   return (
-    <div className={styles.options}>
-      {ordered.map((connector) => {
-        const isConnectingThis = isPending && variables?.connector?.uid === connector.uid
+    <DialogSheet.Body>
+      <DialogSheet.Group>
+        {ordered.map((connector) => {
+          const isConnectingThis = isPending && variables?.connector?.uid === connector.uid
+          // EIP-6963 discovery gives an announced wallet its rdns as the id, so anything
+          // injected under an id other than the generic fallback is provably installed —
+          // wagmi's own `injected()` connector is always listed whether or not it resolves.
+          const isDetected = connector.type === 'injected' && connector.id !== 'injected'
 
-        return (
-          <button
-            key={connector.uid}
-            type="button"
-            className={clsx(styles.options__item, isConnectingThis && styles['options__item--pending'])}
-            onClick={() => connect({ connector }, { onSuccess: () => onConnected?.() })}
-            disabled={isPending}
-          >
-            {connector.icon ? (
-              <img className={styles.options__icon} src={connector.icon} alt="" />
-            ) : (
-              <span className={clsx(styles.options__icon, styles['options__icon--fallback'])}>{connector.name.charAt(0)}</span>
-            )}
+          return (
+            <DialogSheet.Row
+              key={connector.uid}
+              // A string icon falls back to the connector's initial in a tinted tile
+              icon={connector.icon ? <img src={connector.icon} alt="" /> : connector.name}
+              name={connector.name}
+              meta={
+                isConnectingThis ? (
+                  <span className={styles.spinner} aria-label="Connecting" />
+                ) : isDetected ? (
+                  'Detected'
+                ) : connector.type === 'walletConnect' ? (
+                  <QrGlyph />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor">
+                    <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z" />
+                  </svg>
+                )
+              }
+              onClick={() => handleConnect(connector)}
+              disabled={isPending}
+            />
+          )
+        })}
+      </DialogSheet.Group>
 
-            <span className={styles.options__name}>{connector.name}</span>
-
-            {isConnectingThis ? (
-              <span className={styles.options__spinner} aria-label="Connecting" />
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor" className={styles.options__chevron}>
-                <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z" />
-              </svg>
-            )}
-          </button>
-        )
-      })}
-
-      {error && <p className={styles.options__error}>{error.shortMessage || error.message}</p>}
-    </div>
+      {error && <p className={styles.error}>{error.shortMessage || error.message}</p>}
+    </DialogSheet.Body>
   )
 }
 
