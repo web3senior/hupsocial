@@ -1,7 +1,7 @@
 /* Custom scrollbar styling for Firefox */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--network-color-primary, var(--thumbBG)) var(--scrollbarBG);
+  scrollbar-width: unset;
+  scrollbar-color: var(--thumbBG) var(--scrollbarBG);
 }
 
 /* Base scrollbar container for WebKit/Blink browsers */
@@ -18,7 +18,7 @@
 
 /* Draggable thumb configuration */
 ::-webkit-scrollbar-thumb {
-  background-color: var(--network-color-primary, var(--thumbBG));
+  background-color: var(--thumbBG);
   background-clip: padding-box;
   border: 2px solid transparent;
   border-radius: 100vh;
