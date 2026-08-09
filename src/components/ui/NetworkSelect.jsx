@@ -75,19 +75,13 @@ export default function NetworkSelect({ className, placement = 'bottom-end', max
           aria-expanded={isOpen}
           className={clsx(styles['network-select'], isOpen && styles['network-select--open'], className)}
         >
-          <span className={styles['network-select__stack']}>
-            {stack.map((item, index) => (
-              <span
-                key={item.id}
-                style={{ zIndex: stack.length - index }}
-                className={clsx(styles['network-select__icon'], item.id === chainId && styles['network-select__icon--active'])}
+ <span
+                className={clsx(styles['network-select__icon'], chainId === chainId && styles['network-select__icon--active'])}
               >
-                {item.iconUrl ? <img src={item.iconUrl} alt="" /> : item.name.charAt(0)}
+                {chain.iconUrl ? <img src={chain.iconUrl} alt="" /> : chain.name.charAt(0)}
               </span>
-            ))}
-          </span>
 
-          <span className={styles['network-select__stack__number']}>
+          <span className={styles['network-select__name']}>
             {chain.name.split(' ')[0]}
           </span>
 
