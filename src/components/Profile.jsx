@@ -45,17 +45,17 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   // Render placeholder skeletal visual states during active metadata fetches
   if (isLoading || !profile) {
     return (
-      <div className={clsx(styles.profileShimmer, 'flex align-items-center gap-025', className)}>
+      <div className={clsx(styles.profileShimmer, 'flex align-items-center gap-050', className)}>
         <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 36, height: 36, flexShrink: 0 }} />
         {variant !== 'imageOnly' && (
           <div className="flex flex-column gap-025">
             <div className="flex flex-row gap-025">
-              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 20 }} />
-              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 20, height: 20 }} />
-              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 20, height: 20 }} />
-              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 20, height: 20 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 16 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
+              <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
             </div>
-            {isFullLike && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 12 }} />}
+            {isFullLike && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 10 }} />}
           </div>
         )}
       </div>
@@ -109,7 +109,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             >
               {profile.fullName || profile.name}
             </Link>
-            <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} />
+            {/* <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} /> */}
             {chainInfo && (
               <div className={styles.badge} title={chainInfo.name}>
                 <img src={chainInfo.iconUrl} alt="" />
