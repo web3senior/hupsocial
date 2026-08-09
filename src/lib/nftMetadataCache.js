@@ -140,8 +140,9 @@ const writeRow = async (key, isLsp8, metadata) => {
   )
 }
 
-// Rows are normally never deleted — the set only grows. The exception is a row that turned
-// out not to be a token of this collection at all; see the sweep at the bottom of the file.
+// Rows are normally never deleted — the set only grows. The exception is a row that turned out
+// not to be a token of this collection at all, which both the read path above and the sweep at
+// the bottom of the file drop once ownership says the id has no owner.
 const deleteRow = async (key) => {
   await pool.execute(`DELETE FROM nft_metadata_cache WHERE network_id = ? AND collection = ? AND token_id = ?`, [
     key.networkId,
@@ -240,6 +241,31 @@ export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, bas
     }
   }
 
+  // This table doubles as the collection browse's token list — every row in it is presented as
+  // part of the collection. Metadata alone can't tell a token from a typo: an id that was never
+  // minted still resolves to *something*, either the collection's own document or a base URI the
+  // id gets appended to, whose 404 still leaves the collection's name behind. So ownership is
+  // asked on the way in, which keeps a mistyped sell-modal preview out, and on every later
+  // re-read, which is what takes an already-cached ghost — or a token burned since — back off the
+  // grid without waiting for someone to run the collection sweep by hand. Guarding only the
+  // insert left the ghosts already in the table immortal: a row that fails to resolve is re-read
+  // every NEGATIVE_TTL_MS and was rewritten unquestioned each time.
+  //
+  // A token-specific document is proof enough, and the row remembers that proof, so the common
+  // case stays free: a real token whose gateway is having a bad minute resolves to a null source
+  // here without buying the ownership read again.
+  const proved = metadata.source === 'token' || row?.source === 'token'
+  if (!proved && (await tokenExists({ publicClient, collection: key.collection, tokenId, isLsp8 })) === false) {
+    if (row) {
+      try {
+        await deleteRow(key)
+      } catch (error) {
+        console.warn('[nft-metadata-cache] ghost row delete failed:', error.message)
+      }
+    }
+    return { metadata, cached: false }
+  }
+
   // A resolution that lost the offchain document must never overwrite one that had it —
   // otherwise a single bad minute from a gateway blanks artwork that was already working.
   if (!metadata.source && row && isComplete(row)) {
@@ -249,16 +275,6 @@ export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, bas
       console.warn('[nft-metadata-cache] touch failed:', error.message)
     }
     return { metadata: rowToMetadata(row), cached: true }
-  }
-
-  // This table doubles as the collection browse's token list — every row in it is presented as
-  // part of the collection. Metadata alone can't tell a token from a typo (the LSP8 fallback
-  // describes the collection for any id you ask about), so previewing a mistyped id in the sell
-  // modal would otherwise plant a permanent ghost on somebody's collection page. Only the
-  // ambiguous resolutions pay for the ownership read: a token-specific document is proof enough,
-  // and a row that already exists isn't being introduced by this read.
-  if (!row && metadata.source !== 'token' && (await tokenExists({ publicClient, collection: key.collection, tokenId, isLsp8 })) === false) {
-    return { metadata, cached: false }
   }
 
   try {

@@ -5,7 +5,7 @@
  * path in hooks/useNftMetadata), so both tiers agree on what a token's artwork is.
  */
 
-import { ContractFunctionRevertedError, ExecutionRevertedError, hexToString, zeroAddress } from 'viem'
+import { hexToString, zeroAddress } from 'viem'
 import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, decodeVerifiableUri, pickLsp4Image, fetchMetadataJson } from '@/lib/lsp4'
 import { resolveStorageUrl } from '@/lib/storageHelper'
 
@@ -70,6 +70,10 @@ export const nftOwnerAbi = [
   },
 ]
 
+// The two error names viem gives a call the EVM refused to execute: the contract reverted with
+// data (a custom error like LSP8NonExistentTokenId), or the node reported a plain revert.
+const REVERT_ERROR_NAMES = new Set(['ContractFunctionRevertedError', 'ExecutionRevertedError'])
+
 /**
  * Whether a token id actually exists in its collection.
  *
@@ -103,7 +107,13 @@ export const tokenExists = async ({ publicClient, collection, tokenId, isLsp8 })
   } catch (error) {
     // A revert IS an answer. Anything else — a transport failure, a contract with no such
     // getter, an id that isn't even a number — leaves the question open.
-    const reverted = error?.walk?.((cause) => cause instanceof ContractFunctionRevertedError || cause instanceof ExecutionRevertedError)
+    //
+    // Matched by name rather than `instanceof`: this module is imported by the Next server
+    // bundle and by the browser, and viem's classes are not one object across those bundling
+    // layers — an error thrown by the transport's copy fails `instanceof` against the copy
+    // this file imported, which silently turned every revert into "don't know" and made the
+    // whole check a no-op. `name` travels on the instance and survives the boundary.
+    const reverted = error?.walk?.((cause) => REVERT_ERROR_NAMES.has(cause?.name))
     return reverted ? false : null
   }
 }
