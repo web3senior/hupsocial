@@ -107,7 +107,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               onMouseEnter={() => creator && router.prefetch(`/${creator}`)}
               onFocus={() => creator && router.prefetch(`/${creator}`)}
             >
-              {profile.fullName || profile.name}
+              {profile.fullName || (profile.name + '#' + profile.wallet_address.slice(2, 6))}
             </Link>
             {/* <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} /> */}
             {chainInfo && (
