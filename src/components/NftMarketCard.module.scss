@@ -1,6 +1,7 @@
 // Marketplace tile: a contained card with the artwork inset inside it, then a compact
 // meta block. Numerals run in --ff-mono so prices and token ids line up column to column.
 .nftCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -8,13 +9,22 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background-color: var(--surface);
-  color: inherit;
-  text-decoration: none;
   transition: border-color 0.18s ease, transform 0.18s ease;
 
   &:hover {
     border-color: var(--text-muted);
     transform: translateY(-2px);
+  }
+
+  // The tile splits into a navigating link (artwork + meta) and a non-navigating quick
+  // buy footer — a button can't legally nest inside an anchor, so the anchor shrank
+  &__link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
   }
 
   &__media {
@@ -91,6 +101,39 @@
     letter-spacing: 0.02em;
   }
 
+  // Mirrors the media box from outside the anchor (same inset, same square ratio — a
+  // button can't nest in the link) so the buy pill rides the artwork's bottom edge.
+  // Hidden until the tile is hovered or the pill holds focus — mid-purchase focus keeps
+  // it pinned while the wallet popup steals the pointer. Touch has no hover, so there
+  // it stays on permanently.
+  &__quickBuy {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    align-items: flex-end;
+    aspect-ratio: 1;
+    padding: 0.55rem;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
+  }
+
+  &:hover &__quickBuy,
+  &:focus-within &__quickBuy {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (hover: none) {
+    &__quickBuy {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
   &__body {
     display: flex;
     flex-direction: column;
@@ -139,35 +182,80 @@
     white-space: nowrap;
   }
 
-  &__price {
+  // Footer: who's selling on the left, what it costs on the right
+  &__footer {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+  }
+
+  &__seller {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     min-width: 0;
   }
 
-  &__priceValue {
+  &__sellerAvatar {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    object-fit: cover;
+    background-color: var(--surface-muted);
+
+    &--fallback {
+      display: grid;
+      place-items: center;
+      color: var(--text-muted);
+      font-size: var(--font-size-12, 0.78rem);
+      font-weight: 700;
+    }
+  }
+
+  &__sellerMeta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__sellerLabel {
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+  }
+
+  &__sellerName {
     overflow: hidden;
-    font-family: var(--ff-mono);
-    font-size: 1.05rem;
+    font-size: var(--font-size-12, 0.78rem);
     font-weight: 700;
-    letter-spacing: -0.01em;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  &__priceSymbol {
+  &__pricePill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     flex-shrink: 0;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     font-family: var(--ff-mono);
-    font-size: 0.95rem;
+    font-size: var(--font-size-12, 0.78rem);
     font-weight: 700;
+    white-space: nowrap;
+  }
+
+  &__pricePillSymbol {
     color: var(--text-muted);
   }
 
   &__priceIcon {
     flex-shrink: 0;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 999px;
   }
 

@@ -50,7 +50,12 @@ export const buildAssetLinks = ({ chainId, chainInfo, collection, tokenId, isLsp
     }
   }
 
-  const openseaBase = chainId === 10143 ? 'https://testnets.opensea.io/assets/monad_testnet' : OPENSEA_CHAIN_SLUGS[chainId] ? `https://opensea.io/assets/${OPENSEA_CHAIN_SLUGS[chainId]}` : null
+  const openseaBase =
+    chainId === 10143
+      ? 'https://testnets.opensea.io/assets/monad_testnet'
+      : OPENSEA_CHAIN_SLUGS[chainId]
+        ? `https://opensea.io/assets/${OPENSEA_CHAIN_SLUGS[chainId]}`
+        : null
   if (openseaBase) {
     const collectionUrl = `${openseaBase}/${collection.toLowerCase()}`
     return { collectionUrl, tokenUrl: `${collectionUrl}/${BigInt(tokenId)}` }
@@ -76,7 +81,7 @@ const erc725yAbi = [
 ]
 
 // LSP7 Digital Asset (LUKSO) — operator-based equivalents of allowance/approve
-const lsp7Abi = [
+export const lsp7Abi = [
   {
     type: 'function',
     name: 'authorizedAmountFor',
@@ -208,7 +213,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
   }
 
   const symbol = isNativePrice ? nativeCurrency?.symbol || '' : curatedToken?.symbol || (isTokenLsp7 ? lsp4Symbol : erc20Symbol) || 'tokens'
-  const decimals = isNativePrice ? nativeCurrency?.decimals ?? 18 : tokenDecimals
+  const decimals = isNativePrice ? (nativeCurrency?.decimals ?? 18) : tokenDecimals
   const priceNumber = price !== undefined && decimals !== undefined ? Number(formatUnits(price, decimals)) : null
   const formattedPrice = priceNumber !== null ? amountFormat.format(priceNumber) : null
 
@@ -267,10 +272,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
   // the attribution in those cases (seller reposting their own listing, buyer buying
   // through their own repost) instead of failing the purchase
   const referralArg =
-    referral &&
-    isAddress(referral) &&
-    referral.toLowerCase() !== address?.toLowerCase() &&
-    referral.toLowerCase() !== seller?.toLowerCase()
+    referral && isAddress(referral) && referral.toLowerCase() !== address?.toLowerCase() && referral.toLowerCase() !== seller?.toLowerCase()
       ? referral
       : zeroAddress
 
@@ -459,7 +461,11 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
               <span>
                 Details
                 <CaretUpDownIcon size={12} weight="bold" className={styles.tradeCard__breakdownGlyph} />
-                <XIcon size={12} weight="bold" className={clsx(styles.tradeCard__breakdownGlyph, styles['tradeCard__breakdownGlyph--open'])} />
+                <XIcon
+                  size={12}
+                  weight="bold"
+                  className={clsx(styles.tradeCard__breakdownGlyph, styles['tradeCard__breakdownGlyph--open'])}
+                />
               </span>
             </summary>
 

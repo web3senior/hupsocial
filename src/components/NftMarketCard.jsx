@@ -2,13 +2,18 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import clsx from 'clsx'
 import { CubeIcon, DiamondIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
 import { formatStake } from '@/hooks/useStakeToken'
+import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenImage } from '@/lib/utils'
 import useNftMetadata from '@/hooks/useNftMetadata'
+import NftQuickBuy from '@/components/NftQuickBuy'
 import { appChains } from '@/config/contracts'
 import styles from './NftMarketCard.module.scss'
+
+const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
 
 const TOKEN_ID_FORMAT = new Intl.NumberFormat('en')
 
@@ -53,6 +58,10 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
   const isLsp8 = Boolean(Number(listing.is_lsp8))
   const isSold = Number(listing.status) === 2
 
+  // Same resolver the grid's seller filter uses — the row's own profile_image is
+  // DB/UP-only and points plain EOA sellers at a broken image
+  const { profile } = useProfile(listing.wallet_address)
+
   const metadata = useNftMetadata({
     chainId: networkId,
     collection: listing.collection,
@@ -80,6 +89,7 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
 
   const formattedPrice = formatStake(listing.price, listing.decimals)
   const lastSalePrice = listing.last_sale_price ? formatStake(listing.last_sale_price, listing.last_sale_decimals) : null
+  const sellerName = listing.display_name || (listing.wallet_address ? shortAddress(listing.wallet_address) : '')
 
   // Seller-set referral share, same formatting as TradeCard — reposters filter on it,
   // so it has to be readable on the tile. Moot once sold, so it rides with the badge.
@@ -87,58 +97,83 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
 
   return (
-    <Link href={`/nfts/${networkId}/${listing.listing_id}`} className={styles.nftCard} onClick={(e) => e.stopPropagation()}>
-      <div className={styles.nftCard__media}>
-        {metadata.image ? (
-          <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" onError={handleBrokenImage} />
-        ) : (
-          <div className={styles.nftCard__mediaFallback}>
-            <HupMark size={44} />
-          </div>
-        )}
-        {isSold && <span className={styles.nftCard__sold}>Sold</span>}
-        {!isSold && referralPercent && <span className={styles.nftCard__referral}>{referralPercent}% ref</span>}
-        {/* Same badge the listing page carries, so a collection that ships meshes reads as
-            one at grid scale. Every model counts, renderable or not — the detail page is
-            where a glb becomes a viewer and an fbx becomes a download. */}
-        {metadata.model && (
-          <span
-            className={styles.nftCard__model}
-            title={metadata.model.fileType ? `Ships a 3D file (.${metadata.model.fileType})` : 'Ships a 3D file'}
-          >
-            <CubeIcon size={11} weight="fill" />
-            3D
-          </span>
-        )}
-      </div>
-
-      <div className={styles.nftCard__body}>
-        <div className={styles.nftCard__titleRow}>
-          {isMetaLoading ? (
-            <span className={styles.nftCard__skeleton} />
+    <div className={styles.nftCard}>
+      <Link href={`/nfts/${networkId}/${listing.listing_id}`} className={styles.nftCard__link} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.nftCard__media}>
+          {metadata.image ? (
+            <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" onError={handleBrokenImage} />
           ) : (
-            <span className={styles.nftCard__title}>{metadata.collectionName || metadata.name || 'Unnamed'}</span>
+            <div className={styles.nftCard__mediaFallback}>
+              <HupMark size={44} />
+            </div>
           )}
-          <span className={styles.nftCard__tokenId}>
-            <DiamondIcon size={11} weight="fill" />#{formatTokenId(listing.token_id)}
-          </span>
-        </div>
-
-        <div className={styles.nftCard__price}>
-          <span className={styles.nftCard__priceValue}>{formattedPrice ?? '…'}</span>
-          {listing.symbol && <span className={styles.nftCard__priceSymbol}>{listing.symbol}</span>}
-          {chainIcon && <img className={styles.nftCard__priceIcon} src={chainIcon} alt="" title={chain?.name} />}
-        </div>
-
-        {/* Reserved even when empty so tiles in a row keep a common baseline */}
-        <div className={styles.nftCard__lastSale}>
-          {lastSalePrice && (
-            <>
-              Last sale <span className={styles.nftCard__lastSaleValue}>{lastSalePrice}</span> {listing.last_sale_symbol || ''}
-            </>
+          {isSold && <span className={styles.nftCard__sold}>Sold</span>}
+          {!isSold && referralPercent && <span className={styles.nftCard__referral}>{referralPercent}% ref</span>}
+          {/* Same badge the listing page carries, so a collection that ships meshes reads as
+              one at grid scale. Every model counts, renderable or not — the detail page is
+              where a glb becomes a viewer and an fbx becomes a download. */}
+          {metadata.model && (
+            <span
+              className={styles.nftCard__model}
+              title={metadata.model.fileType ? `Ships a 3D file (.${metadata.model.fileType})` : 'Ships a 3D file'}
+            >
+              <CubeIcon size={11} weight="fill" />
+              3D
+            </span>
           )}
         </div>
+
+        <div className={styles.nftCard__body}>
+          <div className={styles.nftCard__titleRow}>
+            {isMetaLoading ? (
+              <span className={styles.nftCard__skeleton} />
+            ) : (
+              <span className={styles.nftCard__title}>{metadata.collectionName || metadata.name || 'Unnamed'}</span>
+            )}
+            <span className={styles.nftCard__tokenId}>
+              <DiamondIcon size={11} weight="fill" />#{formatTokenId(listing.token_id)}
+            </span>
+          </div>
+
+          {/* Seller left, price right — the two facts a buyer compares tile to tile */}
+          <div className={styles.nftCard__footer}>
+            <span className={styles.nftCard__seller}>
+              {profile?.profileImage ? (
+                <img className={styles.nftCard__sellerAvatar} src={profile.profileImage} alt="" loading="lazy" onError={handleBrokenImage} />
+              ) : (
+                <span className={clsx(styles.nftCard__sellerAvatar, styles['nftCard__sellerAvatar--fallback'])} aria-hidden="true">
+                  {sellerName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className={styles.nftCard__sellerMeta}>
+                <span className={styles.nftCard__sellerLabel}>{isSold ? 'Sold by' : 'Owned by'}</span>
+                <span className={styles.nftCard__sellerName}>{sellerName}</span>
+              </span>
+            </span>
+
+            <span className={styles.nftCard__pricePill}>
+              {formattedPrice ?? '…'}
+              {listing.symbol && <span className={styles.nftCard__pricePillSymbol}>{listing.symbol}</span>}
+              {chainIcon && <img className={styles.nftCard__priceIcon} src={chainIcon} alt="" title={chain?.name} />}
+            </span>
+          </div>
+
+          {/* Reserved even when empty so tiles in a row keep a common baseline */}
+          <div className={styles.nftCard__lastSale}>
+            {lastSalePrice && (
+              <>
+                Last sale <span className={styles.nftCard__lastSaleValue}>{lastSalePrice}</span> {listing.last_sale_symbol || ''}
+              </>
+            )}
+          </div>
+        </div>
+      </Link>
+
+      {/* Hover overlay riding the artwork's bottom edge; NftQuickBuy self-gates for
+          sold/cancelled rows and the seller's own tiles, leaving an inert empty layer */}
+      <div className={styles.nftCard__quickBuy}>
+        <NftQuickBuy listing={listing} />
       </div>
-    </Link>
+    </div>
   )
 }
