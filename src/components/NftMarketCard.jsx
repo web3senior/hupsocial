@@ -12,6 +12,7 @@ import useNftMetadata from '@/hooks/useNftMetadata'
 import NftQuickBuy from '@/components/NftQuickBuy'
 import { appChains } from '@/config/contracts'
 import styles from './NftMarketCard.module.scss'
+import Profile from './Profile'
 
 const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
 
@@ -139,7 +140,13 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
           <div className={styles.nftCard__footer}>
             <span className={styles.nftCard__seller}>
               {profile?.profileImage ? (
-                <img className={styles.nftCard__sellerAvatar} src={profile.profileImage} alt="" loading="lazy" onError={handleBrokenImage} />
+                <img
+                  className={styles.nftCard__sellerAvatar}
+                  src={profile.profileImage}
+                  alt=""
+                  loading="lazy"
+                  onError={handleBrokenImage}
+                />
               ) : (
                 <span className={clsx(styles.nftCard__sellerAvatar, styles['nftCard__sellerAvatar--fallback'])} aria-hidden="true">
                   {sellerName.slice(0, 1).toUpperCase()}
@@ -150,7 +157,6 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
                 <span className={styles.nftCard__sellerName}>{sellerName}</span>
               </span>
             </span>
-
             <span className={styles.nftCard__pricePill}>
               {formattedPrice ?? '…'}
               {listing.symbol && <span className={styles.nftCard__pricePillSymbol}>{listing.symbol}</span>}
@@ -159,13 +165,12 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
           </div>
 
           {/* Reserved even when empty so tiles in a row keep a common baseline */}
-          <div className={styles.nftCard__lastSale}>
-            {lastSalePrice && (
-              <>
-                Last sale <span className={styles.nftCard__lastSaleValue}>{lastSalePrice}</span> {listing.last_sale_symbol || ''}
-              </>
-            )}
-          </div>
+
+          {lastSalePrice && (
+            <div className={styles.nftCard__lastSale}>
+              Last sale <span className={styles.nftCard__lastSaleValue}>{lastSalePrice}</span> {listing.last_sale_symbol || ''}
+            </div>
+          )}
         </div>
       </Link>
 
