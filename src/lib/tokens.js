@@ -70,3 +70,37 @@ export const TIP_TOKENS = {
   ],
   // 143 (monad), 4663 (robinhood): no curated tokens yet
 }
+
+// Curated swap-page tokens per chainId — what the token picker offers up front alongside the
+// native coin. Launch tokens arrive from /api/v1/launches and anything else via the picker's
+// custom-address input, so this list stays short: majors with real v3 liquidity. Decimals are
+// read onchain at swap time, not trusted from here. WNATIVE is deliberately absent — pairing
+// it against the native coin is a wrap, not a swap, and the swap form rejects that pair.
+export const SWAP_TOKENS = {
+  // Mainnet entries reuse the TIP_TOKENS addresses above (verified onchain 2026-07-17)
+  1: [
+    { symbol: 'USDC', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+    { symbol: 'USDT', address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
+  ],
+  56: [
+    { symbol: 'USDT', address: '0x55d398326f99059fF775485246999027B3197955' }, // 18 decimals
+    { symbol: 'USDC', address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d' }, // Binance-Peg, 18 decimals
+  ],
+  8453: [
+    { symbol: 'USDC', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' }, // native Circle USDC
+  ],
+  42161: [
+    { symbol: 'USDC', address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831' }, // native Circle USDC
+    { symbol: 'USD₮0', address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9' },
+  ],
+  42220: [
+    { symbol: 'USDC', address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C' }, // native Circle USDC
+    { symbol: 'USDm', address: '0x765DE816845861e75A25fCA122bb6898B8B1282a' }, // ex-cUSD (Mento)
+  ],
+  // 143 (monad): no canonical USDC configured yet — picker offers WMON-paired pastes only
+  84532: [
+    // Circle testnet USDC — symbol/decimals verified onchain 2026-08-12; WETH/USDC pools
+    // live on the official Base Sepolia v3 factory (100 + 500 tiers seen with liquidity)
+    { symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' },
+  ],
+}

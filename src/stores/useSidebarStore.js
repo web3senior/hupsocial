@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import {
+  ArrowsDownUpIcon,
   BellIcon,
   BookmarkSimpleIcon,
   BriefcaseIcon,
@@ -35,6 +36,10 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'bazaar', name: 'Bazaar', path: '/bazaar', icon: TagIcon },
   { id: 'nfts', name: 'NFTs', path: '/nfts', icon: StorefrontIcon },
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
+  // Tokens (/launches) hidden from the nav 2026-08-13 at the user's request — the swap page
+  // carries token discovery now; the directory stays reachable at /launches. To restore:
+  // { id: 'tokens', name: 'Tokens', path: '/launches', icon: CoinIcon } (re-import CoinIcon).
+  { id: 'swap', name: 'Swap', path: '/swap', icon: ArrowsDownUpIcon },
   { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },

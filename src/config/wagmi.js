@@ -3,18 +3,16 @@ import {
   arbitrum,
   arbitrumSepolia,
   base,
+  baseSepolia,
   bsc,
   celo,
-  linea,
   lukso,
   mainnet,
   monad,
-  monadTestnet,
   optimismSepolia,
   sepolia,
   somniaTestnet,
   unichainSepolia,
-  pulsechain
 } from 'wagmi/chains'
 import { injected, safe, walletConnect } from 'wagmi/connectors'
 import { appChains, CONTRACTS, robinhood } from './contracts'
@@ -26,14 +24,10 @@ export { CONTRACTS, robinhood }
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ``
 
-
 // Customize chains object
 // LUKSO
-lukso.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10950_4143)"><g clip-path="url(#clip1_10950_4143)"><path d="M15.6858 3.4167L10.4508 0.415708C9.52382 -0.117736 8.37782 -0.117736 7.45082 0.415708L2.21582 3.4167C1.28882 3.95014 0.71582 4.93359 0.71582 5.9975V12.0025C0.71582 13.0664 1.28882 14.0498 2.21582 14.5833L7.45082 17.5872C8.37782 18.1207 9.52382 18.1207 10.4508 17.5872L15.6858 14.5833C16.6128 14.0498 17.1858 13.0664 17.1858 12.0025V5.9975C17.1858 4.93359 16.6158 3.95014 15.6858 3.4167ZM13.1058 9.59749L11.5488 12.2766C11.3358 12.6462 10.9398 12.8727 10.5108 12.8727H7.39382C6.96482 12.8727 6.56882 12.6462 6.35582 12.2766L4.79582 9.59749C4.58282 9.22796 4.58282 8.77498 4.79582 8.40544L6.35282 5.7263C6.56582 5.35677 6.96182 5.13028 7.39082 5.13028H10.5048C10.9338 5.13028 11.3298 5.35677 11.5428 5.7263L13.0998 8.40544C13.3188 8.77498 13.3188 9.22796 13.1058 9.59749Z" fill="#FE005B"/></g></g><defs><clipPath id="clip0_10950_4143"><rect width="18" height="18" fill="white"/></clipPath><clipPath id="clip1_10950_4143"><rect width="16.3907" height="18" fill="white" transform="translate(0.701172)"/></clipPath></defs></svg>`
+lukso.icon = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12569_3554)"><path d="M27.6553 6.05588L18.3339 0.712379C16.6833 -0.23746 14.6428 -0.23746 12.9922 0.712379L3.67087 6.05588C2.02027 7.00572 1 8.75682 1 10.6512V21.3435C1 23.2379 2.02027 24.989 3.67087 25.9388L12.9922 31.2876C14.6428 32.2375 16.6833 32.2375 18.3339 31.2876L27.6553 25.9388C29.3059 24.989 30.3261 23.2379 30.3261 21.3435V10.6512C30.3261 8.75682 29.3112 7.00572 27.6553 6.05588ZM23.0614 17.0613L20.289 21.8317C19.9097 22.4897 19.2046 22.893 18.4408 22.893H12.8907C12.1268 22.893 11.4217 22.4897 11.0425 21.8317L8.26476 17.0613C7.8855 16.4033 7.8855 15.5967 8.26476 14.9387L11.0371 10.1683C11.4164 9.51032 12.1215 9.10704 12.8854 9.10704H18.4301C19.1939 9.10704 19.8991 9.51032 20.2783 10.1683L23.0507 14.9387C23.4406 15.5967 23.4406 16.4033 23.0614 17.0613Z" fill="#FE005B"/></g><defs><clipPath id="clip0_12569_3554"><rect width="32" height="32" fill="white"/></clipPath></defs></svg>`
 lukso.faucetUrl = `https://faucet.testnet.lukso.network/`
-// luksoTestnet.rpcUrls.default.http = [
-//   `https://4201.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID}`,
-// ]
 lukso.primaryColor = `#FD1669`
 lukso.textColor = `#fff`
 
@@ -59,15 +53,11 @@ monad.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
 monad.primaryColor = `#836EF9`
 monad.textColor = `#fff`
 
-monadTestnet.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10745_2838)"><path d="M8.99994 0C6.40097 0 0 6.4008 0 8.99994C0 11.5991 6.40097 18 8.99994 18C11.5989 18 18 11.599 18 8.99994C18 6.40091 11.599 0 8.99994 0ZM7.59746 14.1464C6.50149 13.8478 3.55489 8.69344 3.85359 7.59746C4.15229 6.50143 9.30656 3.55488 10.4025 3.85358C11.4985 4.15222 14.4451 9.30651 14.1464 10.4025C13.8477 11.4985 8.69344 14.4451 7.59746 14.1464Z" fill="#836EF9"/></g><defs><clipPath id="clip0_10745_2838"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
-monadTestnet.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
-monadTestnet.primaryColor = `#836EF9`
-monadTestnet.textColor = `#fff`
-
-// Linea
-linea.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"> <g clip-path="url(#clip0_10733_2645)"> <path d="M0 0H18V18H0V0Z" fill="#190066"/> <path d="M6.4 11.67H12V13H5V6H6.4V11.67ZM11.75 4.5C12.0815 4.5 12.3995 4.6317 12.6339 4.86612C12.8683 5.10054 13 5.41848 13 5.75C13 6.08152 12.8683 6.39946 12.6339 6.63388C12.3995 6.8683 12.0815 7 11.75 7C11.4185 7 11.1005 6.8683 10.8661 6.63388C10.6317 6.39946 10.5 6.08152 10.5 5.75C10.5 5.41848 10.6317 5.10054 10.8661 4.86612C11.1005 4.6317 11.4185 4.5 11.75 4.5Z" fill="#61DFFF"/> </g> <defs> <clipPath id="clip0_10733_2645"> <rect width="18" height="18" fill="white"/> </clipPath> </defs> </svg>`
-linea.primaryColor = `#190066`
-linea.textColor = `#61DFFF`
+// Base Sepolia
+baseSepolia.icon = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12582_3557)"><path d="M28 0H4C1.79086 0 0 1.79086 0 4V28C0 30.2091 1.79086 32 4 32H28C30.2091 32 32 30.2091 32 28V4C32 1.79086 30.2091 0 28 0Z" fill="#9A9C9F"/><path fill-rule="evenodd" clip-rule="evenodd" d="M15.9832 26C21.5061 26 25.9832 21.5229 25.9832 16C25.9832 10.4772 21.5061 6 15.9832 6C10.7438 6 6.44544 10.0294 6.01808 15.1585H20.8574V16.8237H6.0166C6.43544 21.9612 10.7376 26 15.9832 26Z" fill="white"/></g><defs><clipPath id="clip0_12582_3557"><rect width="32" height="32" fill="white"/></clipPath></defs></svg>`
+baseSepolia.faucetUrl = `https://faucets.chain.link/base-sepolia`
+baseSepolia.primaryColor = `#0052FF`
+baseSepolia.textColor = `#fff`
 
 // OptimismSepolia
 optimismSepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10964_3437)"><path d="M18 0H0V18H18V0Z" fill="#FE0420"/><path fill-rule="evenodd" clip-rule="evenodd" d="M3.64398 11.5333C4.07903 11.8444 4.63715 12 5.31834 12C6.14264 12 6.80091 11.8139 7.29322 11.4417C7.78551 11.0639 8.13181 10.4944 8.33218 9.73332C8.45238 9.26667 8.55541 8.78611 8.6413 8.29167C8.66992 8.11389 8.68421 7.96667 8.68421 7.85C8.68421 7.46111 8.58403 7.12778 8.38369 6.85C8.18333 6.56667 7.90858 6.35556 7.5594 6.21667C7.21021 6.07222 6.81524 6 6.37447 6C4.75449 6 3.74988 6.76389 3.36063 8.29167C3.22325 8.85278 3.11735 9.33333 3.04293 9.73332C3.01431 9.9111 3 10.0611 3 10.1833C3 10.7667 3.21466 11.2167 3.64398 11.5333ZM6.74367 9.68334C6.5793 10.3215 6.12578 10.7368 5.43855 10.7368C4.75869 10.7368 4.52622 10.2771 4.64859 9.68334C4.75163 9.14445 4.85467 8.68889 4.95771 8.31667C5.13523 7.62748 5.55191 7.26316 6.26284 7.26316C6.93965 7.26316 7.16201 7.71644 7.04422 8.31667C6.9755 8.70556 6.87535 9.1611 6.74367 9.68334ZM9.34562 11.94C9.37902 11.98 9.42633 12 9.48761 12H10.6235C10.6792 12 10.732 11.98 10.7822 11.94C10.8323 11.9 10.8629 11.8486 10.874 11.7857L11.2693 10H12.425C13.1544 10 13.6887 9.75144 14.1063 9.43716C14.5295 9.12285 14.8107 8.63714 14.9499 7.98C14.9833 7.82571 15 7.67714 15 7.53429C15 7.03714 14.8107 6.65714 14.432 6.39429C14.059 6.13143 13.5634 6 12.9453 6H10.7237C10.668 6 10.6151 6.02 10.565 6.06C10.5149 6.1 10.4843 6.15143 10.4731 6.21429L9.32055 11.7857C9.30941 11.8429 9.31778 11.8943 9.34562 11.94ZM13.4047 7.96286C13.3008 8.4217 12.9369 8.74352 12.4671 8.74352H11.5066L11.8011 7.26316H12.8034C13.1446 7.26316 13.4298 7.33041 13.4298 7.70571C13.4298 7.78 13.4214 7.86571 13.4047 7.96286Z" fill="white"/></g><defs><clipPath id="clip0_10964_3437"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
@@ -93,6 +83,7 @@ somniaTestnet.textColor = `#F50947`
 robinhood.icon = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12476_3591)"><path d="M0 4C0 1.79086 1.79086 0 4 0H28C30.2091 0 32 1.79086 32 4V28C32 30.2091 30.2091 32 28 32H4C1.79086 32 0 30.2091 0 28V4Z" fill="#CCFF00"/><path d="M17.9177 11.0605H14.2823C14.1508 11.0605 14.0312 11.1087 13.9475 11.2291L11.3405 14.4794C10.9579 14.9609 10.8622 15.4063 10.8622 16.0443V19.3669C10.0132 21.7624 9.47504 23.3876 9.08041 24.8562C9.04454 24.9525 9.09237 25.0007 9.17608 25.0007H9.57071C9.64245 25.0007 9.70225 24.9646 9.73812 24.9044C12.7158 17.2722 15.9565 13.4922 17.9894 11.2291C18.0731 11.1328 18.0373 11.0605 17.9177 11.0605Z" fill="#1C180D"/><path d="M18.0269 7.31628C17.7997 7.42462 17.6801 7.4487 17.4409 7.66538C16.3647 8.59232 15.6472 9.32665 14.9655 10.0489C14.8818 10.1332 14.9177 10.2175 15.0373 10.2175H19.0673C19.438 10.2175 19.6532 10.4342 19.6532 10.8073V15.3818C19.6532 15.5022 19.7489 15.5383 19.8206 15.43L22.2482 12.2399C22.6428 11.7222 22.7624 11.5657 22.87 10.8434C23.0135 9.78408 22.9298 8.15895 22.296 7.48481C21.734 6.88291 19.1988 6.85883 18.0269 7.31628Z" fill="#1C180D"/><path d="M18.6352 11.9751C16.1359 14.78 14.1866 17.7293 12.3809 21.2806C12.3331 21.3769 12.3929 21.4491 12.5005 21.413L16.2315 20.2573C16.6501 20.149 16.8892 19.9564 17.0925 19.6193L18.7548 16.8626C18.7906 16.7903 18.8026 16.7061 18.8026 16.6459V12.0473C18.8026 11.9269 18.7189 11.8788 18.6352 11.9751Z" fill="#1C180D"/></g><defs><clipPath id="clip0_12476_3591"><rect width="32" height="32" fill="white"/></clipPath></defs></svg>`
 robinhood.primaryColor = `#00C805`
 robinhood.textColor = `#fff`
+robinhood.isNew = true
 
 // BNB
 bsc.icon = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12476_3599)"><path d="M28 0H4C1.79086 0 0 1.79086 0 4V28C0 30.2091 1.79086 32 4 32H28C30.2091 32 32 30.2091 32 28V4C32 1.79086 30.2091 0 28 0Z" fill="#F0B90B"/><path d="M9.41131 16.0002L9.42186 19.8686L12.7088 21.8028V24.0675L7.49824 21.0115V14.8691L9.41131 16.0002ZM9.41131 12.1319V14.3861L7.49707 13.2537V10.9995L9.41131 9.86719L11.3349 10.9995L9.41131 12.1319ZM14.0815 10.9995L15.9957 9.86719L17.9193 10.9995L15.9957 12.1319L14.0815 10.9995Z" fill="white"/><path d="M10.7939 19.0668V16.8021L12.7082 17.9344V20.1886L10.7939 19.0668ZM14.0809 22.6139L15.9951 23.7463L17.9187 22.6139V24.8681L15.9951 26.0005L14.0809 24.8681V22.6139ZM20.6641 10.9995L22.5783 9.86719L24.5019 10.9995V13.2537L22.5783 14.3861V12.1319L20.6641 10.9995ZM22.5783 19.8686L22.5889 16.0002L24.5031 14.8679V21.0103L19.2926 24.0663V21.8016L22.5783 19.8686Z" fill="white"/><path d="M21.2053 19.0675L19.291 20.1893V17.9351L21.2053 16.8027V19.0675Z" fill="white"/><path d="M21.2056 12.9337L21.2162 15.1984L17.9199 17.1326V21.0103L16.0057 22.1322L14.0914 21.0103V17.1326L10.7951 15.1984V12.9337L12.7176 11.8013L15.9939 13.7449L19.2902 11.8013L21.2139 12.9337H21.2056ZM10.7939 9.06654L15.9951 6L21.2056 9.06654L19.2914 10.1989L15.9951 8.25536L12.7082 10.1989L10.7939 9.06654Z" fill="white"/></g><defs><clipPath id="clip0_12476_3599"><rect width="32" height="32" fill="white"/></clipPath></defs></svg>`
@@ -126,9 +117,8 @@ const iconChains = [
   lukso,
   celo,
   base,
+  baseSepolia,
   monad,
-  monadTestnet,
-  linea,
   optimismSepolia,
   unichainSepolia,
   arbitrum,
@@ -155,13 +145,15 @@ export const config = createConfig({
     [mainnet.id]: http('https://ethereum-rpc.publicnode.com'),
     [lukso.id]: http(),
     [bsc.id]: http(),
+    // The official Robinhood endpoint (rpc.mainnet.chain.robinhood.com) sends a malformed
+    // Access-Control-Allow-Origin ('*,*') that browsers reject — every client-side read on
+    // 4663 (swap quotes, balances) fails CORS against it. Publicnode passes preflight.
+    [robinhood.id]: http('https://robinhood-rpc.publicnode.com'),
     [monad.id]: http(),
-    [monadTestnet.id]: http(),
     [arbitrum.id]: http(),
     [base.id]: http(),
+    [baseSepolia.id]: http(),
     [celo.id]: http(),
-    [linea.id]: http(),
-    [robinhood.id]: http(),
   },
   ssr: true,
   // storage: createStorage({
