@@ -8,8 +8,8 @@
   justify-content: center;
   gap: 0.4rem;
   flex-shrink: 0;
+  padding-block: 0.4rem;
   padding-inline: calc(var(--spacing) * 3);
-  height: 38px;
   border-radius: var(--radius-12);
   border: 1px solid var(--border);
   background-color: var(--surface);
@@ -22,7 +22,7 @@
     border-color 0.2s ease;
 
   &:hover {
-    background-color: var(--gray-50);
+    background-color: var(--surface-muted);
   }
 
   &:active {
@@ -59,7 +59,7 @@
 
   &__name {
     position: relative;
-    font-weight: 600;
+    font-weight: 500;
         @include resp.sm-down {
       display: none;
       
@@ -77,22 +77,29 @@
   }
 }
 
-// Sizing only — never a bare `display` here. NativePopover owns the panel's display
-// (block when open, the UA's none when closed); an author `display` on this element
-// overrides the UA rule and leaves the panel permanently on screen.
+// Sizing only — never a `display` here, on the closed state or the open one. NativePopover
+// owns it (block when open, the UA's none when closed); an author `display` overrides the UA
+// rule and leaves the panel permanently on screen, and an author `display: flex !important`
+// on the open state only beat NativePopover's own `!important` by source order.
+//
+// The panel stays a plain block box on purpose. It used to be a column flex container
+// with `max-height` on itself and `flex: 1` on the list below, which made the list a
+// flex item with a 0% basis inside a container whose height was indefinite. WebKit sizes
+// such a container from its items' flex base sizes rather than their content, so the list
+// contributed nothing, collapsed to zero, and got clipped by `overflow: hidden` — Safari
+// showed the footer alone with no chains on it. Bounding the scroller directly keeps the
+// height purely content-driven, which every engine agrees on.
 .network-select-panel {
   width: min(220px, 90vw);
-  max-height: 60svh;
   overflow: hidden;
-  flex-direction: column;
   padding: 0.2rem;
-  &:global(:popover-open) {
-    display: flex !important;
-  }
 
   &__container {
-    flex: 1;
-    min-height: 0;
+    // Caps the list itself instead of the panel, so the footer sits below the cap
+    // rather than competing with the list for a shared height. The vh line is the
+    // fallback for engines without small-viewport units.
+    max-height: 55vh;
+    max-height: 55svh;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -155,7 +162,7 @@
 
   &__check {
     flex-shrink: 0;
-    color: var(--black);
+    color: var(--color);
   }
   &__new {
     font-size: var(--font-size-9);
