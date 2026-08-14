@@ -8,6 +8,16 @@ import { resolveStorageImageUrl } from '@/lib/storageHelper'
 // Deduplicate the fetch so generateMetadata and Page share one request per render
 const fetchPost = cache((networkId, postId) => getPostById(networkId, postId, null))
 
+/* Crawlers give an OG image only a few seconds before abandoning the card, and several
+   (WhatsApp, Telegram) cap the payload outright. 800w/q60 cuts the transfer roughly 4x
+   versus 1200/q80 while still clearing X's summary_large_image minimum (300x157) and
+   Facebook's recommended 600x315, so links keep rendering as large cards.
+   still:1 skips the per-frame animated encode — no OG card plays animation anyway. */
+const OG_IMAGE_OPTIONS = { width: 800, quality: 60, still: true }
+
+/* 1.91:1, the ratio crawlers assume, used when the post never recorded media dimensions */
+const OG_FALLBACK_RATIO = 630 / 1200
+
 export async function generateMetadata({ params }, parent) {
   // Fetch and resolve the parent metadata object
   const parentMetadata = await parent
@@ -23,22 +33,28 @@ export async function generateMetadata({ params }, parent) {
     // Initialize an array to hold mapped images for metadata tags
     let images = []
 
+    /* Only the first image is advertised: Facebook and LinkedIn fetch every og:image
+       candidate before picking one, so a multi-image post multiplied the cold IPFS
+       round trips a crawler had to survive before rendering anything */
     const mediaElement = item?.content?.elements?.find((el) => el?.type === 'media')
-    if (mediaElement?.data?.items?.length > 0) {
-      mediaElement.data.items.forEach((mediaItem) => {
-        if (mediaItem.type === 'image') {
-          /* Relative proxy URLs are absolutized by metadataBase for crawlers */
-          const url = mediaItem.cid.startsWith('http') ? mediaItem.cid : resolveStorageImageUrl(mediaItem.cid, { width: 1200 })
-          if (url) {
-            images.push({
-              url,
-              width: mediaItem.width || 1200,
-              height: mediaItem.height || 630,
-              alt: mediaItem.alt || 'Post Image',
-            })
-          }
-        }
-      })
+    const firstImage = mediaElement?.data?.items?.find((mediaItem) => mediaItem?.type === 'image')
+
+    if (firstImage?.cid) {
+      /* Relative proxy URLs are absolutized by metadataBase for crawlers */
+      const url = resolveStorageImageUrl(firstImage.cid, OG_IMAGE_OPTIONS)
+      if (url) {
+        /* The proxy never enlarges, so the served width is whichever is smaller */
+        const width = Math.min(firstImage.width || OG_IMAGE_OPTIONS.width, OG_IMAGE_OPTIONS.width)
+        const height =
+          firstImage.width && firstImage.height ? Math.round((width * firstImage.height) / firstImage.width) : Math.round(width * OG_FALLBACK_RATIO)
+
+        images.push({
+          url,
+          width,
+          height,
+          alt: firstImage.alt || 'Post Image',
+        })
+      }
     }
 
     // Fall back to empty text string if body content cannot be resolved

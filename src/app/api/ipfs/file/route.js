@@ -177,7 +177,11 @@ export async function GET(req) {
     return new Response(optimizedBuffer, {
       headers: {
         'Content-Type': 'image/webp',
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        /* The output is a pure function of cid + params, so it can sit in the shared cache
+           forever. Without s-maxage only browsers cached it, and every social crawler that
+           scraped a link paid the full gateway fetch + sharp re-encode again. */
+        'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable',
+        'CDN-Cache-Control': 'public, s-maxage=31536000',
       },
     })
   } catch (error) {
