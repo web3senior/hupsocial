@@ -5,10 +5,15 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { communityJoin } from '@/lib/communityJoin'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { getFollowingAddresses } from '@/lib/followSystem'
 
 export const runtime = 'nodejs'
+
+// Pinned to the current HupCommunity deployment per network — an unpinned join multiplies every
+// community post by the number of deployments that chain has hosted (see lib/communityJoin.js)
+const COMMUNITY_JOIN = communityJoin()
 
 // --- Trending feed configuration ---
 // Velocity ranking: posts are scored by engagement RECEIVED inside a trailing
@@ -22,6 +27,17 @@ const TRENDING_WINDOWS_HOURS = [24, 168] // 24h first; 7-day fallback keeps a qu
 const TRENDING_COMMENT_WEIGHT = 3 // comments are costlier to fake than likes
 
 const trendingCache = new Map()
+
+// --- Author cooldown (chronological discovery feeds) ---
+// Posting is onchain, so nothing can rate-limit a spammer at write time — the feed has to do it
+// at read time. Each author gets at most AUTHOR_BURST_CAP posts per AUTHOR_BURST_WINDOW_HOURS
+// bucket and AUTHOR_DAILY_CAP per day; the overflow never enters the feed (it stays reachable on
+// the author's profile and by permalink). Buckets are fixed wall-clock slices rather than a
+// rolling gap so the ranking is deterministic — an offset-paginated feed whose filter depends on
+// which rows preceded it would shift posts between pages.
+const AUTHOR_BURST_WINDOW_HOURS = 1
+const AUTHOR_BURST_CAP = 2
+const AUTHOR_DAILY_CAP = 6
 
 export async function GET(request) {
   try {
@@ -182,20 +198,35 @@ export async function GET(request) {
     }
     queryParams.push(...whereParams)
 
+    // Discovery feeds (home, premium, nft) rate-limit each author so a single wallet can't own
+    // the timeline. Profile timelines, community rooms and following are deliberate subscriptions
+    // to one author or one room, so they stay complete; trending does its own per-author dedup.
+    const applyAuthorCooldown = !walletAddress && !communityId && feedType !== 'following'
+
     // Paginate FIRST inside a derived table (filter + sort on the bare posts table), then join
     // back to hydrate the page. Applying whereClause directly to buildPostSelect let the
     // optimizer materialize the metric subqueries for EVERY matching post before the filesort,
     // so LIMIT never limited the work (14s unfiltered feeds in production).
+    const pageSubquery = applyAuthorCooldown
+      ? `SELECT pid, pnid FROM (${buildAuthorCooldownRanking(whereClause)}) ranked
+         WHERE (burst_seq <= ${AUTHOR_BURST_CAP} AND day_seq <= ${AUTHOR_DAILY_CAP})
+           ${viewerAddress ? `OR LOWER(pwallet) = LOWER(?)` : ''}
+         ORDER BY pcreated DESC, pid DESC
+         LIMIT ? OFFSET ?`
+      : `SELECT p.id AS pid, p.network_id AS pnid
+         FROM posts p
+         ${COMMUNITY_JOIN}
+         ${whereClause}
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT ? OFFSET ?`
+
     const query = `${buildPostSelect(viewerAddress)}
       JOIN (
-        SELECT p.id AS pid, p.network_id AS pnid
-        FROM posts p
-        LEFT JOIN communities comm ON comm.network_id = p.network_id AND comm.id = p.community_id
-        ${whereClause}
-        ORDER BY p.created_at DESC, p.id DESC
-        LIMIT ? OFFSET ?
+        ${pageSubquery}
       ) page ON page.pid = p.id AND page.pnid = p.network_id
       ORDER BY p.created_at DESC, p.id DESC`
+    // The exemption placeholder sits after the WHERE params and before LIMIT/OFFSET in the SQL text
+    if (applyAuthorCooldown && viewerAddress) queryParams.push(viewerAddress)
     queryParams.push(limit + 1, offset)
 
     /* Execute using standardized pool */
@@ -209,7 +240,7 @@ export async function GET(request) {
         `SELECT COUNT(*) AS total
          FROM posts p
          JOIN networks n ON p.network_id = n.id
-         LEFT JOIN communities comm ON comm.network_id = p.network_id AND comm.id = p.community_id
+         ${COMMUNITY_JOIN}
          ${whereClause}`,
         whereParams,
       )
@@ -266,6 +297,38 @@ function parseIPFSContent(content) {
 }
 
 /**
+ * Ranks every post the feed filter matches by its position inside its author's time bucket, so
+ * the caller can keep only the first few. Partitioning on the wallet alone (not wallet+network)
+ * makes the cap cross-chain: reposting the same thing on nine networks is one author flooding one
+ * feed. LOWER() because cidex writes checksummed addresses into binary-collated columns, so the
+ * same wallet can differ in case between rows. Selects only the narrow columns the outer
+ * pagination needs — the heavy metric subqueries still run on the final page slice alone.
+ */
+function buildAuthorCooldownRanking(whereClause) {
+  // Buckets are cut from the stored DATETIME itself (DATE + HOUR), never UNIX_TIMESTAMP: that
+  // function reads a DATETIME through the *session* time zone, so the same row would fall in
+  // different buckets depending on the connection's TZ and would drift across a DST change.
+  return `
+        SELECT
+          p.id AS pid,
+          p.network_id AS pnid,
+          p.created_at AS pcreated,
+          p.wallet_address AS pwallet,
+          ROW_NUMBER() OVER (
+            PARTITION BY LOWER(p.wallet_address), DATE(p.created_at), FLOOR(HOUR(p.created_at) / ${AUTHOR_BURST_WINDOW_HOURS})
+            ORDER BY p.created_at DESC, p.id DESC
+          ) AS burst_seq,
+          ROW_NUMBER() OVER (
+            PARTITION BY LOWER(p.wallet_address), DATE(p.created_at)
+            ORDER BY p.created_at DESC, p.id DESC
+          ) AS day_seq
+        FROM posts p
+        ${COMMUNITY_JOIN}
+        ${whereClause}
+  `
+}
+
+/**
  * Shared SELECT skeleton (profile/network joins + unified metric subqueries)
  * used by both the chronological feed and the trending hydration query.
  * When viewerAddress is set, callers must push it TWICE at the head of their
@@ -302,7 +365,7 @@ function buildPostSelect(viewerAddress) {
       FROM posts p
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
       JOIN networks n ON p.network_id = n.id
-      LEFT JOIN communities comm ON comm.network_id = p.network_id AND comm.id = p.community_id
+      ${COMMUNITY_JOIN}
   `
 }
 
@@ -411,7 +474,7 @@ async function queryTrendingWindow(networkId, windowHours) {
       GROUP BY post_id, network_id
     ) agg
     JOIN posts p ON p.id = agg.post_id AND p.network_id = agg.network_id
-    LEFT JOIN communities comm ON comm.network_id = p.network_id AND comm.id = p.community_id
+    ${COMMUNITY_JOIN}
     WHERE p.is_comment IS NULL AND p.is_deleted = 0
       AND (p.community_id IS NULL OR comm.membership_type = 0)
       AND agg.score >= ${TRENDING_MIN_SCORE}
