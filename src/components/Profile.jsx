@@ -36,6 +36,15 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
     return creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
   }, [creator])
 
+  // Name plus a short address discriminator, the way non-UP handles are shown.
+  // The address can be absent when the profile fetch failed, so fall back to the
+  // creator prop — an upstream hiccup must not take the whole list down with it.
+  const displayName = useMemo(() => {
+    if (profile?.fullName) return profile.fullName
+    const walletAddress = profile?.wallet_address || creator
+    return walletAddress ? `${profile?.name}#${walletAddress.slice(2, 6)}` : profile?.name
+  }, [profile, creator])
+
   const handleUniversalProfile = (e) => {
     e.stopPropagation()
     const url = `https://universaleverything.io/${creator}`
@@ -84,8 +93,8 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               name={profile.name}
               profileImage={profile.profileImage}
               address={creator}
-              size={20}
-              className={clsx(styles.imageWrapper__fingerprint, 'rounded-full')}
+              size={18}
+              className={clsx(styles.imageWrapper__fingerprint)}
             />
           </button>
         }
@@ -107,7 +116,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               onMouseEnter={() => creator && router.prefetch(`/${creator}`)}
               onFocus={() => creator && router.prefetch(`/${creator}`)}
             >
-              {profile.fullName || (profile.name + '#' + profile.wallet_address.slice(2, 6))}
+              {displayName}
             </Link>
             {/* <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} /> */}
             {chainInfo && (
