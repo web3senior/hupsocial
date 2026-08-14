@@ -75,7 +75,12 @@ export async function GET(req) {
 
   const width = intParam(searchParams.get('w'), null, 1, 4096)
   const quality = intParam(searchParams.get('q'), 80, 1, 100)
-  const stillOnly = searchParams.get('still') === '1'
+
+  /* Social crawlers are inconsistent about WebP — X in particular will drop a card rather
+     than render one — so link previews ask for fmt=jpeg. JPEG has no animation, so it
+     forces the still path regardless of what the caller passed. */
+  const format = searchParams.get('fmt') === 'jpeg' ? 'jpeg' : 'webp'
+  const stillOnly = searchParams.get('still') === '1' || format === 'jpeg'
 
   if (!rootHash) {
     return NextResponse.json({ error: 'Root Hash is required' }, { status: 400 })
@@ -109,21 +114,29 @@ export async function GET(req) {
       })
     }
 
-    const optimizedBuffer = await pipeline
-      .webp({
-        quality,
-        ...(isAnimated
-          ? {
-              loop: metadata.loop ?? 0,
-              ...(metadata.delay ? { delay: metadata.delay } : {}),
-            }
-          : {}),
-      })
-      .toBuffer()
+    const optimizedBuffer =
+      format === 'jpeg'
+        ? await pipeline
+            /* JPEG has no alpha channel — without a flatten, transparent PNGs
+               decode onto black and the card renders as a dark slab */
+            .flatten({ background: '#ffffff' })
+            .jpeg({ quality, progressive: true, mozjpeg: true })
+            .toBuffer()
+        : await pipeline
+            .webp({
+              quality,
+              ...(isAnimated
+                ? {
+                    loop: metadata.loop ?? 0,
+                    ...(metadata.delay ? { delay: metadata.delay } : {}),
+                  }
+                : {}),
+            })
+            .toBuffer()
 
     return new Response(optimizedBuffer, {
       headers: {
-        'Content-Type': 'image/webp',
+        'Content-Type': format === 'jpeg' ? 'image/jpeg' : 'image/webp',
         /* The output is a pure function of hash + params, so it can sit in the shared cache
            forever. Without s-maxage only browsers cached it, and every social crawler that
            scraped a link paid the full indexer download + sharp re-encode again. */

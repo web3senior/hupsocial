@@ -12,8 +12,10 @@ const fetchPost = cache((networkId, postId) => getPostById(networkId, postId, nu
    (WhatsApp, Telegram) cap the payload outright. 800w/q60 cuts the transfer roughly 4x
    versus 1200/q80 while still clearing X's summary_large_image minimum (300x157) and
    Facebook's recommended 600x315, so links keep rendering as large cards.
-   still:1 skips the per-frame animated encode — no OG card plays animation anyway. */
-const OG_IMAGE_OPTIONS = { width: 800, quality: 60, still: true }
+   still:1 skips the per-frame animated encode — no OG card plays animation anyway.
+   JPEG rather than WebP because X drops cards whose image it can't decode, and JPEG is
+   the one format every crawler handles. */
+const OG_IMAGE_OPTIONS = { width: 800, quality: 60, still: true, format: 'jpeg' }
 
 /* 1.91:1, the ratio crawlers assume, used when the post never recorded media dimensions */
 const OG_FALLBACK_RATIO = 630 / 1200
@@ -64,19 +66,38 @@ export async function generateMetadata({ params }, parent) {
       ? images
       : [{ url: '/open-graph.png', width: 1200, height: 630, alt: 'Open Graph Image' }]
 
+    const title = bodyText.slice(0, 60).trim() || 'Post Details'
+    const description = bodyText.slice(0, 160).trim() || parentMetadata.description || 'View the details of this post on our platform.'
+    const postUrl = `/networks/${networkId}/${postId}`
+
     // Construct unified dynamic metadata configuration payload
     const metadata = {
       // Slice the first 60 characters for the SEO title
-      title: bodyText.slice(0, 60).trim() || 'Post Details',
+      title,
 
       // Slice the first 160 characters for the description, then fall back if empty
-      description: bodyText.slice(0, 160).trim() || parentMetadata.description || 'View the details of this post on our platform.',
+      description,
+
+      /* The root layout pins canonical to '/', which every page inherits. X honours
+         rel=canonical, so without this override each shared post resolved back to the
+         home page and X rendered the generic site card instead of the post's own. */
+      alternates: { canonical: postUrl },
 
       // Build out Open Graph specific data representations
-      openGraph: { images: ogImages },
+      /* Next replaces the parent openGraph wholesale rather than merging it, so siteName
+         and locale have to be restated here or the card loses its branding */
+      openGraph: {
+        type: 'article',
+        url: postUrl,
+        siteName: process.env.NEXT_PUBLIC_NAME,
+        locale: 'en_US',
+        title,
+        description,
+        images: ogImages,
+      },
 
       // Always use summary_large_image since we always have an OG image now
-      twitter: { card: 'summary_large_image', images: ogImages },
+      twitter: { card: 'summary_large_image', title, description, images: ogImages },
     }
 
     return metadata
