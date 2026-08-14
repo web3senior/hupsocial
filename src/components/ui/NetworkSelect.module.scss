@@ -104,6 +104,30 @@
     flex-direction: column;
     overflow-y: auto;
     gap: 0.5rem;
+
+    // The app's global scrollbar is a 12px bar with a 2px-inset thumb, which is far too
+    // heavy inside a 220px popover — every WebKit/Blink engine paints it here unless the
+    // scroller says otherwise, so Safari showed a chunky bar down the chain list.
+    // `scrollbar-width` covers Firefox and the engines that support the standard property.
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text) 15%, transparent) transparent;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+      background-color: transparent;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      // The global thumb insets itself with a 2px transparent border and clips the paint
+      // to the padding box; at 6px wide that leaves a ~2px sliver, so drop the inset.
+      border: 0;
+      border-radius: 999px;
+      background-color: color-mix(in srgb, var(--text) 15%, transparent);
+    }
   }
 
   // The items are block-level flex containers, so they stack without the panel
