@@ -13,8 +13,9 @@ import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { useSidebarStore, getWalletBatchMap, countBatchItems } from '@/stores/useSidebarStore'
+import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
+import BatchLikeTrigger from './BatchLikeTrigger'
 import NativePopover from './ui/NativePopover'
 import { GitHub } from './Icons'
 import styles from './Aside.module.scss'
@@ -53,7 +54,7 @@ const normalizeNavItem = (item) => {
   }
 }
 
-const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCount, onNavigate, onLinkClick }) => {
+const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNavigate, onLinkClick }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
 
@@ -65,7 +66,6 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCou
   const Component = typeof item.component === 'string' ? NAV_COMPONENTS[item.component] : item.component
 
   // Match target item flags against common dynamic identifier properties
-  const isBatchLikeItem = item.id === 'batch-like' || item.path === '/batch-like' || item.name === 'Batch Like'
   const isChatItem = item.id === 'chat' || item.path === '/chat' || item.name === 'Chat'
   const isNotificationItem = item.id === 'notifications' || item.path === '/notifications' || item.name === 'Notifications'
 
@@ -75,7 +75,6 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCou
         <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
-        {isBatchLikeItem && isCompact && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
         {isNotificationItem && isCompact && unreadCount > 0 && <span className={styles.notificationBadgeDot} aria-hidden="true" />}
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
@@ -83,7 +82,6 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, batchCount, unreadCou
       {isChatItem && !isCompact && <span className={styles.betaBadge}></span>}
 
       {/* Render full numeric indicator tag layout when sidebar is wide/expanded */}
-      {isBatchLikeItem && !isCompact && batchCount > 0 && <span className={styles.badgeCounter}>{batchCount}</span>}
       {isNotificationItem && !isCompact && unreadCount > 0 && (
         <span className={styles.notificationBadgeCounter}>{unreadCount > 99 ? '99+' : unreadCount}</span>
       )}
@@ -146,14 +144,6 @@ export default function Aside() {
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
-
-  // Extract network-mapped queue states to calculate aggregated metrics safely
-  const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
-
-  // Count only the connected wallet's own basket across all chain networks
-  const batchCount = useMemo(() => {
-    return countBatchItems(getWalletBatchMap(likedPostIdsMap, address))
-  }, [likedPostIdsMap, address])
 
   // Hand any pre-wallet basket over to the first wallet that connects
   useEffect(() => {
@@ -296,7 +286,6 @@ export default function Aside() {
                 isActive={isActivePath(pathname, item.path)}
                 isCompact={isCompact}
                 showTooltip={tooltipReady}
-                batchCount={batchCount}
                 unreadCount={unreadCount}
                 onNavigate={isMobileLayout ? closeSidebar : undefined}
                 onLinkClick={item.id === 'foryou' ? handleHomeLinkClick : undefined}
@@ -430,16 +419,10 @@ export default function Aside() {
 
       {pathname !== '/chat' && (
         <div className={styles.floatingActions}>
-          {batchCount > 0 && (
-            <Link
-              href="/batch-like"
-              className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])}
-              aria-label={`View batch queue with ${batchCount} operations`}
-            >
-              <HeartIcon size={20} weight="fill" color="var(--batch-like-color, #facc15)" />
-              <span className={styles.floatingActions__badge}>{batchCount}</span>
-            </Link>
-          )}
+          <BatchLikeTrigger
+            className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])}
+            badgeClassName={styles.floatingActions__badge}
+          />
 
           <button
             className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}

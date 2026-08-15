@@ -11,9 +11,10 @@ import {
   ChartBarIcon,
   ChartLineUpIcon,
   ChatCircleIcon,
+  CoinIcon,
   CoinsIcon,
-  HeartIcon,
   HouseIcon,
+  Image,
   MagnifyingGlassIcon,
   PlusIcon,
   SquaresFourIcon,
@@ -35,10 +36,9 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   { id: 'bazaar', name: 'Bazaar', path: '/bazaar', icon: TagIcon },
   { id: 'nfts', name: 'NFTs', path: '/nfts', icon: StorefrontIcon },
+  { id: 'drops', name: 'Drops', path: '/drops', icon: Image },
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
-  // Tokens (/launches) hidden from the nav 2026-08-13 at the user's request — the swap page
-  // carries token discovery now; the directory stays reachable at /launches. To restore:
-  // { id: 'tokens', name: 'Tokens', path: '/launches', icon: CoinIcon } (re-import CoinIcon).
+  { id: 'tokens', name: 'Tokens', path: '/launches', icon: CoinIcon },
   { id: 'swap', name: 'Swap', path: '/swap', icon: ArrowsDownUpIcon },
   { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
@@ -46,7 +46,6 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
   { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon },
-  { id: 'batch-like', name: 'Like', path: '/batch-like', icon: HeartIcon, hasBadge: true },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
 ]
@@ -87,7 +86,7 @@ export const getLikeOverride = (likeOverrides, address, networkId, postId) => {
 
 export const useSidebarStore = create(
   persist(
-    (set, get) => ({
+    (set) => ({
       // State configurations
       isMenuOpen: true,
       isMobileMenuOpen: false,
@@ -224,18 +223,9 @@ export const useSidebarStore = create(
       closeMobileMenu: () => set({ isMobileMenuOpen: false }),
       toggleMobileMenu: () => set((state) => ({ isMobileMenuOpen: !state.isMobileMenuOpen })),
 
-      // Computed layout helper that appends dynamic badges natively
-      getNavItems: (wallet) => {
-        // Badge only reflects the connected wallet's own basket
-        const queueCount = countBatchItems(getWalletBatchMap(get().likedPostIds, wallet))
-
-        return NAV_ITEMS_SCHEMA.map((item) => {
-          if (item.id === 'batch-like') {
-            return { ...item, badgeCount: queueCount }
-          }
-          return item
-        })
-      },
+      // The basket lives in the floating heart (components/BatchLikeTrigger) rather than a
+      // nav row, so the schema needs no per-item badge wiring
+      getNavItems: () => NAV_ITEMS_SCHEMA,
     }),
     {
       name: 'hup-sidebar-state',

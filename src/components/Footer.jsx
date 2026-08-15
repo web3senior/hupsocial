@@ -4,11 +4,11 @@ import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import { HeartIcon, HouseIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
+import { HouseIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { useClientMounted } from '@/hooks/useClientMount'
-import { useSidebarStore, getWalletBatchMap, countBatchItems } from '@/stores/useSidebarStore'
+import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import styles from './Footer.module.scss'
 
@@ -26,7 +26,6 @@ export default function Footer() {
 
   // Pull global sidebar states to match functional action layers
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
-  const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
   const requestFeedRefresh = usePostStore((state) => state.requestFeedRefresh)
 
   // Home link double-duty: scrolled down -> back to top, already at top -> pull fresh posts
@@ -42,11 +41,6 @@ export default function Footer() {
     }
   }
 
-  // Sync batch calculation exactly with the Aside metric tracking
-  const batchCount = useMemo(() => {
-    return countBatchItems(getWalletBatchMap(likedPostIdsMap, address))
-  }, [likedPostIdsMap, address])
-
   const navLinks = useMemo(() => {
     const profilePath = isConnected && address ? `/${address}` : '/connect'
 
@@ -54,7 +48,6 @@ export default function Footer() {
       { name: 'Home', path: '/', icon: HouseIcon },
       { name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
       { name: 'New', action: () => setIsComponentOpen(true), icon: PlusIcon },
-      { name: 'Notifications', path: '/batch-like', icon: HeartIcon, isBatch: true },
       { name: 'Profile', path: profilePath, icon: UserIcon },
     ]
   }, [address, isConnected, setIsComponentOpen])
@@ -72,8 +65,6 @@ export default function Footer() {
             const iconContent = (
               <div className={styles.iconWrapper} data-icon={item.name}>
                 <Icon size={24} weight={isActive && item.name !== 'Search' ? 'fill' : 'regular'} />
-                {/* Dynamically append badge if item is tracking batch counts */}
-                {item.isBatch && batchCount > 0 && <span className={styles.compactBadgeDot} aria-hidden="true" />}
               </div>
             )
 
