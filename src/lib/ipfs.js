@@ -66,6 +66,33 @@ export async function uploadObjectToIPFS(contentObj) {
 }
 
 /**
+ * keccak256 of the bytes a gateway serves for a CID, via /api/ipfs/hash — the digest LSP2/LSP4
+ * verification data carries. Returns null when the gateway can't be read: callers publishing
+ * metadata fall back to the unverified form rather than blocking on a gateway hiccup.
+ * @param {string} uri An `ipfs://` URI or a bare CID.
+ * @returns {Promise<string|null>} 0x-prefixed 32-byte digest, or null.
+ */
+export async function hashIpfsContent(uri) {
+  if (!uri) return null
+
+  const cid = String(uri).replace(/^ipfs:\/\//, '').trim()
+  if (!cid) return null
+
+  try {
+    const res = await fetch(`/api/ipfs/hash?cid=${encodeURIComponent(cid)}`)
+    if (!res.ok) {
+      console.warn(`[ipfs] could not hash ${cid}: ${res.status}`)
+      return null
+    }
+    const { hash } = await res.json()
+    return hash || null
+  } catch (e) {
+    console.warn(`[ipfs] could not hash ${cid}:`, e.message)
+    return null
+  }
+}
+
+/**
  * Fetches and parses JSON content from a specified IPFS gateway URL using the CID.
  */
 export const getIPFS = async (CID) => {
