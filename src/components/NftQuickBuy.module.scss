@@ -1,17 +1,22 @@
-// Quick buy pill overlaying the artwork on market grid tiles — frosted like the tile's
-// other media chips (referral, 3D). The wrapper (NftMarketCard's __quickBuy layer) owns
-// geometry and the hover reveal; this owns only the pill's look. The wrapper is inert
-// (pointer-events: none) so the pill re-arms clicks itself.
+// Quick buy pill overlaying the artwork in the top-right corner of market grid tiles. The
+// wrapper (NftMarketCard's __quickBuy layer) owns geometry and the hover reveal; this owns
+// only the pill's look. The wrapper is inert (pointer-events: none) so the pill re-arms
+// clicks itself.
+//
+// Fixed white/ink rather than --surface/--text: the pill lands on arbitrary artwork, not on
+// the tile's ground, so a theme-following chip would vanish against half the market. A near
+// -opaque white with the tile's usual blur behind it holds the CTA in every theme.
 .quickBuy {
-  width: 100%;
-  padding: 0.55rem 1rem;
+  max-width: 100%;
+  padding: 0.5rem 1.15rem;
   border: 0;
   border-radius: 999px;
-  background-color: color-mix(in srgb, var(--surface) 82%, transparent);
+  background-color: color-mix(in srgb, var(--white) 92%, transparent);
   backdrop-filter: blur(6px);
-  color: var(--text);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  color: var(--black);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 700;
   text-align: center;
   white-space: nowrap;
@@ -22,19 +27,19 @@
   transition: background-color 0.15s ease, opacity 0.15s ease;
 
   &:not([disabled]):hover {
-    background-color: color-mix(in srgb, var(--surface) 95%, transparent);
+    background-color: var(--white);
   }
 
   &[disabled] {
-    opacity: 0.8;
+    opacity: 0.85;
     cursor: default;
   }
 
   &--done {
-    background-color: color-mix(in srgb, var(--green-500, #22c55e) 24%, var(--surface));
+    background-color: color-mix(in srgb, var(--green-500, #22c55e) 26%, var(--white));
   }
 
   &--gone {
-    color: var(--text-muted);
+    color: var(--gray-500);
   }
 }

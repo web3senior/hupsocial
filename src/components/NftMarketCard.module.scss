@@ -13,7 +13,6 @@
 
   &:hover {
     border-color: var(--text-muted);
-    transform: translateY(-2px);
   }
 
   // The tile splits into a navigating link (artwork + meta) and a non-navigating quick
@@ -58,10 +57,13 @@
     color: var(--text-muted);
   }
 
+  // Both share the top-LEFT slot — a listing is either sold or still paying a referral,
+  // never both — which leaves the top-right corner to the quick buy pill
   &__sold,
   &__referral {
     position: absolute;
     top: 0.5rem;
+    left: 0.5rem;
     padding: 0.2rem 0.55rem;
     border-radius: 999px;
     font-size: var(--font-size-10, 10px);
@@ -69,7 +71,6 @@
   }
 
   &__sold {
-    left: 0.5rem;
     background-color: var(--red-500);
     color: var(--white);
     text-transform: uppercase;
@@ -77,17 +78,17 @@
   }
 
   &__referral {
-    right: 0.5rem;
     background-color: color-mix(in srgb, var(--surface) 82%, transparent);
     backdrop-filter: blur(4px);
     color: var(--text);
   }
 
-  // Bottom-right, so it never collides with the sold/referral pair along the top edge
+  // Bottom-left: the sold/referral pair owns the top edge and the quick buy pill lands
+  // bottom-right on hover, so this is the one corner left free
   &__model {
     position: absolute;
     bottom: 0.5rem;
-    right: 0.5rem;
+    left: 0.5rem;
     display: inline-flex;
     align-items: center;
     gap: 0.2rem;
@@ -101,11 +102,17 @@
     letter-spacing: 0.02em;
   }
 
-  // Mirrors the media box from outside the anchor (same inset, same square ratio — a
-  // button can't nest in the link) so the buy pill rides the artwork's bottom edge.
-  // Hidden until the tile is hovered or the pill holds focus — mid-purchase focus keeps
-  // it pinned while the wallet popup steals the pointer. Touch has no hover, so there
-  // it stays on permanently.
+  // Mirrors the media box from outside the anchor — same inset, same square ratio, same
+  // radius, because a button can't nest in the link — so the pill rides the artwork's
+  // bottom edge on a scrim that clips to the artwork's own rounded corners. The gradient
+  // is gone by 40% up: the pill and its padding only reach ~15%, so the rest is ramp
+  // rather than a band with a visible edge. The layer still spans the full width so a
+  // long label ("Approve USDC", "Buy 1.5 ETH") grows leftward and ellipses inside the art.
+  //
+  // Hidden until the tile is hovered or the pill holds focus — mid-purchase focus keeps it
+  // pinned while the wallet popup steals the pointer. Touch has no hover, so there it
+  // stays on permanently. Opacity alone does the reveal: the scrim fills the whole square,
+  // and translating it would swing a dark sliver past the artwork's bottom corners.
   &__quickBuy {
     position: absolute;
     top: 0.5rem;
@@ -113,24 +120,24 @@
     right: 0.5rem;
     display: flex;
     align-items: flex-end;
+    justify-content: flex-end;
     aspect-ratio: 1;
-    padding: 0.55rem;
+    padding: 0.65rem;
+    border-radius: 12px;
+    background-image: linear-gradient(to top, rgb(0 0 0 / 0.62) 0%, rgb(0 0 0 / 0.28) 18%, transparent 40%);
     opacity: 0;
-    transform: translateY(4px);
-    transition: opacity 0.18s ease, transform 0.18s ease;
+    transition: opacity 0.18s ease;
     pointer-events: none;
   }
 
   &:hover &__quickBuy,
   &:focus-within &__quickBuy {
     opacity: 1;
-    transform: none;
   }
 
   @media (hover: none) {
     &__quickBuy {
       opacity: 1;
-      transform: none;
     }
   }
 

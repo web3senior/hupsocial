@@ -26,8 +26,8 @@ const MAX_LIMIT = 60
 // IHupTrade.ListingStatus, as cidex writes it into nft_listings
 const STATUS_ACTIVE = 1
 
-// New tokens only ever join the set (cache rows are never deleted, only refreshed), so a
-// minute of staleness costs one late tile at most
+// The set almost only ever grows — the one subtraction is a row dropped for having no owner
+// onchain — so a minute of staleness costs one late tile, or one lingering ghost, at most
 const CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
 
 export async function GET(request, { params }) {
