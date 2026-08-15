@@ -1,0 +1,119 @@
+[
+  {
+    "type": "function",
+    "name": "createLaunch",
+    "stateMutability": "payable",
+    "inputs": [
+      { "name": "_owner", "type": "address" },
+      { "name": "_name", "type": "string" },
+      { "name": "_symbol", "type": "string" },
+      { "name": "_takeCreatorFee", "type": "bool" },
+      { "name": "_metadata", "type": "string" }
+    ],
+    "outputs": [{ "name": "launchId", "type": "uint256" }]
+  },
+  {
+    "type": "function",
+    "name": "getLaunch",
+    "stateMutability": "view",
+    "inputs": [{ "name": "_launchId", "type": "uint256" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          { "name": "creator", "type": "address" },
+          { "name": "token", "type": "address" },
+          { "name": "pool", "type": "address" },
+          { "name": "positionTokenId", "type": "uint256" },
+          { "name": "createdAt", "type": "uint64" },
+          { "name": "createdBlock", "type": "uint64" },
+          { "name": "creatorShareBps", "type": "uint16" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "creationFee",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256" }]
+  },
+  {
+    "type": "function",
+    "name": "defaultCreatorShareBps",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint16" }]
+  },
+  {
+    "type": "function",
+    "name": "openingSupplyValue",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint128" }]
+  },
+  {
+    "type": "function",
+    "name": "wnative",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "address" }]
+  },
+  {
+    "type": "function",
+    "name": "locker",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "address" }]
+  },
+  {
+    "type": "function",
+    "name": "POOL_FEE",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint24" }]
+  },
+  {
+    "type": "function",
+    "name": "TOTAL_SUPPLY",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256" }]
+  },
+  {
+    "type": "function",
+    "name": "launchIdOf",
+    "stateMutability": "view",
+    "inputs": [{ "name": "token", "type": "address" }],
+    "outputs": [{ "name": "", "type": "uint256" }]
+  },
+  {
+    "type": "event",
+    "name": "LaunchCreated",
+    "anonymous": false,
+    "inputs": [
+      { "name": "launchId", "type": "uint256", "indexed": true },
+      { "name": "creator", "type": "address", "indexed": true },
+      { "name": "token", "type": "address", "indexed": true },
+      { "name": "pool", "type": "address", "indexed": false },
+      { "name": "positionTokenId", "type": "uint256", "indexed": false },
+      { "name": "name", "type": "string", "indexed": false },
+      { "name": "symbol", "type": "string", "indexed": false },
+      { "name": "sqrtPriceX96", "type": "uint160", "indexed": false },
+      { "name": "creatorShareBps", "type": "uint16", "indexed": false },
+      { "name": "metadata", "type": "string", "indexed": false }
+    ]
+  },
+  { "type": "error", "name": "InsufficientPayment", "inputs": [{ "name": "provided", "type": "uint256" }, { "name": "required", "type": "uint256" }] },
+  { "type": "error", "name": "InvalidAddress", "inputs": [] },
+  { "type": "error", "name": "InvalidOpeningValue", "inputs": [] },
+  { "type": "error", "name": "LaunchNotFound", "inputs": [] },
+  { "type": "error", "name": "MetadataTooLarge", "inputs": [{ "name": "length", "type": "uint256" }, { "name": "maxLength", "type": "uint256" }] },
+  { "type": "error", "name": "SessionExpired", "inputs": [] },
+  { "type": "error", "name": "TokenInfoRequired", "inputs": [] },
+  { "type": "error", "name": "TransferFailed", "inputs": [] },
+  { "type": "error", "name": "Unauthorized", "inputs": [] },
+  { "type": "error", "name": "UnexpectedNativePayment", "inputs": [] }
+]
