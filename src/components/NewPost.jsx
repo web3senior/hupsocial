@@ -1,10 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useSignTypedData, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { isSessionActive } from '@/lib/burnerSession'
+import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
+import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ChartLineUpIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, CoinIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -20,6 +23,8 @@ import DialogHeader from '@/components/ui/DialogHeader'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
+import AttachLaunchModal from '@/components/AttachLaunchModal'
+import AttachDropModal from '@/components/AttachDropModal'
 import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
@@ -298,6 +303,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     actionType === 'edit' ? getContentPayload(existingPost)?.predictMarket ?? null : null
   )
   const [showAttachMarket, setShowAttachMarket] = useState(false)
+  // Token launches too — a { launchId, token, chainId } reference the LaunchCard resolves live,
+  // so the curve's price and state are never frozen into the stored post
+  const [tokenLaunch, setTokenLaunch] = useState(() =>
+    actionType === 'edit' ? getContentPayload(existingPost)?.tokenLaunch ?? null : null
+  )
+  const [showAttachLaunch, setShowAttachLaunch] = useState(false)
+  // NFT drops as well — a thin reference plus static art; DropCard resolves supply, phases,
+  // and progress live from the HupDrops engine so the card never shows stale mint state
+  const [nftDrop, setNftDrop] = useState(() => (actionType === 'edit' ? getContentPayload(existingPost)?.nftDrop ?? null : null))
+  const [showAttachDrop, setShowAttachDrop] = useState(false)
   // Mini apps travel the same way: a thin { appId, chainId } reference, never the frame URL, so
   // a moderator revoking an app takes effect in every post that embedded it
   const [miniApp, setMiniApp] = useState(() => (actionType === 'edit' ? getContentPayload(existingPost)?.miniApp ?? null : null))
@@ -357,11 +372,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     const read = (functionName, args) =>
       communityPublicClient.readContract({ address: communityContract, abi: HupCommunityABI, functionName, args })
 
-    let membershipType
     let currentKeyVersion
     try {
-      const communityRow = await read('communities', [BigInt(communityId)])
-      membershipType = Number(communityRow[2])
       currentKeyVersion = Number(await read('keyVersion', [BigInt(communityId)]))
     } catch (err) {
       console.error('Failed to resolve the community encryption state for this reply:', err)
@@ -369,20 +381,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       return null
     }
 
-    // Encrypted membership types (Request-Based, Private, NFT/Token/NFT+Token/Follower-Gated)
-    // with an initialized key get sealed; plaintext communities just carry the tag.
-    const isEncryptedType = [1, 2, 3, 4, 5, 8].includes(membershipType)
-    if (!isEncryptedType) {
-      return { ...plainContent, communityId: Number(communityId) }
-    }
-
-    // Encrypted type but keyVersion 0: the creator switched the type but the follow-up
-    // initializeKey tx never confirmed. Publishing now would leak plaintext into a community
-    // that presents itself as private — block until the creator finishes encryption setup
-    // (the community card offers them a "Finish encryption setup" action).
+    // Encryption is orthogonal to admission mode now: keyVersion > 0 is the single source of
+    // truth. No key epoch → plaintext community → just carry the tag. (The old "encrypted type
+    // but no key" trap can't exist anymore — the toggle and the key are set atomically.)
     if (currentKeyVersion === 0) {
-      toast("This community's encryption setup isn't finished yet — posting is paused until the creator completes it", 'error')
-      return null
+      return { ...plainContent, communityId: Number(communityId) }
     }
 
     const privKeyHex = getCachedIdentityPrivKeyHex()
@@ -407,7 +410,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const mediaItems = postContent.elements[1].data.items
   const isBusy = isSigning || isConfirming || isUploading || isSubmitting
   const hasPostBody =
-    postText.trim().length > 0 || mediaItems.length > 0 || Boolean(nftListing) || Boolean(predictMarket) || Boolean(miniApp)
+    postText.trim().length > 0 ||
+    mediaItems.length > 0 ||
+    Boolean(nftListing) ||
+    Boolean(predictMarket) ||
+    Boolean(tokenLaunch) ||
+    Boolean(nftDrop) ||
+    Boolean(miniApp)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
   // Every submission is pinned to one chain: an edit updates the post where it already lives,
@@ -424,6 +433,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       ? Number(communityTarget.networkId)
       : Number(getActiveChain()?.[0]?.id) || null
   const targetChain = appChains.find((chain) => chain.id === targetChainId)
+
+  // Relay reads (forwarder nonce, account code) must hit the chain the submission lands on
+  const targetPublicClient = usePublicClient({ chainId: targetChainId || undefined })
+  const { signTypedDataAsync } = useSignTypedData()
+
   // The wallet only ever signs on the chain it is connected to — editing a Celo post from a
   // LUKSO connection would otherwise fire `update` at Celo's contract address on LUKSO, so the
   // composer prompts for a switch instead (same pattern as the Bazaar/Predict dialogs)
@@ -435,6 +449,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const nftTradeAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.trade)
   // Prediction markets pin to the same chain the post lands on, like NFT listings
   const predictAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.predict)
+  // Token launches pin to the post's chain like the others
+  const launchAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.launch)
+  // NFT drops too — only offered where the HupDrops engine is deployed
+  const dropsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.drops)
+  // The composer already holds an image and text, so the create dialog opens with two of its four
+  // required fields filled — the author only types a name and a ticker
+  const launchPrefillImage = mediaItems.find((item) => item.type === 'image' && item.cid)?.cid ?? ''
 
   const handleClose = useCallback(
     (e) => {
@@ -947,6 +968,49 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     if (moderationWarning) moderationDialogRef.current?.open()
   }, [moderationWarning])
 
+  // Shared by the wallet path (receipt confirmed) and the relayed path (relayer accepted the
+  // transaction) — both end the composer the same way
+  const finishSubmission = useCallback(() => {
+    if (actionType === 'post') localStorage.removeItem(getDraftStorageKey())
+    toast(isComment ? 'Your reply will appear once the transaction is confirmed.' : 'Your post will appear once the transaction is confirmed.', 'success')
+    onConfirmed?.()
+    handleClose()
+  }, [actionType, handleClose, isComment, onConfirmed])
+
+  /**
+   * Relays `create` through our forwarder so the author pays no gas. Returns false when the
+   * relay is unavailable for this wallet or network, leaving the caller to send the
+   * transaction the usual way. Only `create` is sponsored — edits keep paying their own gas.
+   */
+  const tryGaslessCreate = async (args) => {
+    if (!isGaslessEnabled(targetChainId) || !targetChain || !targetPublicClient) return false
+
+    try {
+      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
+
+      await relayHupAction({
+        chain: targetChain,
+        publicClient: targetPublicClient,
+        owner: address,
+        functionName: 'create',
+        args,
+        signTypedDataAsync,
+        useSessionKey: session.active,
+      })
+
+      return true
+    } catch (err) {
+      // A cooldown is an answer, not a failure — falling through would charge the author for
+      // a post they were just told to retry in a moment
+      if (err.code === 'RELAY_COOLDOWN') throw err
+
+      // A relayer hiccup is never fatal — the wallet path still works, so this only
+      // decides who pays for the post
+      console.warn('Gasless post unavailable:', err.message)
+      return false
+    }
+  }
+
   const handleCreatePost = async (event) => {
     event.preventDefault()
 
@@ -959,6 +1023,15 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     if (isWrongChain) {
       toast(`Switch your wallet to ${targetChain?.name || 'the right network'} first`, 'error')
       return
+    }
+
+    // Same reason: a sponsored post still cooling down should not pin its media first
+    if (actionType !== 'edit') {
+      const cooldown = gaslessCooldown('create', targetChainId, address)
+      if (cooldown > 0) {
+        toast(`Slow down — you can post again in ${formatWait(cooldown)}.`, 'error')
+        return
+      }
     }
 
     if (!hasPostBody) {
@@ -993,6 +1066,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // Prediction markets too — the market already exists onchain; PredictCard resolves
       // the reference from the indexed API
       if (predictMarket) serializableContent.predictMarket = predictMarket
+
+      // Token launches as well — the launch already exists onchain (created in CreateLaunchDialog);
+      // LaunchCard resolves price and curve state live so the post never carries stale numbers
+      if (tokenLaunch) serializableContent.tokenLaunch = tokenLaunch
+
+      // NFT drops as well — the drop already exists onchain (created in CreateDropDialog);
+      // DropCard resolves supply and phase state live so the post never carries stale numbers
+      if (nftDrop) serializableContent.nftDrop = nftDrop
 
       // Mini apps as well — MiniAppEmbed resolves the frame URL at render time, so an app
       // that later loses its embeddable grant stops rendering without touching stored posts
@@ -1057,22 +1138,32 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         // Replies must land on the same network as the post they target, not whatever chain the wallet happens to be on
         const targetContractAddress = CONTRACTS[`chain${replyTarget?.network_id}`]?.hup
         if (!targetContractAddress) throw new Error('Contract configuration missing for network')
+        const createArgs = [address, ContentType.Comment, metadata, replyTarget.id, allowComments]
+        if (await tryGaslessCreate(createArgs)) {
+          finishSubmission()
+          return
+        }
         writeContract({
           abi,
           address: targetContractAddress,
           functionName: 'create',
-          args: [address, ContentType.Comment, metadata, replyTarget.id, allowComments],
+          args: createArgs,
           chainId: targetChainId,
         })
       } else if (isQuote) {
         // Quotes must land on the same network as the post they quote, so the id stays resolvable
         const targetContractAddress = CONTRACTS[`chain${quoteTarget?.network_id}`]?.hup
         if (!targetContractAddress) throw new Error('Contract configuration missing for network')
+        const createArgs = [address, ContentType.Post, metadata, 0, allowComments]
+        if (await tryGaslessCreate(createArgs)) {
+          finishSubmission()
+          return
+        }
         writeContract({
           abi,
           address: targetContractAddress,
           functionName: 'create',
-          args: [address, ContentType.Post, metadata, 0, allowComments],
+          args: createArgs,
           chainId: targetChainId,
         })
       } else {
@@ -1082,11 +1173,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           ? CONTRACTS[`chain${communityTarget.networkId}`]?.hup
           : getActiveChain()?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
         if (!postContractAddress) throw new Error('Contract configuration missing for network')
+        const createArgs = [address, ContentType.Post, metadata, 0, allowComments]
+        if (await tryGaslessCreate(createArgs)) {
+          finishSubmission()
+          return
+        }
         writeContract({
           abi,
           address: postContractAddress,
           functionName: 'create',
-          args: [address, ContentType.Post, metadata, 0, allowComments],
+          args: createArgs,
           chainId: targetChainId,
         })
       }
@@ -1128,11 +1224,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   useEffect(() => {
     if (!isConfirmed) return
-    if (actionType === 'post') localStorage.removeItem(getDraftStorageKey())
-    toast(isComment ? 'Your reply will appear once the transaction is confirmed.' : 'Your post will appear once the transaction is confirmed.', 'success')
-    onConfirmed?.()
-    handleClose()
-  }, [handleClose, isConfirmed, actionType, isComment, onConfirmed])
+    finishSubmission()
+  }, [isConfirmed, finishSubmission])
 
   useEffect(() => {
     return () => {
@@ -1319,6 +1412,30 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                   <span>Predict</span>
                 </button>
               )}
+              {canAttachNft && launchAvailable && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowAttachLaunch(true)}
+                  aria-label="Launch a token"
+                  disabled={isBusy || Boolean(tokenLaunch)}
+                >
+                  <CoinIcon size={20} />
+                  <span>Token</span>
+                </button>
+              )}
+              {canAttachNft && dropsAvailable && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowAttachDrop(true)}
+                  aria-label="Attach an NFT drop"
+                  disabled={isBusy || Boolean(nftDrop)}
+                >
+                  <ImageIcon size={20} />
+                  <span>Drop</span>
+                </button>
+              )}
               {canAttachNft && (
                 <button
                   type="button"
@@ -1348,6 +1465,26 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 <ChartLineUpIcon size={16} />
                 <span>Prediction market attached (market #{predictMarket.marketId})</span>
                 <button type="button" onClick={() => setPredictMarket(null)} aria-label="Detach prediction market" disabled={isBusy}>
+                  <XIcon size={14} />
+                </button>
+              </div>
+            )}
+
+            {tokenLaunch && (
+              <div className={styles.nftAttachment}>
+                <CoinIcon size={16} />
+                <span>Token launch attached (launch #{tokenLaunch.launchId})</span>
+                <button type="button" onClick={() => setTokenLaunch(null)} aria-label="Detach token launch" disabled={isBusy}>
+                  <XIcon size={14} />
+                </button>
+              </div>
+            )}
+
+            {nftDrop && (
+              <div className={styles.nftAttachment}>
+                <ImageIcon size={16} />
+                <span>NFT drop attached (drop #{nftDrop.dropId})</span>
+                <button type="button" onClick={() => setNftDrop(null)} aria-label="Detach NFT drop" disabled={isBusy}>
                   <XIcon size={14} />
                 </button>
               </div>
@@ -1526,6 +1663,32 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             setShowAttachMarket(false)
           }}
           onClose={() => setShowAttachMarket(false)}
+        />
+      )}
+
+      {showAttachLaunch && (
+        <AttachLaunchModal
+          chainId={targetChainId}
+          prefillImage={launchPrefillImage}
+          prefillDescription={postText}
+          onAttached={(launchReference) => {
+            setTokenLaunch(launchReference)
+            setShowAttachLaunch(false)
+          }}
+          onClose={() => setShowAttachLaunch(false)}
+        />
+      )}
+
+      {showAttachDrop && (
+        <AttachDropModal
+          chainId={targetChainId}
+          prefillImage={launchPrefillImage}
+          prefillDescription={postText}
+          onAttached={(dropReference) => {
+            setNftDrop(dropReference)
+            setShowAttachDrop(false)
+          }}
+          onClose={() => setShowAttachDrop(false)}
         />
       )}
 

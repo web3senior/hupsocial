@@ -2,8 +2,125 @@ import { ethers } from 'ethers'
 import { NextResponse } from 'next/server'
 import forwarderAbi from '../../../../abis/Forwarder.json'
 import chatAbi from '../../../../abis/Chat.json'
+import hupAbi from '../../../../abi/post.json'
+import { CONTRACTS } from '../../../../config/contracts'
+import { GASLESS_BUCKETS, formatWait, gaslessPolicyFor } from '../../../../config/gasless'
 
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
+
+// --- Relay policy ---
+// The relayer's key pays for everything that lands here, so a request may only target a
+// contract this app deployed on that chain. The Hup contract is narrowed further to the
+// sponsored selectors in config/gasless.js — `create` only, since it also carries paid,
+// owner-only and admin functions that must never run on our key. Likes are not sponsored:
+// like/unlike is a toggle, so one account tapping a heart could drain the relayer.
+const hupInterface = new ethers.Interface(hupAbi)
+
+const SPONSORED_SELECTORS = new Map(
+  Object.entries(GASLESS_BUCKETS).map(([name, bucket]) => [hupInterface.getFunction(name).selector, bucket]),
+)
+
+// Returns the rate-limit bucket a request belongs to, or null when we will not pay for it.
+const sponsoredBucket = (chainId, to, data) => {
+  const contracts = CONTRACTS[`chain${chainId}`]
+  if (!contracts || !to) return null
+
+  const target = to.toLowerCase()
+  const configured = Object.values(contracts)
+    .filter((value) => typeof value === 'string' && value.startsWith('0x') && value.length === 42)
+    .map((value) => value.toLowerCase())
+
+  if (!configured.includes(target)) return null
+
+  if (contracts.hup && target === contracts.hup.toLowerCase()) {
+    return SPONSORED_SELECTORS.get((data || '').slice(0, 10).toLowerCase()) ?? null
+  }
+
+  return 'chat'
+}
+
+// --- Throttle ---
+// In-memory and per-instance on purpose: a spend brake for the gasless trial, not a security
+// boundary. Serverless instances each keep their own window. Limits live in config/gasless.js
+// so the client can pre-check against the same numbers.
+const relayHits = new Map()
+
+const throttleKey = (bucket, chainId, from) => `${bucket}:${chainId}:${from.toLowerCase()}`
+
+// Live hits for a key, pruned to the policy window.
+const recentHits = (bucket, chainId, from) => {
+  const { windowMs } = gaslessPolicyFor(bucket)
+  const key = throttleKey(bucket, chainId, from)
+  const now = Date.now()
+
+  // Cheap sweep so a long-lived instance never grows the map without bound
+  if (relayHits.size > 5000) {
+    for (const [entryKey, stamps] of relayHits) {
+      if (stamps.every((stamp) => now - stamp >= windowMs)) relayHits.delete(entryKey)
+    }
+  }
+
+  const hits = (relayHits.get(key) ?? []).filter((stamp) => now - stamp < windowMs)
+  relayHits.set(key, hits)
+  return hits
+}
+
+// Authoritative check: a cooldown between consecutive calls, plus a ceiling per window.
+// Returns how long the caller must wait rather than a bare boolean, so the UI can say it.
+const peekThrottle = (bucket, chainId, from) => {
+  const { cooldownMs, max } = gaslessPolicyFor(bucket)
+  const hits = recentHits(bucket, chainId, from)
+  const now = Date.now()
+
+  const last = hits[hits.length - 1]
+  if (cooldownMs > 0 && last !== undefined && now - last < cooldownMs) {
+    return { allowed: false, retryAfter: Math.ceil((cooldownMs - (now - last)) / 1000) }
+  }
+
+  if (hits.length >= max) {
+    const { windowMs } = gaslessPolicyFor(bucket)
+    return { allowed: false, retryAfter: Math.ceil((windowMs - (now - hits[0])) / 1000) }
+  }
+
+  return { allowed: true }
+}
+
+// Counted only once the request is actually going out, so a rejected signature or a failed
+// simulation never starts someone's cooldown — the clock tracks what we spend, not what we saw.
+const recordThrottleHit = (bucket, chainId, from) => {
+  recentHits(bucket, chainId, from).push(Date.now())
+}
+
+// --- Send queue ---
+// Two concurrent sends from the relayer race on its account nonce, which surfaces as
+// "nonce too low" / "replacement underpriced". Each chain's sends run one after another.
+const sendQueues = new Map()
+
+const enqueueSend = (chainId, task) => {
+  const previous = sendQueues.get(chainId) ?? Promise.resolve()
+  const next = previous.then(task, task)
+
+  sendQueues.set(
+    chainId,
+    next.catch(() => {}),
+  )
+
+  return next
+}
+
+// The EIP-712 name a forwarder was actually deployed with, read from the contract itself.
+// Returns null when the call fails, leaving the caller's own error to surface.
+const readForwarderDomainName = async (provider, forwarderAddress) => {
+  try {
+    const iface = new ethers.Interface(['function eip712Domain() view returns (bytes1,string,string,uint256,address,bytes32,uint256[])'])
+    const raw = await provider.call({ to: forwarderAddress, data: iface.encodeFunctionData('eip712Domain') })
+    const [, name] = iface.decodeFunctionResult('eip712Domain', raw)
+    return name || null
+  } catch (err) {
+    console.warn('RELAY_DOMAIN_READ_FAILED:', err.message)
+    return null
+  }
+}
 
 // Must match the types used in signMetaTransactionSessionMode on the client.
 const FORWARD_REQUEST_TYPES = {
@@ -24,9 +141,9 @@ export async function POST(request) {
   let forwarderAddress = null
 
   // Decode a revert error into a human-readable string.
-  // Checks forwarder custom errors, then Chat custom errors, then falls back to
-  // the ethers short message.  If the error is FailedCall it also simulates the
-  // inner EIP-2771 call (appending `from`) to recover the Chat contract's reason.
+  // Checks forwarder custom errors, then Chat and Hup custom errors, then falls back
+  // to the ethers short message.  If the error is FailedCall it also simulates the
+  // inner EIP-2771 call (appending `from`) to recover the target contract's reason.
   const decodeRevert = async (err) => {
     let msg = err.shortMessage || err.message
     if (err.data) {
@@ -36,6 +153,10 @@ export async function POST(request) {
       } catch {}
       try {
         const decoded = new ethers.Interface(chatAbi).parseError(err.data)
+        if (decoded) { msg = decoded.name; console.error('RELAY_INNER_REVERT:', decoded.name, decoded.args) }
+      } catch {}
+      try {
+        const decoded = new ethers.Interface(hupAbi).parseError(err.data)
         if (decoded) { msg = decoded.name; console.error('RELAY_INNER_REVERT:', decoded.name, decoded.args) }
       } catch {}
     }
@@ -49,6 +170,10 @@ export async function POST(request) {
             const decoded = new ethers.Interface(chatAbi).parseError(simErr.data)
             if (decoded) { msg = decoded.name; console.error('RELAY_INNER_REVERT_DECODED:', decoded.name, decoded.args) }
           } catch {}
+          try {
+            const decoded = new ethers.Interface(hupAbi).parseError(simErr.data)
+            if (decoded) { msg = decoded.name; console.error('RELAY_INNER_REVERT_DECODED:', decoded.name, decoded.args) }
+          } catch {}
         }
         if (msg === 'FailedCall') msg = simErr.shortMessage || simErr.message || 'FailedCall'
       }
@@ -58,7 +183,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
-    const { request: forwardRequest, signature, rpcUrl, forwarderAddress: fwdAddr, chainId: bodyChainId } = body
+    const { request: forwardRequest, signature, rpcUrl, forwarderAddress: fwdAddr, chainId: bodyChainId, forwarderName } = body
     forwarderAddress = fwdAddr
     console.log(`Received relay request with RPC URL: ${rpcUrl}`)
     const fetchRequest = new ethers.FetchRequest(rpcUrl)
@@ -81,12 +206,25 @@ export async function POST(request) {
     // chainId is trusted from the client — the on-chain forwarder enforces it anyway.
     // Accepting it here eliminates the getNetwork() round-trip on every relay call.
     const chainId = bodyChainId ?? Number((await provider.getNetwork()).chainId)
-    const domain = {
-      name: 'HupChatForwarder',
-      version: '1',
-      chainId,
-      verifyingContract: forwarderAddress,
+
+    // Spend gates — both run before any RPC work that could cost us gas.
+    const bucket = sponsoredBucket(chainId, fullRequest.to, fullRequest.data)
+
+    if (!bucket) {
+      console.error('RELAY_TARGET_REJECTED:', { chainId, to: fullRequest.to, selector: (fullRequest.data || '').slice(0, 10) })
+      return NextResponse.json({ error: 'This call is not sponsored by the relayer.' }, { status: 403 })
     }
+
+    const throttle = peekThrottle(bucket, chainId, fullRequest.from)
+
+    if (!throttle.allowed) {
+      console.warn('RELAY_THROTTLED:', bucket, fullRequest.from, `${throttle.retryAfter}s`)
+      return NextResponse.json(
+        { error: `Slow down — you can do that again in ${formatWait(throttle.retryAfter)}.`, retryAfter: throttle.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(throttle.retryAfter) } },
+      )
+    }
+
     const message = {
       from: fullRequest.from,
       to: fullRequest.to,
@@ -96,49 +234,71 @@ export async function POST(request) {
       deadline: fullRequest.deadline,
       data: fullRequest.data,
     }
-    // Compute the EIP-712 digest once; reused by all three verification steps below.
-    const digest = ethers.TypedDataEncoder.hash(domain, FORWARD_REQUEST_TYPES, message)
-    let sigValid = false
-    let sigStep = null
 
-    // Step 1 — raw ECDSA of EIP-712 digest (regular EOAs via eth_signTypedData_v4).
-    try {
-      const recovered = ethers.recoverAddress(digest, signature)
-      if (recovered.toLowerCase() === fullRequest.from.toLowerCase()) { sigValid = true; sigStep = 'ecdsa' }
-    } catch (e1) { console.warn('RELAY_SIG_S1:', e1.message) }
+    // Runs all three signature checks against one candidate signing domain. The digest is
+    // computed once per candidate and reused by every step.
+    const verifyWithDomainName = async (name) => {
+      const candidate = { name, version: '1', chainId, verifyingContract: forwarderAddress }
+      const digest = ethers.TypedDataEncoder.hash(candidate, FORWARD_REQUEST_TYPES, message)
+      let sigValid = false
+      let sigStep = null
 
-    // Step 2 — personal_sign / eth_sign of EIP-712 digest (LUKSO controller EOAs or wallets
-    //           that don't support typed-data signing; eth_sign adds the Ethereum prefix).
-    if (!sigValid) {
+      // Step 1 — raw ECDSA of EIP-712 digest (regular EOAs via eth_signTypedData_v4).
       try {
-        const recovered = ethers.verifyMessage(ethers.getBytes(digest), signature)
-        if (recovered.toLowerCase() === fullRequest.from.toLowerCase()) { sigValid = true; sigStep = 'personal_eoa' }
-      } catch (e2) { console.warn('RELAY_SIG_S2:', e2.message) }
+        const recovered = ethers.recoverAddress(digest, signature)
+        if (recovered.toLowerCase() === fullRequest.from.toLowerCase()) { sigValid = true; sigStep = 'ecdsa' }
+      } catch (e1) { console.warn('RELAY_SIG_S1:', e1.message) }
+
+      // Step 2 — personal_sign / eth_sign of EIP-712 digest (LUKSO controller EOAs or wallets
+      //           that don't support typed-data signing; eth_sign adds the Ethereum prefix).
+      if (!sigValid) {
+        try {
+          const recovered = ethers.verifyMessage(ethers.getBytes(digest), signature)
+          if (recovered.toLowerCase() === fullRequest.from.toLowerCase()) { sigValid = true; sigStep = 'personal_eoa' }
+        } catch (e2) { console.warn('RELAY_SIG_S2:', e2.message) }
+      }
+
+      // Step 3 — ERC-1271 for smart-contract wallets (LUKSO Universal Profiles).
+      //           personal_sign produces a sig over personal_hash(digest). LUKSO UP's
+      //           isValidSignature does ECDSA.recover(dataHash, sig) directly, so we must
+      //           pass the already-prefixed personal hash — same pattern as the notifications API.
+      if (!sigValid) {
+        try {
+          const code = await provider.getCode(fullRequest.from)
+          console.log('RELAY_ERC1271: from', fullRequest.from, 'codeLen', code?.length)
+          if (code && code !== '0x') {
+            const personalHash = ethers.hashMessage(ethers.getBytes(digest))
+            const iface = new ethers.Interface(['function isValidSignature(bytes32,bytes) view returns (bytes4)'])
+            const raw = await provider.call({ to: fullRequest.from, data: iface.encodeFunctionData('isValidSignature', [personalHash, signature]) })
+            console.log('RELAY_ERC1271: raw', raw)
+            if (raw && raw.length >= 10 && raw.slice(0, 10).toLowerCase() === '0x1626ba7e') { sigValid = true; sigStep = 'erc1271' }
+          }
+        } catch (e3) { console.error('RELAY_SIG_S3:', e3.message) }
+      }
+
+      return { domain: candidate, digest, sigValid, sigStep }
     }
 
-    // Step 3 — ERC-1271 for smart-contract wallets (LUKSO Universal Profiles).
-    //           personal_sign produces a sig over personal_hash(digest). LUKSO UP's
-    //           isValidSignature does ECDSA.recover(dataHash, sig) directly, so we must
-    //           pass the already-prefixed personal hash — same pattern as the notifications API.
-    if (!sigValid) {
-      try {
-        const code = await provider.getCode(fullRequest.from)
-        console.log('RELAY_ERC1271: from', fullRequest.from, 'codeLen', code?.length)
-        if (code && code !== '0x') {
-          const personalHash = ethers.hashMessage(ethers.getBytes(digest))
-          const iface = new ethers.Interface(['function isValidSignature(bytes32,bytes) view returns (bytes4)'])
-          const raw = await provider.call({ to: fullRequest.from, data: iface.encodeFunctionData('isValidSignature', [personalHash, signature]) })
-          console.log('RELAY_ERC1271: raw', raw)
-          if (raw && raw.length >= 10 && raw.slice(0, 10).toLowerCase() === '0x1626ba7e') { sigValid = true; sigStep = 'erc1271' }
-        }
-      } catch (e3) { console.error('RELAY_SIG_S3:', e3.message) }
+    // The signing domain name differs per deployment (HupForwarder / HupChatForwarder), so
+    // callers send their own. When that name doesn't verify, ask the forwarder which name it
+    // actually uses and try once more — a mismatch here is a config drift, not a bad signer.
+    let verification = await verifyWithDomainName(forwarderName || 'HupChatForwarder')
+
+    if (!verification.sigValid) {
+      const onChainName = await readForwarderDomainName(provider, forwarderAddress)
+      if (onChainName && onChainName !== verification.domain.name) {
+        console.warn('RELAY_DOMAIN_RETRY: forwarder reports', onChainName)
+        verification = await verifyWithDomainName(onChainName)
+      }
     }
 
-    if (!sigValid) {
-      console.error('RELAY_SIG_MISMATCH:', { from: fullRequest.from, chainId: domain.chainId, digest })
+    const domain = verification.domain
+
+    if (!verification.sigValid) {
+      console.error('RELAY_SIG_MISMATCH:', { from: fullRequest.from, chainId: domain.chainId, digest: verification.digest })
       return NextResponse.json({ error: 'Invalid Signature' }, { status: 400 })
     }
-    console.log('RELAY_SIG_OK via', sigStep)
+    console.log('RELAY_SIG_OK via', verification.sigStep)
 
     // Check the on-chain nonce to decide whether simulation is meaningful.
     // When the client sends messages faster than blocks are mined, previous txs
@@ -202,11 +362,15 @@ export async function POST(request) {
     const feeData = await provider.getFeeData()
     const networkMax = feeData.maxFeePerGas ?? 0n
     const maxFeePerGas = networkMax >= maxPriorityFeePerGas ? networkMax : maxPriorityFeePerGas
-    const tx = await forwarder.execute(fullRequest, {
-      gasLimit: BigInt(fullRequest.gas) + 100000n,
-      maxPriorityFeePerGas,
-      maxFeePerGas,
-    })
+    recordThrottleHit(bucket, chainId, fullRequest.from)
+
+    const tx = await enqueueSend(chainId, () =>
+      forwarder.execute(fullRequest, {
+        gasLimit: BigInt(fullRequest.gas) + 100000n,
+        maxPriorityFeePerGas,
+        maxFeePerGas,
+      }),
+    )
 
     return NextResponse.json({
       success: true,
