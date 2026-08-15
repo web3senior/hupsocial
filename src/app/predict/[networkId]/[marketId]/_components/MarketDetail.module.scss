@@ -174,7 +174,12 @@
   &__description {
     margin: 0;
     font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
     color: var(--text-muted, #666);
+    // Market rules are written as paragraphs in the composer's textarea — keep the
+    // creator's line breaks instead of collapsing them into one run of text
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
 
   &__volume {
