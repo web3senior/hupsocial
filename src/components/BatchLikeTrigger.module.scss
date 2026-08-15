@@ -3,6 +3,26 @@
 .panel {
   min-width: 240px;
   max-width: 300px;
+
+  // The popover renders as a sibling of its trigger, which on the floating action stack
+  // sits inside a `pointer-events: none` container (it must not block the feed behind it).
+  // Being in the top layer does not exempt the panel from that inherited value, so without
+  // this every click inside it falls straight through to the page.
+  pointer-events: auto;
+}
+
+// Stacks the caption under the heart on the floating action button
+.trigger {
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.caption {
+  color: var(--text-muted);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .badge {
@@ -32,6 +52,13 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+  }
+
+  &__lede {
+    margin: -0.25rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
   }
 
   &__list {
@@ -87,7 +114,9 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.625rem;
-  border: 0;
+  // Both controls in a row are outlined: without the send arrow there was nothing marking
+  // them as pressable, and hover cannot say it on touch
+  border: 1px solid var(--border);
   border-radius: var(--global-border-radius);
   background: transparent;
   color: var(--text);
@@ -112,6 +141,9 @@
   }
 
   &__count {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     min-width: 20px;
     padding: 0 6px;
     border-radius: 1000px;
@@ -128,7 +160,7 @@
     align-items: center;
     justify-content: center;
     padding: 0.5rem;
-    border: 0;
+    border: 1px solid var(--border);
     border-radius: var(--global-border-radius);
     background: transparent;
     color: var(--text-muted);

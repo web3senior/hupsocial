@@ -1,19 +1,22 @@
 'use client'
 
 import clsx from 'clsx'
-import { ArrowRightIcon, HeartIcon, SpinnerIcon, TrashIcon } from '@phosphor-icons/react'
+import { HeartIcon, SpinnerIcon, TrashIcon } from '@phosphor-icons/react'
 import NativePopover from '@/components/ui/NativePopover'
 import { useBatchLike } from '@/hooks/useBatchLike'
 import styles from './BatchLikeTrigger.module.scss'
 
 /**
  * The basket's only surface now that /batch-like is gone: an orange heart carrying the
- * queued count.
+ * queued count, opening a panel that lists what is queued per chain.
  *
- * One queued chain sends straight away. Several open a chooser instead of firing everything,
- * because a batchLike is one transaction per chain and the wallet must switch networks
- * between them — a silent "send all" would be a run of switch-and-sign prompts, and a
- * rejection halfway through would leave the rest in an unexplained state.
+ * The panel opens even for a single queued chain rather than firing on tap. Sending costs
+ * gas, so a floating button deserves a deliberate second tap, and it keeps clearing the
+ * basket reachable in every state — otherwise a queued like nobody wants can never be
+ * removed. There is deliberately no "send all" either: batchLike runs on one Hup contract
+ * at a time and the wallet must switch networks for each, so a single tap across three
+ * chains would be a run of switch-and-sign prompts, with a rejection halfway through
+ * leaving the rest in an unexplained state.
  *
  * @param {Object} props
  * @param {string} [props.className] Classes for the trigger button, supplied by the host surface.
@@ -30,6 +33,7 @@ export default function BatchLikeTrigger({
   badge = 'count',
   iconSize = 20,
   placement = 'top-end',
+  caption,
 }) {
   const { total, groups, pendingNetworkId, isProcessing, send, clear } = useBatchLike()
 
@@ -55,29 +59,25 @@ export default function BatchLikeTrigger({
 
   const content = iconWrapperClassName ? <span className={iconWrapperClassName}>{face}</span> : face
 
-  const label = `Send ${total} queued like${total === 1 ? '' : 's'}`
-
-  if (groups.length === 1) {
-    return (
-      <button type="button" className={className} disabled={isProcessing} onClick={() => send(groups[0].networkId)} aria-label={label}>
-        {content}
-      </button>
-    )
-  }
+  const label = `Open pending likes, ${total} waiting to be sent`
 
   return (
     <NativePopover
       placement={placement}
       className={styles.panel}
       trigger={
-        <button type="button" className={className} disabled={isProcessing} aria-label={`${label} across ${groups.length} networks`}>
+        // A bare heart on a floating button reads as "like something", not "you have likes
+        // waiting" — the caption is what tells a first-time user which one it is
+        <button type="button" className={clsx(className, caption && styles.trigger)} disabled={isProcessing} aria-label={label}>
           {content}
+          {caption && <span className={styles.caption}>{caption}</span>}
         </button>
       }
     >
       {({ close }) => (
         <div className={styles.basket}>
-          <p className={styles.basket__title}>Queued likes</p>
+          <p className={styles.basket__title}>Pending likes</p>
+          <p className={styles.basket__lede}>Hearts you tapped in the feed. Nothing is onchain until you send them.</p>
 
           <ul className={styles.basket__list}>
             {groups.map((group) => (
@@ -86,18 +86,20 @@ export default function BatchLikeTrigger({
                   type="button"
                   className={styles.network}
                   disabled={isProcessing}
+                  aria-label={`Send ${group.count} like${group.count === 1 ? '' : 's'} on ${group.name}`}
                   onClick={() => {
                     close()
                     send(group.networkId)
                   }}
                 >
                   <span className={styles.network__name}>{group.name}</span>
-                  <span className={styles.network__count}>{group.count}</span>
-                  {pendingNetworkId === group.networkId ? (
-                    <SpinnerIcon size={14} className="animate spin" />
-                  ) : (
-                    <ArrowRightIcon size={14} />
-                  )}
+                  <span className={styles.network__count}>
+                    <HeartIcon size={11} weight="fill" />
+                    {group.count}
+                  </span>
+                  {/* No send arrow: sitting beside the trash it turned the pair into a
+                      guess, and the row itself is the send target */}
+                  {pendingNetworkId === group.networkId && <SpinnerIcon size={14} className="animate spin" />}
                 </button>
 
                 <button
@@ -113,7 +115,9 @@ export default function BatchLikeTrigger({
             ))}
           </ul>
 
-          <p className={styles.basket__hint}>One transaction per network — your wallet switches between them.</p>
+          {groups.length > 1 && (
+            <p className={styles.basket__hint}>One transaction per network — your wallet switches between them.</p>
+          )}
 
           <button
             type="button"

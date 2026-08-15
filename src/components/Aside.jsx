@@ -422,6 +422,7 @@ export default function Aside() {
           <BatchLikeTrigger
             className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])}
             badgeClassName={styles.floatingActions__badge}
+            caption="Pending"
           />
 
           <button
