@@ -165,7 +165,8 @@ export const useBatchLike = () => {
           batch.forEach((id) => removeFromBatch(address, networkId, id))
         }
 
-        toast(session.active ? 'Liked via active session key!' : 'Batch like sent!', 'success')
+        const likedLabel = queue.length === 1 ? 'Post Liked' : 'Posts Liked'
+        toast(session.active ? `${likedLabel} via active session key!` : likedLabel, 'success')
       } catch (err) {
         console.error('Batch like transaction failed:', err)
         toast(shortTxError(err, 'Batch like failed'), 'error')
