@@ -22,7 +22,7 @@
 import { ethers } from 'ethers'
 import hupAbi from '@/abi/post.json'
 import { CONTRACTS } from '@/config/contracts'
-import { GASLESS_BUCKETS, formatWait, gaslessPolicyFor } from '@/config/gasless'
+import { GASLESS_BUCKETS, formatWait, gaslessPolicyFor, isGaslessChainId } from '@/config/gasless'
 import { getBurnerSignerSilent } from '@/lib/burnerSession'
 
 const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
@@ -32,9 +32,6 @@ export const localStorageGaslessKey = `${prefix}gasless_enabled`
 // Trial default for users who never touched the toggle. Flip to false to park the
 // experiment for everyone without editing any call site.
 export const GASLESS_DEFAULT = true
-
-// Ethereum mainnet is excluded by default — an L1 post is real money every time.
-const EXCLUDED_CHAIN_IDS = [1]
 
 // Forwarder overhead plus the call itself: `create` stores a struct and a CID string. The
 // relay route adds its own headroom for the outer transaction.
@@ -90,34 +87,16 @@ const holdUntil = (bucket, chainId, owner, ms) => {
   localStorage.setItem(waitKey(bucket, chainId, owner), String(Date.now() + ms))
 }
 
-// Optional deploy-time override, e.g. NEXT_PUBLIC_GASLESS_CHAINS="42,143,8453".
-// Absent, every configured chain except the exclusions above is sponsored.
-const chainAllowlist = () => {
-  const raw = process.env.NEXT_PUBLIC_GASLESS_CHAINS
-  if (!raw) return null
-
-  const ids = raw
-    .split(',')
-    .map((value) => Number(value.trim()))
-    .filter((value) => Number.isInteger(value) && value > 0)
-
-  return ids.length > 0 ? ids : null
-}
-
 /**
- * True when the network has both a forwarder and a Hup contract configured and is not
- * excluded from the trial. Adding a chain to config/contracts.js is all the app needs —
- * the chain still has to trust the forwarder onchain and the relayer still needs funding.
+ * True when the chain is on the sponsored list (NEXT_PUBLIC_GASLESS_CHAINS, the single place
+ * that list lives) and has both a forwarder and a Hup contract configured. A listed chain
+ * still has to trust the forwarder onchain and the relayer still needs funding there.
  */
 export const isGaslessChain = (networkId) => {
-  const id = Number(networkId)
-  if (!id) return false
+  if (!isGaslessChainId(networkId)) return false
 
-  const contracts = CONTRACTS[`chain${id}`]
-  if (!contracts?.forwarder || !contracts?.hup) return false
-
-  const allowlist = chainAllowlist()
-  return allowlist ? allowlist.includes(id) : !EXCLUDED_CHAIN_IDS.includes(id)
+  const contracts = CONTRACTS[`chain${Number(networkId)}`]
+  return Boolean(contracts?.forwarder && contracts?.hup)
 }
 
 /** Reads the user's stored preference, falling back to the trial default. */

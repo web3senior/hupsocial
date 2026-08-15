@@ -4,7 +4,7 @@ import forwarderAbi from '../../../../abis/Forwarder.json'
 import chatAbi from '../../../../abis/Chat.json'
 import hupAbi from '../../../../abi/post.json'
 import { CONTRACTS } from '../../../../config/contracts'
-import { GASLESS_BUCKETS, formatWait, gaslessPolicyFor } from '../../../../config/gasless'
+import { GASLESS_BUCKETS, formatWait, gaslessPolicyFor, isGaslessChainId } from '../../../../config/gasless'
 
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
 
@@ -213,6 +213,14 @@ export async function POST(request) {
     if (!bucket) {
       console.error('RELAY_TARGET_REJECTED:', { chainId, to: fullRequest.to, selector: (fullRequest.data || '').slice(0, 10) })
       return NextResponse.json({ error: 'This call is not sponsored by the relayer.' }, { status: 403 })
+    }
+
+    // The gasless trial is per-chain, and the client cannot be the one enforcing that — a
+    // crafted request would otherwise spend our key on a chain we never opted into (an L1
+    // post being the expensive case). Chat predates the trial and keeps its own chains.
+    if (bucket !== 'chat' && !isGaslessChainId(chainId)) {
+      console.error('RELAY_CHAIN_REJECTED:', chainId)
+      return NextResponse.json({ error: 'The relayer does not sponsor this network.' }, { status: 403 })
     }
 
     const throttle = peekThrottle(bucket, chainId, fullRequest.from)

@@ -6,6 +6,28 @@
  * pull in wallet code, the same reason config/contracts.js exists.
  */
 
+/**
+ * The chains we sponsor, and the ONLY place that list lives — NEXT_PUBLIC_GASLESS_CHAINS in
+ * .env. Nothing is excluded in code: leave a chain off the env list and it is off, which is
+ * how Ethereum mainnet stays out. An unset or empty variable means the trial is off
+ * everywhere, so a deploy that forgets it falls back to users paying rather than silently
+ * sponsoring an L1.
+ */
+export const gaslessChainIds = () => {
+  const raw = process.env.NEXT_PUBLIC_GASLESS_CHAINS
+  if (!raw) return []
+
+  return raw
+    .split(',')
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isInteger(value) && value > 0)
+}
+
+export const isGaslessChainId = (networkId) => {
+  const id = Number(networkId)
+  return Boolean(id) && gaslessChainIds().includes(id)
+}
+
 // Per sponsored action:
 //   cooldownMs — minimum gap between two of them from one account
 //   max/windowMs — ceiling over a longer stretch
