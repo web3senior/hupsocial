@@ -5,6 +5,7 @@
 // component shows a pointer there instead of running its own password prompts.
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import hupABI from '@/abi/hup.json'
@@ -420,7 +421,13 @@ export default function InAppWallet({ onOpenSecurity }) {
         </div>
 
         <div className={clsx('col-desktop-4 flex align-items-center justify-content-between gap-1')}>
-          <span>Gasless Post</span>
+          <div className="flex flex-column">
+            <span>Gasless Post</span>
+            {/* Whoever just learned their posts are paid for is exactly who might chip in */}
+            <Link href="/gas" className={styles.subtleLink}>
+              See the gas tank
+            </Link>
+          </div>
           <ToggleSwitch checked={isGaslessOn} onChange={handleGaslessToggleChange} />
         </div>
       </div>

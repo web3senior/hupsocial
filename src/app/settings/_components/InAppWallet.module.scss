@@ -297,3 +297,15 @@ $circle-diameter: $height - ($padding * 2);
     }
   }
 }
+
+// Quiet pointer to the relayer's balances, sitting under the Gasless Post toggle
+.subtleLink {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:hover {
+    color: var(--text);
+  }
+}
