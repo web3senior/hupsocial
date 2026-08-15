@@ -1,0 +1,57 @@
+.comment-skeleton-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.comment-skeleton {
+  display: flex;
+  gap: 0.75rem;
+  // Matches .post so the skeleton and the reply that replaces it occupy the same box.
+  padding: 20px 20px 0 20px;
+  padding-bottom: 20px;
+
+  @media (max-width: 640px) {
+    padding: 10px;
+  }
+
+  & + & {
+    border-top: 1px solid var(--border);
+  }
+
+  &__avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__handle {
+    width: 28%;
+    height: 12px;
+    border-radius: 6px;
+  }
+
+  &__line {
+    height: 11px;
+    border-radius: 6px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.35rem;
+  }
+
+  &__pill {
+    height: 22px;
+    border-radius: 999px;
+  }
+}

@@ -1,54 +1,87 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Post from '@/components/Post'
-import styles from './comments.module.scss'
-import { getActiveChain } from '@/lib/communication'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Post from '@/components/Post'
+import CommentSkeletonList from '@/components/ui/CommentSkeleton'
 import { usePostStore } from '@/stores/usePostStore'
+import { useCommentsCacheStore, commentsCacheKey } from '@/stores/useCommentsCacheStore'
+import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
+import styles from './comments.module.scss'
+
+// Snapshot of a thread from the session cache, shaped for this component's state.
+function readThread(key, viewer) {
+  const cached = useCommentsCacheStore.getState().readCommentsCache(key, viewer)
+  return { key, list: cached?.list ?? [], isLoading: !cached, isFresh: !!cached?.isFresh }
+}
 
 export default function Comments({ networkId, postId, viewerAddress }) {
-  const [comments, setComments] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const activeChain = getActiveChain()
   const router = useRouter()
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
+  const fetchComments = useCommentsCacheStore((state) => state.fetchComments)
+
+  const cacheKey = commentsCacheKey(networkId, postId)
+  const viewer = viewerAddress ?? null
+
+  // Thread from an earlier visit this session, if any. Safe to read in an
+  // initializer: the store is in-memory, so it's always empty during SSR
+  // hydration and cache hits only ever happen on client-side remounts.
+  const [thread, setThread] = useState(() => readThread(cacheKey, viewer))
+
+  // Params whose data is already on screen ("key|viewer"). Set on data
+  // application, never on fetch start, so StrictMode's double-run can't mark an
+  // in-flight request as done. `isFresh` is read only here, to seed it.
+  const appliedRef = useRef(thread.isFresh ? `${cacheKey}|${viewer}` : null)
+
+  // Navigating comment → parent keeps this component mounted with a new postId,
+  // so the thread has to swap during render: an effect would paint the previous
+  // post's replies under the new one for a frame.
+  if (thread.key !== cacheKey) {
+    const next = readThread(cacheKey, viewer)
+    appliedRef.current = next.isFresh ? `${cacheKey}|${viewer}` : null
+    setThread(next)
+  }
 
   useEffect(() => {
-    async function loadComments() {
-      try {
-        let url = `/api/v1/networks/${networkId}/${postId}/comments?page=1&limit=30`
-        if (viewerAddress) {
-          url += `&viewer_address=${encodeURIComponent(viewerAddress)}`
-        }
+    const params = `${cacheKey}|${viewer}`
+    // Already applied — a snapshot fresh enough to trust, or a fetch this effect
+    // already finished. Skipping here is what stops every visit from re-requesting
+    // a thread the session already has.
+    if (appliedRef.current === params) return
 
-        const res = await fetch(url)
-        const json = await res.json()
-        if (json.success) {
-          setComments(json.data)
-        }
-      } catch (err) {
+    let cancelled = false
+
+    fetchComments(networkId, postId, viewer)
+      .then((list) => {
+        if (cancelled) return
+        appliedRef.current = params
+        setThread({ key: cacheKey, list, isLoading: false, isFresh: true })
+      })
+      .catch((err) => {
+        if (cancelled) return
         console.error('Failed to load comments', err)
-      } finally {
-        setIsLoading(false)
-      }
+        // A failed background revalidation leaves the cached thread on screen;
+        // only a cold load has to drop out of the skeleton.
+        setThread((prev) => (prev.isLoading ? { ...prev, isLoading: false } : prev))
+      })
+
+    return () => {
+      cancelled = true
     }
+  }, [networkId, postId, viewer, cacheKey, fetchComments])
 
-    loadComments()
-  }, [networkId, postId, viewerAddress])
-
-  if (isLoading) return <div className={styles.commentsList__empty}>Loading discussion thread...</div>
+  if (thread.isLoading) return <CommentSkeletonList count={3} />
 
   return (
     <div className={styles.commentsList}>
-      {comments.length === 0 ? (
+      {thread.list.length === 0 ? (
         <p className={styles.commentsList__empty}>No comments yet. Start the conversation!</p>
       ) : (
-        comments.map((comment, i) => (
+        thread.list.map((comment, i) => (
           <section key={comment.id} className={styles.commentsList__item}
-           onClick={() => {
-             const selection = window.getSelection()
-             if (selection && selection.toString().length > 0) return
+           onPointerDown={rememberCardPointerDown}
+           onClick={(e) => {
+             if (isTextSelectionDrag(e)) return
              // Seed the store so the detail route paints this comment instantly
              setCurrentPost(comment)
              router.push(`/networks/${networkId}/${comment.id}`)
@@ -69,7 +102,7 @@ export default function Comments({ networkId, postId, viewerAddress }) {
                 'bookmark',
               ].filter(Boolean)} // Simplified actions matrix for reply nodes
             />
-            {i < comments.length - 1 && <hr className={styles.commentsList__divider} />}
+            {i < thread.list.length - 1 && <hr className={styles.commentsList__divider} />}
           </section>
         ))
       )}

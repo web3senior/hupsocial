@@ -2,8 +2,11 @@
 
 import clsx from 'clsx'
 import { useParams } from 'next/navigation'
+import { useConnection } from 'wagmi'
 import PageTitle from '@/components/PageTitle'
 import Post from '@/components/Post'
+import Comments from '@/components/Comments'
+import CommentSkeletonList from '@/components/ui/CommentSkeleton'
 import { usePostStore } from '@/stores/usePostStore'
 import pageStyles from './page.module.scss'
 import detailStyles from './_components/PostDetails.module.scss'
@@ -14,6 +17,7 @@ import detailStyles from './_components/PostDetails.module.scss'
 // markup mirrors PostDetails exactly, making the Suspense swap invisible.
 export default function Loading() {
   const params = useParams()
+  const { address } = useConnection()
   const currentPost = usePostStore((state) => state.currentPost)
 
   // Only trust the cache when it is the post being navigated to (back/forward
@@ -42,7 +46,16 @@ export default function Loading() {
                   <hr />
                 </article>
               </div>
-              <div>Loading discussion thread...</div>
+              {/* Same cache-first component PostDetails mounts: a thread this session
+                  already loaded repaints here instead of shimmering for the whole
+                  roundtrip, and a cold one shares its request with PostDetails'.
+                  The route params come first in both places so the two mounts
+                  derive an identical cache key. */}
+              <Comments
+                networkId={params?.networkId || currentPost.network_id}
+                postId={currentPost.is_repost > 0 ? currentPost.is_repost : targetId ?? currentPost.id}
+                viewerAddress={address}
+              />
             </div>
           </div>
         ) : (
@@ -86,27 +99,7 @@ function Skeleton() {
           </div>
         </section>
 
-        {[1, 2, 3].map((i) => (
-          <section
-            key={i}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-              padding: '0.75rem 1rem',
-              borderBottom: '1px solid var(--border)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div className="shimmer" style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0 }} />
-              <div className="shimmer" style={{ width: '28%', height: 10, borderRadius: 6 }} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', paddingLeft: '2.6rem' }}>
-              <div className="shimmer" style={{ width: `${70 + i * 7}%`, height: 11, borderRadius: 6 }} />
-              {i < 3 && <div className="shimmer" style={{ width: `${50 + i * 5}%`, height: 11, borderRadius: 6 }} />}
-            </div>
-          </section>
-        ))}
+        <CommentSkeletonList count={3} />
       </div>
     </div>
   )
