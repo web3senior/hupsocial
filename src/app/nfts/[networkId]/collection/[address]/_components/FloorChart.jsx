@@ -67,7 +67,13 @@ function FloorTooltip({ active, payload, label, symbol }) {
       {/* The diamond is a doorway now, but nothing about a diamond says so — one muted line
           here is what makes the affordance discoverable without decorating the plot */}
       {hasSale && row.saleTrades?.length > 0 && (
-        <span className={styles.chart__tooltipHint}>{row.saleCount > 1 ? 'Click the marker to see each sale' : 'Click the marker to open the NFT'}</span>
+        <span className={styles.chart__tooltipHint}>
+          {row.saleCount > 1
+            ? 'Click the marker to see each sale'
+            : Number(row.saleTrades[0]?.listing_id) > 0
+              ? 'Click the marker to open the NFT'
+              : 'Click the marker to see the sale'}
+        </span>
       )}
     </div>
   )
@@ -160,10 +166,14 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
   }, [salesDay])
 
   // One sale is one NFT, so the marker goes straight to its listing page; a multi-sale day
-  // has no single destination and opens the picker instead of guessing one
+  // has no single destination and opens the picker instead of guessing one.
+  //
+  // Sales settled through an offer rather than a listing carry listing_id 0 — there is no
+  // listing page to send anyone to, so those open the picker (which names the NFT) instead of
+  // routing to /nfts/<chain>/0, which is a "listing doesn't exist" dead end.
   const handleOpenSales = (row) => {
     if (!row?.saleTrades?.length) return
-    if (row.saleTrades.length === 1) {
+    if (row.saleTrades.length === 1 && Number(row.saleTrades[0].listing_id) > 0) {
       router.push(`/nfts/${chainId}/${row.saleTrades[0].listing_id}`)
       return
     }
@@ -288,7 +298,10 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
                   when the payload names it — cached pre-listing_id responses fall back to text */}
               {lastSale &&
                 (lastSale.listing_id ? (
-                  <Link href={`/nfts/${chainId}/${lastSale.listing_id}`} className={clsx(styles.chart__lastSale, styles['chart__lastSale--link'])}>
+                  <Link
+                    href={`/nfts/${chainId}/${lastSale.listing_id}`}
+                    className={clsx(styles.chart__lastSale, styles['chart__lastSale--link'])}
+                  >
                     Last sale
                     <strong>
                       {formatStake(lastSale.price, decimals)} {symbol}
@@ -370,8 +383,8 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
             <div className={styles.chart__tableWrap}>
               <table className={styles.chart__table}>
                 <caption className={styles.chart__caption}>
-                  Daily floor and sales in {symbol}. Days with nothing listed and nothing sold are left out; a day
-                  with several sales shows their average.
+                  Daily floor and sales in {symbol}. Days with nothing listed and nothing sold are left out; a day with several sales shows
+                  their average.
                 </caption>
                 <thead>
                   <tr>
@@ -390,11 +403,11 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
                       <td>
                         {point.sale === null ? (
                           '—'
-                        ) : point.saleTrades.length === 1 ? (
+                        ) : point.saleTrades.length === 1 && Number(point.saleTrades[0].listing_id) > 0 ? (
                           <Link href={`/nfts/${chainId}/${point.saleTrades[0].listing_id}`} className={styles.chart__tableSale}>
                             {compact.format(point.sale)}
                           </Link>
-                        ) : point.saleTrades.length > 1 ? (
+                        ) : point.saleTrades.length >= 1 ? (
                           <button type="button" className={styles.chart__tableSale} onClick={() => handleOpenSales(point)}>
                             {compact.format(point.sale)}
                             <small className={styles.chart__tableCount}>×{point.saleCount}</small>
@@ -454,7 +467,12 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
                 />
                 {/* After the line, so a sale that landed on the floor it cleared sits on top of
                     it rather than under it */}
-                <Scatter dataKey="sale" name="Sale" shape={<SaleMarker symbol={symbol} onOpen={handleOpenSales} />} isAnimationActive={false} />
+                <Scatter
+                  dataKey="sale"
+                  name="Sale"
+                  shape={<SaleMarker symbol={symbol} onOpen={handleOpenSales} />}
+                  isAnimationActive={false}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           )}
@@ -476,28 +494,42 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
               <h4 className={styles.chart__salesTitle}>
                 {salesDay.saleCount} sales on {formatDay(salesDay.date)}
               </h4>
-              <button
-                type="button"
-                className={styles.chart__salesClose}
-                onClick={() => salesDialogRef.current?.close()}
-                aria-label="Close"
-              >
+              <button type="button" className={styles.chart__salesClose} onClick={() => salesDialogRef.current?.close()} aria-label="Close">
                 <XIcon size={16} />
               </button>
             </header>
 
             <ul className={styles.chart__salesList}>
-              {salesDay.saleTrades.map((trade) => (
-                <li key={trade.listing_id}>
-                  <Link href={`/nfts/${chainId}/${trade.listing_id}`} className={styles.chart__salesItem}>
+              {salesDay.saleTrades.map((trade) => {
+                // Offer settlements carry listing_id 0 — there was never a listing to open, so
+                // the row still reports the sale but isn't a doorway. Keys can't lean on
+                // listing_id either: every offer sale in a day would share the same 0.
+                const href = Number(trade.listing_id) > 0 ? `/nfts/${chainId}/${trade.listing_id}` : null
+                const body = (
+                  <>
                     <span className={styles.chart__salesToken}>#{displayTokenId(trade.token_id)}</span>
                     <strong className={styles.chart__salesPrice}>
                       {formatStake(trade.price, decimals)} {symbol}
                     </strong>
-                    <small className={styles.chart__salesTime}>{timeFormatter.format(new Date(trade.sold_at * 1000))}</small>
-                  </Link>
-                </li>
-              ))}
+                    <small className={styles.chart__salesTime}>
+                      {timeFormatter.format(new Date(trade.sold_at * 1000))}
+                      {!href && ' · via offer'}
+                    </small>
+                  </>
+                )
+
+                return (
+                  <li key={`${trade.token_id}-${trade.sold_at}-${trade.listing_id}`}>
+                    {href ? (
+                      <Link href={href} className={styles.chart__salesItem}>
+                        {body}
+                      </Link>
+                    ) : (
+                      <span className={styles.chart__salesItem}>{body}</span>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           </>
         )}

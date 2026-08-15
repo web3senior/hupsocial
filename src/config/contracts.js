@@ -7,7 +7,7 @@
  * client code.
  */
 
-import { arbitrum, base, baseSepolia, bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, baseSepolia, bsc, celo, lukso, luksoTestnet, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Robinhood Chain (Arbitrum Orbit L2, ETH as native gas token)
@@ -31,7 +31,7 @@ export const robinhood = defineChain({
 // Chains the app runs on â€” single source of truth for the wagmi config's
 // `chains` tuple and for server-side RPC lookups (chain.rpcUrls.default.http).
 // L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia] //somniaTestnet
+export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia, luksoTestnet] //somniaTestnet
 
 export const CONTRACTS = {
   chain1: {
@@ -95,6 +95,38 @@ export const CONTRACTS = {
     drops: '',
     // No Uniswap on LUKSO, and launches are one-phase Uniswap pools — so no launches here.
     // Stays empty unless LUKSO ever gets a v3 deployment.
+    launch: '',
+    univ3Router: '',
+    univ3Quoter: '',
+  },
+  // LUKSO Testnet, re-registered 2026-08-13 as a dev chain alongside Base Sepolia. The 4201
+  // deployments from the app's first generation (and their cidex rows, deleted 2026-08-11)
+  // are retired — fill addresses in as fresh contracts land.
+  chain4201: {
+    name: 'lukso-testnet',
+    forwarder: '0xab100B28D06e93fF52DAE95DB8e90F83680671FC',
+    forwarderName: 'HupChatForwarder',
+    hup: '0xb0b992E90e11b6bCE51cb5ea4de160D06098B955',
+    status: '',
+    community: '0x898d77dd27f5C8d8edb71b11B876DF1fc306eb8b',
+    chat: '',
+    // Canonical LSP26 (same address as every other chain); the own deploy 0x78430Ef5… is retired.
+    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    store: '',
+    tipper: '',
+    trade: '',
+    // HupOffers 1.0.0, deployed 2026-08-14 (block 8310250). Escrow-backed buy offers and OTC
+    // deals — the buy-side complement of trade/editions, and independent of both: offers work
+    // on any token, listed or not, which is why this is filled here while `trade` is not.
+    offers: '0x7d52B675d44126A1cCBb33462D9D251e54277237',
+    events: '',
+    predict: '',
+    apps: '',
+    // HupDrops engine, redeployed 2026-08-13 with creator-controlled phase start/pause (the
+    // Phase struct changed, so createDrop's selector did too — 0x7854…C847 is retired along
+    // with its drops). Satellites: LSP7 0xb489…3F06, LSP8 0x761B…62b1.
+    drops: '0x073F3E3FF95b7EA8cb0Afb22389774E694782DaC',
+    // No Uniswap on LUKSO testnet either (see chain42) — no launches or swaps here.
     launch: '',
     univ3Router: '',
     univ3Quoter: '',

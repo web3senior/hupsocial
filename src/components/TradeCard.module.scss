@@ -11,10 +11,6 @@
   background-color: var(--surface-muted);
   transition: border-color 0.15s ease;
 
-  &:hover {
-    border-color: color-mix(in srgb, var(--text-muted) 60%, var(--border));
-  }
-
   &__media {
     position: relative;
     width: 88px;
@@ -208,7 +204,7 @@
       content: '';
       flex: 1;
       height: 1px;
-      background-color: var(--border);
+      background-color: var(--border-strong);
     }
 
     // Bare label at rest — the pill is a hover affordance, so a closed panel reads as one
@@ -219,15 +215,20 @@
       gap: 0.35rem;
       padding: 0.25rem 0.7rem;
       border-radius: 999px;
-      color: var(--text-muted);
+      color: var(--text);
       font-size: 0.75rem;
       font-weight: 600;
-      transition: background-color 0.15s ease, color 0.15s ease;
+      transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+
+      &:hover {
+        color: var(--text1) !important;
+      }
     }
 
     &:hover span,
     &:focus-visible span {
-      background-color: color-mix(in srgb, var(--text) 8%, transparent);
       color: var(--text);
     }
   }
@@ -325,6 +326,7 @@
   // Neutral filled pills — matching the info chips rather than a colored ad-style CTA
   &__buy,
   &__cancelListing,
+  &__offer,
   &__view {
     padding: 0.7rem 1.5rem;
     border: 0;
@@ -337,7 +339,9 @@
     text-align: center;
     white-space: nowrap;
     cursor: pointer;
-    transition: background-color 0.15s ease, opacity 0.15s ease;
+    transition:
+      background-color 0.15s ease,
+      opacity 0.15s ease;
 
     &[disabled] {
       opacity: 0.7;
@@ -386,6 +390,7 @@
     // stray left-aligned pill
     &__buy,
     &__cancelListing,
+    &__offer,
     &__view {
       flex: 1 0 auto;
       padding-block: 0.65rem;

@@ -13,6 +13,7 @@ import {
   ChatCircleIcon,
   CoinIcon,
   CoinsIcon,
+  HandshakeIcon,
   HouseIcon,
   Image,
   MagnifyingGlassIcon,
@@ -40,6 +41,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
   { id: 'tokens', name: 'Tokens', path: '/launches', icon: CoinIcon },
   { id: 'swap', name: 'Swap', path: '/swap', icon: ArrowsDownUpIcon },
+  { id: 'p2p', name: 'P2P', path: '/p2p', icon: HandshakeIcon },
   { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },
@@ -243,7 +245,8 @@ export const useSidebarStore = create(
         // legacy bucket so the next connecting wallet can claim it
         if (version < 2) {
           const legacyMap = migrated.likedPostIds
-          const hasLegacyEntries = legacyMap && typeof legacyMap === 'object' && !Array.isArray(legacyMap) && Object.keys(legacyMap).length > 0
+          const hasLegacyEntries =
+            legacyMap && typeof legacyMap === 'object' && !Array.isArray(legacyMap) && Object.keys(legacyMap).length > 0
 
           migrated.likedPostIds = hasLegacyEntries ? { [LEGACY_BATCH_KEY]: legacyMap } : {}
         }

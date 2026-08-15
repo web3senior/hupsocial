@@ -49,6 +49,11 @@ Once the plan is stated, adhere strictly to the following coding guidelines:
     // --- Modifiers ---
     // --- Logic ---
     ```
+* **Wallet compatibility (MetaMask + Universal Profile):** Users interact through both MetaMask EOAs and LUKSO Universal Profiles (ERC725 smart contract accounts). All contracts MUST support both caller types:
+    * Never require `msg.sender == tx.origin` or otherwise assume the caller is an EOA — a Universal Profile calls via its ERC725X `execute()`, so `msg.sender` is a contract.
+    * Attribute actions, ownership, and payouts to `msg.sender` (the UP or EOA address itself); never derive identity from `tx.origin`.
+    * When sending value back to users, use `.call{value: ...}("")` (never `transfer`/`send`) so smart contract accounts with receive logic (like UPs with LSP1 delegates) aren't broken by the 2300 gas stipend.
+    * For token integrations, remember LUKSO-native assets follow LSP7/LSP8 while other chains use ERC20/ERC721 — support the standards relevant to each deployment target.
 
 ### 5. Terminology
 * **"onchain", never "on-chain":** Always write **onchain** (one word, no hyphen) in all code, comments, UI copy, and documentation. Apply the same to "offchain".

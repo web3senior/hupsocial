@@ -6,7 +6,7 @@ import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
 import { zeroAddress } from 'viem'
-import { appChains } from '@/config/contracts'
+import { appChains, CONTRACTS } from '@/config/contracts'
 import { toRelative } from '@/lib/predict'
 import { formatFeeShare } from '@/lib/tradeFee'
 import { handleBrokenImage } from '@/lib/utils'
@@ -18,6 +18,7 @@ import useCollectionMetadataRefresh, { collectionRefreshLabel, describeCollectio
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import TradeCard, { buildAssetLinks } from '@/components/TradeCard'
+import OfferModal from '@/components/OfferModal'
 import Share from '@/components/ui/Share'
 import HupMark from '@/components/ui/HupMark'
 import ModelViewer from '@/components/ui/ModelViewer'
@@ -29,6 +30,7 @@ import {
   CaretRightIcon,
   ChatCircleIcon,
   CubeIcon,
+  HandCoinsIcon,
   ImageIcon,
   ReceiptIcon,
   RepeatIcon,
@@ -93,6 +95,7 @@ export default function ListingDetail({ networkId, listingId }) {
   // Collections that ship a 3D asset still lead with their artwork: the mesh is megabytes
   // and the renderer another few hundred KB, so both wait until someone asks for them.
   const [showModel, setShowModel] = useState(false)
+  const [showOfferModal, setShowOfferModal] = useState(false)
 
   const chainId = Number(networkId)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
@@ -267,7 +270,13 @@ export default function ListingDetail({ networkId, listingId }) {
             </button>
 
             {model && !model.isRenderable && (
-              <a href={model.url} target="_blank" rel="noopener noreferrer" className={styles.listing__refresh} title="This collection ships a 3D file the browser can't render inline">
+              <a
+                href={model.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.listing__refresh}
+                title="This collection ships a 3D file the browser can't render inline"
+              >
                 <CubeIcon size={14} />
                 3D file (.{model.fileType})
                 <ArrowSquareOutIcon size={12} />
@@ -276,6 +285,28 @@ export default function ListingDetail({ networkId, listingId }) {
           </div>
 
           {cardListing && <TradeCard listing={cardListing} compact showDetailsLink={false} />}
+
+          {/* Offers live in HupOffers, not HupTrade — the button only renders on chains
+              where the offers contract is deployed */}
+          {CONTRACTS[`chain${chainId}`]?.offers && (
+            <button type="button" className={styles.listing__offer} onClick={() => setShowOfferModal(true)}>
+              <HandCoinsIcon size={16} />
+              Make an offer
+            </button>
+          )}
+          {showOfferModal && (
+            <OfferModal
+              chainId={chainId}
+              collection={listing.collection}
+              tokenId={listing.token_id}
+              isLsp8={isLsp8}
+              assetName={title}
+              // While the listing is active the seller is the owner; once sold/cancelled the
+              // page can't know the current owner without a chain call, so accept stays off
+              ownerAddress={Number(listing.status) === 1 ? listing.wallet_address : null}
+              onClose={() => setShowOfferModal(false)}
+            />
+          )}
         </aside>
 
         <div className={styles.listing__info}>
@@ -389,7 +420,13 @@ export default function ListingDetail({ networkId, listingId }) {
           {(collectionInfo.name || collectionInfo.description) && (
             <aside className={styles.listing__collection} aria-label="About the collection">
               {collectionInfo.icon ? (
-                <img className={styles.listing__collectionIcon} src={collectionInfo.icon} alt="" loading="lazy" onError={handleBrokenImage} />
+                <img
+                  className={styles.listing__collectionIcon}
+                  src={collectionInfo.icon}
+                  alt=""
+                  loading="lazy"
+                  onError={handleBrokenImage}
+                />
               ) : (
                 <span className={clsx(styles.listing__collectionIcon, styles['listing__collectionIcon--fallback'])}>
                   <HupMark size={20} />
@@ -499,7 +536,8 @@ export default function ListingDetail({ networkId, listingId }) {
                     )}
                     {hasReferral && (
                       <span>
-                        Referral <ReferralName address={trade.referral} /> earned {formatStake(trade.referral_amount, decimals) ?? '…'} {symbol}
+                        Referral <ReferralName address={trade.referral} /> earned {formatStake(trade.referral_amount, decimals) ?? '…'}{' '}
+                        {symbol}
                       </span>
                     )}
                     {explorerUrl && (

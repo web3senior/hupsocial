@@ -96,6 +96,29 @@
 
   // Secondary by design: useful when a collection has just changed its onchain metadata,
   // noise the rest of the time, so it sits quietly under the artwork.
+  // Full-width secondary CTA under the buy panel — offers are the counterpart to the
+  // TradeCard's primary buy action
+  &__offer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
+    }
+  }
+
   &__refresh {
     display: inline-flex;
     align-items: center;
@@ -110,7 +133,9 @@
     background: transparent;
     text-decoration: none;
     cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
 
     &:hover:not(:disabled) {
       color: var(--color-text);
@@ -452,7 +477,9 @@
     border: 1px solid var(--border);
     border-radius: 999px;
     color: var(--text-muted, #888);
-    transition: color 0.15s ease, border-color 0.15s ease;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
 
     &:hover {
       color: var(--text);

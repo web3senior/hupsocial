@@ -1,0 +1,295 @@
+.p2p {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  padding-bottom: 3rem;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.6rem;
+    font-weight: 800;
+  }
+
+  &__subtitle {
+    margin: 0;
+    max-width: 60ch;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  &__create {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    padding: 0.7rem 1.2rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--network-color-text, var(--white));
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+
+    &[disabled] {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  &__chains {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__chain {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      border-color: var(--network-color-primary, var(--color-primary));
+      color: var(--network-color-primary, var(--color-primary));
+      font-weight: 600;
+    }
+  }
+
+  &__views {
+    display: flex;
+    gap: 0.35rem;
+    align-self: flex-start;
+    padding: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+  }
+
+  &__view {
+    padding: 0.4rem 0.95rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      background-color: var(--background);
+      color: var(--text);
+    }
+  }
+
+  // Terminal state on a past deal — a statement, not an action
+  &__badge {
+    flex-shrink: 0;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+
+    &--filled {
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 14%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.85rem;
+    width: 100%;
+  }
+
+  &__deal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--surface-muted);
+  }
+
+  &__dealHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  &__lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+
+    &--mine {
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 14%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  // The two legs of the trade, read left to right in the filler's direction
+  &__terms {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 12px;
+    background-color: var(--background);
+  }
+
+  &__leg {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__legLabel {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  &__legValue {
+    overflow: hidden;
+    font-size: 0.95rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // Contract identity under the amount — small, but the only line on the card that proves
+  // which token is actually being asked for
+  &__assetMeta {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  &__assetAddress {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    cursor: pointer;
+
+    code {
+      font-family: var(--font-family-monospace);
+      font-size: 0.7rem;
+    }
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  &__assetLink {
+    display: inline-flex;
+    color: var(--text-muted);
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  &__swapIcon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
+
+  &__dealFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__expiry,
+  &__hint {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+
+  &__action {
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 1rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--network-color-text, var(--white));
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+
+    &[disabled] {
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    // Reclaiming your own escrow is a retreat, not the card's call to action — so it reads as
+    // a quiet secondary control next to everyone else's Fill button
+    &--cancel {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+
+      &:hover:not([disabled]) {
+        border-color: var(--danger-500, #ef4444);
+        color: var(--danger-500, #ef4444);
+      }
+    }
+  }
+
+  &__empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+  }
+}

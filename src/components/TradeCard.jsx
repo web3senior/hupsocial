@@ -19,6 +19,7 @@ import useTradeFee from '@/hooks/useTradeFee'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { toast } from '@/components/NextToast'
 import EditListingModal from './EditListingModal'
+import OfferModal from './OfferModal'
 import styles from './TradeCard.module.scss'
 
 const amountFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
@@ -120,6 +121,7 @@ export const lsp7Abi = [
 const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false }) => {
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isOfferOpen, setIsOfferOpen] = useState(false)
   const { address } = useConnection()
   const lastActionRef = useRef(null)
 
@@ -127,6 +129,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
   const publicClient = usePublicClient({ chainId })
   const chainInfo = appChains.find((c) => c.id === chainId)
   const tradeAddress = CONTRACTS[`chain${chainId}`]?.trade || null
+  const offersAddress = CONTRACTS[`chain${chainId}`]?.offers || null
   const nativeCurrency = chainInfo?.nativeCurrency
   const listingId = listing?.listingId ? BigInt(listing.listingId) : null
 
@@ -567,7 +570,36 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
               {isBusy ? 'Confirming...' : 'Buy'}
             </button>
           ))}
+
+        {/* Feed cards get the below-asking path too; the listing page carries its own offers
+            entry, so compact stays buy-only here */}
+        {!compact && !isSeller && offersAddress && (
+          <button
+            type="button"
+            className={styles.tradeCard__offer}
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsOfferOpen(true)
+            }}
+          >
+            Offer
+          </button>
+        )}
       </div>
+
+      {isOfferOpen && (
+        <OfferModal
+          chainId={chainId}
+          collection={listing.collection}
+          tokenId={listing.tokenId}
+          isLsp8={Boolean(listing.isLsp8)}
+          assetName={metadata.name || metadata.collectionName || null}
+          // While the listing is live the seller is the owner; on sold/cancelled/stale cards
+          // the current owner is unknown here, so the accept flow stays off
+          ownerAddress={isActive && !isUnavailable ? seller : null}
+          onClose={() => setIsOfferOpen(false)}
+        />
+      )}
 
       {isEditOpen && (
         <EditListingModal

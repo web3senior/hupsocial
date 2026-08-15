@@ -85,6 +85,28 @@
     padding: 0 0.125rem 0.125rem;
   }
 
+  // Unlisted tokens' only action — a quiet pill so the grid stays artwork-first
+  &__offerBtn {
+    align-self: stretch;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
+    }
+  }
+
   &__name {
     color: var(--color);
     font-size: 0.85rem;

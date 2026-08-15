@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { CONTRACTS } from '@/config/contracts'
 import { getNftListings } from '@/lib/api'
 import useCollectionTokens from '@/hooks/useCollectionTokens'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { displayTokenId } from '@/lib/walletNfts'
 import { formatStake } from '@/hooks/useStakeToken'
+import OfferModal from '@/components/OfferModal'
 import styles from './CollectionBrowser.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -16,7 +18,7 @@ const count = new Intl.NumberFormat()
 // carry their own listing from the API's join, so the cap only ever costs chain-mode badges.
 const LISTING_OVERLAY_LIMIT = 60
 
-function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listing, nativeCurrency }) {
+function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listing, nativeCurrency, onOffer }) {
   const meta = useNftMetadata({ chainId, collection, tokenId, isLsp8, imageWidth: 320, still: true })
   const label = displayTokenId(tokenId)
   const name = meta.name || (collectionName ? `${collectionName} #${label}` : `#${label}`)
@@ -24,7 +26,7 @@ function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listi
   // Native-coin listings come back with null symbol/decimals — the chain config fills both
   // in, the same rule every price in the app follows
   const symbol = listing ? listing.symbol || nativeCurrency?.symbol || '' : ''
-  const decimals = listing ? listing.decimals ?? nativeCurrency?.decimals : undefined
+  const decimals = listing ? (listing.decimals ?? nativeCurrency?.decimals) : undefined
 
   const body = (
     <>
@@ -52,13 +54,32 @@ function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listi
   // half-page to send it to, so no pretend link
   if (listing) {
     return (
-      <Link href={`/nfts/${chainId}/${listing.listing_id}`} className={styles.browser__item} aria-label={`${name}, listed for ${formatStake(listing.price, decimals)} ${symbol}`}>
+      <Link
+        href={`/nfts/${chainId}/${listing.listing_id}`}
+        className={styles.browser__item}
+        aria-label={`${name}, listed for ${formatStake(listing.price, decimals)} ${symbol}`}
+      >
         {body}
       </Link>
     )
   }
 
-  return <span className={styles.browser__item}>{body}</span>
+  // Unlisted tokens can still be bid on — offers are escrow-backed and non-custodial, so
+  // they don't need the owner to have listed anything
+  return (
+    <span className={styles.browser__item}>
+      {body}
+      {onOffer && (
+        <button
+          type="button"
+          className={styles.browser__offerBtn}
+          onClick={() => onOffer({ tokenId, isLsp8: Boolean(Number(isLsp8)), name })}
+        >
+          Make offer
+        </button>
+      )}
+    </span>
+  )
 }
 
 /**
@@ -93,6 +114,11 @@ export default function CollectionBrowser({ chainId, collection, collectionName,
   // Live listings overlaid onto chain-enumerated rows, so a token that is up for sale badges
   // its price. Cache-backed rows already carry their listing from the API's own join.
   const [listingByToken, setListingByToken] = useState(null)
+
+  // One shared offer dialog for the whole grid; unlisted tiles open it on their token
+  // (listed tiles route to the listing page, which carries its own offers entry)
+  const [offerTarget, setOfferTarget] = useState(null)
+  const offersEnabled = Boolean(CONTRACTS[`chain${chainId}`]?.offers)
 
   useEffect(() => {
     if (!enabled) return
@@ -134,8 +160,8 @@ export default function CollectionBrowser({ chainId, collection, collectionName,
           {mode === 'chain'
             ? `All ${count.format(total)} tokens, read straight from the contract.`
             : total > 0
-            ? `The ${count.format(total)} token${total === 1 ? '' : 's'} Hup has seen${supply ? ` of ${count.format(supply)}` : ''} — this collection doesn't publish a token index, so tokens appear here as they're listed, traded or browsed.`
-            : ''}
+              ? `The ${count.format(total)} token${total === 1 ? '' : 's'} Hup has seen${supply ? ` of ${count.format(supply)}` : ''} — this collection doesn't publish a token index, so tokens appear here as they're listed, traded or browsed.`
+              : ''}
         </p>
       )}
 
@@ -166,9 +192,21 @@ export default function CollectionBrowser({ chainId, collection, collectionName,
               isLsp8={token.is_lsp8}
               listing={token.listing || listingByToken?.get(String(token.token_id)) || null}
               nativeCurrency={chainInfo?.nativeCurrency}
+              onOffer={offersEnabled ? setOfferTarget : null}
             />
           ))}
         </div>
+      )}
+
+      {offerTarget && (
+        <OfferModal
+          chainId={chainId}
+          collection={collection}
+          tokenId={offerTarget.tokenId}
+          isLsp8={offerTarget.isLsp8}
+          assetName={offerTarget.name}
+          onClose={() => setOfferTarget(null)}
+        />
       )}
 
       {hasMore && !isLoading && (
