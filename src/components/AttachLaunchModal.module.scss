@@ -1,0 +1,115 @@
+/* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+.attachLaunch {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  width: min(360px, calc(100vw - 6px - 2em - 2px));
+
+  &__header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+  }
+
+  &__cancel {
+    all: unset;
+    cursor: pointer;
+    position: absolute;
+    left: 1rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    max-height: 60svh;
+    overflow-y: auto;
+  }
+
+  &__create {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: none;
+    background-color: var(--primary, #ec4899);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.6rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &__sectionTitle {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      background: var(--background);
+      color: inherit;
+      border-radius: var(--global-border-radius);
+      padding: 0.6rem 0.75rem;
+      font-size: var(--font-size-14, 0.875rem);
+      text-align: left;
+      cursor: pointer;
+
+      &:hover {
+        border-color: var(--primary, #ec4899);
+      }
+
+      span {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+
+        em {
+          font-style: normal;
+          color: var(--text-muted, #888);
+        }
+      }
+    }
+  }
+
+  &__status {
+    flex-shrink: 0;
+    font-size: var(--font-size-10, 0.625rem);
+    color: var(--text-muted, #888);
+    white-space: nowrap;
+  }
+}
