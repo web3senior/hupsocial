@@ -20,6 +20,18 @@ const SPONSORED_SELECTORS = new Map(
   Object.entries(GASLESS_BUCKETS).map(([name, bucket]) => [hupInterface.getFunction(name).selector, bucket]),
 )
 
+// The relayer sends `execute` to whatever forwarder the caller names, so that address has to
+// be one of ours too — otherwise a crafted request points us at an arbitrary contract and we
+// pay the gas for whatever it does. A chain can have two: the chat forwarder and, where Hup
+// was deployed against its own, `hupForwarder`.
+const isConfiguredForwarder = (chainId, forwarderAddress) => {
+  const contracts = CONTRACTS[`chain${chainId}`]
+  if (!contracts || !forwarderAddress) return false
+
+  const target = forwarderAddress.toLowerCase()
+  return [contracts.forwarder, contracts.hupForwarder].filter(Boolean).some((address) => address.toLowerCase() === target)
+}
+
 // Returns the rate-limit bucket a request belongs to, or null when we will not pay for it.
 const sponsoredBucket = (chainId, to, data) => {
   const contracts = CONTRACTS[`chain${chainId}`]
@@ -221,6 +233,11 @@ export async function POST(request) {
     if (bucket !== 'chat' && !isGaslessChainId(chainId)) {
       console.error('RELAY_CHAIN_REJECTED:', chainId)
       return NextResponse.json({ error: 'The relayer does not sponsor this network.' }, { status: 403 })
+    }
+
+    if (!isConfiguredForwarder(chainId, forwarderAddress)) {
+      console.error('RELAY_FORWARDER_REJECTED:', { chainId, forwarderAddress })
+      return NextResponse.json({ error: 'Unknown forwarder for this network.' }, { status: 403 })
     }
 
     const throttle = peekThrottle(bucket, chainId, fullRequest.from)

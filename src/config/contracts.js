@@ -75,6 +75,12 @@ export const CONTRACTS = {
     name: 'lukso',
     forwarder: '0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972',
     forwarderName: 'HupChatForwarder',
+    // Hup was deployed against its own forwarder, not the chat one above, and only ever
+    // trusted that address — relaying `create` through `forwarder` fails with
+    // ERC2771UntrustfulTarget. Verified onchain 2026-08-15 via hup.trustedForwarder().
+    // Chains without this pair trust `forwarder` for both.
+    hupForwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
+    hupForwarderName: 'HupForwarder',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
@@ -130,6 +136,9 @@ export const CONTRACTS = {
     name: 'monad',
     forwarder: '0x09FAf2fddED624958589aD9ca704Bc4C6C232e72',
     forwarderName: 'HupChatForwarder',
+    // Same split as LUKSO: Hup trusts its own forwarder, chat uses the one above
+    hupForwarder: '0x8466799e31a86a4d51B76154e57B14DcAF9A8756',
+    hupForwarderName: 'HupForwarder',
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
     chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
