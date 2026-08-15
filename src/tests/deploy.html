@@ -85,6 +85,10 @@
       word-break: break-all;
       font-size: .82rem;
     }
+    .deployer__ctor { display: flex; flex-direction: column; gap: .45rem; }
+    .deployer__ctor:empty { display: none; }
+    .deployer__ctor label { display: flex; flex-direction: column; gap: .2rem; }
+    .deployer__ctor span { color: var(--muted); font-size: .78rem; }
     .deployer__log-line--ok { color: var(--ok); }
     .deployer__log-line--warn { color: var(--warn); }
     .deployer__log-line--err { color: var(--err); }
@@ -96,9 +100,9 @@
     <h1 class="deployer__title">Deterministic CREATE2 Deployer</h1>
     <p class="deployer__subtitle">
       Deploys any contract at the same address on every chain via the canonical factory
-      <span id="factoryAddr"></span>. Compile in Remix, copy the <b>init bytecode</b>
-      (Compilation Details → BYTECODE → "object"), paste below. If the constructor takes
-      arguments, append their ABI-encoded hex to the end of the bytecode.
+      <span id="factoryAddr"></span>. Pick a precompiled contract below and fill its constructor
+      arguments, or paste <b>init bytecode</b> from Remix by hand (Compilation Details → BYTECODE
+      → "object", with ABI-encoded constructor arguments appended).
     </p>
 
     <section class="deployer__panel">
@@ -113,9 +117,19 @@
     </section>
 
     <section class="deployer__panel">
+      <span class="deployer__label">Precompiled contracts</span>
+      <div class="deployer__row">
+        <select id="artifactSelect" class="deployer__input" style="flex: 1 1 260px"></select>
+        <button id="loadArtifactBtn" class="deployer__button deployer__button--secondary">Load bytecode</button>
+      </div>
+      <div id="ctorFields" class="deployer__ctor"></div>
+      <span id="artifactHint" class="deployer__meta">Pick a contract to fill its constructor arguments.</span>
+    </section>
+
+    <section class="deployer__panel">
       <label class="deployer__label" for="saltInput">Salt (bytes32)</label>
-      <input id="saltInput" class="deployer__input" spellcheck="false"
-        value="0x7c0acd1428c1a42815d06ceeb50b11fcb9beddb1dcc582ddf5f9ca37979c7e4d" />
+      <!-- Filled from DEFAULT_SALT below, so the value lives in exactly one place -->
+      <input id="saltInput" class="deployer__input" spellcheck="false" />
 
       <label class="deployer__label" for="bytecodeInput">Init bytecode (creation code + encoded constructor args)</label>
       <textarea id="bytecodeInput" class="deployer__textarea" spellcheck="false"
@@ -133,7 +147,6 @@
       <div class="deployer__row">
         <button id="checkBtn" class="deployer__button deployer__button--secondary" disabled>Check chain</button>
         <button id="deployBtn" class="deployer__button" disabled>Deploy</button>
-        <button id="loadLsp26Btn" class="deployer__button deployer__button--secondary">Load LSP26 bytecode</button>
       </div>
     </section>
 
@@ -146,8 +159,12 @@
   <script>
     const FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 
+    // The page's default salt, and the one the canonical LSP26 address derives from — which
+    // is why picking LSP26 restores it rather than deploying under whatever was typed since.
+    const DEFAULT_SALT = "0x7c0acd1428c1a42815d06ceeb50b11fcb9beddb1dcc582ddf5f9ca37979c7e4d";
+
     // LSP26 Follower System init code, captured byte-for-byte from the original
-    // LUKSO mainnet deployment tx. With the default salt above it reproduces
+    // LUKSO mainnet deployment tx. With DEFAULT_SALT it reproduces
     // 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA on any chain.
     const LSP26_INIT_CODE = "0x608060405234801561001057600080fd5b50610d6c806100206000396000f3fe608060405234801561001057600080fd5b50600436106100a35760003560e01c8063645487071161007657806399ec3a421161005b57806399ec3a421461013c578063b2a8d0691461015f578063cf8711c81461017257600080fd5b806364548707146101165780638dd1e47e1461012957600080fd5b8063015a4ead146100a857806330b3a890146100bd5780634dbf27cc146100e35780635a39c581146100f6575b600080fd5b6100bb6100b6366004610a01565b610185565b005b6100d06100cb366004610a01565b610191565b6040519081526020015b60405180910390f35b6100bb6100f1366004610a01565b6101b8565b610109610104366004610a1c565b6101c1565b6040516100da9190610a4f565b6100d0610124366004610a01565b610292565b6100bb610137366004610ae3565b6102b3565b61014f61014a366004610b90565b6102f5565b60405190151581526020016100da565b61010961016d366004610a1c565b61031e565b6100bb610180366004610ae3565b6103e5565b61018e81610423565b50565b6001600160a01b03811660009081526020819052604081206101b2906105d0565b92915050565b61018e816105da565b606060006101cf8484610bd9565b905060008167ffffffffffffffff8111156101ec576101ec610a9c565b604051908082528060200260200182016040528015610215578160200160208202803683370190505b50905060005b828110156102885761024e6102308288610bec565b6001600160a01b038916600090815260016020526040902090610752565b82828151811061026057610260610bff565b6001600160a01b039092166020928302919091019091015261028181610c15565b905061021b565b5095945050505050565b6001600160a01b03811660009081526001602052604081206101b2906105d0565b60005b81518110156102f1576102e18282815181106102d4576102d4610bff565b6020026020010151610423565b6102ea81610c15565b90506102b6565b5050565b6001600160a01b0382166000908152600160205260408120610317908361075e565b9392505050565b6060600061032c8484610bd9565b905060008167ffffffffffffffff81111561034957610349610a9c565b604051908082528060200260200182016040528015610372578160200160208202803683370190505b50905060005b82811015610288576103ab61038d8288610bec565b6001600160a01b038916600090815260208190526040902090610752565b8282815181106103bd576103bd610bff565b6001600160a01b03909216602092830291909101909101526103de81610c15565b9050610378565b60005b81518110156102f15761041382828151811061040657610406610bff565b60200260200101516105da565b61041c81610c15565b90506103e8565b33600090815260016020526040812061043c9083610780565b905080610485576040517fc70bad4e0000000000000000000000000000000000000000000000000000000081526001600160a01b03831660048201526024015b60405180910390fd5b6001600160a01b03821660009081526020819052604090206104a79033610780565b50604080513381526001600160a01b03841660208201527f083700fd0d85112c9d8c5823585c7542e8fadb693c9902e5bc590ab367f7a15e910160405180910390a16105036001600160a01b038316631aed5a8560e21b610795565b156102f1576040516bffffffffffffffffffffffff193360601b1660208201526001600160a01b03831690636bb56a14907f9d3c0b4012b69658977b099bdaa51eff0f0460f421fba96d15669506c00d1c4f906034015b6040516020818303038152906040526040518363ffffffff1660e01b8152600401610586929190610c52565b6000604051808303816000875af19250505080156105c657506040513d6000823e601f3d908101601f191682016040526105c39190810190610c8c565b60015b156102f157505050565b60006101b2825490565b6001600160a01b038116330361061c576040517fea61954200000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b3360009081526001602052604081206106359083610864565b905080610679576040517f6feacbf60000000000000000000000000000000000000000000000000000000081526001600160a01b038316600482015260240161047c565b6001600160a01b038216600090815260208190526040902061069b9033610864565b50604080513381526001600160a01b03841660208201527fbccc71dc7842b86291138666aa18e133ee6d41aa71e6d7c650debad1a0576635910160405180910390a16106f76001600160a01b038316631aed5a8560e21b610795565b156102f1576040516bffffffffffffffffffffffff193360601b1660208201526001600160a01b03831690636bb56a14907f71e02f9f05bcd5816ec4f3134aa2e5a916669537ec6c77fe66ea595fabc2d51a9060340161055a565b60006103178383610879565b6001600160a01b03811660009081526001830160205260408120541515610317565b6000610317836001600160a01b0384166108a3565b604080517fffffffff000000000000000000000000000000000000000000000000000000008316602480830191909152825180830390910181526044909101909152602080820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff167f01ffc9a700000000000000000000000000000000000000000000000000000000178152825160009392849283928392918391908a617530fa92503d9150600051905082801561084d575060208210155b80156108595750600081115b979650505050505050565b6000610317836001600160a01b038416610996565b600082600001828154811061089057610890610bff565b9060005260206000200154905092915050565b6000818152600183016020526040812054801561098c5760006108c7600183610bd9565b85549091506000906108db90600190610bd9565b90508181146109405760008660000182815481106108fb576108fb610bff565b906000526020600020015490508087600001848154811061091e5761091e610bff565b6000918252602080832090910192909255918252600188019052604090208390555b855486908061095157610951610d20565b6001900381819060005260206000200160009055905585600101600086815260200190815260200160002060009055600193505050506101b2565b60009150506101b2565b60008181526001830160205260408120546109dd575081546001818101845560008481526020808220909301849055845484825282860190935260409020919091556101b2565b5060006101b2565b80356001600160a01b03811681146109fc57600080fd5b919050565b600060208284031215610a1357600080fd5b610317826109e5565b600080600060608486031215610a3157600080fd5b610a3a846109e5565b95602085013595506040909401359392505050565b6020808252825182820181905260009190848201906040850190845b81811015610a905783516001600160a01b031683529284019291840191600101610a6b565b50909695505050505050565b634e487b7160e01b600052604160045260246000fd5b604051601f8201601f1916810167ffffffffffffffff81118282101715610adb57610adb610a9c565b604052919050565b60006020808385031215610af657600080fd5b823567ffffffffffffffff80821115610b0e57600080fd5b818501915085601f830112610b2257600080fd5b813581811115610b3457610b34610a9c565b8060051b9150610b45848301610ab2565b8181529183018401918481019088841115610b5f57600080fd5b938501935b83851015610b8457610b75856109e5565b82529385019390850190610b64565b98975050505050505050565b60008060408385031215610ba357600080fd5b610bac836109e5565b9150610bba602084016109e5565b90509250929050565b634e487b7160e01b600052601160045260246000fd5b818103818111156101b2576101b2610bc3565b808201808211156101b2576101b2610bc3565b634e487b7160e01b600052603260045260246000fd5b600060018201610c2757610c27610bc3565b5060010190565b60005b83811015610c49578181015183820152602001610c31565b50506000910152565b8281526040602082015260008251806040840152610c77816060850160208701610c2e565b601f01601f1916919091016060019392505050565b600060208284031215610c9e57600080fd5b815167ffffffffffffffff80821115610cb657600080fd5b818401915084601f830112610cca57600080fd5b815181811115610cdc57610cdc610a9c565b610cef601f8201601f1916602001610ab2565b9150808252856020828501011115610d0657600080fd5b610d17816020840160208601610c2e565b50949350505050565b634e487b7160e01b600052603160045260246000fdfea2646970667358221220d49dd5b2a7c580c2c5c73e52c9cd6bd492943d285801069245b07017db7893bd64736f6c63430008110033";
 
@@ -156,7 +173,62 @@
       8453: "Base", 42161: "Arbitrum", 42220: "Celo", 10143: "Monad Testnet",
     };
 
+    // Contracts with precompiled artifacts in ./deploy-artifacts/artifacts. The HupDrops suite
+    // is solc 0.8.36 / optimizer 200 / viaIR (Remix can't compile the LUKSO satellites — see
+    // that folder's README); HupOffers is solc 0.8.35 / optimizer 200, no viaIR. Each entry's
+    // bytecode date is the artifact file's own mtime, read over HTTP below rather than written
+    // here, so it can never drift from the bytes actually being deployed.
+    const ARTIFACTS = [
+      { id: "", label: "— pick a contract —" },
+      { id: "HupDrops", label: "HupDrops (engine)", file: "HupDrops.json" },
+      { id: "HupDropsDeployerLSP7", label: "HupDrops deployer · LSP7 (editions, LUKSO)", file: "HupDropsDeployerLSP7.json" },
+      { id: "HupDropsDeployerLSP8", label: "HupDrops deployer · LSP8 (numbered, LUKSO)", file: "HupDropsDeployerLSP8.json" },
+      { id: "HupDropsDeployer721", label: "HupDrops deployer · ERC721 (numbered, EVM)", file: "HupDropsDeployer721.json" },
+      { id: "HupDropsDeployer1155", label: "HupDrops deployer · ERC1155 (editions, EVM)", file: "HupDropsDeployer1155.json" },
+      { id: "HupOffers", label: "HupOffers (escrowed offers / OTC)", file: "HupOffers.json" },
+      { id: "LSP26", label: "LSP26 Follower System (canonical address)", raw: true },
+    ];
+
+    // Split so the two parts join with a space rather than the comma a single formatter emits
+    const stampDateFormat = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
+    const stampTimeFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+    // Last-Modified → "2026-08-14 15:53", in local time: the question it answers is "did I
+    // compile this before or after my last edit", which is a wall-clock comparison. Null for
+    // anything the server doesn't date (or the inline LSP26 bytecode, which lives in this
+    // file rather than on disk).
+    const artifactStamp = (lastModified) => {
+      if (!lastModified) return null;
+      const date = new Date(lastModified);
+      if (Number.isNaN(date.getTime())) return null;
+      return `${stampDateFormat.format(date)} ${stampTimeFormat.format(date)}`;
+    };
+
+    // Known constructor values per chain, so the common deploy is a click rather than a
+    // hunt through config/contracts.js. Anything missing stays blank.
+    const CTOR_DEFAULTS = {
+      HupDrops: {
+        4201: [
+          "0xb0b992E90e11b6bCE51cb5ea4de160D06098B955", // Hup core
+          "0xab100B28D06e93fF52DAE95DB8e90F83680671FC", // HupChatForwarder
+          "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
+          "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA", // canonical LSP26
+        ],
+      },
+      HupOffers: {
+        4201: [
+          "0xb0b992E90e11b6bCE51cb5ea4de160D06098B955", // Hup core
+          "0xab100B28D06e93fF52DAE95DB8e90F83680671FC", // HupChatForwarder
+          "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
+        ],
+      },
+    };
+
     const els = {
+      artifactSelect: document.getElementById("artifactSelect"),
+      loadArtifactBtn: document.getElementById("loadArtifactBtn"),
+      ctorFields: document.getElementById("ctorFields"),
+      artifactHint: document.getElementById("artifactHint"),
       factoryAddr: document.getElementById("factoryAddr"),
       connectBtn: document.getElementById("connectBtn"),
       walletInfo: document.getElementById("walletInfo"),
@@ -167,11 +239,11 @@
       targetStatus: document.getElementById("targetStatus"),
       checkBtn: document.getElementById("checkBtn"),
       deployBtn: document.getElementById("deployBtn"),
-      loadLsp26Btn: document.getElementById("loadLsp26Btn"),
       log: document.getElementById("log"),
     };
 
     els.factoryAddr.textContent = FACTORY;
+    els.saltInput.value = DEFAULT_SALT;
 
     let provider = null;
     let signer = null;
@@ -288,20 +360,156 @@
       }
     }
 
+    // --- Precompiled artifact picker ---
+
+    let loadedArtifact = null;
+
+    for (const entry of ARTIFACTS) {
+      const option = document.createElement("option");
+      option.value = entry.id;
+      option.textContent = entry.label;
+      option.dataset.label = entry.label;
+      els.artifactSelect.appendChild(option);
+    }
+
+    // Date each file-backed entry by its own mtime, so the list says outright how fresh the
+    // bytecode is — a stale artifact next to a freshly edited .sol is the mistake worth
+    // catching before a deploy, not after. HEAD costs headers only, never the artifact body.
+    async function stampArtifactOptions() {
+      await Promise.all(
+        ARTIFACTS.filter((entry) => entry.file).map(async (entry) => {
+          try {
+            const response = await fetch(`./deploy-artifacts/artifacts/${entry.file}`, { method: "HEAD" });
+            if (!response.ok) return;
+            const stamp = artifactStamp(response.headers.get("Last-Modified"));
+            if (!stamp) return;
+            entry.stamp = stamp;
+            const option = els.artifactSelect.querySelector(`option[value="${entry.id}"]`);
+            if (option) option.textContent = `${entry.label} · bytecode ${stamp}`;
+          } catch {
+            // Served over file://, or no Last-Modified — the label simply stays undated
+          }
+        }),
+      );
+    }
+
+    async function selectArtifact(id) {
+      els.ctorFields.replaceChildren();
+      loadedArtifact = null;
+
+      if (!id) {
+        els.artifactHint.textContent = "Pick a contract to fill its constructor arguments.";
+        return;
+      }
+
+      const entry = ARTIFACTS.find((item) => item.id === id);
+      if (entry.raw) {
+        loadedArtifact = entry;
+        els.artifactHint.textContent = "Deploys at 0xf01103E5…dDcA with the default salt. No constructor arguments.";
+        return;
+      }
+
+      try {
+        const response = await fetch(`./deploy-artifacts/artifacts/${entry.file}`);
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        // Same header the picker labels use — reread here so a file replaced since page load
+        // reports its new date rather than the one cached in the option
+        const stamp = artifactStamp(response.headers.get("Last-Modified")) ?? entry.stamp ?? null;
+        loadedArtifact = { ...entry, stamp, ...(await response.json()) };
+      } catch (err) {
+        // file:// blocks fetch — the page has to be served (XAMPP already serves htdocs)
+        els.artifactHint.textContent = `Could not read the artifact (${err.message}). Open this page over http:// rather than file://, or paste the init code manually below.`;
+        log(`Artifact load failed: ${err.message}`, "err");
+        return;
+      }
+
+      const inputs = (loadedArtifact.abi ?? []).find((item) => item.type === "constructor")?.inputs ?? [];
+      const chainId = provider ? Number((await provider.getNetwork()).chainId) : null;
+      const defaults = (chainId && CTOR_DEFAULTS[id]?.[chainId]) || [];
+
+      inputs.forEach((input, index) => {
+        const label = document.createElement("label");
+        const caption = document.createElement("span");
+        caption.textContent = `${input.name || `arg${index}`} · ${input.type}`;
+        const field = document.createElement("input");
+        field.className = "deployer__input";
+        field.spellcheck = false;
+        field.dataset.type = input.type;
+        field.placeholder = input.type === "address" ? "0x…" : input.type;
+        field.value = defaults[index] ?? "";
+        field.addEventListener("input", () => {
+          els.artifactHint.textContent = "Arguments changed — press Load bytecode again.";
+        });
+        label.append(caption, field);
+        els.ctorFields.appendChild(label);
+      });
+
+      const stampNote = loadedArtifact.stamp ? ` Bytecode compiled ${loadedArtifact.stamp}.` : "";
+      els.artifactHint.textContent =
+        (inputs.length
+          ? `${loadedArtifact.contractName}: fill the ${inputs.length} constructor argument${inputs.length > 1 ? "s" : ""}, then press Load bytecode.`
+          : `${loadedArtifact.contractName}: no constructor arguments — press Load bytecode.`) + stampNote;
+    }
+
+    // Text in, ABI value out. Only the types these constructors actually use.
+    function coerceArg(raw, type) {
+      const value = raw.trim();
+      if (type.startsWith("uint") || type.startsWith("int")) return BigInt(value || "0");
+      if (type === "bool") return value === "true" || value === "1";
+      return value;
+    }
+
+    function loadArtifactBytecode() {
+      if (!loadedArtifact) {
+        log("Pick a contract first.", "warn");
+        return;
+      }
+
+      if (loadedArtifact.raw) {
+        els.bytecodeInput.value = LSP26_INIT_CODE;
+        // Canonical only at this exact salt, so restore it rather than deploying LSP26 to a
+        // one-off address under whatever salt happened to be left in the field
+        els.saltInput.value = DEFAULT_SALT;
+        updatePrediction();
+        log("Loaded LSP26 bytecode — predicted address should be 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA");
+        if (provider) checkChain().catch((e) => log(e.message, "err"));
+        return;
+      }
+
+      const fields = [...els.ctorFields.querySelectorAll("input")];
+      try {
+        // Constructor arguments are ABI-encoded and appended to the creation code, which is
+        // exactly what the factory expects — and what makes each argument set its own address
+        const types = fields.map((field) => field.dataset.type);
+        const values = fields.map((field) => coerceArg(field.value, field.dataset.type));
+        const encoded = types.length
+          ? ethers.AbiCoder.defaultAbiCoder().encode(types, values).slice(2)
+          : "";
+        els.bytecodeInput.value = `${loadedArtifact.bytecode}${encoded}`;
+        els.artifactHint.textContent =
+          `${loadedArtifact.contractName} loaded with ${types.length} argument${types.length === 1 ? "" : "s"}.` +
+          (loadedArtifact.stamp ? ` Bytecode compiled ${loadedArtifact.stamp}.` : "");
+        updatePrediction();
+        log(
+          `Loaded ${loadedArtifact.contractName} init code (${(els.bytecodeInput.value.length - 2) / 2} bytes${loadedArtifact.stamp ? `, compiled ${loadedArtifact.stamp}` : ""}).`,
+        );
+        if (provider) checkChain().catch((e) => log(e.message, "err"));
+      } catch (err) {
+        log(`Could not encode constructor arguments: ${err.shortMessage || err.message}`, "err");
+      }
+    }
+
+    els.artifactSelect.addEventListener("change", (e) => selectArtifact(e.target.value));
+    els.loadArtifactBtn.addEventListener("click", loadArtifactBytecode);
+
     els.connectBtn.addEventListener("click", () => connect().catch((e) => log(e.message, "err")));
     els.checkBtn.addEventListener("click", () => checkChain().catch((e) => log(e.message, "err")));
     els.deployBtn.addEventListener("click", deploy);
-    els.loadLsp26Btn.addEventListener("click", () => {
-      els.bytecodeInput.value = LSP26_INIT_CODE;
-      els.saltInput.value = "0x7c0acd1428c1a42815d06ceeb50b11fcb9beddb1dcc582ddf5f9ca37979c7e4d";
-      updatePrediction();
-      log("Loaded LSP26 bytecode — predicted address should be 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA");
-      if (provider) checkChain().catch((e) => log(e.message, "err"));
-    });
     els.saltInput.addEventListener("input", updatePrediction);
     els.bytecodeInput.addEventListener("input", updatePrediction);
 
     updatePrediction();
+    stampArtifactOptions();
   </script>
 </body>
 </html>
