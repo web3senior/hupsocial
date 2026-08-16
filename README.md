@@ -60,7 +60,7 @@ To keep public post URLs stable and clean, the app uses an off-chain public post
 Example public URL:
 
 ```txt
-/networks/4201/45
+/networks/42/45
 ```
 
 The `45` in the URL is treated as a public/global post ID by the backend, not necessarily the raw contract `contentCount` ID.
@@ -84,14 +84,14 @@ The backend/indexer stores each Hup deployment as a range:
 ```js
 const hupDeployments = [
   {
-    networkId: 4201,
+    networkId: 42,
     address: '0xOldHupContract',
     startPublicId: 1,
     endPublicId: 45,
     offset: 0,
   },
   {
-    networkId: 4201,
+    networkId: 42,
     address: '0xNewHupContract',
     startPublicId: 46,
     endPublicId: null,
@@ -105,7 +105,7 @@ const hupDeployments = [
 When a request comes in for:
 
 ```txt
-/networks/4201/48
+/networks/42/48
 ```
 
 the backend finds the deployment range that contains public post ID `48`.
@@ -254,7 +254,7 @@ To keep URLs stable, the backend owns public/global post IDs and maps them to th
 Example:
 
 ```txt
-/networks/4201/45
+/networks/42/45
 ```
 
 The `45` is a public post ID. The backend resolves it to:
@@ -360,9 +360,15 @@ Posts are locked with **one shared master key per community**; that master key t
 
 By default every rotation is an epoch wall: new members receive only the current key, so posts from before the last rotation stay locked for them. Communities whose value *is* the archive can flip this: a moderator toggles **"New members can read history"**, and from then on each rotation also publishes a `keyBacklink` — the retiring key encrypted under the new one. Holding the current key plus an unbroken chain of backlinks yields every *older* key, but never a newer one, so a departed member still can't read anything after their removal. The links are write-once and can be **backfilled retroactively** (moderators hold envelopes for all versions), and toggling the policy off only affects future rotations — links already published are on-chain forever, and any member could have cached old keys anyway.
 
-## Why only some membership types are encrypted
+## Encryption is a per-community toggle (orthogonal to admission)
 
-Encryption needs a moderator-approval moment to hook the key handover onto (`addMember`/`approveRequest`) — only someone who *holds* the master key can hand it out, and that requires their unlocked browser. Request-Based, Private, NFT/Token/NFT+Token-Gated, and Follower-Gated have that moment. Public, Whitelisted, and Pay-to-Join self-admit via `join()` with no moderator in the loop, so they stay plaintext.
+A community's access model has three independent axes, which the retired `MembershipType` enum used to conflate:
+
+1. **AdmissionMode** — how wallets get onto the roster: Open, Request Approval, Invite Only (consent handshake), Self-serve if eligible, Pay to Join.
+2. **Requirements** — a composable list (up to 10 entries) of what wallets must hold or be: native/token/NFT balances, whitelist membership, following the creator — combined ALL-of or ANY-of, plus an optional `IHupEligibilityModule` contract for logic the list can't express. Checked inside `join()` for Self-serve mode and re-checked live in `canPost()` for everyone, so selling the gating asset suspends posting. "Invite-only but must hold 100 tokens" is just configuration.
+3. **Encrypted content** — `keyVersion > 0` onchain, chosen at creation (atomic key init) or enabled later with one `initializeKey` tx. The composer's rule is exactly this flag.
+
+The old constraint — "only approval-based types can be encrypted" — is solved by key-delivery timing instead of by forbidding combinations: approval/invite admissions hand the envelope over at the moment a moderator acts on the member; self-admit admissions (Open/Self-serve/Pay) admit instantly and the member's client files a key request that a moderator batch-delivers from the lazy grant queue. The honest cost is that new members of self-admit encrypted communities can't read until a moderator is next online — the UI says so at creation time.
 
 ## Honest limits at scale
 
@@ -471,6 +477,22 @@ HupPredict escrows real stakes, so its trust posture is stricter than the other 
 4. **Judges must consent onchain.** Being named a judge attaches a name but no power; only calling `confirmJudging` — with the judge's own key — grants the ability to act. Judges can step down at any time, and the last judge leaving a funded market opens refunds immediately.
 
 Residual trust assumptions: the `ADMIN_ROLE` holder can pause new activity, change fees for future markets, adjust the resolve window within 1–90 days, and moderate market visibility. Holding that role with a multisig or timelock is the recommended posture.
+
+# Why HupOffers Is Not Gasless
+
+Every other Hup extension accepts ERC2771 meta-transactions and resolves burner session keys to their primary wallet. HupOffers accepts neither. Its constructor takes one argument — the admin — with no Hup Core reference and no trusted forwarder, and there is no `setTrustedForwarder` to add one later. Every action is credited to `msg.sender` and nothing else. This is a deliberate departure, not an omission.
+
+1. **Relaying would buy nothing.** Gasless exists so someone can act without holding the chain's coin. But both sides of an offer must already control value: the offerer's escrow is pulled from the caller (native `msg.value`, or an ERC20/LSP7 allowance the caller granted), and the seller's asset leaves the caller's own holdings. There is no useful action a third party could perform on someone's behalf, because every action spends something only the owner has.
+
+2. **Relaying would cost a great deal.** An ERC2771 forwarder is, by construction, an address permitted to name any sender — `_msgSender()` reads the last 20 bytes of calldata on its word alone. This contract's entire job is spending standing approvals. Combine the two and a forwarder can forge `makeOffer` as a victim up to whatever allowance they granted, then fill it with a worthless asset; or forge `acceptOffer` as a victim against a lowball offer and take an approved NFT. Neither needs the victim's key. A rotatable forwarder makes this the admin's power too, since whitelisting one is an admin call — which would have quietly undone the reason `HupPredict` reads raw `msg.sender` for its market-control paths.
+
+3. **Approvals here are collection-wide, which widens what an impersonation would reach.** Sellers grant ERC721 rights with `setApprovalForAll` rather than a per-token `approve`, because the per-token approval is exclusive and would silently revoke the one HupTrade holds for a live listing. That is the right trade — but it means one forged `acceptOffer` would reach an entire collection, not one token. Removing the forge is better than narrowing it.
+
+4. **What an admin can still do.** Pause new offers and fills, move the fee within its hard 10% cap (snapshotted per offer at creation, so pending offers settle at the rate they were made under), whitelist ERC677 payment tokens, and withdraw `accruedFees`. It can never move a user's tokens, and it can never touch escrow: there is no whole-balance sweep, and `cancelOffer` carries no `whenNotPaused`, so an exit from escrow is never blockable.
+
+The one place the contract credits anyone but its caller is ERC677's `onTokenTransfer`, which attributes the offer to the `_sender` the token reports. That is safe for the opposite reason: the caller there *is* the whitelisted token, and the whitelist is the only proof a real transfer preceded the callback. It is also the closest thing to a gasless convenience the contract keeps — whitelisted tokens (G$ on Celo, for instance) fund or fill an offer in a single `transferAndCall` with no prior approve.
+
+The cost is real and worth naming: every offer action is a transaction the user pays for, including Universal Profile holders, who get the session-key skip when tipping or playing the miner game. Offers ask them to sign each action themselves. For a contract whose whole purpose is holding other people's money against other people's approvals, that is the correct side to err on.
 
 # Web Share Target (PWA)
 
