@@ -8,10 +8,9 @@ import clsx from 'clsx'
 import styles from './Header.module.scss'
 import { Menu } from './Icons'
 
-
 export default function Header() {
   const pathname = usePathname()
-  const { navItems, isMenuOpen, isMobileMenuOpen, openMobileMenu, closeMobileMenu } = useSidebarStore()
+  const { isMenuOpen, openMobileMenu } = useSidebarStore()
   const title = usePageTitleStore((state) => state.title)
 
   return (

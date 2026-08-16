@@ -286,6 +286,37 @@
   border-top: 1px solid var(--border);
 }
 
+.leaderRowHeader {
+  appearance: none;
+  position: sticky;
+  top: 4rem;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 40px 2fr repeat(7, minmax(62px, 0.55fr)) minmax(72px, 0.5fr);
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+background-color: var(--surface-muted);
+  padding: 0.75rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-align: left;
+      font-size: var(--system-12-font-size);
+
+      span:nth-child(1) {
+        text-align: center;
+      }
+
+  @media (max-width: 960px) {
+    grid-template-columns: 40px 1fr 40px;
+
+    span:not(:nth-of-type(1), :nth-of-type(2),:last-child) {
+      display: none;
+    }
+  }
+}
+
 .leaderRow {
   appearance: none;
   display: grid;
@@ -322,7 +353,6 @@
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background-color: var(--surface-muted);
   color: var(--text-muted);
   font-size: var(--system-13-font-size);
   font-weight: 700;

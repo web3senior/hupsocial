@@ -14,7 +14,7 @@
     flex-shrink: 0;
     border: none;
     border-radius: 50%;
-    background: var(--color-surface-muted, rgba(0, 0, 0, 0.05));
+  background: var(--surface-muted);
     cursor: pointer;
   }
 
@@ -32,7 +32,7 @@
     font-size: 0.9375rem;
 
     &:hover:not(&--disabled) {
-      background: var(--color-surface-muted, rgba(0, 0, 0, 0.05));
+     background: var(--surface-muted);
     }
 
     &--disabled {

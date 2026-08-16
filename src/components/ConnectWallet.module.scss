@@ -1,4 +1,5 @@
 .connect {
+
   button {
     color: var(--white, #fff);
     background-color: var(--color-primary);
@@ -22,19 +23,16 @@
 
 button.btnConnect {
   border: none;
-  background-color: var(--black);
-  color: var(--white, #fff);
-  padding-block: 0.5rem;
+  background-color: var(--surface-muted);
+  color: var(--color);
+  padding-block: 0.4rem;
   padding-inline: calc(var(--spacing) * 3);
   border-radius: var(--radius-12);
-  font-size: var(--font-size-13);
+  font-weight: 500;
   cursor: pointer;
   will-change: transform;
   transition: transform 0.2s ease;
 
-  &:hover {
-    transform: scale(1.025);
-  }
 
   &:active {
     transform: scale(0.95);

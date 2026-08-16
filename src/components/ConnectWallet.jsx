@@ -85,9 +85,12 @@ export const ConnectWallet = () => {
 
   return !mounted ? null : (
     <>
-      <NetworkSelect />
-
-      {isConnected && <Profile addr={address} />}
+      {isConnected && (
+        <>
+          <NetworkSelect />
+          <Profile addr={address} />
+        </>
+      )}
 
       {!isConnected &&
         (isCompact ? (
@@ -153,7 +156,16 @@ export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, re
 /** Scannable-code glyph for connectors that pair by QR rather than by an installed provider. */
 function QrGlyph() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
       <rect x="3" y="3" width="7" height="7" rx="1.5" />
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
       <rect x="3" y="14" width="7" height="7" rx="1.5" />
@@ -168,7 +180,9 @@ export function WalletOptions({ onConnected }) {
 
   // Inside a LUKSO Grid frame the host's Universal Profile is the connector that actually works
   // (extensions don't inject into cross-origin iframes), so it leads the list there
-  const ordered = isFramedByGridHost() ? [...connectors].sort((a, b) => (b.id === UP_PROVIDER_RDNS) - (a.id === UP_PROVIDER_RDNS)) : connectors
+  const ordered = isFramedByGridHost()
+    ? [...connectors].sort((a, b) => (b.id === UP_PROVIDER_RDNS) - (a.id === UP_PROVIDER_RDNS))
+    : connectors
 
   const handleConnect = (connector) => {
     connect({ connector }, { onSuccess: () => onConnected?.() })

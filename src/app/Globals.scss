@@ -1,5 +1,15 @@
 :root,
 [data-theme='light'] {
+  --surface-1: #191919;
+  --surface-2: #1f1f1f;
+  --surface-3: #2a2a2a;
+  --border: #ffffff0f;
+  --border-strong: #ffffff1f;
+  --text-1: #fff;
+  --text-2: #ffffffa6;
+  --text-3: #ffffff61;
+
+  --bg: #fff;
   --background: #ffffff;
   --foreground: #171717;
 
@@ -39,7 +49,7 @@
   // trend hue is a caret in the header, and both carry a shape and a label besides.
   --chart-sale: #d97706;
 
-  --scrollbarBG: var(--gray-50);
+  --scrollbarBG: transparent;
   --thumbBG: var(--gray-200);
   --network-color-primary-light: color-mix(in srgb, var(--network-color-primary) 35%, transparent);
 
@@ -51,19 +61,31 @@
   --color-icon-muted: #4b5563;
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23666666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
-  accent-color: var(--network-color-text);
+  --accent-primary: var(--network-color-text);
+  --accent-press: var(--accent-primary);
+  accent-color: var(--accent-primary);
   color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --background: #0a0a0a;
+  --surface-1: #191919;
+  --surface-2: #1f1f1f;
+  --surface-3: #2a2a2a;
+  --border: #ffffff0f;
+  --border-strong: #ffffff1f;
+  --text-1: #fff;
+  --text-2: #ffffffa6;
+  --text-3: #ffffff61;
+
+  --bg: #131313;
+  --background: #131313;
   --foreground: #ededed;
 
-  --surface: #101114;
-  --surface-muted: #181a1f;
-  --text: #ededed;
+  --surface: #191919;
+  --surface-muted: #2a2a2a;
+  --text: #ffffffa6;
   --text-muted: #a1a1aa;
-  --border: var(--black-800, #2a2d34);
+
   --hover: #20232a;
   --tag: var(--black-800);
   --shimmer-glint: rgba(255, 255, 255, 0.12);
@@ -74,8 +96,8 @@
   // ΔE 9.4 against the teal. Teal and the line hue both pass here unchanged.
   --trend-down: #de535e;
 
-  --scrollbarBG: #101114;
-  --thumbBG: var(--black);
+  --scrollbarBG: transparent;
+  --thumbBG: #2a2a2a;
 
   --fingerprint-border: var(--surface-muted);
   --beta-badge-background: var(--black-400);
@@ -85,7 +107,9 @@
   --color-icon-muted: #52525b;
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
-  accent-color: var(--network-color-text);
+  --accent-primary: var(--network-color-text);
+  --accent-press: var(--accent-primary);
+  accent-color: var(--accent-primary);
   color-scheme: dark;
 }
 
@@ -105,7 +129,7 @@
   // Blue is off-palette here — a saturated green still reads apart from the body text.
   --cashtag-color: #4ade80;
 
-  --scrollbarBG: #0d1c12;
+  --scrollbarBG: transparent;
   --thumbBG: var(--black);
 
   --fingerprint-border: var(--surface-muted);
@@ -118,6 +142,10 @@
 
   accent-color: #a3ffad;
   color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -228,9 +256,11 @@ html {
 body {
   // Colors are set on the `html, body` rule above, not repeated here — html has to carry them
   // so the overscroll area past the end of the page is painted too.
-  //
-  // --font-sans resolves to the Archivo that app/layout.jsx self-hosts through next/font; no
+  // --font-sans is defined in variables.scss; no
   // !important needed, since this is the only font-family declaration on body in the app.
+  // font-family: var(--font-sans);
+  // font-family: Arial, Helvetica, sans-serif;
+  // font-family: var(--font-geist-sans);
   font-family: var(--font-sans);
   font-size: var(--system-16-font-size);
   -webkit-font-smoothing: antialiased;

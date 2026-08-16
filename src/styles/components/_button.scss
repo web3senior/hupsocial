@@ -5,15 +5,14 @@
   align-items: center;
   background: var(--color-primary);
   color: var(--white, #fff);
-  border-radius: var(--global-border-radius);
+  border-radius: var(--radius-12);
   cursor: pointer;
   display: flex;
   justify-content: center;
-  padding: 0.6rem 0.9rem;
+  padding-block: 0.5rem;
+  padding-inline: calc(var(--spacing) * 3);
   width: auto;
   z-index: 1;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
 
   &[disabled] {
     opacity: 0.4;
@@ -33,17 +32,15 @@
 
 .btn-reset {
   background: var(--color-primary);
-  border-radius: 0.2em;
   box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
   min-width: 110px;
-  padding: 0.1rem 0.2rem;
   text-align: center;
   vertical-align: middle;
   transition: all 0.2s;
-  border-radius: 999px;
+  border-radius: var(--radius-12);
   color: var(--white);
-  border-radius: 999px;
-  padding: 0.5rem 1rem;
+  padding-block: 0.5rem;
+  padding-inline: calc(var(--spacing) * 3);
   box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
   background-image: linear-gradient(to right, #ffdd1f 0%, #e09a01 51%, #640902 100%);
   transition: 0.5s;

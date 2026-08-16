@@ -36,14 +36,14 @@
     border: none;
     border-radius: 999px;
     background: var(--color-surface-muted, rgba(0, 0, 0, 0.05));
-    color: var(--color-text-muted, #767676);
+    color: var(--text-muted);
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
 
     &--active {
-      background: var(--color-surface-active, #000);
-      color: var(--color-text-on-active, #fff);
+      background: var(--surface-muted);
+      color: var(--color);
     }
   }
 

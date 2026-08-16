@@ -3,7 +3,18 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWRInfinite from 'swr/infinite'
-import { ArrowDownIcon, ChatCircleIcon, EyeIcon, FlameIcon, HashIcon, HeartIcon, PackageIcon, RepeatIcon, TrophyIcon, UsersIcon } from '@phosphor-icons/react'
+import {
+  ArrowDownIcon,
+  ChatCircleIcon,
+  EyeIcon,
+  FlameIcon,
+  HashIcon,
+  HeartIcon,
+  PackageIcon,
+  RepeatIcon,
+  TrophyIcon,
+  UsersIcon,
+} from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
@@ -16,7 +27,7 @@ const RANK_ICONS = {
   1: '/icons/1st.svg',
   2: '/icons/2nd.svg', // Fixed typo: 2st -> 2nd
   3: '/icons/3rd.svg', // Fixed typo: 3st -> 3rd
-};
+}
 
 const PERIOD_OPTIONS = [
   { value: 'all', label: 'All time' },
@@ -105,7 +116,6 @@ export default function LeaderboardPage() {
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="large">
           <header className={styles.header}>
-
             <div className={styles.filters} aria-label="Leaderboard filters">
               <div className={styles.segmented} role="group" aria-label="Time range">
                 {PERIOD_OPTIONS.map((option) => (
@@ -180,6 +190,18 @@ export default function LeaderboardPage() {
               </section>
 
               <section className={styles.leaderList} aria-label="Leaderboard rows">
+                <div className={styles.leaderRowHeader}>
+                  <span>#</span>
+                  <span>Profiles</span>
+                  <span>Posts</span>
+                  <span>Comments</span>
+                  <span>Likes</span>
+                  <span>Reposts</span>
+                  <span>Views</span>
+                  <span>Transactions</span>
+                  <span>Followers</span>
+                  <span>Score</span>
+                </div>
                 {leaders.map((leader) => (
                   <button
                     key={`${leader.rank}-${leader.wallet_address}`}
@@ -189,7 +211,7 @@ export default function LeaderboardPage() {
                   >
                     <span className={styles.rankNumber}>{leader.rank}</span>
                     <Profile creator={leader.wallet_address} className={styles.avatar} variant="fullWithoutTime" />
-                  
+
                     <Metric icon={FlameIcon} label="Posts" value={leader.root_posts} />
                     <Metric icon={ChatCircleIcon} label="Comments" value={leader.comments_made} />
                     <Metric icon={HeartIcon} label="Likes" value={leader.likes_received} />
@@ -237,17 +259,15 @@ function Metric({ icon: Icon, label, value }) {
   )
 }
 
-
-
 function RankBadge({ rank }) {
-  const iconSrc = RANK_ICONS[rank];
+  const iconSrc = RANK_ICONS[rank]
 
   return (
     <span className={styles.rankBadge}>
       {iconSrc && <img src={iconSrc} alt={`Rank ${rank}`} />}
       <span className={styles.rankNumber}>#{rank}</span>
     </span>
-  );
+  )
 }
 
 function LeaderboardSkeleton() {
