@@ -5,6 +5,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { getPosts } from '@/lib/api'
+import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
 import { usePostStore } from '@/stores/usePostStore'
@@ -276,9 +277,6 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
   }
 
   const handlePostClick = (item) => {
-    const selection = window.getSelection()
-    if (selection && selection.toString().length > 0) return
-
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(200)
     }
@@ -397,8 +395,10 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
                 key={item.id}
                 // Restored feeds must repaint identically in place — no entrance replay.
                 className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
+                onPointerDown={rememberCardPointerDown}
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (isTextSelectionDrag(e)) return
                   handlePostClick(item)
                 }}
                 onMouseEnter={() => handlePostPrefetch(item)}

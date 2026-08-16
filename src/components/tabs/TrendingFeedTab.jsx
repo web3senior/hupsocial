@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { getTrendingPosts } from '@/lib/api'
+import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
@@ -91,8 +92,6 @@ export default function TrendingFeedTab() {
   }, [isFetching, hasMore, page, address])
 
   const handlePostClick = (item) => {
-    const selection = window.getSelection()
-    if (selection && selection.toString().length > 0) return
     router.push(`/networks/${item.network_id}/${item.id}`)
   }
 
@@ -126,7 +125,15 @@ export default function TrendingFeedTab() {
 
       <div className={clsx('__container', styles.page__container)} data-width="medium">
         {posts.list.map((item, i) => (
-          <section key={`${item.network_id}-${item.id}`} className={clsx(styles.post, 'animate', 'fade')} onClick={() => handlePostClick(item)}>
+          <section
+            key={`${item.network_id}-${item.id}`}
+            className={clsx(styles.post, 'animate', 'fade')}
+            onPointerDown={rememberCardPointerDown}
+            onClick={(e) => {
+              if (isTextSelectionDrag(e)) return
+              handlePostClick(item)
+            }}
+          >
             <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
             {i < posts.list.length - 1 && <hr />}
           </section>

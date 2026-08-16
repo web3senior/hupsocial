@@ -19,6 +19,7 @@ import ProfileInsights from '@/components/ProfileInsights'
 import UPlogo from '@/../public/up.png'
 import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS } from '@/lib/ipfs'
+import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import LinksTab from '@/components/tabs/LinksTab'
 import AssetsTab from '@/components/tabs/AssetsTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
@@ -190,9 +191,6 @@ export default function UserProfile() {
   }
 
   const handlePostClick = (postId, chainId) => {
-    const selection = window.getSelection()
-    if (selection && selection.toString().length > 0) return
-
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(200)
     }
@@ -292,7 +290,11 @@ const PostFeed = ({ feed, emptyLabel, onPostClick, onPostPrefetch }) => {
             <section
               key={`${item.network_id}:${item.id}`}
               className={`${styles.post} animate fade`}
-              onClick={() => onPostClick(item.id, item.network_id)}
+              onPointerDown={rememberCardPointerDown}
+              onClick={(e) => {
+                if (isTextSelectionDrag(e)) return
+                onPostClick(item.id, item.network_id)
+              }}
               onMouseEnter={() => onPostPrefetch(item.id, item.network_id)}
               onTouchStart={() => onPostPrefetch(item.id, item.network_id)}
             >
@@ -574,7 +576,7 @@ const Profile = ({ addr }) => {
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
             <div className={styles.profile__header}>
               <b className={styles.profile__name}>{profile.name ? profile.name : 'hup-user'}</b>
-              <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} />
+              {/* <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} /> */}
 
               {profile.source === `universal_profile` && (
                 <div className={styles.badge} onClick={handleUniversalProfile}>
