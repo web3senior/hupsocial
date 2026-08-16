@@ -151,6 +151,9 @@
   gap: 0.75rem;
   padding: 0 var(--dialog-padding, 1.25rem) var(--dialog-padding, 1.25rem);
   overflow-y: auto;
+  // Reaching the top of the body must end the scroll, not rubber-band or chain — the
+  // next downward pan is the sheet drag's to take.
+  overscroll-behavior: contain;
 }
 
 // A card of rows sharing one rounded outline, divided by hairlines — the rows carry no
