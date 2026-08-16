@@ -712,12 +712,11 @@ export default function Chat() {
               }
             }
 
-            // Determine direction using senderAddr from payload (most reliable)
-            // Fall back to on-chain sender vs known addresses
-            const payloadSender = ipfsPayload?.senderAddr?.toLowerCase?.() ?? null
-            const effectiveSender = payloadSender ?? onChainSender
-
-            const isMine = effectiveSender === myAddress || onChainSender === myAddress || onChainSender === myBurnerAddress
+            // The authoritative sender rides inside the encrypted envelope, so it cannot be read
+            // until after decryption. Key resolution only needs to know whether the message is
+            // outgoing, and that is answerable on chain: my own messages always relay from either
+            // my wallet or my burner.
+            const isMineOnChain = onChainSender === myAddress || onChainSender === myBurnerAddress
 
             // Resolve decryption key
             let decryptionKey = null
@@ -728,7 +727,7 @@ export default function Chat() {
 
             // Fallback for incoming messages: ECIES unwrap
             // (only works when vault private key matches the registered on-chain public key)
-            if (!decryptionKey && !isMine) {
+            if (!decryptionKey && !isMineOnChain) {
               const wrappedKeyBlob = decodeEncryptedKeyBlob(msgEncryptedKey)
               if (wrappedKeyBlob) {
                 try {
@@ -744,7 +743,7 @@ export default function Chat() {
             }
 
             if (!decryptionKey) {
-              console.warn('No decryption key for:', msgMetadata, '| isMine:', isMine)
+              console.warn('No decryption key for:', msgMetadata, '| isMine:', isMineOnChain)
               return null
             }
 
@@ -763,6 +762,13 @@ export default function Chat() {
             }
 
             const content = JSON.parse(new TextDecoder().decode(decryptedBuffer))
+
+            // Sender travels inside the ciphertext, so it is authenticated by the AES-GCM tag and
+            // readable only by the pair. Messages pinned before that change carry it as a plaintext
+            // IPFS field — still read for backwards compatibility, never written again.
+            const payloadSender = content?.senderAddr?.toLowerCase?.() ?? ipfsPayload?.senderAddr?.toLowerCase?.() ?? null
+            const effectiveSender = payloadSender ?? onChainSender
+            const isMine = isMineOnChain || effectiveSender === myAddress
 
             return {
               id: `${entry.topic}-${msgTimestamp}-${effectiveSender}-${msgMetadata}`,
@@ -894,7 +900,7 @@ export default function Chat() {
       const ciphertext = await subtle.encrypt(
         { name: 'AES-GCM', iv: payloadIv },
         contentKey,
-        new TextEncoder().encode(JSON.stringify({ version: '1', elements: messageElements }))
+        new TextEncoder().encode(JSON.stringify({ version: '1', senderAddr: address, elements: messageElements }))
       )
 
       // Prefetch nonce from forwarder in parallel with IPFS — saves one RPC round-trip on first send.
@@ -905,7 +911,6 @@ export default function Chat() {
           version: '1',
           iv: ethers.hexlify(payloadIv),
           ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
-          senderAddr: address,
         }),
         shouldPrefetchNonce
           ? publicClient.readContract({ address: forwarderAddress, abi: forwarderAbi, functionName: 'nonces', args: [burnerAddr] })
@@ -1263,13 +1268,14 @@ export default function Chat() {
       const ciphertext = await subtle.encrypt(
         { name: 'AES-GCM', iv: payloadIv },
         contentKey,
-        new TextEncoder().encode(JSON.stringify({ version: '1', elements: [{ type: 'text', data: { text: newText } }] }))
+        new TextEncoder().encode(
+          JSON.stringify({ version: '1', senderAddr: address, elements: [{ type: 'text', data: { text: newText } }] })
+        )
       )
       const ipfsResult = await uploadObjectToIPFS({
         version: '1',
         iv: ethers.hexlify(payloadIv),
         ciphertext: ethers.hexlify(new Uint8Array(ciphertext)),
-        senderAddr: address,
       })
       if (!ipfsResult?.cid) throw new Error('IPFS upload failed.')
       const functionData = encodeFunctionData({
