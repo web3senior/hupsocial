@@ -14,7 +14,8 @@ const FETCH_TIMEOUT_MS = 5000
 
 // GeckoTerminal network slugs for the chains it indexes. Monad and Robinhood are absent
 // (too new/niche) and testnet tokens have no listing, so those simply get no logo.
-const GECKOTERMINAL_NETWORKS = {
+// Shared with lib/tokenInfo.js, which reads the same upstream one token at a time.
+export const GECKOTERMINAL_NETWORKS = {
   1: 'eth',
   42: 'lukso',
   56: 'bsc',

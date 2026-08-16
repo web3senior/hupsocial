@@ -21,6 +21,7 @@ import { V4_PROBE_TIERS, buildV4Swap, v4PoolKey } from '@/lib/uniswap-v4'
 import NetworkSelect from '@/components/ui/NetworkSelect'
 import TokenIcon from '@/components/ui/TokenIcon'
 import TokenSelectDialog from './TokenSelectDialog'
+import TokenInfoCard from './TokenInfoCard'
 import TrendingTokens from './TrendingTokens'
 import uniAbi from '@/abis/UniswapV3Periphery.json'
 import v4Abi from '@/abis/UniswapV4.json'
@@ -394,11 +395,6 @@ const SwapForm = () => {
   const symbolAsset = mode === 'buy' ? symbolOut : symbolIn
   const symbolCounter = mode === 'buy' ? symbolIn : symbolOut
 
-  // Native entries carry no logo of their own; the chain icon stands in
-  const withChainLogo = (token) => (token?.native ? { ...token, logo: chain?.iconUrl } : token)
-  const displayAsset = withChainLogo(asset)
-  const displayCounter = withChainLogo(counter)
-
   // Fiat for the pair — the dollar-denominated field, the value line and the FDV row. Chains
   // DefiLlama can't price fall back to token units throughout.
   const marketAssets = useMemo(() => {
@@ -420,6 +416,18 @@ const SwapForm = () => {
   const priceIn = priceOf(tokenIn)
   const priceOut = priceOf(tokenOut)
   const priceCounter = mode === 'buy' ? priceIn : priceOut
+
+  // Native entries carry no logo of their own; the chain icon stands in. ERC20s that arrived
+  // logoless (curated majors, pasted addresses) borrow GeckoTerminal's branding, which the
+  // market lookup above already fetched for both sides of the pair.
+  const withLogo = (token) => {
+    if (!token) return token
+    if (token.native) return { ...token, logo: chain?.iconUrl }
+    if (token.logo) return token
+    return { ...token, logo: market[`${chainId}:${token.address?.toLowerCase()}`]?.logo ?? null }
+  }
+  const displayAsset = withLogo(asset)
+  const displayCounter = withLogo(counter)
 
   // Dollars are only an option where the counter token has a price. Until one arrives the card
   // renders in token units without touching the stored preference, so a chain that prices a
@@ -1262,6 +1270,16 @@ const SwapForm = () => {
             {submitLabel}
           </button>
         </form>
+      )}
+
+      {canSwapHere && asset?.address && (
+        <TokenInfoCard
+          chainId={chainId}
+          address={asset.address}
+          symbol={symbolAsset}
+          logo={displayAsset?.logo ?? null}
+          explorerUrl={chain?.blockExplorers?.default?.url}
+        />
       )}
 
       {canSwapHere && <TrendingTokens chainId={chainId} nativeSymbol={nativeSymbol} onSelect={handleTrendingPick} />}

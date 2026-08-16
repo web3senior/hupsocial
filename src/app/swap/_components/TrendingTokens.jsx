@@ -1,12 +1,13 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { SWAP_TOKENS } from '@/lib/tokens'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { formatNative } from '@/lib/launch'
 import TokenIcon from '@/components/ui/TokenIcon'
-import { FlameIcon } from '@phosphor-icons/react'
+import { toast } from '@/components/NextToast'
+import { CheckIcon, CopyIcon, FlameIcon } from '@phosphor-icons/react'
 import styles from './TrendingTokens.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
@@ -19,9 +20,22 @@ const shortAddress = (value) => (value ? `${value.slice(0, 6)}…${value.slice(-
  * swapped through this page recently (swap_activity, ranked by distinct traders so one wallet
  * can't trend a token alone) and tokens launched on Hup (cidex-indexed launch pools). No
  * external market APIs — this is Hup's own activity. Tapping a row loads it as the receive
- * side of the form, quote ready.
+ * side of the form, quote ready; each row also carries its copyable contract address, since
+ * the address — not the ticker — is what actually identifies a token.
  */
 const TrendingTokens = ({ chainId, nativeSymbol, onSelect }) => {
+  const [copiedAddress, setCopiedAddress] = useState(null)
+
+  const handleCopy = async (address) => {
+    try {
+      await navigator.clipboard.writeText(address)
+      setCopiedAddress(address)
+      setTimeout(() => setCopiedAddress((current) => (current === address ? null : current)), 1500)
+    } catch {
+      toast('Could not copy the address', 'error')
+    }
+  }
+
   const { data: swapped } = useSWR(chainId ? `/api/v1/swaps/trending?networkId=${chainId}&days=7&limit=8` : null, fetcher, {
     refreshInterval: 60_000,
   })
@@ -78,7 +92,9 @@ const TrendingTokens = ({ chainId, nativeSymbol, onSelect }) => {
       </h2>
       <ul className={styles.trending__list}>
         {rows.map((token) => (
-          <li key={token.address}>
+          // The copy chip is a sibling of the row button, never a child — nested buttons are
+          // invalid HTML — so the li carries the shared hover surface
+          <li key={token.address} className={styles.trending__item}>
             <button type="button" className={styles.trending__row} onClick={() => onSelect?.(token)}>
               <TokenIcon token={token} chainId={chainId} size="md" />
               <span className={styles.trending__identity}>
@@ -93,6 +109,16 @@ const TrendingTokens = ({ chainId, nativeSymbol, onSelect }) => {
                   {formatNative(token.volume)} {nativeSymbol}
                 </span>
               )}
+            </button>
+            <button
+              type="button"
+              className={styles.trending__copy}
+              onClick={() => handleCopy(token.address)}
+              title={`Copy ${token.address}`}
+              aria-label={`Copy the contract address ${token.address}`}
+            >
+              <code>{shortAddress(token.address)}</code>
+              {copiedAddress === token.address ? <CheckIcon size={11} weight="bold" /> : <CopyIcon size={11} />}
             </button>
           </li>
         ))}

@@ -22,6 +22,20 @@
     flex-direction: column;
   }
 
+  // The li is the hover surface: the select button and the copy chip live side by side
+  // inside it, and highlighting only one of them would read as a broken row
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-right: 0.5rem;
+    border-radius: 12px;
+
+    &:hover {
+      background-color: var(--surface-muted, #f7f7f8);
+    }
+  }
+
   &__row {
     all: unset;
     box-sizing: border-box;
@@ -29,12 +43,32 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: 0.5rem 0.5rem;
-    border-radius: 12px;
+  }
+
+  &__copy {
+    all: unset;
+    box-sizing: border-box;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-11, 0.6875rem);
+    color: var(--text-muted, #888);
+
+    code {
+      font-size: inherit;
+    }
 
     &:hover {
-      background-color: var(--surface-muted, #f7f7f8);
+      color: var(--text);
+      border-color: var(--text-muted, #888);
     }
   }
 
