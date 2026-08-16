@@ -199,42 +199,11 @@
   }
 
   // Contract identity under the amount — small, but the only line on the card that proves
-  // which token is actually being asked for
-  &__assetMeta {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+  // which token is actually on each side of the deal. Chrome comes from TokenIdentity; this
+  // only pins it to the leg's own width so a long ticker can't stretch the row.
+  &__legToken {
     min-width: 0;
-  }
-
-  &__assetAddress {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--text-muted);
-    font: inherit;
-    cursor: pointer;
-
-    code {
-      font-family: var(--font-family-monospace);
-      font-size: 0.7rem;
-    }
-
-    &:hover {
-      color: var(--text);
-    }
-  }
-
-  &__assetLink {
-    display: inline-flex;
-    color: var(--text-muted);
-
-    &:hover {
-      color: var(--text);
-    }
+    margin-top: 0.1rem;
   }
 
   &__swapIcon {

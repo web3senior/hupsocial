@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { erc20Abi, formatUnits } from 'viem'
+import { erc20Abi, formatUnits, zeroAddress } from 'viem'
 import useSWR from 'swr'
 import clsx from 'clsx'
-import { ArrowSquareOutIcon, CheckIcon, CopyIcon, HandshakeIcon, LockKeyIcon, PlusIcon } from '@phosphor-icons/react'
+import { HandshakeIcon, LockKeyIcon, PlusIcon } from '@phosphor-icons/react'
 import { appChains, CONTRACTS } from '@/config/contracts'
 import offersAbi from '@/abis/HupOffers.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
 import { ContentSpinner } from '@/components/Loading'
+import TokenIdentity from '@/components/ui/TokenIdentity'
 import CreateDealModal from './CreateDealModal'
 import useTokenMeta from './useTokenMeta'
 import styles from './P2pDirectory.module.scss'
@@ -76,7 +77,6 @@ const formatExpiry = (expiresAt) => {
  */
 function DealCard({ deal, chain, offersAddress, address, onSettled }) {
   const lastActionRef = useRef(null)
-  const [copied, setCopied] = useState(false)
 
   const isNativeAsset = deal.standard === STANDARD_NATIVE
   const isLsp7Asset = deal.standard === STANDARD_LSP7
@@ -143,16 +143,6 @@ function DealCard({ deal, chain, offersAddress, address, onSettled }) {
   // that actually says what this deal wants, so it's shown, copyable, and linked out.
   const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
   const assetLabel = asset.symbol ?? (isNativeAsset ? chain.nativeCurrency?.symbol : shortAddress(assetToken))
-
-  const handleCopyAsset = async () => {
-    try {
-      await navigator.clipboard.writeText(assetToken)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      toast('Could not copy the address', 'error')
-    }
-  }
 
   const { data: hash, isPending: isSubmitting, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
@@ -251,30 +241,15 @@ function DealCard({ deal, chain, offersAddress, address, onSettled }) {
 
           {/* Native has no contract to verify, so only token assets carry the address row */}
           {!isNativeAsset && (
-            <span className={styles.p2p__assetMeta}>
-              <button
-                type="button"
-                className={styles.p2p__assetAddress}
-                onClick={handleCopyAsset}
-                title={`Copy ${assetToken}`}
-                aria-label={`Copy the contract address ${assetToken}`}
-              >
-                <code>{shortAddress(assetToken)}</code>
-                {copied ? <CheckIcon size={11} weight="bold" /> : <CopyIcon size={11} />}
-              </button>
-
-              {explorerUrl && (
-                <a
-                  href={`${explorerUrl}/address/${assetToken}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.p2p__assetLink}
-                  title="Open the token contract in the explorer"
-                >
-                  <ArrowSquareOutIcon size={11} />
-                </a>
-              )}
-            </span>
+            <TokenIdentity
+              chainId={chain.id}
+              address={assetToken}
+              symbol={asset.symbol}
+              isLsp7={isLsp7Asset}
+              explorerUrl={explorerUrl}
+              size="sm"
+              className={styles.p2p__legToken}
+            />
           )}
         </div>
         <HandshakeIcon size={18} className={styles.p2p__swapIcon} />
@@ -283,6 +258,20 @@ function DealCard({ deal, chain, offersAddress, address, onSettled }) {
           <strong className={styles.p2p__legValue}>
             {amountFormat.format(Number(formatUnits(shownPayment, paymentDecimals)))} {paymentSymbol}
           </strong>
+
+          {/* The payment is no longer always a curated stablecoin — a deal can be funded with
+              any ERC20 or LSP7 — so it needs the same verifiable identity the asset leg has */}
+          {deal.payment_token && deal.payment_token !== zeroAddress && (
+            <TokenIdentity
+              chainId={chain.id}
+              address={deal.payment_token}
+              symbol={paymentSymbol}
+              isLsp7={Boolean(deal.is_lsp7)}
+              explorerUrl={explorerUrl}
+              size="sm"
+              className={styles.p2p__legToken}
+            />
+          )}
         </div>
       </div>
 

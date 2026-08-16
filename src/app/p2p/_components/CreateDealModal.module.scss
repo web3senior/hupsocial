@@ -95,17 +95,6 @@
     }
   }
 
-  &__note {
-    margin: 0;
-    font-size: 0.78rem;
-    line-height: 1.45;
-    color: var(--text-muted);
-
-    &--error {
-      color: var(--danger-500, #ef4444);
-    }
-  }
-
   &__tokenSearch {
     position: relative;
   }

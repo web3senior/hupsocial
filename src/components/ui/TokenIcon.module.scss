@@ -1,0 +1,36 @@
+.tokenIcon {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text-muted, #888);
+  overflow: hidden;
+
+  // The logo covers the glyph rather than replacing it, so a 404 needs no re-render —
+  // the <img> hides itself and the coin underneath is already drawn
+  img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &--sm {
+    width: 20px;
+    height: 20px;
+  }
+
+  &--md {
+    width: 28px;
+    height: 28px;
+  }
+
+  &--lg {
+    width: 32px;
+    height: 32px;
+  }
+}

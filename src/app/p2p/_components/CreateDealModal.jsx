@@ -11,6 +11,7 @@ import offersAbi from '@/abis/HupOffers.json'
 import { toast } from '@/components/NextToast'
 import NativeDialog from '@/components/ui/NativeDialog'
 import RecipientField from '@/components/ui/RecipientField'
+import TokenIdentity from '@/components/ui/TokenIdentity'
 import useTokenMeta from './useTokenMeta'
 import { STANDARD_ERC20, STANDARD_LSP7, STANDARD_NATIVE } from './P2pDirectory'
 import styles from './CreateDealModal.module.scss'
@@ -119,6 +120,7 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
   // LSP7 only exists on LUKSO, so offering it as a payment standard anywhere else would just
   // be a way to post a deal nobody can fund
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
+  const explorerUrl = chain.blockExplorers?.default?.url
 
   const isNativeAsset = assetKind === 'native'
   const trimmedAsset = assetToken.trim()
@@ -463,12 +465,18 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
               </>
             )}
             {/* Says outright which standard the deal will be posted as — it decides how the
-                asset is delivered, so it shouldn't be invisible */}
+                asset is delivered, so it shouldn't be invisible — and shows the contract the
+                deal will actually name, since a ticker alone is not an identity */}
             {assetAddress && asset.isResolved && isStandardKnown && (
-              <p className={styles.deal__note}>
-                {asset.symbol ? `${asset.symbol} · ` : ''}
-                {isLsp7Asset ? 'LSP7' : 'ERC20'} · {asset.decimals} decimals
-              </p>
+              <TokenIdentity
+                chainId={chainId}
+                address={assetAddress}
+                symbol={asset.symbol}
+                isLsp7={Boolean(isLsp7Asset)}
+                decimals={asset.decimals}
+                standard={isLsp7Asset ? 'LSP7' : 'ERC20'}
+                explorerUrl={explorerUrl}
+              />
             )}
           </div>
         )}
@@ -545,10 +553,15 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
               </>
             )}
             {paymentAddress && payment.isResolved && (
-              <p className={styles.deal__note}>
-                {payment.symbol ? `${payment.symbol} · ` : ''}
-                {isPaymentLsp7 ? 'LSP7' : 'ERC20'} · {payment.decimals} decimals
-              </p>
+              <TokenIdentity
+                chainId={chainId}
+                address={paymentAddress}
+                symbol={payment.symbol}
+                isLsp7={isPaymentLsp7}
+                decimals={payment.decimals}
+                standard={isPaymentLsp7 ? 'LSP7' : 'ERC20'}
+                explorerUrl={explorerUrl}
+              />
             )}
           </div>
         )}
