@@ -38,6 +38,7 @@ import {
 } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
 import { renderMarkdown } from '@/lib/markdown'
+import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { postToMarkdown, getPostMarkdownUrl } from '@/lib/postMarkdown'
 import { AI_TARGETS, buildPostAiUrl } from '@/lib/aiTargets'
 import useSWR, { useSWRConfig } from 'swr'
@@ -48,7 +49,9 @@ import EmbedPostDialog from './EmbedPostDialog'
 import TipModal from './TipModal'
 import BuyButton from './BuyButton'
 import TradeCard from './TradeCard'
+import DropCard from './DropCard'
 import PredictCard from './PredictCard'
+import LaunchCard from './LaunchCard'
 import MiniAppEmbed from './MiniAppEmbed'
 import NewPost from './NewPost'
 import { shouldOfferTranslation } from '@/lib/languageHelper'
@@ -349,6 +352,21 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               )}
 
               {displayItem?.content?.predictMarket && <PredictCard marketRef={displayItem.content.predictMarket} />}
+
+              {displayItem?.content?.tokenLaunch && <LaunchCard launchRef={displayItem.content.tokenLaunch} />}
+
+              {displayItem?.content?.nftDrop && (
+                <DropCard
+                  drop={displayItem.content.nftDrop}
+                  // Same repost-style referral attribution as TradeCard above; HupDrops rejects
+                  // self- and creator-referrals onchain (DropCard zeroes those).
+                  referral={
+                    isRepost && item.wallet_address?.toLowerCase() !== displayItem?.wallet_address?.toLowerCase()
+                      ? item.wallet_address
+                      : displayItem?.wallet_address
+                  }
+                />
+              )}
 
               {/* Nothing loads until the viewer presses launch, so a veiled post never runs
                   third-party code — the inert wrapper blocks the launch button outright */}
@@ -780,8 +798,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
 
   const openLastComment = (e) => {
     e.stopPropagation()
-    const selection = window.getSelection()
-    if (selection && selection.toString().length > 0) return
+    if (isTextSelectionDrag(e)) return
     setCurrentPost(lastComment)
     router.push(`/networks/${lastComment.network_id}/${lastComment.id}`)
   }
@@ -795,6 +812,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
         ) : lastComment ? (
           <div
             className={styles.post__commentLink}
+            onPointerDown={rememberCardPointerDown}
             onClick={openLastComment}
             onMouseEnter={() => router.prefetch(`/networks/${lastComment.network_id}/${lastComment.id}`)}
           >
@@ -979,6 +997,12 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
         <TradeCard listing={quotedPost.content.nftListing} referral={quotedBy} />
       )}
       {quotedPost?.content?.predictMarket && <PredictCard marketRef={quotedPost.content.predictMarket} />}
+      {quotedPost?.content?.tokenLaunch && <LaunchCard launchRef={quotedPost.content.tokenLaunch} />}
+      {quotedPost?.content?.nftDrop && (
+        // Quoting a drop is a referral channel like reposting: mints made from this
+        // quote credit the quote's author with the drop's referral share
+        <DropCard drop={quotedPost.content.nftDrop} referral={quotedBy} />
+      )}
       {quotedPost?.content?.miniApp && <MiniAppEmbed reference={quotedPost.content.miniApp} contextAddress={quotedPost?.wallet_address} />}
     </div>
   )
@@ -999,7 +1023,7 @@ const Poll = ({ polls }) => {
             >
               <section data-name={item.name} className={`flex flex-column align-items-start justify-content-between`}>
                 <header className={`${styles.poll__header}`}>
-                  <Profile creator={item.creator} createdAt={item.createdAt} chainId={4201} />
+                  <Profile creator={item.creator} createdAt={item.createdAt} />
                 </header>
                 <main className={`${styles.poll__main} w-100 flex flex-column grid--gap-050`}>
                   <div

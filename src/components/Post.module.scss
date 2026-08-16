@@ -116,7 +116,7 @@
 
     &__option {
       display: flex;
-      
+
       justify-content: space-between;
       gap: 18px;
       border: 0;
@@ -293,7 +293,6 @@
         border-color: var(--red-500, #e53e3e);
       }
     }
-
   }
 
   &__main {
@@ -306,6 +305,8 @@
 
     &__content {
       overflow: hidden;
+      font-family: var(--font-sans);
+      font-size: var(--system-16-font-size);
       line-height: 1.4;
       position: relative;
       white-space: pre-wrap;
