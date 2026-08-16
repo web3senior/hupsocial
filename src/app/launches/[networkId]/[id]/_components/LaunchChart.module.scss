@@ -1,0 +1,170 @@
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  // No border box: the reference reads as marks floating on the page, not a framed widget
+  padding: 0.25rem 0 0;
+
+  &__empty {
+    margin: 0;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  &__ohlc {
+    display: flex;
+    gap: 0.7rem;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+
+    div {
+      display: flex;
+      align-items: baseline;
+      gap: 0.25rem;
+    }
+
+    dt {
+      font-size: var(--font-size-10, 0.625rem);
+      // The letter stays neutral so the value's colour is a second cue, never the only one
+      color: var(--text-muted, #888);
+    }
+
+    dd {
+      margin: 0;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+    }
+  }
+
+  &__intervals {
+    display: flex;
+    gap: 0.15rem;
+
+    button {
+      border: none;
+      background: transparent;
+      color: var(--text-muted, #888);
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover {
+        color: inherit;
+      }
+    }
+  }
+
+  &__interval--active {
+    background: var(--background) !important;
+    color: inherit !important;
+  }
+
+  // The canvas is transparent and the library's own gridlines are off, so the dot grid lives
+  // here — which keeps it on the app's theme tokens instead of a hex baked into JS.
+  &__canvas {
+    height: 320px;
+    // 10% keeps the grid at the edge of perception — present enough to read position from,
+    // faint enough that the candles are the only real ink
+    background-image: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--text-muted, #888) 10%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 20px 20px;
+    background-position: 0 0;
+
+    @media (max-width: 600px) {
+      height: 260px;
+    }
+  }
+
+  &__volume {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-top: 1px solid var(--border);
+    padding: 0.85rem 0 0;
+  }
+
+  &__volumeHead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+
+    > div:first-child {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+
+    span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    strong {
+      font-size: var(--font-size-16, 1rem);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__split {
+    display: flex;
+    // A 2px surface gap so the two fills read as separate marks rather than one bar
+    gap: 2px;
+    height: 6px;
+
+    span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      min-width: 2px;
+    }
+  }
+
+  &__splitLegend {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    p {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      margin: 0;
+
+      &:last-child {
+        text-align: end;
+      }
+    }
+
+    b {
+      font-size: var(--font-size-12);
+      font-weight: 600;
+    }
+
+    small {
+      font-size: var(--font-size-10, 0.625rem);
+      // Detail lines wear text ink; the count above carries the colour
+      color: var(--text-muted, #888);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
