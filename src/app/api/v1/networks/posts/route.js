@@ -255,6 +255,10 @@ export async function GET(request) {
     // Fulfill any missing Universal Profile fields
     await fulfillUniversalProfiles(postsToSend, pool)
 
+    // Hydrate repost rows with their original post so the client renders them
+    // without a per-card getPostById round trip.
+    await attachRepostOriginals(postsToSend, viewerAddress)
+
     return NextResponse.json({
       success: true,
       data: postsToSend.map(post => ({
@@ -294,6 +298,88 @@ function parseIPFSContent(content) {
   } catch (e) {
     return content
   }
+}
+
+/**
+ * Hydrates repost rows in place with their original post under `repost_original`.
+ * A repost row only carries the original's id (is_repost), so without this every
+ * repost card pays an N+1 getPostById round trip after the feed paints — the
+ * lone card-level shimmer in an otherwise loaded feed. One point-lookup query
+ * per page, and only when the page actually contains repost rows. The select
+ * mirrors the single-post route (viewer repost/bookmark state included) because
+ * the embed replaces exactly that client fetch — dropping fields would regress
+ * the repost menu's Undo state.
+ */
+async function attachRepostOriginals(rows, viewerAddress) {
+  const repostRows = rows.filter((row) => Number(row.is_repost || 0) !== 0)
+  if (repostRows.length === 0) return
+
+  // Dedupe on (network, original id) — several reposts on a page can point at one post
+  const pairs = [
+    ...new Map(repostRows.map((row) => [`${row.network_id}:${row.is_repost}`, [row.is_repost, row.network_id]])).values(),
+  ]
+
+  const queryParams = []
+  if (viewerAddress) {
+    queryParams.push(viewerAddress, viewerAddress, viewerAddress, viewerAddress, viewerAddress)
+  }
+  pairs.forEach(([postId, networkId]) => queryParams.push(postId, networkId))
+
+  const query = `
+      SELECT
+        p.*,
+        u.name as display_name,
+        u.profileImage as profile_image,
+        n.name as network_name,
+        n.explorer_url,
+        comm.name as community_name,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
+        (
+          (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
+          + (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.parent_id = p.id
+            AND child.parent_id <> 0 AND child.is_deleted = 0
+            AND NOT (child.is_comment <=> p.id)
+            AND (child.content_type = 1 OR child.is_comment IS NOT NULL))
+        ) as total_comments,
+        (SELECT COUNT(*) FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND is_deleted = 0)
+        + (SELECT COUNT(*) FROM posts q WHERE q.network_id = p.network_id AND q.is_deleted = 0
+           AND CASE WHEN JSON_VALID(q.content) THEN JSON_UNQUOTE(JSON_EXTRACT(q.content, '$.quoteOf')) = CAST(p.id AS CHAR) ELSE 0 END) as total_reposts,
+        (SELECT COUNT(*) FROM post_views WHERE post_id = p.id AND network_id = p.network_id) as total_views,
+        (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
+        (SELECT COUNT(*) FROM tips WHERE post_id = p.id AND network_id = p.network_id) as total_tips,
+        (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,
+        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ?))` : '0'} as has_liked,
+        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?))` : '0'} as has_bookmarked,
+        ${viewerAddress ? `(SELECT folder_id FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?)` : 'NULL'} as folder_id,
+        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND wallet_address = ? AND is_deleted = 0))` : '0'} as has_reposted,
+        ${viewerAddress ? `(SELECT id FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND wallet_address = ? AND is_deleted = 0 LIMIT 1)` : 'NULL'} as viewer_repost_id
+      FROM posts p
+      LEFT JOIN users u ON p.wallet_address = u.wallet_address
+      JOIN networks n ON p.network_id = n.id
+      ${COMMUNITY_JOIN}
+      WHERE (p.id, p.network_id) IN (${pairs.map(() => '(?, ?)').join(', ')})
+  `
+
+  const [origRows] = await pool.execute(query, queryParams)
+  await fulfillUniversalProfiles(origRows, pool)
+
+  const byKey = new Map(origRows.map((row) => [`${row.network_id}:${row.id}`, row]))
+  repostRows.forEach((row) => {
+    const orig = byKey.get(`${row.network_id}:${row.is_repost}`)
+    if (!orig) return
+    row.repost_original = {
+      ...orig,
+      content: parseIPFSContent(orig.content),
+      has_liked: !!orig.has_liked,
+      is_liked: !!orig.has_liked,
+      is_bookmarked: !!orig.has_bookmarked,
+      folder_id: orig.folder_id ?? null,
+      has_reposted: !!orig.has_reposted,
+      viewer_repost_id: orig.viewer_repost_id ?? null,
+    }
+  })
 }
 
 /**
@@ -412,6 +498,7 @@ async function handleTrendingFeed({ networkId, viewerAddress, page, limit, offse
     .filter(Boolean)
 
   await fulfillUniversalProfiles(orderedPosts, pool)
+  await attachRepostOriginals(orderedPosts, viewerAddress)
 
   return NextResponse.json({
     success: true,

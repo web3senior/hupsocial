@@ -127,14 +127,19 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const [showReportModal, setShowReportModal] = useState(null)
   const sectionRef = useRef(null)
 
-  // Original post behind a repost row, fetched under the same SWR key the footer
-  // counters use (getPostStatsKey) so both read one cache entry. SWR's global
+  // Original post behind a repost row. Feed rows arrive with the original
+  // embedded (repost_original, hydrated server-side by the posts route), so the
+  // card renders in the same paint as the rest of the feed — the fetcher only
+  // runs for rows from surfaces that don't embed (search, saved, older cached
+  // feeds). It shares the SWR key the footer counters use (getPostStatsKey) so
+  // stats mutations and the card content live in one cache entry, and that
   // cache survives unmounts — a feed restored from useFeedCacheStore repaints
   // repost cards synchronously instead of re-showing the skeleton and shifting
   // the restored scroll position. revalidateIfStale is off for parity with the
   // rest of the restored feed (usePostStats already revalidates this key on
   // focus); keepPreviousData holds the card through the anonymous → connected
-  // key change on wagmi reconnect.
+  // key change on wagmi reconnect (the feed refetch on connect delivers a fresh
+  // embed with the viewer's repost/bookmark state).
   const repostKey = isRepost ? getPostStatsKey({ id: repostedPostId, network_id: item.network_id }, address) : null
   const { data: repostedPost, isLoading: isLoadingRepost } = useSWR(
     repostKey,
@@ -143,7 +148,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
       const post = Array.isArray(res?.data) ? res.data[0] : res?.data
       return post ?? null
     },
-    { revalidateIfStale: false, keepPreviousData: true },
+    { fallbackData: item.repost_original ?? undefined, revalidateIfStale: false, keepPreviousData: true },
   )
 
   const baseDisplayItem = isRepost ? repostedPost : item
