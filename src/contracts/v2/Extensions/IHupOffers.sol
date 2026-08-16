@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.35;
 
-import "./../IHup.sol";
-
 /**
  * @title IHupOffers
  * @author Hup Labs
@@ -110,9 +108,6 @@ interface IHupOffers {
     ///         offer funding and filling via onTokenTransfer.
     event Erc677TokenUpdated(address indexed token, bool enabled);
 
-    /// @notice Emitted when a trusted forwarder's status is updated.
-    event TrustedForwarderUpdated(address indexed forwarder, bool trusted);
-
     /// @notice Emitted when the percentage offer fee (in basis points) is updated. Applies to
     ///         offers made after it: existing offers settle at the rate they snapshotted.
     event OfferFeeUpdated(uint256 oldValue, uint256 newValue);
@@ -176,16 +171,11 @@ interface IHupOffers {
     error InvalidOfferData();
     error TransferFailed();
     error Unauthorized();
-    error SessionExpired();
 
     // --- STATE GETTERS ---
 
     function version() external pure returns (string memory);
-    /// @notice The Hup Core reference used to resolve burner sessions. Fixed at deployment.
-    function hupContract() external view returns (IHup);
     function ADMIN_ROLE() external view returns (bytes32);
-    function trustedForwarders(address forwarder) external view returns (bool);
-    function isTrustedForwarder(address forwarder) external view returns (bool);
     function offerFeeBps() external view returns (uint256);
     function FEE_DENOMINATOR() external view returns (uint256);
     function ABSOLUTE_MAX_OFFER_FEE_BPS() external view returns (uint256);
@@ -220,8 +210,9 @@ interface IHupOffers {
      *      offer is created. One-of-one standards force `_amount` = 1 and reject offering on a
      *      token the offerer currently owns. Partial-fillable standards (ERC1155, 0-decimal
      *      LSP7) require `_price % _amount == 0`. Fee-on-transfer/deflationary payment tokens
-     *      are unsupported: the contract escrows the gross amount and pays shares out of it.
-     * @param _offerer The primary wallet funding the offer (or address(0) if caller is primary).
+     *      are unsupported: the contract escrows the gross amount and pays shares out of it. The
+     *      offer is always attributed to msg.sender: the escrow is pulled from the caller, so
+     *      there is no third party for the contract to act on behalf of.
      * @param _collection The asset contract address, or address(0) for a NATIVE-asset offer.
      * @param _tokenId The token id as bytes32 (ERC721/ERC1155 ids are `bytes32(uint256(id))`);
      *        bytes32(0) for LSP7, ERC20, and NATIVE.
@@ -237,7 +228,7 @@ interface IHupOffers {
      * @param _counterparty The only address allowed to fill, or address(0) for anyone.
      * @return offerId The id of the created offer.
      */
-    function makeOffer(address _offerer, address _collection, bytes32 _tokenId, AssetStandard _standard, address _token, bool _isTokenLsp7, uint256 _price, uint256 _amount, uint256 _expiresAt, address _counterparty) external payable returns (uint256 offerId);
+    function makeOffer(address _collection, bytes32 _tokenId, AssetStandard _standard, address _token, bool _isTokenLsp7, uint256 _price, uint256 _amount, uint256 _expiresAt, address _counterparty) external payable returns (uint256 offerId);
 
     /**
      * @notice Fills an offer: delivers `_quantity` of the asset to the offerer and receives
@@ -252,13 +243,13 @@ interface IHupOffers {
      *      exactly equal `_quantity`; every other standard requires msg.value = 0. The asset
      *      moves seller → offerer directly (ERC721 via transferFrom, not safeTransferFrom, so
      *      smart-wallet offerers without onERC721Received — e.g. Universal Profiles — can still
-     *      receive); escrow is released only after delivery succeeds.
-     * @param _seller The primary wallet delivering the asset (or address(0) if caller is
-     *        primary). Must not be the offerer; must match the offer's counterparty when set.
+     *      receive); escrow is released only after delivery succeeds. The seller is always
+     *      msg.sender — the asset moves out of the caller's own holdings — and must not be the
+     *      offerer; it must match the offer's counterparty when one is set.
      * @param _offerId The id of the offer to fill.
      * @param _quantity The asset quantity to deliver, in the asset's base units.
      */
-    function acceptOffer(address _seller, uint256 _offerId, uint256 _quantity) external payable;
+    function acceptOffer(uint256 _offerId, uint256 _quantity) external payable;
 
     /**
      * @notice Cancels an active offer and refunds its remaining escrow to the offerer. This is
@@ -275,9 +266,9 @@ interface IHupOffers {
      *      been moved to this contract. Only whitelisted tokens are accepted (`erc677Tokens`):
      *      the callback carries no other proof that a real transfer preceded it. Reverting
      *      anywhere below unwinds that transfer — ERC677 requires this callback to succeed — so
-     *      a rejected offer or fill can never strand funds. No burner-session resolution
-     *      applies: the tokens must come from whoever actually holds them, and the token
-     *      reports that holder as `_sender`.
+     *      a rejected offer or fill can never strand funds. `_sender` is the one place the
+     *      contract attributes an action to someone other than its caller, and it is safe
+     *      precisely because the caller is the whitelisted token reporting who actually paid.
      *
      *      `_data` = abi.encode(uint8 action, bytes params):
      *      - action ERC677_ACTION_MAKE: params = abi.encode(address collection, bytes32 tokenId,
@@ -320,7 +311,6 @@ interface IHupOffers {
 
     function pause() external;
     function unpause() external;
-    function setTrustedForwarder(address _forwarder, bool _trusted) external;
     function setOfferFeeBps(uint256 _offerFeeBps) external;
     /// @notice Enables or disables an ERC677 token for one-transaction funding and filling.
     function setErc677Token(address _token, bool _enabled) external;

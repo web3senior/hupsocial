@@ -498,14 +498,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
 
               {referralBps > 0 && (
                 <div className={styles.tradeCard__breakdownRow}>
-                  <span>
-                    Referral ({formatBps(referralBps)})
-                    <Tooltip content="Paid to whoever's repost leads to the sale. Also taken from the seller's proceeds, and only when a buyer actually arrives through a share.">
-                      <button type="button" className={styles.tradeCard__breakdownInfo} aria-label="About the referral share">
-                        <InfoIcon size={12} />
-                      </button>
-                    </Tooltip>
-                  </span>
+                  <span>Referral ({formatBps(referralBps)})</span>
                   <span>
                     −{amountFormat.format(split.referral)} {symbol}
                   </span>

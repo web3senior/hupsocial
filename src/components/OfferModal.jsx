@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { encodeAbiParameters, erc20Abi, formatUnits, hexToString, isAddress, numberToHex, parseUnits, zeroAddress } from 'viem'
 import useSWR from 'swr'
 import clsx from 'clsx'
@@ -11,7 +11,6 @@ import clsx from 'clsx'
 import { appChains, CONTRACTS } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import offersAbi from '@/abis/HupOffers.json'
 import { toast } from '@/components/NextToast'
 import Profile from './Profile'
@@ -132,11 +131,11 @@ const erc721Abi = [
   },
   {
     type: 'function',
-    name: 'approve',
+    name: 'setApprovalForAll',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'tokenId', type: 'uint256' },
+      { name: 'operator', type: 'address' },
+      { name: 'approved', type: 'bool' },
     ],
     outputs: [],
   },
@@ -238,14 +237,12 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
   const [customToken, setCustomToken] = useState('')
   const [tokenSearchResults, setTokenSearchResults] = useState([])
   const [expirySeconds, setExpirySeconds] = useState(EXPIRY_OPTIONS[2].seconds)
-  const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   // The offer row a pending accept/cancel belongs to, so only that row's button spins
   const [pendingOfferId, setPendingOfferId] = useState(null)
   const { address } = useConnection()
   const dialogRef = useRef(null)
   const lastActionRef = useRef(null)
 
-  const publicClient = usePublicClient({ chainId })
   const chainInfo = appChains.find((c) => c.id === chainId)
   const offersAddress = CONTRACTS[`chain${chainId}`]?.offers || null
   const nativeCurrency = chainInfo?.nativeCurrency
@@ -453,7 +450,7 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = isPending || isConfirming || isBurnerBusy
+  const isBusy = isPending || isConfirming
 
   // Mount = open / unmount = close, matching the TipModal dialog contract
   useEffect(() => {
@@ -471,7 +468,7 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
       toast('Token approved — you can place your offer now', 'success')
       refetchAllowance()
     } else if (lastActionRef.current === 'approve-nft') {
-      toast('NFT approved — you can accept the offer now', 'success')
+      toast(isLsp8 ? 'NFT approved — you can accept the offer now' : 'Collection approved — you can accept the offer now', 'success')
       refetchTransferRights()
     } else if (lastActionRef.current === 'make') {
       toast('Offer placed — your payment is escrowed until it fills, expires, or you cancel', 'success')
@@ -512,15 +509,17 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
     }
   }
 
-  const handleMakeOffer = async (e) => {
+  // Every offers write goes through the connected wallet. HupOffers has no forwarder and no
+  // burner-session resolution — it credits msg.sender and nothing else — because both sides of
+  // an offer must already control value, so relaying would only add an impersonation surface.
+  const handleMakeOffer = (e) => {
     e.stopPropagation()
     if (amountUnits === null || !offersAddress || (isTokenPayment && !tokenAddress)) return
 
     const expiresAt = computeExpiresAt(expirySeconds)
 
     // ERC677: one transaction, no approve. The offer is created from onTokenTransfer, which
-    // reads the asset out of the payload. Burner sessions can't apply here — the tokens have
-    // to leave the wallet that actually holds them — so this path always uses wagmi.
+    // reads the asset out of the payload.
     if (isErc677) {
       lastActionRef.current = 'make'
       writeContract({
@@ -533,39 +532,12 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
       return
     }
 
-    const args = [address, collection, tokenId, standard, tokenAddress ?? zeroAddress, isTokenLsp7, amountUnits, 1n, expiresAt, zeroAddress]
-
-    // Route through the burner session key if one's active — same convenience TipModal gets,
-    // skipping the wallet popup. Approvals stay wagmi-only regardless.
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
-
-    if (session.active) {
-      setIsBurnerBusy(true)
-      try {
-        await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: offersAddress,
-          abi: offersAbi,
-          functionName: 'makeOffer',
-          args: isTokenPayment ? args : [...args, { value: amountUnits }],
-        })
-
-        toast('Offer placed — your payment is escrowed until it fills, expires, or you cancel', 'success')
-        dialogRef.current?.close()
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsBurnerBusy(false)
-      }
-      return
-    }
-
     lastActionRef.current = 'make'
     writeContract({
       abi: offersAbi,
       address: offersAddress,
       functionName: 'makeOffer',
-      args,
+      args: [collection, tokenId, standard, tokenAddress ?? zeroAddress, isTokenLsp7, amountUnits, 1n, expiresAt, zeroAddress],
       chainId,
       ...(isTokenPayment ? {} : { value: amountUnits }),
     })
@@ -577,6 +549,8 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
 
     lastActionRef.current = 'approve-nft'
     if (isLsp8) {
+      // LSP8 operators are additive — authorizing this contract leaves HupTrade's
+      // authorization for the same token intact, so a live listing survives
       writeContract({
         abi: lsp8Abi,
         address: collection,
@@ -585,11 +559,15 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
         chainId,
       })
     } else {
+      // setApprovalForAll, never approve(offers, tokenId): ERC721's per-token approval is
+      // exclusive, so granting it here would silently revoke the one the seller gave HupTrade
+      // when they listed — the listing would stay visible and every buy() would revert. The
+      // operator flag is a separate slot, so both contracts can hold transfer rights at once.
       writeContract({
         abi: erc721Abi,
         address: collection,
-        functionName: 'approve',
-        args: [offersAddress, BigInt(tokenId)],
+        functionName: 'setApprovalForAll',
+        args: [offersAddress, true],
         chainId,
       })
     }
@@ -604,7 +582,7 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
       abi: offersAbi,
       address: offersAddress,
       functionName: 'acceptOffer',
-      args: [address, BigInt(offer.offer_id), 1n],
+      args: [BigInt(offer.offer_id), 1n],
       chainId,
     })
   }
@@ -761,11 +739,12 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
             {isOwner && !hasTransferRights && offers.length > 0 && (
               <div className={styles.offerModal__approve}>
                 <p className={styles.offerModal__approveNote}>
-                  Approve this NFT once to accept any offer below. It stays in your wallet — the approval only lets the offers contract move
-                  it at the moment you accept.
+                  {isLsp8
+                    ? 'Approve this NFT once to accept any offer below. It stays in your wallet — the approval only lets the offers contract move it at the moment you accept.'
+                    : 'Approve this collection once to accept any offer below. Your NFTs stay in your wallet — the approval only lets the offers contract move one at the moment you accept, and it leaves any live listing you have untouched.'}
                 </p>
                 <button type="button" className={styles.offerModal__approveButton} onClick={handleApproveNft} disabled={isBusy}>
-                  {isBusy ? 'Confirming...' : 'Approve NFT'}
+                  {isBusy ? 'Confirming...' : isLsp8 ? 'Approve NFT' : 'Approve collection'}
                 </button>
               </div>
             )}

@@ -28,6 +28,14 @@ export const robinhood = defineChain({
   },
 })
 
+// viem's default BNB Chain endpoint (56.rpc.thirdweb.com) rejects keyless datacenter
+// callers, so every server-side read on chain 56 — relay status included — failed in
+// production while browsers, whose wallets bring their own RPC, looked fine. Pinned to
+// publicnode, which already serves the Ethereum and Robinhood reads here. Mutating the
+// shared chain object (config/wagmi does the same for brand colors) keeps every importer
+// of `bsc` on the pinned endpoint.
+bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
+
 // Chains the app runs on â€” single source of truth for the wagmi config's
 // `chains` tuple and for server-side RPC lookups (chain.rpcUrls.default.http).
 // L1s first, then L2s.
@@ -88,7 +96,12 @@ export const CONTRACTS = {
     store: '',
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
     trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
-    offers: '',
+    // HupOffers 1.0.0, deployed 2026-08-16. Escrow-backed buy offers and OTC deals — the
+    // buy-side complement of trade/editions, and independent of both: offers work on any
+    // token, listed or not. Alone among the extensions it takes no forwarder and honors no
+    // burner session (see "Why HupOffers Is Not Gasless" in the README), so `msg.sender` is
+    // the only identity it acts on and gasless relaying never applies to these calls.
+    offers: '0xf0c1dB3059608bb589726B651108D3984060D5d8',
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
     predict: '0xD76dcBB664a002247269c1fBB161B0440674C570',
     apps: '0xe30350Cf486210C299Aef91De61799Daed1Df6C5',
@@ -115,10 +128,17 @@ export const CONTRACTS = {
     store: '',
     tipper: '',
     trade: '',
-    // HupOffers 1.0.0, deployed 2026-08-14 (block 8310250). Escrow-backed buy offers and OTC
-    // deals — the buy-side complement of trade/editions, and independent of both: offers work
-    // on any token, listed or not, which is why this is filled here while `trade` is not.
-    offers: '0x7d52B675d44126A1cCBb33462D9D251e54277237',
+    // Retired. 0x7d52B675d44126A1cCBb33462D9D251e54277237 (2026-08-14, block 8310250) is the
+    // pre-rework HupOffers: it took a Hup core reference and a trusted forwarder, and its
+    // makeOffer/acceptOffer carried a leading actor address. The 2026-08-16 rework dropped all
+    // three, so src/abis/HupOffers.json no longer matches that deployment — pointing at it
+    // would encode selectors it doesn't have. Left empty rather than repointed: no HupTrade
+    // here, so there is nothing to make offers against until this chain gets one.
+    //
+    // Escrow still sitting in the old contract is not stranded. cancelOffer(uint256) survived
+    // the rework unchanged, so the offerer can still reclaim it by calling that address
+    // directly (offer 4 was the only one still Active at retirement).
+    offers: '',
     events: '',
     predict: '',
     apps: '',
@@ -178,7 +198,7 @@ export const CONTRACTS = {
     store: '',
     tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
     trade: '0x80218c06A00316687957951036bbD1326a6790C1',
-    offers: '',
+    offers: '0xF7D27236978cc4B4f3Ab469701EAfCD546B64B79',
     events: '0x39CB4342C425Cdc8576fa593988E5a4980db9853',
     predict: '0xf9df0275821dbcCBd7Fe461c4224F1ccAC46ae20',
     apps: '',
@@ -202,7 +222,7 @@ export const CONTRACTS = {
     store: '',
     tipper: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     trade: '0x94D81b00b1e4596343e84298dD705e93E36eAb14',
-    offers: '',
+    offers: '0x0627e2bDCa82dC70B633DB02Eb179c1525F7Bfdc',
     events: '0x10feacEEDDB387112f9a484EfB2df9FB197934E4',
     predict: '0xb0F3D16De2B029Bb18d44C35AB811E23C4FC1B87',
     apps: '',
@@ -232,7 +252,7 @@ export const CONTRACTS = {
     store: '',
     tipper: '0x01F725975b17dB66DBF26ebAa02bc74F8a433A18',
     trade: '0x7E14bB18b370b59e0b70759C915f5E3A79599091',
-    offers: '',
+    offers: '0xA724524E11c971B8a98165DEc9065eBa563d424a',
     events: '0x6dB2352e9921F46F005449FcA36938e7cb5A29f5',
     predict: '0x70DBfbb6E64f2e246A83d3Ae0262CC9588c31472',
     apps: '',
@@ -255,7 +275,7 @@ export const CONTRACTS = {
     store: '',
     tipper: '0x74AC93C4A4a67f56af9d1Bd3153910D90F802632',
     trade: '0x594d084D863446cd1618244de695d574a5DfADD5',
-    offers: '',
+    offers: '0x1fFab913fcB1142b2Bb483421Acd1893161dFd3A',
     events: '0xD479950963A8F87d9Cd44Ad3983C96A5A4b3c14d',
     predict: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     apps: '',
@@ -279,7 +299,7 @@ export const CONTRACTS = {
     store: '',
     tipper: '0x3EF07D888e4B4d91e5b6c889E6Bdb7A37BE76CDE',
     trade: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
-    offers: '',
+    offers: '0x9ab0466E3fa6AB0A41AC16d43199D8881b3809E2',
     events: '0x735A8352036B953F8AC0Ae421DaEf8f2978EcC91',
     predict: '0x08c4631B621959468770c3C9831E867aF9014780',
     apps: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
@@ -323,7 +343,7 @@ export const CONTRACTS = {
     store: '',
     tipper: '0x0Fc1223079367ADC73F9960E48d786705e992e14',
     trade: '0x71Ce7aF80996AB5a9c265E2048c5759435131631',
-    offers: '',
+    offers: '0x732794525ABFc3D799EFab72E07E1FD183bEE739',
     events: '0x88C0963857049368470E2851aFf5EDFc2D32346C',
     predict: '0x81369e32F31DDAb46F9BF3269e523A440822C748',
     apps: '',

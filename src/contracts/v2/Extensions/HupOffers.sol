@@ -4,7 +4,6 @@ pragma solidity ^0.8.35;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -36,9 +35,20 @@ import "./ILSP8Minimal.sol";
  *      escrow), so admin withdrawal is limited to fees accrued per payment token at fill time;
  *      there is no whole-balance sweep, and cancelOffer works even while paused so an exit from
  *      escrow is never blockable. Uses IHupOffers for shared structs, events, errors, and view
- *      signatures. Integrates with Hup Core via IHup only to resolve burner session keys to
- *      primary wallets, through an immutable reference — see hupContract for why that address
- *      must never be swappable. Supports rotatable ERC2771 trusted forwarders for meta-transactions,
+ *      signatures.
+ *
+ *      Deliberately has no meta-transaction support and no burner-session resolution, unlike its
+ *      siblings: every action is attributed to msg.sender and nothing else. Both sides of an
+ *      offer must already control value — the offerer's escrow is pulled from the caller, the
+ *      seller's asset is moved out of the caller's own holdings — so relaying buys no
+ *      convenience a signature wouldn't already have to provide. What it would buy is an
+ *      impersonation surface: an ERC2771 forwarder is, by construction, an address permitted to
+ *      name any sender, and this contract's whole reason to exist is spending standing
+ *      approvals. With msg.sender as the only identity, a compromised admin can pause the
+ *      contract, move the fee within its cap, and withdraw accrued fees — it can never move a
+ *      user's tokens. The one attribution that is not the caller is ERC677's onTokenTransfer,
+ *      where the caller is the whitelisted token itself reporting who paid it.
+ *
  *      AccessControl for admin permissions, Pausable for emergency controls, and ReentrancyGuard
  *      for protected settlement. Every state change emits an event; offchain indexers derive
  *      full offer state from OfferMade / OfferFilled / OfferCancelled alone.
@@ -48,7 +58,7 @@ import "./ILSP8Minimal.sol";
  * @custom:security-contact security@hup.social
  * @custom:emoji 🤝
  */
-contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
+contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
 
     // --- STATE VARIABLES ---
@@ -60,19 +70,6 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
     uint8 public constant ERC677_ACTION_MAKE = 1;
     uint8 public constant ERC677_ACTION_FILL = 2;
 
-    /// @notice The Hup Core contract instance (burner session resolution only).
-    /// @dev Immutable, deliberately. This is the oracle that decides whether a caller may act as
-    ///      another wallet, and both makeOffer and acceptOffer move value on that answer — so an
-    ///      admin able to repoint it could authorize itself as anyone and force a trade at a
-    ///      price of its choosing against any wallet holding a live approval. Hup Core writes
-    ///      userSessions only from authorizeSession/revokeSession, keyed to the caller, so with
-    ///      this address fixed at deployment there is no path to impersonation at all.
-    ///
-    ///      The cost is bounded: if Hup Core is ever redeployed, only the burner-session
-    ///      shortcut stops working here. Offers remain fully usable by their owners signing
-    ///      directly, since that path never consults this contract, and escrow is never stranded.
-    IHup public immutable hupContract;
-
     /// @notice Total number of offers ever created; ids are 1..offerCount
     uint256 public offerCount;
 
@@ -83,8 +80,6 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
     ///         none). One active offer per asset per offerer; making another auto-cancels and
     ///         refunds the old one. NATIVE-asset offers key under collection address(0).
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public activeOfferOf;
-
-    mapping(address => bool) public trustedForwarders;
 
     /// @notice Percentage fee charged on each fill, in basis points (100 = 1%)
     uint256 public offerFeeBps = 0;
@@ -105,7 +100,7 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
 
     // --- MODIFIERS ---
 
-    modifier onlyDirectAdmin() {
+    modifier onlyAdmin() {
         if (!hasRole(ADMIN_ROLE, msg.sender)) revert Unauthorized();
         _;
     }
@@ -114,28 +109,18 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
 
     /**
      * @notice Initializes the offers contract.
-     * @param _hupAddress Address of the deployed core Hup contract.
-     * @param _trustedForwarder Address of the initial EIP-2771 trusted forwarder (or address(0) to skip).
      * @param _admin Address granted DEFAULT_ADMIN_ROLE and ADMIN_ROLE.
      */
-    constructor(address _hupAddress, address _trustedForwarder, address _admin) ERC2771Context(_trustedForwarder) {
-        if (_hupAddress == address(0) || _admin == address(0)) revert InvalidAddress();
-
-        hupContract = IHup(_hupAddress);
+    constructor(address _admin) {
+        if (_admin == address(0)) revert InvalidAddress();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(ADMIN_ROLE, _admin);
-
-        if (_trustedForwarder != address(0)) {
-            trustedForwarders[_trustedForwarder] = true;
-            emit TrustedForwarderUpdated(_trustedForwarder, true);
-        }
     }
 
     // --- MUTATIVE LOGIC ---
 
     function makeOffer(
-        address _offerer,
         address _collection,
         bytes32 _tokenId,
         AssetStandard _standard,
@@ -147,7 +132,7 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
         address _counterparty
     ) external payable whenNotPaused nonReentrant returns (uint256 offerId) {
         Offer memory offer = Offer({
-            offerer: _resolveActor(_offerer),
+            offerer: msg.sender,
             counterparty: _counterparty,
             collection: _collection,
             tokenId: _tokenId,
@@ -195,7 +180,7 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
         offerId = _createOffer(offer);
     }
 
-    function acceptOffer(address _seller, uint256 _offerId, uint256 _quantity) external payable whenNotPaused nonReentrant {
+    function acceptOffer(uint256 _offerId, uint256 _quantity) external payable whenNotPaused nonReentrant {
         Offer storage offer = _offers[_offerId];
         if (offer.status != OfferStatus.Active) revert OfferNotActive();
         if (block.timestamp >= offer.expiresAt) revert OfferExpired();
@@ -203,7 +188,7 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
         if (_quantity > offer.remaining) revert InsufficientRemaining(_quantity, offer.remaining);
         if (!offer.partialFillable && _quantity != offer.remaining) revert PartialFillNotAllowed();
 
-        address seller = _resolveActor(_seller);
+        address seller = msg.sender;
         if (seller == offer.offerer) revert SelfFill();
         if (offer.counterparty != address(0) && seller != offer.counterparty) revert NotCounterparty();
 
@@ -228,8 +213,7 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
         // escrow must never be blockable. This is also the reclaim path for expired offers.
         Offer storage offer = _offers[_offerId];
         if (offer.status != OfferStatus.Active) revert OfferNotActive();
-        // Resolving against the stored offerer accepts both the offerer and their active burner key
-        if (offer.offerer != _resolveActor(offer.offerer)) revert Unauthorized();
+        if (offer.offerer != msg.sender) revert Unauthorized();
 
         uint256 unfilled = offer.remaining;
         uint256 refund = (offer.price * unfilled) / offer.amount;
@@ -250,8 +234,8 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
 
         (uint8 action, bytes memory params) = abi.decode(_data, (uint8, bytes));
 
-        // No _resolveActor on either path: burner sessions can't apply, because the tokens must
-        // come from whoever actually holds them and the token reports that holder as _sender.
+        // _sender over msg.sender on both paths, and it is the only place this contract credits
+        // anyone but its caller: here the caller IS the token, reporting who actually paid it.
         //
         // Already-funded: transferAndCall moves the tokens before invoking this callback, so the
         // make path skips the escrow pull and the fill path forwards instead of pulling.
@@ -299,23 +283,15 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
 
     // --- ADMIN CONFIGURATION ---
 
-    function pause() external onlyDirectAdmin {
+    function pause() external onlyAdmin {
         _pause();
     }
 
-    function unpause() external onlyDirectAdmin {
+    function unpause() external onlyAdmin {
         _unpause();
     }
 
-    function setTrustedForwarder(address _forwarder, bool _trusted) external onlyDirectAdmin {
-        if (_forwarder == address(0)) revert InvalidAddress();
-
-        trustedForwarders[_forwarder] = _trusted;
-
-        emit TrustedForwarderUpdated(_forwarder, _trusted);
-    }
-
-    function setOfferFeeBps(uint256 _offerFeeBps) external onlyDirectAdmin {
+    function setOfferFeeBps(uint256 _offerFeeBps) external onlyAdmin {
         if (_offerFeeBps > ABSOLUTE_MAX_OFFER_FEE_BPS) revert InvalidFeeBps();
 
         uint256 oldValue = offerFeeBps;
@@ -324,7 +300,7 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
         emit OfferFeeUpdated(oldValue, _offerFeeBps);
     }
 
-    function setErc677Token(address _token, bool _enabled) external onlyDirectAdmin {
+    function setErc677Token(address _token, bool _enabled) external onlyAdmin {
         if (_token == address(0)) revert InvalidAddress();
 
         erc677Tokens[_token] = _enabled;
@@ -332,7 +308,7 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
         emit Erc677TokenUpdated(_token, _enabled);
     }
 
-    function withdrawFees(address _token, address _receiver, bool _isLsp7) external onlyDirectAdmin nonReentrant {
+    function withdrawFees(address _token, address _receiver, bool _isLsp7) external onlyAdmin nonReentrant {
         if (_receiver == address(0)) revert InvalidAddress();
 
         uint256 amount = accruedFees[_token];
@@ -671,53 +647,6 @@ contract HupOffers is IHupOffers, Pausable, ReentrancyGuard, AccessControl, ERC2
 
         (bool success, ) = _to.call{value: _amount}("");
         if (!success) revert TransferFailed();
-    }
-
-    /**
-     * @dev Resolves the primary owner address based on burner session rules.
-     */
-    function _resolveActor(address _owner) internal view returns (address) {
-        address sender = _msgSender();
-
-        if (sender == address(0)) revert InvalidAddress();
-
-        if (_owner == address(0) || _owner == sender) {
-            return sender;
-        }
-
-        (address burnerKey, uint256 expiresAt) = hupContract.userSessions(_owner);
-        if (burnerKey != sender) revert Unauthorized();
-        if (block.timestamp >= expiresAt) revert SessionExpired();
-
-        return _owner;
-    }
-
-    /**
-     * @dev See EIP-2771. Returns true if the address is a trusted forwarder.
-     */
-    function isTrustedForwarder(address forwarder) public view override(ERC2771Context, IHupOffers) returns (bool) {
-        return trustedForwarders[forwarder];
-    }
-
-    /**
-     * @dev Returns the original signer of the transaction, supporting meta-transactions.
-     */
-    function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
-        return ERC2771Context._msgSender();
-    }
-
-    /**
-     * @dev Returns the input call data, supporting meta-transactions.
-     */
-    function _msgData() internal view override(Context, ERC2771Context) returns (bytes calldata) {
-        return ERC2771Context._msgData();
-    }
-
-    /**
-     * @dev Returns the context suffix length, supporting meta-transactions.
-     */
-    function _contextSuffixLength() internal view override(Context, ERC2771Context) returns (uint256) {
-        return ERC2771Context._contextSuffixLength();
     }
 
     receive() external payable {

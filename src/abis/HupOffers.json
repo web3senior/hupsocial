@@ -3,16 +3,6 @@
     "type": "constructor",
     "inputs": [
       {
-        "name": "_hupAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_trustedForwarder",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_admin",
         "type": "address",
         "internalType": "address"
@@ -119,11 +109,6 @@
     "type": "function",
     "name": "acceptOffer",
     "inputs": [
-      {
-        "name": "_seller",
-        "type": "address",
-        "internalType": "address"
-      },
       {
         "name": "_offerId",
         "type": "uint256",
@@ -396,19 +381,6 @@
   },
   {
     "type": "function",
-    "name": "hupContract",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IHup"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "isFillable",
     "inputs": [
       {
@@ -438,32 +410,8 @@
   },
   {
     "type": "function",
-    "name": "isTrustedForwarder",
-    "inputs": [
-      {
-        "name": "forwarder",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "makeOffer",
     "inputs": [
-      {
-        "name": "_offerer",
-        "type": "address",
-        "internalType": "address"
-      },
       {
         "name": "_collection",
         "type": "address",
@@ -663,62 +611,12 @@
   },
   {
     "type": "function",
-    "name": "setTrustedForwarder",
-    "inputs": [
-      {
-        "name": "_forwarder",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_trusted",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
         "name": "interfaceId",
         "type": "bytes4",
         "internalType": "bytes4"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "trustedForwarder",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "trustedForwarders",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [
@@ -1073,25 +971,6 @@
   },
   {
     "type": "event",
-    "name": "TrustedForwarderUpdated",
-    "inputs": [
-      {
-        "name": "forwarder",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "trusted",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "UnattributedDeposit",
     "inputs": [
       {
@@ -1301,11 +1180,6 @@
   {
     "type": "error",
     "name": "SelfOffer",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "SessionExpired",
     "inputs": []
   },
   {

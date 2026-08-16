@@ -215,12 +215,11 @@
           "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA", // canonical LSP26
         ],
       },
+      // One argument, deliberately: HupOffers takes no Hup core reference and no forwarder. It
+      // credits msg.sender and nothing else, so there is no address to point it at but the admin.
       HupOffers: {
-        4201: [
-          "0xb0b992E90e11b6bCE51cb5ea4de160D06098B955", // Hup core
-          "0xab100B28D06e93fF52DAE95DB8e90F83680671FC", // HupChatForwarder
-          "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
-        ],
+        42: ["0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // admin
+        4201: ["0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // admin
       },
     };
 

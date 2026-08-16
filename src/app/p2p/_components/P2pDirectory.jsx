@@ -221,7 +221,7 @@ function DealCard({ deal, chain, offersAddress, address, onSettled }) {
       abi: offersAbi,
       address: offersAddress,
       functionName: 'acceptOffer',
-      args: [address, BigInt(deal.offer_id), remaining],
+      args: [BigInt(deal.offer_id), remaining],
       chainId: chain.id,
       // Native assets deliver by value; every other standard must send zero
       ...(isNativeAsset ? { value: remaining } : {}),
@@ -420,7 +420,9 @@ export default function P2pDirectory() {
         <p className={styles.p2p__empty}>
           {view === 'past'
             ? `Nothing has settled or expired on ${chain?.name} yet.`
-            : `No open deals on ${chain?.name} yet — post the first one.`}
+            : address
+              ? `No open deals on ${chain?.name} yet — yours would be the first.`
+              : `No open deals on ${chain?.name} yet. Connect a wallet to post one.`}
         </p>
       ) : (
         <div className={styles.p2p__grid}>

@@ -260,7 +260,6 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
       address: offersAddress,
       functionName: 'makeOffer',
       args: [
-        address,
         // Fungible assets are identified by contract alone; native has no contract at all
         isNativeAsset ? zeroAddress : assetAddress,
         zeroHash,
