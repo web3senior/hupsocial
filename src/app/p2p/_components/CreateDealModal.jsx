@@ -311,7 +311,10 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
           <label htmlFor="dealAssetKind">You want to receive</label>
           <select id="dealAssetKind" value={assetKind} onChange={(e) => setAssetKind(e.target.value)}>
             <option value="token">A token</option>
-            <option value="native">{nativeCurrency?.name || 'Native coin'}</option>
+            {/* Name AND symbol, matching the payment select below: several chains name their
+                coin after themselves (LUKSO, Monad, Celo), so the name alone reads as a chain
+                picker rather than an asset one */}
+            <option value="native">{`${nativeCurrency?.name || 'Native'} (${nativeCurrency?.symbol || ''})`}</option>
           </select>
         </div>
 
