@@ -24,6 +24,8 @@ const EXPIRY_OPTIONS = [
 
 const computeExpiresAt = (seconds) => BigInt(Math.floor(Date.now() / 1000) + seconds)
 
+const LUKSO_CHAIN_IDS = [42, 4201]
+
 // Key still says otc- so drafts saved before the P2P rename still load. Drafts are keyed per chain: token addresses and curated payment options differ between
 // chains, so restoring one chain's half-typed deal onto another would hand back an address
 // that doesn't exist there. Same storage prefix the post composer's draft uses.
@@ -104,12 +106,19 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
     if (saved?.input) return { input: saved.input, address: saved.address ?? null, profile: null }
     return EMPTY_RECIPIENT
   })
+  const [customPayment, setCustomPayment] = useState(draft?.customPayment ?? '')
   const [expirySeconds, setExpirySeconds] = useState(draft?.expirySeconds ?? EXPIRY_OPTIONS[2].seconds)
-  const [tokenSearchResults, setTokenSearchResults] = useState([])
+  // Two independent result lists: both fields can be mid-search at once, and one field's
+  // results must never surface under the other
+  const [assetResults, setAssetResults] = useState([])
+  const [paymentResults, setPaymentResults] = useState([])
 
   const chainId = chain.id
   const nativeCurrency = chain.nativeCurrency
   const curatedTokens = TIP_TOKENS[chainId] ?? []
+  // LSP7 only exists on LUKSO, so offering it as a payment standard anywhere else would just
+  // be a way to post a deal nobody can fund
+  const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
 
   const isNativeAsset = assetKind === 'native'
   const trimmedAsset = assetToken.trim()
@@ -146,7 +155,7 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
     let cancelled = false
     const timeout = setTimeout(() => {
       searchTokens(chainId, trimmedAsset).then((results) => {
-        if (!cancelled) setTokenSearchResults(results)
+        if (!cancelled) setAssetResults(results)
       })
     }, 350)
 
@@ -158,11 +167,11 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
 
   // Derived at render rather than cleared from the effect, so picking a result or switching to
   // the native coin hides the list immediately instead of one debounce later
-  const tokenResults = !isNativeAsset && !isAddress(trimmedAsset) && trimmedAsset.length >= 2 ? tokenSearchResults : []
+  const assetSuggestions = !isNativeAsset && !isAddress(trimmedAsset) && trimmedAsset.length >= 2 ? assetResults : []
 
   const handleSelectToken = (result) => {
     setAssetToken(result.address)
-    setTokenSearchResults([])
+    setAssetResults([])
   }
 
   const isStandardKnown = isNativeAsset || isLsp7Asset || isErc20Asset
@@ -173,9 +182,46 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
   const listedToken = paymentChoice.startsWith('token:')
     ? curatedTokens.find((t) => t.address === paymentChoice.slice('token:'.length))
     : null
-  const paymentAddress = listedToken?.address ?? null
-  const isPaymentLsp7 = Boolean(listedToken?.lsp7)
+  // The curated list is a shortcut, not the boundary — the contract escrows any ERC20 or LSP7,
+  // so paying with a token nobody curated (selling your own LSP7 for the native coin, say) is
+  // a matter of naming it. Unlike the asset side the standard is chosen rather than probed:
+  // the offerer already knows what they hold, and the escrow pull happens in the same
+  // transaction, so a wrong answer fails immediately instead of posting an unfillable deal.
+  const isCustomPayment = paymentChoice === 'custom-erc20' || paymentChoice === 'custom-lsp7'
+  const trimmedCustomPayment = customPayment.trim()
+  const paymentAddress = listedToken?.address ?? (isCustomPayment && isAddress(trimmedCustomPayment) ? trimmedCustomPayment : null)
+  const isPaymentLsp7 = paymentChoice === 'custom-lsp7' || Boolean(listedToken?.lsp7)
   const payment = useTokenMeta({ chainId, token: paymentAddress, isLsp7: isPaymentLsp7, nativeCurrency })
+
+  // Same search for the payment side, so the token you pay with is as findable as the one you
+  // want. Only the custom options search — a curated pick is already an address. Declared here
+  // rather than beside the asset search because it reads the derivations just above it.
+  useEffect(() => {
+    if (!isCustomPayment || isAddress(trimmedCustomPayment) || trimmedCustomPayment.length < 2) return
+
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      searchTokens(chainId, trimmedCustomPayment).then((results) => {
+        if (!cancelled) setPaymentResults(results)
+      })
+    }, 350)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [isCustomPayment, trimmedCustomPayment, chainId])
+
+  const paymentSuggestions =
+    isCustomPayment && !isAddress(trimmedCustomPayment) && trimmedCustomPayment.length >= 2 ? paymentResults : []
+
+  // The picked result knows its own standard, so choosing from search also corrects a
+  // mismatched ERC20/LSP7 selection rather than leaving it to fail at the approve step
+  const handleSelectPayment = (result) => {
+    setPaymentChoice(result.isLsp7 ? 'custom-lsp7' : 'custom-erc20')
+    setCustomPayment(result.address)
+    setPaymentResults([])
+  }
 
   // The asset and the payment can't be the same thing — the contract rejects it, and offering
   // a token for itself is meaningless anyway
@@ -246,6 +292,7 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
           assetToken,
           assetAmount,
           paymentChoice,
+          customPayment,
           price,
           counterparty: { input: counterparty.input, address: counterparty.address },
           expirySeconds,
@@ -254,7 +301,7 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
     } catch (error) {
       console.error('Failed to save OTC draft:', error)
     }
-  }, [chainId, assetKind, assetToken, assetAmount, paymentChoice, price, counterparty, expirySeconds])
+  }, [chainId, assetKind, assetToken, assetAmount, paymentChoice, customPayment, price, counterparty, expirySeconds])
 
   useEffect(() => {
     if (!submitError) return
@@ -334,7 +381,11 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
   // dead with nothing on screen saying why — so each one now names itself.
   const blocker = (() => {
     if (!address) return 'Connect your wallet to post a deal'
-    if (!isNativeAsset && !assetAddress) return 'Enter the contract address of the token you want'
+    if (!isNativeAsset && !assetAddress) return 'Search for the token you want, or paste its address'
+    if (isCustomPayment && !paymentAddress) return "Search for the token you'll pay with, or paste its address"
+    if (isCustomPayment && payment.isError) {
+      return `No decimals() at that payment address on ${chain.name} — check the address, and that it is the standard you picked`
+    }
     if (!isNativeAsset && asset.isError) {
       return `No decimals() at that address on ${chain.name} — it may be an NFT collection, not a token, or deployed on a different chain`
     }
@@ -383,10 +434,10 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
               autoComplete="off"
               spellCheck={false}
             />
-            {tokenResults.length > 0 && (
+            {assetSuggestions.length > 0 && (
               <>
                 <ul className={styles.deal__tokenResults}>
-                  {tokenResults.map((result) => {
+                  {assetSuggestions.map((result) => {
                     const popularity = formatTokenPopularity(result)
                     return (
                       <li key={result.address}>
@@ -448,8 +499,59 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
                 {token.symbol}
               </option>
             ))}
+            <option value="custom-erc20">Another token (ERC20)</option>
+            {isLukso && <option value="custom-lsp7">Another token (LSP7)</option>}
           </select>
         </div>
+
+        {isCustomPayment && (
+          <div className={clsx(styles.deal__field, styles.deal__tokenSearch)}>
+            <label htmlFor="dealCustomPayment">Search token or paste address</label>
+            <input
+              type="text"
+              id="dealCustomPayment"
+              value={customPayment}
+              onChange={(e) => setCustomPayment(e.target.value)}
+              placeholder="Token name or 0x..."
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {paymentSuggestions.length > 0 && (
+              <>
+                <ul className={styles.deal__tokenResults}>
+                  {paymentSuggestions.map((result) => {
+                    const popularity = formatTokenPopularity(result)
+                    return (
+                      <li key={result.address}>
+                        <button type="button" onClick={() => handleSelectPayment(result)}>
+                          <span className={styles.deal__tokenResultMain}>
+                            <span className={styles.deal__tokenResultSymbol}>{result.symbol}</span>
+                            {result.name && <span className={styles.deal__tokenResultName}>{result.name}</span>}
+                          </span>
+                          <span className={styles.deal__tokenResultMeta}>
+                            <span className={styles.deal__tokenResultAddress}>
+                              {result.address.slice(0, 6)}…{result.address.slice(-4)}
+                            </span>
+                            {popularity && <span className={styles.deal__tokenResultPopularity}>{popularity}</span>}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className={styles.deal__tokenWarning} role="alert">
+                  Anyone can create a token with any name — check the contract address before posting.
+                </p>
+              </>
+            )}
+            {paymentAddress && payment.isResolved && (
+              <p className={styles.deal__note}>
+                {payment.symbol ? `${payment.symbol} · ` : ''}
+                {isPaymentLsp7 ? 'LSP7' : 'ERC20'} · {payment.decimals} decimals
+              </p>
+            )}
+          </div>
+        )}
 
         <div className={styles.deal__field}>
           <label htmlFor="dealPrice">Total price (escrowed now)</label>
