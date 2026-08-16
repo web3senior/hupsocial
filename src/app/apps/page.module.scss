@@ -553,6 +553,25 @@
     }
   }
 
+  /* Owner-only, beside Edit — quiet until hovered, then unmistakably destructive */
+  &__delist {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--red-500, #ef4444);
+      color: var(--red-500, #ef4444);
+    }
+  }
+
   /* Owner-only, sits beside Open in the footer */
   &__edit {
     display: flex;

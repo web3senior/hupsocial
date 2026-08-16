@@ -21,9 +21,11 @@ import {
   SealCheckIcon,
   SquaresFourIcon,
   StarIcon,
+  TrashSimpleIcon,
 } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import ListAppDialog from '@/components/ListAppDialog'
+import DelistAppDialog from '@/components/DelistAppDialog'
 import AppModerationBar from '@/components/AppModerationBar'
 import { useAppsModerator } from '@/hooks/useAppsModerator'
 import clsx from 'clsx'
@@ -52,13 +54,19 @@ export default function AppsPage() {
 
   const listDialogRef = useRef(null)
   const editDialogRef = useRef(null)
+  const delistDialogRef = useRef(null)
   const [editingApp, setEditingApp] = useState(null)
+  const [delistingApp, setDelistingApp] = useState(null)
   const [showHidden, setShowHidden] = useState(false)
 
   // The edit dialog mounts on demand, so it can only be shown after the render that creates it
   useEffect(() => {
     if (editingApp) editDialogRef.current?.open()
   }, [editingApp])
+
+  useEffect(() => {
+    if (delistingApp) delistDialogRef.current?.open()
+  }, [delistingApp])
 
   // Hidden listings are only reachable through a moderator's own view — otherwise hiding would
   // be a one-way door, since a hidden card takes its moderation controls with it
@@ -200,7 +208,7 @@ export default function AppsPage() {
           ) : (
             <ul className={styles.grid}>
               {filteredApps.map((app) => (
-                <AppCard key={app.id} app={app} onChanged={() => mutate()} onEdit={setEditingApp} />
+                <AppCard key={app.id} app={app} onChanged={() => mutate()} onEdit={setEditingApp} onDelist={setDelistingApp} />
               ))}
             </ul>
           )}
@@ -221,6 +229,16 @@ export default function AppsPage() {
             setEditingApp(null)
             mutate()
           }}
+        />
+      )}
+
+      {/* Unmounts on close (onClosed), so re-delisting the same app always remounts it fresh */}
+      {delistingApp && (
+        <DelistAppDialog
+          ref={delistDialogRef}
+          app={delistingApp}
+          onClosed={() => setDelistingApp(null)}
+          onDelisted={() => mutate()}
         />
       )}
     </>
@@ -379,7 +397,7 @@ function BuildSection() {
   )
 }
 
-function AppCard({ app, onChanged, onEdit }) {
+function AppCard({ app, onChanged, onEdit, onDelist }) {
   const { address } = useConnection()
   // Ownership comes from the indexed onchain owner; the contract re-checks it on updateApp
   // anyway, so a stale row can only show a button that reverts, never a working exploit
@@ -446,6 +464,18 @@ function AppCard({ app, onChanged, onEdit }) {
           >
             <PencilSimpleIcon size={13} aria-hidden="true" />
             <span>Edit</span>
+          </button>
+        )}
+
+        {isOwner && (
+          <button
+            type="button"
+            className={clsx(styles.card__delist, 'rounded-full')}
+            onClick={() => onDelist(app)}
+            title="Delist — permanently remove this listing from the directory"
+            aria-label={`Delist ${app.name}`}
+          >
+            <TrashSimpleIcon size={13} aria-hidden="true" />
           </button>
         )}
       </div>
