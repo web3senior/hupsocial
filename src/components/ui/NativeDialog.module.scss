@@ -23,12 +23,14 @@
     transform: none;
   }
 
-  // The blur is at full strength from the first frame. Ramping it 0→2px re-softens
-  // every edge behind the dialog for the length of the transition, and that reads as
-  // the page moving even though nothing behind the dialog changes position.
+  // Dim only — deliberately NO backdrop-filter. A filtered backdrop is clipped to its
+  // Backdrop Root (the nearest ancestor that isolates a group), and every page in the app
+  // renders inside a `.page__container` carrying `isolation: isolate`. The blur AND the dim
+  // then landed on that card alone: sidebar and header stayed bright while the page behind
+  // the dialog went soft, and the clipped region snapped back on close. A plain color has no
+  // backdrop root, so it covers the whole viewport from whatever depth the dialog is opened.
   &::backdrop {
     background: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(2px);
     transition:
       background 0.18s ease,
       overlay 0.18s ease allow-discrete,
@@ -36,7 +38,7 @@
   }
 
   &[open]::backdrop {
-    background: rgba(0, 0, 0, 0.36);
+    background: rgba(0, 0, 0, 0.45);
   }
 }
 

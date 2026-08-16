@@ -115,6 +115,18 @@ function computePosition(triggerRect, pw, ph, placement) {
  */
 export function anchorElement(panelEl, triggerEl, placement) {
   if (!panelEl || !triggerEl) return
+  // Measure from a clean slate. With auto insets (first open) or the previous open's
+  // stale coords (reopens), a shrink-to-fit panel sizes against whatever space that
+  // position happens to leave — inside a dialog that can be a fraction of its
+  // max-width — and the box measured below then rewraps once the real coords land,
+  // leaving the panel anchored to a phantom size that drifts further every reopen.
+  // Both callers keep the panel visibility:hidden through this, so the hop to the
+  // origin never paints.
+  panelEl.style.position = 'fixed'
+  panelEl.style.top = '0px'
+  panelEl.style.left = '0px'
+  panelEl.style.bottom = 'auto'
+  panelEl.style.right = 'auto'
   const rect = triggerEl.getBoundingClientRect()
   const anchored = placement !== 'center' && !placement.endsWith('-corner')
   const { placement: resolvedPlacement, ...pos } = computePosition(rect, panelEl.offsetWidth, panelEl.offsetHeight, placement)

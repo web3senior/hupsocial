@@ -32,13 +32,13 @@
     translate: -50% -50%;
   }
 
-  // Backdrop for center + corner placements. The blur is at full strength from the
-  // first frame — ramping it 0→2px re-softens every edge behind the panel for the
-  // length of the transition, which looks like the page settling into a new position.
+  // Backdrop for center + corner placements. Dim only, for the same reason NativeDialog
+  // carries no backdrop-filter: a filtered backdrop is clipped to its Backdrop Root, and
+  // the app's `.page__container` isolates one on every page — the dim then covered that
+  // card instead of the viewport.
   &[data-placement='center']::backdrop,
   &[data-placement$='-corner']::backdrop {
     background: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(2px);
     transition:
       background 0.18s ease,
       overlay 0.18s ease allow-discrete,
@@ -47,7 +47,7 @@
 
   &[data-placement='center']:global(:popover-open)::backdrop,
   &[data-placement$='-corner']:global(:popover-open)::backdrop {
-    background: rgba(0, 0, 0, 0.36);
+    background: rgba(0, 0, 0, 0.45);
   }
 }
 

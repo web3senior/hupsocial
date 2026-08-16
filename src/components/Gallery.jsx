@@ -5,6 +5,7 @@ import useEmblaCarousel from 'embla-carousel-react'
 import { ArrowLeftIcon, ArrowRightIcon, PauseIcon, PlayIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
 import useMediaZoom from '@/hooks/useMediaZoom'
+import { lockPageScroll, unlockPageScroll } from '@/lib/scrollLock'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 
 // Reserve the media's natural ratio so the whole image is always visible
@@ -251,23 +252,13 @@ export default function MediaGallery({ data = [] }) {
     setRevealedItems((prev) => ({ ...prev, [index]: true }))
   }
 
-  // Lock the page scroller while the lightbox is open. The page scrolls on
-  // <html> (Globals.scss sets `overflow: hidden scroll`), so body overflow has
-  // no effect. Padding compensates for the hidden scrollbar to avoid layout
-  // shift, and restore uses behavior:'instant' to bypass the global
-  // scroll-behavior:smooth so the position snaps back exactly where it was.
+  // Lock the page scroller while the lightbox is open. Shared with every modal through
+  // lib/scrollLock.js — it is refcounted, so a lightbox opened from inside a dialog
+  // doesn't unlock the page out from under the dialog on close.
   useEffect(() => {
     if (!isLightboxOpen) return
-    const html = document.documentElement
-    const scrollY = window.scrollY
-    const scrollbarWidth = window.innerWidth - html.clientWidth
-    html.style.overflowY = 'hidden'
-    html.style.paddingRight = `${scrollbarWidth}px`
-    return () => {
-      html.style.overflowY = ''
-      html.style.paddingRight = ''
-      window.scrollTo({ top: scrollY, left: 0, behavior: 'instant' })
-    }
+    lockPageScroll()
+    return unlockPageScroll
   }, [isLightboxOpen])
 
   const openLightbox = (index) => {
