@@ -282,7 +282,7 @@ export const CONTRACTS = {
     offers: '',
     events: '0x735A8352036B953F8AC0Ae421DaEf8f2978EcC91',
     predict: '0x08c4631B621959468770c3C9831E867aF9014780',
-    apps: '',
+    apps: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     drops: '',
     launch: '',
     // Robinhood Chain has only a Uniswap V4 stack — no official v3 deployment. Addresses
