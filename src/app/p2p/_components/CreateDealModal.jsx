@@ -5,9 +5,12 @@ import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteC
 import { erc20Abi, isAddress, parseUnits, zeroAddress, zeroHash } from 'viem'
 import clsx from 'clsx'
 import { TIP_TOKENS } from '@/lib/tokens'
+import { formatTokenPopularity, searchTokens } from '@/lib/tokenSearch'
+import { EMPTY_RECIPIENT, recipientFromInput } from '@/lib/recipientSearch'
 import offersAbi from '@/abis/HupOffers.json'
 import { toast } from '@/components/NextToast'
 import NativeDialog from '@/components/ui/NativeDialog'
+import RecipientField from '@/components/ui/RecipientField'
 import useTokenMeta from './useTokenMeta'
 import { STANDARD_ERC20, STANDARD_LSP7, STANDARD_NATIVE } from './P2pDirectory'
 import styles from './CreateDealModal.module.scss'
@@ -92,8 +95,17 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
   // What you'll pay for it
   const [paymentChoice, setPaymentChoice] = useState(draft?.paymentChoice ?? 'native')
   const [price, setPrice] = useState(draft?.price ?? '')
-  const [counterparty, setCounterparty] = useState(draft?.counterparty ?? '')
+  // Drafts saved before this field became a RecipientField stored a bare address string, so
+  // both shapes have to load. The newer one keeps the address a name already resolved to,
+  // rather than making a restored draft re-resolve it.
+  const [counterparty, setCounterparty] = useState(() => {
+    const saved = draft?.counterparty
+    if (typeof saved === 'string') return recipientFromInput(saved)
+    if (saved?.input) return { input: saved.input, address: saved.address ?? null, profile: null }
+    return EMPTY_RECIPIENT
+  })
   const [expirySeconds, setExpirySeconds] = useState(draft?.expirySeconds ?? EXPIRY_OPTIONS[2].seconds)
+  const [tokenSearchResults, setTokenSearchResults] = useState([])
 
   const chainId = chain.id
   const nativeCurrency = chain.nativeCurrency
@@ -125,6 +137,34 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
     query: { enabled: Boolean(assetAddress) },
   })
 
+  // Debounced name search for the asset field, same shape as OfferModal's payment-token
+  // search. A pasted address never triggers it (isAddress short-circuits), so the paste path
+  // stays exactly as fast as it was before the field learned to search.
+  useEffect(() => {
+    if (isNativeAsset || isAddress(trimmedAsset) || trimmedAsset.length < 2) return
+
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      searchTokens(chainId, trimmedAsset).then((results) => {
+        if (!cancelled) setTokenSearchResults(results)
+      })
+    }, 350)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [isNativeAsset, trimmedAsset, chainId])
+
+  // Derived at render rather than cleared from the effect, so picking a result or switching to
+  // the native coin hides the list immediately instead of one debounce later
+  const tokenResults = !isNativeAsset && !isAddress(trimmedAsset) && trimmedAsset.length >= 2 ? tokenSearchResults : []
+
+  const handleSelectToken = (result) => {
+    setAssetToken(result.address)
+    setTokenSearchResults([])
+  }
+
   const isStandardKnown = isNativeAsset || isLsp7Asset || isErc20Asset
   const asset = useTokenMeta({ chainId, token: assetAddress, isLsp7: isLsp7Asset, nativeCurrency })
   const assetStandard = isNativeAsset ? STANDARD_NATIVE : isLsp7Asset ? STANDARD_LSP7 : STANDARD_ERC20
@@ -154,10 +194,13 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
 
   const amountUnits = toUnits(assetAmount, isNativeAsset ? (nativeCurrency?.decimals ?? 18) : asset.decimals)
   const priceUnits = toUnits(price, isTokenPayment ? payment.decimals : (nativeCurrency?.decimals ?? 18))
-  const trimmedCounterparty = counterparty.trim()
-  const counterpartyArg = trimmedCounterparty ? trimmedCounterparty : zeroAddress
-  const isCounterpartyValid = !trimmedCounterparty || isAddress(trimmedCounterparty)
-  const isSelfLock = trimmedCounterparty && address && trimmedCounterparty.toLowerCase() === address.toLowerCase()
+  // RecipientField resolves a name, ENS or pasted address down to `.address`; anything it
+  // could not resolve leaves that null while `.input` still holds what was typed, which is
+  // exactly the difference between "empty, so open deal" and "typed something unresolvable"
+  const typedCounterparty = counterparty.input.trim()
+  const counterpartyArg = counterparty.address ?? zeroAddress
+  const isCounterpartyValid = !typedCounterparty || Boolean(counterparty.address)
+  const isSelfLock = counterparty.address && address && counterparty.address.toLowerCase() === address.toLowerCase()
 
   // Escrow is pulled from the payment token, so a token-denominated deal needs an allowance
   const { data: erc20Allowance, refetch: refetchErc20 } = useReadContract({
@@ -196,7 +239,17 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
     try {
       localStorage.setItem(
         getDraftKey(chainId),
-        JSON.stringify({ assetKind, assetToken, assetAmount, paymentChoice, price, counterparty, expirySeconds })
+        // Only the typed text and what it resolved to — the profile behind it carries an
+        // avatar URL and follower counts that would bloat the draft and go stale anyway
+        JSON.stringify({
+          assetKind,
+          assetToken,
+          assetAmount,
+          paymentChoice,
+          price,
+          counterparty: { input: counterparty.input, address: counterparty.address },
+          expirySeconds,
+        })
       )
     } catch (error) {
       console.error('Failed to save OTC draft:', error)
@@ -290,7 +343,7 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
     if (isSameToken) return 'The asset and the payment must be different'
     if (amountUnits === null) return 'Enter how much you want to receive'
     if (priceUnits === null) return `Enter the price you'll pay`
-    if (!isCounterpartyValid) return 'That counterparty address is not valid'
+    if (!isCounterpartyValid) return `No wallet found for "${typedCounterparty}" — pick one from the list or paste an address`
     if (isSelfLock) return 'A deal cannot be locked to yourself'
     return null
   })()
@@ -319,17 +372,45 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
         </div>
 
         {!isNativeAsset && (
-          <div className={styles.deal__field}>
-            <label htmlFor="dealAssetToken">Token address</label>
+          <div className={clsx(styles.deal__field, styles.deal__tokenSearch)}>
+            <label htmlFor="dealAssetToken">Search token or paste address</label>
             <input
               type="text"
               id="dealAssetToken"
               value={assetToken}
               onChange={(e) => setAssetToken(e.target.value)}
-              placeholder="0x..."
+              placeholder="Token name or 0x..."
               autoComplete="off"
               spellCheck={false}
             />
+            {tokenResults.length > 0 && (
+              <>
+                <ul className={styles.deal__tokenResults}>
+                  {tokenResults.map((result) => {
+                    const popularity = formatTokenPopularity(result)
+                    return (
+                      <li key={result.address}>
+                        <button type="button" onClick={() => handleSelectToken(result)}>
+                          <span className={styles.deal__tokenResultMain}>
+                            <span className={styles.deal__tokenResultSymbol}>{result.symbol}</span>
+                            {result.name && <span className={styles.deal__tokenResultName}>{result.name}</span>}
+                          </span>
+                          <span className={styles.deal__tokenResultMeta}>
+                            <span className={styles.deal__tokenResultAddress}>
+                              {result.address.slice(0, 6)}…{result.address.slice(-4)}
+                            </span>
+                            {popularity && <span className={styles.deal__tokenResultPopularity}>{popularity}</span>}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className={styles.deal__tokenWarning} role="alert">
+                  Anyone can create a token with any name — check the contract address before posting.
+                </p>
+              </>
+            )}
             {/* Says outright which standard the deal will be posted as — it decides how the
                 asset is delivered, so it shouldn't be invisible */}
             {assetAddress && asset.isResolved && isStandardKnown && (
@@ -387,22 +468,18 @@ export default function CreateDealModal({ chain, offersAddress, onClose, onCreat
           </div>
         </div>
 
-        <div className={styles.deal__field}>
-          <label htmlFor="dealCounterparty">Lock to one wallet (optional)</label>
-          <input
-            type="text"
-            id="dealCounterparty"
-            value={counterparty}
-            onChange={(e) => setCounterparty(e.target.value)}
-            placeholder="0x... — leave empty for an open deal"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <p className={styles.deal__note}>
-            A locked deal can only be filled by that address, so a price agreed privately settles at that price and nobody else can take it
-            first.
-          </p>
-        </div>
+        {/* Same people-picker as every other recipient field in the app: a name, an ENS name
+            or a pasted address all resolve here, and the wallet you're posting from is excluded
+            because the contract rejects a deal locked to yourself */}
+        <RecipientField
+          label="Lock to one wallet (optional)"
+          value={counterparty}
+          onChange={setCounterparty}
+          viewer={address ?? null}
+          exclude={address ? [address] : []}
+          className={styles.deal__field}
+          hint="A locked deal can only be filled by that wallet, so a price agreed privately settles at that price and nobody else can take it first. Leave it empty for an open deal."
+        />
 
         <div className={styles.deal__field}>
           <label htmlFor="dealExpiry">Expires</label>

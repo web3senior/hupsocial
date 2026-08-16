@@ -8,7 +8,7 @@
 // index covers the major EVM chains well). Chains neither source covers return no results —
 // callers keep the manual paste-an-address field as the fallback.
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // GeckoTerminal network slugs for the chains Hup runs on that it actually indexes.
 // Monad and Robinhood aren't covered (too new/niche) — searchTokens returns [] for them.
@@ -110,6 +110,23 @@ async function searchGeckoTerminalTokens(chainId, query) {
   }
 
   return [...seen.values()].sort((a, b) => b.liquidityUsd - a.liquidityUsd).slice(0, MAX_RESULTS)
+}
+
+const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+/**
+ * Popularity line for a search result — the signal that separates the real token from
+ * same-name copycats (LUKSO returns holder counts, GeckoTerminal pool liquidity). Lives here
+ * rather than in each caller because it formats this module's own result shape.
+ * @param {{holderCount: number|null, liquidityUsd: number|null}} result
+ * @returns {string|null} Null when neither source reported anything to show.
+ */
+export const formatTokenPopularity = (result) => {
+  if (result.holderCount !== null && result.holderCount !== undefined) {
+    return `${compactNumber.format(result.holderCount)} ${result.holderCount === 1 ? 'holder' : 'holders'}`
+  }
+  if (result.liquidityUsd) return `$${compactNumber.format(result.liquidityUsd)} liquidity`
+  return null
 }
 
 /**
