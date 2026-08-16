@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { erc20Abi, formatEther, formatUnits, isAddress, parseEther, parseUnits, zeroAddress } from 'viem'
-import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia } from 'wagmi/chains'
+import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia } from 'wagmi/chains'
 import { useConnection, usePublicClient, useReadContract, useSignMessage, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { USDC } from '@/lib/tokens'
@@ -23,8 +23,8 @@ const MAX_FILES = 5
 const MAX_LINKS = 5
 const BUYERS_PAGE_SIZE = 5
 const FEE_DENOMINATOR = 10_000 // matches HupBazaar.sol's FEE_DENOMINATOR constant (buyFeeBps is in basis points)
-const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia]
-const LUKSO_CHAIN_IDS = [42, 4201]
+const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia]
+const LUKSO_CHAIN_IDS = [42]
 
 // Reconstructs a File from the base64 payload decrypt returns, so previously uploaded content
 // can be dropped straight back into the same file-picker state used for new uploads.

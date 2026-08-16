@@ -58,7 +58,7 @@ export default function RevealGatedContent({ item, cid }) {
       const message = `Reveal gated content for post ${item.id}\nTimestamp: ${timestamp}`
       const signature = await signMessageAsync({ message })
 
-      const isLukso = Number(item.network_id) === 42 || Number(item.network_id) === 4201
+      const isLukso = Number(item.network_id) === 42
 
       const res = await fetch('/api/store/decrypt', {
         method: 'POST',

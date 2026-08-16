@@ -17,7 +17,7 @@
 
 import { pad, toHex } from 'viem'
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // A gallery, not an inventory export. Kept low deliberately: NFT artwork is frequently huge
 // (ORBS ships a 4.9MB animated GIF per token), so a big grid is megabytes of download before

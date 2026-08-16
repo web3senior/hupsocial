@@ -11,7 +11,7 @@ import { toast } from '@/components/NextToast'
 import NativeDialog from './ui/NativeDialog'
 import styles from './EditListingModal.module.scss'
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // Listing terms live onchain; HupTrade caps the referral share at 50% (MAX_REFERRAL_BPS)
 const MAX_REFERRAL_PERCENT = 50

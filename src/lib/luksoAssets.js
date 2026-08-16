@@ -13,7 +13,7 @@
  * needs no follow-up onchain reads at all.
  */
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // One row per token held; a wallet with more distinct tokens than this is vanishingly rare and
 // the tail would be dust anyway

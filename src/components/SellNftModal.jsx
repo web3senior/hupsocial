@@ -28,7 +28,7 @@ import NativeDialog from './ui/NativeDialog'
 import NativePopover from './ui/NativePopover'
 import styles from './SellNftModal.module.scss'
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // A listing can only settle where HupTrade is deployed — the network picker offers nothing else
 const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)

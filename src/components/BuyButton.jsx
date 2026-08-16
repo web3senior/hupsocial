@@ -1,7 +1,7 @@
 'use client'
 
 import { erc20Abi, formatEther, formatUnits, zeroAddress } from 'viem'
-import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia } from 'wagmi/chains'
+import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia } from 'wagmi/chains'
 import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { useEffect, useRef, useState } from 'react'
 import { CONTRACTS } from '@/config/wagmi'
@@ -13,7 +13,7 @@ import { SparkleIcon, TrendUpIcon } from '@phosphor-icons/react'
 import RevealGatedContent from './RevealGatedContent'
 import styles from './BuyButton.module.scss'
 
-const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, lineaSepolia]
+const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia]
 
 // Compact ("1.2K") for large amounts, but sub-1 amounts keep their significant digits —
 // compact's 2-fraction-digit rounding would collapse e.g. 0.00005 ETH raised to "0 ETH".

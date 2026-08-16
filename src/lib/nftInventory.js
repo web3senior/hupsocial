@@ -11,7 +11,7 @@
  * (see useOwnedTokenIds); callers there suggest collections and probe them instead of scanning.
  */
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // Holds are one row per token, so a whale in a big collection can return a lot of them. The cap
 // is about the collection rollup below staying cheap, not about listing every token.

@@ -31,7 +31,7 @@ const formatTokenPopularity = (result) => {
   return null
 }
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // LSP7 has no symbol() — LSP4 metadata lives in ERC725Y storage, read via getData
 // with the keccak256('LSP4TokenSymbol') data key

@@ -216,7 +216,7 @@ export default function ActivityFeed() {
 
     // Universal Profiles sign through the account contract, so the route needs the UP address to
     // run the ERC-1271 check instead of a plain EOA recovery.
-    const isLukso = chain?.id === 42 || chain?.id === 4201
+    const isLukso = chain?.id === 42
     const body = { mark_all: true, message, signature, ...(isLukso && { up_address: address }) }
 
     try {

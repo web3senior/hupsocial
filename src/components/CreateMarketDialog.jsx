@@ -19,7 +19,7 @@ import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
 import NetworkSelect from '@/components/ui/NetworkSelect'
 import styles from './CreateMarketDialog.module.scss'
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 const MAX_OUTCOMES = 16
 const MAX_JUDGES = 8
 
