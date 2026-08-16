@@ -151,8 +151,10 @@ const escapeEditorHtml = (text) =>
 // rather than turning into markup on every edit.
 const markdownToEditorHtml = (text) => {
   if (!text) return ''
+  // CR-aware split: pasted Windows text saved "\r\n" into old drafts, and a lone \r
+  // in innerHTML gets parser-normalized into a newline — doubling every break
   return text
-    .split('\n')
+    .split(/\r\n|[\r\n]/)
     .map((line) =>
       escapeEditorHtml(line)
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -173,8 +175,9 @@ const editorToMarkdown = (editor) => {
 
   const lines = ['']
   const appendText = (text) => {
-    // A pre-wrap editor also receives literal newlines from the browser's Enter handling
-    const parts = text.split('\n')
+    // A pre-wrap editor also receives literal newlines from the browser's Enter
+    // handling, and pasted Windows clipboard text arrives with \r\n line endings
+    const parts = text.split(/\r\n|[\r\n]/)
     lines[lines.length - 1] += parts[0]
     for (let index = 1; index < parts.length; index += 1) lines.push(parts[index])
   }
