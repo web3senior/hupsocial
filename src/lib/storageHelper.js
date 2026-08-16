@@ -55,8 +55,9 @@ export const resolveIPFSUrl = (ipfsUrl) => {
  * Only use for images — video/audio should resolve via resolveIPFSUrl to keep
  * native gateway streaming.
  * @param {string} ipfsUrl - The IPFS URL or raw CID.
- * @param {{ width?: number, quality?: number, still?: boolean }} [options] - Optional resize width,
- * WebP quality (1-100), and still (first-frame-only, skips animated encoding — for thumbnails).
+ * @param {{ width?: number, quality?: number, still?: boolean, format?: 'webp'|'jpeg' }} [options] - Optional
+ * resize width, quality (1-100), still (first-frame-only, skips animated encoding — for thumbnails), and
+ * format ('jpeg' for social crawlers that mishandle WebP; defaults to WebP).
  * @returns {string|null} The API proxy endpoint URL, or null if invalid.
  */
 export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
@@ -70,6 +71,7 @@ export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
   if (options.width) params.set('w', String(options.width))
   if (options.quality) params.set('q', String(options.quality))
   if (options.still) params.set('still', '1')
+  if (options.format === 'jpeg') params.set('fmt', 'jpeg')
 
   return `/api/ipfs/file?${params.toString()}`
 }
@@ -131,8 +133,9 @@ export const resolveStorageUrl = (src) => {
  * Only use for images; video/audio must resolve via resolveStorageUrl to keep
  * native gateway streaming.
  * @param {string} src - The raw input string (IPFS CID, 0G Hash, Custom URI, or HTTP URL).
- * @param {{ width?: number, quality?: number, still?: boolean }} [options] - Optional resize width,
- * WebP quality (1-100), and still (first-frame-only, skips animated encoding — for thumbnails).
+ * @param {{ width?: number, quality?: number, still?: boolean, format?: 'webp'|'jpeg' }} [options] - Optional
+ * resize width, quality (1-100), still (first-frame-only, skips animated encoding — for thumbnails), and
+ * format ('jpeg' for social crawlers that mishandle WebP; defaults to WebP).
  * @returns {string|null} The fully resolved target URL string.
  */
 export const resolveStorageImageUrl = (src, options = {}) => {
@@ -151,6 +154,7 @@ export const resolveStorageImageUrl = (src, options = {}) => {
     if (options.width) params.push(`w=${options.width}`)
     if (options.quality) params.push(`q=${options.quality}`)
     if (options.still) params.push('still=1')
+    if (options.format === 'jpeg') params.push('fmt=jpeg')
     return params.length ? `${base}&${params.join('&')}` : base
   }
 
