@@ -116,8 +116,6 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   })
-  const [repostedPost, setRepostedPost] = useState(null)
-  const [isLoadingRepost, setIsLoadingRepost] = useState(false)
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   // Flagged posts are never withheld — the content still renders, blurred behind a veil until
   // the viewer opts in. Revealing is per-post and resets on remount.
@@ -129,37 +127,24 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const [showReportModal, setShowReportModal] = useState(null)
   const sectionRef = useRef(null)
 
-  // Fetch the original post data if this item is a repost
-  useEffect(() => {
-    let cancelled = false
-
-    if (!isRepost || !repostedPostId) {
-      setRepostedPost(null)
-      return
-    }
-
-    setIsLoadingRepost(true)
-
-    getPostById(item.network_id, repostedPostId, address)
-      .then((res) => {
-        if (cancelled) return
-
-        const post = Array.isArray(res?.data) ? res.data[0] : res?.data
-
-        setRepostedPost(post || null)
-        setIsLoadingRepost(false)
-      })
-      .catch(() => {
-        if (!cancelled) setRepostedPost(null)
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingRepost(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [isRepost, repostedPostId, item.network_id, address])
+  // Original post behind a repost row, fetched under the same SWR key the footer
+  // counters use (getPostStatsKey) so both read one cache entry. SWR's global
+  // cache survives unmounts — a feed restored from useFeedCacheStore repaints
+  // repost cards synchronously instead of re-showing the skeleton and shifting
+  // the restored scroll position. revalidateIfStale is off for parity with the
+  // rest of the restored feed (usePostStats already revalidates this key on
+  // focus); keepPreviousData holds the card through the anonymous → connected
+  // key change on wagmi reconnect.
+  const repostKey = isRepost ? getPostStatsKey({ id: repostedPostId, network_id: item.network_id }, address) : null
+  const { data: repostedPost, isLoading: isLoadingRepost } = useSWR(
+    repostKey,
+    async () => {
+      const res = await getPostById(item.network_id, repostedPostId, address)
+      const post = Array.isArray(res?.data) ? res.data[0] : res?.data
+      return post ?? null
+    },
+    { revalidateIfStale: false, keepPreviousData: true },
+  )
 
   const baseDisplayItem = isRepost ? repostedPost : item
   const displayItem = useDecryptedCommunityItem(baseDisplayItem)
@@ -203,8 +188,10 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const sourceText = getRawContentText()
   const actionsSet = useMemo(() => new Set(actions.map((a) => a.toLowerCase())), [actions])
 
-  // Guard clause: Render global loading state until repost data is completely ready
-  if (isRepost && isLoadingRepost) {
+  // Guard clause: Render global loading state until repost data is completely ready.
+  // Only on a truly cold load — keepPreviousData keeps the previous entry rendered
+  // while the key swaps from the anonymous to the connected viewer.
+  if (isRepost && isLoadingRepost && !repostedPost) {
     return <PostSkeleton />
   }
 
