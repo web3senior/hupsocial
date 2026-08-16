@@ -1,10 +1,10 @@
 // app/api/communities/join-requests/route.js
 //
 // Pure UI discovery index for Request-Based community join requests. HupCommunity.sol's join()
-// sets isPending=true on-chain but emits no event for that branch, so moderators have no way to
-// discover pending requests from chain data alone. This table is written by the client right
-// after a join() tx confirms, and removed right after a moderator approves/rejects — it's not
-// security-critical: actual authorization always comes from the on-chain registry()/approveRequest.
+// sets isPending=true onchain (and emits MembershipRequested, which no indexer consumes yet), so
+// moderators have no way to discover pending requests without this table. It is written by the
+// client only after a join() tx confirms, and removed right after a moderator approves/rejects —
+// it's not security-critical: actual authorization always comes from registry()/approveRequest.
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'

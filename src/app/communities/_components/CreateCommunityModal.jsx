@@ -6,22 +6,38 @@
 // publishes content to Hup core.
 
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi'
-import { formatEther, parseEther, decodeEventLog } from 'viem'
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount, usePublicClient } from 'wagmi'
+import { formatEther, parseEther, parseUnits, decodeEventLog } from 'viem'
 import clsx from 'clsx'
 import NativeDialog from '@/components/ui/NativeDialog'
 import DialogHeader from '@/components/ui/DialogHeader'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getActiveChain } from '@/lib/communication'
 import { uploadObjectToIPFS } from '@/lib/ipfs'
-import { generateContentKey, wrapContentKey, isEncryptedMembershipType } from '@/lib/communityVault'
+import { generateContentKey, wrapContentKey } from '@/lib/communityVault'
+import { buildLinks, emptySocials } from '@/lib/socialLinks'
+import BrandingLinksFields from './BrandingLinksFields'
 import ImagePicker from './ImagePicker'
-import { MEMBERSHIP_OPTIONS, COMMUNITY_TYPE_OPTIONS } from '../membershipOptions'
+import { AssetUnitLabel, TokenUnitHint } from './TokenAmount'
+import { ZERO_ADDRESS, fetchTokenDecimals, getNativeCurrency } from '../tokenUnits'
+import {
+  ADMISSION,
+  ADMISSION_OPTIONS,
+  COMMUNITY_TYPE_OPTIONS,
+  REQUIREMENT_TYPE,
+  REQUIREMENT_TYPE_OPTIONS,
+  REQUIREMENT_MODE_OPTIONS,
+  ENCRYPTION_NOTES,
+  SELF_SERVE_HINTS,
+} from '../membershipOptions'
 import styles from '../page.module.scss'
 
 const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, vaultPrompt, onClose, onCreated }, ref) {
-  const [, activeChainContracts] = getActiveChain()
+  const [activeChain, activeChainContracts] = getActiveChain()
   const CONTRACT_ADDRESS = activeChainContracts?.community
+  const chainId = activeChain?.id
+  const publicClient = usePublicClient({ chainId })
+  const nativeCurrency = getNativeCurrency(chainId)
 
   // Stays mounted for the whole page life (like the app's other modals) so a half-filled
   // form survives close/reopen — the parent opens and closes it through this handle
@@ -36,24 +52,38 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const [description, setDescription] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
-  const [membershipType, setMembershipType] = useState(0)
+  const [socials, setSocials] = useState(emptySocials)
+  const [extraLinks, setExtraLinks] = useState([])
+  const [admission, setAdmission] = useState(ADMISSION.Open)
   const [communityType, setCommunityType] = useState(0)
 
-  // Per-type gating requirements — stored on the contract via follow-up setter txs after
-  // createCommunity confirms (the create call itself has no requirement parameters)
-  const [nftAddress, setNftAddress] = useState('')
-  const [nftMinBalance, setNftMinBalance] = useState('1')
-  const [tokenAddress, setTokenAddress] = useState('')
-  const [tokenMinBalance, setTokenMinBalance] = useState('1')
+  // The three orthogonal axes: admission mode above, the composable requirement list here,
+  // and the encrypted-content flag. Requirements land via a follow-up setRequirements tx
+  // after createCommunity confirms (the create call itself has no requirement parameters).
+  const [requirements, setRequirements] = useState([])
+  const [requirementMode, setRequirementMode] = useState(0)
+  const [encrypted, setEncrypted] = useState(false)
   const [paymentToken, setPaymentToken] = useState('')
   const [paymentPrice, setPaymentPrice] = useState('')
   const [paymentIsLsp7, setPaymentIsLsp7] = useState(false)
   const [isConfiguring, setIsConfiguring] = useState(false)
   const [configError, setConfigError] = useState('')
 
-  const needsNft = membershipType === 3 || membershipType === 5
-  const needsToken = membershipType === 4 || membershipType === 5
-  const needsPayment = membershipType === 7
+  const needsPayment = admission === ADMISSION.PayToJoin
+  const isSelfAdmit = admission === ADMISSION.Open || admission === ADMISSION.SelfServeIfEligible || admission === ADMISSION.PayToJoin
+
+  // Self-serve with an empty requirement list is indistinguishable from Open onchain
+  // (isEligible() is true for everyone), so the option stays locked until a requirement
+  // exists — and emptying the list again drops back to Open rather than deploying the duplicate.
+  const selfServeLocked = requirements.length === 0
+  useEffect(() => {
+    if (selfServeLocked && admission === ADMISSION.SelfServeIfEligible) setAdmission(ADMISSION.Open)
+  }, [selfServeLocked, admission])
+
+  const addRequirement = () => setRequirements((rows) => [...rows, { rType: 2, asset: '', minBalance: '1' }])
+  const updateRequirement = (index, patch) =>
+    setRequirements((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  const removeRequirement = (index) => setRequirements((rows) => rows.filter((_, i) => i !== index))
 
   // Community creation fee, set by the contract admin (0 by default) — read live so the form
   // always reflects the actual on-chain requirement instead of assuming it's free
@@ -97,7 +127,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const { isLoading: isConfirming, isSuccess: isConfirmed, data: receipt } = useWaitForTransactionReceipt({ hash })
   const { mutateAsync: writeSetterAsync } = useWriteContract()
 
-  const isCreatingEncrypted = isEncryptedMembershipType(membershipType)
+  const isCreatingEncrypted = encrypted
 
   // createCommunity has no requirement parameters, so gated types need follow-up setter txs.
   // The new community's id comes from the CommunityCreated event in the creation receipt —
@@ -122,38 +152,44 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
         }
       }
 
-      const hasFollowUps =
-        newCommunityId !== null && ((needsNft && nftAddress) || (needsToken && tokenAddress) || (needsPayment && paymentPrice))
+      const hasFollowUps = newCommunityId !== null && (requirements.length > 0 || (needsPayment && paymentPrice))
 
       if (hasFollowUps) {
         setIsConfiguring(true)
         setConfigError('')
         try {
-          if (needsNft && nftAddress) {
+          if (requirements.length > 0) {
+            // Every minimum is entered in whole units of the asset it gates on, so each one is
+            // scaled by that asset's decimals; NFT minimums are plain counts and scale by nothing
+            const requirementTuples = await Promise.all(
+              requirements.map(async (row) => ({
+                rType: row.rType,
+                asset: row.asset || ZERO_ADDRESS,
+                minBalance:
+                  row.rType === REQUIREMENT_TYPE.NativeBalance
+                    ? parseEther(row.minBalance || '0')
+                    : row.rType === REQUIREMENT_TYPE.TokenBalance
+                      ? parseUnits(row.minBalance || '0', await fetchTokenDecimals(publicClient, chainId, row.asset))
+                      : BigInt(row.minBalance || '0'),
+              }))
+            )
             await writeSetterAsync({
               address: CONTRACT_ADDRESS,
               abi: HupCommunityABI,
-              functionName: 'setNftRequirement',
-              args: [newCommunityId, nftAddress, BigInt(nftMinBalance || '1')],
-            })
-          }
-          if (needsToken && tokenAddress) {
-            await writeSetterAsync({
-              address: CONTRACT_ADDRESS,
-              abi: HupCommunityABI,
-              functionName: 'setTokenRequirement',
-              args: [newCommunityId, tokenAddress, BigInt(tokenMinBalance || '1')],
+              functionName: 'setRequirements',
+              args: [newCommunityId, requirementTuples, requirementMode],
             })
           }
           if (needsPayment && paymentPrice) {
-            // Native-coin prices are entered in whole coin units (parseEther); token prices are
-            // entered directly in the token's smallest unit — same convention as the edit form
-            const priceValue = paymentToken ? BigInt(paymentPrice) : parseEther(paymentPrice)
+            // Prices are whole-unit amounts of the coin or token they're set in, same as above
+            const priceValue = paymentToken
+              ? parseUnits(paymentPrice, await fetchTokenDecimals(publicClient, chainId, paymentToken))
+              : parseEther(paymentPrice)
             await writeSetterAsync({
               address: CONTRACT_ADDRESS,
               abi: HupCommunityABI,
               functionName: 'setPaymentRequirement',
-              args: [newCommunityId, paymentToken || '0x0000000000000000000000000000000000000000', priceValue, paymentIsLsp7],
+              args: [newCommunityId, paymentToken || ZERO_ADDRESS, priceValue, paymentIsLsp7],
             })
           }
         } catch (err) {
@@ -192,12 +228,17 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       return
     }
 
+    // `links` is omitted entirely when nothing was filled in, so a community with no socials
+    // serializes exactly as it did before this section existed
+    const links = buildLinks(socials, extraLinks)
+
     const metadataObj = {
       name,
       summary,
       description,
       'logo url': logoUrl,
       'cover url': coverUrl,
+      ...(links.length > 0 ? { links } : {}),
     }
 
     // Community metadata is stored on-chain as an IPFS CID only (MAX_METADATA_LENGTH enforces
@@ -220,7 +261,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       address: CONTRACT_ADDRESS,
       abi: HupCommunityABI,
       functionName: 'createCommunity',
-      args: [membershipType, communityType, metadataCid, initialWrappedKey],
+      args: [admission, communityType, metadataCid, initialWrappedKey],
       value: creationFee,
     })
   }
@@ -237,19 +278,18 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
         <form className={styles.manager__form} onSubmit={handleCreate}>
           <div className={styles.manager__row}>
             <div className={styles.manager__field}>
-              <label className={styles.manager__label}>Membership rule (gating)</label>
-              <select
-                className={styles.manager__select}
-                value={membershipType}
-                onChange={(e) => setMembershipType(Number(e.target.value))}
-              >
-                {MEMBERSHIP_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+              <label className={styles.manager__label}>Admission (how people get in)</label>
+              <select className={styles.manager__select} value={admission} onChange={(e) => setAdmission(Number(e.target.value))}>
+                {ADMISSION_OPTIONS.map((option) => {
+                  const locked = option.value === ADMISSION.SelfServeIfEligible && selfServeLocked
+                  return (
+                    <option key={option.value} value={option.value} disabled={locked} title={locked ? SELF_SERVE_HINTS.locked : option.note}>
+                      {locked ? `${option.label} ${SELF_SERVE_HINTS.lockedSuffix}` : option.label}
+                    </option>
+                  )
+                })}
               </select>
-              <p className={styles.optionNote}>{MEMBERSHIP_OPTIONS[membershipType]?.note}</p>
+              <p className={styles.optionNote}>{ADMISSION_OPTIONS[admission]?.note}</p>
             </div>
 
             <div className={styles.manager__field}>
@@ -269,55 +309,103 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             </div>
           </div>
 
-          {needsNft && (
-            <div className={styles.manager__row}>
-              <div className={styles.manager__field}>
-                <label className={styles.manager__label}>NFT contract address</label>
-                <input
-                  className={styles.manager__input}
-                  placeholder="0x..."
-                  value={nftAddress}
-                  onChange={(e) => setNftAddress(e.target.value)}
-                  required
-                />
-              </div>
-              <div className={styles.manager__field}>
-                <label className={styles.manager__label}>Minimum NFT balance</label>
-                <input
-                  className={styles.manager__input}
-                  type="number"
-                  min="1"
-                  value={nftMinBalance}
-                  onChange={(e) => setNftMinBalance(e.target.value)}
-                />
-              </div>
+          <div className={styles.manager__field}>
+            <label className={styles.manager__label}>Requirements — what members must hold or be (optional)</label>
+            {requirements.map((row, index) => {
+              const meta = REQUIREMENT_TYPE_OPTIONS[row.rType]
+              return (
+                <div key={index} className="flex align-items-center gap-050" style={{ marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                  <select
+                    className={styles.manager__select}
+                    style={{ width: 'auto' }}
+                    title={meta?.note}
+                    value={row.rType}
+                    // Reset the minimum on type change: a decimal entered for native would
+                    // break the integer BigInt conversion token/NFT rows use
+                    onChange={(e) => updateRequirement(index, { rType: Number(e.target.value), minBalance: '1' })}
+                  >
+                    {REQUIREMENT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {meta?.needsAsset && (
+                    <input
+                      className={styles.manager__input}
+                      style={{ flex: 1, minWidth: '180px' }}
+                      placeholder="0x... contract address"
+                      value={row.asset}
+                      onChange={(e) => updateRequirement(index, { asset: e.target.value })}
+                      required
+                    />
+                  )}
+                  {meta?.needsMin && (
+                    <>
+                      <input
+                        className={styles.manager__input}
+                        style={{ width: '130px' }}
+                        type="number"
+                        min="0"
+                        // Coin and token minimums are whole units (decimals allowed); NFT
+                        // minimums are a count of items, so they stay integers
+                        step={row.rType === REQUIREMENT_TYPE.NftBalance ? '1' : 'any'}
+                        placeholder={row.rType === REQUIREMENT_TYPE.NftBalance ? 'minimum' : 'e.g. 0.001'}
+                        value={row.minBalance}
+                        onChange={(e) => updateRequirement(index, { minBalance: e.target.value })}
+                      />
+                      {row.rType === REQUIREMENT_TYPE.TokenBalance && <TokenUnitHint address={row.asset} chainId={chainId} />}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.card__cancelBtn}
+                    aria-label="Remove requirement"
+                    onClick={() => removeRequirement(index)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
+            })}
+            <div className="flex align-items-center gap-050" style={{ flexWrap: 'wrap' }}>
+              <button type="button" className={styles.card__editBtn} onClick={addRequirement} disabled={requirements.length >= 10}>
+                + Add requirement
+              </button>
+              {requirements.length >= 2 && (
+                <select
+                  className={styles.manager__select}
+                  style={{ width: 'auto' }}
+                  value={requirementMode}
+                  onChange={(e) => setRequirementMode(Number(e.target.value))}
+                  aria-label="How requirements combine"
+                >
+                  {REQUIREMENT_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
-          )}
+            {requirements.length > 0 && (
+              <p className={styles.optionNote}>
+                {requirements.length >= 2 ? `${REQUIREMENT_MODE_OPTIONS[requirementMode]?.note} ` : ''}
+                Requirements are re-checked live on every post — selling the asset suspends posting.
+              </p>
+            )}
+          </div>
 
-          {needsToken && (
-            <div className={styles.manager__row}>
-              <div className={styles.manager__field}>
-                <label className={styles.manager__label}>Token contract address</label>
-                <input
-                  className={styles.manager__input}
-                  placeholder="0x..."
-                  value={tokenAddress}
-                  onChange={(e) => setTokenAddress(e.target.value)}
-                  required
-                />
-              </div>
-              <div className={styles.manager__field}>
-                <label className={styles.manager__label}>Minimum token balance (smallest unit)</label>
-                <input
-                  className={styles.manager__input}
-                  type="number"
-                  min="1"
-                  value={tokenMinBalance}
-                  onChange={(e) => setTokenMinBalance(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+          <div className={styles.manager__field}>
+            <label className={styles.manager__label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input type="checkbox" checked={encrypted} onChange={(e) => setEncrypted(e.target.checked)} />
+              Encrypted content 🔒
+            </label>
+            <p className={styles.optionNote}>
+              {encrypted ? ENCRYPTION_NOTES.on : ENCRYPTION_NOTES.off}
+              {encrypted && isSelfAdmit ? ` ${ENCRYPTION_NOTES.onSelfAdmit}` : ''}
+            </p>
+          </div>
 
           {needsPayment && (
             <>
@@ -332,10 +420,15 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
                   />
                 </div>
                 <div className={styles.manager__field}>
-                  <label className={styles.manager__label}>Price {paymentToken ? '(smallest unit)' : '(native coin)'}</label>
+                  <label className={styles.manager__label}>
+                    Price <AssetUnitLabel address={paymentToken} chainId={chainId} />
+                  </label>
                   <input
                     className={styles.manager__input}
-                    placeholder={paymentToken ? 'e.g. 1000000' : 'e.g. 0.5'}
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="e.g. 0.5"
                     value={paymentPrice}
                     onChange={(e) => setPaymentPrice(e.target.value)}
                     required
@@ -348,28 +441,19 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
                   This token is an LSP7 asset (not ERC-20)
                 </label>
               )}
-              <p className={styles.manager__subtitle}>Payments go directly to you (the creator) when someone joins.</p>
+              <p className={styles.manager__subtitle}>
+                The price is a whole-token amount, exactly as a holder would say it. Payments go directly to you (the creator) when
+                someone joins.
+              </p>
             </>
           )}
 
-          {membershipType === 6 && (
-            <p className={styles.manager__subtitle}>
-              Whitelist entries are added after creation — open the community's ⋯ menu → Manage community.
-            </p>
-          )}
-
-          {membershipType === 8 && (
-            <p className={styles.manager__subtitle}>
-              Members must follow you via the on-chain Follower System to be eligible.
-            </p>
-          )}
-
-          {needsNft || needsToken || needsPayment ? (
+          {(requirements.length > 0 || needsPayment) && (
             <p className={styles.manager__subtitle}>
               Creating this community takes one extra wallet confirmation after the create transaction, to store the
-              gating requirement on-chain.
+              requirements onchain. Whitelist entries are managed after creation from Members & moderation.
             </p>
-          ) : null}
+          )}
 
           {isCreatingEncrypted && (!vault.identity || vault.needsRegistration) && vaultPrompt}
 
@@ -422,9 +506,20 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             labelClassName={styles.manager__label}
           />
 
+          <BrandingLinksFields
+            socials={socials}
+            onSocialsChange={setSocials}
+            extraLinks={extraLinks}
+            onExtraLinksChange={setExtraLinks}
+            disabled={isPending || isConfirming}
+            fieldClassName={styles.manager__field}
+            labelClassName={styles.manager__label}
+            inputClassName={styles.manager__input}
+          />
+
           {creationFee > 0n && (
             <p className={styles.manager__subtitle}>
-              Creation fee: {formatEther(creationFee)} native coin
+              Creation fee: {formatEther(creationFee)} {nativeCurrency.symbol}
             </p>
           )}
 
@@ -438,14 +533,22 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
           <button
             type="submit"
             className={clsx(styles.manager__submit, { [styles['manager__submit--loading']]: isPending || isConfirming })}
-            disabled={isPending || isConfirming || (isCreatingEncrypted && !vault.identity) || cooldownRemainingSec > 0}
+            // Encrypted creation requires both an unlocked vault AND an onchain-registered
+            // identity — the contract reverts IdentityNotRegistered otherwise (an unregistered
+            // creator would lose access at the first key rotation), so block up front
+            disabled={
+              isPending ||
+              isConfirming ||
+              (isCreatingEncrypted && (!vault.identity || vault.needsRegistration)) ||
+              cooldownRemainingSec > 0
+            }
           >
             {isPending
               ? 'Confirm in Wallet...'
               : isConfirming
               ? 'Mining Tx...'
               : creationFee > 0n
-              ? `Create Community (${formatEther(creationFee)})`
+              ? `Create Community (${`${formatEther(creationFee)} ${nativeCurrency.symbol}`.trim()})`
               : 'Create Community'}
           </button>
         </form>

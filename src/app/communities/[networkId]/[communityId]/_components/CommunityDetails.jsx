@@ -7,11 +7,13 @@ import { ArrowLeftIcon, CalendarBlankIcon, UserIcon, UsersIcon } from '@phosphor
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { toRelativeTime } from '@/lib/dateHelper'
+import { displayLinks } from '@/lib/socialLinks'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { CommunityCard, CreatorName } from '../../../page'
 import styles from './CommunityDetails.module.scss'
 
-const membershipLabels = ['Public', 'Request-Based', 'Private', 'NFT-Gated', 'Token-Gated']
+// membership_type in the indexed row now stores the AdmissionMode enum (see membershipOptions.js)
+const admissionLabels = ['Open', 'Request Approval', 'Invite Only', 'Self-serve if eligible', 'Pay to Join']
 const typeLabels = ['Discussion', 'Broadcast']
 
 export default function CommunityDetails({ networkId, communityId, initialName }) {
@@ -31,6 +33,17 @@ export default function CommunityDetails({ networkId, communityId, initialName }
   }, [resolvedNetworkId, resolvedCommunityId])
 
   const name = community?.name || initialName || `Community #${resolvedCommunityId}`
+
+  // cidex keeps the community's whole IPFS metadata JSON in the indexed row, so the optional
+  // website/socials come along with the columns it also splits out — no extra fetch, and a
+  // malformed blob just renders no links.
+  const links = (() => {
+    try {
+      return displayLinks(JSON.parse(community?.metadata ?? '')?.links)
+    } catch {
+      return []
+    }
+  })()
 
   return (
     <div className={styles.details}>
@@ -70,7 +83,7 @@ export default function CommunityDetails({ networkId, communityId, initialName }
             </div>
 
             <div className={styles.details__tags}>
-              <span className={styles.details__tag}>{membershipLabels[community.membership_type]}</span>
+              <span className={styles.details__tag}>{admissionLabels[community.membership_type]}</span>
               {community.community_type !== null && community.community_type !== undefined && (
                 <span className={styles.details__tag}>{typeLabels[community.community_type]}</span>
               )}
@@ -87,6 +100,22 @@ export default function CommunityDetails({ networkId, communityId, initialName }
 
             {community.description && (
               <p className={styles.details__description}>{community.description}</p>
+            )}
+
+            {links.length > 0 && (
+              <div className={styles.details__links}>
+                {links.map((link, index) => (
+                  <a
+                    key={index}
+                    href={link.url}
+                    className={styles.details__linkChip}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                  >
+                    {link.title}
+                  </a>
+                ))}
+              </div>
             )}
 
             <div className={styles.details__meta}>

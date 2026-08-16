@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.35;
+pragma solidity ^0.8.36;
 
 /**
  * @title IHupCommunity
@@ -15,24 +15,53 @@ pragma solidity ^0.8.35;
  * @custom:security-contact security@hup.social
  * @custom:emoji 💬
  */
+/**
+ * @notice Escape hatch for eligibility logic the built-in requirement list can't express
+ *         (nested boolean conditions, offchain-attested scores, cross-community state, ...).
+ *         A community may point at a module implementing this; see HupCommunity.isEligible.
+ */
+interface IHupEligibilityModule {
+    function isEligible(uint256 communityId, address actor) external view returns (bool);
+}
+
 interface IHupCommunity {
     // --- SHARED ENUMS & STRUCTS ---
 
-    enum MembershipType {
-        Public,
-        RequestBased,
-        Private,
-        NftGated,
-        TokenGated,
-        NftAndTokenGated,
-        WhitelistGated,
-        PaidGated,
-        FollowerGated
+    /// @notice How wallets get onto the roster. Orthogonal to the requirement list (what they
+    ///         must hold/be) and to content encryption (keyVersion > 0) — the three axes the
+    ///         old MembershipType enum conflated.
+    enum AdmissionMode {
+        Open, // join() admits anyone
+        RequestApproval, // join() files a request; a moderator approves
+        InviteOnly, // moderators invite; the wallet accepts (consent handshake)
+        SelfServeIfEligible, // join() admits instantly iff the requirement list passes
+        PayToJoin // join() collects paymentRequirements, then admits
     }
 
     enum CommunityType {
         Discussion,
         Broadcast
+    }
+
+    /// @notice One entry of a community's composable requirement list.
+    enum RequirementType {
+        NativeBalance, // hold >= minBalance of the chain's native coin (asset ignored)
+        TokenBalance, // hold >= minBalance of an ERC-20/LSP7 at `asset`
+        NftBalance, // hold >= minBalance (0 => 1) of an ERC-721/LSP8 collection at `asset`
+        Whitelisted, // be on the community's whitelist (asset/minBalance ignored)
+        FollowsCreator // follow the creator on the LSP26 registry (asset/minBalance ignored)
+    }
+
+    /// @notice How the requirement list combines: every entry must pass, or any one suffices.
+    enum RequirementMode {
+        AllOf,
+        AnyOf
+    }
+
+    struct AssetRequirement {
+        RequirementType rType;
+        address asset;
+        uint256 minBalance;
     }
 
     struct MemberStatus {
@@ -41,16 +70,6 @@ interface IHupCommunity {
         bool isModerator;
         bool isBanned;
         bool canPost; // New permission bit for read-only
-    }
-
-    struct NftRequirement {
-        address nftAddress;
-        uint256 minBalance; // Minimum NFTs of the collection to hold; 0 is treated as 1
-    }
-
-    struct TokenRequirement {
-        address tokenAddress; // Use address(0) for native token
-        uint256 minBalance;
     }
 
     struct PaymentRequirement {
@@ -63,19 +82,36 @@ interface IHupCommunity {
 
     // --- SHARED EVENTS ---
 
-    event CommunityCreated(uint256 indexed id, address indexed creator, MembershipType mType);
+    // NOTE: AdmissionMode encodes as uint8 exactly like the old MembershipType did, so the
+    // CommunityCreated/CommunityUpdated selectors are unchanged and existing indexers keep
+    // decoding them — only the value's meaning shifted from "membership type" to "admission mode".
+    event CommunityCreated(uint256 indexed id, address indexed creator, AdmissionMode admission);
     event MemberStatusUpdated(uint256 indexed id, address indexed actor, bool isMember);
     event ModeratorUpdated(uint256 indexed id, address indexed actor, bool isModerator);
     event UnattributedDeposit(address indexed from, uint256 amount);
     event FeeUpdated(uint256 oldValue, uint256 newValue);
-    event CommunityUpdated(uint256 indexed id, MembershipType mType, CommunityType cType, string metadata);
+    event CommunityUpdated(uint256 indexed id, AdmissionMode admission, CommunityType cType, string metadata);
+    event RequirementsUpdated(uint256 indexed id, RequirementMode mode, uint256 count);
+    event EligibilityModuleUpdated(uint256 indexed id, address module);
+    event PaymentRequirementUpdated(uint256 indexed id, address token, uint256 price, bool isLsp7);
     event CommunityStatusUpdated(uint256 indexed id, bool isActive);
     event CommunityOwnershipTransferStarted(uint256 indexed id, address indexed oldCreator, address indexed newCreator);
     event CommunityOwnershipTransferred(uint256 indexed id, address indexed oldCreator, address indexed newCreator);
     event CommunityGovernorUpdated(uint256 indexed id, address indexed governor);
+    /// @notice A wallet filed a join request against a RequestApproval community (join() setting
+    ///         isPending). Without this, a pending request left no trace in the log at all and the
+    ///         moderator queue could only be reconstructed offchain. Any later MemberStatusUpdated
+    ///         for the same (id, actor) resolves the request — approveRequest emits it with
+    ///         isMember true, rejectRequest with the wallet's unchanged (false) membership.
+    event MembershipRequested(uint256 indexed id, address indexed actor);
     event MemberInvited(uint256 indexed id, address indexed actor);
     event InviteRevoked(uint256 indexed id, address indexed actor);
     event Withdrawal(address indexed recipient, uint256 amount);
+    /// @notice Emitted alongside Withdrawal when a creator claims accrued join fees, so indexers
+    ///         can tell creator payouts from the admin's creation-fee sweep (both of which emit
+    ///         the generic Withdrawal). `creator` owns the ledger entry; `recipient` is where the
+    ///         coin was sent, and the two differ when withdrawJoinPayoutsTo redirects it.
+    event JoinPayoutWithdrawn(address indexed creator, address indexed recipient, uint256 amount);
     event IdentityKeyRegistered(address indexed user);
     event KeyInitialized(uint256 indexed communityId);
     event KeyGranted(uint256 indexed communityId, address indexed holder, uint256 indexed version);
@@ -101,7 +137,6 @@ interface IHupCommunity {
     error AlreadyInitialized();
     error NotInitialized();
     error NotMember();
-    error NotWhitelisted();
     error BatchTooLarge();
     error MetadataTooLong();
     error CreationCooldownActive();
@@ -113,12 +148,16 @@ interface IHupCommunity {
     error BacklinkAlreadyPublished();
     error NotInvited();
     error NoPendingRequest();
+    error NotEligible();
+    error TooManyRequirements();
+    error NothingToWithdraw();
+    error IdentityNotRegistered();
 
     // --- SHARED HOOKS ---
 
     function version() external pure returns (string memory);
     function canPost(address actor, uint256 communityId) external view returns (bool);
-    function updateCommunity(uint256 _id, MembershipType _type, CommunityType _communityType, string calldata _metadata) external;
+    function updateCommunity(uint256 _id, AdmissionMode _admission, CommunityType _communityType, string calldata _metadata) external;
 
     // --- STATE GETTERS ---
 

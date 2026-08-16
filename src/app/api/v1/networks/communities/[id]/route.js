@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { currentCommunityContract } from '@/lib/communityJoin'
 
 export const runtime = 'nodejs'
 
@@ -31,9 +32,15 @@ export async function GET(request, { params }) {
     `
     const queryParams = [networkId, communityId]
 
-    if (contractAddress) {
+    // (network_id, id) is NOT unique — `communities` is keyed by (network_id, contract_address,
+    // id), so every HupCommunity deployment a chain has hosted contributes its own row per id,
+    // and an unpinned LIMIT 1 answered with whichever the optimizer reached first (the detail
+    // page showed a retired deployment's community #1 in place of the current one). An explicit
+    // contract_address still wins, for looking a specific deployment up on purpose.
+    const pinnedContract = contractAddress?.toLowerCase() || currentCommunityContract(networkId)
+    if (pinnedContract) {
       query += ` AND c.contract_address = ?`
-      queryParams.push(contractAddress.toLowerCase())
+      queryParams.push(pinnedContract)
     }
 
     query += ` LIMIT 1`

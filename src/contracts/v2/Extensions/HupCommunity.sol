@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.35;
+pragma solidity ^0.8.36;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -31,13 +31,17 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
+    /// @dev Field order is load-bearing: creator/admission/cType/isActive pack into one slot
+    ///      (20 + 1 + 1 + 1 bytes), which is what makes canPost's isActive-then-creator reads hit
+    ///      the same warm slot. `metadata` must stay last — a string always takes its own slot, so
+    ///      anything after it starts a new one.
     struct Community {
         uint256 id;
         address creator;
-        MembershipType membershipType;
+        AdmissionMode admission;
         CommunityType cType;
-        string metadata;
         bool isActive;
+        string metadata;
     }
 
     bytes32 public constant MODERATOR_ROLE = keccak256("MODERATOR_ROLE");
@@ -63,10 +67,48 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     mapping(uint256 => Community) public communities;
     mapping(uint256 => mapping(address => MemberStatus)) public registry;
-    mapping(uint256 => NftRequirement) public nftRequirements;
-    mapping(uint256 => TokenRequirement) public tokenRequirements;
     mapping(uint256 => PaymentRequirement) public paymentRequirements;
     mapping(uint256 => address) public pendingCreator;
+
+    /// @notice creator => withdrawable native-coin join fees (pull-over-push: paying out inside
+    ///         join() would let a creator whose address can't receive native coin — a Safe/
+    ///         Timelock without a payable path, or a griefing contract — permanently brick
+    ///         joins for their community). Token-priced fees still transfer directly, since
+    ///         the creator picked the token and its failure modes themselves.
+    mapping(address => uint256) public joinPayouts;
+
+    /// @notice Sum of all unclaimed joinPayouts balances. Fences withdrawAll off the escrow:
+    ///         the admin sweep may only take address(this).balance minus this amount, so
+    ///         creators' accrued join fees can never be drained out from under them.
+    uint256 public totalJoinPayouts;
+
+    // --- Composable eligibility requirements ---
+    // What a wallet must hold or be, independent of how it is admitted (AdmissionMode) and of
+    // whether content is encrypted (keyVersion). Checked at join() only for SelfServeIfEligible,
+    // and re-checked live inside canPost() for everyone — sell the gating asset and posting
+    // rights lapse immediately, exactly like the old single-asset gated types behaved.
+
+    /// @notice Hard cap on a community's requirement list, bounding join()'s external-call gas.
+    uint256 public constant MAX_REQUIREMENTS = 10;
+
+    /// @notice Gas ceiling for eligibility-module calls — a hostile module fails closed instead
+    ///         of gas-bombing join()/canPost() callers.
+    uint256 public constant ELIGIBILITY_MODULE_GAS_CAP = 100_000;
+
+    mapping(uint256 => AssetRequirement[]) private requirementsOf;
+
+    /// @notice communityId => how its requirement list combines (AllOf / AnyOf).
+    mapping(uint256 => RequirementMode) public requirementMode;
+
+    /// @notice communityId => optional IHupEligibilityModule for logic the list can't express.
+    ///         ANDed with the requirement list; a reverting module fails closed.
+    mapping(uint256 => address) public eligibilityModules;
+
+    /// @notice communityId => wallet => outstanding moderator invite awaiting the wallet's own
+    ///         acceptInvite. Consent is structural: membership is a public, indexed signal, so no
+    ///         moderator action may place a wallet on a roster unilaterally — an invite grants
+    ///         nothing until the invitee accepts it.
+    mapping(uint256 => mapping(address => bool)) public invites;
 
     // --- DAO governance ---
     // Optional per-community governor: a contract address (Governor+Timelock, Safe, or any
@@ -80,7 +122,7 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     /// @notice communityId => governance executor with creator-level powers (0 = none).
     mapping(uint256 => address) public governors;
 
-    /// @notice communityId => wallet => pre-approved to self-service join a WhitelistGated community.
+    /// @notice communityId => wallet => passes the Whitelisted requirement type (see AssetRequirement).
     mapping(uint256 => mapping(address => bool)) public whitelist;
 
     // --- Enumerable member/whitelist lists ---
@@ -94,10 +136,12 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     mapping(uint256 => EnumerableSet.AddressSet) private whitelistSet;
 
     // --- Creation rate limiting ---
-    // Cheap, adjustable anti-spam guard now that createCommunity has no cost floor when `fee`
-    // is left at 0. Both knobs are admin-configurable; 0 disables the respective check.
+    // Cheap, adjustable anti-spam guard for when createCommunity has no cost floor (`fee` 0).
+    // Both knobs are admin-tunable via setCreationLimits; 0 disables the respective check.
+    // Cooldown ships disabled — turn it on if spam actually shows up, rather than taxing
+    // legitimate creators from day one.
 
-    uint256 public creationCooldown = 1 hours;
+    uint256 public creationCooldown = 0;
     uint256 public maxCommunitiesPerWallet = 20;
 
     mapping(address => uint256) public lastCommunityCreatedAt;
@@ -209,7 +253,7 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
      *      in an uninitialized "gated but unencrypted" state between two separate signatures.
      */
     function createCommunity(
-        MembershipType _type,
+        AdmissionMode _admission,
         CommunityType _communityType,
         string calldata _metadataCid,
         bytes calldata initialWrappedKey
@@ -234,33 +278,39 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         communityCount++;
         uint256 id = communityCount;
 
-        communities[id] = Community(id, sender, _type, _communityType, _metadataCid, true);
+        communities[id] = Community(id, sender, _admission, _communityType, true, _metadataCid);
         registry[id][sender] = MemberStatus(true, false, true, false, true);
         _addToMemberList(id, sender);
 
         if (initialWrappedKey.length > 0) {
+            // The creator can always open their own envelope without registering (the private
+            // half lives client-side), but an unregistered creator has no mailbox for a co-
+            // moderator's future rotation grants — they'd silently lose access at the first
+            // rotation. Enforce the right order here instead of discovering it months later.
+            if (communityIdentityKeys[sender].length == 0) revert IdentityNotRegistered();
+
             keyVersion[id] = 1;
             wrappedKeys[id][sender][1] = initialWrappedKey;
             emit KeyInitialized(id);
             emit KeyGranted(id, sender, 1);
         }
 
-        emit CommunityCreated(id, sender, _type);
+        emit CommunityCreated(id, sender, _admission);
         return id;
     }
 
-    /// @dev Creator-only (not moderators): changing the membership type can flip a Private
-    /// community public or add a paywall — too much power to delegate to moderators.
-    function updateCommunity(uint256 _id, MembershipType _type, CommunityType _communityType, string calldata _metadataCid) external communityExists(_id) onlyCreator(_id) {
+    /// @dev Creator-only (not moderators): changing the admission mode can flip an invite-only
+    /// community open or add a paywall — too much power to delegate to moderators.
+    function updateCommunity(uint256 _id, AdmissionMode _admission, CommunityType _communityType, string calldata _metadataCid) external communityExists(_id) onlyCreator(_id) {
         if (bytes(_metadataCid).length > MAX_METADATA_LENGTH) revert MetadataTooLong();
 
         Community storage c = communities[_id];
 
-        c.membershipType = _type;
+        c.admission = _admission;
         c.cType = _communityType;
         c.metadata = _metadataCid;
 
-        emit CommunityUpdated(_id, _type, _communityType, _metadataCid);
+        emit CommunityUpdated(_id, _admission, _communityType, _metadataCid);
     }
 
     /**
@@ -300,7 +350,7 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     /**
      * @notice Grants a member access to the community's current key version.
-     * @dev Only the creator/a moderator. Called right after approveRequest/addMember, and again
+     * @dev Only the creator/a moderator. Called right after approveRequest (or once an invitee accepts and files a key request), and again
      *      per remaining member after a rotation (bumpKeyVersion) to bring them forward.
      */
     function grantKey(uint256 _id, address member, bytes calldata wrappedKey) external communityExists(_id) onlyModerator(_id) {
@@ -397,58 +447,101 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
      *      sender and recipient on transfer).
      */
     function join(uint256 _id) external payable communityExists(_id) whenNotPaused nonReentrant {
-        MemberStatus storage status = registry[_id][_msgSender()];
+        address sender = _msgSender();
+        MemberStatus storage status = registry[_id][sender];
         if (status.isBanned) revert Banned();
         if (status.isMember) revert AlreadyMember();
 
         Community storage c = communities[_id];
         if (!c.isActive) revert CommunityInactive();
-        if (msg.value > 0 && c.membershipType != MembershipType.PaidGated) revert IncorrectPaymentAmount();
+        if (msg.value > 0 && c.admission != AdmissionMode.PayToJoin) revert IncorrectPaymentAmount();
 
-        if (c.membershipType == MembershipType.Public) {
-            status.isMember = true;
-            status.canPost = true;
-            _addToMemberList(_id, _msgSender());
-            emit MemberStatusUpdated(_id, _msgSender(), true);
-        } else if (c.membershipType == MembershipType.RequestBased) {
+        if (c.admission == AdmissionMode.Open) {
+            _admit(_id, sender);
+        } else if (c.admission == AdmissionMode.RequestApproval) {
             status.isPending = true;
-        } else if (c.membershipType == MembershipType.WhitelistGated) {
-            if (!whitelist[_id][_msgSender()]) revert NotWhitelisted();
-            status.isMember = true;
-            status.canPost = true;
-            _addToMemberList(_id, _msgSender());
-            emit MemberStatusUpdated(_id, _msgSender(), true);
-        } else if (c.membershipType == MembershipType.PaidGated) {
+            emit MembershipRequested(_id, sender);
+        } else if (c.admission == AdmissionMode.InviteOnly) {
+            // acceptInvite is the only path onto an invite-only roster
+            revert NotInvited();
+        } else if (c.admission == AdmissionMode.SelfServeIfEligible) {
+            if (!isEligible(sender, _id)) revert NotEligible();
+            _admit(_id, sender);
+        } else {
+            // PayToJoin — membership is granted before the payout runs (checks-effects-
+            // interactions + nonReentrant): the recipient is the creator, who could be a
+            // contract with its own receive/token-transfer hooks (LSP7 in particular calls
+            // back into both sender and recipient on transfer).
             PaymentRequirement memory req = paymentRequirements[_id];
             if (req.price == 0) revert PaymentNotConfigured();
 
-            status.isMember = true;
-            status.canPost = true;
-            _addToMemberList(_id, _msgSender());
-            emit MemberStatusUpdated(_id, _msgSender(), true);
-            emit MembershipPaid(_id, _msgSender(), req.token, req.price);
+            _admit(_id, sender);
+            emit MembershipPaid(_id, sender, req.token, req.price);
 
             if (req.token == address(0)) {
                 if (msg.value != req.price) revert IncorrectPaymentAmount();
-                (bool success, ) = c.creator.call{value: req.price}("");
-                if (!success) revert TransferFailed();
+                // Pull-over-push: accrue to the creator's payout ledger instead of forwarding —
+                // a non-payable or reverting creator address must never block admissions
+                joinPayouts[c.creator] += req.price;
+                totalJoinPayouts += req.price;
             } else {
                 if (msg.value != 0) revert IncorrectPaymentAmount();
                 if (req.isLsp7) {
                     // LSP7 (LUKSO): joiner must have called authorizeOperator(address(this), price, "")
                     // beforehand — LSP7 has no transferFrom; balanceOf is ERC-20-selector-compatible
                     // but transfers are not, so this can't reuse the plain ERC-20 branch below.
-                    ILSP7Minimal(req.token).transfer(_msgSender(), c.creator, req.price, true, "");
+                    ILSP7Minimal(req.token).transfer(sender, c.creator, req.price, true, "");
                 } else {
-                    IERC20(req.token).safeTransferFrom(_msgSender(), c.creator, req.price);
+                    IERC20(req.token).safeTransferFrom(sender, c.creator, req.price);
                 }
             }
         }
     }
 
+    /// @notice Withdraws the caller's accrued native-coin join fees (see joinPayouts) to the
+    ///         caller's own address.
+    function withdrawJoinPayouts() external {
+        withdrawJoinPayoutsTo(payable(_msgSender()));
+    }
+
+    /// @notice Withdraws the caller's accrued native-coin join fees to `_to`.
+    /// @dev The recipient is overridable because the ledger's whole reason for existing is a
+    ///      creator address that can't receive native coin (Safe/Timelock without a payable
+    ///      path). Paying out to _msgSender() alone would strand exactly those balances: the
+    ///      escrow keeps joins working, this keeps the coin recoverable. Only the caller's own
+    ///      ledger entry is ever spent — there is no approval or delegation to abuse.
+    function withdrawJoinPayoutsTo(address payable _to) public nonReentrant {
+        if (_to == address(0)) revert InvalidAddress();
+
+        address sender = _msgSender();
+        uint256 amount = joinPayouts[sender];
+        if (amount == 0) revert NothingToWithdraw();
+
+        joinPayouts[sender] = 0;
+        totalJoinPayouts -= amount;
+        (bool success, ) = _to.call{value: amount}("");
+        if (!success) revert TransferFailed();
+
+        // Withdrawal stays for existing indexers; JoinPayoutWithdrawn is the precise one.
+        emit Withdrawal(_to, amount);
+        emit JoinPayoutWithdrawn(sender, _to, amount);
+    }
+
+    /// @dev Shared admission effect for every path that ends in membership (open/eligible/paid
+    ///      joins, approvals, accepted invites) — one place emits MemberStatusUpdated.
+    function _admit(uint256 _id, address _actor) private {
+        MemberStatus storage status = registry[_id][_actor];
+        status.isMember = true;
+        status.canPost = true;
+        status.isPending = false;
+        _addToMemberList(_id, _actor);
+
+        emit MemberStatusUpdated(_id, _actor, true);
+    }
+
     /**
      * @notice Adds or removes a wallet from a community's join whitelist. Only meaningful for
-     *         WhitelistGated communities, but not restricted to that type — a creator can
+     *         communities using the Whitelisted requirement type, but not restricted to them — a creator can
      *         pre-populate a whitelist before switching a community's type via updateCommunity.
      */
     function setWhitelisted(uint256 _id, address _actor, bool _allowed) external communityExists(_id) onlyModerator(_id) {
@@ -485,22 +578,57 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit MemberStatusUpdated(_id, _msgSender(), false);
     }
 
-    function addMember(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
-        registry[_id][_actor].isMember = true;
-        registry[_id][_actor].canPost = true;
-        registry[_id][_actor].isPending = false;
-        _addToMemberList(_id, _actor);
+    /**
+     * @notice Invites a wallet to the community. Replaces the old consentless addMember: the
+     *         invite grants nothing until the invitee calls acceptInvite themselves, so nobody
+     *         can be conscripted onto a roster (membership is public, indexed, and permanent in
+     *         the event log — being listed must be the wallet owner's own choice).
+     */
+    function inviteMember(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
+        if (_actor == address(0)) revert InvalidAddress();
+        if (registry[_id][_actor].isMember) revert AlreadyMember();
+        if (registry[_id][_actor].isBanned) revert Banned();
 
-        emit MemberStatusUpdated(_id, _actor, true);
+        invites[_id][_actor] = true;
+
+        emit MemberInvited(_id, _actor);
+    }
+
+    /// @notice Moderator withdraws an outstanding invite before it is accepted.
+    function cancelInvite(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
+        delete invites[_id][_actor];
+
+        emit InviteRevoked(_id, _actor);
+    }
+
+    /// @notice Invitee turns the invite down — same cleanup as cancelInvite, from the other side.
+    function declineInvite(uint256 _id) external communityExists(_id) {
+        delete invites[_id][_msgSender()];
+
+        emit InviteRevoked(_id, _msgSender());
+    }
+
+    /**
+     * @notice Accepts a pending invite — the only way a moderator's inviteMember ever results in
+     *         membership. Bans and archived status are re-checked here since either may have
+     *         changed while the invite sat open.
+     */
+    function acceptInvite(uint256 _id) external communityExists(_id) {
+        address sender = _msgSender();
+        if (!invites[_id][sender]) revert NotInvited();
+        if (!communities[_id].isActive) revert CommunityInactive();
+        if (registry[_id][sender].isBanned) revert Banned();
+
+        delete invites[_id][sender];
+        _admit(_id, sender);
     }
 
     function approveRequest(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
-        registry[_id][_actor].isMember = true;
-        registry[_id][_actor].canPost = true;
-        registry[_id][_actor].isPending = false;
-        _addToMemberList(_id, _actor);
+        // Consent guard: only requests the wallet itself filed (join() sets isPending) can be
+        // approved — without this, approveRequest doubles as a consentless addMember.
+        if (!registry[_id][_actor].isPending) revert NoPendingRequest();
 
-        emit MemberStatusUpdated(_id, _actor, true);
+        _admit(_id, _actor);
     }
 
     /**
@@ -537,7 +665,7 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     /**
      * @notice Removes a member's current membership without banning them — unlike setBanStatus,
-     *         they remain free to rejoin later (Public), be re-added (addMember/approveRequest),
+     *         they remain free to rejoin later (Open), be re-invited (inviteMember/approveRequest),
      *         or be re-whitelisted. This is the missing middle ground between "still a member" and
      *         "permanently banned".
      */
@@ -555,12 +683,44 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit MemberStatusUpdated(_id, _actor, false);
     }
 
-    function setNftRequirement(uint256 _id, address _nftAddress, uint256 _minBalance) external communityExists(_id) onlyModerator(_id) {
-        nftRequirements[_id] = NftRequirement(_nftAddress, _minBalance);
+    /**
+     * @notice Replaces the community's whole requirement list and its ALL/ANY combinator.
+     *         Requirements compose with any admission mode: they gate join() under
+     *         SelfServeIfEligible and are re-checked live in canPost() for every member.
+     * @dev Creator-only (same reasoning as updateCommunity): the requirement list decides who
+     *      can participate, which is community-shape power, not day-to-day moderation.
+     */
+    function setRequirements(
+        uint256 _id,
+        AssetRequirement[] calldata _requirements,
+        RequirementMode _mode
+    ) external communityExists(_id) onlyCreator(_id) {
+        if (_requirements.length > MAX_REQUIREMENTS) revert TooManyRequirements();
+
+        delete requirementsOf[_id];
+        for (uint256 i = 0; i < _requirements.length; i++) {
+            AssetRequirement calldata r = _requirements[i];
+            if ((r.rType == RequirementType.TokenBalance || r.rType == RequirementType.NftBalance) && r.asset == address(0)) {
+                revert InvalidAddress();
+            }
+            requirementsOf[_id].push(r);
+        }
+        requirementMode[_id] = _mode;
+
+        emit RequirementsUpdated(_id, _mode, _requirements.length);
     }
 
-    function setTokenRequirement(uint256 _id, address _tokenAddress, uint256 _minBalance) external communityExists(_id) onlyModerator(_id) {
-        tokenRequirements[_id] = TokenRequirement(_tokenAddress, _minBalance);
+    /// @notice The community's current requirement list (pair with requirementMode for ALL/ANY).
+    function getRequirements(uint256 _id) external view returns (AssetRequirement[] memory) {
+        return requirementsOf[_id];
+    }
+
+    /// @notice Points the community at an optional IHupEligibilityModule for logic the built-in
+    ///         list can't express; address(0) clears it. ANDed with the requirement list.
+    function setEligibilityModule(uint256 _id, address _module) external communityExists(_id) onlyCreator(_id) {
+        eligibilityModules[_id] = _module;
+
+        emit EligibilityModuleUpdated(_id, _module);
     }
 
     /// @notice Sets the join price for a PaidGated community. `_token` address(0) means native
@@ -575,7 +735,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         uint256 _price,
         bool _isLsp7
     ) external communityExists(_id) onlyCreator(_id) {
-        paymentRequirements[_id] = PaymentRequirement(_token, _price, _token != address(0) && _isLsp7);
+        bool isLsp7 = _token != address(0) && _isLsp7;
+        paymentRequirements[_id] = PaymentRequirement(_token, _price, isLsp7);
+
+        emit PaymentRequirementUpdated(_id, _token, _price, isLsp7);
     }
 
     function setPostingPermission(uint256 _id, address _actor, bool _canPost) external communityExists(_id) onlyModerator(_id) {
@@ -635,32 +798,66 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit CommunityOwnershipTransferred(_id, oldCreator, newCreator);
     }
 
-    function isEligibleViaToken(address _actor, uint256 _id) public view returns (bool) {
-        TokenRequirement memory req = tokenRequirements[_id];
-        if (req.minBalance == 0) return true;
-
-        if (req.tokenAddress == address(0)) {
-            return _actor.balance >= req.minBalance;
-        } else {
-            return IERC20(req.tokenAddress).balanceOf(_actor) >= req.minBalance;
+    /// @dev One requirement entry against one wallet. FollowsCreator fails closed when no
+    ///      LSP26 registry has been wired; NFT minBalance 0 is kept as "hold any 1".
+    function _passesRequirement(uint256 _id, address _actor, AssetRequirement memory r) private view returns (bool) {
+        if (r.rType == RequirementType.NativeBalance) {
+            return _actor.balance >= r.minBalance;
         }
-    }
-
-    function isEligibleViaNft(address _actor, uint256 _id) public view returns (bool) {
-        NftRequirement memory req = nftRequirements[_id];
-        if (req.nftAddress == address(0)) return false;
-
-        // The UI collects a minimum-balance threshold — enforce it (0 kept as "hold any 1")
-        uint256 required = req.minBalance == 0 ? 1 : req.minBalance;
-        return IERC721(req.nftAddress).balanceOf(_actor) >= required;
-    }
-
-    /// @notice True if `_actor` follows the community's creator on the wired-in LSP26-compatible
-    ///         follower registry. Fails closed (returns false) if no registry has been set yet.
-    function isEligibleViaFollow(address _actor, uint256 _id) public view returns (bool) {
+        if (r.rType == RequirementType.TokenBalance) {
+            return IERC20(r.asset).balanceOf(_actor) >= r.minBalance;
+        }
+        if (r.rType == RequirementType.NftBalance) {
+            uint256 required = r.minBalance == 0 ? 1 : r.minBalance;
+            return IERC721(r.asset).balanceOf(_actor) >= required;
+        }
+        if (r.rType == RequirementType.Whitelisted) {
+            return whitelist[_id][_actor];
+        }
+        // FollowsCreator
         if (followerSystem == address(0)) return false;
-
         return ILSP26FollowerSystem(followerSystem).isFollowing(_actor, communities[_id].creator);
+    }
+
+    /**
+     * @notice Live composite eligibility: the requirement list under its ALL/ANY mode, ANDed
+     *         with the optional eligibility module. An empty list with no module means everyone
+     *         is eligible. This is what SelfServeIfEligible joins and every canPost() consult.
+     */
+    function isEligible(address _actor, uint256 _id) public view returns (bool) {
+        AssetRequirement[] storage reqs = requirementsOf[_id];
+        uint256 len = reqs.length;
+
+        if (len > 0) {
+            if (requirementMode[_id] == RequirementMode.AnyOf) {
+                bool anyPassed = false;
+                for (uint256 i = 0; i < len; i++) {
+                    if (_passesRequirement(_id, _actor, reqs[i])) {
+                        anyPassed = true;
+                        break;
+                    }
+                }
+                if (!anyPassed) return false;
+            } else {
+                for (uint256 i = 0; i < len; i++) {
+                    if (!_passesRequirement(_id, _actor, reqs[i])) return false;
+                }
+            }
+        }
+
+        address module = eligibilityModules[_id];
+        if (module != address(0)) {
+            // A reverting or broken module fails closed rather than bricking canPost/join, and
+            // the gas cap keeps a hostile module from turning joins into gas bombs — 100k is
+            // generous for any honest eligibility check (a handful of SLOADs/balance reads)
+            try IHupEligibilityModule(module).isEligible{gas: ELIGIBILITY_MODULE_GAS_CAP}(_id, _actor) returns (bool ok) {
+                if (!ok) return false;
+            } catch {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     function canPost(address actor, uint256 communityId) external view override returns (bool) {
@@ -672,28 +869,15 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         MemberStatus storage status = registry[communityId][actor];
 
         if (status.isBanned) return false;
-        if (c.creator == actor || status.isModerator) return true;
+        // Order matters for gas: creator (slot already warm from isActive) and isModerator
+        // (same slot as isBanned) come before the cold governors mapping read
+        if (c.creator == actor || status.isModerator || governors[communityId] == actor) return true;
         if (c.cType == CommunityType.Broadcast) return false;
-        if (!status.canPost) return false;
-        if (c.membershipType == MembershipType.Public) return true;
+        if (!status.isMember || !status.canPost) return false;
 
-        if (c.membershipType == MembershipType.NftGated) {
-            return isEligibleViaNft(actor, communityId);
-        }
-
-        if (c.membershipType == MembershipType.TokenGated) {
-            return isEligibleViaToken(actor, communityId);
-        }
-
-        if (c.membershipType == MembershipType.NftAndTokenGated) {
-            return isEligibleViaNft(actor, communityId) && isEligibleViaToken(actor, communityId);
-        }
-
-        if (c.membershipType == MembershipType.FollowerGated) {
-            return isEligibleViaFollow(actor, communityId);
-        }
-
-        return status.isMember;
+        // Requirements are re-checked live on every post, whatever the admission mode — selling
+        // the gating asset (AllOf) suspends posting until the wallet qualifies again
+        return isEligible(actor, communityId);
     }
 
     /// @notice Total current members of a community — pairs with getMembers for pagination.
@@ -712,8 +896,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         uint256 total = set.length();
         if (offset >= total || limit == 0) return new address[](0);
 
-        uint256 end = offset + limit;
-        if (end > total) end = total;
+        // Clamp against the remaining tail rather than truncating offset + limit afterwards —
+        // the sum overflows to a panic revert on a caller passing an unbounded `limit`.
+        uint256 remaining = total - offset;
+        uint256 end = offset + (limit < remaining ? limit : remaining);
 
         page = new address[](end - offset);
         for (uint256 i = offset; i < end; i++) {
@@ -734,8 +920,9 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         uint256 total = set.length();
         if (offset >= total || limit == 0) return new address[](0);
 
-        uint256 end = offset + limit;
-        if (end > total) end = total;
+        // Clamp against the remaining tail — see getMembers.
+        uint256 remaining = total - offset;
+        uint256 end = offset + (limit < remaining ? limit : remaining);
 
         page = new address[](end - offset);
         for (uint256 i = offset; i < end; i++) {
@@ -767,7 +954,7 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     }
 
     /// @notice Wires in the LSP26-compatible follower registry FollowerGated communities check
-    ///         against. address(0) makes isEligibleViaFollow (and canPost for that type) fail
+    ///         against. address(0) makes the FollowsCreator requirement (and any eligibility depending on it) fail
     ///         closed until it's set.
     function setFollowerSystem(address _followerSystem) external onlyDirectAdmin {
         address oldValue = followerSystem;
@@ -779,8 +966,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     function withdrawAll(address payable _receiver) external onlyDirectAdmin nonReentrant {
         if (_receiver == address(0)) revert InvalidAddress();
 
-        uint256 balance = address(this).balance;
-        if (balance == 0) revert TransferFailed();
+        // Escrowed join fees belong to creators (withdrawJoinPayouts) — sweep only the surplus:
+        // creation fees plus any stray coin.
+        uint256 balance = address(this).balance - totalJoinPayouts;
+        if (balance == 0) revert NothingToWithdraw();
 
         (bool success, ) = _receiver.call{value: balance}("");
         if (!success) revert TransferFailed();

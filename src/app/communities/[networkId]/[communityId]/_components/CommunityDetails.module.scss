@@ -154,6 +154,37 @@
     }
   }
 
+  // Website + socials from the metadata's links array (optional, creator-supplied)
+  &__links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__linkChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    max-width: 100%;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--tag);
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    text-decoration: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+  }
+
   &__meta {
     display: flex;
     flex-wrap: wrap;

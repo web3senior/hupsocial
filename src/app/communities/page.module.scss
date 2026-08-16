@@ -646,6 +646,53 @@
     margin-top: 1rem;
   }
 
+  // Website + socials from the metadata's links array. Rendered outside the card's header
+  // <Link> — anchors can't nest, and these each navigate somewhere else entirely.
+  &__links {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+  }
+
+  &__linkChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    max-width: 100%;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--tag);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    text-decoration: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    &:hover {
+      color: var(--foreground);
+      border-color: var(--foreground);
+    }
+  }
+
+  // Detail-page gating row — the directory card shows the same chips inline among its header
+  // tags; hideHeader skips that block, so the detail surface labels them explicitly
+  &__requirements {
+    margin-bottom: 1rem;
+  }
+
+  &__requirementsLabel {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
   &__tag {
     font-size: 0.75rem;
     font-weight: 500;
@@ -724,6 +771,13 @@
     resize: vertical;
   }
 
+  // Wrapper for the shared RecipientField in the invite and whitelist rows — it carries its own
+  // input styling via inputClassName, so all this owes it is the width the plain input had
+  &__recipient {
+    flex: 1;
+    min-width: 0;
+  }
+
   &__submit {
     padding: 0.65rem;
     background: var(--foreground);
@@ -786,6 +840,12 @@
   font-size: 0.78rem;
   line-height: 1.45;
   color: var(--text-muted);
+
+  // For the setting that is technically valid but currently a no-op (e.g. self-serve
+  // admission on a community with no requirements)
+  &--warn {
+    color: var(--liked-color);
+  }
 }
 
 // Modal shell for the card's management panels (Modify / Manage Members) — NativeDialog owns
@@ -838,6 +898,74 @@
   &__body {
     overflow-y: auto;
     padding: 1.25rem 24px 1.5rem;
+  }
+}
+
+// Optional website/socials panel inside the create and Modify forms (BrandingLinksFields) —
+// the fields themselves borrow whichever form's field/label/input classes get passed in, so
+// only the collapsible chrome lives here
+.branding {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    align-self: flex-start;
+    border: none;
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+
+    svg {
+      transition: transform 0.15s ease;
+    }
+  }
+
+  &__caret--open {
+    transform: rotate(180deg);
+  }
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    input:first-of-type {
+      width: 130px;
+      flex: none;
+    }
+
+    input:last-of-type {
+      flex: 1;
+      min-width: 180px;
+    }
+  }
+
+  &__hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
   }
 }
 

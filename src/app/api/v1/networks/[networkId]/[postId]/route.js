@@ -4,6 +4,7 @@
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { communityJoin } from '@/lib/communityJoin'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
@@ -57,7 +58,7 @@ export async function GET(request, { params }) {
       FROM posts p
       JOIN networks n ON p.network_id = n.id
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
-      LEFT JOIN communities comm ON comm.network_id = p.network_id AND comm.id = p.community_id
+      ${communityJoin()}
       WHERE p.id = ? AND n.id = ?
       LIMIT 1
     `

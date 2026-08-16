@@ -10,7 +10,7 @@ import {
   useConnection,
   useChainId,
 } from 'wagmi'
-import { formatEther, parseEther } from 'viem'
+import { formatEther, parseEther, parseUnits } from 'viem'
 import clsx from 'clsx'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -18,6 +18,8 @@ import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import NativeDialog from '@/components/ui/NativeDialog'
 import DialogHeader from '@/components/ui/DialogHeader'
+import RecipientField from '@/components/ui/RecipientField'
+import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
 import { GearSixIcon, MagnifyingGlassIcon, UsersIcon } from '@phosphor-icons/react'
 import { PostCard } from '@/components/Post'
 import HupCommunityABI from '@/abis/HupCommunity'
@@ -33,7 +35,6 @@ import {
   wrapKeyWithKey,
   unwrapKeyWithKey,
   decryptPostContent,
-  isEncryptedMembershipType,
 } from '@/lib/communityVault'
 import { getActiveChain } from '@/lib/communication'
 import { useProfile } from '@/hooks/useProfile'
@@ -41,9 +42,31 @@ import { config, CONTRACTS } from '@/config/wagmi'
 import { getPosts } from '@/lib/api'
 import { getIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
+import { buildLinks, displayLinks, emptySocials, parseLinks } from '@/lib/socialLinks'
+import BrandingLinksFields from './_components/BrandingLinksFields'
 import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
-import { MEMBERSHIP_OPTIONS, COMMUNITY_TYPE_OPTIONS } from './membershipOptions'
+import { AssetUnitLabel, TokenRequirementTag, TokenUnitHint } from './_components/TokenAmount'
+import {
+  ZERO_ADDRESS,
+  fetchTokenDecimals,
+  formatTokenDisplay,
+  getNativeCurrency,
+  isNativeAsset,
+  toAmountInput,
+  useTokenMeta,
+} from './tokenUnits'
+import {
+  ADMISSION,
+  ADMISSION_OPTIONS,
+  COMMUNITY_TYPE_OPTIONS,
+  REQUIREMENT_TYPE,
+  REQUIREMENT_TYPE_OPTIONS,
+  REQUIREMENT_MODE_OPTIONS,
+  ENCRYPTION_NOTES,
+  SELF_SERVE_HINTS,
+} from './membershipOptions'
 import styles from './page.module.scss'
 
 // Metadata JSON uploads share lib/ipfs.js's uploadObjectToIPFS; the historical local name is
@@ -190,10 +213,12 @@ export function CreatorName({ address }) {
   return profile ? profile.fullName || profile.name || truncated : truncated
 }
 
-// Dedicated presentation sub-component to isolate ERC-721 naming hooks safely
-function NftTag({ tokenAddress, minBalance }) {
+// Dedicated presentation sub-component to isolate ERC-721 naming hooks safely. NFT minimums are
+// plain counts, so unlike token balances they need no decimals scaling.
+function NftTag({ tokenAddress, chainId, minBalance }) {
   const { data: nftName } = useReadContract({
     address: tokenAddress,
+    chainId,
     abi: [{ name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }],
     functionName: 'name',
   })
@@ -241,16 +266,15 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const [editDescription, setEditDescription] = useState('')
   const [editLogoUrl, setEditLogoUrl] = useState('')
   const [editCoverUrl, setEditCoverUrl] = useState('')
-  const [editMembershipType, setEditMembershipType] = useState(0)
+  const [editSocials, setEditSocials] = useState(emptySocials)
+  const [editExtraLinks, setEditExtraLinks] = useState([])
+  const [editAdmission, setEditAdmission] = useState(0)
   const [editCommunityType, setEditCommunityType] = useState(0)
 
-  // NFT Requirement Input States
-  const [nftContractAddress, setNftContractAddress] = useState('')
-  const [minNftBalance, setMinNftBalance] = useState('1')
-
-  // Token Requirement Input States (address(0) tokenAddress means the native coin)
-  const [tokenContractAddress, setTokenContractAddress] = useState('')
-  const [minTokenBalance, setMinTokenBalance] = useState('1')
+  // Composable requirement rows being edited ({ rType, asset, minBalance } — string minBalance
+  // until submit) plus their ALL/ANY combinator, mirroring the create modal's editor
+  const [editRequirements, setEditRequirements] = useState([])
+  const [editRequirementMode, setEditRequirementMode] = useState(0)
 
   // Payment Requirement Input States (blank paymentTokenAddress means the native coin)
   const [paymentTokenAddress, setPaymentTokenAddress] = useState('')
@@ -269,18 +293,21 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // Member management state
   const [pendingRequests, setPendingRequests] = useState([])
   const [members, setMembers] = useState([])
-  const [inviteAddress, setInviteAddress] = useState('')
+  const [inviteAddress, setInviteAddress] = useState(EMPTY_RECIPIENT)
   const [approvingAddress, setApprovingAddress] = useState(null)
   const [rejectingAddress, setRejectingAddress] = useState(null)
   const [banningAddress, setBanningAddress] = useState(null)
   const [whitelistEntries, setWhitelistEntries] = useState([])
-  const [newWhitelistAddress, setNewWhitelistAddress] = useState('')
+  const [newWhitelistAddress, setNewWhitelistAddress] = useState(EMPTY_RECIPIENT)
   const [removingWhitelistAddress, setRemovingWhitelistAddress] = useState(null)
 
   // Lazy key-delivery state: pending 'grant' requests (members missing the current-version
   // envelope) and whether a rotation is pending (someone self-left; only a moderator can rotate)
   const [keyRequests, setKeyRequests] = useState([])
   const [isGrantingBatch, setIsGrantingBatch] = useState(false)
+  // Grant requests that couldn't be fulfilled because the member has no identity key
+  // registered on this contract — surfaced instead of silently skipped
+  const [grantSkippedAddresses, setGrantSkippedAddresses] = useState([])
   const [isTogglingHistory, setIsTogglingHistory] = useState(false)
   const [isBackfilling, setIsBackfilling] = useState(false)
   const [isInitializingKey, setIsInitializingKey] = useState(false)
@@ -300,27 +327,30 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   // Safe-to-use-before-loaded derived values so hooks below can reference them unconditionally
   const creator = data ? data[1] : null
-  const membershipType = data ? Number(data[2]) : null
+  const admission = data ? Number(data[2]) : null
   const cType = data ? Number(data[3]) : null
-  const isActive = data ? Boolean(data[5]) : true
+  // Indices track the Community struct's field order (id, creator, admission, cType, isActive,
+  // metadata) — isActive sits before metadata so it packs into the creator slot onchain.
+  const isActive = data ? Boolean(data[4]) : true
   const isOwner = Boolean(activeAccountAddress && creator && activeAccountAddress.toLowerCase() === creator.toLowerCase())
-  const isEncryptedType = isEncryptedMembershipType(membershipType)
 
-  // Read data directly from the automatically generated public mapping getter
-  const { data: nftRequirementData, refetch: refetchNftRequirements } = useReadContract({
+  // The community's composable requirement list + its ALL/ANY combinator (empty = no gating)
+  const { data: requirementsData, refetch: refetchRequirements } = useReadContract({
     address: CONTRACT_ADDRESS,
     chainId,
     abi: HupCommunityABI,
-    functionName: 'nftRequirements',
+    functionName: 'getRequirements',
     args: [id],
   })
+  const requirementsList = requirementsData ?? []
 
-  const { data: tokenRequirementData, refetch: refetchTokenRequirements } = useReadContract({
+  const { data: requirementModeData } = useReadContract({
     address: CONTRACT_ADDRESS,
     chainId,
     abi: HupCommunityABI,
-    functionName: 'tokenRequirements',
+    functionName: 'requirementMode',
     args: [id],
+    query: { enabled: requirementsList.length > 1 },
   })
 
   const { data: paymentRequirementData, refetch: refetchPaymentRequirement } = useReadContract({
@@ -330,6 +360,21 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     functionName: 'paymentRequirements',
     args: [id],
   })
+
+  // Unpacked next to its read (rather than further down with the rest of the render values) so
+  // the metadata hook below stays above this component's loading return.
+  const savedPaymentToken = paymentRequirementData ? paymentRequirementData[0] : null
+  const savedPaymentPrice = paymentRequirementData ? paymentRequirementData[1]?.toString() : null
+  const savedPaymentIsLsp7 = Boolean(paymentRequirementData?.[2])
+  const hasValidPaymentRequirement = Boolean(paymentRequirementData) && savedPaymentPrice !== '0'
+  const isPaymentNative = isNativeAsset(savedPaymentToken)
+
+  // The join price is stored in the smallest unit of whichever asset it's priced in — it only
+  // becomes a number anyone can read once scaled by that asset's decimals
+  const nativeCurrency = getNativeCurrency(chainId)
+  const paymentMeta = useTokenMeta(savedPaymentToken, chainId)
+  const paymentPriceLabel = formatTokenDisplay(savedPaymentPrice, paymentMeta.decimals)
+  const paymentPriceWithSymbol = paymentPriceLabel === null ? '…' : `${paymentPriceLabel} ${paymentMeta.symbol}`.trim()
 
   // Current viewer's membership status (isMember, isPending, isModerator, isBanned, canPost)
   const { data: myStatusData, refetch: refetchMyStatus } = useReadContract({
@@ -356,19 +401,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     query: { enabled: !!activeAccountAddress },
   })
 
-  // Live whitelist check — lets the "Join" button for WhitelistGated communities disable itself
-  // proactively instead of letting the viewer submit a join() that's guaranteed to revert
-  const { data: amIWhitelisted } = useReadContract({
+  // Live composite eligibility (requirement list + optional module) — lets the Self-serve
+  // Join button disable itself proactively instead of submitting a join() that will revert
+  const { data: amIEligible } = useReadContract({
     address: CONTRACT_ADDRESS,
     chainId,
     abi: HupCommunityABI,
-    functionName: 'whitelist',
-    args: [id, activeAccountAddress],
-    query: { enabled: !!activeAccountAddress && membershipType === 6 },
+    functionName: 'isEligible',
+    args: [activeAccountAddress, id],
+    query: { enabled: !!activeAccountAddress && admission === ADMISSION.SelfServeIfEligible },
   })
 
-  // Joining a Request-Based community (join() is a no-op on-chain for Private/NFT/Token-Gated —
-  // see handleRequestAccess for how those are handled instead)
   const { mutate: joinCommunity, data: joinHash, isPending: isJoinPending, error: joinError } = useWriteContract()
   const { isSuccess: isJoinConfirmed } = useWaitForTransactionReceipt({ hash: joinHash })
 
@@ -420,15 +463,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   const { isLoading: isUpdateConfirming, isSuccess: isUpdateConfirmed } = useWaitForTransactionReceipt({ hash: updateHash })
 
-  // Contract modification hook for setting NFT configuration requirements
-  const { mutate: updateNftRequirement, data: nftHash, isPending: isNftPending, error: nftError } = useWriteContract()
+  // Contract modification hook for replacing the composable requirement list
+  const {
+    mutate: updateRequirementsWrite,
+    data: requirementsHash,
+    isPending: isRequirementsPending,
+    error: requirementsError,
+  } = useWriteContract()
 
-  const { isLoading: isNftConfirming, isSuccess: isNftConfirmed } = useWaitForTransactionReceipt({ hash: nftHash })
-
-  // Contract modification hook for setting Token configuration requirements
-  const { mutate: updateTokenRequirement, data: tokenReqHash, isPending: isTokenReqPending, error: tokenReqError } = useWriteContract()
-
-  const { isLoading: isTokenReqConfirming, isSuccess: isTokenReqConfirmed } = useWaitForTransactionReceipt({ hash: tokenReqHash })
+  const { isLoading: isRequirementsConfirming, isSuccess: isRequirementsConfirmed } = useWaitForTransactionReceipt({
+    hash: requirementsHash,
+  })
 
   // Contract modification hook for setting the Fixed Price join cost
   const {
@@ -508,6 +553,24 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     }
   }, [isInviteRespConfirmed])
 
+  // --- Join-fee earnings (pull-payment ledger: join() accrues, the creator withdraws) ---
+
+  const { data: joinPayoutsData, refetch: refetchJoinPayouts } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    chainId,
+    abi: HupCommunityABI,
+    functionName: 'joinPayouts',
+    args: [activeAccountAddress],
+    query: { enabled: !!activeAccountAddress && isOwner },
+  })
+
+  const { mutate: withdrawPayouts, data: withdrawHash, isPending: isWithdrawPending, error: withdrawError } = useWriteContract()
+  const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawConfirmed } = useWaitForTransactionReceipt({ hash: withdrawHash })
+
+  useEffect(() => {
+    if (isWithdrawConfirmed) refetchJoinPayouts()
+  }, [isWithdrawConfirmed, refetchJoinPayouts])
+
   // --- DAO governance (set/clear the community's governance executor) ---
 
   const [newGovernorAddress, setNewGovernorAddress] = useState('')
@@ -542,19 +605,12 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const banHandledRef = useRef(null)
   const rotateHandledRef = useRef(null)
 
-  // Refresh NFT requirement state on successful block confirmation
+  // Refresh the requirement list on successful block confirmation
   useEffect(() => {
-    if (isNftConfirmed) {
-      refetchNftRequirements()
+    if (isRequirementsConfirmed) {
+      refetchRequirements()
     }
-  }, [isNftConfirmed, refetchNftRequirements])
-
-  // Refresh Token requirement state on successful block confirmation
-  useEffect(() => {
-    if (isTokenReqConfirmed) {
-      refetchTokenRequirements()
-    }
-  }, [isTokenReqConfirmed, refetchTokenRequirements])
+  }, [isRequirementsConfirmed, refetchRequirements])
 
   // Refresh Payment requirement state on successful block confirmation
   useEffect(() => {
@@ -608,14 +664,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const pendingGrantRequests = keyRequests.filter((r) => r.request_type === 'grant')
   const isRotationPending = keyRequests.some((r) => r.request_type === 'rotation')
 
-  const isRequestableMembershipType =
-    membershipType === 1 || membershipType === 3 || membershipType === 4 || membershipType === 5 || membershipType === 8
+  const isRequestApproval = admission === ADMISSION.RequestApproval
 
   useEffect(() => {
-    if (isRequestableMembershipType) {
+    if (isRequestApproval) {
       refetchPendingRequests()
     }
-  }, [isRequestableMembershipType, chainId, id])
+  }, [isRequestApproval, chainId, id])
 
   // Lazy key delivery, member side: a member with no envelope for the current key version (e.g.
   // they were offline during a rotation) files a 'grant' request so moderators can batch-deliver.
@@ -650,20 +705,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   const myPendingRequest = pendingRequests.find((r) => r.wallet_address?.toLowerCase() === activeAccountAddress?.toLowerCase())
 
-  // WhitelistGated is self-service: join() either succeeds immediately or reverts with
-  // NotWhitelisted — there's no "pending" state to track off-chain like RequestBased/NFT/Token
-  // gated need, so this stays a separate handler rather than folding into handleRequestAccess.
-  const handleJoinWhitelisted = () => {
-    joinCommunity({
-      address: CONTRACT_ADDRESS,
-      chainId,
-      abi: HupCommunityABI,
-      functionName: 'join',
-      args: [id],
-    })
-  }
-
-  // Pay to Join is also self-service, like WhitelistGated, but pays first: native coin goes
+  // Pay to Join is also self-service, but pays first: native coin goes
   // straight into join()'s value; a token price needs an authorization step the contract can pull
   // from first — LSP7's authorizeOperator(spender, amount, data) for an LSP7 asset, or ERC-20's
   // approve(spender, amount) otherwise. These are not the same call: LSP7 has no transferFrom, so
@@ -727,10 +769,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     }
   }
 
-  // Public communities still require an explicit join() — the contract's canPost() checks the
-  // roster's canPost flag even for Public, and cidex mirrors that check before tagging a post
-  // with a community. Without joining first, a post would publish untagged (no community badge).
-  const handleJoinPublic = () => {
+  // Open and Self-serve communities still require an explicit join() — the contract's canPost()
+  // checks the roster's canPost flag for everyone, and cidex mirrors that check before tagging a
+  // post with a community. Without joining first, a post would publish untagged.
+  const handleJoin = () => {
     if (!activeAccountAddress || !chainId) return
     joinCommunity({
       address: CONTRACT_ADDRESS,
@@ -741,85 +783,54 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     })
   }
 
-  const handleRequestAccess = async () => {
+  // RequestApproval admission: join() files the onchain isPending flag; the offchain record that
+  // makes the request discoverable to moderators is written only AFTER the tx confirms (see the
+  // isJoinConfirmed effect below). Recording it here would leave a phantom queue entry whenever
+  // the wallet prompt is rejected or the tx fails — approveRequest on a wallet whose onchain
+  // isPending was never set reverts with NoPendingRequest.
+  const handleRequestAccess = () => {
     if (!activeAccountAddress || !chainId) return
 
-    if (membershipType === 1) {
-      joinCommunity({
-        address: CONTRACT_ADDRESS,
-        chainId,
-        abi: HupCommunityABI,
-        functionName: 'join',
-        args: [id],
-      })
-    }
+    joinCommunity({
+      address: CONTRACT_ADDRESS,
+      chainId,
+      abi: HupCommunityABI,
+      functionName: 'join',
+      args: [id],
+    })
+  }
 
-    // join() is a no-op on-chain for NFT/Token-Gated (no roster branch in HupCommunity.sol), so
-    // the off-chain request is the only signal a moderator has to go grant access
-    try {
-      await fetch('/api/communities/join-requests', {
+  // Once the confirmed join() was a RequestApproval request (it only sets isPending, not
+  // membership), file the offchain discovery record — guarded per-hash so a re-render can't
+  // double-post the same confirmation.
+  const requestRecordedRef = useRef(null)
+  useEffect(() => {
+    if (!isJoinConfirmed) return
+
+    refetchMyStatus()
+    refetchMyCanPost()
+
+    if (admission === ADMISSION.RequestApproval && activeAccountAddress && requestRecordedRef.current !== joinHash) {
+      requestRecordedRef.current = joinHash
+      fetch('/api/communities/join-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ networkId: chainId, communityId: id, walletAddress: activeAccountAddress }),
       })
-      refetchPendingRequests()
-    } catch (err) {
-      console.error('Failed to record the access request:', err)
+        .then(() => refetchPendingRequests())
+        .catch((err) => console.error('Failed to record the access request:', err))
     }
-  }
+  }, [isJoinConfirmed, joinHash, admission, activeAccountAddress, refetchMyStatus, refetchMyCanPost])
 
-  useEffect(() => {
-    if (isJoinConfirmed) {
-      refetchMyStatus()
-      refetchMyCanPost()
-    }
-  }, [isJoinConfirmed, refetchMyStatus, refetchMyCanPost])
-
-  // Refresh the on-chain community row once an update confirms — membershipType drives the
-  // composer's encrypt-or-not decision, so it must not stay stale after a type change.
+  // Refresh the on-chain community row once an update confirms
   useEffect(() => {
     if (isUpdateConfirmed) refetchCommunity()
   }, [isUpdateConfirmed, refetchCommunity])
 
-  // Plaintext → encrypted type change: once updateCommunity confirms, initialize the encryption
-  // key (keyVersion 0 → 1) by wrapping a fresh content key to the creator's own identity — the
-  // same wrap creation performs atomically. Without this the community *claims* to be private
-  // but keeps posting plaintext. initializeKey is creator-only and one-shot on the contract, so
-  // the guards mirror that instead of discovering it via a revert.
-  const initKeyHandledRef = useRef(null)
-  useEffect(() => {
-    const run = async () => {
-      if (!isUpdateConfirmed || initKeyHandledRef.current === updateHash) return
-      if (!isOwner || isEncryptionInitialized || !isEncryptedMembershipType(editMembershipType)) return
-      if (!vault.identity) {
-        // Vault got locked between submit and confirmation — reprompt; the effect re-runs once
-        // the identity is derived (it's in the dependency list), so nothing is lost.
-        vault.setShowPinPrompt(true)
-        return
-      }
-      initKeyHandledRef.current = updateHash
-
-      try {
-        await writeVaultAsync({
-          address: CONTRACT_ADDRESS,
-          chainId,
-          abi: HupCommunityABI,
-          functionName: 'initializeKey',
-          args: [id, wrapContentKey(generateContentKey(), vault.identity.pubKeyHex)],
-        })
-        refetchKeyVersion()
-      } catch (err) {
-        console.error('Failed to initialize the community encryption key after the type change:', err)
-      }
-    }
-    run()
-  }, [isUpdateConfirmed, updateHash, isOwner, isEncryptionInitialized, editMembershipType, vault.identity])
-
-  // Recovery for the two-tx type-change flow: updateCommunity confirmed but the follow-up
-  // initializeKey above never did (rejected wallet prompt, closed tab, relocked vault). Until
-  // the key epoch exists the composer blocks all posting in this community, so the creator
-  // gets a banner with this handler to finish the setup at any later time.
-  const handleFinishEncryptionSetup = async () => {
+  // Enable encrypted content: encryption is now an explicit per-community toggle (orthogonal to
+  // admission mode) backed by keyVersion > 0, so enabling it later is one direct initializeKey
+  // tx from the Modify dialog — no more two-tx type-change window to fall into.
+  const handleEnableEncryption = async () => {
     if (!vault.identity) {
       vault.setShowPinPrompt(true)
       return
@@ -911,10 +922,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       refetchMembers()
       if (isModerator) {
         refetchKeyRequests()
-        if (membershipType === 6) refetchWhitelist()
+        refetchWhitelist()
       }
     }
-  }, [isManagingMembers, id, isApproveConfirmed, isBanConfirmed, isUnbanConfirmed, membershipType, isModerator])
+  }, [isManagingMembers, id, isApproveConfirmed, isBanConfirmed, isUnbanConfirmed, isModerator])
 
   // Readmission is roster-only — clear the row's busy state once it confirms (the member list
   // refresh itself is handled by the effect above via isUnbanConfirmed)
@@ -982,6 +993,26 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     setPendingRequests((prev) => prev.filter((r) => r.wallet_address?.toLowerCase() !== rejectingAddress.toLowerCase()))
     setRejectingAddress(null)
   }, [isRejectConfirmed, rejectHash, rejectingAddress])
+
+  // Self-heal phantom queue entries: an approveRequest that reverts NoPendingRequest (0xcc2c06e8)
+  // means the offchain record exists but the wallet's onchain isPending was never set — its join()
+  // tx was rejected or failed after the record was written (possible for rows created before the
+  // record-after-confirm fix). Drop the orphaned record so the queue matches the chain; the wallet
+  // can simply request again.
+  const staleRequestHandledRef = useRef(null)
+  useEffect(() => {
+    if (!approveError || !approvingAddress || staleRequestHandledRef.current === approveError) return
+    const text = `${approveError.shortMessage || ''} ${approveError.message || ''}`
+    if (!text.includes('NoPendingRequest') && !text.includes('0xcc2c06e8')) return
+    staleRequestHandledRef.current = approveError
+
+    fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&wallet_address=${approvingAddress}`, {
+      method: 'DELETE',
+    }).catch(() => {})
+
+    setPendingRequests((prev) => prev.filter((r) => r.wallet_address?.toLowerCase() !== approvingAddress.toLowerCase()))
+    setApprovingAddress(null)
+  }, [approveError, approvingAddress])
 
   // After a ban/leave confirms on encrypted communities: rotate the key so the departed member
   // can't read future posts. Only a moderator can rotate (bumpKeyVersion is moderator-gated), so
@@ -1302,7 +1333,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   useEffect(() => {
     if (!data) return
     let cancelled = false
-    const cid = data[4]
+    const cid = data[5]
 
     const resolve = async () => {
       let resolved = { name: `Space #${id}`, summary: 'Invalid metadata payload structure' }
@@ -1340,51 +1371,58 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     )
   }
 
-  const membershipLabels = [
-    'Public',
-    'Request-Based',
-    'Private',
-    'NFT-Gated',
-    'Token-Gated',
-    'NFT + Token Gated',
-    'Whitelisted',
-    'Pay to Join',
-    'Follower-Gated',
-  ]
+  const admissionLabel = ADMISSION_OPTIONS[admission]?.label || '—'
   const typeLabels = ['Discussion', 'Broadcast']
 
-  // Auto-generated mapping getters return fields in structural definition order
-  // This layout structure maps fields as: [address tokenAddress, uint256 minimumBalance]
-  const savedNftAddress = nftRequirementData ? nftRequirementData[0] : null
-  const savedNftMinBalance = nftRequirementData ? nftRequirementData[1]?.toString() : null
-  const hasValidNftAddress = savedNftAddress && savedNftAddress !== '0x0000000000000000000000000000000000000000'
+  // Every amount in the editor is a whole-unit string, so seeding means scaling the raw onchain
+  // integers back by their asset's decimals. The reads are near-always cache hits (the card's own
+  // tags resolved the same assets); when one genuinely fails the editor stays shut rather than
+  // opening with a number that would be written back wrong.
+  const handleStartEditing = async () => {
+    let seededRequirements
+    let seededPaymentPrice
+    try {
+      seededRequirements = await Promise.all(
+        requirementsList.map(async (row) => {
+          const rType = Number(row.rType)
+          const raw = row.minBalance ?? 0n
+          return {
+            rType,
+            asset: row.asset === ZERO_ADDRESS ? '' : row.asset,
+            minBalance:
+              rType === REQUIREMENT_TYPE.NativeBalance
+                ? formatEther(raw)
+                : rType === REQUIREMENT_TYPE.TokenBalance
+                  ? toAmountInput(raw, await fetchTokenDecimals(publicClient, chainId, row.asset))
+                  : raw.toString(),
+          }
+        })
+      )
+      seededPaymentPrice = hasValidPaymentRequirement
+        ? toAmountInput(savedPaymentPrice, await fetchTokenDecimals(publicClient, chainId, savedPaymentToken))
+        : ''
+    } catch (err) {
+      console.error('Failed to read the decimals of this community’s gating assets:', err)
+      alert('Could not load this community’s token settings right now. Please try again in a moment.')
+      return
+    }
 
-  const savedTokenAddress = tokenRequirementData ? tokenRequirementData[0] : null
-  const savedTokenMinBalance = tokenRequirementData ? tokenRequirementData[1]?.toString() : null
-  const hasValidTokenRequirement = tokenRequirementData && savedTokenMinBalance !== '0'
-
-  const savedPaymentToken = paymentRequirementData ? paymentRequirementData[0] : null
-  const savedPaymentPrice = paymentRequirementData ? paymentRequirementData[1]?.toString() : null
-  const savedPaymentIsLsp7 = Boolean(paymentRequirementData?.[2])
-  const hasValidPaymentRequirement = paymentRequirementData && savedPaymentPrice !== '0'
-  const isPaymentNative = !savedPaymentToken || savedPaymentToken === '0x0000000000000000000000000000000000000000'
-
-  const handleStartEditing = () => {
     setEditName(metadata.name || '')
     setEditSummary(metadata.summary || '')
     setEditDescription(metadata.description || '')
     setEditLogoUrl(metadata['logo url'] || '')
     setEditCoverUrl(metadata['cover url'] || '')
-    setEditMembershipType(membershipType)
+    // Splits the stored array back into the dedicated social fields plus a free-form remainder,
+    // so a save round-trips links this form has no dedicated input for
+    const { socials: storedSocials, extra: storedExtraLinks } = parseLinks(metadata.links ?? [])
+    setEditSocials(storedSocials)
+    setEditExtraLinks(storedExtraLinks)
+    setEditAdmission(admission)
     setEditCommunityType(cType)
-    setNftContractAddress(savedNftAddress || '')
-    setMinNftBalance(savedNftMinBalance || '1')
-    setTokenContractAddress(
-      savedTokenAddress && savedTokenAddress !== '0x0000000000000000000000000000000000000000' ? savedTokenAddress : ''
-    )
-    setMinTokenBalance(savedTokenMinBalance || '1')
+    setEditRequirements(seededRequirements)
+    setEditRequirementMode(Number(requirementModeData ?? 0))
     setPaymentTokenAddress(isPaymentNative ? '' : savedPaymentToken)
-    setPaymentPrice(savedPaymentPrice || '')
+    setPaymentPrice(seededPaymentPrice)
     setPaymentIsLsp7(savedPaymentIsLsp7)
     setIsEditing(true)
     setIsPosting(false)
@@ -1400,14 +1438,39 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const handleUpdateSubmit = async (e) => {
     e.preventDefault()
 
-    // Switching a plaintext community to an encrypted type needs the vault unlocked up front:
-    // right after the type change confirms, a follow-up initializeKey tx (see the effect below)
-    // wraps a fresh content key to the creator's identity. Creation does this atomically via
-    // createCommunity's initialWrappedKey param — updateCommunity has no key parameter.
-    if (isEncryptedMembershipType(editMembershipType) && !isEncryptionInitialized && !vault.identity) {
-      vault.setShowPinPrompt(true)
+    // Amounts convert first, before anything is uploaded or signed: every one of them is entered
+    // in whole units of the asset it gates on, so each needs that asset's decimals, and a failed
+    // read here must abort the whole save rather than leave the metadata already updated.
+    let editedTuples
+    let priceValue
+    try {
+      editedTuples = await Promise.all(
+        editRequirements.map(async (row) => ({
+          rType: row.rType,
+          asset: row.asset || ZERO_ADDRESS,
+          // NFT minimums are plain collection counts — they scale by nothing
+          minBalance:
+            row.rType === REQUIREMENT_TYPE.NativeBalance
+              ? parseEther(row.minBalance || '0')
+              : row.rType === REQUIREMENT_TYPE.TokenBalance
+                ? parseUnits(row.minBalance || '0', await fetchTokenDecimals(publicClient, chainId, row.asset))
+                : BigInt(row.minBalance || '0'),
+        }))
+      )
+      if (editAdmission === ADMISSION.PayToJoin && paymentPrice) {
+        priceValue = paymentTokenAddress
+          ? parseUnits(paymentPrice, await fetchTokenDecimals(publicClient, chainId, paymentTokenAddress))
+          : parseEther(paymentPrice)
+      }
+    } catch (err) {
+      console.error('Failed to convert the entered amounts to their onchain units:', err)
+      alert('Could not read the decimals of one of the tokens you entered. Check the address and try again.')
       return
     }
+
+    // Same omit-when-empty rule the create modal uses: clearing every field drops the key
+    // rather than writing an empty array
+    const updatedLinks = buildLinks(editSocials, editExtraLinks)
 
     const updatedMetadataObj = {
       name: editName,
@@ -1415,6 +1478,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       description: editDescription,
       'logo url': editLogoUrl,
       'cover url': editCoverUrl,
+      ...(updatedLinks.length > 0 ? { links: updatedLinks } : {}),
     }
 
     // Community metadata is stored on-chain as an IPFS CID only (MAX_METADATA_LENGTH enforces
@@ -1434,42 +1498,33 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       chainId,
       abi: HupCommunityABI,
       functionName: 'updateCommunity',
-      args: [id, editMembershipType, editCommunityType, updatedMetadataCid],
+      args: [id, editAdmission, editCommunityType, updatedMetadataCid],
     })
 
-    // Trigger update rule targeting public mapping setter when membership rule needs an NFT check
-    if ((editMembershipType === 3 || editMembershipType === 5) && nftContractAddress) {
-      updateNftRequirement({
+    // Replace the whole requirement list (creator-only setter) whenever the editor differs
+    // from what's onchain — one tx swaps the entire configuration atomically
+    const onchainKey = JSON.stringify(
+      requirementsList.map((r) => [Number(r.rType), r.asset.toLowerCase(), r.minBalance?.toString()])
+    )
+    const editedKey = JSON.stringify(editedTuples.map((r) => [r.rType, r.asset.toLowerCase(), r.minBalance.toString()]))
+    const modeChanged = editRequirements.length > 1 && Number(requirementModeData ?? 0) !== editRequirementMode
+    if (onchainKey !== editedKey || modeChanged) {
+      updateRequirementsWrite({
         address: CONTRACT_ADDRESS,
         chainId,
         abi: HupCommunityABI,
-        functionName: 'setNftRequirement',
-        args: [id, nftContractAddress, BigInt(minNftBalance)],
+        functionName: 'setRequirements',
+        args: [id, editedTuples, editRequirementMode],
       })
     }
 
-    // Trigger update rule targeting public mapping setter when membership rule needs a token check
-    if (editMembershipType === 4 || editMembershipType === 5) {
-      updateTokenRequirement({
-        address: CONTRACT_ADDRESS,
-        chainId,
-        abi: HupCommunityABI,
-        functionName: 'setTokenRequirement',
-        args: [id, tokenContractAddress || '0x0000000000000000000000000000000000000000', BigInt(minTokenBalance || '1')],
-      })
-    }
-
-    // Trigger update rule targeting public mapping setter when membership rule is Pay to Join.
-    // Native-coin prices are entered in whole coin units (parseEther); token prices are entered
-    // directly in the token's smallest unit, same convention as the NFT/Token min-balance fields.
-    if (editMembershipType === 7 && paymentPrice) {
-      const priceValue = paymentTokenAddress ? BigInt(paymentPrice) : parseEther(paymentPrice)
+    if (priceValue !== undefined) {
       updatePaymentRequirement({
         address: CONTRACT_ADDRESS,
         chainId,
         abi: HupCommunityABI,
         functionName: 'setPaymentRequirement',
-        args: [id, paymentTokenAddress || '0x0000000000000000000000000000000000000000', priceValue, paymentIsLsp7],
+        args: [id, paymentTokenAddress || ZERO_ADDRESS, priceValue, paymentIsLsp7],
       })
     }
   }
@@ -1542,14 +1597,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   const handleAddToWhitelist = (e) => {
     e.preventDefault()
-    if (!newWhitelistAddress) return
+    if (!newWhitelistAddress.address) return
 
     setWhitelistedContract({
       address: CONTRACT_ADDRESS,
       chainId,
       abi: HupCommunityABI,
       functionName: 'setWhitelisted',
-      args: [id, newWhitelistAddress, true],
+      args: [id, newWhitelistAddress.address, true],
     })
   }
 
@@ -1674,6 +1729,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
       const grantMembers = []
       const grantEnvelopes = []
+      const skippedNoIdentity = []
       for (const req of pendingGrantRequests) {
         try {
           const [statusData, memberPubKey] = await Promise.all([
@@ -1700,7 +1756,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             ).catch(() => {})
             continue
           }
-          if (!memberPubKey || memberPubKey === '0x') continue // no mailbox yet — leave the request pending
+          if (!memberPubKey || memberPubKey === '0x') {
+            // No mailbox: the member never registered an identity key on THIS contract (each
+            // deployment starts a fresh registry). Leave the request pending, but tell the
+            // moderator — silently skipping here made the button look broken.
+            skippedNoIdentity.push(req.wallet_address)
+            continue
+          }
 
           grantMembers.push(req.wallet_address)
           grantEnvelopes.push(wrapContentKey(rawContentKey, memberPubKey))
@@ -1716,6 +1778,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
         await writeVaultAsync({
           address: CONTRACT_ADDRESS,
+          chainId,
           abi: HupCommunityABI,
           functionName: 'grantKeyBatch',
           args: [id, memberChunk, envelopeChunk],
@@ -1731,6 +1794,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         )
       }
 
+      setGrantSkippedAddresses(skippedNoIdentity)
       refetchKeyRequests()
     } catch (err) {
       console.error('Failed to grant pending keys:', err)
@@ -1772,44 +1836,33 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       >
         Write Post
       </button>
-      {!isOwner && !isMember && membershipType === 0 && (
-        <button type="button" className={styles.card__editBtn} disabled={!isActive || isJoinPending} onClick={handleJoinPublic}>
+      {!isOwner && !isMember && admission === ADMISSION.Open && (
+        <button type="button" className={styles.card__editBtn} disabled={!isActive || isJoinPending} onClick={handleJoin}>
           {isJoinPending ? 'Joining...' : 'Join'}
         </button>
       )}
-      {!isOwner && !isMember && isRequestableMembershipType && (
+      {!isOwner && !isMember && admission === ADMISSION.RequestApproval && (
         <button
           type="button"
           className={styles.card__editBtn}
-          disabled={
-            !isActive ||
-            isJoinPending ||
-            Boolean(myPendingRequest) ||
-            ((membershipType === 3 || membershipType === 4 || membershipType === 5 || membershipType === 8) && !myCanPostLive)
-          }
+          disabled={!isActive || isJoinPending || Boolean(myPendingRequest)}
           onClick={handleRequestAccess}
         >
-          {isJoinPending
-            ? 'Requesting...'
-            : myPendingRequest
-              ? 'Request Pending'
-              : (membershipType === 3 || membershipType === 4 || membershipType === 5 || membershipType === 8) && !myCanPostLive
-                ? `Requires ${membershipType === 3 ? 'NFT' : membershipType === 4 ? 'Token' : membershipType === 5 ? 'NFT + Token' : 'Follow'}`
-                : 'Request Access'}
+          {isJoinPending ? 'Requesting...' : myPendingRequest ? 'Request Pending' : 'Request Access'}
         </button>
       )}
-      {!isOwner && !isMember && membershipType === 6 && (
+      {!isOwner && !isMember && admission === ADMISSION.SelfServeIfEligible && (
         <button
           type="button"
           className={styles.card__editBtn}
-          disabled={!isActive || isJoinPending || amIWhitelisted === false}
-          title={amIWhitelisted === false ? "Your wallet is not on this space's whitelist" : undefined}
-          onClick={handleJoinWhitelisted}
+          disabled={!isActive || isJoinPending || amIEligible === false}
+          title={amIEligible === false ? "Your wallet doesn't meet this community's requirements yet" : undefined}
+          onClick={handleJoin}
         >
-          {isJoinPending ? 'Joining...' : amIWhitelisted === false ? 'Not Whitelisted' : 'Join'}
+          {isJoinPending ? 'Joining...' : amIEligible === false ? 'Not Eligible' : 'Join'}
         </button>
       )}
-      {!isOwner && !isMember && membershipType === 7 && (
+      {!isOwner && !isMember && admission === ADMISSION.PayToJoin && (
         <button
           type="button"
           className={styles.card__editBtn}
@@ -1820,7 +1873,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             ? 'Paying...'
             : !hasValidPaymentRequirement
               ? 'Price Not Set'
-              : `Pay ${isPaymentNative ? formatEther(BigInt(savedPaymentPrice || '0')) : savedPaymentPrice} & Join`}
+              : `Pay ${paymentPriceWithSymbol} & Join`}
         </button>
       )}
       {!isOwner && isMember && (
@@ -1833,8 +1886,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           {isBanPending && banningAddress === activeAccountAddress ? 'Leaving...' : 'Leave'}
         </button>
       )}
-      {/* Post.jsx-style three-dot menu holding the management actions; the Members item swaps
-          the popover to the member-list view (AddTabMenu's view-switching pattern) */}
       {isModerator && (
         // Moderation surfaces are first-class icon buttons rather than a hidden menu:
         // Members opens the management modal, the gear opens community settings (Modify).
@@ -1867,15 +1918,91 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     </>
   )
 
+  // Requirement chips shared by the directory card's header tags and the detail page's
+  // labeled requirements row — one fragment so the two surfaces can't drift. NftTag resolves
+  // collection names; the ALL/ANY chip only matters once there's more than one entry.
+  const hasJoinPrice = admission === ADMISSION.PayToJoin && hasValidPaymentRequirement
+  const requirementChips = (
+    <>
+      {requirementsList.length > 1 && (
+        <span className={styles.card__tag} title="How the requirements below combine">
+          {Number(requirementModeData ?? 0) === 1 ? 'ANY of' : 'ALL of'}
+        </span>
+      )}
+      {requirementsList.map((req, index) => {
+        const rType = Number(req.rType)
+        if (rType === REQUIREMENT_TYPE.NftBalance)
+          return <NftTag key={index} tokenAddress={req.asset} chainId={chainId} minBalance={req.minBalance?.toString()} />
+        if (rType === REQUIREMENT_TYPE.TokenBalance)
+          return (
+            <TokenRequirementTag
+              key={index}
+              address={req.asset}
+              chainId={chainId}
+              minBalance={req.minBalance}
+              className={styles.card__tag}
+            />
+          )
+        if (rType === REQUIREMENT_TYPE.NativeBalance)
+          return (
+            <span key={index} className={styles.card__tag}>
+              min {formatEther(req.minBalance ?? 0n)} {nativeCurrency.symbol}
+            </span>
+          )
+        if (rType === REQUIREMENT_TYPE.Whitelisted)
+          return (
+            <span key={index} className={styles.card__tag}>
+              Whitelist
+            </span>
+          )
+        return (
+          <span key={index} className={styles.card__tag}>
+            Follows creator
+          </span>
+        )
+      })}
+      {hasJoinPrice && (
+        <span className={styles.card__tag} title={isPaymentNative ? undefined : `Contract: ${savedPaymentToken}`}>
+          💰 {paymentPriceWithSymbol} to join
+        </span>
+      )}
+    </>
+  )
+
+  // Website + socials the creator saved in the metadata's links array. The detail page renders
+  // its own copy from the indexed row (CommunityDetails), so this only shows on the directory
+  // card — hideHeader skips the whole header block it belongs to.
+  const communityLinks = displayLinks(metadata.links)
+
   // Modify and Manage Members open as NativeDialog modals (CardDialog below) rather than
   // expanding the card inline, so the card itself never stretches the directory grid
   return (
     <div className={hideHeader ? undefined : styles.card}>
       <>
           {hideHeader ? (
-            <div className={styles.card__actionRow} style={{ marginBottom: '1.25rem' }}>
-              {actionButtons}
-            </div>
+            <>
+              {/* The detail page's own header (indexed data) has no requirement info, so the
+                  gating chips get their own labeled row here — a visitor should see what a
+                  "Not Eligible" join button is actually asking for */}
+              {(requirementsList.length > 0 || hasJoinPrice) && (
+                <div className={styles.card__requirements}>
+                  <span
+                    className={styles.card__requirementsLabel}
+                    title={
+                      admission === ADMISSION.SelfServeIfEligible
+                        ? 'Checked by the contract when you join — meeting them admits you instantly'
+                        : 'Your wallet must meet these to participate here'
+                    }
+                  >
+                    Requirements
+                  </span>
+                  <div className={styles.card__tags}>{requirementChips}</div>
+                </div>
+              )}
+              <div className={styles.card__actionRow} style={{ marginBottom: '1.25rem' }}>
+                {actionButtons}
+              </div>
+            </>
           ) : (
             <>
               <Link href={`/communities/${chainId}/${id}`} className={styles.card__link}>
@@ -1926,7 +2053,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 <p className={styles.card__summary}>{metadata.summary || metadata.description}</p>
 
                 <div className={styles.card__tags} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-                  <span className={styles.card__tag}>{membershipLabels[membershipType]}</span>
+                  <span className={styles.card__tag}>{admissionLabel}</span>
                   <span className={styles.card__tag}>{typeLabels[cType]}</span>
                   {/* Indexed member count, passed down from the directory's API rows (the card
                       itself never queries it — the on-chain getters are moderator-gated) */}
@@ -1941,9 +2068,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                       Archived
                     </span>
                   )}
-                  {isEncryptedType && (
+                  {isEncryptionInitialized && (
                     <span className={styles.card__tag} title="Post content is end-to-end encrypted for members">
-                      {isEncryptionInitialized ? '🔒 Encrypted' : '🔒 Encryption pending'}
+                      🔒 Encrypted
                     </span>
                   )}
                   {governor && (
@@ -1952,24 +2079,28 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                     </span>
                   )}
 
-                  {/* Render the extracted sub-component to eliminate the rule-of-hooks error */}
-                  {(membershipType === 3 || membershipType === 5) && hasValidNftAddress && (
-                    <NftTag tokenAddress={savedNftAddress} minBalance={savedNftMinBalance} />
-                  )}
-                  {(membershipType === 4 || membershipType === 5) && hasValidTokenRequirement && (
-                    <span className={styles.card__tag} title={`Contract: ${savedTokenAddress}`}>
-                      Token: min {savedTokenMinBalance}{' '}
-                      {savedTokenAddress === '0x0000000000000000000000000000000000000000' ? 'native coin' : ''}
-                    </span>
-                  )}
-                  {membershipType === 7 && hasValidPaymentRequirement && (
-                    <span className={styles.card__tag} title={isPaymentNative ? undefined : `Contract: ${savedPaymentToken}`}>
-                      💰 {isPaymentNative ? `${formatEther(BigInt(savedPaymentPrice || '0'))} native coin` : `${savedPaymentPrice} (token)`}{' '}
-                      to join
-                    </span>
-                  )}
+                  {requirementChips}
                 </div>
               </Link>
+
+              {/* Outside the header <Link> on purpose — anchors can't nest, and each of these
+                  navigates off-app rather than into the community */}
+              {communityLinks.length > 0 && (
+                <div className={styles.card__links}>
+                  {communityLinks.map((link, index) => (
+                    <a
+                      key={index}
+                      href={link.url}
+                      className={styles.card__linkChip}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {link.title}
+                    </a>
+                  ))}
+                </div>
+              )}
 
               <div className={styles.card__actionRow}>{actionButtons}</div>
             </>
@@ -1984,6 +2115,12 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           )}
 
           {payToJoinError && <div className={styles.card__error}>Error: {payToJoinError.shortMessage || payToJoinError.message}</div>}
+
+          {/* Member of an encrypted community without a working key mailbox (locked vault or
+              unregistered identity): tell THEM directly — moderators can't deliver a key to a
+              wallet with no registered public key, and shouldn't have to chase members 1:1.
+              VaultUnlockPrompt renders the right action for whichever half is missing. */}
+          {isMember && isEncryptionInitialized && (!vault.identity || vault.needsRegistration) && <VaultUnlockPrompt vault={vault} />}
 
           {/* Two-step invite, invitee side: a moderator invited this wallet, but membership is a
               public onchain signal — it only happens if the viewer accepts here themselves */}
@@ -2034,39 +2171,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             </div>
           )}
 
-          {/* Encrypted type chosen but initializeKey never confirmed: the composer refuses to
-              post into this half-configured state (it would leak plaintext), so the creator gets
-              an in-place recovery action. keyVersionData is awaited so the banner doesn't flash
-              while the key version is still loading. */}
-          {isOwner && isEncryptedType && keyVersionData !== undefined && !isEncryptionInitialized && (
-            <div className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')} style={{ marginTop: '1rem' }}>
-              <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Encryption setup unfinished</h5>
-              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem' }}>
-                This community uses an encrypted membership type, but its content key was never initialized — posting is paused for
-                everyone until you finish this step.
-              </p>
-              {vault.identity ? (
-                <button
-                  type="button"
-                  className={styles.card__submit}
-                  style={{ width: 'auto', padding: '0.65rem 1.5rem' }}
-                  disabled={isInitializingKey}
-                  onClick={handleFinishEncryptionSetup}
-                >
-                  {isInitializingKey ? 'Confirming...' : 'Finish encryption setup'}
-                </button>
-              ) : (
-                <Link
-                  href="/settings?tab=security"
-                  className={styles.card__submit}
-                  style={{ display: 'inline-block', width: 'auto', padding: '0.65rem 1.5rem', textAlign: 'center', textDecoration: 'none' }}
-                >
-                  Unlock your Security Vault to continue
-                </Link>
-              )}
-            </div>
-          )}
-
           {/* Sub-Feed Component Layer — detail page (hideHeader) only; the directory grid doesn't need it */}
           {hideHeader && (
             <div className={styles.feed}>
@@ -2078,7 +2182,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               ) : (
                 <div className={styles.feed__list}>
                   {communityPosts.map((post, i) => (
-                    <div key={post.id} className="animate fade">
+                    // Same open-on-click affordance as the home/trending feeds: the row
+                    // navigates to the post's thread view (text selection doesn't trigger it)
+                    <div
+                      key={post.id}
+                      className="animate fade pointer"
+                      onPointerDown={rememberCardPointerDown}
+                      onClick={(e) => {
+                        if (isTextSelectionDrag(e)) return
+                        router.push(`/networks/${post.network_id ?? chainId}/${post.id}`)
+                      }}
+                    >
                       <PostCard item={post} chainId={chainId} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'bookmark']} />
                       {i < communityPosts.length - 1 && <hr />}
                     </div>
@@ -2121,27 +2235,30 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               style={{ margin: '0.5rem 0 0.75rem' }}
               onSubmit={(e) => {
                 e.preventDefault()
-                if (!inviteAddress) return
+                if (!inviteAddress.address) return
                 inviteMemberWrite({
                   address: CONTRACT_ADDRESS,
                   chainId,
                   abi: HupCommunityABI,
                   functionName: 'inviteMember',
-                  args: [id, inviteAddress.trim()],
+                  args: [id, inviteAddress.address],
                 })
               }}
             >
-              <input
-                className={styles.card__input}
-                placeholder="0x... wallet to invite"
+              <RecipientField
+                className={styles.card__recipient}
+                label={null}
+                inputClassName={styles.card__input}
                 value={inviteAddress}
-                onChange={(e) => setInviteAddress(e.target.value)}
+                onChange={setInviteAddress}
+                viewer={address ?? null}
+                placeholder="Name, ENS, or 0x… wallet to invite"
               />
               <button
                 type="submit"
                 className={styles.card__submit}
                 style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
-                disabled={!inviteAddress || isInvitePending}
+                disabled={!inviteAddress.address || isInvitePending}
               >
                 {isInvitePending ? 'Confirm Wallet...' : 'Invite'}
               </button>
@@ -2186,6 +2303,38 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               ))
             )}
           </div>
+
+          {/* Join-fee earnings: paid joins accrue to an onchain ledger (pull-over-push, so a
+              non-payable creator address can never brick admissions) — withdraw from here.
+              The ledger is per-creator across all their communities on this contract. */}
+          {isOwner && Boolean(joinPayoutsData) && joinPayoutsData > 0n && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h5 style={{ fontSize: '0.95rem' }}>Earnings</h5>
+              <div className="flex justify-content-between align-items-center" style={{ padding: '0.5rem 0' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Collected join fees (all your communities): {formatEther(joinPayoutsData)} {nativeCurrency.symbol}
+                </span>
+                <button
+                  type="button"
+                  className={styles.card__submit}
+                  style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
+                  disabled={isWithdrawPending || isWithdrawConfirming}
+                  onClick={() =>
+                    withdrawPayouts({
+                      address: CONTRACT_ADDRESS,
+                      chainId,
+                      abi: HupCommunityABI,
+                      functionName: 'withdrawJoinPayouts',
+                      args: [],
+                    })
+                  }
+                >
+                  {isWithdrawPending ? 'Confirm Wallet...' : isWithdrawConfirming ? 'Withdrawing...' : 'Withdraw'}
+                </button>
+              </div>
+              {withdrawError && <div className={styles.card__error}>Error: {withdrawError?.shortMessage || withdrawError?.message}</div>}
+            </div>
+          )}
 
           {/* DAO governance: point creator-level authority at a governance executor. UI writes
               are creator-only in practice (a governor is a contract executing by proposal). */}
@@ -2304,28 +2453,46 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                       style={{ padding: '0.25rem 0', fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}
                     >
                       {req.wallet_address.slice(0, 8)}...{req.wallet_address.slice(-6)}
+                      {grantSkippedAddresses.includes(req.wallet_address) && (
+                        <span style={{ marginLeft: '0.5rem', fontFamily: 'inherit' }}>
+                          ⚠ no encryption identity on this network yet
+                        </span>
+                      )}
                     </div>
                   ))}
+                  {grantSkippedAddresses.length > 0 && (
+                    <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      ⚠ {grantSkippedAddresses.length} member{grantSkippedAddresses.length > 1 ? 's' : ''} can't receive the key yet:
+                      they must unlock their Security Vault once (Settings → Security) so their encryption identity gets registered on
+                      this network — their request stays queued until then.
+                    </p>
+                  )}
                 </>
               )}
             </div>
           )}
 
-          {isModerator && membershipType === 6 && (
+          {isModerator && (
             <div style={{ marginBottom: '1.5rem' }}>
               <h5 style={{ fontSize: '0.95rem' }}>Whitelist</h5>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0.75rem' }}>
+                Wallets here pass the "Whitelisted" requirement type (configure requirements in Settings).
+              </p>
               <form onSubmit={handleAddToWhitelist} className="flex align-items-center gap-050" style={{ marginBottom: '0.75rem' }}>
-                <input
-                  className={styles.card__input}
-                  placeholder="0x... wallet address"
+                <RecipientField
+                  className={styles.card__recipient}
+                  label={null}
+                  inputClassName={styles.card__input}
                   value={newWhitelistAddress}
-                  onChange={(e) => setNewWhitelistAddress(e.target.value)}
+                  onChange={setNewWhitelistAddress}
+                  viewer={address ?? null}
+                  placeholder="Name, ENS, or 0x… wallet address"
                 />
                 <button
                   type="submit"
                   className={styles.card__submit}
                   style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
-                  disabled={isWhitelistPending || !newWhitelistAddress}
+                  disabled={isWhitelistPending || !newWhitelistAddress.address}
                 >
                   {isWhitelistPending && !removingWhitelistAddress ? 'Adding...' : 'Add'}
                 </button>
@@ -2353,9 +2520,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             </div>
           )}
 
-          {isModerator && isRequestableMembershipType && (
+          {isModerator && isRequestApproval && (
             <div style={{ marginBottom: '1.5rem' }}>
-              <h5 style={{ fontSize: '0.95rem' }}>{membershipType === 1 ? 'Pending Requests' : 'Access Requests'}</h5>
+              <h5 style={{ fontSize: '0.95rem' }}>Pending Requests</h5>
               {pendingRequests.length === 0 ? (
                 <p className={styles.feed__empty}>No pending requests.</p>
               ) : (
@@ -2390,12 +2557,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           {(approveError || banError || unbanError) && (
             <div className={styles.card__error}>
               Error:{' '}
-              {approveError?.shortMessage ||
-                approveError?.message ||
-                banError?.shortMessage ||
-                banError?.message ||
-                unbanError?.shortMessage ||
-                unbanError?.message}
+              {`${approveError?.shortMessage || ''}${approveError?.message || ''}`.match(/NoPendingRequest|0xcc2c06e8/)
+                ? 'This request no longer exists onchain — the wallet’s join transaction never confirmed. The stale entry was removed; they can request again.'
+                : approveError?.shortMessage ||
+                  approveError?.message ||
+                  banError?.shortMessage ||
+                  banError?.message ||
+                  unbanError?.shortMessage ||
+                  unbanError?.message}
             </div>
           )}
         </div>
@@ -2415,16 +2584,28 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               <label className={styles.card__label}>Membership rule</label>
               <select
                 className={styles.card__select}
-                value={editMembershipType}
-                onChange={(e) => setEditMembershipType(Number(e.target.value))}
+                value={editAdmission}
+                onChange={(e) => setEditAdmission(Number(e.target.value))}
               >
-                {MEMBERSHIP_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                {ADMISSION_OPTIONS.map((option) => {
+                  // Same rule as the create modal — self-serve with no requirements admits
+                  // exactly who Open does. Exempt when it's already the community's mode: this
+                  // form writes the enum onchain, so silently downgrading it isn't ours to do.
+                  const locked =
+                    option.value === ADMISSION.SelfServeIfEligible &&
+                    editRequirements.length === 0 &&
+                    editAdmission !== ADMISSION.SelfServeIfEligible
+                  return (
+                    <option key={option.value} value={option.value} disabled={locked} title={locked ? SELF_SERVE_HINTS.locked : option.note}>
+                      {locked ? `${option.label} ${SELF_SERVE_HINTS.lockedSuffix}` : option.label}
+                    </option>
+                  )
+                })}
               </select>
-              <p className={styles.optionNote}>{MEMBERSHIP_OPTIONS[editMembershipType]?.note}</p>
+              <p className={styles.optionNote}>{ADMISSION_OPTIONS[editAdmission]?.note}</p>
+              {editAdmission === ADMISSION.SelfServeIfEligible && editRequirements.length === 0 && (
+                <p className={clsx(styles.optionNote, styles['optionNote--warn'])}>{SELF_SERVE_HINTS.redundant}</p>
+              )}
             </div>
 
             <div className={styles.card__field}>
@@ -2444,87 +2625,139 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             </div>
           </div>
 
-          {/* Conditional Input UI layer for handling smart NFT registration gating configuration properties */}
-          {(editMembershipType === 3 || editMembershipType === 5) && (
-            <div
-              className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')}
-              style={{ marginTop: '1rem', marginBottom: '1rem' }}
-            >
-              <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>NFT Gating Configuration</h5>
-              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem' }}>
-                Works with ERC-721 or LUKSO LSP8 (LSP8's `balanceOf` matches ERC-721's selector).
-              </p>
-              <div className={styles.card__field}>
-                <label className={styles.card__label}>NFT token address</label>
-                <input
-                  className={styles.card__input}
-                  placeholder="0x..."
-                  value={nftContractAddress}
-                  onChange={(e) => setNftContractAddress(e.target.value)}
-                  required={editMembershipType === 3 || editMembershipType === 5}
-                />
-              </div>
-              <div className={styles.card__field} style={{ marginTop: '0.5rem' }}>
-                <label className={styles.card__label}>Minimum NFT balance threshold</label>
-                <input
-                  type="number"
-                  className={styles.card__input}
-                  placeholder="1"
-                  min="1"
-                  value={minNftBalance}
-                  onChange={(e) => setMinNftBalance(e.target.value)}
-                  required={editMembershipType === 3 || editMembershipType === 5}
-                />
-              </div>
+          {/* Composable requirement editor — same rows as the create modal. Works with
+              ERC-721/LSP8 collections and ERC-20/LSP7 tokens (balanceOf is selector-compatible
+              in both pairs). */}
+          <div className={styles.card__field}>
+            <label className={styles.card__label}>Requirements — what members must hold or be (optional)</label>
+            {editRequirements.map((row, index) => {
+              const meta = REQUIREMENT_TYPE_OPTIONS[row.rType]
+              return (
+                <div key={index} className="flex align-items-center gap-050" style={{ marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                  <select
+                    className={styles.card__select}
+                    style={{ width: 'auto' }}
+                    title={meta?.note}
+                    value={row.rType}
+                    // Reset the minimum on type change: a decimal entered for native would
+                    // break the integer BigInt conversion token/NFT rows use
+                    onChange={(e) =>
+                      setEditRequirements((rows) =>
+                        rows.map((r, i) => (i === index ? { ...r, rType: Number(e.target.value), minBalance: '1' } : r))
+                      )
+                    }
+                  >
+                    {REQUIREMENT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {meta?.needsAsset && (
+                    <input
+                      className={styles.card__input}
+                      style={{ flex: 1, minWidth: '180px' }}
+                      placeholder="0x... contract address"
+                      value={row.asset}
+                      onChange={(e) =>
+                        setEditRequirements((rows) => rows.map((r, i) => (i === index ? { ...r, asset: e.target.value } : r)))
+                      }
+                      required
+                    />
+                  )}
+                  {meta?.needsMin && (
+                    <>
+                      <input
+                        className={styles.card__input}
+                        style={{ width: '130px' }}
+                        type="number"
+                        min="0"
+                        // Coin and token minimums are whole units (decimals allowed); NFT
+                        // minimums are a count of items, so they stay integers
+                        step={row.rType === REQUIREMENT_TYPE.NftBalance ? '1' : 'any'}
+                        placeholder={row.rType === REQUIREMENT_TYPE.NftBalance ? 'minimum' : 'e.g. 0.001'}
+                        value={row.minBalance}
+                        onChange={(e) =>
+                          setEditRequirements((rows) => rows.map((r, i) => (i === index ? { ...r, minBalance: e.target.value } : r)))
+                        }
+                      />
+                      {row.rType === REQUIREMENT_TYPE.TokenBalance && <TokenUnitHint address={row.asset} chainId={chainId} />}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.card__cancelBtn}
+                    aria-label="Remove requirement"
+                    onClick={() => setEditRequirements((rows) => rows.filter((_, i) => i !== index))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
+            })}
+            <div className="flex align-items-center gap-050" style={{ flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className={styles.card__editBtn}
+                disabled={editRequirements.length >= 10}
+                onClick={() => setEditRequirements((rows) => [...rows, { rType: 2, asset: '', minBalance: '1' }])}
+              >
+                + Add requirement
+              </button>
+              {editRequirements.length >= 2 && (
+                <select
+                  className={styles.card__select}
+                  style={{ width: 'auto' }}
+                  value={editRequirementMode}
+                  onChange={(e) => setEditRequirementMode(Number(e.target.value))}
+                  aria-label="How requirements combine"
+                >
+                  {REQUIREMENT_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
-          )}
+          </div>
 
-          {/* Conditional Input UI layer for handling token gating configuration properties */}
-          {(editMembershipType === 4 || editMembershipType === 5) && (
-            <div
-              className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')}
-              style={{ marginTop: '1rem', marginBottom: '1rem' }}
-            >
-              <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>Token Gating Configuration</h5>
-              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem' }}>
-                Works with the native coin, ERC-20, or LUKSO LSP7 (LSP7's `balanceOf` matches ERC-20's selector). Leave the address blank to
-                gate on the native coin balance instead.
+          {/* Encrypted content: an explicit toggle now, orthogonal to admission. Enabling is a
+              one-shot initializeKey; there's no "off" that decrypts history (epoch semantics). */}
+          <div className={styles.card__field}>
+            <label className={styles.card__label}>Encrypted content 🔒</label>
+            {isEncryptionInitialized ? (
+              <p className={styles.optionNote}>
+                Enabled — posts seal with the community key. Manage keys and rotation from Members & moderation.
               </p>
-              <div className={styles.card__field}>
-                <label className={styles.card__label}>Token contract address (blank = native coin)</label>
-                <input
-                  className={styles.card__input}
-                  placeholder="0x... (leave blank for native coin)"
-                  value={tokenContractAddress}
-                  onChange={(e) => setTokenContractAddress(e.target.value)}
-                />
-              </div>
-              <div className={styles.card__field} style={{ marginTop: '0.5rem' }}>
-                <label className={styles.card__label}>Minimum token balance threshold</label>
-                <input
-                  type="number"
-                  className={styles.card__input}
-                  placeholder="1"
-                  min="1"
-                  value={minTokenBalance}
-                  onChange={(e) => setMinTokenBalance(e.target.value)}
-                  required={editMembershipType === 4 || editMembershipType === 5}
-                />
-              </div>
-            </div>
-          )}
+            ) : vault.identity ? (
+              <>
+                <button
+                  type="button"
+                  className={styles.card__editBtn}
+                  style={{ width: 'fit-content' }}
+                  disabled={isInitializingKey}
+                  onClick={handleEnableEncryption}
+                >
+                  {isInitializingKey ? 'Confirming...' : 'Enable encryption'}
+                </button>
+                <p className={styles.optionNote}>{ENCRYPTION_NOTES.off}</p>
+              </>
+            ) : (
+              <VaultUnlockPrompt vault={vault} />
+            )}
+          </div>
 
           {/* Conditional Input UI layer for handling Pay to Join configuration */}
-          {editMembershipType === 7 && (
+          {editAdmission === ADMISSION.PayToJoin && (
             <div
               className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')}
               style={{ marginTop: '1rem', marginBottom: '1rem' }}
             >
               <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>Pay to Join Configuration</h5>
               <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem' }}>
-                Payment goes straight to your wallet at join time. Leave the token address blank to price in the native coin (whole-coin
-                units); fill it in to price in an ERC-20 or LSP7 token (smallest unit, e.g. wei for an 18-decimal token) — check the LSP7
-                box below if it's an LSP7 asset, since its transfer mechanism differs from ERC-20's.
+                Payment goes straight to your wallet at join time. Leave the token address blank to price in {nativeCurrency.symbol || 'the native coin'}; fill it in to price in an ERC-20 or LSP7 token — check the LSP7 box below if it's an LSP7 asset, since its
+                transfer mechanism differs from ERC-20's. Either way the price is a whole-token amount, exactly as a holder would say it.
               </p>
               <div className={styles.card__field}>
                 <label className={styles.card__label}>Payment token address (blank = native coin)</label>
@@ -2547,23 +2780,21 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 </div>
               )}
               <div className={styles.card__field} style={{ marginTop: '0.5rem' }}>
-                <label className={styles.card__label}>Price {paymentTokenAddress ? '(smallest unit)' : '(native coin)'}</label>
+                <label className={styles.card__label}>
+                  Price <AssetUnitLabel address={paymentTokenAddress} chainId={chainId} />
+                </label>
                 <input
                   type="number"
                   step="any"
                   className={styles.card__input}
-                  placeholder={paymentTokenAddress ? '1000000000000000000' : '0.01'}
+                  placeholder="0.01"
                   min="0"
                   value={paymentPrice}
                   onChange={(e) => setPaymentPrice(e.target.value)}
-                  required={editMembershipType === 7}
+                  required={editAdmission === ADMISSION.PayToJoin}
                 />
               </div>
             </div>
-          )}
-
-          {isEncryptedMembershipType(editMembershipType) && !isEncryptionInitialized && (!vault.identity || vault.needsRegistration) && (
-            <VaultUnlockPrompt vault={vault} />
           )}
 
           <div className={styles.card__field}>
@@ -2590,23 +2821,29 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
           <ImagePicker label="Cover image" value={editCoverUrl} onChange={setEditCoverUrl} />
 
+          <BrandingLinksFields
+            socials={editSocials}
+            onSocialsChange={setEditSocials}
+            extraLinks={editExtraLinks}
+            onExtraLinksChange={setEditExtraLinks}
+            disabled={isUpdatePending || isUpdateConfirming}
+          />
+
           <button
             type="submit"
             className={styles.card__submit}
             disabled={
               isUpdatePending ||
               isUpdateConfirming ||
-              isNftPending ||
-              isNftConfirming ||
-              isTokenReqPending ||
-              isTokenReqConfirming ||
+              isRequirementsPending ||
+              isRequirementsConfirming ||
               isPaymentReqPending ||
               isPaymentReqConfirming
             }
           >
-            {isUpdatePending || isNftPending || isTokenReqPending || isPaymentReqPending
+            {isUpdatePending || isRequirementsPending || isPaymentReqPending
               ? 'Confirm Wallet...'
-              : isUpdateConfirming || isNftConfirming || isTokenReqConfirming || isPaymentReqConfirming
+              : isUpdateConfirming || isRequirementsConfirming || isPaymentReqConfirming
                 ? 'Updating Block...'
                 : 'Save Configuration'}
           </button>
@@ -2627,21 +2864,16 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 : 'Reactivate community'}
           </button>
 
-          {(updateHash || nftHash || tokenReqHash || paymentReqHash) && (
+          {(updateHash || requirementsHash || paymentReqHash) && (
             <div className={styles.card__monitor}>
               {updateHash && (
                 <p className={styles.card__tx}>
                   Metadata Tx: <span>{updateHash}</span>
                 </p>
               )}
-              {nftHash && (
+              {requirementsHash && (
                 <p className={styles.card__tx}>
-                  NFT Requirement Tx: <span>{nftHash}</span>
-                </p>
-              )}
-              {tokenReqHash && (
-                <p className={styles.card__tx}>
-                  Token Requirement Tx: <span>{tokenReqHash}</span>
+                  Requirements Tx: <span>{requirementsHash}</span>
                 </p>
               )}
               {paymentReqHash && (
@@ -2649,28 +2881,24 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   Payment Requirement Tx: <span>{paymentReqHash}</span>
                 </p>
               )}
-              {(isUpdateConfirming || isNftConfirming || isTokenReqConfirming || isPaymentReqConfirming) && (
+              {(isUpdateConfirming || isRequirementsConfirming || isPaymentReqConfirming) && (
                 <p className={styles.card__status}>Waiting for confirmation...</p>
               )}
               {isUpdateConfirmed &&
-                (editMembershipType !== 3 || isNftConfirmed) &&
-                (editMembershipType !== 4 || isTokenReqConfirmed) &&
-                (editMembershipType !== 5 || (isNftConfirmed && isTokenReqConfirmed)) &&
-                (editMembershipType !== 7 || isPaymentReqConfirmed) && (
-                  <p className={clsx(styles.card__status, styles['card__status--success'])}>Changes committed on-chain!</p>
+                (!requirementsHash || isRequirementsConfirmed) &&
+                (editAdmission !== ADMISSION.PayToJoin || !paymentReqHash || isPaymentReqConfirmed) && (
+                  <p className={clsx(styles.card__status, styles['card__status--success'])}>Changes committed onchain!</p>
                 )}
             </div>
           )}
 
-          {(updateError || nftError || tokenReqError || paymentReqError) && (
+          {(updateError || requirementsError || paymentReqError) && (
             <div className={styles.card__error}>
               Error:{' '}
               {updateError?.shortMessage ||
                 updateError?.message ||
-                nftError?.shortMessage ||
-                nftError?.message ||
-                tokenReqError?.shortMessage ||
-                tokenReqError?.message ||
+                requirementsError?.shortMessage ||
+                requirementsError?.message ||
                 paymentReqError?.shortMessage ||
                 paymentReqError?.message}
             </div>
@@ -2682,7 +2910,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           mode — it seals/tags content for this community and submits on this community's chain */}
       {isPosting && (
         <>
-          {isEncryptionInitialized && isEncryptedType && (!vault.identity || vault.needsRegistration) ? (
+          {isEncryptionInitialized && (!vault.identity || vault.needsRegistration) ? (
             <div className={styles.card__form}>
               <VaultUnlockPrompt vault={vault} />
               <button type="button" className={styles.card__cancelBtn} onClick={() => setIsPosting(false)}>
@@ -2729,8 +2957,8 @@ export default function CommunitiesPage() {
   // reads it directly for anything that actually needs live/authoritative data.
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  // Public/Private split: 'public' = plaintext-content types, 'private' = encrypted membership
-  // types (the isEncryptedMembershipType partition) — resolved by the API's visibility param
+  // Public/Private split: 'public' = plaintext content, 'private' = encrypted content
+  // (indexed is_encrypted flag from KeyInitialized) — resolved by the API's visibility param
   const [visibilityFilter, setVisibilityFilter] = useState('all')
   const [communityRows, setCommunityRows] = useState([])
   const [directoryPage, setDirectoryPage] = useState(1)

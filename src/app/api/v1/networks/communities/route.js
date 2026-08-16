@@ -66,14 +66,14 @@ export async function GET(request) {
       whereClause += ` AND c.membership_type = ?`
       whereParams.push(membershipType)
     }
-    // Visibility split: "public" = plaintext-content types (Public, Whitelisted, Pay to Join),
-    // "private" = the encrypted membership types — the same partition as communityVault's
-    // isEncryptedMembershipType, so the filter matches the 🔒 tag users see on cards
+    // Visibility split by content encryption (the indexed is_encrypted flag, fed by
+    // KeyInitialized events) — encryption is orthogonal to admission mode, so this matches
+    // the 🔒 tag users see on cards exactly
     const visibility = searchParams.get('visibility')
     if (visibility === 'public') {
-      whereClause += ` AND c.membership_type IN (0, 6, 7)`
+      whereClause += ` AND c.is_encrypted = 0`
     } else if (visibility === 'private') {
-      whereClause += ` AND c.membership_type IN (1, 2, 3, 4, 5, 8)`
+      whereClause += ` AND c.is_encrypted = 1`
     }
     if (creatorAddress) {
       whereClause += ` AND c.creator_address = ?`
