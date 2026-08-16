@@ -292,14 +292,16 @@ const TokenPill = ({ token, symbol, chainId, placeholder, caret = 'none', onClic
  * wherever a price exists and flips to token units through the line under it, so "$25 of this"
  * and "5.7K of this" are the same control.
  *
- * Underneath, unchanged: exact-input swaps quoted across BOTH Uniswap venues at once and
- * executed on whichever answers best. v3: QuoterV2 previews every fee tier (and every tier pair
- * for WNATIVE-routed token↔token hops), SwapRouter02 executes, native legs travel as WNATIVE
+ * Underneath, unchanged: exact-input swaps quoted across every venue at once and executed on
+ * whichever answers best. v3: QuoterV2 previews every fee tier (and every tier pair for
+ * WNATIVE-routed token↔token hops), SwapRouter02 executes, native legs travel as WNATIVE
  * with unwrap-in-multicall on the way out — the LaunchCard pattern. v4: V4Quoter probes hookless
  * native↔token pool keys, the UniversalRouter executes, native is currency 0x0 directly, and
- * ERC20 input arrives through the two-step Permit2 grant flow. A chain is live when either venue
- * is fully configured — Robinhood is v4-only, Celo v3-only (its native coin is an ERC20, so
- * v4's 0x0-currency pools don't apply).
+ * ERC20 input arrives through the two-step Permit2 grant flow. Sushi (classic v2): getAmountsOut
+ * previews the direct pair and the WNATIVE hop, the same router executes on one plain approval,
+ * and native legs ride its ETH entry points. A chain is live when any venue is fully
+ * configured — Robinhood is v4-only, Celo v3+Sushi (its native coin is an ERC20, so v4's
+ * 0x0-currency pools don't apply).
  *
  * Dollars always denominate the counter token, the side that has a price feed, so both modes
  * still resolve to one of the two shapes the engine already knows: an exact input, or a receive
@@ -1044,11 +1046,15 @@ const SwapForm = () => {
   // info icon, rather than two more rows on a card the mock keeps to four
   const routeLabel = !best
     ? null
-    : best.venue === 'v4'
-      ? `v4 ${feeLabel(best.tier.fee)}`
-      : best.fees.length === 1
-        ? `v3 ${feeLabel(best.fees[0])}`
-        : `v3 via W${nativeSymbol} ${best.fees.map(feeLabel).join(' → ')}`
+    : best.venue === 'sushi'
+      ? best.path.length === 2
+        ? 'Sushi 0.3%'
+        : `Sushi via W${nativeSymbol}`
+      : best.venue === 'v4'
+        ? `v4 ${feeLabel(best.tier.fee)}`
+        : best.fees.length === 1
+          ? `v3 ${feeLabel(best.fees[0])}`
+          : `v3 via W${nativeSymbol} ${best.fees.map(feeLabel).join(' → ')}`
   const slippageHint =
     best && outSide.decimals !== null
       ? `How far the price may move before the swap reverts — the router enforces it onchain. At this tolerance you receive at least ${qtyLabel(minOut, outSide.decimals, symbolOut)}, routed through ${routeLabel}.`
@@ -1057,7 +1063,7 @@ const SwapForm = () => {
   return (
     <div className={styles.swap}>
       <header className={styles.swap__header}>
-        <p>Swap tokens straight against Uniswap pools — every token launched on Hup trades here too.</p>
+        <p>Swap tokens straight against Uniswap and SushiSwap pools — every token launched on Hup trades here too.</p>
         <NetworkSelect />
       </header>
 
