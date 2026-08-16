@@ -1,0 +1,564 @@
+.manage {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  padding: 1rem;
+  margin-top: 0.5rem;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: inherit;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+      border-color: var(--primary, #ec4899);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+
+    @media (max-width: 480px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    border-radius: var(--global-border-radius);
+    // --background equals --surface in the light and terminal themes, so a borderless block
+    // nested on a surface must step in with --surface-muted or it renders invisible
+    background: var(--surface-muted);
+    padding: 0.7rem 0.8rem;
+
+    span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    strong {
+      font-size: var(--font-size-16, 1rem);
+      font-variant-numeric: tabular-nums;
+    }
+
+    small {
+      font-size: var(--font-size-10, 0.625rem);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.5;
+  }
+
+  &__phases,
+  &__activity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    li {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      padding: 0.55rem 0.7rem;
+      font-size: var(--font-size-12);
+    }
+  }
+
+  &__phaseStatus {
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+    font-weight: 600;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted, #888);
+
+    &--live {
+      background: rgba(34, 160, 107, 0.12);
+      color: #22a06b;
+    }
+
+    &--upcoming {
+      color: var(--primary, #ec4899);
+    }
+
+    &--paused {
+      background: rgba(217, 119, 6, 0.12);
+      color: #d97706;
+    }
+  }
+
+  &__phaseName {
+    font-weight: 600;
+  }
+
+  &__phaseMeta {
+    color: var(--text-muted, #888);
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__phaseMinted {
+    color: var(--text-muted, #888);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__royalty {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+  }
+
+  &__royaltyRow {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.5rem;
+
+    @media (max-width: 520px) {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+  }
+
+  &__phaseToggle {
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: inherit;
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--primary, #ec4899);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    // Starting is the affirmative action, so it carries the accent; pausing stays quiet
+    &--start {
+      background: var(--primary, #ec4899);
+      border-color: var(--primary, #ec4899);
+      color: #fff;
+    }
+  }
+
+  &__activity {
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--font-size-12);
+      // Reads as one block like the phase list rather than text floating on the card
+      background: var(--surface-muted);
+      border-radius: var(--global-border-radius);
+      overflow: hidden;
+    }
+
+    th {
+      text-align: start;
+      font-weight: 600;
+      color: var(--text-muted, #888);
+      padding: 0.45rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 0.45rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  &__danger {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    border: 1px solid rgba(227, 73, 72, 0.35);
+    border-radius: var(--global-border-radius);
+    padding: 0.75rem;
+
+    > div {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      line-height: 1.45;
+    }
+  }
+
+  &__close {
+    border: 1px solid #e34948;
+    background: transparent;
+    color: #e34948;
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+
+    &--armed {
+      background: #e34948;
+      color: #fff;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__disarm {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  /* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+  &__dialog {
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    width: min(440px, calc(100vw - 6px - 2em - 2px));
+  }
+
+  &__dialogHeader {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+  }
+
+  &__dialogCancel {
+    all: unset;
+    cursor: pointer;
+    position: absolute;
+    left: 1rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__dialogBody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1rem;
+    max-height: 70svh;
+    overflow-y: auto;
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  &__image {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: var(--global-border-radius);
+    border: 1px dashed var(--border);
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    overflow: hidden;
+
+    &:hover {
+      border-color: var(--primary, #ec4899);
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &--filled {
+      border-style: solid;
+    }
+
+    &--icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+    }
+  }
+
+  &__imageHint {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    > span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+
+      em {
+        float: inline-end;
+        font-style: normal;
+        opacity: 0.7;
+      }
+    }
+
+    textarea,
+    input:not([type='file']) {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: inherit;
+      padding: 0.6rem 0.75rem;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      resize: vertical;
+
+      &:focus-visible {
+        outline: none;
+        border-color: var(--primary, #ec4899);
+      }
+    }
+
+    small {
+      font-size: var(--font-size-10, 0.625rem);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__banner {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1600 / 640;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    overflow: hidden;
+
+    &:hover {
+      border-color: var(--primary, #ec4899);
+    }
+
+    > span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: var(--font-size-12);
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &--filled {
+      border-style: solid;
+    }
+  }
+
+  &__linksEditor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    > span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__linkRow {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+    gap: 0.4rem;
+    align-items: center;
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: inherit;
+      padding: 0.45rem 0.6rem;
+      font: inherit;
+      font-size: var(--font-size-12);
+
+      &:focus-visible {
+        outline: none;
+        border-color: var(--primary, #ec4899);
+      }
+    }
+
+    button {
+      all: unset;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      color: var(--text-muted, #888);
+
+      &:hover {
+        background: var(--hover);
+      }
+    }
+  }
+
+  &__addLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    align-self: flex-start;
+    border: none;
+    background: none;
+    color: var(--primary, #ec4899);
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  &__save {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: none;
+    background-color: var(--primary, #ec4899);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.7rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}

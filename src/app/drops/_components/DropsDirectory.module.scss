@@ -1,0 +1,315 @@
+.directory {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      max-width: 44ch;
+      line-height: 1.5;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__create {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: none;
+    background-color: var(--primary, #ec4899);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.55rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+
+  &__empty {
+    margin: 1.5rem 0;
+    text-align: center;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  &__sectionHead {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    // Three to a row at full width — tiles carry artwork, a byline and a progress bar, so they
+    // need the room a four-up track was squeezing out
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+
+    @media (max-width: 700px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 480px) {
+      gap: 0.6rem;
+    }
+  }
+
+  /* Launchpad-style tile: full-bleed square artwork with overlay chips, then a bold
+     name and a price + minted-progress stat row on an elevated card */
+  &__card {
+    display: flex;
+    flex-direction: column;
+    border-radius: 20px;
+    // The page container is already --surface, so cards sit on --background to stay legible
+    background: var(--background);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--network-color-primary);
+    }
+  }
+
+  &__media {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__mediaFallback {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+  }
+
+  &__chips {
+    position: absolute;
+    inset-block-start: 0.55rem;
+    inset-inline-start: 0.55rem;
+    display: flex;
+    gap: 0.3rem;
+    max-width: calc(100% - 1.1rem);
+  }
+
+  &__chip {
+    border-radius: 4px;
+    background: rgba(20, 22, 28, 0.62);
+    backdrop-filter: blur(6px);
+    color: #f4f4f5;
+    padding: 0.22rem 0.6rem;
+    font-size: var(--font-size-10, 0.625rem);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &--status {
+      position: absolute;
+      inset-block-start: 0.55rem;
+      inset-inline-end: 0.55rem;
+      background: rgba(227, 73, 72, 0.85);
+    }
+
+    // Mark then name, in the slot the name held alone before — the icon is tucked into the
+    // chip's left padding so the pair costs barely more room than the word did
+    &--network {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding-inline-start: 0.35rem;
+
+      img {
+        display: block;
+        flex-shrink: 0;
+        width: 13px;
+        height: 13px;
+        border-radius: 999px;
+      }
+    }
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.7rem 0.85rem 0.85rem;
+    min-width: 0;
+  }
+
+  &__nameRow {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-16, 1rem);
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // A ticker, not a headline — the name keeps the weight, and the symbol never gets squeezed
+  // out by a long collection name
+  &__ticker {
+    flex-shrink: 0;
+    max-width: 6rem;
+    border-radius: var(--chip-border-radius);
+    background: color-mix(in srgb, var(--text-muted, #888) 14%, transparent);
+    padding: 0.1rem 0.4rem;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-10, 0.625rem);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__by {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__stats {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-variant-numeric: tabular-nums;
+
+    b {
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 700;
+    }
+
+    // The supply count sits quiet beside the price now — the bar under it carries the emphasis
+    em {
+      font-style: normal;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text-muted, #888);
+      white-space: nowrap;
+    }
+  }
+
+  &__progressTrack {
+    display: block;
+    width: 100%;
+    height: 5px;
+    margin-block-start: 0.15rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text-muted, #888) 18%, transparent);
+    overflow: hidden;
+  }
+
+  &__progressFill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    position: relative;
+    overflow: hidden;
+    // Dim at the start, full strength at the leading edge — the bar reads as filling toward
+    // something rather than as a flat block of colour
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 45%, transparent),
+      var(--network-color-primary, var(--color-primary))
+    );
+    // A mint that lands while the grid is open slides the bar instead of snapping it
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  // Only a drop someone can still mint gets the sheen — a sold-out or closed bar is history,
+  // and animating it would suggest otherwise
+  &__progressFill--minting::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: directorySheen 2.4s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &__progressFill {
+      transition: none;
+
+      &::after {
+        animation: none;
+      }
+    }
+  }
+}
+
+@keyframes directorySheen {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}

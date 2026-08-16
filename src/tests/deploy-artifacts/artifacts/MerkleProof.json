@@ -1,0 +1,11 @@
+{
+  "contractName": "MerkleProof",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "MerkleProofInvalidMultiproof",
+      "type": "error"
+    }
+  ],
+  "bytecode": "0x6080806040523460175760399081601c823930815050f35b5f80fdfe5f80fdfea2646970667358221220be3ae2a6c8874e1435486696fca96a7800898e26f6f29b7b9a7650ef6db46f8764736f6c63430008240033"
+}
