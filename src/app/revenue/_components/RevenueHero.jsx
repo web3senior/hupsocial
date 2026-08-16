@@ -1,9 +1,9 @@
 'use client'
 
-import { getAddress } from 'viem'
 import { CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
 import { appChains } from '@/config/contracts'
+import { tokenIconUrl } from '@/lib/tokenIcons'
 import useTokenIcon from '@/hooks/useTokenIcon'
 import { formatTokenAmount } from './formatTokenAmount'
 import styles from './RevenueHero.module.scss'
@@ -13,29 +13,9 @@ const usdFormatter = new Intl.NumberFormat(undefined, { style: 'currency', curre
 
 const NATIVE_TOKEN = '0x0000000000000000000000000000000000000000'
 
-// chainId → TrustWallet assets repo slug, for plain-ERC20 logo lookups. Chains absent
-// here (LUKSO, Monad, testnets) fall back to the initials avatar.
-const TRUSTWALLET_SLUGS = {
-  1: 'ethereum',
-  56: 'smartchain',
-  8453: 'base',
-  42161: 'arbitrum',
-  42220: 'celo',
-}
-
 // The wagmi config stamps iconUrl onto these shared chain objects at client load.
 function chainIconUrl(networkId) {
   return appChains.find((chain) => chain.id === networkId)?.iconUrl || null
-}
-
-function trustwalletIconUrl(networkId, token) {
-  const slug = TRUSTWALLET_SLUGS[networkId]
-  if (!slug) return null
-  try {
-    return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${slug}/assets/${getAddress(token)}/logo.png`
-  } catch (e) {
-    return null
-  }
 }
 
 function shortAddress(address) {
@@ -61,7 +41,7 @@ function TokenRow({ total }) {
 
   // Native rows wear the chain icon; LSP7s their onchain icon; plain ERC20s try
   // TrustWallet. Initials always render underneath as the fallback.
-  const iconSrc = isNative ? chainIcon : lsp7Icon || trustwalletIconUrl(total.network_id, total.token)
+  const iconSrc = isNative ? chainIcon : lsp7Icon || tokenIconUrl(total.network_id, total.token)
 
   return (
     <li className={styles.hero__token}>
