@@ -5,7 +5,8 @@ import useSWR from 'swr'
 import { SWAP_TOKENS } from '@/lib/tokens'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { formatNative } from '@/lib/launch'
-import { CoinIcon, FlameIcon } from '@phosphor-icons/react'
+import TokenIcon from '@/components/ui/TokenIcon'
+import { FlameIcon } from '@phosphor-icons/react'
 import styles from './TrendingTokens.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
@@ -79,13 +80,7 @@ const TrendingTokens = ({ chainId, nativeSymbol, onSelect }) => {
         {rows.map((token) => (
           <li key={token.address}>
             <button type="button" className={styles.trending__row} onClick={() => onSelect?.(token)}>
-              {token.logo ? (
-                <img src={token.logo} alt="" className={styles.trending__logo} />
-              ) : (
-                <span className={styles.trending__logo} aria-hidden="true">
-                  <CoinIcon size={16} />
-                </span>
-              )}
+              <TokenIcon token={token} chainId={chainId} size="md" />
               <span className={styles.trending__identity}>
                 <strong>
                   {token.symbol}

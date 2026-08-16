@@ -7,7 +7,8 @@ import { useReadContracts } from 'wagmi'
 import { SWAP_TOKENS } from '@/lib/tokens'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import NativeDialog from '@/components/ui/NativeDialog'
-import { CoinIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import TokenIcon from '@/components/ui/TokenIcon'
+import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
 import styles from './TokenSelectDialog.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
@@ -115,8 +116,13 @@ const TokenSelectDialog = forwardRef(function TokenSelectDialog({ chainId, chain
     <NativeDialog ref={dialogRef} className={styles.tokenDialog} lightDismiss>
       <header className={styles.tokenDialog__header}>
         <h3>Select a token</h3>
-        <button type="button" className={styles.tokenDialog__cancel} onClick={() => dialogRef.current?.close()}>
-          Cancel
+        <button
+          type="button"
+          className={styles.tokenDialog__close}
+          aria-label="Close"
+          onClick={() => dialogRef.current?.close()}
+        >
+          <XIcon size={18} />
         </button>
       </header>
 
@@ -150,9 +156,7 @@ const TokenSelectDialog = forwardRef(function TokenSelectDialog({ chainId, chain
               disabled={!customSymbol}
               onClick={() => pick({ address: customAddress, symbol: customSymbol })}
             >
-              <span className={styles.tokenDialog__logo} aria-hidden="true">
-                <CoinIcon size={18} />
-              </span>
+              <TokenIcon token={{ address: customAddress }} chainId={chainId} />
               <span className={styles.tokenDialog__identity}>
                 <strong>{customSymbol ?? 'Reading token…'}</strong>
                 <small>{customSymbol ? `${customName} · ${shortAddress(customAddress)}` : shortAddress(customAddress)}</small>
@@ -164,13 +168,7 @@ const TokenSelectDialog = forwardRef(function TokenSelectDialog({ chainId, chain
         {rows.map((token) => (
           <li key={token.native ? 'native' : token.address}>
             <button type="button" className={styles.tokenDialog__row} onClick={() => pick(token)}>
-              {token.logo ? (
-                <img src={token.logo} alt="" className={styles.tokenDialog__logo} />
-              ) : (
-                <span className={styles.tokenDialog__logo} aria-hidden="true">
-                  <CoinIcon size={18} />
-                </span>
-              )}
+              <TokenIcon token={token} chainId={chainId} />
               <span className={styles.tokenDialog__identity}>
                 <strong>{token.symbol}</strong>
                 <small>{token.name ?? shortAddress(token.address)}</small>

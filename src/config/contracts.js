@@ -78,6 +78,14 @@ export const CONTRACTS = {
     univ4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
     univ4Quoters: ['0x52F0E24D1c21C8A0cB1e5a5dD6198556BD9E1203'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    // SushiSwap classic (V2 AMM), the third venue in the swap page's quote race. One address
+    // does both jobs: getAmountsOut previews, the same router executes. Every sushiV2Router
+    // below was verified onchain 2026-08-16 — router.factory() matches Sushi's canonical
+    // factory on that chain, router.WETH() == wnative (Celo's router has no WETH at all,
+    // mirroring Uniswap's Celo deploy — CELO the ERC20 is what pools pair against), and a
+    // live getAmountsOut through the wnative/stable pair answered on every one. Monad has
+    // no code at Sushi's addresses; Robinhood and the testnets have no Sushi deployment.
+    sushiV2Router: '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F',
   },
   chain42: {
     name: 'lukso',
@@ -206,6 +214,9 @@ export const CONTRACTS = {
     launch: '',
     univ3Router: '0xfE31F71C1b106EAc32F1A19239c9a9A72ddfb900',
     univ3Quoter: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
+    // No sushiV2Router: Sushi's classic factory/router addresses have no code on Monad
+    // (checked 2026-08-16). Add one only after resolving it from Sushi's own registry and
+    // re-running the chain1 verification drill.
     wnative: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A', // WMON
     univ4Router: '0x0D97Dc33264bfC1c226207428A79b26757fb9dc3',
     univ4PoolManager: '0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e',
@@ -242,6 +253,9 @@ export const CONTRACTS = {
     univ4PoolManager: '0x288dc841A52FCA2707c6947B3A777c5E56cd87BC',
     univ4Quoters: ['0x28566da1093609182dFf2cB2A91CFD72e61d66cd'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    // Verified per the chain1 drill; nativeIsErc20 keeps every Sushi trade here on the
+    // plain token-to-token path, so the router's missing WETH() never comes into play.
+    sushiV2Router: '0x1421bDe4B10e8dd459b3BCb598810B1337D56842',
   },
   chain8453: {
     name: 'base',
@@ -265,6 +279,7 @@ export const CONTRACTS = {
     univ4PoolManager: '0x498581fF718922c3f8e6A244956aF099B2652b2b',
     univ4Quoters: ['0x0d5e0F971ED27FBfF6c2837bf31316121532048D'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    sushiV2Router: '0x6BDED42c6DA8FBf0d2bA55B2fa120C5e0c8D7891', // verified per the chain1 drill
   },
   chain56: {
     name: 'bnb',
@@ -288,6 +303,7 @@ export const CONTRACTS = {
     univ4PoolManager: '0x28e2Ea090877bF75740558f6BFB36A5ffeE9e9dF',
     univ4Quoters: ['0x9F75dD27D6664c475B90e105573E550ff69437B0'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506', // verified per the chain1 drill
   },
   chain4663: {
     name: 'robinhood',
@@ -356,6 +372,7 @@ export const CONTRACTS = {
     univ4PoolManager: '0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32',
     univ4Quoters: ['0x3972C00f7ed4885e145823eb7C655375d275A1C5'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506', // verified per the chain1 drill
   },
 }
 
