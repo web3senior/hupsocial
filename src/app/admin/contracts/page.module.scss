@@ -1,18 +1,198 @@
 /* @file app/admin/contracts/page.module.scss */
 
+@use '@/styles/components/responsive' as *;
+
 .admin-contracts {
   padding: 2.5rem 0;
   min-height: 80vh;
   box-sizing: border-box;
 
+  // Aside is fixed at 250px and nothing in the layout reserves that gutter, so a canvas this
+  // wide has to keep clear of it itself — otherwise the left column of cards sits under the nav
+  @include md-up() {
+    padding-left: 250px;
+  }
+
   &__container {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
-    max-width: 900px;
+    gap: 1.5rem;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 0 1rem;
     box-sizing: border-box;
+  }
+
+  &__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  &__toolbar-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  &__page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+
+  &__page-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0;
+    word-break: break-all;
+
+    code {
+      font-family: var(--font-mono, monospace);
+      background: var(--surface-muted);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+  }
+
+  // The tab strip has to clear the app's fixed 70px header, or scrolling parks it underneath.
+  // Below md it stays in the flow — two sticky rows plus the header would eat a third of a phone.
+  &__nav {
+    @include md-up() {
+      position: sticky;
+      top: 70px;
+      z-index: 1;
+    }
+
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
+  }
+
+  // Eleven tabs never fit a phone, so the strip scrolls sideways instead of wrapping into a
+  // block that pushes the cards off screen
+  &__tabs {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 0.25rem;
+  }
+
+  &__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 0 0 auto;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--accent, #f97316);
+    }
+
+    &--active {
+      background: var(--accent, #f97316);
+      border-color: var(--accent, #f97316);
+      color: #0d0d0d;
+    }
+
+    &--empty:not(&--active) {
+      opacity: 0.45;
+    }
+  }
+
+  &__tab-count {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.05rem 0.4rem;
+    border-radius: 50px;
+    background: var(--surface-muted);
+    color: inherit;
+
+    .admin-contracts__tab--active & {
+      background: rgba(0, 0, 0, 0.18);
+    }
+  }
+
+  &__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+
+    // Ten chains wrap to three rows on a phone; scroll them sideways instead
+    @include md-down() {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      padding-bottom: 0.25rem;
+    }
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 0 0 auto;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      background: var(--network-color-primary, var(--accent, #f97316));
+      border-color: var(--network-color-primary, var(--accent, #f97316));
+      color: var(--network-color-text, #0d0d0d);
+    }
+  }
+
+  &__chip-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  &__empty {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2.5rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    margin: 0;
   }
 
   &__header {
@@ -36,13 +216,16 @@
     margin: 0;
   }
 
+  // Each tab shows one group at a time, so cards can pair up on wide screens instead of
+  // stacking a chain per screenful
   &__grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 1.5rem;
+    align-items: start;
 
-    @media (min-width: 768px) {
-      grid-template-columns: 1fr;
+    @media (min-width: 1180px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
@@ -140,7 +323,7 @@
     font-size: 0.8rem;
     color: var(--text-muted);
     font-weight: 500;
-    min-width: 140px;
+    min-width: 120px;
 
     a {
       color: inherit;
@@ -167,7 +350,13 @@
       border: 1px solid var(--border);
     }
 
+    // Explorer links are "<code>0x…</code> ↗" — laid out inline the arrow breaks onto a line of
+    // its own the moment the address runs long, so keep the pair as one shrinking flex box
     a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      max-width: 100%;
       color: var(--accent, #f97316);
       text-decoration: none;
       transition: opacity 0.15s ease;
@@ -292,6 +481,7 @@
   &__tools {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.75rem;
   }
 
