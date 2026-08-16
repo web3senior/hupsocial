@@ -32,7 +32,9 @@ export const profileFetcher = async (address) => {
     console.error('Profile fetch pipeline error:', e)
   }
 
-  return { wallet: address, name: DEFAULT_USERNAME, profileImage: DEFAULT_PFP }
+  // Keyed as `wallet_address` to match both the UP and database shapes — consumers
+  // read that field, so a differently-named key here reads as a missing address.
+  return { wallet_address: address, name: DEFAULT_USERNAME, profileImage: DEFAULT_PFP }
 }
 
 /**
