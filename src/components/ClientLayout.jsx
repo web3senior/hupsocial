@@ -45,7 +45,7 @@ export default function ClientLayout({ children }) {
         <Header />
         <Aside />
         <main className={styles.main}>{children}</main>
-        <Footer />
+        {/* <Footer /> */}
         <InstallAppDialog />
       </WagmiContext>
 
