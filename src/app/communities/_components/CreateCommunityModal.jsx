@@ -32,6 +32,10 @@ import {
 } from '../membershipOptions'
 import styles from '../page.module.scss'
 
+// A half-filled form survives a full page refresh too: every field mirrors into this
+// localStorage draft, restored on mount and dropped once a community is actually created.
+const DRAFT_STORAGE_KEY = 'hup_community_create_draft'
+
 const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, vaultPrompt, onClose, onCreated }, ref) {
   const [activeChain, activeChainContracts] = getActiveChain()
   const CONTRACT_ADDRESS = activeChainContracts?.community
@@ -68,6 +72,91 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const [paymentIsLsp7, setPaymentIsLsp7] = useState(false)
   const [isConfiguring, setIsConfiguring] = useState(false)
   const [configError, setConfigError] = useState('')
+
+  // Draft restore runs in an effect, not the state initializers — effects never run during
+  // SSR, so the server-rendered markup and the first client render always agree.
+  const suppressNextDraftSaveRef = useRef(true)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (!raw) return
+      const draft = JSON.parse(raw)
+      setName(draft.name ?? '')
+      setSummary(draft.summary ?? '')
+      setDescription(draft.description ?? '')
+      setLogoUrl(draft.logoUrl ?? '')
+      setCoverUrl(draft.coverUrl ?? '')
+      // Merged over the empty shapes so a draft written before a field existed stays valid
+      setSocials({ ...emptySocials, ...(draft.socials ?? {}) })
+      setExtraLinks(Array.isArray(draft.extraLinks) ? draft.extraLinks : [])
+      setAdmission(draft.admission ?? ADMISSION.Open)
+      setCommunityType(draft.communityType ?? 0)
+      setRequirements(Array.isArray(draft.requirements) ? draft.requirements : [])
+      setRequirementMode(draft.requirementMode ?? 0)
+      setEncrypted(Boolean(draft.encrypted))
+      setPaymentToken(draft.paymentToken ?? '')
+      setPaymentPrice(draft.paymentPrice ?? '')
+      setPaymentIsLsp7(Boolean(draft.paymentIsLsp7))
+    } catch {
+      // Unreadable draft (corrupt JSON, blocked storage) — start clean
+    }
+  }, [])
+
+  useEffect(() => {
+    // Suppressed on mount: that run still sees the pristine initial values, and writing them
+    // would clobber the stored draft before the restore effect's setStates have applied
+    if (suppressNextDraftSaveRef.current) {
+      suppressNextDraftSaveRef.current = false
+      return
+    }
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          name,
+          summary,
+          description,
+          logoUrl,
+          coverUrl,
+          socials,
+          extraLinks,
+          admission,
+          communityType,
+          requirements,
+          requirementMode,
+          encrypted,
+          paymentToken,
+          paymentPrice,
+          paymentIsLsp7,
+        })
+      )
+    } catch {
+      // Storage full or blocked — the form still works, it just won't survive a refresh
+    }
+  }, [name, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7])
+
+  // Fields go back to their initial values once a community is fully created — the parent
+  // closes the modal at that point, and reopening it with the created community's data still
+  // filled in would invite an accidental duplicate. The reset's own save-effect run is
+  // suppressed so it doesn't immediately re-write a pristine draft.
+  const resetForm = () => {
+    suppressNextDraftSaveRef.current = true
+    setName('')
+    setSummary('')
+    setDescription('')
+    setLogoUrl('')
+    setCoverUrl('')
+    setSocials(emptySocials)
+    setExtraLinks([])
+    setAdmission(ADMISSION.Open)
+    setCommunityType(0)
+    setRequirements([])
+    setRequirementMode(0)
+    setEncrypted(false)
+    setPaymentToken('')
+    setPaymentPrice('')
+    setPaymentIsLsp7(false)
+  }
 
   const needsPayment = admission === ADMISSION.PayToJoin
   const isSelfAdmit = admission === ADMISSION.Open || admission === ADMISSION.SelfServeIfEligible || admission === ADMISSION.PayToJoin
@@ -139,6 +228,14 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       if (!isConfirmed || !receipt || configuredRef.current === hash) return
       configuredRef.current = hash
 
+      // The community exists onchain from this point (even if the gating follow-ups below
+      // fail), so the refresh-survival draft would only resurrect an already-created form
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY)
+      } catch {
+        // Blocked storage — nothing to clean up
+      }
+
       let newCommunityId = null
       for (const log of receipt.logs) {
         try {
@@ -203,6 +300,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
         setIsConfiguring(false)
       }
 
+      resetForm()
       onCreated?.()
     }
     run()
