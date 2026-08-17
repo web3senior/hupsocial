@@ -2,11 +2,14 @@
 
 import { useEffect, useRef } from 'react'
 import { QuotesIcon, RepeatIcon } from '@phosphor-icons/react'
-import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useSignTypedData, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { getPublicClient } from 'wagmi/actions'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
-import { CONTRACTS } from '@/config/wagmi'
+import { CONTRACTS, config } from '@/config/wagmi'
+import { isSessionActive } from '@/lib/burnerSession'
+import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import abi from '@/abi/post.json'
 import NativePopover from './NativePopover'
@@ -21,7 +24,9 @@ import postStyles from '../Post.module.scss'
  */
 export const Repost = ({ post, onQuote }) => {
   const isMounted = useClientMounted()
-  const { isConnected } = useConnection()
+  const { address, isConnected } = useConnection()
+  const publicClient = usePublicClient()
+  const { signTypedDataAsync } = useSignTypedData()
   const { stats, mutate } = usePostStats(post)
   const lastActionRef = useRef(null)
   const { data: hash, isPending, mutateAsync: writeContractAsync } = useWriteContract()
@@ -52,6 +57,50 @@ export const Repost = ({ post, onQuote }) => {
     return targetChain.hup
   }
 
+  /**
+   * Relays the repost `create` through the forwarder so the tap costs the user nothing.
+   * The relay route buckets it as a repost, not a post, by decoding the ContentType
+   * argument. Returns false whenever the relay is unavailable — cooldown included —
+   * leaving the tap on the usual wallet path, where the prompt is the consent to pay.
+   * @param {Array} args Owner-first `create` args for the repost.
+   * @returns {Promise<boolean>} Whether the repost went out sponsored.
+   */
+  const tryGaslessRepost = async (args) => {
+    const chainId = Number(post.network_id)
+    if (!isGaslessEnabled(chainId)) return false
+    if (gaslessCooldown('create', chainId, address, args) > 0) return false
+
+    const chainDefinition = config.chains.find((item) => item.id === chainId)
+    if (!chainDefinition) return false
+
+    // Pinned to the post's own chain: the relay reads nonce and forwarder trust there,
+    // regardless of which network the wallet is connected to
+    const targetPublicClient = getPublicClient(config, { chainId }) ?? publicClient
+
+    try {
+      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
+
+      await relayHupAction({
+        chain: chainDefinition,
+        publicClient: targetPublicClient,
+        owner: address,
+        functionName: 'create',
+        args,
+        signTypedDataAsync,
+        useSessionKey: session.active,
+      })
+
+      return true
+    } catch (err) {
+      if (err.code === 'RELAY_COOLDOWN') {
+        toast('Free-repost allowance is used up for now — using your wallet instead.', 'info')
+      } else {
+        console.warn('Gasless repost unavailable:', err.message)
+      }
+      return false
+    }
+  }
+
   const repost = async (id) => {
     const hupAddress = resolveHupAddress()
     if (!hupAddress) return
@@ -68,6 +117,14 @@ export const Repost = ({ post, onQuote }) => {
         }),
         { revalidate: false },
       )
+
+      // Owner-first for the relay — attribution flows through _resolveActor both for a
+      // session key and for a wallet signing for itself. The wallet fallback below keeps
+      // its ZERO_ADDRESS direct-call form.
+      if (await tryGaslessRepost([address, ContentType.Repost, '', BigInt(id), false])) {
+        toast('Reposted — gas covered by Hup!', 'success')
+        return
+      }
 
       await writeContractAsync({
         abi,

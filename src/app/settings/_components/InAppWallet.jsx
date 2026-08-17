@@ -25,7 +25,8 @@ export default function InAppWallet({ onOpenSecurity }) {
   // Establish state to track whether the switch is turned on or off
   const [isOn, setIsOn] = useState(true)
 
-  // Trial: while on, posts are relayed through our forwarder and cost the author nothing
+  // Trial: while on, posts, likes, unlikes and reposts are relayed through our forwarder
+  // and cost the user nothing
   const [isGaslessOn, setIsGaslessOn] = useState(true)
 
   const { address } = useConnection()
@@ -422,7 +423,7 @@ export default function InAppWallet({ onOpenSecurity }) {
 
         <div className={clsx('col-desktop-4 flex align-items-center justify-content-between gap-1')}>
           <div className="flex flex-column">
-            <span>Gasless Post</span>
+            <span>Gasless Actions</span>
             {/* Whoever just learned their posts are paid for is exactly who might chip in */}
             <Link href="/gas" className={styles.subtleLink}>
               See the gas tank

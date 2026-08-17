@@ -33,17 +33,57 @@ export const isGaslessChainId = (networkId) => {
 //   max/windowMs — ceiling over a longer stretch
 // Posting has no natural bound the way a like does (a like can only land once per post), so
 // the cooldown is what keeps one account from emptying the relayer.
+//
+// The interaction buckets have no cooldown on purpose: a basket bigger than one batchLike
+// chunk sends its chunks back-to-back, and a gap between them would throttle chunk two of
+// the same tap. The window cap is the brake instead — and it caps transactions, not
+// hearts, since one batchLike carries up to 50 of them.
+//
+// Unlike gets its own deliberately small window, and that asymmetry is the whole defense
+// against heart-toggle farming: a like→unlike→like drain cycle needs exactly one sponsored
+// unlike per round, so cycles are capped at the unlike max per account per chain per hour.
+// Real users unlike a mistap now and then; past the cap the app falls back to the user's
+// own wallet, so nothing breaks — it just stops being on us. The two remaining backstops
+// are the pre-send simulation (a toggle the contract would revert never costs gas) and the
+// tank itself: relayer balances are kept small per chain, so the worst any farm can do is
+// empty a tank and turn the trial back into user-paid.
 export const GASLESS_POLICY = {
   create: { cooldownMs: 60000, windowMs: 3600000, max: 20 },
+  like: { cooldownMs: 0, windowMs: 3600000, max: 30 },
+  unlike: { cooldownMs: 0, windowMs: 3600000, max: 5 },
+  repost: { cooldownMs: 0, windowMs: 3600000, max: 30 },
   chat: { cooldownMs: 0, windowMs: 60000, max: 30 },
 }
 
 export const gaslessPolicyFor = (bucket) => GASLESS_POLICY[bucket] ?? GASLESS_POLICY.chat
 
 // Which bucket a relayed Hup call belongs to; anything absent here is not sponsored.
-// Creating content is the only sponsored Hup action — likes stay on the user's own key.
+// Creating content, liking, unliking and reposting are sponsored. Un-repost is deliberately
+// not: it rides deleteContent, a selector that deletes ANY of the caller's content, and
+// sponsoring deletions is a different decision from sponsoring taps. batchLike is the only
+// like selector listed because it is the only one the app sends — even a single heart goes
+// out as batchLike([id]).
 export const GASLESS_BUCKETS = {
   create: 'create',
+  batchLike: 'like',
+  unlike: 'unlike',
+}
+
+// ContentType.Repost in the Hup contract, mirrored here because this file must stay
+// dependency-free (see header).
+export const CONTENT_TYPE_REPOST = 2
+
+/**
+ * Rate-limit bucket for a sponsored call. A repost rides the `create` selector with
+ * ContentType.Repost and empty metadata, so `create` splits on the call's type argument —
+ * a repost is throttled like the tap it is, not like authoring a post. `args` is index 1 =
+ * content type, which holds both for the client's plain args array and for the route's
+ * decoded calldata.
+ */
+export const gaslessBucketFor = (functionName, args) => {
+  const bucket = GASLESS_BUCKETS[functionName]
+  if (bucket === 'create' && Number(args?.[1]) === CONTENT_TYPE_REPOST) return 'repost'
+  return bucket
 }
 
 /** "45 seconds" / "2 minutes" — for user-facing throttle messages. */

@@ -11,12 +11,13 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
-import { useChainId, useConfig, useConnection, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi'
+import { useChainId, useConfig, useConnection, usePublicClient, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi'
 import { getPublicClient } from 'wagmi/actions'
 import abi from '@/abi/post.json'
 import { CONTRACTS } from '@/config/wagmi'
 import { getNetworkDisplayName } from '@/lib/chains'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { MAX_BATCH_LIKE_COUNT, chunk, describeDropped, preflightQueue } from '@/lib/batchLike'
 import { getWalletBatchMap, useSidebarStore } from '@/stores/useSidebarStore'
 import { toast } from '@/components/NextToast'
@@ -31,6 +32,7 @@ export const useBatchLike = () => {
   const publicClient = usePublicClient()
   const { switchChainAsync } = useSwitchChain()
   const { mutateAsync: writeContractAsync } = useWriteContract()
+  const { signTypedDataAsync } = useSignTypedData()
 
   const likedPostIdsMap = useSidebarStore((state) => state.likedPostIds ?? {})
   const removeFromBatch = useSidebarStore((state) => state.removeFromBatch)
@@ -86,13 +88,20 @@ export const useBatchLike = () => {
       // client pinned to the basket's own chain
       const targetPublicClient = getPublicClient(config, { chainId: numericChainId }) ?? publicClient
 
+      // Only the wallet write path needs the wallet on the basket's chain — the relay and
+      // the burner session both sign locally against the pinned chain definition. Switching
+      // lazily means a fully sponsored send never opens a network-switch prompt at all.
+      let walletOnTargetChain = walletChainId === numericChainId
+
+      const ensureWalletChain = async () => {
+        if (walletOnTargetChain) return
+        toast('Switching network to match the basket...', 'info')
+        await switchChainAsync({ chainId: numericChainId })
+        walletOnTargetChain = true
+      }
+
       try {
         setPendingNetworkId(String(networkId))
-
-        if (walletChainId !== numericChainId) {
-          toast('Switching network to match the basket...', 'info')
-          await switchChainAsync({ chainId: numericChainId })
-        }
 
         let queue = group.ids
         let dropped = []
@@ -134,28 +143,65 @@ export const useBatchLike = () => {
 
         const batches = chunk(queue, MAX_BATCH_LIKE_COUNT)
 
+        // The pre-check only skips a relay round trip that the local cooldown mirror already
+        // knows is doomed; the server stays the authority once a request goes out.
+        let relayUsable = isGaslessEnabled(networkId) && gaslessCooldown('batchLike', networkId, address) === 0
+        let relayedCount = 0
+
         for (let index = 0; index < batches.length; index++) {
           const batch = batches[index]
 
           if (batches.length > 1) toast(`Signing batch ${index + 1} of ${batches.length}`, 'info')
 
-          if (session.active) {
-            // Burner key authorization route needs no wallet confirmation
-            await writeWithBurnerSession({
-              chain: chainDefinition,
-              contractAddress: targetChain.hup,
-              abi,
-              functionName: 'batchLike',
-              args: [address, batch],
-            })
-          } else {
-            await writeContractAsync({
-              abi,
-              chainId: numericChainId,
-              address: targetChain.hup,
-              functionName: 'batchLike',
-              args: [address, batch],
-            })
+          let sent = false
+
+          if (relayUsable) {
+            try {
+              await relayHupAction({
+                chain: chainDefinition,
+                publicClient: targetPublicClient ?? publicClient,
+                owner: address,
+                functionName: 'batchLike',
+                args: [address, batch],
+                signTypedDataAsync,
+                useSessionKey: session.active,
+              })
+
+              sent = true
+              relayedCount++
+            } catch (err) {
+              // Unlike posting, a like cooldown falls back to the paid path instead of
+              // stopping: the free-like window can be a long wait, hearts that stop working
+              // read as broken, and the wallet prompt itself is the user's consent to pay.
+              relayUsable = false
+              if (err.code === 'RELAY_COOLDOWN') {
+                toast('Free-like allowance is used up for now — sending with your wallet instead.', 'info')
+              } else {
+                console.warn('Gasless like unavailable:', err.message)
+              }
+            }
+          }
+
+          if (!sent) {
+            if (session.active) {
+              // Burner key authorization route needs no wallet confirmation
+              await writeWithBurnerSession({
+                chain: chainDefinition,
+                contractAddress: targetChain.hup,
+                abi,
+                functionName: 'batchLike',
+                args: [address, batch],
+              })
+            } else {
+              await ensureWalletChain()
+              await writeContractAsync({
+                abi,
+                chainId: numericChainId,
+                address: targetChain.hup,
+                functionName: 'batchLike',
+                args: [address, batch],
+              })
+            }
           }
 
           // Flag every signed post as liked so feed hearts turn red immediately instead of
@@ -166,7 +212,14 @@ export const useBatchLike = () => {
         }
 
         const likedLabel = queue.length === 1 ? 'Post Liked' : 'Posts Liked'
-        toast(session.active ? `${likedLabel} via active session key!` : likedLabel, 'success')
+        toast(
+          relayedCount === batches.length
+            ? `${likedLabel} — gas covered by Hup!`
+            : session.active
+              ? `${likedLabel} via active session key!`
+              : likedLabel,
+          'success',
+        )
       } catch (err) {
         console.error('Batch like transaction failed:', err)
         toast(shortTxError(err, 'Batch like failed'), 'error')
@@ -174,7 +227,7 @@ export const useBatchLike = () => {
         setPendingNetworkId(null)
       }
     },
-    [address, config, groups, isConnected, markLikeOverride, publicClient, removeFromBatch, switchChainAsync, walletChainId, writeContractAsync],
+    [address, config, groups, isConnected, markLikeOverride, publicClient, removeFromBatch, signTypedDataAsync, switchChainAsync, walletChainId, writeContractAsync],
   )
 
   const clear = useCallback((networkId) => clearBatch(address, networkId), [address, clearBatch])

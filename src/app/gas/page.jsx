@@ -219,8 +219,9 @@ export default function GasPage() {
             <GasPumpIcon size={32} />
             <h1 className={styles.hero__title}>The gas tank</h1>
             <p className={styles.hero__body}>
-              Posting on Hup is free — a relayer submits your post and pays the fee. This is what it has left, per
-              network. Anyone can top it up, and everything sent here goes to covering other people&apos;s posts.
+              Posting, liking and reposting on Hup are free — a relayer submits the transaction and pays the fee.
+              This is what it has left, per network. Anyone can top it up, and everything sent here goes to covering
+              other people&apos;s activity.
             </p>
 
             {data?.totalUsd > 0 && (
@@ -256,7 +257,7 @@ export default function GasPage() {
 
               <p className={styles.footnote}>
                 Donations are voluntary and non-refundable. The relayer is a hot wallet that does one thing — pay gas
-                for posts — and the post counts above are estimates at the current gas price.
+                for posts, likes and reposts — and the post counts above are estimates at the current gas price.
               </p>
             </>
           )}

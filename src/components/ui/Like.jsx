@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import clsx from 'clsx'
 import { HeartIcon } from '@phosphor-icons/react'
 import useSWR from 'swr'
-import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
+import { useWaitForTransactionReceipt, useConnection, useSignTypedData, useWriteContract, usePublicClient } from 'wagmi'
+import { getPublicClient } from 'wagmi/actions'
 import { getActiveChain } from '@/lib/communication'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { CONTRACTS } from '@/config/wagmi'
+import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
+import { CONTRACTS, config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import { useSidebarStore, getWalletBatchMap, getLikeOverride } from '@/stores/useSidebarStore'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -37,6 +39,7 @@ export const Like = ({ post, onUpdate }) => {
   const activeChain = getActiveChain()
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
+  const { signTypedDataAsync } = useSignTypedData()
 
   // ■■■ SWR Data Fetching Configuration ■■■
   const cacheKey = post?.id ? `posts/${post.network_id}/${post.id}/${address || 'anonymous'}/likes` : null
@@ -124,6 +127,53 @@ export const Like = ({ post, onUpdate }) => {
   }, [isConfirmed])
   
   /**
+   * Relays a heart action (batchLike([id]) or unlike(id)) through the forwarder so the tap
+   * costs the user nothing. Returns false whenever the relay is unavailable — cooldown
+   * included: the free window can be a long wait, so the tap falls back to the usual
+   * session/wallet path instead of blocking, and the wallet prompt there is the user's
+   * consent to pay. Unlike has a much smaller window than like on purpose — that asymmetry
+   * is what caps heart-toggle farming (see config/gasless.js).
+   * @param {string} functionName 'batchLike' or 'unlike'.
+   * @param {Array} args Owner-first args for that function.
+   * @returns {Promise<boolean>} Whether the action went out sponsored.
+   */
+  const tryGaslessHeart = async (functionName, args) => {
+    const chainId = Number(post.network_id)
+    if (!isGaslessEnabled(chainId)) return false
+    if (gaslessCooldown(functionName, chainId, address) > 0) return false
+
+    const chainDefinition = config.chains.find((item) => item.id === chainId)
+    if (!chainDefinition) return false
+
+    // Pinned to the post's own chain: the relay reads nonce and forwarder trust there,
+    // regardless of which network the wallet is connected to
+    const targetPublicClient = getPublicClient(config, { chainId }) ?? publicClient
+
+    try {
+      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
+
+      await relayHupAction({
+        chain: chainDefinition,
+        publicClient: targetPublicClient,
+        owner: address,
+        functionName,
+        args,
+        signTypedDataAsync,
+        useSessionKey: session.active,
+      })
+
+      return true
+    } catch (err) {
+      if (err.code === 'RELAY_COOLDOWN') {
+        toast('Free-like allowance is used up for now — using your wallet instead.', 'info')
+      } else {
+        console.warn('Gasless like unavailable:', err.message)
+      }
+      return false
+    }
+  }
+
+  /**
    * Like post
    * @param {integer} id
    * @returns
@@ -151,6 +201,18 @@ export const Like = ({ post, onUpdate }) => {
         },
         { revalidate: false },
       )
+
+      if (await tryGaslessHeart('batchLike', [address, [id]])) {
+        markLikeOverride(address, post.network_id, id, true)
+        mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
+
+        if (typeof onUpdate === 'function') {
+          onUpdate(id, { is_liked: 1, total_likes: previousData.likeCount + 1 })
+        }
+
+        toast('Liked — gas covered by Hup!', 'success')
+        return
+      }
 
       const session = await isSessionActive({
         userAddress: address,
@@ -218,6 +280,18 @@ export const Like = ({ post, onUpdate }) => {
         },
         { revalidate: false },
       )
+
+      if (await tryGaslessHeart('unlike', [address, id])) {
+        markLikeOverride(address, post.network_id, id, false)
+        mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
+
+        if (typeof onUpdate === 'function') {
+          onUpdate(id, { is_liked: 0, total_likes: Math.max(0, previousData.likeCount - 1) })
+        }
+
+        toast('Like removed — gas covered by Hup!', 'success')
+        return
+      }
 
       const session = await isSessionActive({
         userAddress: address,

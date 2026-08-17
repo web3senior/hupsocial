@@ -4,16 +4,19 @@ import forwarderAbi from '../../../../abis/Forwarder.json'
 import chatAbi from '../../../../abis/Chat.json'
 import hupAbi from '../../../../abi/post.json'
 import { CONTRACTS } from '../../../../config/contracts'
-import { GASLESS_BUCKETS, formatWait, gaslessPolicyFor, isGaslessChainId } from '../../../../config/gasless'
+import { GASLESS_BUCKETS, formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '../../../../config/gasless'
 
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
 
 // --- Relay policy ---
 // The relayer's key pays for everything that lands here, so a request may only target a
 // contract this app deployed on that chain. The Hup contract is narrowed further to the
-// sponsored selectors in config/gasless.js — `create` only, since it also carries paid,
-// owner-only and admin functions that must never run on our key. Likes are not sponsored:
-// like/unlike is a toggle, so one account tapping a heart could drain the relayer.
+// sponsored selectors in config/gasless.js — `create`, `batchLike` and `unlike` only, since
+// it also carries paid, owner-only and admin functions that must never run on our key.
+// Unlike has its own small window, which is what caps heart-toggle farming: every
+// like→unlike→like cycle spends one sponsored unlike, so cycles stop at that bucket's max.
+// Un-repost is deliberately unsponsored: it rides deleteContent, which deletes any of the
+// caller's content, and sponsoring deletions is a different decision.
 const hupInterface = new ethers.Interface(hupAbi)
 
 const SPONSORED_SELECTORS = new Map(
@@ -45,7 +48,18 @@ const sponsoredBucket = (chainId, to, data) => {
   if (!configured.includes(target)) return null
 
   if (contracts.hup && target === contracts.hup.toLowerCase()) {
-    return SPONSORED_SELECTORS.get((data || '').slice(0, 10).toLowerCase()) ?? null
+    const bucket = SPONSORED_SELECTORS.get((data || '').slice(0, 10).toLowerCase()) ?? null
+    if (bucket !== 'create') return bucket
+
+    // A repost rides the create selector (ContentType.Repost, empty metadata), so the
+    // bucket splits on the decoded type argument — same resolver the client uses.
+    // Calldata that carries create's selector but will not decode is refused outright
+    // rather than carried to simulation on our key.
+    try {
+      return gaslessBucketFor('create', hupInterface.decodeFunctionData('create', data))
+    } catch {
+      return null
+    }
   }
 
   return 'chat'

@@ -1,13 +1,14 @@
 /**
  * @file lib/relayGasless.js
- * @description Trial gasless path for the one action we sponsor: creating content (posts,
- * replies, quotes). Instead of prompting for a transaction, the app signs an ERC-2771
- * ForwardRequest and posts it to /api/v1/relay, where our relayer pays the gas. Deliberately
- * self-contained: the experiment reverts by deleting this file plus its call sites in
- * components/NewPost.jsx and the settings toggle.
+ * @description Trial gasless path for the actions we sponsor: creating content (posts,
+ * replies, quotes, reposts), liking and unliking. Instead of prompting for a transaction,
+ * the app signs an ERC-2771 ForwardRequest and posts it to /api/v1/relay, where our relayer
+ * pays the gas. Deliberately self-contained: the experiment reverts by deleting this file
+ * plus its call sites in components/NewPost.jsx, components/ui/Like.jsx,
+ * components/ui/Repost.jsx, hooks/useBatchLike.js and the settings toggle.
  *
- * Likes are NOT sponsored and keep using the batch basket / the user's own key. Like and
- * unlike are a toggle, so one account tapping a heart could drain the relayer without limit.
+ * Un-repost is NOT sponsored: it rides deleteContent, which deletes any of the caller's
+ * content, and sponsoring deletions is a different decision from sponsoring taps.
  *
  * Two signer paths, both ending in a plain ECDSA signature because OZ's ERC2771Forwarder
  * recovers with ECDSA and nothing else:
@@ -22,7 +23,7 @@
 import { ethers } from 'ethers'
 import hupAbi from '@/abi/post.json'
 import { CONTRACTS } from '@/config/contracts'
-import { GASLESS_BUCKETS, formatWait, gaslessPolicyFor, isGaslessChainId } from '@/config/gasless'
+import { formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '@/config/gasless'
 import { getBurnerSignerSilent } from '@/lib/burnerSession'
 
 const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
@@ -33,10 +34,15 @@ export const localStorageGaslessKey = `${prefix}gasless_enabled`
 // experiment for everyone without editing any call site.
 export const GASLESS_DEFAULT = true
 
-// Forwarder overhead plus the call itself: `create` stores a struct and a CID string. The
-// relay route adds its own headroom for the outer transaction.
+// Forwarder overhead plus the call itself: `create` stores a struct and a CID string;
+// `batchLike` scales with the basket, dominated by one cold storage slot per liked post.
+// Values are a bigint or a function of the call args. The relay route adds its own headroom
+// for the outer transaction, and unused gas is never charged — these only need to be safe
+// ceilings, not estimates.
 const RELAY_GAS = {
   create: 600000n,
+  batchLike: (args) => 150000n + 45000n * BigInt(args?.[1]?.length || 1),
+  unlike: 150000n,
 }
 
 // Sponsored actions are fire-and-forget, so a request has no reason to stay signable for long
@@ -171,10 +177,12 @@ const chainTrustsForwarder = async (publicClient, chainId, hupAddress, forwarder
 /**
  * Seconds the account must wait before the relayer sponsors `functionName` again, or 0 when
  * it is free to go. Call sites use this to bail before any expensive work (an IPFS pin, an
- * optimistic update) rather than discovering the cooldown at the end of the flow.
+ * optimistic update) rather than discovering the cooldown at the end of the flow. Pass the
+ * call's `args` when it matters for bucketing — a repost `create` throttles separately from
+ * a post `create`.
  */
-export const gaslessCooldown = (functionName, networkId, owner) => {
-  const bucket = GASLESS_BUCKETS[functionName]
+export const gaslessCooldown = (functionName, networkId, owner, args) => {
+  const bucket = gaslessBucketFor(functionName, args)
   if (!bucket || !owner || !isGaslessEnabled(networkId)) return 0
 
   return remainingCooldown(bucket, Number(networkId), owner)
@@ -200,8 +208,9 @@ export const relayHupAction = async ({ chain, publicClient, owner, functionName,
   const { address: forwarderAddress, name: forwarderName } = hupForwarderFor(contracts)
   const hupAddress = contracts?.hup
   const rpcUrl = chain?.rpcUrls?.default?.http?.[0]
-  const gas = RELAY_GAS[functionName]
-  const bucket = GASLESS_BUCKETS[functionName]
+  const gasEntry = RELAY_GAS[functionName]
+  const gas = typeof gasEntry === 'function' ? gasEntry(args) : gasEntry
+  const bucket = gaslessBucketFor(functionName, args)
 
   if (!chainId || !forwarderAddress || !hupAddress || !rpcUrl) throw unsupported('Relay is not configured for this network')
   if (!publicClient || !owner) throw unsupported('Relay needs a connected wallet')
