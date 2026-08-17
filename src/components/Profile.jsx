@@ -10,6 +10,7 @@ import { toRelativeTime } from '@/lib/dateHelper'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { getActiveChain } from '@/lib/communication'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
+import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
@@ -150,8 +151,19 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
   const targetNetworkId = networkId || fallbackChain?.id
   const followerSystemAddress = CONTRACTS[`chain${targetNetworkId}`]?.followerSystem
   const isSelf = address && creator && address.toLowerCase() === creator.toLowerCase()
+  const [copied, setCopied] = useState(false)
 
   const truncatedAddress = creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(creator)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast(`Could not copy the address`, `error`)
+    }
+  }
 
   const { data: isFollowingData, refetch: refetchIsFollowing } = useReadContract({
     address: followerSystemAddress,
@@ -211,7 +223,18 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
         <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} />
       </div>
 
-      {creator && <code className={styles.address}>{truncatedAddress}</code>}
+      {creator && (
+        <button
+          type="button"
+          className={styles.hoverCard__copy}
+          onClick={handleCopy}
+          title={`Copy ${creator}`}
+          aria-label={`Copy the wallet address ${creator}`}
+        >
+          <code className={styles.address}>{truncatedAddress}</code>
+          {copied ? <CheckIcon size={12} weight="bold" /> : <CopyIcon size={12} />}
+        </button>
+      )}
 
       {profile.description && <p className={styles.hoverCard__bio}>{profile.description}</p>}
 

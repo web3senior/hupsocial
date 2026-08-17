@@ -113,6 +113,28 @@
     }
   }
 
+  &__copy {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    color: var(--gray-400);
+
+    &:hover {
+      color: var(--text, inherit);
+      border-color: var(--text-muted, var(--gray-400));
+
+      code {
+        color: inherit;
+      }
+    }
+  }
+
   &__bio {
     margin: 0;
     font-size: var(--system-13-font-size);
