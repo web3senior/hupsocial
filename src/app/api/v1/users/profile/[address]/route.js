@@ -60,6 +60,12 @@ export async function GET(request, { params }) {
 
     const dbProfile = rows[0]
 
+    // The notification email is private contact data on a public endpoint —
+    // never let SELECT u.* leak it now that the column is actually populated.
+    delete dbProfile.email
+    delete dbProfile.email_verified_at
+    delete dbProfile.email_notifications
+
     /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
     dbProfile.profileImage = resolveStorageImageUrl(dbProfile.profileImage, { width: 512 })
 
@@ -183,8 +189,8 @@ export async function POST(request, { params }) {
 
     const [rows] = await pool.execute(
       `
-      SELECT 
-        u.*, 
+      SELECT
+        u.*,
         (SELECT COUNT(*) FROM posts p WHERE p.wallet_address = u.wallet_address) as total_posts
       FROM users u
       WHERE u.wallet_address = ?
@@ -192,7 +198,14 @@ export async function POST(request, { params }) {
       [walletAddress],
     )
 
-    return NextResponse.json(rows[0])
+    // Anyone can POST any address (ensureProfile does, on every connect), so the
+    // echoed row must not carry the owner's private notification email.
+    const created = rows[0]
+    delete created.email
+    delete created.email_verified_at
+    delete created.email_notifications
+
+    return NextResponse.json(created)
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

@@ -2,15 +2,17 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AtIcon, BroadcastIcon, CaretLeftIcon, CaretRightIcon, FadersHorizontalIcon, FadersIcon, GlobeIcon, KeyIcon, LockIcon, PaperPlaneTiltIcon, ProhibitIcon, QuestionIcon, UserCheckIcon, UserMinusIcon, WalletIcon } from '@phosphor-icons/react'
+import { AtIcon, BroadcastIcon, CaretLeftIcon, CaretRightIcon, EnvelopeSimpleIcon, FadersHorizontalIcon, FadersIcon, GlobeIcon, KeyIcon, LockIcon, PaperPlaneTiltIcon, ProhibitIcon, QuestionIcon, UserCheckIcon, UserMinusIcon, WalletIcon } from '@phosphor-icons/react'
 import styles from './SettingsNav.module.scss'
 import InAppWallet from './InAppWallet'
 import SecurityVault from './SecurityVault'
 import LanguagePreference from './LanguagePreference'
+import EmailNotifications from './EmailNotifications'
+import EmailWallet from './EmailWallet'
 import PushNotificationManager from '@/components/ui/PushNotificationManager'
 
 // The tabs that render a real pane — everything else in navItems is a disabled placeholder
-const VALID_TABS = ['security', 'in-app-wallet', 'notification', 'language']
+const VALID_TABS = ['security', 'in-app-wallet', 'email-wallet', 'notification', 'email-notifications', 'language']
 
 export default function SettingsNav() {
   // Deep-linkable: other pages send users here with /settings?tab=security instead of
@@ -38,10 +40,22 @@ export default function SettingsNav() {
       icon: <WalletIcon size={20} />,
     },
     {
+      id: 'email-wallet',
+      label: 'Email wallet',
+      desc: 'Recovery password, key export and device controls for your email login wallet.',
+      icon: <KeyIcon size={20} />,
+    },
+    {
       id: 'notification',
       desc: 'Get notifications',
       label: 'Push Notification',
       icon: <LockIcon size={20} />,
+    },
+    {
+      id: 'email-notifications',
+      label: 'Email notifications',
+      desc: 'Get your notifications as email digests.',
+      icon: <EnvelopeSimpleIcon size={20} />,
     },
     {
       id: 'language',
@@ -135,7 +149,9 @@ export default function SettingsNav() {
 
         {activeTab === 'security' && <SecurityVault />}
         {activeTab === 'in-app-wallet' && <InAppWallet onOpenSecurity={() => handleTabSelect('security')} />}
+        {activeTab === 'email-wallet' && <EmailWallet />}
         {activeTab === 'notification' && <PushNotificationManager />}
+        {activeTab === 'email-notifications' && <EmailNotifications />}
         {activeTab === 'language' && <LanguagePreference />}
 
         <div className={styles.subMenuList}>

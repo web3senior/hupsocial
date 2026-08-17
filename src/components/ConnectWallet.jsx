@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
+import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connector'
 import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
@@ -178,13 +179,30 @@ export function WalletOptions({ onConnected }) {
   const connectors = useConnectors()
   const { mutate: connect, isPending, variables, error } = useConnect()
 
-  // Inside a LUKSO Grid frame the host's Universal Profile is the connector that actually works
-  // (extensions don't inject into cross-origin iframes), so it leads the list there
-  const ordered = isFramedByGridHost()
-    ? [...connectors].sort((a, b) => (b.id === UP_PROVIDER_RDNS) - (a.id === UP_PROVIDER_RDNS))
-    : connectors
+  // List order: Email leads (the no-extension path), then wallets provably
+  // installed (EIP-6963 announced — Universal Profile, MetaMask, ...), then the
+  // generic rest. Inside a LUKSO Grid frame the host's Universal Profile is the
+  // connector that actually works (extensions don't inject into cross-origin
+  // iframes), so it outranks everything there. Array.sort is stable, so ties
+  // keep their registration order.
+  const inGridFrame = isFramedByGridHost()
+  const rank = (connector) => {
+    if (inGridFrame && connector.id === UP_PROVIDER_RDNS) return 0
+    if (connector.id === EMAIL_CONNECTOR_ID) return 1
+    if (connector.type === 'injected' && connector.id !== 'injected') return 2
+    return 3
+  }
+  const ordered = [...connectors].sort((a, b) => rank(a) - rank(b))
 
   const handleConnect = (connector) => {
+    // Email is not a one-click connect: it runs its own dialog (OTP, recovery
+    // password) and calls connect() itself once the key is in memory.
+    if (connector.id === EMAIL_CONNECTOR_ID) {
+      onConnected?.()
+      openEmailLogin()
+      return
+    }
+
     connect({ connector }, { onSuccess: () => onConnected?.() })
 
     // WalletConnect draws its QR sheet as a <w3m-modal> inside the page, but this list lives in

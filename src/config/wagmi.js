@@ -16,6 +16,7 @@ import {
   unichainSepolia,
 } from 'wagmi/chains'
 import { injected, safe, walletConnect } from 'wagmi/connectors'
+import { emailWallet } from '@/lib/embeddedWallet/connector'
 import { appChains, CONTRACTS, robinhood } from './contracts'
 
 // Chain data and contract addresses live in config/contracts.js so server code
@@ -145,7 +146,7 @@ export const config = createConfig({
   // moment it is constructed, and this module also evaluates on the server
   // (SSR and any API route reaching wagmi through an import chain) — so
   // connectors only exist in the browser.
-  connectors: typeof window === 'undefined' ? [] : [injected(), walletConnect({ projectId }), safe()],
+  connectors: typeof window === 'undefined' ? [] : [injected(), walletConnect({ projectId }), safe(), emailWallet()],
   transports: {
     // viem's default mainnet endpoint (eth.merkle.io) sends no Access-Control-Allow-Origin, so
     // every browser read on chain 1 fails CORS — the profile Assets tab showed no Ethereum row

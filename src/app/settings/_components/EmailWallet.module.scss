@@ -1,0 +1,175 @@
+.emailWallet {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--surface-muted);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16, 1rem);
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    max-width: 420px;
+  }
+
+  &__sectionTitle {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
+  }
+
+  &__keyRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background-color: var(--surface-muted);
+  }
+
+  &__iconBtn {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+
+    &:hover {
+      background-color: var(--surface);
+    }
+  }
+
+  &__input {
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    padding: 0.6rem 0.75rem;
+
+    &:focus-visible {
+      outline: 2px solid var(--primary, #0d6efd);
+      outline-offset: 1px;
+    }
+  }
+
+  &__submit {
+    border: none;
+    border-radius: var(--global-border-radius);
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    align-self: flex-start;
+
+    &:hover {
+      opacity: 0.9;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    &--outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: inherit;
+
+      &:hover {
+        background-color: var(--surface-muted);
+        opacity: 1;
+      }
+    }
+  }
+
+  /* Hold-to-reveal: a fill sweeps the button for the hold duration; letting go
+     snaps it back. Fill duration mirrors HOLD_TO_REVEAL_MS in EmailWallet.jsx. */
+  &__holdReveal {
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    touch-action: none;
+    width: 100%;
+    align-self: stretch;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      width: 0;
+      background-color: var(--primary, #0d6efd);
+      opacity: 0.35;
+      transition: width 0.15s ease;
+    }
+
+    &--holding::before {
+      width: 100%;
+      transition: width 1.5s linear;
+    }
+  }
+
+  &__holdLabel {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+
+  &__error {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--danger, #dc3545);
+  }
+}
