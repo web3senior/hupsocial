@@ -375,6 +375,19 @@
     width: 24px;
   }
 
+  // Connected user's pfp shown in place of the profile icon
+  .navAvatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .navAvatarActive {
+    outline: 1.5px solid currentColor;
+    outline-offset: 1px;
+  }
+
   // Tiny red alert indicator badge overlay for the collapsed view state
   .compactBadgeDot {
     color: var(--liked-color);

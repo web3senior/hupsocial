@@ -13,6 +13,7 @@ import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useProfile } from '@/hooks/useProfile'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import BatchLikeTrigger from './BatchLikeTrigger'
@@ -72,7 +73,18 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
   const content = (
     <>
       <div className={styles.iconWrapper} data-icon={item.name}>
-        <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
+        {item.avatarSrc ? (
+          <Image
+            className={clsx(styles.navAvatar, isActive && styles.navAvatarActive)}
+            src={item.avatarSrc}
+            alt=""
+            width={20}
+            height={20}
+            unoptimized
+          />
+        ) : (
+          <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
+        )}
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
         {isNotificationItem && isCompact && unreadCount > 0 && <span className={styles.notificationBadgeDot} aria-hidden="true" />}
@@ -178,6 +190,9 @@ export default function Aside() {
     return () => mql.removeEventListener('change', handleChange)
   }, [])
 
+  // Only fetch a profile once a wallet is connected — the disconnected state keeps the plain icon
+  const { profile } = useProfile(isConnected && address ? address : null)
+
   const navLinks = useMemo(() => {
     const profilePath = isConnected && address ? `/${address}` : '/connect'
 
@@ -188,9 +203,10 @@ export default function Aside() {
         name: 'Profile',
         path: profilePath,
         icon: UserIcon,
+        avatarSrc: isConnected && address ? profile?.profileImage : null,
       },
     ]
-  }, [address, isConnected, navItems])
+  }, [address, isConnected, navItems, profile?.profileImage])
 
   const isMobileLayout = !isWideScreen
   const isExpanded = isMobileLayout ? isMobileMenuOpen : isMenuOpen
