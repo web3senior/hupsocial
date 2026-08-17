@@ -180,11 +180,9 @@ export default function MyOffers() {
 
   if (!isConnected) {
     return (
-      <div className="__container" data-width="large">
-        <div className={styles.myOffers__gate}>
-          <HandCoinsIcon size={32} />
-          <p>Connect your wallet to see the offers you&apos;ve made.</p>
-        </div>
+      <div className={styles.myOffers__gate}>
+        <HandCoinsIcon size={32} />
+        <p>Connect your wallet to see the offers you&apos;ve made.</p>
       </div>
     )
   }
@@ -192,120 +190,118 @@ export default function MyOffers() {
   const rows = offers ?? []
 
   return (
-    <div className="__container" data-width="large">
-      <div className={`${styles.myOffers} animate fade`}>
-        <p className={styles.myOffers__intro}>
-          Offers you&apos;ve made across the market. Cancel a live one anytime — and reclaim your escrow from expired ones, since an
-          expired offer keeps holding your payment until you do.
-        </p>
+    <div className={`${styles.myOffers} animate fade`}>
+      <p className={styles.myOffers__intro}>
+        Offers you&apos;ve made across the market. Cancel a live one anytime — and reclaim your escrow from expired ones, since an
+        expired offer keeps holding your payment until you do.
+      </p>
 
-        <div className={styles.myOffers__tabs} role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === 'active'}
-            className={clsx(styles.myOffers__tab, view === 'active' && styles['myOffers__tab--active'])}
-            onClick={() => setView('active')}
-          >
-            Active
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === 'past'}
-            className={clsx(styles.myOffers__tab, view === 'past' && styles['myOffers__tab--active'])}
-            onClick={() => setView('past')}
-          >
-            Past
-          </button>
-        </div>
-
-        {isLoading ? (
-          <ContentSpinner />
-        ) : rows.length === 0 ? (
-          <p className={styles.myOffers__empty}>
-            {view === 'active' ? (
-              <>
-                No active offers — find something on the <Link href="/nfts">NFT market</Link> and make one.
-              </>
-            ) : (
-              'Nothing here yet — filled, cancelled, and expired offers will show up in this view.'
-            )}
-          </p>
-        ) : (
-          <div className={styles.myOffers__scroller}>
-            <table className={styles.myOffers__table}>
-              <thead>
-                <tr>
-                  <th scope="col">Asset</th>
-                  <th scope="col">Price</th>
-                  <th scope="col">{view === 'active' ? 'Expires in' : 'Status'}</th>
-                  <th scope="col" className={styles.myOffers__actionsCell}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((offer) => {
-                  const rowKey = `${offer.network_id}:${offer.offer_id}`
-                  const rowBusy = isBusy && pendingKey === rowKey
-                  const reclaimable = view === 'past' && isReclaimable(offer)
-                  const hasAction = view === 'active' || reclaimable
-                  return (
-                    <tr key={rowKey}>
-                      <td data-label="Asset" className={styles.myOffers__assetCell}>
-                        <AssetCell offer={offer} />
-                      </td>
-                      <td data-label="Price" className={styles.myOffers__price}>
-                        {formatPrice(offer)}
-                      </td>
-                      {view === 'active' ? (
-                        <td
-                          data-label="Expires in"
-                          className={styles.myOffers__expires}
-                          title={new Date(offer.expires_at * 1000).toLocaleString()}
-                        >
-                          {formatTimeLeft(offer.expires_at)}
-                        </td>
-                      ) : (
-                        <td data-label="Status" className={styles.myOffers__expires}>
-                          {statusLabel(offer)}
-                        </td>
-                      )}
-                      <td
-                        data-label="Actions"
-                        className={clsx(styles.myOffers__actionsCell, !hasAction && styles['myOffers__actionsCell--none'])}
-                      >
-                        {view === 'active' ? (
-                          <button
-                            type="button"
-                            className={clsx(styles.myOffers__action, styles['myOffers__action--cancel'])}
-                            onClick={() => handleCancel(offer, 'cancel')}
-                            disabled={isBusy}
-                          >
-                            {rowBusy ? 'Confirming...' : 'Cancel'}
-                          </button>
-                        ) : reclaimable ? (
-                          <button
-                            type="button"
-                            className={styles.myOffers__action}
-                            onClick={() => handleCancel(offer, 'reclaim')}
-                            disabled={isBusy}
-                          >
-                            {rowBusy ? 'Confirming...' : 'Reclaim escrow'}
-                          </button>
-                        ) : (
-                          <span className={styles.myOffers__noAction}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className={styles.myOffers__tabs} role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'active'}
+          className={clsx(styles.myOffers__tab, view === 'active' && styles['myOffers__tab--active'])}
+          onClick={() => setView('active')}
+        >
+          Active
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'past'}
+          className={clsx(styles.myOffers__tab, view === 'past' && styles['myOffers__tab--active'])}
+          onClick={() => setView('past')}
+        >
+          Past
+        </button>
       </div>
+
+      {isLoading ? (
+        <ContentSpinner />
+      ) : rows.length === 0 ? (
+        <p className={styles.myOffers__empty}>
+          {view === 'active' ? (
+            <>
+              No active offers — find something on the <Link href="/nfts">NFT market</Link> and make one.
+            </>
+          ) : (
+            'Nothing here yet — filled, cancelled, and expired offers will show up in this view.'
+          )}
+        </p>
+      ) : (
+        <div className={styles.myOffers__scroller}>
+          <table className={styles.myOffers__table}>
+            <thead>
+              <tr>
+                <th scope="col">Asset</th>
+                <th scope="col">Price</th>
+                <th scope="col">{view === 'active' ? 'Expires in' : 'Status'}</th>
+                <th scope="col" className={styles.myOffers__actionsCell}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((offer) => {
+                const rowKey = `${offer.network_id}:${offer.offer_id}`
+                const rowBusy = isBusy && pendingKey === rowKey
+                const reclaimable = view === 'past' && isReclaimable(offer)
+                const hasAction = view === 'active' || reclaimable
+                return (
+                  <tr key={rowKey}>
+                    <td data-label="Asset" className={styles.myOffers__assetCell}>
+                      <AssetCell offer={offer} />
+                    </td>
+                    <td data-label="Price" className={styles.myOffers__price}>
+                      {formatPrice(offer)}
+                    </td>
+                    {view === 'active' ? (
+                      <td
+                        data-label="Expires in"
+                        className={styles.myOffers__expires}
+                        title={new Date(offer.expires_at * 1000).toLocaleString()}
+                      >
+                        {formatTimeLeft(offer.expires_at)}
+                      </td>
+                    ) : (
+                      <td data-label="Status" className={styles.myOffers__expires}>
+                        {statusLabel(offer)}
+                      </td>
+                    )}
+                    <td
+                      data-label="Actions"
+                      className={clsx(styles.myOffers__actionsCell, !hasAction && styles['myOffers__actionsCell--none'])}
+                    >
+                      {view === 'active' ? (
+                        <button
+                          type="button"
+                          className={clsx(styles.myOffers__action, styles['myOffers__action--cancel'])}
+                          onClick={() => handleCancel(offer, 'cancel')}
+                          disabled={isBusy}
+                        >
+                          {rowBusy ? 'Confirming...' : 'Cancel'}
+                        </button>
+                      ) : reclaimable ? (
+                        <button
+                          type="button"
+                          className={styles.myOffers__action}
+                          onClick={() => handleCancel(offer, 'reclaim')}
+                          disabled={isBusy}
+                        >
+                          {rowBusy ? 'Confirming...' : 'Reclaim escrow'}
+                        </button>
+                      ) : (
+                        <span className={styles.myOffers__noAction}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
