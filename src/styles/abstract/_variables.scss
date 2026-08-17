@@ -305,7 +305,11 @@ $secondary-color: #9e481d;
   // it is the fallback chain, which also covers the paint before the file lands. The inline
   // ui-sans-serif fallback inside var() matters: an undefined custom property with no fallback
   // invalidates the whole font-family declaration rather than just skipping that one entry.
-  --font-sans: "Basel Grotesk", "Basel Grotesk Fallback", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  // Emoji fonts must stay AFTER the generic sans-serif: Apple Color Emoji's cmap covers
+  // U+0020, so if it precedes a font that resolves, iOS renders every word space with the
+  // emoji-width space glyph (huge gaps between words). Per-character fallback still reaches
+  // the emoji fonts for actual emoji.
+  --font-sans: "Basel Grotesk", "Basel Grotesk Fallback", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
   --font-mono: "InputMono-Regular", monospace;
   --font-family-serif: ui-serif, New York Small, New York, Georgia, Times New Roman, Times, serif;
   --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
