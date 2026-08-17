@@ -1,0 +1,268 @@
+.offerList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+
+  // One-time gate above the list: approving is a token-level grant, so it reads as a
+  // precondition rather than as an action belonging to any single offer
+  &__approve {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.85rem;
+    border: 1px solid color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 40%, var(--border));
+    border-radius: 12px;
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 7%, transparent);
+  }
+
+  &__approveNote {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+  }
+
+  &__approveButton {
+    align-self: flex-start;
+    height: 36px;
+    padding: 0 1rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--network-color-text, var(--white));
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+
+    &[disabled] {
+      opacity: 0.7;
+      cursor: default;
+    }
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 1.5rem 0.75rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  // On the page the empty state sits under a section heading, not inside a dialog —
+  // plain left-aligned copy like the sale records' empty line
+  &--table &__empty {
+    padding: 0;
+    text-align: left;
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  // --- stack variant (OfferModal tab) ---
+
+  &__offers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__offer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-muted);
+  }
+
+  &__offerWho {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__offerExpiry {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  &__offerAmount {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // --- table variant (listing page) ---
+
+  // Wide content scrolls inside its own container so the page never scrolls sideways
+  &__scroller {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  // The global _table.scss element sheet reaches every bare <table> — undo its frame,
+  // fixed layout, hardcoded row colors, and grey header band; the scroller is the chrome
+  &__table {
+    width: 100%;
+    min-width: 520px;
+    border: 0;
+    border-collapse: collapse;
+    table-layout: auto;
+
+    tr {
+      border: 0;
+      background-color: transparent;
+    }
+
+    tbody tr:hover {
+      background-color: var(--hover);
+    }
+
+    th {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      background-color: transparent;
+      color: var(--text-muted, #888);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    td {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      font-size: var(--font-size-14, 0.875rem);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+  }
+
+  &__price {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__from {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  // A link now, not a badge — it routes to /nfts/offers where all of the viewer's offers live
+  &__mine {
+    flex-shrink: 0;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    text-decoration: none;
+
+    &:hover {
+      border-color: var(--text-muted);
+      color: var(--text);
+    }
+  }
+
+  &__expires {
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  &__actionsCell {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  &__noAction {
+    color: var(--text-muted);
+  }
+
+  // Under 600px the global _table.scss linearizes every table: thead is clipped away,
+  // rows stack as cards, and each cell renders its data-label bold to the left. Adopt
+  // that idiom — drop the desktop frame and min width, right-align values beside their
+  // floated labels, and hide the cells that only held the "no action" placeholder.
+  @media screen and (max-width: 600px) {
+    &__scroller {
+      border: 0;
+      border-radius: 0;
+    }
+
+    &__table {
+      min-width: 0;
+
+      tr {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      tbody tr:hover {
+        background-color: transparent;
+      }
+
+      td {
+        text-align: right;
+      }
+    }
+
+    &__from {
+      justify-content: flex-end;
+    }
+
+    &__actionsCell--none {
+      display: none;
+    }
+  }
+
+  // --- shared row action ---
+
+  &__action {
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 0.9rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--network-color-text, var(--white));
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+
+    &[disabled] {
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    &--cancel {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+
+      &:hover:not([disabled]) {
+        border-color: var(--danger-500, #ef4444);
+        color: var(--danger-500, #ef4444);
+      }
+    }
+  }
+}

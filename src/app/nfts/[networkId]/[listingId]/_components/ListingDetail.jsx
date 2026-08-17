@@ -19,6 +19,7 @@ import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import TradeCard, { buildAssetLinks } from '@/components/TradeCard'
 import OfferModal from '@/components/OfferModal'
+import OfferList from '@/components/OfferList'
 import Share from '@/components/ui/Share'
 import HupMark from '@/components/ui/HupMark'
 import ModelViewer from '@/components/ui/ModelViewer'
@@ -100,6 +101,9 @@ export default function ListingDetail({ networkId, listingId }) {
   const chainId = Number(networkId)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
   const explorerUrl = chainInfo?.blockExplorers?.default?.url?.replace(/\/$/, '') || null
+  // Offers live in HupOffers, not HupTrade — every offers surface on this page only renders
+  // on chains where the offers contract is deployed
+  const offersAddress = CONTRACTS[`chain${chainId}`]?.offers || null
 
   const { data: detail, isLoading } = useSWR(`/api/v1/nfts/${listingId}?networkId=${chainId}`, fetcher)
 
@@ -286,9 +290,7 @@ export default function ListingDetail({ networkId, listingId }) {
 
           {cardListing && <TradeCard listing={cardListing} compact showDetailsLink={false} />}
 
-          {/* Offers live in HupOffers, not HupTrade — the button only renders on chains
-              where the offers contract is deployed */}
-          {CONTRACTS[`chain${chainId}`]?.offers && (
+          {offersAddress && (
             <button type="button" className={styles.listing__offer} onClick={() => setShowOfferModal(true)}>
               <HandCoinsIcon size={16} />
               Make an offer
@@ -495,6 +497,28 @@ export default function ListingDetail({ networkId, listingId }) {
           </div>
         </div>
       </div>
+
+      {/* The asset's live offer book, in the open — the modal stays the place to make one,
+          this is where everyone sees, accepts, or cancels them without opening it */}
+      {offersAddress && (
+        <section className={styles.listing__offers} aria-label="Offers">
+          <h2>
+            <HandCoinsIcon size={16} />
+            Offers
+          </h2>
+
+          <OfferList
+            variant="table"
+            chainId={chainId}
+            collection={listing.collection}
+            tokenId={listing.token_id}
+            isLsp8={isLsp8}
+            // While the listing is active the seller is the owner; once sold/cancelled the
+            // list resolves the current owner from the chain itself
+            ownerAddress={Number(listing.status) === 1 ? listing.wallet_address : null}
+          />
+        </section>
+      )}
 
       <section className={styles.listing__sales} aria-label="Sale records">
         <h2>

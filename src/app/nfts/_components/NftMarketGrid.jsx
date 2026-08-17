@@ -1,11 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useConnection, useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
-import { ArrowsClockwiseIcon, FunnelIcon, MagnifyingGlassIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowsClockwiseIcon, FunnelIcon, HandCoinsIcon, MagnifyingGlassIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
 import { getNftListings, getNftPaymentTokens, getNftSellers } from '@/lib/api'
 import { handleBrokenImage } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
@@ -677,6 +678,14 @@ export default function NftMarketGrid() {
               <ArrowsClockwiseIcon size={16} className={clsx(collectionRefresh.isRefreshing && styles['market__refreshButton--spinning'])} />
             </button>
           )}
+
+          {/* The buy side's counterpart to listing: every offer this wallet has out across
+              the market, including expired ones still holding escrow to reclaim */}
+          <Tooltip placement="top-end" content="Offers you've made — cancel live ones or reclaim escrow from expired ones.">
+            <Link href="/nfts/offers" className={styles.market__filterButton} aria-label="My offers">
+              <HandCoinsIcon size={16} />
+            </Link>
+          </Tooltip>
 
           <NativePopover
             placement="bottom-end"

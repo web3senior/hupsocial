@@ -513,7 +513,8 @@
     }
   }
 
-  &__sales {
+  &__sales,
+  &__offers {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;

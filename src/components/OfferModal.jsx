@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { encodeAbiParameters, erc20Abi, formatUnits, hexToString, isAddress, numberToHex, parseUnits, zeroAddress } from 'viem'
-import useSWR from 'swr'
+import { encodeAbiParameters, erc20Abi, hexToString, isAddress, numberToHex, parseUnits, zeroAddress } from 'viem'
 import clsx from 'clsx'
 // Both from config/contracts, never config/wagmi: this dialog is reached from the collection
 // grid, whose route graph is evaluated server-side, and importing the wagmi config there
@@ -13,11 +12,8 @@ import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
 import offersAbi from '@/abis/HupOffers.json'
 import { toast } from '@/components/NextToast'
-import Profile from './Profile'
 import NativeDialog from './ui/NativeDialog'
 import styles from './OfferModal.module.scss'
-
-const fetcher = (url) => fetch(url).then((res) => res.json())
 
 // IHupOffers.AssetStandard — this modal only fronts the one-of-one standards; the
 // fungible/edition standards get their own OTC surface later
@@ -104,6 +100,8 @@ const erc677Abi = [
   },
 ]
 
+// Owner lookups only — the approval/operator sides of both standards moved to OfferList
+// with the accept flow they serve
 const erc721Abi = [
   {
     type: 'function',
@@ -112,36 +110,9 @@ const erc721Abi = [
     inputs: [{ name: 'tokenId', type: 'uint256' }],
     outputs: [{ name: '', type: 'address' }],
   },
-  {
-    type: 'function',
-    name: 'getApproved',
-    stateMutability: 'view',
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [{ name: '', type: 'address' }],
-  },
-  {
-    type: 'function',
-    name: 'isApprovedForAll',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'operator', type: 'address' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    type: 'function',
-    name: 'setApprovalForAll',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'operator', type: 'address' },
-      { name: 'approved', type: 'bool' },
-    ],
-    outputs: [],
-  },
 ]
 
-// LSP8 Identifiable Digital Asset (LUKSO) — per-token operator equivalents of approve
+// LSP8 Identifiable Digital Asset (LUKSO)
 const lsp8Abi = [
   {
     type: 'function',
@@ -149,27 +120,6 @@ const lsp8Abi = [
     stateMutability: 'view',
     inputs: [{ name: 'tokenId', type: 'bytes32' }],
     outputs: [{ name: '', type: 'address' }],
-  },
-  {
-    type: 'function',
-    name: 'isOperatorFor',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'operator', type: 'address' },
-      { name: 'tokenId', type: 'bytes32' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    type: 'function',
-    name: 'authorizeOperator',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'operator', type: 'address' },
-      { name: 'tokenId', type: 'bytes32' },
-      { name: 'operatorNotificationData', type: 'bytes' },
-    ],
-    outputs: [],
   },
 ]
 
@@ -187,15 +137,6 @@ const encodeErc677MakeData = (collection, tokenId, standard, amount, expiresAt, 
   )
 
 const amountFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
-const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'always' })
-
-// "in 3 days" / "in 5 hours" — offers expire on hour-to-month horizons, so two units cover it
-const formatExpiry = (expiresAt) => {
-  const seconds = expiresAt - Math.floor(Date.now() / 1000)
-  if (seconds <= 0) return 'expired'
-  if (seconds >= 86400) return relativeTime.format(Math.round(seconds / 86400), 'day')
-  return relativeTime.format(Math.max(Math.round(seconds / 3600), 1), 'hour')
-}
 
 const computeExpiresAt = (seconds) => BigInt(Math.floor(Date.now() / 1000) + seconds)
 
@@ -213,11 +154,10 @@ const toBytes32TokenId = (raw) => {
 
 /**
  * Offer Modal
- * Escrow-backed offers on a single one-of-one NFT through HupOffers: a Make Offer tab that
- * locks the payment up front (native coin, a curated token, or a whitelisted ERC677 token in
- * one transferAndCall), and an Active Offers tab listing the asset's live offers — with
- * cancel for the viewer's own offer and the approve-then-accept flow when the viewer owns
- * the token. Offer rows come from the cidex-indexed nft_offers read model.
+ * Escrow-backed offers on a single one-of-one NFT through HupOffers: locks the payment up
+ * front (native coin, a curated token, or a whitelisted ERC677 token in one transferAndCall).
+ * Make-only by design — viewing, accepting, and cancelling offers live on the listing page's
+ * OfferList table and the /nfts/offers page, not behind this dialog.
  * @param {Object} props
  * @param {number} props.chainId The asset's chain.
  * @param {string} props.collection The NFT contract address.
@@ -231,14 +171,11 @@ const toBytes32TokenId = (raw) => {
  */
 const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetName, ownerAddress, onClose }) => {
   const tokenId = toBytes32TokenId(tokenIdProp)
-  const [tab, setTab] = useState('make')
   const [amount, setAmount] = useState('')
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
   const [tokenSearchResults, setTokenSearchResults] = useState([])
   const [expirySeconds, setExpirySeconds] = useState(EXPIRY_OPTIONS[2].seconds)
-  // The offer row a pending accept/cancel belongs to, so only that row's button spins
-  const [pendingOfferId, setPendingOfferId] = useState(null)
   const { address } = useConnection()
   const dialogRef = useRef(null)
   const lastActionRef = useRef(null)
@@ -402,52 +339,6 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
   // ERC677 funds and creates the offer in one transaction, so it never needs an allowance
   const needsPaymentApproval = isTokenPayment && !isErc677 && allowance !== undefined && amountUnits !== null && allowance < amountUnits
 
-  // Accept side: the owner delivers the token non-custodially, so the offers contract needs
-  // transfer rights at accept time — the same approval dance the sell flow does for HupTrade
-  const { data: erc721Approved, refetch: refetchErc721Approved } = useReadContract({
-    abi: erc721Abi,
-    address: collection,
-    functionName: 'getApproved',
-    args: [tokenId ? BigInt(tokenId) : 0n],
-    chainId,
-    query: { enabled: Boolean(isOwner && !isLsp8 && tokenId && offersAddress) },
-  })
-
-  const { data: erc721ApprovedForAll, refetch: refetchErc721ApprovedForAll } = useReadContract({
-    abi: erc721Abi,
-    address: collection,
-    functionName: 'isApprovedForAll',
-    args: [address, offersAddress],
-    chainId,
-    query: { enabled: Boolean(isOwner && !isLsp8 && address && offersAddress) },
-  })
-
-  const { data: lsp8IsOperator, refetch: refetchLsp8Operator } = useReadContract({
-    abi: lsp8Abi,
-    address: collection,
-    functionName: 'isOperatorFor',
-    args: [offersAddress, tokenId],
-    chainId,
-    query: { enabled: Boolean(isOwner && isLsp8 && tokenId && offersAddress) },
-  })
-
-  const hasTransferRights = isLsp8
-    ? Boolean(lsp8IsOperator)
-    : erc721Approved?.toLowerCase() === offersAddress?.toLowerCase() || Boolean(erc721ApprovedForAll)
-  const refetchTransferRights = () => {
-    if (isLsp8) refetchLsp8Operator()
-    else {
-      refetchErc721Approved()
-      refetchErc721ApprovedForAll()
-    }
-  }
-
-  const offersKey = offersAddress
-    ? `/api/v1/nfts/offers?networkId=${chainId}&collection=${collection.toLowerCase()}&tokenId=${tokenId.toLowerCase()}`
-    : null
-  const { data: offersData, mutate: mutateOffers } = useSWR(offersKey, fetcher)
-  const offers = offersData?.data ?? []
-
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
   const isBusy = isPending || isConfirming
@@ -467,20 +358,9 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
     if (lastActionRef.current === 'approve-payment') {
       toast('Token approved — you can place your offer now', 'success')
       refetchAllowance()
-    } else if (lastActionRef.current === 'approve-nft') {
-      toast(isLsp8 ? 'NFT approved — you can accept the offer now' : 'Collection approved — you can accept the offer now', 'success')
-      refetchTransferRights()
     } else if (lastActionRef.current === 'make') {
       toast('Offer placed — your payment is escrowed until it fills, expires, or you cancel', 'success')
       dialogRef.current?.close()
-    } else if (lastActionRef.current === 'accept') {
-      toast('Offer accepted — the NFT was delivered and the payment is yours', 'success')
-      setPendingOfferId(null)
-      mutateOffers()
-    } else if (lastActionRef.current === 'cancel') {
-      toast('Offer cancelled — your escrow was refunded', 'success')
-      setPendingOfferId(null)
-      mutateOffers()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
@@ -543,64 +423,6 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
     })
   }
 
-  const handleApproveNft = (e) => {
-    e.stopPropagation()
-    if (!offersAddress) return
-
-    lastActionRef.current = 'approve-nft'
-    if (isLsp8) {
-      // LSP8 operators are additive — authorizing this contract leaves HupTrade's
-      // authorization for the same token intact, so a live listing survives
-      writeContract({
-        abi: lsp8Abi,
-        address: collection,
-        functionName: 'authorizeOperator',
-        args: [offersAddress, tokenId, '0x'],
-        chainId,
-      })
-    } else {
-      // setApprovalForAll, never approve(offers, tokenId): ERC721's per-token approval is
-      // exclusive, so granting it here would silently revoke the one the seller gave HupTrade
-      // when they listed — the listing would stay visible and every buy() would revert. The
-      // operator flag is a separate slot, so both contracts can hold transfer rights at once.
-      writeContract({
-        abi: erc721Abi,
-        address: collection,
-        functionName: 'setApprovalForAll',
-        args: [offersAddress, true],
-        chainId,
-      })
-    }
-  }
-
-  const handleAccept = (offer) => {
-    if (!offersAddress) return
-
-    lastActionRef.current = 'accept'
-    setPendingOfferId(offer.offer_id)
-    writeContract({
-      abi: offersAbi,
-      address: offersAddress,
-      functionName: 'acceptOffer',
-      args: [BigInt(offer.offer_id), 1n],
-      chainId,
-    })
-  }
-
-  const handleCancel = (offer) => {
-    if (!offersAddress) return
-
-    lastActionRef.current = 'cancel'
-    setPendingOfferId(offer.offer_id)
-    writeContract({
-      abi: offersAbi,
-      address: offersAddress,
-      functionName: 'cancelOffer',
-      args: [BigInt(offer.offer_id)],
-      chainId,
-    })
-  }
-
   return (
     <NativeDialog
       ref={dialogRef}
@@ -619,208 +441,119 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
       <main className={styles.offerModal__body}>
         {assetName && <p className={styles.offerModal__asset}>{assetName}</p>}
 
-        <div className={styles.offerModal__tabs} role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'make'}
-            className={clsx(styles.offerModal__tab, tab === 'make' && styles['offerModal__tab--active'])}
-            onClick={() => setTab('make')}
-          >
-            Make offer
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'offers'}
-            className={clsx(styles.offerModal__tab, tab === 'offers' && styles['offerModal__tab--active'])}
-            onClick={() => setTab('offers')}
-          >
-            Active offers{offers.length > 0 ? ` (${offers.length})` : ''}
-          </button>
+        <div className={styles.offerModal__field}>
+          <label htmlFor="offerModalToken">Pay with</label>
+          <select id="offerModalToken" value={paymentChoice} onChange={(e) => setPaymentChoice(e.target.value)}>
+            <option value="native">{`${nativeCurrency?.name || 'Native'} (${nativeCurrency?.symbol || ''})`}</option>
+            {offerTokens.map((token) => (
+              <option key={token.address} value={`token:${token.address}`}>
+                {token.symbol}
+              </option>
+            ))}
+            <option value="custom-erc20">Custom ERC20</option>
+            {isLukso && <option value="custom-lsp7">Custom LSP7</option>}
+          </select>
         </div>
 
-        {tab === 'make' ? (
-          <>
-            <div className={styles.offerModal__field}>
-              <label htmlFor="offerModalToken">Pay with</label>
-              <select id="offerModalToken" value={paymentChoice} onChange={(e) => setPaymentChoice(e.target.value)}>
-                <option value="native">{`${nativeCurrency?.name || 'Native'} (${nativeCurrency?.symbol || ''})`}</option>
-                {offerTokens.map((token) => (
-                  <option key={token.address} value={`token:${token.address}`}>
-                    {token.symbol}
-                  </option>
-                ))}
-                <option value="custom-erc20">Custom ERC20</option>
-                {isLukso && <option value="custom-lsp7">Custom LSP7</option>}
-              </select>
-            </div>
-
-            {isCustomToken && (
-              <div className={clsx(styles.offerModal__field, styles.offerModal__tokenSearch)}>
-                <label htmlFor="offerModalCustomToken">Search token or paste address</label>
-                <input
-                  type="text"
-                  id="offerModalCustomToken"
-                  value={customToken}
-                  onChange={(e) => setCustomToken(e.target.value)}
-                  placeholder="Token name or 0x..."
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                {searchResults.length > 0 && (
-                  <>
-                    <ul className={styles.offerModal__tokenResults}>
-                      {searchResults.map((result) => {
-                        const popularity = formatTokenPopularity(result)
-                        return (
-                          <li key={result.address}>
-                            <button type="button" onClick={() => handleSelectSearchResult(result)}>
-                              <span className={styles.offerModal__tokenResultMain}>
-                                <span className={styles.offerModal__tokenResultSymbol}>{result.symbol}</span>
-                                {result.name && <span className={styles.offerModal__tokenResultName}>{result.name}</span>}
-                              </span>
-                              <span className={styles.offerModal__tokenResultMeta}>
-                                <span className={styles.offerModal__tokenResultAddress}>
-                                  {result.address.slice(0, 6)}…{result.address.slice(-4)}
-                                </span>
-                                {popularity && <span className={styles.offerModal__tokenResultPopularity}>{popularity}</span>}
-                              </span>
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                    <p className={styles.offerModal__tokenWarning} role="alert">
-                      Anyone can create a token with any name — check the contract address before offering.
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className={styles.offerModal__field}>
-              <label htmlFor="offerModalAmount">Offer price</label>
-              <div className={styles.offerModal__amount}>
-                <input
-                  type="number"
-                  id="offerModalAmount"
-                  value={amount}
-                  min={0}
-                  step="any"
-                  inputMode="decimal"
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                />
-                <span className={styles.offerModal__amountSymbol}>{symbol}</span>
-              </div>
-            </div>
-
-            <div className={styles.offerModal__field}>
-              <label htmlFor="offerModalExpiry">Expires</label>
-              <select id="offerModalExpiry" value={expirySeconds} onChange={(e) => setExpirySeconds(Number(e.target.value))}>
-                {EXPIRY_OPTIONS.map((option) => (
-                  <option key={option.seconds} value={option.seconds}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className={styles.offerModal__note}>
-                Your payment is escrowed in the offers contract. Cancel anytime — expired offers just need a cancel to reclaim.
-              </p>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Approval is granted once for the token, not per offer — as a button on every row
-                it read as "accept this one", and since they all share the pending write every
-                row said "Confirming..." at once. One notice above the list is the honest shape:
-                a gate to open before any Accept button exists. */}
-            {isOwner && !hasTransferRights && offers.length > 0 && (
-              <div className={styles.offerModal__approve}>
-                <p className={styles.offerModal__approveNote}>
-                  {isLsp8
-                    ? 'Approve this NFT once to accept any offer below. It stays in your wallet — the approval only lets the offers contract move it at the moment you accept.'
-                    : 'Approve this collection once to accept any offer below. Your NFTs stay in your wallet — the approval only lets the offers contract move one at the moment you accept, and it leaves any live listing you have untouched.'}
+        {isCustomToken && (
+          <div className={clsx(styles.offerModal__field, styles.offerModal__tokenSearch)}>
+            <label htmlFor="offerModalCustomToken">Search token or paste address</label>
+            <input
+              type="text"
+              id="offerModalCustomToken"
+              value={customToken}
+              onChange={(e) => setCustomToken(e.target.value)}
+              placeholder="Token name or 0x..."
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {searchResults.length > 0 && (
+              <>
+                <ul className={styles.offerModal__tokenResults}>
+                  {searchResults.map((result) => {
+                    const popularity = formatTokenPopularity(result)
+                    return (
+                      <li key={result.address}>
+                        <button type="button" onClick={() => handleSelectSearchResult(result)}>
+                          <span className={styles.offerModal__tokenResultMain}>
+                            <span className={styles.offerModal__tokenResultSymbol}>{result.symbol}</span>
+                            {result.name && <span className={styles.offerModal__tokenResultName}>{result.name}</span>}
+                          </span>
+                          <span className={styles.offerModal__tokenResultMeta}>
+                            <span className={styles.offerModal__tokenResultAddress}>
+                              {result.address.slice(0, 6)}…{result.address.slice(-4)}
+                            </span>
+                            {popularity && <span className={styles.offerModal__tokenResultPopularity}>{popularity}</span>}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className={styles.offerModal__tokenWarning} role="alert">
+                  Anyone can create a token with any name — check the contract address before offering.
                 </p>
-                <button type="button" className={styles.offerModal__approveButton} onClick={handleApproveNft} disabled={isBusy}>
-                  {isBusy ? 'Confirming...' : isLsp8 ? 'Approve NFT' : 'Approve collection'}
-                </button>
-              </div>
+              </>
             )}
-
-            <ul className={styles.offerModal__offers}>
-              {offers.length === 0 && <li className={styles.offerModal__empty}>No active offers yet — be the first.</li>}
-              {offers.map((offer) => {
-                const isOwn = address && offer.offerer.toLowerCase() === address.toLowerCase()
-                const offerBusy = isBusy && pendingOfferId === offer.offer_id
-                return (
-                  <li key={offer.offer_id} className={styles.offerModal__offer}>
-                    <div className={styles.offerModal__offerWho}>
-                      {/* Same identity treatment every other surface gives a wallet — avatar,
-                        resolved name, hover card and profile link, Universal Profiles included */}
-                      <Profile variant="fullWithoutTime" creator={offer.offerer} networkId={chainId} />
-                      <span className={styles.offerModal__offerExpiry}>
-                        {isOwn && 'Your offer · '}expires {formatExpiry(offer.expires_at)}
-                      </span>
-                    </div>
-                    <span className={styles.offerModal__offerAmount}>
-                      {amountFormat.format(Number(formatUnits(BigInt(offer.price), offer.payment_decimals ?? 18)))}{' '}
-                      {offer.payment_symbol ?? ''}
-                    </span>
-                    {isOwn ? (
-                      <button
-                        type="button"
-                        className={clsx(styles.offerModal__offerAction, styles['offerModal__offerAction--cancel'])}
-                        onClick={() => handleCancel(offer)}
-                        disabled={isBusy}
-                      >
-                        {offerBusy ? 'Confirming...' : 'Cancel'}
-                      </button>
-                    ) : isOwner && hasTransferRights ? (
-                      <button
-                        type="button"
-                        className={styles.offerModal__offerAction}
-                        onClick={() => handleAccept(offer)}
-                        disabled={isBusy}
-                      >
-                        {offerBusy ? 'Confirming...' : 'Accept'}
-                      </button>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
-          </>
+          </div>
         )}
+
+        <div className={styles.offerModal__field}>
+          <label htmlFor="offerModalAmount">Offer price</label>
+          <div className={styles.offerModal__amount}>
+            <input
+              type="number"
+              id="offerModalAmount"
+              value={amount}
+              min={0}
+              step="any"
+              inputMode="decimal"
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+            />
+            <span className={styles.offerModal__amountSymbol}>{symbol}</span>
+          </div>
+        </div>
+
+        <div className={styles.offerModal__field}>
+          <label htmlFor="offerModalExpiry">Expires</label>
+          <select id="offerModalExpiry" value={expirySeconds} onChange={(e) => setExpirySeconds(Number(e.target.value))}>
+            {EXPIRY_OPTIONS.map((option) => (
+              <option key={option.seconds} value={option.seconds}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className={styles.offerModal__note}>
+            Your payment is escrowed in the offers contract. Cancel anytime — expired offers just need a cancel to reclaim.
+          </p>
+        </div>
       </main>
 
-      {tab === 'make' && (
-        <footer className={styles.offerModal__footer}>
-          {!offersAddress && <p className={styles.offerModal__hint}>Offers aren&apos;t available on this network yet</p>}
-          {isOwner && <p className={styles.offerModal__hint}>You own this NFT — offers on your own token aren&apos;t allowed</p>}
-          {!address && offersAddress && <p className={styles.offerModal__hint}>Connect your wallet to make an offer</p>}
-          {needsPaymentApproval ? (
-            <button
-              type="button"
-              className={styles.offerModal__send}
-              onClick={handleApprovePayment}
-              disabled={isBusy || amountUnits === null || isOwner}
-            >
-              {isBusy ? 'Confirming...' : `Approve ${amountFormat.format(parsedAmount)} ${symbol}`}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={styles.offerModal__send}
-              onClick={handleMakeOffer}
-              disabled={isBusy || amountUnits === null || isOwner || !offersAddress || !address}
-            >
-              {isBusy ? 'Confirming...' : isValidAmount ? `Offer ${amountFormat.format(parsedAmount)} ${symbol}` : 'Make offer'}
-            </button>
-          )}
-        </footer>
-      )}
+      <footer className={styles.offerModal__footer}>
+        {!offersAddress && <p className={styles.offerModal__hint}>Offers aren&apos;t available on this network yet</p>}
+        {isOwner && <p className={styles.offerModal__hint}>You own this NFT — offers on your own token aren&apos;t allowed</p>}
+        {!address && offersAddress && <p className={styles.offerModal__hint}>Connect your wallet to make an offer</p>}
+        {needsPaymentApproval ? (
+          <button
+            type="button"
+            className={styles.offerModal__send}
+            onClick={handleApprovePayment}
+            disabled={isBusy || amountUnits === null || isOwner}
+          >
+            {isBusy ? 'Confirming...' : `Approve ${amountFormat.format(parsedAmount)} ${symbol}`}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={styles.offerModal__send}
+            onClick={handleMakeOffer}
+            disabled={isBusy || amountUnits === null || isOwner || !offersAddress || !address}
+          >
+            {isBusy ? 'Confirming...' : isValidAmount ? `Offer ${amountFormat.format(parsedAmount)} ${symbol}` : 'Make offer'}
+          </button>
+        )}
+      </footer>
     </NativeDialog>
   )
 }
