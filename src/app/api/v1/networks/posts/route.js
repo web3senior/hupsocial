@@ -255,9 +255,10 @@ export async function GET(request) {
     // Fulfill any missing Universal Profile fields
     await fulfillUniversalProfiles(postsToSend, pool)
 
-    // Hydrate repost rows with their original post so the client renders them
-    // without a per-card getPostById round trip.
+    // Hydrate repost rows with their original post and commented rows with their
+    // newest reply, so the client renders both without per-card round trips.
     await attachRepostOriginals(postsToSend, viewerAddress)
+    await attachLastComments(postsToSend, viewerAddress)
 
     return NextResponse.json({
       success: true,
@@ -383,6 +384,116 @@ async function attachRepostOriginals(rows, viewerAddress) {
 }
 
 /**
+ * Hydrates commented rows in place with their newest reply under `last_comment`,
+ * replacing the client's per-card `comments?last=true` round trip — the preview
+ * shimmer that pops in under cards after the feed paints and pushes the page
+ * down. The newest reply per post is picked in a narrow window-function derived
+ * table first (same paginate-then-hydrate rule as the feed query: metric
+ * subqueries must only ever run on the final row set), then hydrated with the
+ * comments route's exact field shape, since `PostCard` renders the embed through
+ * the same `<Post>` markup the fetched row fed. A comment's feed post is
+ * is_comment when set, else parent_id — mirroring the per-post route's
+ * `(NULLIF(parent_id, 0) = ? OR is_comment = ?)` match.
+ */
+async function attachLastComments(rows, viewerAddress) {
+  const commentedRows = rows.filter((row) => Number(row.total_comments) > 0)
+  if (commentedRows.length === 0) return
+
+  const pairs = [...new Map(commentedRows.map((row) => [`${row.network_id}:${row.id}`, [row.id, row.network_id]])).values()]
+
+  // Newest reply per post via one UNION ALL of per-post point lookups — each
+  // branch is the per-post comments route's own predicate and ORDER BY ... LIMIT 1,
+  // so it rides the same indexes. (A ROW_NUMBER() OVER a tuple-IN-on-expression
+  // derived table looked cleaner but is exactly the kind of exotic plan this
+  // XAMPP MariaDB 10.4 build crashes on.)
+  const pickParams = []
+  const pickQuery = pairs
+    .map(([postId, networkId]) => {
+      pickParams.push(postId, networkId, postId, postId)
+      return `(SELECT c.id, c.network_id, ? AS last_comment_of
+        FROM posts c
+        WHERE c.network_id = ?
+          AND c.is_deleted = 0
+          AND (c.content_type = 1 OR c.is_comment IS NOT NULL)
+          AND (NULLIF(c.parent_id, 0) = ? OR c.is_comment = ?)
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT 1)`
+    })
+    .join(' UNION ALL ')
+
+  const [pickRows] = await pool.execute(pickQuery, pickParams)
+  if (pickRows.length === 0) return
+
+  const queryParams = []
+  if (viewerAddress) {
+    queryParams.push(viewerAddress)
+  }
+  pickRows.forEach((row) => queryParams.push(row.id, row.network_id))
+
+  const query = `
+      SELECT
+        p.*,
+        u.name as display_name,
+        u.profileImage as profile_image,
+        n.name as network_name,
+        n.explorer_url,
+        (
+          SELECT COUNT(*)
+          FROM post_likes pl
+          WHERE pl.post_id = p.id
+            AND pl.network_id = p.network_id
+            AND pl.contract_address <=> p.contract_address
+            AND pl.is_active = 1
+        ) as total_likes,
+        (
+          (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
+          + (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id
+            AND child.contract_address <=> p.contract_address AND child.parent_id = p.id
+            AND child.parent_id <> 0 AND child.is_deleted = 0
+            AND NOT (child.is_comment <=> p.id)
+            AND (child.content_type = 1 OR child.is_comment IS NOT NULL))
+        ) as total_comments,
+        (SELECT COUNT(*) FROM posts reposter WHERE reposter.network_id = p.network_id
+          AND reposter.is_deleted = 0 AND reposter.is_repost = p.id)
+        + (SELECT COUNT(*) FROM posts q WHERE q.network_id = p.network_id AND q.is_deleted = 0
+           AND CASE WHEN JSON_VALID(q.content) THEN JSON_UNQUOTE(JSON_EXTRACT(q.content, '$.quoteOf')) = CAST(p.id AS CHAR) ELSE 0 END) as total_reposts,
+        (SELECT COUNT(*) FROM post_views pv WHERE pv.post_id = p.id AND pv.network_id = p.network_id) as total_views,
+        ${viewerAddress ? `(
+          SELECT EXISTS(
+            SELECT 1
+            FROM post_likes pl
+            WHERE pl.post_id = p.id
+              AND pl.network_id = p.network_id
+              AND pl.contract_address <=> p.contract_address
+              AND pl.liker_address = ?
+              AND pl.is_active = 1
+          )
+        )` : '0'} as has_liked
+      FROM posts p
+      LEFT JOIN users u ON p.wallet_address = u.wallet_address
+      JOIN networks n ON p.network_id = n.id
+      WHERE (p.id, p.network_id) IN (${pickRows.map(() => '(?, ?)').join(', ')})
+  `
+
+  const [commentRows] = await pool.execute(query, queryParams)
+  await fulfillUniversalProfiles(commentRows, pool)
+
+  // pick told us which post each comment previews; the hydrated rows carry ids only
+  const parentOf = new Map(pickRows.map((row) => [`${row.network_id}:${row.id}`, row.last_comment_of]))
+  const byParent = new Map(commentRows.map((row) => [`${row.network_id}:${parentOf.get(`${row.network_id}:${row.id}`)}`, row]))
+  commentedRows.forEach((row) => {
+    const match = byParent.get(`${row.network_id}:${row.id}`)
+    if (!match) return
+    row.last_comment = {
+      ...match,
+      is_liked: Boolean(match.has_liked),
+      content: parseIPFSContent(match.content),
+    }
+  })
+}
+
+/**
  * Ranks every post the feed filter matches by its position inside its author's time bucket, so
  * the caller can keep only the first few. Partitioning on the wallet alone (not wallet+network)
  * makes the cap cross-chain: reposting the same thing on nine networks is one author flooding one
@@ -499,6 +610,7 @@ async function handleTrendingFeed({ networkId, viewerAddress, page, limit, offse
 
   await fulfillUniversalProfiles(orderedPosts, pool)
   await attachRepostOriginals(orderedPosts, viewerAddress)
+  await attachLastComments(orderedPosts, viewerAddress)
 
   return NextResponse.json({
     success: true,

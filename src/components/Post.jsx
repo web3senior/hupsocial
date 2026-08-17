@@ -742,49 +742,35 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
 export function PostCard({ item, actions, chainId, networkName }) {
   const router = useRouter()
   const { setCurrentPost } = usePostStore()
-  const [lastComment, setLastComment] = useState(null)
-  const [isLastCommentLoading, setIsLastCommentLoading] = useState(false)
   const { address } = useConnection()
 
   const shouldFetch = Number(item?.total_comments || 0) > 0
 
-  useEffect(() => {
-    if (!shouldFetch || !item?.id || !item?.network_id) {
-      setLastComment(null)
-      return
-    }
-
-    let cancelled = false
-    setIsLastCommentLoading(true)
-
-    const params = new URLSearchParams({ last: 'true' })
-    if (address) params.set('viewer_address', address)
-
-    fetch(`/api/v1/networks/${item.network_id}/${item.id}/comments?${params.toString()}`)
-      .then(async (res) => {
-        const body = await res.json().catch(() => null)
-        if (!res.ok || body?.success === false) throw new Error(body?.error || 'Failed to fetch last comment')
-        return body
-      })
-      .then((res) => {
-        if (cancelled) return
-        const comment = Array.isArray(res?.data) ? res.data[0] : res?.data
-        setLastComment(comment || null)
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          console.error('[LAST_COMMENT_ERROR]:', err.message)
-          setLastComment(null)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLastCommentLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [item?.id, item?.network_id, item?.total_comments, address, shouldFetch])
+  // Newest reply previewed under the card. Feed rows arrive with it embedded
+  // (last_comment, hydrated server-side by the posts route), so the preview
+  // paints with the feed instead of popping in below it and pushing the page
+  // down — the fetcher only runs for rows from surfaces that don't embed.
+  // Same SWR recipe as the repost original above: the cache survives unmounts
+  // for restored feeds, revalidateIfStale stays off, and keepPreviousData
+  // holds the preview through the anonymous → connected key change.
+  const lastCommentKey =
+    shouldFetch && item?.id && item?.network_id
+      ? `posts/${item.network_id}/${item.id}/${address || 'anonymous'}/last-comment`
+      : null
+  const { data: lastComment, isLoading } = useSWR(
+    lastCommentKey,
+    async () => {
+      const params = new URLSearchParams({ last: 'true' })
+      if (address) params.set('viewer_address', address)
+      const res = await fetch(`/api/v1/networks/${item.network_id}/${item.id}/comments?${params.toString()}`)
+      const body = await res.json().catch(() => null)
+      if (!res.ok || body?.success === false) throw new Error(body?.error || 'Failed to fetch last comment')
+      const comment = Array.isArray(body?.data) ? body.data[0] : body?.data
+      return comment ?? null
+    },
+    { fallbackData: item?.last_comment ?? undefined, revalidateIfStale: false, keepPreviousData: true },
+  )
+  const isLastCommentLoading = isLoading && !lastComment
 
   const hasCommentBelow = shouldFetch && (isLastCommentLoading || !!lastComment)
 
