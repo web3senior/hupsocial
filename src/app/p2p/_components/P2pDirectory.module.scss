@@ -192,8 +192,17 @@
   }
 
   &__legValue {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     overflow: hidden;
     font-size: 0.95rem;
+  }
+
+  // The flex row above took the ellipsis away from the strong itself, so the amount text
+  // carries it instead; the icon keeps its size through TokenIcon's own flex-shrink: 0
+  &__legAmount {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

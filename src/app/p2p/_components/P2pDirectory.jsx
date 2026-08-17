@@ -12,6 +12,8 @@ import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
 import { ContentSpinner } from '@/components/Loading'
 import TokenIdentity from '@/components/ui/TokenIdentity'
+import TokenIcon from '@/components/ui/TokenIcon'
+import useTokenIcon from '@/hooks/useTokenIcon'
 import CreateDealModal from './CreateDealModal'
 import useTokenMeta from './useTokenMeta'
 import styles from './P2pDirectory.module.scss'
@@ -90,6 +92,16 @@ function DealCard({ deal, chain, offersAddress, address, onSettled }) {
 
   const paymentDecimals = deal.payment_decimals ?? chain.nativeCurrency?.decimals ?? 18
   const paymentSymbol = deal.payment_symbol ?? chain.nativeCurrency?.symbol ?? ''
+
+  // Artwork for the amount lines: LSP7s carry their icon onchain in LSP4Metadata, the native
+  // coin borrows the chain's own icon like the swap page does, and ERC20s fall back to the CDN
+  // lookup TokenIcon does by address. The LSP4 read is SWR-cached per (chain, token), so the
+  // identical read inside TokenIdentity below costs nothing extra.
+  const paymentToken = deal.payment_token && deal.payment_token !== zeroAddress ? deal.payment_token : null
+  const assetLsp4Icon = useTokenIcon({ chainId: chain.id, token: assetToken, enabled: isLsp7Asset })
+  const paymentLsp4Icon = useTokenIcon({ chainId: chain.id, token: paymentToken, enabled: Boolean(deal.is_lsp7 && paymentToken) })
+  const assetIconToken = isNativeAsset ? { logo: chain.iconUrl } : { logo: assetLsp4Icon, address: assetToken }
+  const paymentIconToken = paymentToken ? { logo: paymentLsp4Icon, address: paymentToken } : { logo: chain.iconUrl }
 
   const remaining = BigInt(deal.remaining)
   // All-or-nothing for divisible assets, so the whole remainder settles in one fill and the
@@ -236,7 +248,10 @@ function DealCard({ deal, chain, offersAddress, address, onSettled }) {
         <div className={styles.p2p__leg}>
           <span className={styles.p2p__legLabel}>{assetLegLabel}</span>
           <strong className={styles.p2p__legValue}>
-            {asset.isResolved ? amountFormat.format(Number(formatUnits(shownQuantity, asset.decimals))) : '…'} {assetLabel}
+            <TokenIcon token={assetIconToken} chainId={chain.id} size="sm" />
+            <span className={styles.p2p__legAmount}>
+              {asset.isResolved ? amountFormat.format(Number(formatUnits(shownQuantity, asset.decimals))) : '…'} {assetLabel}
+            </span>
           </strong>
 
           {/* Native has no contract to verify, so only token assets carry the address row */}
@@ -256,15 +271,18 @@ function DealCard({ deal, chain, offersAddress, address, onSettled }) {
         <div className={styles.p2p__leg}>
           <span className={styles.p2p__legLabel}>{paymentLegLabel}</span>
           <strong className={styles.p2p__legValue}>
-            {amountFormat.format(Number(formatUnits(shownPayment, paymentDecimals)))} {paymentSymbol}
+            <TokenIcon token={paymentIconToken} chainId={chain.id} size="sm" />
+            <span className={styles.p2p__legAmount}>
+              {amountFormat.format(Number(formatUnits(shownPayment, paymentDecimals)))} {paymentSymbol}
+            </span>
           </strong>
 
           {/* The payment is no longer always a curated stablecoin — a deal can be funded with
               any ERC20 or LSP7 — so it needs the same verifiable identity the asset leg has */}
-          {deal.payment_token && deal.payment_token !== zeroAddress && (
+          {paymentToken && (
             <TokenIdentity
               chainId={chain.id}
-              address={deal.payment_token}
+              address={paymentToken}
               symbol={paymentSymbol}
               isLsp7={Boolean(deal.is_lsp7)}
               explorerUrl={explorerUrl}
