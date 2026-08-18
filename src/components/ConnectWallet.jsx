@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import useSWRImmutable from 'swr/immutable'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
 import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connector'
@@ -46,11 +47,50 @@ const ConnectTrigger = forwardRef(function ConnectTrigger(props, ref) {
   )
 })
 
+const memberCount = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+const fetchJson = (url) => fetch(url).then((response) => response.json())
+
+/**
+ * Social proof under the title: three random member faces and the live users count. Renders
+ * nothing until the numbers exist — an empty claim is worse than none — and since both popup
+ * surfaces mount their content eagerly, the data is warm before the popup ever opens.
+ */
+function CommunityProof() {
+  const { data } = useSWRImmutable('/api/v1/users/community', fetchJson)
+  const proof = data?.success ? data.data : null
+
+  if (!proof?.count || !proof.users?.length) return null
+
+  return (
+    <div className={`${styles.proof} flex align-items-center`}>
+      <div className={`${styles.proof__avatars} flex`}>
+        {proof.users.map((user) => (
+          <img
+            key={user.address}
+            src={user.avatar}
+            alt=""
+            loading="lazy"
+            onError={(event) => {
+              event.currentTarget.src = '/default-pfp.svg'
+            }}
+          />
+        ))}
+      </div>
+      <p className={styles.proof__text}>
+        Join <strong>{memberCount.format(proof.count)}+</strong> other users now
+      </p>
+    </div>
+  )
+}
+
 /** Title, connector list and footnote — identical in the sheet and the anchored panel. */
 function WalletPanelContent({ onConnected, onClose, session }) {
   return (
     <>
       <DialogSheet.Header title="Connect a wallet" onClose={onClose} />
+
+      <CommunityProof />
 
       <WalletOptions key={session} onConnected={onConnected} />
 

@@ -133,3 +133,39 @@ figure.pfp {
     transform: rotate(360deg);
   }
 }
+// Social proof strip between the title and the connector list — shared by the sheet and the
+// anchored panel, so it inherits each surface's --dialog-padding for gutter alignment.
+.proof {
+  flex-shrink: 0;
+  gap: 0.6rem;
+  padding: 0 var(--dialog-padding, 1.25rem) 0.9rem;
+
+  &__avatars {
+    img {
+      --r: 26px;
+      width: var(--r);
+      height: var(--r);
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 50%;
+      // A surface-colored ring separates the overlapping faces from each other
+      border: 2px solid var(--surface);
+      background-color: var(--surface-muted);
+
+      &:not(:first-child) {
+        margin-left: -8px;
+      }
+    }
+  }
+
+  &__text {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+
+    strong {
+      color: var(--color);
+      font-weight: 600;
+    }
+  }
+}
