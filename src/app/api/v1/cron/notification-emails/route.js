@@ -17,12 +17,33 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { sendNotificationDigest } from '@/lib/mailer'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 
 // Serverless-budget caps: recipients per run, rows fetched per run, and lines
 // actually listed in one digest (the rest is folded into "+N more").
 const MAX_RECIPIENTS = 50
 const MAX_ROWS = 500
 const MAX_LISTED = 10
+
+const shortWallet = (wallet) => `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
+
+/**
+ * Builds the digest line for one notification row. cidex copy leads with a
+ * short wallet label ("0x1234...abcd liked your post.") because that is all an
+ * indexer knows; at send time the actor's current profile is one join away, so
+ * the label is upgraded to their display name. Case-insensitive prefix match:
+ * cidex shortens the checksummed event address while the column may store
+ * lowercase.
+ * @param {object} row - Notification row joined with the actor's users row.
+ * @returns {string} Line copy for the email.
+ */
+const digestLine = (row) => {
+  const line = row.message || row.title
+  if (!row.actor_wallet_address || !row.actor_name) return line
+  const short = shortWallet(row.actor_wallet_address)
+  if (!line.toLowerCase().startsWith(short.toLowerCase())) return line
+  return `${row.actor_name}${line.slice(short.length)}`
+}
 
 export async function GET(request) {
   try {
@@ -40,9 +61,11 @@ export async function GET(request) {
     )
 
     const [rows] = await pool.execute(
-      `SELECT n.id, n.recipient_wallet_address, n.title, n.action_url, u.email
+      `SELECT n.id, n.recipient_wallet_address, n.actor_wallet_address, n.title, n.message, n.action_url, u.email,
+       a.name AS actor_name, a.profileImage AS actor_profile_image
        FROM notifications n
        JOIN users u ON u.wallet_address = n.recipient_wallet_address
+       LEFT JOIN users a ON a.wallet_address = n.actor_wallet_address
        WHERE n.email_status = 'pending'
        AND u.email IS NOT NULL AND u.email_verified_at IS NOT NULL AND u.email_notifications = 1
        ORDER BY n.recipient_wallet_address, n.created_at
@@ -59,7 +82,11 @@ export async function GET(request) {
     let sent = 0
     let failed = 0
     for (const [, items] of Array.from(byRecipient).slice(0, MAX_RECIPIENTS)) {
-      const listed = items.slice(0, MAX_LISTED)
+      const listed = items.slice(0, MAX_LISTED).map((row) => ({
+        line: digestLine(row),
+        action_url: row.action_url,
+        avatar: resolveStorageImageUrl(row.actor_profile_image, { width: 64 }),
+      }))
       try {
         await sendNotificationDigest(items[0].email, listed, items.length - listed.length)
         await pool.execute(`UPDATE notifications SET email_status = 'sent' WHERE id IN (${items.map(() => '?').join(',')})`, [
