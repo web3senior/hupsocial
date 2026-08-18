@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -94,6 +93,12 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     /// @notice Gas ceiling for eligibility-module calls — a hostile module fails closed instead
     ///         of gas-bombing join()/canPost() callers.
     uint256 public constant ELIGIBILITY_MODULE_GAS_CAP = 100_000;
+
+    /// @notice Gas ceiling for balanceOf reads against requirement assets — same fail-closed
+    ///         philosophy as the module cap: a hostile or broken token can neither gas-bomb nor
+    ///         revert join()/canPost() callers. Generous for any honest balanceOf, including
+    ///         proxied and rebasing (shares-computed) tokens.
+    uint256 public constant ASSET_READ_GAS_CAP = 50_000;
 
     mapping(uint256 => AssetRequirement[]) private requirementsOf;
 
@@ -627,6 +632,12 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         // Consent guard: only requests the wallet itself filed (join() sets isPending) can be
         // approved — without this, approveRequest doubles as a consentless addMember.
         if (!registry[_id][_actor].isPending) revert NoPendingRequest();
+        // Mirror acceptInvite: bans and archived status are re-checked since either may have
+        // changed while the request sat pending (setBanStatus doesn't clear isPending) — without
+        // this, approving a stale request puts a banned wallet on the roster of a live community,
+        // or grows the roster of an archived one. A stuck banned request is cleared via rejectRequest.
+        if (!communities[_id].isActive) revert CommunityInactive();
+        if (registry[_id][_actor].isBanned) revert Banned();
 
         _admit(_id, _actor);
     }
@@ -648,11 +659,13 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit ModeratorUpdated(_id, _actor, _isMod);
     }
 
-    /// @dev The creator can't be banned (mirrors kick's guard — a moderator outranking the
-    ///      creator would be a privilege inversion). Banning also strips moderator status, so a
-    ///      later unban doesn't silently restore moderation powers — the creator must re-grant.
+    /// @dev Neither the creator nor the governor can be banned (mirrors kick's guard — a
+    ///      moderator outranking either would be a privilege inversion; banning the governor
+    ///      would only block its posting while every creator-level power stayed intact, and it
+    ///      could unban itself anyway). Banning also strips moderator status, so a later unban
+    ///      doesn't silently restore moderation powers — the creator must re-grant.
     function setBanStatus(uint256 _id, address _actor, bool _banned) external communityExists(_id) onlyModerator(_id) {
-        if (communities[_id].creator == _actor) revert Unauthorized();
+        if (communities[_id].creator == _actor || governors[_id] == _actor) revert Unauthorized();
 
         MemberStatus storage status = registry[_id][_actor];
         status.isBanned = _banned;
@@ -670,7 +683,7 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
      *         "permanently banned".
      */
     function kick(uint256 _id, address _actor) external communityExists(_id) onlyModerator(_id) {
-        if (communities[_id].creator == _actor) revert Unauthorized();
+        if (communities[_id].creator == _actor || governors[_id] == _actor) revert Unauthorized();
 
         MemberStatus storage status = registry[_id][_actor];
         if (!status.isMember) revert NotMember();
@@ -700,8 +713,13 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         delete requirementsOf[_id];
         for (uint256 i = 0; i < _requirements.length; i++) {
             AssetRequirement calldata r = _requirements[i];
-            if ((r.rType == RequirementType.TokenBalance || r.rType == RequirementType.NftBalance) && r.asset == address(0)) {
-                revert InvalidAddress();
+            if (r.rType == RequirementType.TokenBalance || r.rType == RequirementType.NftBalance) {
+                if (r.asset == address(0)) revert InvalidAddress();
+                // Probe balanceOf(address) at set time so a wrong asset (an ERC-1155, an EOA, a
+                // typo) is rejected here with a clear error instead of surfacing later as the
+                // requirement failing closed for every member in canPost().
+                (bool ok, ) = _tryBalanceOf(r.asset, _msgSender());
+                if (!ok) revert InvalidAsset();
             }
             requirementsOf[_id].push(r);
         }
@@ -798,18 +816,37 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit CommunityOwnershipTransferred(_id, oldCreator, newCreator);
     }
 
-    /// @dev One requirement entry against one wallet. FollowsCreator fails closed when no
+    /// @dev Gas-capped, non-reverting balanceOf(address) probe shared by the ERC-20/LSP7 and
+    ///      ERC-721/LSP8 requirement checks (the selector is identical across all four standards).
+    ///      Deliberately a raw staticcall rather than try/catch: try/catch does NOT catch the
+    ///      revert from calling an address with no code, nor a return-data decoding failure —
+    ///      exactly what a typo'd, EOA, or ERC-1155 `asset` produces. `ok` false means the asset
+    ///      reverted, is not a contract, or returned malformed data; callers treat that as
+    ///      "requirement not met" so one broken asset can never revert isEligible/canPost (and
+    ///      with it Hup core's post flow) for the whole community.
+    function _tryBalanceOf(address _asset, address _holder) private view returns (bool ok, uint256 balance) {
+        (bool success, bytes memory data) = _asset.staticcall{gas: ASSET_READ_GAS_CAP}(
+            abi.encodeCall(IERC20.balanceOf, (_holder))
+        );
+        if (!success || data.length < 32) return (false, 0);
+        return (true, abi.decode(data, (uint256)));
+    }
+
+    /// @dev One requirement entry against one wallet. Balance reads are gas-capped and fail
+    ///      closed on broken assets (see _tryBalanceOf); FollowsCreator fails closed when no
     ///      LSP26 registry has been wired; NFT minBalance 0 is kept as "hold any 1".
     function _passesRequirement(uint256 _id, address _actor, AssetRequirement memory r) private view returns (bool) {
         if (r.rType == RequirementType.NativeBalance) {
             return _actor.balance >= r.minBalance;
         }
         if (r.rType == RequirementType.TokenBalance) {
-            return IERC20(r.asset).balanceOf(_actor) >= r.minBalance;
+            (bool ok, uint256 balance) = _tryBalanceOf(r.asset, _actor);
+            return ok && balance >= r.minBalance;
         }
         if (r.rType == RequirementType.NftBalance) {
             uint256 required = r.minBalance == 0 ? 1 : r.minBalance;
-            return IERC721(r.asset).balanceOf(_actor) >= required;
+            (bool ok, uint256 balance) = _tryBalanceOf(r.asset, _actor);
+            return ok && balance >= required;
         }
         if (r.rType == RequirementType.Whitelisted) {
             return whitelist[_id][_actor];

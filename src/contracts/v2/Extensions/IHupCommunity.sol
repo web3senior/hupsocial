@@ -150,6 +150,7 @@ interface IHupCommunity {
     error NoPendingRequest();
     error NotEligible();
     error TooManyRequirements();
+    error InvalidAsset();
     error NothingToWithdraw();
     error IdentityNotRegistered();
 

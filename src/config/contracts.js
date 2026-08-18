@@ -129,7 +129,10 @@ export const CONTRACTS = {
     forwarderName: 'HupChatForwarder',
     hup: '0xb0b992E90e11b6bCE51cb5ea4de160D06098B955',
     status: '',
-    community: '0x898d77dd27f5C8d8edb71b11B876DF1fc306eb8b',
+    // Redeployed 2026-08-17 (block 8332629): fail-closed gas-capped requirement asset reads,
+    // InvalidAsset probe in setRequirements, stale-request + governor guards. The 2026-08-13
+    // deploy 0x898d77dd27f5C8d8edb71b11B876DF1fc306eb8b is retired.
+    community: '0xd664Bddf31A44140E2e918CdC52d30a006b7eE53',
     chat: '',
     // Canonical LSP26 (same address as every other chain); the own deploy 0x78430Ef5… is retired.
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
