@@ -184,6 +184,21 @@
   color: #0da2e7;
 }
 
+// Loading follows the theme foreground like success — the motion, not a hue, is the signal.
+.loading .toast__icon {
+  color: var(--foreground, #141414);
+
+  svg {
+    animation: toast-spin 800ms linear infinite;
+  }
+}
+
+@keyframes toast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes toast-in-up {
   from {
     opacity: 0;

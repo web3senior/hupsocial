@@ -11,6 +11,7 @@ import { formatEther, parseEther, parseUnits, decodeEventLog } from 'viem'
 import clsx from 'clsx'
 import NativeDialog from '@/components/ui/NativeDialog'
 import DialogHeader from '@/components/ui/DialogHeader'
+import { toast } from '@/components/NextToast'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getActiveChain } from '@/lib/communication'
 import { uploadObjectToIPFS } from '@/lib/ipfs'
@@ -216,6 +217,32 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const { isLoading: isConfirming, isSuccess: isConfirmed, data: receipt } = useWaitForTransactionReceipt({ hash })
   const { mutateAsync: writeSetterAsync } = useWriteContract()
 
+  // Tx progress lives in one morphing toast (loading → success) instead of status rows
+  // pinned under the form — a toast also outlives the modal, so closing it early doesn't
+  // hide the confirmation the user is still waiting on.
+  const txToastRef = useRef(null)
+  const showTxToast = (message, type) => {
+    // update() returns false once the user has closed the toast — start a fresh one then,
+    // so the final success/failure state is never silently swallowed
+    if (!txToastRef.current?.update(message, type)) txToastRef.current = toast(message, type)
+  }
+
+  useEffect(() => {
+    if (isConfirming) showTxToast('Waiting for block confirmation...', 'loading')
+  }, [isConfirming])
+
+  useEffect(() => {
+    if (isConfiguring) showTxToast('Community created — confirm the gating requirement transaction in your wallet...', 'loading')
+  }, [isConfiguring])
+
+  // Submission failures keep their inline error display — just drop the spinner
+  useEffect(() => {
+    if (createError) {
+      txToastRef.current?.dismiss()
+      txToastRef.current = null
+    }
+  }, [createError])
+
   const isCreatingEncrypted = encrypted
 
   // createCommunity has no requirement parameters, so gated types need follow-up setter txs.
@@ -295,10 +322,17 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             'Community created, but its gating setup was not completed — finish it from the Modify form.',
           )
           setIsConfiguring(false)
+          txToastRef.current?.dismiss()
+          txToastRef.current = null
           return // keep the modal open so the error is seen; user closes manually
         }
         setIsConfiguring(false)
       }
+
+      // Success resolves the loading toast rather than a footer row, so it stays visible
+      // even though resetForm/onCreated close the modal right after
+      showTxToast('Community successfully registered!', 'success')
+      txToastRef.current = null
 
       resetForm()
       onCreated?.()
@@ -650,15 +684,6 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
               : 'Create Community'}
           </button>
         </form>
-
-        {hash && (
-          <div className={styles.manager__monitor}>
-            <p className={styles.manager__tx}>Tx: <span>{hash}</span></p>
-            {isConfirming && <p className={styles.manager__status}>Waiting for block confirmation...</p>}
-            {isConfiguring && <p className={styles.manager__status}>Community created — confirm the gating requirement transaction in your wallet...</p>}
-            {isConfirmed && !isConfiguring && <p className={clsx(styles.manager__status, styles['manager__status--success'])}>Community Successfully Registered!</p>}
-          </div>
-        )}
 
         {friendlyCreateError && <div className={styles.manager__error}>Error: {friendlyCreateError}</div>}
 

@@ -123,37 +123,6 @@
     }
   }
 
-  &__monitor {
-    margin-top: 1.5rem;
-    padding: 1rem;
-    background: var(--surface-muted);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-  }
-
-  &__tx {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    word-break: break-all;
-    margin: 0 0 0.5rem 0;
-
-    span {
-      font-family: monospace;
-      color: var(--text);
-    }
-  }
-
-  &__status {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--batch-like-color);
-    margin: 0;
-
-    &--success {
-      color: var(--text); 
-    }
-  }
-
   &__error {
     margin-top: 1rem;
     padding: 1rem;
