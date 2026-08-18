@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
-import { BookIcon, BugIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { BookIcon, BugIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
@@ -341,6 +341,12 @@ export default function Aside() {
                     <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
                       <HeartIcon size={16} />
                       <span>Liked</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/nfts/offers" onClick={close} className="flex align-items-center gap-050">
+                      <HandCoinsIcon size={16} />
+                      <span>My offers</span>
                     </Link>
                   </li>
                   <li>
