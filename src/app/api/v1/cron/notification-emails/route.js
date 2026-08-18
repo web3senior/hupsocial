@@ -13,12 +13,17 @@
  * email are marked skipped alongside them, so the pending set never grows
  * unbounded.
  *
+ * Replies and quotes carry their text into the email (SNIPPET_SOURCE): "X
+ * commented on your post." alone withholds the one thing the recipient opened
+ * the mail for.
+ *
  * Vercel cron GETs this path with `Authorization: Bearer ${CRON_SECRET}`
  * (vercel.json); locally the same curl works.
  */
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { getMediaItems, getText } from '@/lib/content'
 import { sendNotificationDigest } from '@/lib/mailer'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 
@@ -27,6 +32,10 @@ import { resolveStorageImageUrl } from '@/lib/storageHelper'
 const MAX_RECIPIENTS = 50
 const MAX_ROWS = 500
 const MAX_LISTED = 10
+
+// Quoted reply text is a preview, not the post — long enough to carry a real
+// sentence, short enough that ten of them stay one scroll.
+const MAX_SNIPPET = 140
 
 /**
  * The only action types that reach an inbox. Two kinds of row are deliberately
@@ -63,7 +72,28 @@ const EMAIL_WORTHY_TYPES = [
 
 const WORTHY_PLACEHOLDERS = EMAIL_WORTHY_TYPES.map(() => '?').join(', ')
 
+/**
+ * Action types whose line is worth quoting a post under, mapped to the `data`
+ * key holding that post's id — the same child-post resolution the in-app feed
+ * does through `previewFrom: 'child'`. Only replies and quotes qualify: a like
+ * or a repost adds no words, and the post they point at is the recipient's own.
+ */
+const SNIPPET_SOURCE = {
+  post_received_comment: 'comment_post_id',
+  post_received_quote: 'quote_post_id',
+}
+
 const shortWallet = (wallet) => `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
+
+const parseJson = (value) => {
+  if (!value) return null
+  if (typeof value === 'object') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
 
 /**
  * Builds the digest line for one notification row. cidex copy leads with a
@@ -81,6 +111,97 @@ const digestLine = (row) => {
   const short = shortWallet(row.actor_wallet_address)
   if (!line.toLowerCase().startsWith(short.toLowerCase())) return line
   return `${row.actor_name}${line.slice(short.length)}`
+}
+
+/** Post ids repeat across networks and across contracts on one network — key on all three. */
+const postKey = (postId, networkId, contractAddress) => `${postId}:${networkId}:${(contractAddress || '').toLowerCase()}`
+
+/**
+ * The post whose text belongs under a row's line: the reply or quote itself,
+ * never the post it answers (the recipient wrote that one).
+ * @param {object} row - Notification row.
+ * @returns {{postId: string, networkId: number|string, contractAddress: string|null}|null}
+ */
+const snippetRef = (row) => {
+  const key = SNIPPET_SOURCE[row.action_type]
+  if (!key) return null
+
+  const data = parseJson(row.data)
+  const postId = data?.[key]
+  const networkId = data?.network_id ?? row.network_id
+  if (!postId || !networkId) return null
+
+  return { postId: String(postId), networkId, contractAddress: data?.contract_address || null }
+}
+
+/**
+ * Plain-text preview of a post's stored metadata: its text, or a media summary
+ * for a wordless reply. Community posts sealed by a vault parse to an
+ * `encrypted` envelope with no elements — those stay unquoted rather than
+ * shipping ciphertext to an inbox.
+ * @param {string|object|null} content - Raw `posts.content` value.
+ * @returns {string|null} Snippet, or null when there is nothing to show.
+ */
+const postSnippet = (content) => {
+  const parsed = parseJson(content)
+  if (!parsed || parsed.encrypted) return null
+
+  const text = getText(parsed).trim()
+  if (text) return text.length > MAX_SNIPPET ? `${text.slice(0, MAX_SNIPPET).trim()}…` : text
+
+  const items = getMediaItems(parsed)
+  if (items.length === 0) return null
+
+  const hasImage = items.some((item) => item?.type === 'image')
+  const hasVideo = items.some((item) => item?.type === 'video')
+  if (hasImage && hasVideo) return '📷🎥 Media'
+  if (hasVideo) return items.length > 1 ? `🎥 ${items.length} videos` : '🎥 Video'
+  return items.length > 1 ? `📷 ${items.length} photos` : '📷 Photo'
+}
+
+/**
+ * One batched posts read for every reply and quote this sweep will list.
+ * Deleted and moderation-flagged posts are excluded in SQL: the app hides those
+ * behind a blur the reader can choose to lift, and an email cannot.
+ * @param {Array<object|null>} refs - Refs from snippetRef, nulls included.
+ * @returns {Promise<Map<string, string>>} postKey -> snippet.
+ */
+const fetchSnippets = async (refs) => {
+  const unique = new Map()
+  for (const ref of refs) {
+    if (ref) unique.set(postKey(ref.postId, ref.networkId, ref.contractAddress), ref)
+  }
+  if (unique.size === 0) return new Map()
+
+  // Matched on (id, network) alone — the PK prefix — and disambiguated by
+  // contract in the map below. posts.contract_address is ascii_bin, so a SQL
+  // comparison against a differently-cased address would silently match nothing.
+  const clauses = []
+  const params = []
+  for (const ref of unique.values()) {
+    clauses.push('(id = ? AND network_id = ?)')
+    params.push(ref.postId, ref.networkId)
+  }
+
+  const [rows] = await pool.execute(
+    `SELECT id, network_id, contract_address, content FROM posts
+     WHERE is_deleted = 0 AND moderation_flagged = 0 AND (${clauses.join(' OR ')})`,
+    params,
+  )
+
+  const snippets = new Map()
+  for (const row of rows) {
+    const snippet = postSnippet(row.content)
+    if (!snippet) continue
+
+    snippets.set(postKey(row.id, row.network_id, row.contract_address), snippet)
+    // Loose key for the refs that carry no contract address; first row wins,
+    // which in practice is the only row that matched that (id, network).
+    const loose = postKey(row.id, row.network_id, null)
+    if (!snippets.has(loose)) snippets.set(loose, snippet)
+  }
+
+  return snippets
 }
 
 export async function GET(request) {
@@ -104,7 +225,8 @@ export async function GET(request) {
     )
 
     const [rows] = await pool.execute(
-      `SELECT n.id, n.recipient_wallet_address, n.actor_wallet_address, n.title, n.message, n.action_url, u.email,
+      `SELECT n.id, n.recipient_wallet_address, n.actor_wallet_address, n.action_type, n.network_id, n.data,
+       n.title, n.message, n.action_url, u.email,
        a.name AS actor_name, a.profileImage AS actor_profile_image
        FROM notifications n
        JOIN users u ON u.wallet_address = n.recipient_wallet_address
@@ -124,14 +246,23 @@ export async function GET(request) {
       byRecipient.set(row.recipient_wallet_address, list)
     }
 
+    // Snippets are read once for the whole sweep, and only for the rows that
+    // reach a listed line — the ones folded into "+N more" quote nothing.
+    const recipients = Array.from(byRecipient.values()).slice(0, MAX_RECIPIENTS)
+    const snippets = await fetchSnippets(recipients.flatMap((items) => items.slice(0, MAX_LISTED).map(snippetRef)))
+
     let sent = 0
     let failed = 0
-    for (const [, items] of Array.from(byRecipient).slice(0, MAX_RECIPIENTS)) {
-      const listed = items.slice(0, MAX_LISTED).map((row) => ({
-        line: digestLine(row),
-        action_url: row.action_url,
-        avatar: resolveStorageImageUrl(row.actor_profile_image, { width: 64 }),
-      }))
+    for (const items of recipients) {
+      const listed = items.slice(0, MAX_LISTED).map((row) => {
+        const ref = snippetRef(row)
+        return {
+          line: digestLine(row),
+          snippet: ref ? snippets.get(postKey(ref.postId, ref.networkId, ref.contractAddress)) || null : null,
+          action_url: row.action_url,
+          avatar: resolveStorageImageUrl(row.actor_profile_image, { width: 64 }),
+        }
+      })
       try {
         await sendNotificationDigest(items[0].email, listed, items.length - listed.length)
         await pool.execute(`UPDATE notifications SET email_status = 'sent' WHERE id IN (${items.map(() => '?').join(',')})`, [
