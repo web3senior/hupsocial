@@ -215,6 +215,17 @@ function QrGlyph() {
   )
 }
 
+/**
+ * Labels for connectors whose own name is a term of art rather than something a user would
+ * recognise. wagmi calls the generic `window.ethereum` fallback "Injected"; renaming it at the
+ * connector would mean handing `injected()` a `target`, and that also switches on the eager
+ * connect/accountsChanged listeners it deliberately leaves off — so the fix belongs here, where
+ * only the label changes and `connector.id` stays what the ordering and Detected checks key off.
+ */
+const CONNECTOR_LABELS = { injected: 'Browser wallet' }
+
+const connectorLabel = (connector) => CONNECTOR_LABELS[connector.id] || connector.name
+
 export function WalletOptions({ onConnected }) {
   const connectors = useConnectors()
   const { mutate: connect, isPending, variables, error } = useConnect()
@@ -266,8 +277,8 @@ export function WalletOptions({ onConnected }) {
             <DialogSheet.Row
               key={connector.uid}
               // A string icon falls back to the connector's initial in a tinted tile
-              icon={connector.icon ? <img src={connector.icon} alt="" /> : connector.name}
-              name={connector.name}
+              icon={connector.icon ? <img src={connector.icon} alt="" /> : connectorLabel(connector)}
+              name={connectorLabel(connector)}
               meta={
                 isConnectingThis ? (
                   <span className={styles.spinner} aria-label="Connecting" />
