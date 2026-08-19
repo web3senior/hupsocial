@@ -27,8 +27,9 @@
 
   min-height: 100svh;
 
-  @media (max-width: 640px) {
-    padding-bottom: 3rem;
+  // Clears the floating One UI bottom bar (components/Footer), hidden from 768px up
+  @media (max-width: 767px) {
+    padding-bottom: var(--bottom-nav-space);
   }
 
   // --pattern-fg: color-mix(in oklab, var(--grey-90-a50) 5%, transparent);

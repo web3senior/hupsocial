@@ -454,8 +454,9 @@
 
   // Modifier: Batch Button styling variations if needed
   &__button--batch {
+    // Sits above the floating bottom bar instead of behind it
     @include md-down() {
-      margin-bottom: 3.5rem;
+      margin-bottom: var(--bottom-nav-space);
     }
   }
 

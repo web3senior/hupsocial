@@ -1,127 +1,156 @@
 @use './../styles/components/responsive' as *;
 
+// Samsung One UI (Gallery) bottom bar: a floating, heavily rounded capsule that hovers
+// over the feed rather than sitting flush on the viewport edge. Every colour resolves
+// from a theme token, so light, dark and terminal all get a bar that belongs to them.
 .footer {
   position: fixed;
+  right: 0;
   bottom: 0;
   left: 0;
-  right: 0;
-  height: 50px;
-  z-index: 0;
-  // Light smoked glass: a subtle translucent black so the blurred content
-  // shows through the frosted effect
-  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 2;
+  padding: 0 var(--bottom-nav-inset) calc(var(--bottom-nav-inset) + env(safe-area-inset-bottom, 0px));
+  // The strip between the bar and the viewport edges must stay click-through
+  pointer-events: none;
+  user-select: none;
 
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
+  // Slides out on the way down, back in on the way up (state lives in Footer.jsx). It is a
+  // pure translate on purpose: an opacity fade would make this element a backdrop root for
+  // the duration and the bar would lose its blur mid-slide.
+  transform: translateY(0);
+  visibility: visible;
+  transition:
+    transform 0.32s cubic-bezier(0.2, 0, 0, 1),
+    visibility 0s;
 
-  // The glass blur effect
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px); // Safari support
+  @media (prefers-reduced-motion: reduce) {
+    transition-duration: 0.01ms, 0s;
+  }
 
-  border-top: 1px solid var(--border);
-  color: var(--text);
-
-  // Safe area support for iOS/modern mobile viewports
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-
-  // Hide on desktop viewports by default (controlled by your layout)
-  @media (min-width: 768px) {
+  @include md-up() {
     display: none;
   }
 
-  nav {
-    width: 100%;
+  // Parked just past the viewport edge; visibility only flips once it is fully out, so the
+  // links leave the tab order without the bar disappearing mid-slide.
+  &--hidden {
+    transform: translateY(calc(100% + 8px));
+    visibility: hidden;
+    transition-delay: 0s, 0.32s;
 
-    ul {
-      display: flex;
-      align-items: center;
-      justify-content: space-around;
-      gap: 0.5rem;
-      list-style: none;
-      margin: 0;
-
-      height: 56px; // Standard global bottom nav depth bar rule
-    }
-
-    li {
-      flex: 1;
-      display: flex;
-      justify-content: center;
+    @media (prefers-reduced-motion: reduce) {
+      transition-delay: 0s, 0s;
     }
   }
-}
 
-.link {
-  position: relative; // Crucial for positioning the absolute pseudo-background
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  padding: 0.5rem;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
+  &__bar {
+    pointer-events: auto;
+    height: var(--bottom-nav-height);
+    border-radius: calc(var(--bottom-nav-height) / 2);
+    border: 1px solid var(--border);
+    // Smoked glass. The alpha is what makes the blur legible: at 88% opaque only a
+    // twelfth of the backdrop survives and the bar just reads as a flat slab, so the
+    // surface is deliberately kept thin enough for the feed to smear through it.
+    background-color: color-mix(in srgb, var(--surface) 62%, transparent);
+    // No hand-written -webkit- twin here: lightningcss drops BOTH declarations when the
+    // legacy alias is present, and it already emits the prefix per browser target itself.
+    backdrop-filter: blur(28px) saturate(180%);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+    max-width: 400px;
+    margin: auto;
 
-  color: var(--footer-link-color, var(--text-muted));
-  border-radius: 8px;
-  isolation: isolate; // Keeps the icon layer strictly on top of the pseudo-background
-  transition: color 0.2s ease;
+    // Without a backdrop filter that thin surface would leave the feed legible straight
+    // through the bar, so those browsers get a near-solid one instead.
+    @supports not (backdrop-filter: blur(2px)) {
+      background-color: color-mix(in srgb, var(--surface) 94%, transparent);
+    }
+  }
 
-  // The pseudo-element acting as our zooming background
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0; // Fills the entire link boundaries
-    z-index: -1; // Places it safely behind the icon
-    background-color: var(--hover);
-    border-radius: 8px;
+  &__list {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
 
-    // Core animation states: start hidden and scaled down to 0.7
-    opacity: 0;
-    transform: scale(0.7);
+  &__item {
+    flex: 1 1 0;
+    display: flex;
+  }
+
+  &__link {
+    position: relative;
+    isolation: isolate; // Keeps the icon and label strictly above the pill layer
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
     transition:
-      transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-      opacity 0.2s ease;
-    // Note: cubic-bezier gives it a slight, clean spring/bounce at the end
-  }
+      color 0.2s ease,
+      transform 0.12s ease;
 
-  // Trigger the zoom expansion on hover or keyboard focus
-  @media (hover: hover) and (pointer: fine) {
-    // FIX: Apply :not() to the parent element before the hover and pseudo-element
-    &:not([aria-label='New']) {
+    // The One UI selection pill. It lives behind the item and grows into place
+    // instead of appearing, which is what gives the switch its soft snap.
+    &::before {
+      content: '';
+      position: absolute;
+      z-index: -1;
+      inset: 4px 4px;
+      border-radius: 1000px;
+      background-color: color-mix(in srgb, var(--foreground) 12%, transparent);
+      opacity: 0;
+      transform: scale(0.72);
+      transition:
+        transform 0.28s cubic-bezier(0.34, 1.46, 0.64, 1),
+        opacity 0.2s ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
       &:hover::before {
-        opacity: 1;
+        opacity: 0.6;
         transform: scale(1);
       }
     }
+
+    // Soft tap shrink, matching One UI's press feedback
+    &:active {
+      transform: scale(0.94);
+    }
   }
 
-  // Soft tap shrink for mobile responsiveness
-  &:active {
-    transform: scale(0.95);
-    transition: transform 0.1s ease;
+  &__link--active {
+    color: var(--foreground);
+
+    &::before {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
-  // Central "New" button styling
-  &[aria-label='New'] {
-    background-color: var(--black);
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
   }
-}
 
-// Active styling mapping across both conditional template methods (clsx and data attributes)
-.linkActive,
-.link[data-active='true'] {
-  color: var(--text); // Light -> dark foreground tracking matching your color-schemes
-}
-
-.iconWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  &__label {
+    font-size: var(--font-size-12);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
 }
 
 // Compact structural notification dot matching the Aside implementation

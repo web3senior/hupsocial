@@ -285,6 +285,13 @@ $secondary-color: #9e481d;
   --page-border-radius: 24px;
   --chip-border-radius: 4px;
 
+  // Floating mobile bottom nav (components/Footer). The bar is inset from the viewport
+  // edges, so anything anchored to the bottom on mobile clears it with --bottom-nav-space
+  // instead of restating the height and the safe area a second time.
+  --bottom-nav-height: 64px;
+  --bottom-nav-inset: 0.5rem;
+  --bottom-nav-space: calc(var(--bottom-nav-height) + var(--bottom-nav-inset) * 2 + env(safe-area-inset-bottom, 0px));
+
   // Card Specifics
   --card-padding: 16px;
   --card-shadow: 0 1px 4px rgba(12, 12, 13, 0.1);

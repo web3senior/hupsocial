@@ -47,7 +47,7 @@ export default function ClientLayout({ children }) {
         <Header />
         <Aside />
         <main className={styles.main}>{children}</main>
-        {/* <Footer /> */}
+        <Footer />
         <InstallAppDialog />
         {/* Email embedded wallet surfaces: the login flow and its extension-popup stand-in */}
         <EmailLoginDialog />
