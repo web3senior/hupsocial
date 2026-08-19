@@ -128,3 +128,18 @@
 .cashtagCard__change .cashtagCard__period {
   margin-inline-start: 3px;
 }
+
+// The lone-card layout: fills the post's width, and the chart grows with it rather than
+// leaving a 96px trend marooned against the right edge of a wide card
+.cashtagCard--wide {
+  inline-size: 100%;
+  flex: 1 1 auto;
+
+  .cashtagCard__chartWrap {
+    flex: 1 1 auto;
+    // Never more than half the card — past that the trend starts crowding the identity it is
+    // supposed to be annotating
+    inline-size: auto;
+    max-inline-size: 52%;
+  }
+}

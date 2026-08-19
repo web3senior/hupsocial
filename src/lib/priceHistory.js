@@ -25,12 +25,24 @@ const FETCH_TIMEOUT_MS = 6000
  * people watch tick; a multi-year line does not meaningfully move within the hour.
  */
 export const RANGES = {
-  '1D': { span: 48, period: '30m', ttlMs: 2 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 24 } },
-  '1W': { span: 56, period: '3h', ttlMs: 10 * 60 * 1000, gecko: { tf: 'hour', aggregate: 4, limit: 42 } },
-  '1M': { span: 30, period: '1d', ttlMs: 30 * 60 * 1000, gecko: { tf: 'day', aggregate: 1, limit: 30 } },
-  '1Y': { span: 52, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 52 } },
-  ALL: { span: 200, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 200 } },
+  '1D': { span: 48, period: '30m', ttlMs: 2 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 24 }, days: 1, strict: true },
+  '1W': { span: 56, period: '3h', ttlMs: 10 * 60 * 1000, gecko: { tf: 'hour', aggregate: 4, limit: 42 }, days: 7, strict: true },
+  '1M': { span: 30, period: '1d', ttlMs: 30 * 60 * 1000, gecko: { tf: 'day', aggregate: 1, limit: 30 }, days: 30, strict: true },
+  // "Up to" ranges: a token that launched last month legitimately has only a month of history,
+  // and refusing to chart it would be wrong. 1D/1W/1M name a window instead, and a series
+  // covering a sliver of one is not that window.
+  '1Y': { span: 52, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 52 }, days: 365, strict: false },
+  ALL: { span: 200, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 200 }, days: null, strict: false },
 }
+
+// Two points are a line segment, not a trend. Below this there is nothing to read in the shape.
+const MIN_POINTS = 8
+
+// How much of a named window a series must actually span to be drawn as that window. TBULL's
+// pool answered a 1W request with two candles four hours apart, which drew a confident little
+// downtrend beside a +49% headline — a chart that contradicts the number above it is worse
+// than no chart.
+const MIN_COVERAGE = 0.4
 
 export const DEFAULT_RANGE = '1D'
 
@@ -62,7 +74,7 @@ const series = (points) => {
     .map((p) => ({ t: num(p.t), p: num(p.p) }))
     .filter((p) => p.t !== null && p.p !== null && p.p > 0)
     .sort((a, b) => a.t - b.t)
-  if (clean.length < 2) return null
+  if (clean.length < MIN_POINTS) return null
 
   const open = clean[0].p
   const close = clean[clean.length - 1].p
@@ -205,11 +217,16 @@ export async function fetchPriceHistory(symbols, range = DEFAULT_RANGE) {
     }
   }
 
+  const { days, strict } = RANGES[range]
+
   const out = {}
   for (const [symbol, entry] of wanted) {
     const data = cache.get(`${entry.key}:${range}`)?.series
-    if (data) out[symbol] = { ...data, range }
     // A null series is a known gap, not a failure — the card renders its quote without a chart
+    if (!data) continue
+    // Nor is a series that does not reach across the window it would be labelled with
+    if (strict && data.coverageDays < days * MIN_COVERAGE) continue
+    out[symbol] = { ...data, range }
   }
   return out
 }

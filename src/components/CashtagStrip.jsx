@@ -96,8 +96,10 @@ const CashtagStrip = ({ text, cashtags }) => {
       onClick={(event) => event.stopPropagation()}
     >
       <div ref={trackRef} className={styles.cashtagStrip__track} role="group" aria-label="Token prices mentioned in this post">
+        {/* A single card has nothing to scroll past, so it takes the post's full width. The
+            fixed pill width only exists to let the next card peek in and advertise the scroll. */}
         {tokens.map((token) => (
-          <CashtagCard key={token.symbol} token={token} />
+          <CashtagCard key={token.symbol} token={token} wide={tokens.length === 1} />
         ))}
       </div>
 

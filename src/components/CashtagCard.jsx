@@ -45,7 +45,7 @@ const signedPercentLabel = (percent) => `${percent >= 0 ? '+' : '−'}${percentL
  * Direction is carried by the arrow and the signed figure as well as the colour — see the note
  * in PriceSparkline about why that pairing is not optional.
  */
-const CashtagCard = ({ token, onRemove }) => {
+const CashtagCard = ({ token, onRemove, wide = false }) => {
   if (!token) return null
 
   const { symbol, name, price, change24h, logo, chainSlug, chainId, address, history } = token
@@ -60,7 +60,7 @@ const CashtagCard = ({ token, onRemove }) => {
   const artwork = logo || nativeLogoFor(symbol) || (chainId && address ? tokenIconUrl(chainId, address) : null)
 
   return (
-    <article className={styles.cashtagCard}>
+    <article className={clsx(styles.cashtagCard, wide && styles['cashtagCard--wide'])}>
       <TokenIcon token={{ logo: artwork }} size="lg" badge={chainBadgeFor(chainSlug)} />
 
       <div className={styles.cashtagCard__identity}>
