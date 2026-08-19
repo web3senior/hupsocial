@@ -47,8 +47,14 @@ const LABEL_AS_REQUESTED = 0.8
 
 export const DEFAULT_RANGE = '1D'
 
-// The compact card's inline sparkline is always a week — it carries no range selector
-export const SPARKLINE_RANGE = '1W'
+// What the compact card asks for. A day, so the line describes the same window as the change
+// figure printed beside it — the two disagree constantly otherwise, and a token down on the day
+// but up on the week draws a green line under a red number.
+export const SPARKLINE_RANGE = '1D'
+
+// Not every token has intraday history: DefiLlama carries none at all for LUKSO. Rather than
+// leave those with no chart, they fall back to the widest window that does exist and say so.
+export const FALLBACK_RANGE = '1W'
 
 // cacheKey -> { at, series }, where a null series is a remembered miss. Caching misses is
 // not an optimisation here but a correctness fix: several listed tokens have no data at some

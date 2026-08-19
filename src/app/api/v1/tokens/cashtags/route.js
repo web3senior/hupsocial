@@ -14,7 +14,7 @@
 
 import { NextResponse } from 'next/server'
 import { CASHTAGS, SLUG_CHAIN_IDS, cashtagFor, splitKey } from '@/config/cashtags'
-import { fetchPriceHistory, DEFAULT_RANGE, RANGES } from '@/lib/priceHistory'
+import { fetchPriceHistory, DEFAULT_RANGE, FALLBACK_RANGE, RANGES } from '@/lib/priceHistory'
 import { fetchUsdPrices, fetchUsdChange24h } from '@/lib/prices'
 import { fetchTokenLogos, logoKeyFor } from '@/lib/tokenLogos'
 import { fetchSolanaMarket } from '@/lib/solanaPrices'
@@ -55,13 +55,19 @@ export async function GET(request) {
       .filter(({ chain }) => SLUG_CHAIN_IDS[chain])
       .map(({ chain, address }) => ({ chainId: SLUG_CHAIN_IDS[chain], address }))
 
-    const [history, prices, changes, logos, solana] = await Promise.all([
+    const [asked, prices, changes, logos, solana] = await Promise.all([
       fetchPriceHistory(symbols, range),
       otherKeys.length ? fetchUsdPrices(otherKeys) : new Map(),
       otherKeys.length ? fetchUsdChange24h(otherKeys) : new Map(),
       logoTargets.length ? fetchTokenLogos(logoTargets) : new Map(),
       solanaSymbols.length ? fetchSolanaMarket(solanaSymbols) : {},
     ])
+
+    // A token with no series at the requested window keeps its chart by widening, rather than
+    // losing it — the card labels whatever span comes back, so this stays honest
+    const missing = symbols.filter((symbol) => !asked[symbol])
+    const widened = missing.length && range !== FALLBACK_RANGE ? await fetchPriceHistory(missing, FALLBACK_RANGE) : {}
+    const history = { ...widened, ...asked }
 
     const data = {}
     for (const symbol of symbols) {

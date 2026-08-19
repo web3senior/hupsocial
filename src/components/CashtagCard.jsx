@@ -48,16 +48,16 @@ const CashtagCard = ({ token, onRemove, wide = false }) => {
 
   // Named by what the line actually spans, not by what was requested — see rangeLabelFor
   const rangeLabel = history ? rangeLabelFor(history) : null
-  const hasChange = typeof change24h === 'number' && Number.isFinite(change24h)
-  const isUp = hasChange ? change24h >= 0 : true
-
-  // The line is coloured by its own span, not by the 24h figure beside it. They disagree more
-  // often than you would think — TBULL has been up 49% on the day while the five hours the
-  // chart can actually draw fell 8% — and a green line sloping downwards is the kind of detail
-  // that makes a reader distrust everything else on the card.
+  // One window per card: the percentage describes exactly the span the line draws. Printing a
+  // 24h figure beside a week-long chart meant ANSEM could show a red number over a green line —
+  // down on the day, up on the week — and neither reading was wrong, which is what made it
+  // impossible to trust. The series' own change wins whenever there is a series.
   const periodChange = history?.changePct
-  const chartUp = typeof periodChange === 'number' && Number.isFinite(periodChange) ? periodChange >= 0 : isUp
-  const direction = chartUp ? 'up' : 'down'
+  const change = typeof periodChange === 'number' && Number.isFinite(periodChange) ? periodChange : change24h
+  const hasChange = typeof change === 'number' && Number.isFinite(change)
+  const isUp = hasChange ? change >= 0 : true
+  const direction = isUp ? 'up' : 'down'
+  const chartUp = isUp
 
   // The API supplies branding for tokens; a native coin borrows its chain's mark, and anything
   // left over falls through to TrustWallet and then to TokenIcon's own glyph
@@ -73,9 +73,9 @@ const CashtagCard = ({ token, onRemove, wide = false }) => {
           <span className={styles.cashtagCard__symbol}>{symbol}</span>
           <span className={styles.cashtagCard__price}>{priceLabel(price)}</span>
           {hasChange && (
-            <span className={clsx(styles.cashtagCard__change, styles[`cashtagCard__change--${isUp ? 'up' : 'down'}`])}>
-              {isUp ? '↑' : '↓'} {percentLabel(change24h)}
-              <span className={styles.cashtagCard__period}>24h</span>
+            <span className={clsx(styles.cashtagCard__change, styles[`cashtagCard__change--${direction}`])}>
+              {isUp ? '↑' : '↓'} {percentLabel(change)}
+              <span className={styles.cashtagCard__period}>{rangeLabel ?? '24h'}</span>
             </span>
           )}
         </span>
@@ -91,7 +91,6 @@ const CashtagCard = ({ token, onRemove, wide = false }) => {
             title={`${symbol} · past ${rangeLabel} · ${signedPercentLabel(history.changePct ?? 0)} over the period`}
             label={`${symbol} price over the past ${rangeLabel}, ${chartUp ? 'up' : 'down'} ${percentLabel(periodChange ?? 0)}`}
           />
-          <span className={styles.cashtagCard__period}>{rangeLabel}</span>
         </span>
       )}
 

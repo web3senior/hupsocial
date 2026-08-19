@@ -7,9 +7,11 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  // Wide enough for the identity block plus a readable trend, narrow enough that a second card
-  // peeks in at the edge of the strip and advertises the scroll
-  inline-size: min(340px, 82vw);
+  // Sized from what the row actually needs: name, symbol, price, change and its period come
+  // to roughly 300px, plus the icon, the trend and the padding. At 340px the identity block
+  // was left 164px of that and quietly clipped the rest. Still short of the strip's width on
+  // a desktop, so a second card keeps peeking in and advertising the scroll.
+  inline-size: min(460px, 88vw);
   flex: 0 0 auto;
   overflow: hidden;
 }
@@ -37,9 +39,14 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  white-space: nowrap;
-  // Clipped at the identity block's edge — the chart owns the space to its right
-  overflow: hidden;
+  // Wraps rather than clips. No width is wide enough for every token — a long name beside a
+  // sub-cent price runs past any card that still fits a phone — so the row is allowed a second
+  // line instead of silently losing the change figure off its right edge.
+  flex-wrap: wrap;
+
+  > * {
+    white-space: nowrap;
+  }
 }
 
 .cashtagCard__symbol {
