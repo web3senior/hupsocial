@@ -580,16 +580,31 @@
 @media (max-width: 640px) {
   /* Twitter-style composer on phones: the sheet takes the whole viewport instead of floating as
      a rounded card. The backdrop is never visible behind it, so the radius and shadow only cost
-     composing height. No margin reset needed — a viewport-sized dialog leaves NativeDialog's
-     `margin: auto` no free space to distribute. */
+     composing height.
+
+     Pinned to the VISUAL viewport, not the layout one. A modal <dialog> renders in the top layer,
+     positioned against the layout viewport — which the software keyboard never shrinks, and which
+     neither vh nor dvh can report around (dvh tracks retractable browser chrome like the URL bar,
+     not the keyboard). A 100dvh sheet therefore keeps its full height once the keys are up: the
+     footer sits behind them, and the scroll the browser does to reveal the caret carries the
+     header off the top. The vars come from useVisualViewport and exist only while the composer is
+     mounted, so dvh stays the fallback for the first paint and for any browser without
+     visualViewport.
+
+     margin has to go to 0 here: `margin: auto` (NativeDialog's, restoring the UA centring) had no
+     free space to distribute while the sheet was viewport-sized, but a keyboard-shortened sheet
+     leaves plenty and would be centred in it, drifting off the top edge just pinned above. */
   .newPost {
+    position: fixed;
+    top: var(--visual-viewport-top, 0px);
+    right: auto;
+    bottom: auto;
+    left: 0;
+    margin: 0;
     width: 100vw;
     max-width: 100vw;
-    height: 100vh;
-    /* dvh tracks the visible viewport, so the sheet shrinks with the software keyboard */
-    height: 100dvh;
-    max-height: 100vh;
-    max-height: 100dvh;
+    height: var(--visual-viewport-height, 100dvh);
+    max-height: var(--visual-viewport-height, 100dvh);
     border-radius: 0;
     box-shadow: none;
   }

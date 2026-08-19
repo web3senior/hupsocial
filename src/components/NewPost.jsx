@@ -13,6 +13,7 @@ import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useActiveChain } from '@/hooks/useActiveChain'
+import useVisualViewport from '@/hooks/useVisualViewport'
 import { getActiveChain } from '@/lib/communication'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
@@ -280,6 +281,9 @@ const restoreCaretState = (editor, caret) => {
 
 export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed }) {
   const mounted = useClientMounted()
+  // The composer mounts open and unmounts closed, so this tracks exactly the sheet's lifetime:
+  // the mobile fullscreen sheet sizes itself off these vars to survive the software keyboard
+  useVisualViewport()
 
   const initialPostContent = useMemo(
     () => getInitialPostContent(text, url, actionType, existingPost),
