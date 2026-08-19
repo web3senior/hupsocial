@@ -76,6 +76,8 @@ export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
   return `/api/ipfs/file?${params.toString()}`
 }
 
+const UP_CLOUD_IMAGE_PREFIX = 'https://api.universalprofile.cloud/image/'
+
 /**
  * Checks if a given string matches your custom protocol.
  * @param {string} src - The asset path or URI string.
@@ -158,10 +160,14 @@ export const resolveStorageImageUrl = (src, options = {}) => {
     return params.length ? `${base}&${params.join('&')}` : base
   }
 
-  /* LUKSO's UP-cloud image CDN resizes via ?width= — pass the hint through so
-     thumbnails don't download full-size artwork (URLs already carry ?method=&data=) */
-  if (src.startsWith('https://api.universalprofile.cloud/image/') && options.width) {
-    return `${src}${src.includes('?') ? '&' : '?'}width=${options.width}`
+  /* LUKSO's UP-cloud image CDN ignores ?width= — it serves the full original either way,
+     so a 26px avatar can pull megabytes (animated GIF profile pictures are the worst case)
+     and often hasn't decoded by the time the surface is on screen. The path after /image/
+     is the IPFS CID, optionally with a subpath, and NEXT_PUBLIC_IPFS_GATEWAY_URL is that
+     same host — so hand it to the sharp proxy, which does honour a width. */
+  if (src.startsWith(UP_CLOUD_IMAGE_PREFIX) && options.width) {
+    const cid = src.slice(UP_CLOUD_IMAGE_PREFIX.length).split('?')[0]
+    if (cid) return resolveIPFSImageUrl(cid, options)
   }
 
   /* Everything else (custom protocol, http, asset paths) resolves as before */

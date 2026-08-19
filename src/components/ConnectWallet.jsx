@@ -70,7 +70,8 @@ function CommunityProof() {
             key={user.address}
             src={user.avatar}
             alt=""
-            loading="lazy"
+            width="26"
+            height="26"
             onError={(event) => {
               event.currentTarget.src = '/default-pfp.svg'
             }}
