@@ -1,0 +1,198 @@
+.tape {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+
+  &__row {
+    --tone-color: var(--text-muted);
+
+    display: grid;
+    grid-template-columns: 2.5rem 5rem 1rem 5.75rem minmax(5rem, 1fr) minmax(0, 1.2fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.3125rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    &--clickable {
+      cursor: pointer;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--tone-color);
+      outline-offset: -2px;
+    }
+
+    &[data-tone='like'] {
+      --tone-color: var(--liked-color);
+    }
+
+    &[data-tone='reply'] {
+      --tone-color: #1d9bf0;
+    }
+
+    &[data-tone='repost'] {
+      --tone-color: #00ba7c;
+    }
+
+    &[data-tone='follow'] {
+      --tone-color: #7856ff;
+    }
+
+    &[data-tone='money'] {
+      --tone-color: #f0a500;
+    }
+
+    &[data-tone='offer'] {
+      --tone-color: #e0569b;
+    }
+
+    &[data-tone='market'] {
+      --tone-color: #ff7a00;
+    }
+
+    &[data-tone='trade'] {
+      --tone-color: #12b8a0;
+    }
+
+    // A new print flashes in its own tone, the way a tape marks a fill.
+    &--enter {
+      animation: activity-tape-flash 1.8s ease-out both;
+    }
+  }
+
+  &__time,
+  &__chain {
+    color: var(--text-muted);
+  }
+
+  // The mark leads, the name follows and is the part that gets clipped when the column tightens —
+  // the logo alone still says which chain the row is from.
+  &__chain {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.3125rem;
+    overflow: hidden;
+
+    img {
+      flex: 0 0 auto;
+      width: 0.75rem;
+      height: 0.75rem;
+      border-radius: 2px;
+    }
+  }
+
+  &__block {
+    --chain-color: var(--text-muted);
+
+    color: color-mix(in srgb, var(--chain-color) 80%, var(--foreground));
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &[data-network='42'] {
+      --chain-color: #fe005b;
+    }
+
+    &[data-network='4201'] {
+      --chain-color: #b06d84;
+    }
+
+    &[data-network='1'] {
+      --chain-color: #627eea;
+    }
+
+    &[data-network='56'] {
+      --chain-color: #f0b90b;
+    }
+
+    &[data-network='143'],
+    &[data-network='10143'] {
+      --chain-color: #836ef9;
+    }
+
+    &[data-network='8453'],
+    &[data-network='84532'] {
+      --chain-color: #2f6dff;
+    }
+
+    &[data-network='42161'] {
+      --chain-color: #12aaff;
+    }
+
+    &[data-network='42220'] {
+      --chain-color: #35d07f;
+    }
+
+    &[data-network='4663'] {
+      --chain-color: #00c805;
+    }
+  }
+
+  &__icon {
+    display: inline-flex;
+    color: var(--tone-color);
+  }
+
+  &__verb {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__actor {
+    color: var(--foreground);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__value {
+    color: var(--tone-color);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@keyframes activity-tape-flash {
+  0% {
+    background: color-mix(in srgb, var(--tone-color) 20%, transparent);
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tape__row--clickable:hover {
+    background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  }
+}
+
+@media (max-width: 40rem) {
+  .tape__row {
+    grid-template-columns: 2.25rem 1rem minmax(4rem, 1fr) minmax(0, 1fr);
+  }
+
+  .tape__block,
+  .tape__verb,
+  .tape__chain {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tape__row--enter {
+    animation: none;
+  }
+}

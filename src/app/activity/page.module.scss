@@ -1,0 +1,18 @@
+.page {
+  height: 100%;
+  min-height: 80svh;
+
+  // The stream draws its own card, so the shell only sets width and rhythm.
+  &__container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0;
+  }
+
+  &__lede {
+    margin: 0 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+}

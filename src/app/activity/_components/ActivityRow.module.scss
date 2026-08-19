@@ -1,0 +1,277 @@
+// One action = one entry: the clickable row, plus its receipt when opened. Keeping them in a single
+// wrapper means the card's last-child border rule sees one element per action, not two.
+.entry {
+  border-bottom: 1px solid var(--border);
+}
+
+.row {
+  --tone-color: var(--text-muted);
+
+  display: grid;
+  grid-template-columns: 1.375rem minmax(0, 1fr) auto auto;
+  gap: 0.625rem;
+  align-items: start;
+  padding: 0.625rem 0.875rem;
+  background: transparent;
+  transition: background-color 0.15s var(--transition-soft);
+
+  &--clickable {
+    cursor: pointer;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--tone-color);
+    outline-offset: -2px;
+  }
+
+  // The tone drives the icon, the amount pill and the focus ring at once, so it is declared on
+  // the row rather than on each part. Values match the notifications feed so one action reads
+  // the same colour wherever it appears.
+  &[data-tone='like'] {
+    --tone-color: var(--liked-color);
+  }
+
+  &[data-tone='reply'] {
+    --tone-color: #1d9bf0;
+  }
+
+  &[data-tone='repost'] {
+    --tone-color: #00ba7c;
+  }
+
+  &[data-tone='follow'] {
+    --tone-color: #7856ff;
+  }
+
+  &[data-tone='money'] {
+    --tone-color: #f0a500;
+  }
+
+  &[data-tone='offer'] {
+    --tone-color: #e0569b;
+  }
+
+  &[data-tone='market'] {
+    --tone-color: #ff7a00;
+  }
+
+  &[data-tone='trade'] {
+    --tone-color: #12b8a0;
+  }
+
+  &__icon {
+    position: relative;
+    display: inline-flex;
+    justify-content: center;
+    padding-top: 0.1875rem;
+    color: var(--tone-color);
+  }
+
+  // Just-landed actions keep a slow ring for ten minutes, then settle like everything else.
+  &--fresh &__icon::after {
+    content: '';
+    position: absolute;
+    inset: 0.0625rem -0.25rem auto;
+    height: 1.375rem;
+    border: 1px solid var(--tone-color);
+    border-radius: 999px;
+    animation: activity-row-ring 2.4s ease-out infinite;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  // Normal inline flow, not flex: the line is a sentence, and a flex gap would insert space
+  // before punctuation ("Alice 's post") and around the amount pill.
+  &__sentence {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+  }
+
+  &__actor {
+    font-weight: 700;
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__verb {
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  &__asset {
+    display: inline-block;
+    max-width: 16rem;
+    vertical-align: bottom;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__amount {
+    display: inline-block;
+    // Spacing lives on the pill so the surrounding words never need padding of their own.
+    margin: 0 0.15rem 0 0.35rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--tone-color) 12%, transparent);
+    color: var(--tone-color);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__preview {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__thumb {
+    --size: 2.75rem;
+
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: var(--size);
+    height: var(--size);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--surface-muted);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  // Bordered and iconned at rest: without both, a bare hash reads as a link out to the explorer
+  // rather than a control that expands the receipt in place.
+  &__hash {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    align-self: center;
+    padding: 0.1875rem 0.4375rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    font-family: var(--font-mono, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+    font-size: 0.6875rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s var(--transition-soft), border-color 0.15s var(--transition-soft);
+
+    &:hover {
+      border-color: var(--text-muted);
+      color: var(--foreground);
+    }
+
+    &[aria-expanded='true'] {
+      border-color: var(--tone-color);
+      color: var(--tone-color);
+    }
+  }
+}
+
+.receipt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0.625rem 0.875rem 0.75rem 2.875rem;
+  border-top: 1px dashed var(--border);
+  background: var(--surface-muted);
+  font-family: var(--font-mono, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+  font-size: 0.75rem;
+
+  dt {
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+  }
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #1d9bf0;
+  }
+
+  &__hash {
+    overflow-wrap: anywhere;
+  }
+
+  &__copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1875rem;
+    margin-left: 0.375rem;
+    padding: 0 0.3125rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.6875rem;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--foreground);
+    }
+  }
+}
+
+@keyframes activity-row-ring {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.65;
+  }
+
+  70%,
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+/* Hover only where a pointer can actually hover — a tap must not leave the row highlighted. */
+@media (hover: hover) and (pointer: fine) {
+  .row--clickable:hover {
+    background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row--fresh .row__icon::after {
+    animation: none;
+    opacity: 0.4;
+    transform: none;
+  }
+}

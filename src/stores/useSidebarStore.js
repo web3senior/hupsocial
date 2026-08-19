@@ -18,6 +18,7 @@ import {
   Image,
   MagnifyingGlassIcon,
   PlusIcon,
+  PulseIcon,
   SquaresFourIcon,
   StorefrontIcon,
   TagIcon,
@@ -49,6 +50,8 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'divider-secondary', type: 'divider' },
   { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
+  // Reads with Insights as a pair: what the network did, then what you did.
+  { id: 'activity', name: 'Activity', path: '/activity', icon: PulseIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
 ]
 

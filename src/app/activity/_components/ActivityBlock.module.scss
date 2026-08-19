@@ -1,0 +1,235 @@
+// Chain identity: the rail, the node and the height all take the colour of the chain that produced
+// the block, so scrolling a multichain feed reads as bands instead of identical rows. Values are the
+// chains' own brand colours, lifted a little where the mainnet hue would go muddy on a dark ground.
+.block,
+.gap {
+  --chain-color: var(--text-muted);
+
+  &[data-network='42'] {
+    --chain-color: #fe005b;
+  }
+
+  &[data-network='4201'] {
+    --chain-color: #b06d84;
+  }
+
+  &[data-network='1'] {
+    --chain-color: #627eea;
+  }
+
+  &[data-network='56'] {
+    --chain-color: #f0b90b;
+  }
+
+  &[data-network='143'],
+  &[data-network='10143'] {
+    --chain-color: #836ef9;
+  }
+
+  &[data-network='8453'],
+  &[data-network='84532'] {
+    --chain-color: #2f6dff;
+  }
+
+  &[data-network='42161'] {
+    --chain-color: #12aaff;
+  }
+
+  &[data-network='42220'] {
+    --chain-color: #35d07f;
+  }
+
+  &[data-network='4663'] {
+    --chain-color: #00c805;
+  }
+}
+
+.block {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  padding-bottom: 0.5rem;
+}
+
+.block__rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+
+  // The segment runs past the card's bottom edge so consecutive blocks read as one chain.
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0.25rem;
+    bottom: -0.5rem;
+    width: 2px;
+    background: color-mix(in srgb, var(--chain-color) 35%, transparent);
+  }
+}
+
+.block__node {
+  position: relative;
+  z-index: 1;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: 0.875rem;
+  border-radius: 2px;
+  border: 2px solid var(--chain-color);
+  background: var(--surface);
+  transform: rotate(45deg);
+}
+
+// A row with no height was never read from a block — a dashed rail and a round node say so rather
+// than dressing it up as one.
+.block--loose {
+  .block__rail::before {
+    background: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--chain-color) 45%, transparent) 0 3px,
+      transparent 3px 7px
+    );
+  }
+
+  .block__node {
+    border-radius: 50%;
+  }
+}
+
+.block__body {
+  min-width: 0;
+}
+
+.block__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4375rem 0 0.375rem;
+  font-family: var(--font-mono, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.block__height {
+  color: var(--chain-color);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.block__chain {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.0625rem 0.4375rem 0.0625rem 0.3125rem;
+  border: 1px solid color-mix(in srgb, var(--chain-color) 40%, var(--border));
+  border-radius: 4px;
+  color: color-mix(in srgb, var(--chain-color) 70%, var(--foreground));
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+
+  img {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 2px;
+  }
+}
+
+.block__count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.block__card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+
+  > *:last-child {
+    border-bottom: 0;
+  }
+}
+
+.block--fresh .block__card {
+  border-color: color-mix(in srgb, var(--chain-color) 40%, var(--border));
+}
+
+// Arrival: the card slides down into place, glows once in its chain colour, and its node pops.
+.block--enter {
+  animation: activity-block-land 0.42s cubic-bezier(0.16, 0.9, 0.28, 1) both;
+
+  .block__card {
+    animation: activity-block-glow 2.4s ease-out both;
+  }
+
+  .block__node {
+    animation: activity-node-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  }
+}
+
+.gap {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  color: var(--text-muted);
+}
+
+.gap__rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--chain-color) 30%, transparent) 0 2px, transparent 2px 6px);
+  }
+}
+
+.gap__label {
+  margin: 0;
+  padding: 0.3125rem 0 0.4375rem;
+  font-family: var(--font-mono, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes activity-block-land {
+  from {
+    opacity: 0;
+    transform: translateY(-0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes activity-block-glow {
+  0% {
+    box-shadow: 0 0 0 1px var(--chain-color), 0 0 28px -4px color-mix(in srgb, var(--chain-color) 55%, transparent);
+  }
+
+  100% {
+    box-shadow: none;
+  }
+}
+
+@keyframes activity-node-pop {
+  0% {
+    transform: rotate(45deg) scale(0.2);
+  }
+
+  100% {
+    transform: rotate(45deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block--enter,
+  .block--enter .block__card,
+  .block--enter .block__node {
+    animation: none;
+  }
+}
