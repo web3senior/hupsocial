@@ -1,26 +1,3 @@
-// ■■■ Configuration & Variables ■■■
-$width: 40px;
-$height: 18px;
-$padding: 2px;
-$circle-diameter: $height - ($padding * 2);
-
-// Explicitly define global selectors individually to maintain CSS Module purity
-:global(:root),
-:global([data-theme='light']) {
-  --toggle-inactive: #e5e5ea;
-  --toggle-active: #4cd964;
-}
-
-:global([data-theme='dark']) {
-  --toggle-inactive: #2a2d34;
-  --toggle-active: #30d158;
-}
-
-:global([data-theme='terminal']) {
-  --toggle-inactive: #12301c;
-  --toggle-active: #a3ffad;
-}
-
 // ■■■ Component Layout Elements ■■■
 .page {
   color: var(--text);
@@ -238,63 +215,6 @@ $circle-diameter: $height - ($padding * 2);
     color: var(--text);
     word-break: break-all;
     line-height: 1.4;
-  }
-}
-
-// ■■■ Custom Interactive Toggle Switch ■■■
-.toggleSwitch {
-  position: relative;
-  display: inline-block;
-  width: $width;
-  height: $height;
-
-  .nativeCheckbox {
-    opacity: 0;
-    width: 0;
-    height: 0;
-    position: absolute;
-
-    &:focus-visible + .slider {
-      box-shadow: 0 0 0 3px var(--shimmer-glint);
-    }
-
-    &:checked + .slider {
-      background-color: var(--toggle-active);
-
-      &::before {
-        transform: translateX($width - $circle-diameter - ($padding * 2));
-      }
-    }
-  }
-
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    inset: 0;
-    background-color: var(--toggle-inactive);
-    transition: background-color 0.3s ease;
-    border-radius: $height / 2;
-
-    &::before {
-      content: '';
-      position: absolute;
-      left: $padding;
-      top: $padding;
-      height: $circle-diameter;
-      width: $circle-diameter;
-      background-color: var(--surface);
-      border-radius: 50%;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-      transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-      will-change: transform;
-    }
-  }
-
-  &.checked .slider {
-    background-color: var(--toggle-active);
-    &::before {
-      transform: translateX($width - $circle-diameter - ($padding * 2));
-    }
   }
 }
 

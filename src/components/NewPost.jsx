@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ChartLineUpIcon, CoinIcon, FadersHorizontalIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -22,6 +22,7 @@ import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
 import DialogHeader from '@/components/ui/DialogHeader'
 import NetworkSelect from '@/components/ui/NetworkSelect'
+import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
@@ -322,7 +323,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // a moderator revoking an app takes effect in every post that embedded it
   const [miniApp, setMiniApp] = useState(() => (actionType === 'edit' ? getContentPayload(existingPost)?.miniApp ?? null : null))
   const attachMiniAppRef = useRef(null)
-  const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedMediaType, setSelectedMediaType] = useState(null)
@@ -1577,34 +1577,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
         <footer className={styles.footer}>
           <div className={styles.postOptions}>
+            {/* One setting, so it sits in the open — a disclosure that hides a single switch
+                behind two taps is all cost and no saving */}
             {!isComment && (
-              <>
-                <button
-                  type="button"
-                  className={styles.postOptionsButton}
-                  onClick={() => setIsOptionsOpen((value) => !value)}
-                  aria-expanded={isOptionsOpen}
-                  aria-controls="new-post-options-panel"
-                >
-                  <FadersHorizontalIcon size={22} />
-                  <span>Post Options</span>
-                </button>
-
-                {isOptionsOpen && (
-                  <div id="new-post-options-panel" className={styles.optionsPanel}>
-                    <label htmlFor="allowComments">Allow comments</label>
-                    <select
-                      id="allowComments"
-                      name="allowComments"
-                      value={allowComments ? 'true' : 'false'}
-                      onChange={(event) => setAllowComments(event.target.value === 'true')}
-                    >
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </div>
-                )}
-              </>
+              <div className={styles.postOption}>
+                <label htmlFor="allowComments">Allow comments</label>
+                <ToggleSwitch
+                  id="allowComments"
+                  checked={allowComments}
+                  onChange={(event) => setAllowComments(event.target.checked)}
+                />
+              </div>
             )}
           </div>
 

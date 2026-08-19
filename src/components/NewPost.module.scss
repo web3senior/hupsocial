@@ -130,7 +130,6 @@
 
 .headerActions button,
 .toolbar button,
-.postOptionsButton,
 .addThreadButton {
   border: 0;
   background: transparent;
@@ -558,36 +557,23 @@
   min-width: 0;
 }
 
-.postOptionsButton {
+/* The composer's single setting, always visible next to the Post button — label and switch
+   on one line, the same pairing Settings uses for its toggles */
+.postOption {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 0;
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  font-weight: 700;
-
-  &:hover {
-    color: var(--text);
-  }
-}
-
-.optionsPanel {
-  display: inline-grid;
-  grid-template-columns: auto minmax(110px, 160px);
-  align-items: center;
   gap: 10px;
-  margin-top: 14px;
+  min-width: 0;
   color: var(--text-muted);
   font-size: 0.9rem;
 
-  select {
-    height: 34px;
-    padding: 0 2rem 0 10px;
+  label {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  &:hover label {
     color: var(--text);
-    background-color: var(--background);
-    border: 1px solid var(--border);
-    border-radius: 8px;
   }
 }
 

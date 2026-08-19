@@ -18,6 +18,7 @@ import { localStorageGaslessKey, readGaslessPreference } from '@/lib/relayGasles
 import { encryptData, decryptData } from '@/lib/cryptoHelper'
 import { getCachedMasterHex, deriveChildKeyBytes, CHILD_KEY_LABELS } from '@/lib/securityVault'
 import { isHexString, Wallet } from 'ethers'
+import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import styles from './InAppWallet.module.scss'
 import clsx from 'clsx'
 
@@ -433,14 +434,5 @@ export default function InAppWallet({ onOpenSecurity }) {
         </div>
       </div>
     </div>
-  )
-}
-
-export function ToggleSwitch({ checked, onChange }) {
-  return (
-    <label className={clsx(styles.toggleSwitch, checked && styles.checked)}>
-      <input type="checkbox" className={styles.nativeCheckbox} checked={checked} onChange={onChange} />
-      <span className={styles.slider}></span>
-    </label>
   )
 }
