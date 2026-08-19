@@ -1,0 +1,31 @@
+.priceSparkline {
+  display: block;
+  width: 100%;
+  // `color` drives the line, and the gradient inherits it through currentColor — one token
+  // per direction rather than a colour repeated in three places.
+  // Clipped, not visible: a non-scaling 2px stroke sits half outside the viewBox at the
+  // extremes, and in a flex row that bleed lands on top of the text beside it.
+  overflow: hidden;
+
+  &--up {
+    color: var(--chart-up);
+  }
+
+  &--down {
+    color: var(--chart-down);
+  }
+}
+
+.priceSparkline__line {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.priceSparkline__baseline {
+  // Recessive: the baseline is a reference, not data, so it never competes with the series
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}

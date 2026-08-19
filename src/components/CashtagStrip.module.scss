@@ -1,0 +1,65 @@
+.cashtagStrip {
+  position: relative;
+  margin-block-start: 10px;
+}
+
+.cashtagStrip__track {
+  display: flex;
+  gap: 8px;
+  // Its own scroll region: the feed scrolls vertically, this scrolls sideways, and naming the
+  // axis keeps a diagonal swipe from stealing the page's scroll
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x;
+  // Mandatory, not proximity: the strip is a row of discrete cards, and proximity let a
+  // gesture settle mid-card with the next one clipped
+  scroll-snap-type: x mandatory;
+  padding-block-end: 4px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  > * {
+    scroll-snap-align: start;
+  }
+}
+
+.cashtagStrip__arrow {
+  position: absolute;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+  display: none;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+
+  // Touch has the gesture already; only a pointer that hovers needs a button to press
+  @media (hover: hover) and (pointer: fine) {
+    display: grid;
+  }
+
+  &--start {
+    inset-inline-start: -6px;
+  }
+
+  &--end {
+    inset-inline-end: -6px;
+  }
+
+  // Kept in the layout but inert at the ends, so the strip does not reflow as it scrolls
+  &--hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

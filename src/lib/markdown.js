@@ -10,7 +10,9 @@ function escapeAttr(value) {
 }
 
 // A cashtag must start with a letter — `$0.025` and `$25` are prices, not tickers.
-const CASHTAG_PATTERN = /(^|[^A-Za-z0-9_$])\$([A-Za-z][A-Za-z0-9]{0,9})\b/g
+// Exported so the cashtag cards detect exactly what the renderer turns blue — two regexes
+// would drift, and a card for a token the text never linked reads as a bug.
+export const CASHTAG_PATTERN = /(^|[^A-Za-z0-9_$])\$([A-Za-z][A-Za-z0-9]{0,9})\b/g
 
 // Hosts that count as "inside Hup" no matter which deployment renders the post.
 const HUP_HOSTS = ['hup.social']

@@ -53,6 +53,7 @@ import DropCard from './DropCard'
 import PredictCard from './PredictCard'
 import LaunchCard from './LaunchCard'
 import MiniAppEmbed from './MiniAppEmbed'
+import CashtagStrip from './CashtagStrip'
 import NewPost from './NewPost'
 import { shouldOfferTranslation } from '@/lib/languageHelper'
 import { usePreferredLanguage } from '@/hooks/usePreferredLanguage'
@@ -363,6 +364,13 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               {/* Nothing loads until the viewer presses launch, so a veiled post never runs
                   third-party code — the inert wrapper blocks the launch button outright */}
               {displayItem?.content?.miniApp && <MiniAppEmbed reference={displayItem.content.miniApp} contextAddress={displayItem?.wallet_address} />}
+
+              {/* Live prices for the tokens this post names. The author's kept list wins when
+                  the post carries one; otherwise the symbols are read from the text, so posts
+                  written before the composer control still get cards. Encrypted posts resolve
+                  to the lock placeholder above, which contains no cashtags, so sealed content
+                  never sources a card. */}
+              <CashtagStrip text={getRawContentText()} cashtags={displayItem?.content?.cashtags} />
 
               <BuyButton item={displayItem || item} />
             </div>

@@ -17,12 +17,16 @@ const GLYPH = { sm: 13, md: 16, lg: 18 }
  * A token's own `logo` wins — the chain icon for native coins, the uploaded image for Hup
  * launches — and everything else falls back to TrustWallet, which covers the curated majors
  * and any listed ERC20 someone pastes in.
+ *
+ * An optional `badge` ({url, label}, from config/chainBadges) pins a chain mark to the corner,
+ * for the tokens whose artwork does not say what chain they live on. It sits in a wrapper
+ * rather than inside the circle, which clips its children to the disc.
  */
-const TokenIcon = ({ token, chainId, size = 'lg', className }) => {
+const TokenIcon = ({ token, chainId, size = 'lg', className, badge }) => {
   const src = token?.logo || tokenIconUrl(chainId, token?.address)
 
-  return (
-    <span className={clsx(styles.tokenIcon, styles[`tokenIcon--${size}`], className)} aria-hidden="true">
+  const circle = (
+    <span className={clsx(styles.tokenIcon, styles[`tokenIcon--${size}`], !badge && className)} aria-hidden="true">
       <CoinIcon size={GLYPH[size] ?? GLYPH.lg} />
       {src && (
         <img
@@ -35,6 +39,15 @@ const TokenIcon = ({ token, chainId, size = 'lg', className }) => {
           }}
         />
       )}
+    </span>
+  )
+
+  if (!badge) return circle
+
+  return (
+    <span className={clsx(styles.tokenIcon__wrap, styles[`tokenIcon__wrap--${size}`], className)}>
+      {circle}
+      <img className={styles.tokenIcon__badge} src={badge.url} alt="" title={badge.label} loading="lazy" />
     </span>
   )
 }

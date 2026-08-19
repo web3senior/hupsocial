@@ -34,3 +34,39 @@
     height: 32px;
   }
 }
+
+// The badge hangs off the disc's corner, so it cannot live inside .tokenIcon — that clips its
+// children to a circle and stretches any <img> to fill it.
+.tokenIcon__wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.tokenIcon__badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 50%;
+  // A ring in the card's own background, so the mark reads as sitting on top of the token
+  // rather than merging into whatever colour the artwork happens to end on
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+}
+
+// Badge scales with the disc — roughly 45%, the point where the mark is still legible without
+// covering the artwork it is annotating
+.tokenIcon__wrap--sm .tokenIcon__badge {
+  width: 10px;
+  height: 10px;
+}
+
+.tokenIcon__wrap--md .tokenIcon__badge {
+  width: 13px;
+  height: 13px;
+}
+
+.tokenIcon__wrap--lg .tokenIcon__badge {
+  width: 15px;
+  height: 15px;
+}

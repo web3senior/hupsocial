@@ -14,6 +14,9 @@
   --foreground: #171717;
 
   --surface: #ffffff;
+  // Chart direction — light steps, contrast 3.30:1 / 4.83:1 on #ffffff
+  --chart-up: #16a34a;
+  --chart-down: #dc2626;
   --surface-muted: #f7f7f8;
   --text: #171717;
   --text-muted: #666666;
@@ -82,6 +85,9 @@
   --foreground: #ededed;
 
   --surface: #191919;
+  // Chart direction — dark steps, contrast 7.72:1 / 4.67:1 on #191919
+  --chart-up: #22c55e;
+  --chart-down: #ef4444;
   --surface-muted: #2a2a2a;
   --text: #ffffffa6;
   --text-muted: #a1a1aa;
@@ -118,6 +124,9 @@
   --foreground: #a3ffad;
 
   --surface: #07110b;
+  // Chart direction — contrast 8.42:1 / 5.10:1 on #07110b
+  --chart-up: #22c55e;
+  --chart-down: #ef4444;
   --surface-muted: #0d1c12;
   --text: #a3ffad;
   --text-muted: #6ee77d;

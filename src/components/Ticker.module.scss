@@ -84,3 +84,32 @@
 .flashDown {
   animation: flashRed 1s ease-out;
 }
+
+/* --- Added for the Solana cashtag cards --- */
+
+.info {
+  .ticker__name {
+    font-size: 10px;
+    color: var(--text-muted);
+    // "The Black Bull" would otherwise stretch the card past the price column
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.ticker__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid var(--border);
+}
+
+.ticker__metaItem {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

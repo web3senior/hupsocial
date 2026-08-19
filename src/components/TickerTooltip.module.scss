@@ -1,9 +1,28 @@
 .floatingContainer {
-  position: fixed;
-  z-index: 9999;
-  pointer-events: none; // Crucial: prevents flicker when mouse hits the ticker
-  transform: translate(-50%, -110%); // Center horizontally, place above text
+  // A [popover] arrives with UA chrome — a border, padding, and an `inset: 0; margin: auto` that
+  // centres it in the viewport. All of it has to go: the Ticker card carries its own chrome,
+  // and anchorElement writes the real coordinates inline.
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+  // No display rule here on purpose — the UA toggles it with :popover-open, and a bare
+  // display would leave the card painted while closed.
+
+  // Stops the card stealing the pointer out from under the cashtag it is describing: the
+  // cursor would leave the trigger, fire mouseout, hide the card, land back on the trigger
+  // and flicker forever.
+  pointer-events: none;
   transition: opacity 0.2s ease;
+}
+
+// Taps are not hovers — here the card must absorb its own touches, or the tap falls through
+// to the post beneath and opens the thread.
+@media (hover: none) {
+  .floatingContainer {
+    pointer-events: auto;
+  }
 }
 
 
@@ -12,5 +31,7 @@
   color: var(--cashtag-color, #1d9bf0);
   cursor: pointer;
   font-weight: 600;
+  // Skips the ~300ms double-tap-zoom wait, so the card opens the instant the finger lifts
+  touch-action: manipulation;
   text-decoration: none;
 }
