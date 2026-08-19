@@ -3,7 +3,9 @@
 import clsx from 'clsx'
 import { useTicker } from '@/hooks/useTicker'
 import TokenIcon from '@/components/ui/TokenIcon'
-import { chainBadgeFor } from '@/config/chainBadges'
+import { chainBadgeFor, nativeLogoFor } from '@/config/chainBadges'
+import { SLUG_CHAIN_IDS } from '@/config/cashtags'
+import { tokenIconUrl } from '@/lib/tokenIcons'
 import styles from './Ticker.module.scss'
 
 // Sub-cent memecoins need far more precision than majors; anything under a cent gets the long
@@ -35,7 +37,13 @@ export default function Ticker({ blockchain, address, symbol }) {
   if (isLoading) return <div className={styles.tickerContainer}>Loading...</div>
   if (isError || !tickerData?.price) return null
 
-  const { price, change24h, mcap, holders, logo, name, chainSlug } = tickerData
+  const { price, change24h, mcap, holders, logo, name, chainSlug, address: tokenAddress } = tickerData
+
+  // DIA answers with a price and nothing else, so most cashtags arrive here with no artwork at
+  // all — $LYX showed a blank coin. Same ladder the cards use: the upstream's own logo, then
+  // the chain's mark for a native coin, then TrustWallet for a listed contract.
+  const artwork =
+    logo || nativeLogoFor(tickerData.symbol) || tokenIconUrl(SLUG_CHAIN_IDS[chainSlug], tokenAddress)
   // No movement figure is not the same as a flat one — leave the badge off rather than "0.00%"
   const hasChange = change24h !== null
   const isPositive = hasChange && change24h >= 0
@@ -45,7 +53,7 @@ export default function Ticker({ blockchain, address, symbol }) {
 
   return (
     <div className={styles.tickerContainer}>
-      <TokenIcon token={{ logo }} size="md" badge={chainBadgeFor(chainSlug)} />
+      <TokenIcon token={{ logo: artwork }} size="md" badge={chainBadgeFor(chainSlug)} />
 
       <div className={styles.info}>
         <span className={styles.symbol}>{tickerData.symbol}</span>

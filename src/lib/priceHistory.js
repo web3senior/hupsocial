@@ -16,6 +16,7 @@
 import { cashtagFor, splitKey } from '@/config/cashtags'
 
 const LLAMA_CHART = 'https://coins.llama.fi/chart/'
+const JUPITER_CHART = 'https://datapi.jup.ag/v2/charts/'
 const GECKOTERMINAL = 'https://api.geckoterminal.com/api/v2/networks'
 
 const FETCH_TIMEOUT_MS = 6000
@@ -25,14 +26,14 @@ const FETCH_TIMEOUT_MS = 6000
  * people watch tick; a multi-year line does not meaningfully move within the hour.
  */
 export const RANGES = {
-  '1D': { span: 48, period: '30m', ttlMs: 2 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 24 }, days: 1, strict: true },
-  '1W': { span: 56, period: '3h', ttlMs: 10 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 168 }, days: 7, strict: true },
-  '1M': { span: 30, period: '1d', ttlMs: 30 * 60 * 1000, gecko: { tf: 'day', aggregate: 1, limit: 30 }, days: 30, strict: true },
+  '1D': { span: 48, period: '30m', ttlMs: 2 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 24 }, jup: { interval: '15_MINUTE', candles: 96, seconds: 86400 }, days: 1, strict: true },
+  '1W': { span: 56, period: '3h', ttlMs: 10 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 168 }, jup: { interval: '1_HOUR', candles: 168, seconds: 604800 }, days: 7, strict: true },
+  '1M': { span: 30, period: '1d', ttlMs: 30 * 60 * 1000, gecko: { tf: 'day', aggregate: 1, limit: 30 }, jup: { interval: '1_DAY', candles: 30, seconds: 2592000 }, days: 30, strict: true },
   // "Up to" ranges: a token that launched last month legitimately has only a month of history,
   // and refusing to chart it would be wrong. 1D/1W/1M name a window instead, and a series
   // covering a sliver of one is not that window.
-  '1Y': { span: 52, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 52 }, days: 365, strict: false },
-  ALL: { span: 200, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 200 }, days: null, strict: false },
+  '1Y': { span: 52, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 52 }, jup: { interval: '1_DAY', candles: 365, seconds: 31536000 }, days: 365, strict: false },
+  ALL: { span: 200, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 200 }, jup: { interval: '1_DAY', candles: 1000, seconds: 315360000 }, days: null, strict: false },
 }
 
 // A couple of points are a line segment, not a trend. Below this there is nothing to read.
@@ -143,7 +144,35 @@ async function topPoolFor(mint) {
   }
 }
 
-/** Read one thin-liquidity mint from its deepest pool's OHLCV. Same ok/series split as above. */
+/**
+ * Read a Solana mint from Jupiter's chart API — the same series jup.ag draws, aggregated across
+ * a token's pools rather than read from one of them. That distinction is the whole reason this
+ * exists: GeckoTerminal answers per-pool, and a pool it has only lately begun indexing returns
+ * a handful of candles no matter which aggregation you ask for. TBULL's deepest pool gave five
+ * hours; the same week from here is 168.
+ *
+ * Timestamps go out in milliseconds and come back in seconds, which the API is not shy about —
+ * it 400s with the exact property it wanted, which is how the shape below was arrived at.
+ */
+async function fetchFromJupiterChart(mint, range) {
+  const { interval, candles, seconds } = RANGES[range].jup
+  const to = Date.now()
+  const from = to - seconds * 1000
+
+  try {
+    const response = await fetch(
+      `${JUPITER_CHART}${mint}?interval=${interval}&from=${from}&to=${to}&candles=${candles}`,
+      { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+    )
+    if (!response.ok) return { ok: false, series: null }
+    const list = (await response.json())?.candles || []
+    return { ok: true, series: series(list.map((candle) => ({ t: candle.time, p: candle.close }))) }
+  } catch (e) {
+    return { ok: false, series: null }
+  }
+}
+
+/** Read one mint from its deepest pool's OHLCV. Jupiter's fallback. Same ok/series split. */
 async function fetchFromGecko(mint, range) {
   const pool = await topPoolFor(mint)
   if (!pool) return { ok: false, series: null }
@@ -193,15 +222,22 @@ export async function fetchPriceHistory(symbols, range = DEFAULT_RANGE) {
   const stale = [...wanted.entries()].filter(([, entry]) => fresh(`${entry.key}:${range}`) === undefined)
 
   if (stale.length > 0) {
-    const viaLlama = stale.filter(([, entry]) => entry.source !== 'dex').map(([, entry]) => entry.key)
-    const viaGecko = stale.filter(([, entry]) => entry.source === 'dex')
+    // Solana reads from Jupiter, everything else from DefiLlama. Jupiter covers SPL mints
+    // DefiLlama never indexes and gives finer candles for the ones it does.
+    const viaJupiter = stale.filter(([, entry]) => splitKey(entry.key).chain === 'solana')
+    const viaLlama = stale.filter(([, entry]) => splitKey(entry.key).chain !== 'solana').map(([, entry]) => entry.key)
 
-    const [llama, gecko] = await Promise.all([
+    const [llama, solana] = await Promise.all([
       viaLlama.length ? fetchFromLlama(viaLlama, range) : { ok: true, found: new Map() },
       Promise.all(
-        viaGecko.map(([, entry]) =>
-          fetchFromGecko(splitKey(entry.key).address, range).then((result) => [entry.key, result]),
-        ),
+        viaJupiter.map(async ([, entry]) => {
+          const mint = splitKey(entry.key).address
+          const primary = await fetchFromJupiterChart(mint, range)
+          // Only fall back when Jupiter drew a blank; a short answer from it still beats a
+          // single pool's view
+          if (primary.series) return [entry.key, primary]
+          return [entry.key, await fetchFromGecko(mint, range)]
+        }),
       ),
     ])
 
@@ -212,7 +248,7 @@ export async function fetchPriceHistory(symbols, range = DEFAULT_RANGE) {
     } else {
       for (const [key, data] of llama.found) cache.set(`${key}:${range}`, { at: Date.now(), series: data })
     }
-    for (const [key, result] of gecko) {
+    for (const [key, result] of solana) {
       if (result.ok || result.series) cache.set(`${key}:${range}`, { at: Date.now(), series: result.series })
     }
   }

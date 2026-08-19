@@ -30,7 +30,7 @@ const fetcher = (url) =>
 const ZERO = '0x0000000000000000000000000000000000000000'
 
 /** The one shape Ticker renders, whichever upstream answered. */
-const quote = ({ symbol, name, price, change24h, mcap, holders, logo, chain, chainSlug }) => ({
+const quote = ({ symbol, name, price, change24h, mcap, holders, logo, chain, chainSlug, address }) => ({
   symbol,
   name: name ?? null,
   price: typeof price === 'number' && Number.isFinite(price) ? price : null,
@@ -42,6 +42,7 @@ const quote = ({ symbol, name, price, change24h, mcap, holders, logo, chain, cha
   // Null for native coins: their artwork already says which chain they are, so a badge on top
   // would just be the same mark twice
   chainSlug: chainSlug ?? null,
+  address: address ?? null,
 })
 
 /**
@@ -87,6 +88,7 @@ export function useTicker(blockchain, address, symbol) {
             logo: entry.logo,
             chain: 'Solana',
             chainSlug: solanaToken.native ? null : 'solana',
+            address: solanaToken.mint,
           })
         : null,
       isLoading: solanaLoading,
@@ -112,6 +114,7 @@ export function useTicker(blockchain, address, symbol) {
           // DIA's chain names lowercase into the slugs chainBadges keys on for the chains that
           // matter here; a zero address marks a native coin, which takes no badge
           chainSlug: address && address !== ZERO ? String(blockchain).toLowerCase() : null,
+          address: address && address !== ZERO ? address : null,
         })
       : null,
     isLoading: diaLoading,
