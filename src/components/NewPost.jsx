@@ -12,6 +12,7 @@ import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useActiveChain } from '@/hooks/useActiveChain'
 import { getActiveChain } from '@/lib/communication'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
@@ -20,6 +21,7 @@ import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
 import DialogHeader from '@/components/ui/DialogHeader'
+import NetworkSelect from '@/components/ui/NetworkSelect'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
@@ -342,6 +344,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   const { address, isConnected, chain: walletChain } = useConnection()
   const switchChain = useSwitchChain({ config })
+  // The composer's own NetworkSelect writes the disconnected selection to a module store, and
+  // getActiveChain() is a plain getter that can't wake this component when it changes — so the
+  // target chain below reads the subscribed value instead of re-polling on every render
+  const { chainId: activeChainId } = useActiveChain()
   const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
@@ -434,8 +440,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       ? Number(quoteTarget?.network_id) || null
       : communityTarget
       ? Number(communityTarget.networkId)
-      : Number(getActiveChain()?.[0]?.id) || null
+      : activeChainId || Number(getActiveChain()?.[0]?.id) || null
   const targetChain = appChains.find((chain) => chain.id === targetChainId)
+
+  // Only a plain post is free to pick its chain — an edit, a reply, a quote, and a community
+  // post all inherit theirs, so the switcher would lie about where the submission lands
+  const isChainPinned = actionType !== 'post' || Boolean(communityTarget)
 
   // Relay reads (forwarder nonce, account code) must hit the chain the submission lands on
   const targetPublicClient = usePublicClient({ chainId: targetChainId || undefined })
@@ -1174,7 +1184,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         // whatever chain the wallet happens to be on
         const postContractAddress = communityTarget
           ? CONTRACTS[`chain${communityTarget.networkId}`]?.hup
-          : getActiveChain()?.[1]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
+          : CONTRACTS[`chain${targetChainId}`]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
         if (!postContractAddress) throw new Error('Contract configuration missing for network')
         const createArgs = [address, ContentType.Post, metadata, 0, allowComments]
         if (await tryGaslessCreate(createArgs)) {
@@ -1265,6 +1275,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                   : 'New post'
         }
         onCancel={(e) => handleClose(e)}
+        actions={isChainPinned ? null : <NetworkSelect placement="bottom-end" />}
       />
 
       {isWrongChain && (

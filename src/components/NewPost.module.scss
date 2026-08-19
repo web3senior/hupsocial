@@ -592,11 +592,20 @@
 }
 
 @media (max-width: 640px) {
+  /* Twitter-style composer on phones: the sheet takes the whole viewport instead of floating as
+     a rounded card. The backdrop is never visible behind it, so the radius and shadow only cost
+     composing height. No margin reset needed — a viewport-sized dialog leaves NativeDialog's
+     `margin: auto` no free space to distribute. */
   .newPost {
-    width: calc(100vw - 20px);
-    max-height: calc(100vh - 20px);
-    max-height: calc(100dvh - 20px);
-    border-radius: 18px;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    /* dvh tracks the visible viewport, so the sheet shrinks with the software keyboard */
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .chainWarning {
@@ -632,7 +641,8 @@
   }
 
   .footer {
-    padding: 20px 18px 22px;
+    /* Edge-to-edge now, so the Post button has to clear the home indicator */
+    padding: 20px 18px max(22px, env(safe-area-inset-bottom));
   }
 }
 
