@@ -26,7 +26,7 @@ const FETCH_TIMEOUT_MS = 6000
  */
 export const RANGES = {
   '1D': { span: 48, period: '30m', ttlMs: 2 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 24 }, days: 1, strict: true },
-  '1W': { span: 56, period: '3h', ttlMs: 10 * 60 * 1000, gecko: { tf: 'hour', aggregate: 4, limit: 42 }, days: 7, strict: true },
+  '1W': { span: 56, period: '3h', ttlMs: 10 * 60 * 1000, gecko: { tf: 'hour', aggregate: 1, limit: 168 }, days: 7, strict: true },
   '1M': { span: 30, period: '1d', ttlMs: 30 * 60 * 1000, gecko: { tf: 'day', aggregate: 1, limit: 30 }, days: 30, strict: true },
   // "Up to" ranges: a token that launched last month legitimately has only a month of history,
   // and refusing to chart it would be wrong. 1D/1W/1M name a window instead, and a series
@@ -35,14 +35,14 @@ export const RANGES = {
   ALL: { span: 200, period: '1w', ttlMs: 60 * 60 * 1000, gecko: { tf: 'day', aggregate: 7, limit: 200 }, days: null, strict: false },
 }
 
-// Two points are a line segment, not a trend. Below this there is nothing to read in the shape.
-const MIN_POINTS = 8
+// A couple of points are a line segment, not a trend. Below this there is nothing to read.
+const MIN_POINTS = 5
 
-// How much of a named window a series must actually span to be drawn as that window. TBULL's
-// pool answered a 1W request with two candles four hours apart, which drew a confident little
-// downtrend beside a +49% headline — a chart that contradicts the number above it is worse
-// than no chart.
-const MIN_COVERAGE = 0.4
+// A series is labelled by the window it was asked for only when it very nearly spans it.
+// Short of that it is labelled by what it actually covers — TBULL has about five hours of
+// history anywhere, and calling that "7D" beside a +49% figure was the real defect, not the
+// shortness of the line.
+const LABEL_AS_REQUESTED = 0.8
 
 export const DEFAULT_RANGE = '1D'
 
@@ -217,16 +217,36 @@ export async function fetchPriceHistory(symbols, range = DEFAULT_RANGE) {
     }
   }
 
-  const { days, strict } = RANGES[range]
-
   const out = {}
   for (const [symbol, entry] of wanted) {
     const data = cache.get(`${entry.key}:${range}`)?.series
     // A null series is a known gap, not a failure — the card renders its quote without a chart
     if (!data) continue
-    // Nor is a series that does not reach across the window it would be labelled with
-    if (strict && data.coverageDays < days * MIN_COVERAGE) continue
     out[symbol] = { ...data, range }
   }
   return out
+}
+
+/**
+ * What to call the span a series actually drew, which is not always the range it was asked
+ * for. A pool GeckoTerminal has only just begun indexing answers a week-long request with a
+ * few hours; the line is still worth drawing, but it must not claim to be the week.
+ * @param {{range: string, coverageDays: number}} history
+ * @returns {string}
+ */
+export function rangeLabelFor(history) {
+  const range = history?.range && RANGES[history.range] ? history.range : DEFAULT_RANGE
+  const nominal = RANGES[range].days
+  const days = history?.coverageDays
+
+  const asked = { '1D': '24h', '1W': '7D', '1M': '30D', '1Y': '1Y', ALL: 'All' }[range]
+  if (!Number.isFinite(days)) return asked
+  // "Up to" ranges have no window to fall short of
+  if (nominal === null || days >= nominal * LABEL_AS_REQUESTED) return asked
+
+  const hours = days * 24
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))}m`
+  if (days < 1) return `${Math.round(hours)}h`
+  if (days < 45) return `${Math.round(days)}D`
+  return `${Math.round(days / 30)}M`
 }
