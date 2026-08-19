@@ -5,6 +5,7 @@ import { chainBadgeFor, nativeLogoFor } from '@/config/chainBadges'
 import TokenIcon from '@/components/ui/TokenIcon'
 import PriceSparkline from '@/components/ui/PriceSparkline'
 import { tokenIconUrl } from '@/lib/tokenIcons'
+import { SPARKLINE_RANGE } from '@/lib/priceHistory'
 import styles from './CashtagCard.module.scss'
 
 // Sub-cent tokens need the long tail or $BONK renders as "$0.00"
@@ -16,6 +17,10 @@ const priceLabel = (price) =>
     maximumFractionDigits: price < 0.01 ? 8 : price < 1 ? 6 : 2,
   }).format(price)
 
+// How the chart's range reads on the card. The percentage beside it is a 24h figure, so both
+// carry their period: a bare "↑ 4.29%" next to a week-long line invites reading one as the other.
+const RANGE_LABEL = { '1D': '24h', '1W': '7D', '1M': '30D', '1Y': '1Y', ALL: 'All' }
+
 // A launch-price move can run to six figures of percent — ANSEM's is +125,000% — so anything
 // past four digits switches to compact notation rather than breaking the row
 const percentLabel = (percent) => {
@@ -26,6 +31,10 @@ const percentLabel = (percent) => {
       : magnitude.toFixed(2)
   return `${formatted}%`
 }
+
+// The card carries direction in its arrow, so percentLabel drops the sign. A hover string has
+// no arrow beside it, so it has to say which way the period went.
+const signedPercentLabel = (percent) => `${percent >= 0 ? '+' : '−'}${percentLabel(percent)}`
 
 /**
  * Cashtag Card — compact
@@ -41,6 +50,7 @@ const CashtagCard = ({ token, onRemove }) => {
 
   const { symbol, name, price, change24h, logo, chainSlug, chainId, address, history } = token
 
+  const rangeLabel = RANGE_LABEL[history?.range ?? SPARKLINE_RANGE] ?? SPARKLINE_RANGE
   const hasChange = typeof change24h === 'number' && Number.isFinite(change24h)
   const isUp = hasChange ? change24h >= 0 : true
   const direction = isUp ? 'up' : 'down'
@@ -61,6 +71,7 @@ const CashtagCard = ({ token, onRemove }) => {
           {hasChange && (
             <span className={clsx(styles.cashtagCard__change, styles[`cashtagCard__change--${direction}`])}>
               {isUp ? '↑' : '↓'} {percentLabel(change24h)}
+              <span className={styles.cashtagCard__period}>24h</span>
             </span>
           )}
         </span>
@@ -68,13 +79,16 @@ const CashtagCard = ({ token, onRemove }) => {
 
       {/* A token too thin to chart still deserves its quote — the row just loses the trend */}
       {history?.points?.length > 1 && (
-        <PriceSparkline
-          className={styles.cashtagCard__chart}
-          points={history.points}
-          direction={direction}
-          height={40}
-          label={`${symbol} price, past week, ${isUp ? 'up' : 'down'} ${percentLabel(change24h ?? 0)}`}
-        />
+        <span className={styles.cashtagCard__chartWrap}>
+          <PriceSparkline
+            points={history.points}
+            direction={direction}
+            height={40}
+            title={`${symbol} · past ${rangeLabel} · ${signedPercentLabel(history.changePct ?? 0)} over the period`}
+            label={`${symbol} price over the past ${rangeLabel}`}
+          />
+          <span className={styles.cashtagCard__period}>{rangeLabel}</span>
+        </span>
       )}
 
       {onRemove && (

@@ -27,7 +27,7 @@ const PAD = 0.08
  * The viewBox is unit-square and stretched, so `vector-effect: non-scaling-stroke` is doing real
  * work: without it the stroke and the baseline's dashes distort with the aspect ratio.
  */
-const PriceSparkline = ({ points, direction = 'up', height = 32, baseline = false, className, label }) => {
+const PriceSparkline = ({ points, direction = 'up', height = 32, baseline = false, className, label, title }) => {
   const geometry = useMemo(() => {
     if (!Array.isArray(points) || points.length < 2) return null
 
@@ -63,6 +63,11 @@ const PriceSparkline = ({ points, direction = 'up', height = 32, baseline = fals
       role="img"
       aria-label={label || `Price trend, ${direction}`}
     >
+      {/* A real SVG <title> rather than an HTML title attribute: it is the accessible name
+          for the graphic and the browser shows it on hover, so the period the line covers is
+          discoverable instead of assumed */}
+      {title && <title>{title}</title>}
+
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />

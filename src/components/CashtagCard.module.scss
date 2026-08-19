@@ -93,3 +93,38 @@
     color: var(--text);
   }
 }
+
+.cashtagCard__chartWrap {
+  position: relative;
+  display: block;
+  // Same slice the chart held on its own — the period label sits over it rather than beside it,
+  // so naming the range costs no width
+  flex: 0 0 96px;
+  inline-size: 96px;
+  margin-inline-start: auto;
+}
+
+// Recessive by design: the period is a unit, not a reading. It should be findable when you
+// wonder what you are looking at and invisible when you do not.
+.cashtagCard__period {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.cashtagCard__chartWrap .cashtagCard__period {
+  position: absolute;
+  inset-block-start: -2px;
+  inset-inline-end: 0;
+  line-height: 1;
+  // Its own ground: the label sits over the plot, and a series that rallies into the top-right
+  // would otherwise run straight under the text
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.cashtagCard__change .cashtagCard__period {
+  margin-inline-start: 3px;
+}
