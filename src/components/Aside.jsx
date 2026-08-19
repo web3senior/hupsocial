@@ -38,6 +38,12 @@ const isActivePath = (pathname, path) => {
   return pathname === path || pathname.startsWith(`${path}/`)
 }
 
+// A section row links to one route but owns several (config/sections.js), so it has
+// to stay lit on any of them — plain `path` matching would drop the highlight the
+// moment the user moved to a sibling tab.
+const isActiveItem = (pathname, item) =>
+  isActivePath(pathname, item.path) || Boolean(item.activePaths?.some((path) => isActivePath(pathname, path)))
+
 const normalizeNavItem = (item) => {
   if (item.name === 'br' || item.type === 'divider') {
     return {
@@ -50,6 +56,7 @@ const normalizeNavItem = (item) => {
     id: item.id ?? item.path ?? item.href ?? item.component ?? item.name ?? item.label,
     name: item.name ?? item.label,
     path: item.path ?? item.href,
+    activePaths: item.activePaths,
     icon: item.icon,
     component: item.component,
   }
@@ -299,7 +306,7 @@ export default function Aside() {
             <li key={item.id ?? `${item.type}-${index}`}>
               <NavLink
                 item={item}
-                isActive={isActivePath(pathname, item.path)}
+                isActive={isActiveItem(pathname, item)}
                 isCompact={isCompact}
                 showTooltip={tooltipReady}
                 unreadCount={unreadCount}

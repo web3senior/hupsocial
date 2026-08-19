@@ -609,317 +609,315 @@ export default function NftMarketGrid() {
   const isFiltered = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS)
 
   return (
-    <div className={clsx('__container')} data-width="large">
-      <div className={styles.market}>
-        <MarketHero networkId={filters.networkId} />
+    <div className={styles.market}>
+      <MarketHero networkId={filters.networkId} />
 
-        <label className={clsx(styles.search, 'rounded-full')}>
-          <MagnifyingGlassIcon size={18} aria-hidden="true" />
-          <input
-            type="search"
-            className={styles.search__input}
-            placeholder="Search NFT or seller..."
-            aria-label="Search NFTs"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+      <label className={clsx(styles.search, 'rounded-full')}>
+        <MagnifyingGlassIcon size={18} aria-hidden="true" />
+        <input
+          type="search"
+          className={styles.search__input}
+          placeholder="Search NFT or seller..."
+          aria-label="Search NFTs"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+      </label>
+
+      {/* The filters users reach for constantly sit in the open; the narrower ones
+          (collection, standard, payment token, price) stay behind the funnel. The pills
+          scroll, the funnel does not — it must stay reachable at any width. */}
+      <div className={styles.market__toolbar}>
+        <div className={styles.market__quickFilters}>
+          <QuickSelect
+            label="Network"
+            tooltip="Show only listings on one chain. Collections and payment tokens are chain-specific, so switching networks clears both."
+            value={filters.networkId}
+            defaultValue=""
+            options={NETWORK_OPTIONS}
+            onChange={(value) => setFilters((f) => ({ ...f, networkId: value, token: '', collection: '' }))}
           />
-        </label>
-
-        {/* The filters users reach for constantly sit in the open; the narrower ones
-            (collection, standard, payment token, price) stay behind the funnel. The pills
-            scroll, the funnel does not — it must stay reachable at any width. */}
-        <div className={styles.market__toolbar}>
-          <div className={styles.market__quickFilters}>
-            <QuickSelect
-              label="Network"
-              tooltip="Show only listings on one chain. Collections and payment tokens are chain-specific, so switching networks clears both."
-              value={filters.networkId}
-              defaultValue=""
-              options={NETWORK_OPTIONS}
-              onChange={(value) => setFilters((f) => ({ ...f, networkId: value, token: '', collection: '' }))}
-            />
-            <QuickSelect
-              label="Status"
-              tooltip="Where a listing stands onchain. Active is what you can buy right now — widen it to see what already sold."
-              value={filters.status}
-              defaultValue="active"
-              options={STATUS_OPTIONS}
-              onChange={(value) => setFilters((f) => ({ ...f, status: value }))}
-            />
-            <QuickSelect
-              label="Referral reward"
-              tooltip="The cut of the sale a listing pays whoever brings the buyer. Filter for listings that pay at least a set share."
-              value={filters.referral}
-              defaultValue=""
-              options={REFERRAL_OPTIONS}
-              onChange={(value) => setFilters((f) => ({ ...f, referral: value }))}
-            />
-            <QuickSelect
-              label="Sort"
-              tooltip="Order the grid — newest listings first, or by price. Price order only lines up across listings priced in the same token."
-              value={filters.sort}
-              defaultValue="newest"
-              options={SORT_OPTIONS}
-              onChange={(value) => setFilters((f) => ({ ...f, sort: value }))}
-            />
-          </div>
-
-          {/* Only while a collection is the view — a sweep of "everything on the market" is
-              not something a button should be able to start */}
-          {activeCollectionChainId && (
-            <button
-              type="button"
-              className={styles.market__refreshButton}
-              aria-label="Refresh this collection's metadata"
-              title="Re-read every NFT in this collection from the blockchain"
-              onClick={handleRefreshCollection}
-              disabled={collectionRefresh.isRefreshing}
-            >
-              <ArrowsClockwiseIcon size={16} className={clsx(collectionRefresh.isRefreshing && styles['market__refreshButton--spinning'])} />
-            </button>
-          )}
-
-          {/* The buy side's counterpart to listing: every offer this wallet has out across
-              the market, including expired ones still holding escrow to reclaim */}
-          <Tooltip placement="top-end" content="Offers you've made — cancel live ones or reclaim escrow from expired ones.">
-            <Link href="/nfts/offers" className={styles.market__filterButton} aria-label="My offers">
-              <HandCoinsIcon size={16} />
-            </Link>
-          </Tooltip>
-
-          <NativePopover
-            placement="bottom-end"
-            className={styles.filtersPanel}
-            trigger={
-              // Tooltip passes the popover's trigger props through to the button, so the
-              // funnel still toggles the panel while describing what's behind it
-              <Tooltip
-                placement="top-end"
-                content={
-                  hiddenCount > 0
-                    ? `${hiddenCount} more ${hiddenCount === 1 ? 'filter is' : 'filters are'} set here — collection, seller, NFT standard, payment token and price range.`
-                    : 'The narrower filters: collection, seller, NFT standard, payment token and price range.'
-                }
-              >
-                <button type="button" className={styles.market__filterButton} aria-label="More filters">
-                  <FunnelIcon size={16} />
-                  {hiddenCount > 0 && <span className={styles.market__filterBadge}>{hiddenCount}</span>}
-                </button>
-              </Tooltip>
-            }
-          >
-            {() => (
-              <div className={styles.filtersPanel__body}>
-                <div className={styles.filtersPanel__field}>
-                  <label htmlFor="nftFilterCollection">Collection</label>
-                  <select
-                    id="nftFilterCollection"
-                    value={filters.collection}
-                    disabled={collectionEntries.length === 0}
-                    onChange={(e) => setFilters((f) => ({ ...f, collection: e.target.value }))}
-                  >
-                    <option value="">All collections</option>
-                    {collectionEntries.map(([address, name]) => (
-                      <option key={address} value={address}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                  {collectionEntries.length === 0 && (
-                    <small className={styles.filtersPanel__hint}>Collections appear as listings load</small>
-                  )}
-                </div>
-
-                <div className={clsx(styles.filtersPanel__field, styles['filtersPanel__field--seller'])}>
-                  <label htmlFor="nftFilterSeller">Seller</label>
-                  {selectedSeller ? (
-                    <div className={styles.filtersPanel__sellerPick}>
-                      <SellerAvatar user={selectedSeller} />
-                      <span className={styles.filtersPanel__sellerName}>{sellerLabel(selectedSeller)}</span>
-                      <button
-                        type="button"
-                        className={styles.filtersPanel__sellerClear}
-                        aria-label="Clear seller filter"
-                        onClick={handleSellerClear}
-                      >
-                        <XIcon size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <input
-                        id="nftFilterSeller"
-                        type="text"
-                        autoComplete="off"
-                        placeholder="Name or wallet address"
-                        value={sellerQuery}
-                        onChange={(e) => setSellerQuery(e.target.value)}
-                        onFocus={() => setIsSellerFocused(true)}
-                        onBlur={() => setIsSellerFocused(false)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && sellerOptions.length > 0) {
-                            e.preventDefault()
-                            handleSellerSelect(sellerOptions[0])
-                          }
-                        }}
-                      />
-                      {/* Overlays the fields below instead of pushing them down. The filters
-                          panel is already in the top layer, so absolute positioning inside it
-                          needs no nested popover. preventDefault on mousedown keeps the input
-                          focused while clicking inside — otherwise blur hides the dropdown
-                          before the option's click can land. */}
-                      {(isSellerFocused || sellerQuery.trim()) && (
-                        <div className={styles.filtersPanel__sellerDropdown} onMouseDown={(e) => e.preventDefault()}>
-                          {sellerOptions.length > 0 ? (
-                            <ul className={styles.filtersPanel__sellerList} aria-label="Matching sellers">
-                              {sellerOptions.map((user) => (
-                                <li key={user.wallet_address}>
-                                  <button type="button" className={styles.filtersPanel__sellerOption} onClick={() => handleSellerSelect(user)}>
-                                    <SellerAvatar user={user} />
-                                    <span className={styles.filtersPanel__sellerName}>{sellerLabel(user)}</span>
-                                    <small>{user.listing_count}</small>
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <small className={styles.filtersPanel__hint}>
-                              {isLoadingSellers ? 'Searching sellers...' : 'No sellers match'}
-                            </small>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                <div className={styles.filtersPanel__field}>
-                  <label htmlFor="nftFilterStandard">NFT standard</label>
-                  <select id="nftFilterStandard" value={filters.standard} onChange={(e) => setFilters((f) => ({ ...f, standard: e.target.value }))}>
-                    <option value="">Any</option>
-                    <option value="erc721">ERC721</option>
-                    <option value="lsp8" title="LSP8">
-                      NFT 2.0
-                    </option>
-                  </select>
-                </div>
-
-                <div className={styles.filtersPanel__field}>
-                  <label htmlFor="nftFilterToken">Payment token</label>
-                  <select
-                    id="nftFilterToken"
-                    value={filters.token}
-                    disabled={tokenOptions.length === 0}
-                    onChange={(e) => setFilters((f) => ({ ...f, token: e.target.value }))}
-                  >
-                    <option value="">Any</option>
-                    {tokenOptions.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label} ({t.count})
-                      </option>
-                    ))}
-                  </select>
-                  {tokenOptions.length === 0 && (
-                    <small className={styles.filtersPanel__hint}>
-                      {isLoadingTokens ? 'Loading currencies...' : 'No listings on this network yet'}
-                    </small>
-                  )}
-                </div>
-
-                <div className={styles.filtersPanel__field}>
-                  <label>Price range</label>
-                  <div className={styles.filtersPanel__range}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      inputMode="decimal"
-                      placeholder="Min"
-                      value={filters.minPrice}
-                      disabled={!canFilterPrice}
-                      onChange={(e) => setFilters((f) => ({ ...f, minPrice: e.target.value }))}
-                    />
-                    <span>–</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      inputMode="decimal"
-                      placeholder="Max"
-                      value={filters.maxPrice}
-                      disabled={!canFilterPrice}
-                      onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))}
-                    />
-                  </div>
-                  {!canFilterPrice && <small className={styles.filtersPanel__hint}>Pick a network or payment token first</small>}
-                </div>
-
-                {isFiltered && (
-                  <button
-                    type="button"
-                    className={styles.filtersPanel__reset}
-                    onClick={() => {
-                      setSellerQuery('')
-                      setSelectedSeller(null)
-                      setFilters(DEFAULT_FILTERS)
-                    }}
-                  >
-                    Reset filters
-                  </button>
-                )}
-              </div>
-            )}
-          </NativePopover>
-
-          {/* Listing needs no post — this opens the same HupTrade flow the composer uses */}
-          <button type="button" className={styles.market__sellButton} aria-label="Sell NFT" onClick={handleSell}>
-            <StorefrontIcon size={16} weight="fill" />
-            <span>Sell NFT</span>
-          </button>
+          <QuickSelect
+            label="Status"
+            tooltip="Where a listing stands onchain. Active is what you can buy right now — widen it to see what already sold."
+            value={filters.status}
+            defaultValue="active"
+            options={STATUS_OPTIONS}
+            onChange={(value) => setFilters((f) => ({ ...f, status: value }))}
+          />
+          <QuickSelect
+            label="Referral reward"
+            tooltip="The cut of the sale a listing pays whoever brings the buyer. Filter for listings that pay at least a set share."
+            value={filters.referral}
+            defaultValue=""
+            options={REFERRAL_OPTIONS}
+            onChange={(value) => setFilters((f) => ({ ...f, referral: value }))}
+          />
+          <QuickSelect
+            label="Sort"
+            tooltip="Order the grid — newest listings first, or by price. Price order only lines up across listings priced in the same token."
+            value={filters.sort}
+            defaultValue="newest"
+            options={SORT_OPTIONS}
+            onChange={(value) => setFilters((f) => ({ ...f, sort: value }))}
+          />
         </div>
 
-        {isLoading ? (
-          <div className={styles.market__grid}>
-            {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className={styles.market__skeletonTile} />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <p className={styles.market__empty}>No listings match these filters.</p>
-        ) : (
-          <div className={styles.market__grid}>
-            {items.map((listing) => {
-              const sellerMatches = Boolean(
-                searchLower &&
-                  ((listing.display_name && listing.display_name.toLowerCase().includes(searchLower)) ||
-                    listing.wallet_address?.toLowerCase().includes(searchLower)),
-              )
-              return (
-                <NftMarketCard
-                  key={`${listing.network_id}-${listing.listing_id}`}
-                  listing={listing}
-                  nameFilter={searchLower && !sellerMatches ? searchLower : undefined}
-                  onCollectionResolved={handleCollectionResolved}
-                />
-              )
-            })}
-          </div>
+        {/* Only while a collection is the view — a sweep of "everything on the market" is
+            not something a button should be able to start */}
+        {activeCollectionChainId && (
+          <button
+            type="button"
+            className={styles.market__refreshButton}
+            aria-label="Refresh this collection's metadata"
+            title="Re-read every NFT in this collection from the blockchain"
+            onClick={handleRefreshCollection}
+            disabled={collectionRefresh.isRefreshing}
+          >
+            <ArrowsClockwiseIcon size={16} className={clsx(collectionRefresh.isRefreshing && styles['market__refreshButton--spinning'])} />
+          </button>
         )}
 
-        {hasMore && !isLoading && (
-          <div className={styles.market__loadMoreWrap}>
-            <button type="button" className={styles.market__loadMore} onClick={loadMore} disabled={isFetchingMore}>
-              {isFetchingMore ? 'Loading...' : 'Load more'}
-            </button>
-          </div>
-        )}
+        {/* The buy side's counterpart to listing: every offer this wallet has out across
+            the market, including expired ones still holding escrow to reclaim */}
+        <Tooltip placement="top-end" content="Offers you've made — cancel live ones or reclaim escrow from expired ones.">
+          <Link href="/nfts/offers" className={styles.market__filterButton} aria-label="My offers">
+            <HandCoinsIcon size={16} />
+          </Link>
+        </Tooltip>
 
-        {/* No onAttached — the modal lists standalone and the grid just refetches after */}
-        {isSelling && (
-          <SellNftModal chainId={sellChainId} onListed={() => setRefreshKey((key) => key + 1)} onClose={() => setIsSelling(false)} />
-        )}
+        <NativePopover
+          placement="bottom-end"
+          className={styles.filtersPanel}
+          trigger={
+            // Tooltip passes the popover's trigger props through to the button, so the
+            // funnel still toggles the panel while describing what's behind it
+            <Tooltip
+              placement="top-end"
+              content={
+                hiddenCount > 0
+                  ? `${hiddenCount} more ${hiddenCount === 1 ? 'filter is' : 'filters are'} set here — collection, seller, NFT standard, payment token and price range.`
+                  : 'The narrower filters: collection, seller, NFT standard, payment token and price range.'
+              }
+            >
+              <button type="button" className={styles.market__filterButton} aria-label="More filters">
+                <FunnelIcon size={16} />
+                {hiddenCount > 0 && <span className={styles.market__filterBadge}>{hiddenCount}</span>}
+              </button>
+            </Tooltip>
+          }
+        >
+          {() => (
+            <div className={styles.filtersPanel__body}>
+              <div className={styles.filtersPanel__field}>
+                <label htmlFor="nftFilterCollection">Collection</label>
+                <select
+                  id="nftFilterCollection"
+                  value={filters.collection}
+                  disabled={collectionEntries.length === 0}
+                  onChange={(e) => setFilters((f) => ({ ...f, collection: e.target.value }))}
+                >
+                  <option value="">All collections</option>
+                  {collectionEntries.map(([address, name]) => (
+                    <option key={address} value={address}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                {collectionEntries.length === 0 && (
+                  <small className={styles.filtersPanel__hint}>Collections appear as listings load</small>
+                )}
+              </div>
+
+              <div className={clsx(styles.filtersPanel__field, styles['filtersPanel__field--seller'])}>
+                <label htmlFor="nftFilterSeller">Seller</label>
+                {selectedSeller ? (
+                  <div className={styles.filtersPanel__sellerPick}>
+                    <SellerAvatar user={selectedSeller} />
+                    <span className={styles.filtersPanel__sellerName}>{sellerLabel(selectedSeller)}</span>
+                    <button
+                      type="button"
+                      className={styles.filtersPanel__sellerClear}
+                      aria-label="Clear seller filter"
+                      onClick={handleSellerClear}
+                    >
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      id="nftFilterSeller"
+                      type="text"
+                      autoComplete="off"
+                      placeholder="Name or wallet address"
+                      value={sellerQuery}
+                      onChange={(e) => setSellerQuery(e.target.value)}
+                      onFocus={() => setIsSellerFocused(true)}
+                      onBlur={() => setIsSellerFocused(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && sellerOptions.length > 0) {
+                          e.preventDefault()
+                          handleSellerSelect(sellerOptions[0])
+                        }
+                      }}
+                    />
+                    {/* Overlays the fields below instead of pushing them down. The filters
+                        panel is already in the top layer, so absolute positioning inside it
+                        needs no nested popover. preventDefault on mousedown keeps the input
+                        focused while clicking inside — otherwise blur hides the dropdown
+                        before the option's click can land. */}
+                    {(isSellerFocused || sellerQuery.trim()) && (
+                      <div className={styles.filtersPanel__sellerDropdown} onMouseDown={(e) => e.preventDefault()}>
+                        {sellerOptions.length > 0 ? (
+                          <ul className={styles.filtersPanel__sellerList} aria-label="Matching sellers">
+                            {sellerOptions.map((user) => (
+                              <li key={user.wallet_address}>
+                                <button type="button" className={styles.filtersPanel__sellerOption} onClick={() => handleSellerSelect(user)}>
+                                  <SellerAvatar user={user} />
+                                  <span className={styles.filtersPanel__sellerName}>{sellerLabel(user)}</span>
+                                  <small>{user.listing_count}</small>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <small className={styles.filtersPanel__hint}>
+                            {isLoadingSellers ? 'Searching sellers...' : 'No sellers match'}
+                          </small>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className={styles.filtersPanel__field}>
+                <label htmlFor="nftFilterStandard">NFT standard</label>
+                <select id="nftFilterStandard" value={filters.standard} onChange={(e) => setFilters((f) => ({ ...f, standard: e.target.value }))}>
+                  <option value="">Any</option>
+                  <option value="erc721">ERC721</option>
+                  <option value="lsp8" title="LSP8">
+                    NFT 2.0
+                  </option>
+                </select>
+              </div>
+
+              <div className={styles.filtersPanel__field}>
+                <label htmlFor="nftFilterToken">Payment token</label>
+                <select
+                  id="nftFilterToken"
+                  value={filters.token}
+                  disabled={tokenOptions.length === 0}
+                  onChange={(e) => setFilters((f) => ({ ...f, token: e.target.value }))}
+                >
+                  <option value="">Any</option>
+                  {tokenOptions.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label} ({t.count})
+                    </option>
+                  ))}
+                </select>
+                {tokenOptions.length === 0 && (
+                  <small className={styles.filtersPanel__hint}>
+                    {isLoadingTokens ? 'Loading currencies...' : 'No listings on this network yet'}
+                  </small>
+                )}
+              </div>
+
+              <div className={styles.filtersPanel__field}>
+                <label>Price range</label>
+                <div className={styles.filtersPanel__range}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    inputMode="decimal"
+                    placeholder="Min"
+                    value={filters.minPrice}
+                    disabled={!canFilterPrice}
+                    onChange={(e) => setFilters((f) => ({ ...f, minPrice: e.target.value }))}
+                  />
+                  <span>–</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    inputMode="decimal"
+                    placeholder="Max"
+                    value={filters.maxPrice}
+                    disabled={!canFilterPrice}
+                    onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))}
+                  />
+                </div>
+                {!canFilterPrice && <small className={styles.filtersPanel__hint}>Pick a network or payment token first</small>}
+              </div>
+
+              {isFiltered && (
+                <button
+                  type="button"
+                  className={styles.filtersPanel__reset}
+                  onClick={() => {
+                    setSellerQuery('')
+                    setSelectedSeller(null)
+                    setFilters(DEFAULT_FILTERS)
+                  }}
+                >
+                  Reset filters
+                </button>
+              )}
+            </div>
+          )}
+        </NativePopover>
+
+        {/* Listing needs no post — this opens the same HupTrade flow the composer uses */}
+        <button type="button" className={styles.market__sellButton} aria-label="Sell NFT" onClick={handleSell}>
+          <StorefrontIcon size={16} weight="fill" />
+          <span>Sell NFT</span>
+        </button>
       </div>
+
+      {isLoading ? (
+        <div className={styles.market__grid}>
+          {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className={styles.market__skeletonTile} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <p className={styles.market__empty}>No listings match these filters.</p>
+      ) : (
+        <div className={styles.market__grid}>
+          {items.map((listing) => {
+            const sellerMatches = Boolean(
+              searchLower &&
+                ((listing.display_name && listing.display_name.toLowerCase().includes(searchLower)) ||
+                  listing.wallet_address?.toLowerCase().includes(searchLower)),
+            )
+            return (
+              <NftMarketCard
+                key={`${listing.network_id}-${listing.listing_id}`}
+                listing={listing}
+                nameFilter={searchLower && !sellerMatches ? searchLower : undefined}
+                onCollectionResolved={handleCollectionResolved}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {hasMore && !isLoading && (
+        <div className={styles.market__loadMoreWrap}>
+          <button type="button" className={styles.market__loadMore} onClick={loadMore} disabled={isFetchingMore}>
+            {isFetchingMore ? 'Loading...' : 'Load more'}
+          </button>
+        </div>
+      )}
+
+      {/* No onAttached — the modal lists standalone and the grid just refetches after */}
+      {isSelling && (
+        <SellNftModal chainId={sellChainId} onListed={() => setRefreshKey((key) => key + 1)} onClose={() => setIsSelling(false)} />
+      )}
     </div>
   )
 }

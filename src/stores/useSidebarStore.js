@@ -9,25 +9,25 @@ import {
   BriefcaseIcon,
   CalendarBlankIcon,
   ChartBarIcon,
-  ChartLineUpIcon,
   ChatCircleIcon,
-  CoinIcon,
   CoinsIcon,
-  HandshakeIcon,
   HouseIcon,
-  Image,
   MagnifyingGlassIcon,
   PlusIcon,
   PulseIcon,
   SquaresFourIcon,
   StorefrontIcon,
-  TagIcon,
   TrophyIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
+import { SECTIONS, sectionLanding, sectionPaths } from '@/config/sections'
 
 // Static navigation schema with icons.
 // Keeps components out of localStorage to prevent serialization crashes.
+//
+// Grouped by what the user came to do, not by which contract backs the page: a row
+// with `activePaths` is a section (config/sections.js) whose member routes are
+// reached through the tab strip on its pages, and it stays highlighted on all of them.
 export const NAV_ITEMS_SCHEMA = [
   { id: 'foryou', name: 'For you', path: '/', icon: HouseIcon },
   { id: 'new-post', name: 'New post', component: 'new-post', icon: PlusIcon },
@@ -36,14 +36,8 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'divider-primary', type: 'divider' },
   { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
-  { id: 'bazaar', name: 'Bazaar', path: '/bazaar', icon: TagIcon },
-  { id: 'nfts', name: 'NFTs', path: '/nfts', icon: StorefrontIcon },
-  { id: 'drops', name: 'Drops', path: '/drops', icon: Image },
-  { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
-  { id: 'tokens', name: 'Tokens', path: '/launches', icon: CoinIcon },
-  { id: 'swap', name: 'Swap', path: '/swap', icon: ArrowsDownUpIcon },
-  { id: 'p2p', name: 'P2P', path: '/p2p', icon: HandshakeIcon },
-  { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
+  { id: 'bazaar', name: 'Bazaar', path: sectionLanding(SECTIONS.bazaar), icon: StorefrontIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
+  { id: 'trade', name: 'Trade', path: sectionLanding(SECTIONS.trade), icon: ArrowsDownUpIcon, activePaths: sectionPaths(SECTIONS.trade) },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
@@ -53,6 +47,8 @@ export const NAV_ITEMS_SCHEMA = [
   // Reads with Insights as a pair: what the network did, then what you did.
   { id: 'activity', name: 'Activity', path: '/activity', icon: PulseIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
+  // Your own sales, so it sits with the rest of your account rather than in the market block
+  { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
 ]
 
 // Baskets migrated from the pre-wallet era live under this key until the

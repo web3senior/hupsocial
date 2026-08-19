@@ -1,0 +1,22 @@
+.page {
+  min-height: 85svh;
+
+  // Same shell as the sibling section pages (drops, swap, launches, p2p, predict)
+  // so tabbing between them doesn't change the card the content sits in
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    isolation: isolate;
+    padding: 1.25rem;
+
+    @media (max-width: 600px) {
+      border: none;
+      border-radius: 0;
+      padding: 1rem;
+    }
+  }
+}

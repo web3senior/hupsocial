@@ -1,0 +1,65 @@
+.sectionTabs {
+  margin-bottom: 0.75rem;
+
+  // Matches the horizontal inset of the card below on small screens, where that card
+  // drops its border and runs edge to edge
+  @media (max-width: 600px) {
+    padding-inline: 1rem;
+  }
+
+  &__nav {
+    // Safety net only: the tabs share the width evenly, so this scrolls solely if a
+    // future label is long enough to stop them fitting
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__list {
+    display: flex;
+    gap: 0.2rem;
+    min-height: 40px;
+    padding: 0.2rem;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--surface-muted);
+    list-style: none;
+  }
+
+  &__item {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 0.9rem;
+    border-radius: 7px;
+    color: var(--text-muted);
+    font-size: var(--system-13-font-size);
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background-color 150ms ease, color 150ms ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    // Solid surface rather than an accent: --accent-primary resolves only once a
+    // wallet is connected, which would leave the active tab unreadable when it isn't
+    &--active {
+      color: var(--text);
+      background-color: var(--surface);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+    }
+  }
+}

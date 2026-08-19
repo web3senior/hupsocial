@@ -30,7 +30,14 @@ const POSTS_PAGE_SIZE = 20
  * exist at once, and a single global "hasInitialized" flag would make every
  * tab after the first skip fetching and show the wrong feed's posts.
  */
-export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, title = 'For you', changeDocumentTitle = false }) {
+export default function HomeFeedTab({
+  feedMode = 'foryou',
+  networkId = null,
+  title = 'For you',
+  changeDocumentTitle = false,
+  // Section pages (bazaar) run wider so the feed lines up with their sibling tabs
+  containerWidth = 'small',
+}) {
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
 
@@ -355,7 +362,7 @@ export default function HomeFeedTab({ feedMode = 'foryou', networkId = null, tit
     <div className={styles.page} ref={containerRef} style={reservedHeight ? { minHeight: reservedHeight } : undefined}>
       <PageTitle name={title} changeDocumentTitle={changeDocumentTitle} spacer={false} showInHeader={false} />
 
-      <div className={clsx('__container')} data-width="small">
+      <div className={clsx('__container')} data-width={containerWidth}>
         {newPostsQueue.length > 0 && (
           <button className={clsx(styles['new-posts'])} onClick={handleMergeNewPosts}>
             Show {newPostsQueue.length} post{newPostsQueue.length > 1 ? 's' : ''}

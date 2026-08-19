@@ -1,6 +1,7 @@
 'use client'
 
 import PageTitle from '@/components/PageTitle'
+import SectionTabs from '@/components/ui/SectionTabs'
 import HomeFeedTab from '@/components/tabs/HomeFeedTab'
 
 // Bazaar: the home feed filtered to premium posts — posts with an active
@@ -11,7 +12,8 @@ export default function Page() {
   return (
     <>
       <PageTitle name="Bazaar" />
-      <HomeFeedTab feedMode="premium" title="Bazaar" />
+      <SectionTabs section="bazaar" />
+      <HomeFeedTab feedMode="premium" title="Bazaar" containerWidth="medium" />
     </>
   )
 }
