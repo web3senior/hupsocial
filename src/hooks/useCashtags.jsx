@@ -15,10 +15,15 @@
 import useSWR from 'swr'
 import { CASHTAG_PATTERN } from '@/lib/markdown'
 import { CASHTAGS } from '@/config/cashtags'
-import { DEFAULT_RANGE } from '@/lib/priceHistory'
+import { SPARKLINE_RANGE } from '@/lib/priceHistory'
 
 // Past a handful the strip stops being context and becomes the post
 const MAX_CARDS = 4
+
+// The compact card charts a week, not the expanded card's default day. Partly because a week
+// is the more useful glance next to a post, and partly because a day does not exist for every
+// token: DefiLlama carries no intraday history for LUKSO at any granularity, so $LYX drew no
+// line at all while the strip was asking for 1D.
 
 const fetcher = (url) => fetch(url).then((res) => (res.ok ? res.json() : { data: {} }))
 
@@ -39,7 +44,7 @@ export const cashtagsIn = (text) => {
  * @param {string[]} [explicit] the author's kept list, when the post carries one
  * @param {string} [range]
  */
-export function useCashtags(text, explicit, range = DEFAULT_RANGE) {
+export function useCashtags(text, explicit, range = SPARKLINE_RANGE) {
   const symbols = (Array.isArray(explicit) ? explicit.filter((s) => CASHTAGS[String(s).toUpperCase()]) : cashtagsIn(text)).slice(0, MAX_CARDS)
 
   // Sorted in the key so two posts citing the same tokens share one request, however each
