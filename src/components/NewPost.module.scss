@@ -606,6 +606,22 @@
     padding: 22px 18px 0;
   }
 
+  /* The sheet is taller than the composer's content, so the body has to claim that free
+     space — otherwise the editor and the attach toolbar bunch up under the header with dead
+     space beneath them. Grow-only (`1 0 auto`): a long post or an attached media grid must
+     never be shrunk back below its content height, .composer scrolls instead. */
+  .composerBody {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+  }
+
+  .editor {
+    /* Takes whatever the toolbar and attachments leave, so tapping anywhere in the empty
+       sheet lands in the text */
+    flex: 1 0 auto;
+  }
+
   .avatar {
     width: 42px;
     height: 42px;
