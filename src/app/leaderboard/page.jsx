@@ -156,7 +156,9 @@ export default function LeaderboardPage() {
           </header>
 
           <section className={styles.summaryGrid} aria-label="Leaderboard summary">
-            <StatCard icon={UsersIcon} label="Users" value={stats.active_users} />
+            {/* active_users counts wallets that posted, not members — "Users" read as a
+                contradiction next to a longer ranked list and the member count elsewhere */}
+            <StatCard icon={UsersIcon} label="Posters" value={stats.active_users} />
             <StatCard icon={FlameIcon} label="Posts" value={stats.root_posts} />
             <StatCard icon={ChatCircleIcon} label="Comments" value={stats.comments} />
             <StatCard icon={HeartIcon} label="Likes" value={stats.likes} />
