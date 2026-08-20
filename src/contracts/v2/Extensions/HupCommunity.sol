@@ -43,7 +43,8 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         string metadata;
     }
 
-    bytes32 public constant MODERATOR_ROLE = keccak256("MODERATOR_ROLE");
+    // Moderation here is per-community (registry[id][wallet].isModerator), not an AccessControl
+    // role — the only protocol-wide role is ADMIN_ROLE.
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     /// @notice Hard cap on setWhitelistedBatch's array length, so a moderator can't submit a
@@ -83,9 +84,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     // --- Composable eligibility requirements ---
     // What a wallet must hold or be, independent of how it is admitted (AdmissionMode) and of
-    // whether content is encrypted (keyVersion). Checked at join() only for SelfServeIfEligible,
-    // and re-checked live inside canPost() for everyone — sell the gating asset and posting
-    // rights lapse immediately, exactly like the old single-asset gated types behaved.
+    // whether content is encrypted (keyVersion). Checked at join() for SelfServeIfEligible and
+    // PayToJoin (never charge a wallet that couldn't post), and re-checked live inside canPost()
+    // for everyone — sell the gating asset and posting rights lapse immediately, exactly like
+    // the old single-asset gated types behaved.
 
     /// @notice Hard cap on a community's requirement list, bounding join()'s external-call gas.
     uint256 public constant MAX_REQUIREMENTS = 10;
@@ -130,15 +132,17 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     /// @notice communityId => wallet => passes the Whitelisted requirement type (see AssetRequirement).
     mapping(uint256 => mapping(address => bool)) public whitelist;
 
-    // --- Enumerable member/whitelist lists ---
-    // Solidity mappings alone can't be listed or paginated, so both `registry` and `whitelist`
-    // are mirrored into OpenZeppelin's EnumerableSet purely so the contract itself can answer
-    // "list all members"/"list the whitelist" directly — no indexer required for correctness.
+    // --- Enumerable member/whitelist/banned lists ---
+    // Solidity mappings alone can't be listed or paginated, so `registry` (members and, since a
+    // ban removes membership, banned wallets separately) and `whitelist` are mirrored into
+    // OpenZeppelin's EnumerableSet purely so the contract itself can answer "list all members"/
+    // "list the whitelist"/"who is banned" directly — no indexer required for correctness.
     // cidex still indexes the same events for a faster/richer read path (search, joined-with-
     // role, etc.), but nothing here depends on it being up to date.
 
     mapping(uint256 => EnumerableSet.AddressSet) private memberSet;
     mapping(uint256 => EnumerableSet.AddressSet) private whitelistSet;
+    mapping(uint256 => EnumerableSet.AddressSet) private bannedSet;
 
     // --- Creation rate limiting ---
     // Cheap, adjustable anti-spam guard for when createCommunity has no cost floor (`fee` 0).
@@ -362,8 +366,11 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         uint256 version = keyVersion[_id];
         if (version == 0) revert NotInitialized();
         // Envelopes only for actual members — key delivery to outsiders was previously possible
-        // (moderator-trust only); now the roster is enforced at the contract layer too.
-        if (!registry[_id][member].isMember) revert NotMember();
+        // (moderator-trust only); now the roster is enforced at the contract layer too. A ban
+        // already clears isMember (setBanStatus), so the isBanned check is belt-and-braces from
+        // the same storage slot: a banned wallet must never receive a rotated key.
+        MemberStatus storage target = registry[_id][member];
+        if (!target.isMember || target.isBanned) revert NotMember();
 
         wrappedKeys[_id][member][version] = wrappedKey;
         emit KeyGranted(_id, member, version);
@@ -386,9 +393,11 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         if (version == 0) revert NotInitialized();
 
         for (uint256 i = 0; i < _members.length; i++) {
-            // Skip (not revert on) non-members: a batch prepared from a member snapshot must not
-            // be wholly rejected because one address left between snapshot and confirmation.
-            if (!registry[_id][_members[i]].isMember) continue;
+            // Skip (not revert on) non-members and banned wallets: a batch prepared from a member
+            // snapshot must not be wholly rejected because one address left (or was banned)
+            // between snapshot and confirmation — and a banned wallet must never be re-keyed.
+            MemberStatus storage target = registry[_id][_members[i]];
+            if (!target.isMember || target.isBanned) continue;
 
             wrappedKeys[_id][_members[i]][version] = _wrappedKeys[i];
             emit KeyGranted(_id, _members[i], version);
@@ -479,6 +488,12 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
             // back into both sender and recipient on transfer).
             PaymentRequirement memory req = paymentRequirements[_id];
             if (req.price == 0) revert PaymentNotConfigured();
+            // A paid admission is the one path where admitting-then-gating would cost the joiner
+            // money: canPost re-checks the requirement list live, so a wallet that pays while
+            // failing it would be admitted, unable to post, and unrefundable. Check before any
+            // coin moves. (Open joins deliberately still admit first — read-only membership until
+            // the wallet qualifies costs nothing.)
+            if (!isEligible(sender, _id)) revert NotEligible();
 
             _admit(_id, sender);
             emit MembershipPaid(_id, sender, req.token, req.price);
@@ -653,17 +668,44 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         emit MemberStatusUpdated(_id, _actor, registry[_id][_actor].isMember);
     }
 
+    /**
+     * @notice Withdraws the caller's own pending join request — the requester's side of
+     *         rejectRequest. Without it a filed request could only be cleared by a moderator
+     *         (leave() reverts NotMember for a wallet that was never admitted), so a wallet
+     *         that changed its mind sat in the queue indefinitely.
+     */
+    function cancelRequest(uint256 _id) external communityExists(_id) {
+        address sender = _msgSender();
+        MemberStatus storage status = registry[_id][sender];
+        if (!status.isPending) revert NoPendingRequest();
+
+        status.isPending = false;
+
+        emit MemberStatusUpdated(_id, sender, status.isMember);
+    }
+
     function setModerator(uint256 _id, address _actor, bool _isMod) external communityExists(_id) onlyCreator(_id) {
         registry[_id][_actor].isModerator = _isMod;
 
         emit ModeratorUpdated(_id, _actor, _isMod);
     }
 
-    /// @dev Neither the creator nor the governor can be banned (mirrors kick's guard — a
-    ///      moderator outranking either would be a privilege inversion; banning the governor
-    ///      would only block its posting while every creator-level power stayed intact, and it
-    ///      could unban itself anyway). Banning also strips moderator status, so a later unban
-    ///      doesn't silently restore moderation powers — the creator must re-grant.
+    /**
+     * @notice Bans (or unbans) a wallet. A ban is a kick plus a flag: the wallet leaves the
+     *         roster, loses moderator status and any pending request, and can't join, accept an
+     *         invite, or be approved again until unbanned. Unbanning only lifts the flag — it
+     *         does NOT restore membership or moderation; the wallet rejoins through the
+     *         community's admission mode and the creator re-grants moderation explicitly.
+     * @dev Neither the creator nor the governor can be banned (mirrors kick's guard — a
+     *      moderator outranking either would be a privilege inversion; banning the governor
+     *      would only block its posting while every creator-level power stayed intact, and it
+     *      could unban itself anyway). Clearing isMember here is what keeps memberCount/
+     *      getMembers and the grantKey/grantKeyBatch roster checks honest without consulting
+     *      isBanned separately: the contract upholds `isMember => !isBanned` at every write site
+     *      (every admit path checks the flag first), so a banned wallet can never be handed a
+     *      rotated content key. The event carries the real post-ban membership (false), and an
+     *      unban of a never-member no longer reports a join that didn't happen.
+     */
     function setBanStatus(uint256 _id, address _actor, bool _banned) external communityExists(_id) onlyModerator(_id) {
         if (communities[_id].creator == _actor || governors[_id] == _actor) revert Unauthorized();
 
@@ -671,9 +713,18 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         status.isBanned = _banned;
         if (_banned) {
             status.isModerator = false;
+            status.isPending = false;
+            if (status.isMember) {
+                status.isMember = false;
+                status.canPost = false;
+                _removeFromMemberList(_id, _actor);
+            }
+            bannedSet[_id].add(_actor);
+        } else {
+            bannedSet[_id].remove(_actor);
         }
 
-        emit MemberStatusUpdated(_id, _actor, !_banned);
+        emit MemberStatusUpdated(_id, _actor, status.isMember);
     }
 
     /**
@@ -851,9 +902,15 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         if (r.rType == RequirementType.Whitelisted) {
             return whitelist[_id][_actor];
         }
-        // FollowsCreator
+        // FollowsCreator — same gas-capped, fail-closed staticcall discipline as the balance
+        // reads: a mis-wired or hostile registry makes the requirement fail, never canPost revert
         if (followerSystem == address(0)) return false;
-        return ILSP26FollowerSystem(followerSystem).isFollowing(_actor, communities[_id].creator);
+        (bool success, bytes memory data) = followerSystem.staticcall{gas: ASSET_READ_GAS_CAP}(
+            abi.encodeCall(ILSP26FollowerSystem.isFollowing, (_actor, communities[_id].creator))
+        );
+        // Decoded as a word, not a bool: abi.decode(bool) panics on any value other than 0/1,
+        // which would turn a malformed registry reply into exactly the revert this guards against
+        return success && data.length >= 32 && abi.decode(data, (uint256)) == 1;
     }
 
     /**
@@ -928,20 +985,8 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     /// @notice Paginated read of a community's current member addresses. No indexer required.
     /// @dev Moderator-gated — see memberCount for the honest limits of view gating.
-    function getMembers(uint256 _id, uint256 offset, uint256 limit) external view communityExists(_id) onlyModerator(_id) returns (address[] memory page) {
-        EnumerableSet.AddressSet storage set = memberSet[_id];
-        uint256 total = set.length();
-        if (offset >= total || limit == 0) return new address[](0);
-
-        // Clamp against the remaining tail rather than truncating offset + limit afterwards —
-        // the sum overflows to a panic revert on a caller passing an unbounded `limit`.
-        uint256 remaining = total - offset;
-        uint256 end = offset + (limit < remaining ? limit : remaining);
-
-        page = new address[](end - offset);
-        for (uint256 i = offset; i < end; i++) {
-            page[i - offset] = set.at(i);
-        }
+    function getMembers(uint256 _id, uint256 offset, uint256 limit) external view communityExists(_id) onlyModerator(_id) returns (address[] memory) {
+        return _page(memberSet[_id], offset, limit);
     }
 
     /// @notice Total whitelisted wallets for a community — pairs with getWhitelist for pagination.
@@ -952,12 +997,31 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
 
     /// @notice Paginated read of a community's whitelisted wallet addresses. No indexer required.
     /// @dev Moderator-gated — see memberCount for the honest limits of view gating.
-    function getWhitelist(uint256 _id, uint256 offset, uint256 limit) external view communityExists(_id) onlyModerator(_id) returns (address[] memory page) {
-        EnumerableSet.AddressSet storage set = whitelistSet[_id];
+    function getWhitelist(uint256 _id, uint256 offset, uint256 limit) external view communityExists(_id) onlyModerator(_id) returns (address[] memory) {
+        return _page(whitelistSet[_id], offset, limit);
+    }
+
+    /// @notice Total banned wallets for a community — pairs with getBanned for pagination. Banned
+    ///         wallets are not members (setBanStatus removes them from the roster), so this is the
+    ///         list a moderator unbans from.
+    /// @dev Moderator-gated — see memberCount for the honest limits of view gating.
+    function bannedCount(uint256 _id) external view communityExists(_id) onlyModerator(_id) returns (uint256) {
+        return bannedSet[_id].length();
+    }
+
+    /// @notice Paginated read of a community's banned wallet addresses. No indexer required.
+    /// @dev Moderator-gated — see memberCount for the honest limits of view gating.
+    function getBanned(uint256 _id, uint256 offset, uint256 limit) external view communityExists(_id) onlyModerator(_id) returns (address[] memory) {
+        return _page(bannedSet[_id], offset, limit);
+    }
+
+    /// @dev One pagination routine behind getMembers/getWhitelist/getBanned. Clamps against the
+    ///      remaining tail rather than truncating offset + limit afterwards — the sum overflows
+    ///      to a panic revert on a caller passing an unbounded `limit`.
+    function _page(EnumerableSet.AddressSet storage set, uint256 offset, uint256 limit) private view returns (address[] memory page) {
         uint256 total = set.length();
         if (offset >= total || limit == 0) return new address[](0);
 
-        // Clamp against the remaining tail — see getMembers.
         uint256 remaining = total - offset;
         uint256 end = offset + (limit < remaining ? limit : remaining);
 

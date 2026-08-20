@@ -113,6 +113,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidAsset",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidKeyVersion",
     "type": "error"
   },
@@ -923,6 +928,19 @@
   },
   {
     "inputs": [],
+    "name": "ASSET_READ_GAS_CAP",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "DEFAULT_ADMIN_ROLE",
     "outputs": [
       {
@@ -987,19 +1005,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "MODERATOR_ROLE",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -1041,6 +1046,25 @@
     "name": "approveRequest",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_id",
+        "type": "uint256"
+      }
+    ],
+    "name": "bannedCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1113,6 +1137,19 @@
       }
     ],
     "name": "cancelInvite",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_id",
+        "type": "uint256"
+      }
+    ],
+    "name": "cancelRequest",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1335,11 +1372,40 @@
         "type": "uint256"
       }
     ],
+    "name": "getBanned",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "offset",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limit",
+        "type": "uint256"
+      }
+    ],
     "name": "getMembers",
     "outputs": [
       {
         "internalType": "address[]",
-        "name": "page",
+        "name": "",
         "type": "address[]"
       }
     ],
@@ -1423,7 +1489,7 @@
     "outputs": [
       {
         "internalType": "address[]",
-        "name": "page",
+        "name": "",
         "type": "address[]"
       }
     ],
