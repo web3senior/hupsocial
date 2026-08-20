@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { queryUniversalProfile } from '@/lib/lukso'
+import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 
 export async function GET(request, { params }) {
   try {
@@ -18,7 +19,11 @@ export async function GET(request, { params }) {
     /* The UP lookup and the DB fallback run in parallel: the local query is cheap,
        and paying for it upfront means a UP miss (or a slow/hung upstream, bounded
        by the helper's timeout) adds zero extra latency before the fallback. */
-    const [upData, [rows]] = await Promise.all([
+    /* The badge joins from the users row itself, so it needs nothing from the two reads
+       beside it and adds no latency running in the same batch. It is re-verified against
+       community_members on every call — see lib/badge.js for why it is never stored already
+       resolved. */
+    const [upData, [rows], badge] = await Promise.all([
       queryUniversalProfile(address),
       pool.execute(
         `SELECT
@@ -28,6 +33,7 @@ export async function GET(request, { params }) {
         WHERE u.wallet_address = ?`,
         [address],
       ),
+      resolveWornBadge(address),
     ])
 
     /* Check if the profile data exists and has valid metadata */
@@ -45,6 +51,8 @@ export async function GET(request, { params }) {
       // Birthday is a Hup-native field with no UP metadata equivalent — always
       // sourced from our own users row, even when the profile itself is a UP.
       profile.birthday = rows[0]?.birthday ?? null
+      // Same for the community badge: a UP describes a person, not their Hup memberships.
+      profile.badge = badge
 
       return NextResponse.json({
         source: 'universal_profile',
@@ -68,6 +76,13 @@ export async function GET(request, { params }) {
 
     /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
     dbProfile.profileImage = resolveStorageImageUrl(dbProfile.profileImage, { width: 512 })
+
+    /* The raw pointer columns say nothing a client can render, and a stale one must never be
+       mistaken for a badge — only the verified resolution above is exposed. */
+    delete dbProfile.badge_network_id
+    delete dbProfile.badge_contract_address
+    delete dbProfile.badge_community_id
+    dbProfile.badge = badge
 
     return NextResponse.json({
       source: 'database',
@@ -95,6 +110,7 @@ export async function PUT(request, { params }) {
     const profileImage = formData.get('profileImage')
     const tags = formData.get('tags')
     const links = formData.get('links')
+    const badge = parseBadgeSelection(formData.get('badge'))
 
     // Verify profile exists before executing update
     const [existing] = await pool.execute('SELECT wallet_address FROM users WHERE wallet_address = ?', [address])
@@ -135,6 +151,24 @@ export async function PUT(request, { params }) {
     if (links !== null) {
       updateFields.push('`links` = ?')
       queryValues.push(links)
+    }
+
+    /* Which community's tag this wallet wears. Only the pointer is written — the tag itself is
+       resolved and re-verified on every read, so a badge set here still vanishes on its own the
+       moment the wallet leaves that community or is banned from it. */
+    if (badge.action === 'invalid') {
+      return NextResponse.json({ error: 'Invalid badge selection' }, { status: 400 })
+    }
+    if (badge.action === 'clear') {
+      updateFields.push('`badge_network_id` = NULL', '`badge_contract_address` = NULL', '`badge_community_id` = NULL')
+    }
+    if (badge.action === 'set') {
+      const wearable = await findWearableBadge(address, badge.selection)
+      if (!wearable) {
+        return NextResponse.json({ error: 'You are not a member of that community, or it has no tag' }, { status: 403 })
+      }
+      updateFields.push('`badge_network_id` = ?', '`badge_contract_address` = ?', '`badge_community_id` = ?')
+      queryValues.push(wearable.networkId, wearable.contractAddress, wearable.communityId)
     }
 
     if (updateFields.length === 0) {

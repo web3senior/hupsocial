@@ -119,6 +119,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             >
               {displayName}
             </Link>
+            <CommunityBadge badge={profile.badge} />
             {/* <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} /> */}
             {chainInfo && (
               <div className={styles.badge} title={chainInfo.name}>
@@ -138,6 +139,26 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
         </div>
       )}
     </div>
+  )
+}
+
+// The community tag a member chose to wear — Hup's answer to a Discord server tag. It renders
+// straight from the profile payload, which re-joins community_members on every fetch, so what is
+// on screen is a live membership claim and not a remembered one: leaving the community (or being
+// banned from it) drops the pill on the next load without anything being written.
+export const CommunityBadge = ({ badge, size = 'sm' }) => {
+  if (!badge?.tag) return null
+
+  return (
+    <Link
+      href={`/communities/${badge.networkId}/${badge.communityId}`}
+      className={clsx(styles.communityTag, size === 'lg' && styles['communityTag--lg'])}
+      title={`Member of ${badge.communityName}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {badge.logoUrl && <img className={styles.communityTag__logo} src={badge.logoUrl} alt="" width={10} height={10} />}
+      <span>{badge.tag}</span>
+    </Link>
   )
 }
 
@@ -220,6 +241,7 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
         <Link href={creator ? `/${creator}` : '#'} className={styles.name}>
           {profile.fullName || profile.name}
         </Link>
+        <CommunityBadge badge={profile.badge} />
         <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} />
       </div>
 

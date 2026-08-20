@@ -21,6 +21,7 @@ import BrandingLinksFields from './BrandingLinksFields'
 import ImagePicker from './ImagePicker'
 import { AssetUnitLabel, TokenUnitHint } from './TokenAmount'
 import { ZERO_ADDRESS, fetchTokenDecimals, getNativeCurrency } from '../tokenUnits'
+import { MAX_TAG_LENGTH, normalizeTag } from '../communityTag'
 import {
   ADMISSION,
   ADMISSION_OPTIONS,
@@ -53,6 +54,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   }))
 
   const [name, setName] = useState('')
+  const [tag, setTag] = useState('')
   const [summary, setSummary] = useState('')
   const [description, setDescription] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
@@ -83,6 +85,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       if (!raw) return
       const draft = JSON.parse(raw)
       setName(draft.name ?? '')
+      setTag(draft.tag ?? '')
       setSummary(draft.summary ?? '')
       setDescription(draft.description ?? '')
       setLogoUrl(draft.logoUrl ?? '')
@@ -115,6 +118,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
         DRAFT_STORAGE_KEY,
         JSON.stringify({
           name,
+          tag,
           summary,
           description,
           logoUrl,
@@ -134,7 +138,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     } catch {
       // Storage full or blocked — the form still works, it just won't survive a refresh
     }
-  }, [name, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7])
+  }, [name, tag, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7])
 
   // Fields go back to their initial values once a community is fully created — the parent
   // closes the modal at that point, and reopening it with the created community's data still
@@ -143,6 +147,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const resetForm = () => {
     suppressNextDraftSaveRef.current = true
     setName('')
+    setTag('')
     setSummary('')
     setDescription('')
     setLogoUrl('')
@@ -366,6 +371,9 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
 
     const metadataObj = {
       name,
+      // Omitted when blank, like `links` — a community without a tag publishes no tag key at
+      // all, and cidex reads its absence as "grants no badge".
+      ...(tag.trim() ? { tag: tag.trim() } : {}),
       summary,
       description,
       'logo url': logoUrl,
@@ -598,6 +606,21 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
               onChange={(e) => setName(e.target.value)}
               required
             />
+          </div>
+
+          <div className={styles.manager__field}>
+            <label className={styles.manager__label}>Tag (optional)</label>
+            <input
+              className={styles.manager__input}
+              placeholder="e.g., ALPHA"
+              value={tag}
+              onChange={(e) => setTag(normalizeTag(e.target.value))}
+              maxLength={MAX_TAG_LENGTH}
+            />
+            <p className={styles.manager__subtitle}>
+              A short code your members can wear next to their name, like a Discord server tag. Up to {MAX_TAG_LENGTH}{' '}
+              characters. Leave it empty and this community grants no badge.
+            </p>
           </div>
 
           <div className={styles.manager__field}>

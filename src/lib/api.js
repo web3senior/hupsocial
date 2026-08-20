@@ -16,6 +16,24 @@ export const getProfile= async (address) => {
 }
 
 /**
+ * The community tags this wallet may wear, for the profile editor's badge picker.
+ * @param {string} address
+ * @returns {Promise<object[]>} Eligible badges, or an empty list if the read fails — an
+ *   unreachable picker should leave the rest of the edit form usable.
+ */
+export const getUserBadges = async (address) => {
+  try {
+    const response = await fetch(`/api/v1/users/${address.toLowerCase()}/badges`)
+    if (!response.ok) return []
+    const data = await response.json()
+    return Array.isArray(data?.data) ? data.data : []
+  } catch (error) {
+    console.error('Badge fetch failed:', error)
+    return []
+  }
+}
+
+/**
  * Get Universal Profile via internal API proxy
  * @param {string} addr
  * @returns {Promise<Object>}

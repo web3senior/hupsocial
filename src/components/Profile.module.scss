@@ -85,6 +85,51 @@
   }
 }
 
+// The worn community tag. Borrows the outline-pill shape the hover card's address button already
+// uses, so a badge reads as part of the name row rather than as a second avatar. It never grows
+// past its content and never shrinks below it: the tag is capped at 8 characters upstream.
+.communityTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  // In em, like the logo below, so the breathing room tracks the font-size the pill is wearing
+  // and the large variant inherits it instead of restating a number.
+  padding: 0.15em 0.45em;
+  border: 1px solid var(--border);
+  background-color: var(--surface-muted);
+  border-radius: 4px;
+  font-size: var(--system-10-font-size);
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--gray-400);
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--text, inherit);
+    border-color: var(--text-muted, var(--gray-400));
+  }
+
+  // Sized in em so the mark tracks whatever font-size the pill is wearing — the large variant
+  // below scales it without restating a number. At the base 10px that still computes to 12px.
+  &__logo {
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  // Beside the profile page's 20px display name the post-header pill reads as a footnote, so the
+  // same pill is offered one step up. Scale only: colour, border, radius and hover all stay on the
+  // base class, so a look tuned for the post card still reaches every surface wearing the tag.
+  &--lg {
+    gap: 0.25rem;
+    font-size: var(--system-12-font-size);
+    line-height: 1.5;
+  }
+}
+
 .createdAt {
   padding-left: 0.25rem;
   font-weight: 400;

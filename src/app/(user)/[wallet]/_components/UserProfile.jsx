@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView } from '@/lib/api'
+import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges } from '@/lib/api'
 import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
@@ -11,6 +11,7 @@ import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
+import { CommunityBadge } from '@/components/Profile'
 import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
@@ -576,6 +577,11 @@ const Profile = ({ addr }) => {
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
             <div className={styles.profile__header}>
               <b className={styles.profile__name}>{profile.name ? profile.name : 'hup-user'}</b>
+
+              {/* The worn tag, from the same component every post header uses, so one badge can
+                  never look like two things — only its scale changes, so it holds its own beside a
+                  display name. Verified server-side on each read — see lib/badge.js. */}
+              <CommunityBadge badge={profile.badge} size="lg" />
               {/* <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} /> */}
 
               {profile.source === `universal_profile` && (
@@ -1012,6 +1018,10 @@ const Status = ({ addr, profile, selfView }) => {
   )
 }
 
+// Identity of a wearable badge: its deployment plus its id. Used for the React key and for
+// "is this the selected one" — community ids are only unique within one deployment.
+const badgeKey = (badge) => (badge ? `${badge.networkId}:${badge.contractAddress}:${badge.communityId}` : '')
+
 /**
  * Profile Modal Component
  * @param {Object} props
@@ -1048,9 +1058,32 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const [isPending, setIsPending] = useState(false)
   const [tags, setTags] = useState({ list: parseSafeList(profile?.tags, false) })
   const [links, setLinks] = useState({ list: parseSafeList(profile?.links, true) })
+  // The community tag worn beside the name. `badgesLoaded` is not cosmetic: without it a failed
+  // fetch would submit an empty picker as an explicit "wear nothing" and quietly strip a badge
+  // the user never touched.
+  const [badges, setBadges] = useState([])
+  const [badgesLoaded, setBadgesLoaded] = useState(false)
+  const [selectedBadge, setSelectedBadge] = useState(profile?.badge ?? null)
   const [editingLinkIndex, setEditingLinkIndex] = useState(null)
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
+
+  // This modal only exists while it is open, so mounting is the right moment to ask. The list is
+  // memberships that can actually become a badge — see api/v1/users/[address]/badges.
+  useEffect(() => {
+    if (!address) return
+    let cancelled = false
+
+    getUserBadges(address).then((list) => {
+      if (cancelled) return
+      setBadges(list)
+      setBadgesLoaded(true)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [address])
 
   // Refs
   const pfpRef = useRef()
@@ -1099,6 +1132,22 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
       formData.set('profileImage', profileImageHash)
       formData.set('tags', JSON.stringify(tags.list))
       formData.set('links', JSON.stringify(links.list))
+    }
+
+    // Hup-native, like birthday, so it is sent for Universal Profiles too — a UP has no notion of
+    // Hup community membership. Omitted entirely when the picker never loaded, which the API
+    // reads as "leave the badge alone".
+    if (badgesLoaded) {
+      formData.set(
+        'badge',
+        selectedBadge
+          ? JSON.stringify({
+              networkId: selectedBadge.networkId,
+              contractAddress: selectedBadge.contractAddress,
+              communityId: selectedBadge.communityId,
+            })
+          : '',
+      )
     }
 
     try {
@@ -1299,6 +1348,40 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 max={new Date().toISOString().slice(0, 10)}
               />
             </div>
+
+            {/* Community tag — only offered when the wallet actually belongs somewhere that grants one */}
+            {badges.length > 0 && (
+              <div className={styles.profileModal__field}>
+                <label className={styles.profileModal__label}>Community tag</label>
+                <div className={styles.profileModal__chips}>
+                  <button
+                    type="button"
+                    className={clsx(styles.profileModal__badge, !selectedBadge && styles['profileModal__badge--selected'])}
+                    onClick={() => setSelectedBadge(null)}
+                  >
+                    None
+                  </button>
+                  {badges.map((badge) => (
+                    <button
+                      key={badgeKey(badge)}
+                      type="button"
+                      className={clsx(
+                        styles.profileModal__badge,
+                        badgeKey(selectedBadge) === badgeKey(badge) && styles['profileModal__badge--selected'],
+                      )}
+                      onClick={() => setSelectedBadge(badge)}
+                      title={`Member of ${badge.communityName}`}
+                    >
+                      {badge.logoUrl && <img src={badge.logoUrl} alt="" width={12} height={12} />}
+                      {badge.tag}
+                    </button>
+                  ))}
+                </div>
+                <small className={styles.profileModal__badgeHint}>
+                  Worn next to your name. It comes off by itself if you leave the community.
+                </small>
+              </div>
+            )}
 
             {!isUP && (
               <>

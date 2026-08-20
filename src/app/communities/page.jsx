@@ -67,6 +67,7 @@ import {
   ENCRYPTION_NOTES,
   SELF_SERVE_HINTS,
 } from './membershipOptions'
+import { MAX_TAG_LENGTH, normalizeTag } from './communityTag'
 import styles from './page.module.scss'
 
 // Metadata JSON uploads share lib/ipfs.js's uploadObjectToIPFS; the historical local name is
@@ -262,6 +263,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   // Update states for inline modifications
   const [editName, setEditName] = useState('')
+  const [editTag, setEditTag] = useState('')
   const [editSummary, setEditSummary] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editLogoUrl, setEditLogoUrl] = useState('')
@@ -1408,6 +1410,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     }
 
     setEditName(metadata.name || '')
+    setEditTag(metadata.tag || '')
     setEditSummary(metadata.summary || '')
     setEditDescription(metadata.description || '')
     setEditLogoUrl(metadata['logo url'] || '')
@@ -1474,6 +1477,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
     const updatedMetadataObj = {
       name: editName,
+      // Dropped from the JSON when cleared rather than written empty: cidex reads a missing tag
+      // as "this community grants no badge", and clearing it takes the pill off every member.
+      ...(editTag.trim() ? { tag: editTag.trim() } : {}),
       summary: editSummary,
       description: editDescription,
       'logo url': editLogoUrl,
@@ -2800,6 +2806,21 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           <div className={styles.card__field}>
             <label className={styles.card__label}>Name</label>
             <input className={styles.card__input} value={editName} onChange={(e) => setEditName(e.target.value)} required />
+          </div>
+
+          <div className={styles.card__field}>
+            <label className={styles.card__label}>Tag (optional)</label>
+            <input
+              className={styles.card__input}
+              placeholder="e.g., ALPHA"
+              value={editTag}
+              onChange={(e) => setEditTag(normalizeTag(e.target.value))}
+              maxLength={MAX_TAG_LENGTH}
+            />
+            <p className={styles.card__hint}>
+              Up to {MAX_TAG_LENGTH} characters, worn by members next to their name. Clearing it removes the badge from
+              everyone wearing it.
+            </p>
           </div>
 
           <div className={styles.card__field}>

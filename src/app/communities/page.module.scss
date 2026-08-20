@@ -713,6 +713,14 @@
     color: var(--text-muted);
   }
 
+  // Sits under an input to explain a field the label can't, so it inherits the field's own
+  // column gap rather than adding a margin of its own.
+  &__hint {
+    margin: 0;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+
   &__input,
   &__select,
   &__textarea {

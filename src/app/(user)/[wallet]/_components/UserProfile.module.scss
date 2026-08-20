@@ -1178,6 +1178,50 @@
     }
   }
 
+  // Community tag picker
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    font-size: var(--system-11-font-size);
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+
+    img {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    &:hover {
+      color: var(--text);
+      background: var(--hover);
+    }
+
+    // The chosen one reads as filled rather than merely outlined — at this size a border-colour
+    // change alone is easy to miss, and only one option is ever selected.
+    &--selected {
+      background: var(--tag);
+      border-color: var(--color-primary);
+      color: var(--text);
+    }
+  }
+
+  &__badgeHint {
+    font-size: var(--system-12-font-size);
+    color: var(--text-muted);
+  }
+
   // Links
   &__linkList {
     display: flex;
