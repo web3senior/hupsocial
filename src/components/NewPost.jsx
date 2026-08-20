@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
@@ -1424,10 +1424,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
               >
                 <TextItalicIcon size={20} />
                 <span>Italic</span>
-              </button>
-              <button type="button" aria-label="Location support coming soon" title="Location support coming soon" disabled>
-                <MapPinIcon size={20} />
-                <span>Location</span>
               </button>
               {canAttachNft && nftTradeAvailable && (
                 <button
