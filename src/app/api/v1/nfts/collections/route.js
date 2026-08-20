@@ -9,6 +9,7 @@
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
 
 export const runtime = 'nodejs'
 
@@ -29,7 +30,7 @@ async function attachFloors(rows) {
             st.symbol, st.decimals
        FROM nft_listings l
        LEFT JOIN store_tokens st ON st.network_id = l.network_id AND st.token = l.payment_token
-      WHERE l.status = 1 AND (l.network_id, l.collection) IN (${keys.map(() => '(?,?)').join(',')})
+      WHERE l.status = 1 AND l.backed = 1 AND (l.network_id, l.collection) IN (${keys.map(() => '(?,?)').join(',')})
       GROUP BY l.network_id, l.collection, l.payment_token, l.is_lsp7, st.symbol, st.decimals
       ORDER BY token_count DESC`,
     keys.flat(),
@@ -64,7 +65,7 @@ async function attachSamples(rows) {
          SELECT l.network_id, l.collection, l.token_id, l.is_lsp8,
                 ROW_NUMBER() OVER (PARTITION BY l.network_id, l.collection ORDER BY l.listed_at DESC) AS rn
            FROM nft_listings l
-          WHERE l.status = 1 AND (l.network_id, l.collection) IN (${keys.map(() => '(?,?)').join(',')})
+          WHERE l.status = 1 AND l.backed = 1 AND (l.network_id, l.collection) IN (${keys.map(() => '(?,?)').join(',')})
        ) ranked
       WHERE rn <= ?`,
     [...keys.flat(), SAMPLES_PER_COLLECTION],
@@ -88,7 +89,7 @@ export async function GET(request) {
     const limit = Math.min(parseInt(searchParams.get('limit')) || 12, 24)
     const networkId = searchParams.get('networkId')
 
-    let whereClause = ` WHERE l.status IN (1, 2)`
+    let whereClause = ` WHERE l.status IN (1, 2) AND ${BACKED_LISTINGS_SQL}`
     const whereParams = []
 
     if (networkId) {

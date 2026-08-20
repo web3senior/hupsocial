@@ -10,6 +10,7 @@
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
@@ -122,7 +123,9 @@ export async function GET(request) {
     // unknown key (a hand-edited URL, or the retired 'cancelled') degrades to active.
     const statuses = STATUS_BY_KEY[statusKey] || STATUS_BY_KEY.active
 
-    let whereClause = ` WHERE l.status IN (${statuses.map(() => '?').join(',')})`
+    // Status alone would still serve listings whose seller no longer holds the token — see
+    // BACKED_LISTINGS_SQL for why that state exists and where the column comes from
+    let whereClause = ` WHERE l.status IN (${statuses.map(() => '?').join(',')}) AND ${BACKED_LISTINGS_SQL}`
     const whereParams = [...statuses]
 
     if (networkId) {

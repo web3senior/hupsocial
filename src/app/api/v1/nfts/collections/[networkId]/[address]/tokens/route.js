@@ -59,7 +59,7 @@ export async function GET(request, { params }) {
            FROM nft_metadata_cache m
            LEFT JOIN nft_listings l
              ON l.network_id = m.network_id AND l.collection = m.collection
-            AND l.token_id = m.token_id AND l.status = ${STATUS_ACTIVE}
+            AND l.token_id = m.token_id AND l.status = ${STATUS_ACTIVE} AND l.backed = 1
            LEFT JOIN store_tokens st ON st.network_id = l.network_id AND st.token = l.payment_token
           WHERE m.network_id = ? AND m.collection = ?
           ORDER BY LENGTH(m.token_id), m.token_id

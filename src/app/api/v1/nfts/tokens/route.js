@@ -11,6 +11,7 @@
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
 
 export const runtime = 'nodejs'
 
@@ -24,7 +25,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const networkId = searchParams.get('networkId')
 
-    let whereClause = ` WHERE l.status IN (${MARKET_STATUSES.map(() => '?').join(',')})`
+    // Same backing filter as the grid, so the currency list can't offer a token whose only
+    // active listing is no longer fillable
+    let whereClause = ` WHERE l.status IN (${MARKET_STATUSES.map(() => '?').join(',')}) AND ${BACKED_LISTINGS_SQL}`
     const whereParams = [...MARKET_STATUSES]
 
     if (networkId) {

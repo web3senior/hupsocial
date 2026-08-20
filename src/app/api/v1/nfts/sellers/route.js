@@ -14,6 +14,7 @@
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
@@ -27,7 +28,9 @@ export async function GET(request) {
     const q = (searchParams.get('q') || '').trim()
     const networkId = searchParams.get('networkId')
 
-    let whereClause = ` WHERE l.status IN (${MARKET_STATUSES.map(() => '?').join(',')})`
+    // Matching the grid's own filter, so a seller whose only active listing lost its backing
+    // stops being suggested rather than offering an empty grid
+    let whereClause = ` WHERE l.status IN (${MARKET_STATUSES.map(() => '?').join(',')}) AND ${BACKED_LISTINGS_SQL}`
     const whereParams = [...MARKET_STATUSES]
 
     if (networkId) {

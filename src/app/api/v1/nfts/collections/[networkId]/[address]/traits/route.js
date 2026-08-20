@@ -12,6 +12,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -108,7 +109,7 @@ export async function GET(request, { params }) {
          FROM nft_listings l
          LEFT JOIN nft_metadata_cache m
            ON m.network_id = l.network_id AND m.collection = l.collection AND m.token_id = l.token_id
-        WHERE l.network_id = ? AND l.collection = ? AND l.status IN (${placeholders})`,
+        WHERE l.network_id = ? AND l.collection = ? AND l.status IN (${placeholders}) AND ${BACKED_LISTINGS_SQL}`,
       [networkId, collection, ...statuses],
     )
 
@@ -123,7 +124,7 @@ export async function GET(request, { params }) {
           AND EXISTS (
             SELECT 1 FROM nft_listings l
              WHERE l.network_id = m.network_id AND l.collection = m.collection
-               AND l.token_id = m.token_id AND l.status IN (${placeholders})
+               AND l.token_id = m.token_id AND l.status IN (${placeholders}) AND ${BACKED_LISTINGS_SQL}
           )
         LIMIT ?`,
       [networkId, collection, ...statuses, SCAN_LIMIT],
