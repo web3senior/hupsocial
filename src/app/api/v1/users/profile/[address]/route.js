@@ -33,7 +33,14 @@ export async function GET(request, { params }) {
         WHERE u.wallet_address = ?`,
         [address],
       ),
-      resolveWornBadge(address),
+      /* A badge is decoration on a profile, never a precondition for one. Left unguarded it
+         shares this Promise.all's fate: one failed join — a schema not yet migrated, a
+         communities table mid-rebuild — rejects the batch and 500s every profile read in the
+         app, taking every avatar with it. Degrade to no badge instead. */
+      resolveWornBadge(address).catch((badgeError) => {
+        console.error('[BADGE_RESOLVE_ERROR]:', badgeError.message)
+        return null
+      }),
     ])
 
     /* Check if the profile data exists and has valid metadata */
