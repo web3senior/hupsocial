@@ -1,22 +1,12 @@
 'use client'
 
 import clsx from 'clsx'
-import { useTicker } from '@/hooks/useTicker'
+import { useCashtags } from '@/hooks/useCashtags'
 import TokenIcon from '@/components/ui/TokenIcon'
 import { chainBadgeFor, nativeLogoFor } from '@/config/chainBadges'
-import { SLUG_CHAIN_IDS } from '@/config/cashtags'
 import { tokenIconUrl } from '@/lib/tokenIcons'
+import { priceLabel, percentLabel, changeFor } from '@/lib/cashtagFormat'
 import styles from './Ticker.module.scss'
-
-// Sub-cent memecoins need far more precision than majors; anything under a cent gets the long
-// tail so $BONK does not render as "$0.00"
-const priceLabel = (price) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: price < 0.01 ? 10 : price < 1 ? 6 : 2,
-  }).format(price)
 
 const compactUsd = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -28,25 +18,32 @@ const compactUsd = new Intl.NumberFormat('en-US', {
 const compactNumber = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 
 /**
- * The cashtag hover card. Shape comes normalized from useTicker, so this renders the same
- * whether the quote came from DIA or from Hup's Solana endpoint.
+ * The cashtag hover card.
+ *
+ * Reads the exact row the card under the post reads — same registry, same endpoint, same
+ * formatting — because the two used to be separate pipelines: this one quoted DIA against a
+ * hand-kept address map while the card quoted DefiLlama, so hovering a cashtag showed one
+ * price and the card two inches below it showed another. There is no second source left to
+ * disagree with.
  */
-export default function Ticker({ blockchain, address, symbol }) {
-  const { tickerData, isLoading, isError } = useTicker(blockchain, address, symbol)
+export default function Ticker({ symbol }) {
+  const { tokens, isLoading } = useCashtags(null, [symbol])
+  const token = tokens[0]
 
   if (isLoading) return <div className={styles.tickerContainer}>Loading...</div>
-  if (isError || !tickerData?.price) return null
+  if (!token?.price) return null
 
-  const { price, change24h, mcap, holders, logo, name, chainSlug, address: tokenAddress } = tickerData
+  const { name, price, logo, chainSlug, chainId, address, mcap, holders } = token
 
-  // DIA answers with a price and nothing else, so most cashtags arrive here with no artwork at
-  // all — $LYX showed a blank coin. Same ladder the cards use: the upstream's own logo, then
-  // the chain's mark for a native coin, then TrustWallet for a listed contract.
-  const artwork =
-    logo || nativeLogoFor(tickerData.symbol) || tokenIconUrl(SLUG_CHAIN_IDS[chainSlug], tokenAddress)
+  // The API supplies branding for tokens; a native coin borrows its chain's mark, and anything
+  // left over falls through to TrustWallet and then to TokenIcon's own glyph
+  const artwork = logo || nativeLogoFor(token.symbol) || (chainId && address ? tokenIconUrl(chainId, address) : null)
+
+  // The move, and the window it actually covers — the card prints the same pair
+  const { change, label } = changeFor(token)
   // No movement figure is not the same as a flat one — leave the badge off rather than "0.00%"
-  const hasChange = change24h !== null
-  const isPositive = hasChange && change24h >= 0
+  const hasChange = change !== null
+  const isUp = hasChange && change >= 0
   // Explicit booleans: a bare `mcap &&` renders the number 0 as text when a token has no figure
   const hasMcap = Boolean(mcap)
   const hasHolders = Boolean(holders)
@@ -56,17 +53,16 @@ export default function Ticker({ blockchain, address, symbol }) {
       <TokenIcon token={{ logo: artwork }} size="md" badge={chainBadgeFor(chainSlug)} />
 
       <div className={styles.info}>
-        <span className={styles.symbol}>{tickerData.symbol}</span>
+        <span className={styles.symbol}>{token.symbol}</span>
         {name && <span className={styles.ticker__name}>{name}</span>}
       </div>
 
       <div className={styles.values}>
-        <span className={clsx(styles.price, hasChange && (isPositive ? styles.up : styles.down))}>
-          {priceLabel(price)}
-        </span>
+        <span className={clsx(styles.price, hasChange && (isUp ? styles.up : styles.down))}>{priceLabel(price)}</span>
         {hasChange && (
-          <span className={clsx(styles.change, isPositive ? styles.up : styles.down)}>
-            {isPositive ? '▲' : '▼'} {Math.abs(change24h).toFixed(2)}%
+          <span className={clsx(styles.change, isUp ? styles.up : styles.down)}>
+            {isUp ? '▲' : '▼'} {percentLabel(change)}
+            <span className={styles.ticker__period}>{label}</span>
           </span>
         )}
       </div>

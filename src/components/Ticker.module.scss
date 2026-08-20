@@ -113,3 +113,13 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+/* The window the percentage beside it covers — the card under a post labels its move the same
+   way, so the two can be read against each other */
+.ticker__period {
+  margin-inline-start: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}

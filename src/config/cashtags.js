@@ -41,6 +41,8 @@ export const CASHTAGS = {
   KAS: { name: "Kaspa", key: 'coingecko:kaspa' },
   ICP: { name: "Internet Computer", key: 'coingecko:internet-computer' },
   ETC: { name: "Ethereum Classic", key: 'coingecko:ethereum-classic' },
+  CRO: { name: 'Cronos', key: 'coingecko:crypto-com-chain' },
+  HYPE: { name: 'Hyperliquid', key: 'coingecko:hyperliquid' },
 
   // --- Tokens, keyed by DefiLlama chain slug ---
   NEAR: { name: "NEAR Protocol", key: 'ethereum:0x85f17cf997934a597031b2e18a9ab6ebd4b9f6a4' },
@@ -64,6 +66,14 @@ export const CASHTAGS = {
   IMX: { name: "Immutable", key: 'ethereum:0xf57e7e7c23978c3caec3c3548e3d615c346e79ff' },
   GTC: { name: "Gitcoin", key: 'ethereum:0xde30da39c46104798bb5aa3fe8b9e0e1f348163f' },
   G: { name: "GoodDollar", key: 'celo:0x62b8b11039fcfe5ab0c56e502b1c372a3d2a9c7a' },
+  MNT: { name: 'Mantle', key: 'ethereum:0x3c3a81e81dc49a522a592e7622a7e711c06bf354' },
+  ONDO: { name: 'Ondo', key: 'ethereum:0xfaba6f8e4a5e8ab82f62fe7c39859fa577269be3' },
+  RENDER: { name: 'Render', key: 'ethereum:0x6de037ef9ad2725eb40118bb1702ebb27e4aeb24' },
+  WLD: { name: 'Worldcoin', key: 'ethereum:0x163f8c2467924be0ae7b5347228cabf260318753' },
+  USDE: { name: 'Ethena USDe', key: 'ethereum:0x4c9edd5852cd905f086c759e8383e09bff1e68b3' },
+  // DefiLlama prices neither contract under its own address, so both read from the listing
+  PYUSD: { name: 'PayPal USD', key: 'coingecko:paypal-usd' },
+  FDUSD: { name: 'First Digital USD', key: 'coingecko:first-digital-usd' },
 
   // --- Solana ---
   // Symbols are not unique on Solana and the popular ones all have same-symbol, same-name
