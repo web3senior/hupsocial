@@ -19,6 +19,10 @@ import styles from '@/app/page.module.scss'
 // so mixing page sizes shifts the offset and re-fetches an already-loaded window.
 const POSTS_PAGE_SIZE = 20
 
+// How far down the author can be and still have their freshly indexed post merged in place of
+// being queued — roughly "hasn't really left the top of the feed yet".
+const AUTHORED_MERGE_MAX_SCROLL_PX = 200
+
 /**
  * Renders a single feed of posts: the unscoped "For you" feed, one locked to a
  * specific network (chainId), or the cross-network "premium" feed (posts with
@@ -40,6 +44,7 @@ export default function HomeFeedTab({
 }) {
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
+  const authoredPostNonce = usePostStore((state) => state.authoredPostNonce)
 
   const mounted = useClientMounted()
   const { address } = useConnection()
@@ -253,31 +258,36 @@ export default function HomeFeedTab({
     setRetryNonce((nonce) => nonce + 1)
   }, [])
 
+  // Fetches page 1 and parks anything newer than the top card behind the "Show N posts" pill,
+  // leaving the reader's scroll position untouched. Shared by the 30s background poll and the
+  // nonce below, which needs the same non-intrusive pull on demand.
+  const pollNewPosts = useCallback(async () => {
+    try {
+      const latestKnownId = posts.list[0]?.id
+      const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
+
+      if (response.success && response.data.length > 0) {
+        const newItemsIndex = response.data.findIndex((item) => item.id === latestKnownId)
+
+        if (newItemsIndex > 0) {
+          setNewPostsQueue(response.data.slice(0, newItemsIndex))
+        } else if (newItemsIndex === -1 && latestKnownId !== undefined) {
+          setNewPostsQueue(response.data)
+        }
+      }
+    } catch (error) {
+      console.error('Polling error:', error)
+    }
+  }, [posts.list, address, scopedNetworkId, feedType, excludeNft])
+
   // Background polling for new posts
   useEffect(() => {
     if (!mounted || !hasInitialized) return
 
-    const pollingInterval = setInterval(async () => {
-      try {
-        const latestKnownId = posts.list[0]?.id
-        const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
-
-        if (response.success && response.data.length > 0) {
-          const newItemsIndex = response.data.findIndex((item) => item.id === latestKnownId)
-
-          if (newItemsIndex > 0) {
-            setNewPostsQueue(response.data.slice(0, newItemsIndex))
-          } else if (newItemsIndex === -1 && latestKnownId !== undefined) {
-            setNewPostsQueue(response.data)
-          }
-        }
-      } catch (error) {
-        console.error('Polling error:', error)
-      }
-    }, 30000)
+    const pollingInterval = setInterval(pollNewPosts, 30000)
 
     return () => clearInterval(pollingInterval)
-  }, [mounted, hasInitialized, posts.list, address, scopedNetworkId, feedType, excludeNft])
+  }, [mounted, hasInitialized, pollNewPosts])
 
   const handlePostPrefetch = (item) => {
     router.prefetch(`/networks/${item.network_id}/${item.id}`)
@@ -357,6 +367,21 @@ export default function HomeFeedTab({
     lastRefreshNonceRef.current = feedRefreshNonce
     handleManualRefresh()
   }, [feedRefreshNonce, handleManualRefresh])
+
+  // The viewer's own post just finished indexing (lib/postPublishToast.js). Merge it straight in
+  // while they are still parked at the top — that is the whole point of the wait — but if they
+  // have scrolled away in the meantime, queue it behind the pill instead of snatching the page.
+  const handleAuthoredPost = useCallback(async () => {
+    if (window.scrollY <= AUTHORED_MERGE_MAX_SCROLL_PX) await handleManualRefresh()
+    else await pollNewPosts()
+  }, [handleManualRefresh, pollNewPosts])
+
+  const lastAuthoredNonceRef = useRef(authoredPostNonce)
+  useEffect(() => {
+    if (authoredPostNonce === lastAuthoredNonceRef.current) return
+    lastAuthoredNonceRef.current = authoredPostNonce
+    handleAuthoredPost()
+  }, [authoredPostNonce, handleAuthoredPost])
 
   return (
     <div className={styles.page} ref={containerRef} style={reservedHeight ? { minHeight: reservedHeight } : undefined}>

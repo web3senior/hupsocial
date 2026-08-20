@@ -15,6 +15,12 @@ export const usePostStore = create((set, get) => ({
   feedRefreshNonce: 0,
   requestFeedRefresh: () => set((state) => ({ feedRefreshNonce: state.feedRefreshNonce + 1 })),
 
+  // Bumped by lib/postPublishToast.js once the indexer has the viewer's own new post. Separate
+  // from feedRefreshNonce because that one is an explicit "take me to the top" request, while
+  // this one arrives seconds after the fact and must not yank a reader out of the feed.
+  authoredPostNonce: 0,
+  notifyAuthoredPost: () => set((state) => ({ authoredPostNonce: state.authoredPostNonce + 1 })),
+
   setCurrentPost: (post) => set({ currentPost: post }),
 
   setInitialData: (apps, postsResponse) => {

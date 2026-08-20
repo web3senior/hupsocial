@@ -11,6 +11,7 @@ import { ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, MapPinIcon, MicrophoneIc
 import abi from '@/abi/post.json'
 import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
+import { trackPostPublication } from '@/lib/postPublishToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useActiveChain } from '@/hooks/useActiveChain'
 import useVisualViewport from '@/hooks/useVisualViewport'
@@ -341,6 +342,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const gifPickerRef = useRef(null)
   const mediaItemsRef = useRef([])
   const seededRef = useRef(false)
+  // What the in-flight submission needs to be recognised once the indexer writes it. Filled the
+  // moment the metadata is pinned, read by finishSubmission — which runs from a receipt effect
+  // and so can't see handleCreatePost's locals.
+  const pendingPublishRef = useRef(null)
   // Undo/redo history for the contenteditable editor. The paste handler and applyFormat
   // mutate the DOM programmatically (no execCommand), which the browser's native undo
   // stack can't track — so Ctrl+Z is backed by these snapshots instead.
@@ -989,10 +994,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // transaction) — both end the composer the same way
   const finishSubmission = useCallback(() => {
     if (actionType === 'post') localStorage.removeItem(getDraftStorageKey())
-    toast(isComment ? 'Your reply will appear once the transaction is confirmed.' : 'Your post will appear once the transaction is confirmed.', 'success')
+
+    // Handed to a module-scope tracker, not awaited here: the composer unmounts on the next line,
+    // so the loading toast and its poll have to live outside it. Clearing the ref also makes a
+    // second call (a re-fired isConfirmed effect) a no-op instead of a duplicate toast.
+    const pending = pendingPublishRef.current
+    pendingPublishRef.current = null
+    if (pending) trackPostPublication(pending)
+
     onConfirmed?.()
     handleClose()
-  }, [actionType, handleClose, isComment, onConfirmed])
+  }, [actionType, handleClose, onConfirmed])
 
   /**
    * Relays `create` through our forwarder so the author pays no gas. Returns false when the
@@ -1138,6 +1150,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       const resultIPFS = await uploadObjectToIPFS(contentForUpload)
       const metadata = resultIPFS.cid
       if (!metadata) throw new Error('CID not found')
+
+      // The metadata URI is the one handle on this submission that works everywhere: it exists
+      // before the transaction is sent (so the relayed path has it too), it is what the indexer
+      // stores verbatim, and an edit rewrites it onto the row it already has.
+      pendingPublishRef.current = {
+        networkId: targetChainId,
+        author: address,
+        metadata,
+        kind: actionType === 'edit' ? 'edit' : isComment ? 'reply' : 'post',
+      }
 
       if (actionType === 'edit') {
         // Edits must go back to the chain the post already lives on — the wallet's active chain
