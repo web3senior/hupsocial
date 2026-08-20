@@ -20,17 +20,23 @@ import { buildLinks, emptySocials } from '@/lib/socialLinks'
 import BrandingLinksFields from './BrandingLinksFields'
 import ImagePicker from './ImagePicker'
 import { AssetUnitLabel, TokenUnitHint } from './TokenAmount'
+import TokenAssetInput from './TokenAssetInput'
+import OptionPicker from './OptionPicker'
 import { ZERO_ADDRESS, fetchTokenDecimals, getNativeCurrency } from '../tokenUnits'
 import { MAX_TAG_LENGTH, normalizeTag } from '../communityTag'
+import { DEFAULT_COMMUNITY_CATEGORY } from '@/config/communityCategories'
+import useCommunityCategories from '@/hooks/useCommunityCategories'
 import {
   ADMISSION,
   ADMISSION_OPTIONS,
   COMMUNITY_TYPE_OPTIONS,
   REQUIREMENT_TYPE,
   REQUIREMENT_TYPE_OPTIONS,
+  REQUIREMENT_TYPE_CHOICES,
   REQUIREMENT_MODE_OPTIONS,
   ENCRYPTION_NOTES,
   SELF_SERVE_HINTS,
+  toOnchainRequirement,
 } from '../membershipOptions'
 import styles from '../page.module.scss'
 
@@ -44,6 +50,8 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const chainId = activeChain?.id
   const publicClient = usePublicClient({ chainId })
   const nativeCurrency = getNativeCurrency(chainId)
+  const isLuksoChain = chainId === 42 || chainId === 4201
+  const { categories } = useCommunityCategories()
 
   // Stays mounted for the whole page life (like the app's other modals) so a half-filled
   // form survives close/reopen — the parent opens and closes it through this handle
@@ -55,6 +63,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
 
   const [name, setName] = useState('')
   const [tag, setTag] = useState('')
+  const [category, setCategory] = useState(DEFAULT_COMMUNITY_CATEGORY)
   const [summary, setSummary] = useState('')
   const [description, setDescription] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
@@ -86,6 +95,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       const draft = JSON.parse(raw)
       setName(draft.name ?? '')
       setTag(draft.tag ?? '')
+      setCategory(draft.category ?? DEFAULT_COMMUNITY_CATEGORY)
       setSummary(draft.summary ?? '')
       setDescription(draft.description ?? '')
       setLogoUrl(draft.logoUrl ?? '')
@@ -119,6 +129,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
         JSON.stringify({
           name,
           tag,
+          category,
           summary,
           description,
           logoUrl,
@@ -138,7 +149,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     } catch {
       // Storage full or blocked — the form still works, it just won't survive a refresh
     }
-  }, [name, tag, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7])
+  }, [name, tag, category, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7])
 
   // Fields go back to their initial values once a community is fully created — the parent
   // closes the modal at that point, and reopening it with the created community's data still
@@ -148,6 +159,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     suppressNextDraftSaveRef.current = true
     setName('')
     setTag('')
+    setCategory(DEFAULT_COMMUNITY_CATEGORY)
     setSummary('')
     setDescription('')
     setLogoUrl('')
@@ -233,11 +245,11 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   }
 
   useEffect(() => {
-    if (isConfirming) showTxToast('Waiting for block confirmation...', 'loading')
+    if (isConfirming) showTxToast('Creating your community…', 'loading')
   }, [isConfirming])
 
   useEffect(() => {
-    if (isConfiguring) showTxToast('Community created — confirm the gating requirement transaction in your wallet...', 'loading')
+    if (isConfiguring) showTxToast('Community created — one more confirmation in your wallet to save its requirements…', 'loading')
   }, [isConfiguring])
 
   // Submission failures keep their inline error display — just drop the spinner
@@ -291,16 +303,19 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             // Every minimum is entered in whole units of the asset it gates on, so each one is
             // scaled by that asset's decimals; NFT minimums are plain counts and scale by nothing
             const requirementTuples = await Promise.all(
-              requirements.map(async (row) => ({
-                rType: row.rType,
-                asset: row.asset || ZERO_ADDRESS,
-                minBalance:
-                  row.rType === REQUIREMENT_TYPE.NativeBalance
-                    ? parseEther(row.minBalance || '0')
-                    : row.rType === REQUIREMENT_TYPE.TokenBalance
-                      ? parseUnits(row.minBalance || '0', await fetchTokenDecimals(publicClient, chainId, row.asset))
+              requirements.map(async (row) => {
+                // A blank-asset "Token or coin balance" row is the contract's NativeBalance type;
+                // fetchTokenDecimals resolves that blank to the coin's decimals the same way
+                const { rType, asset } = toOnchainRequirement(row)
+                return {
+                  rType,
+                  asset,
+                  minBalance:
+                    rType === REQUIREMENT_TYPE.NativeBalance || rType === REQUIREMENT_TYPE.TokenBalance
+                      ? parseUnits(row.minBalance || '0', await fetchTokenDecimals(publicClient, chainId, asset))
                       : BigInt(row.minBalance || '0'),
-              }))
+                }
+              })
             )
             await writeSetterAsync({
               address: CONTRACT_ADDRESS,
@@ -336,7 +351,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
 
       // Success resolves the loading toast rather than a footer row, so it stays visible
       // even though resetForm/onCreated close the modal right after
-      showTxToast('Community successfully registered!', 'success')
+      showTxToast('Your community is live!', 'success')
       txToastRef.current = null
 
       resetForm()
@@ -351,9 +366,9 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     if (!createError) return null
     const raw = `${createError.shortMessage || ''} ${createError.message || ''}`
     if (raw.includes('CreationCooldownActive'))
-      return 'You created a community recently — the anti-spam cooldown is 1 hour per wallet. Try again in a few minutes.'
-    if (raw.includes('MaxCommunitiesReached')) return 'This wallet has reached the maximum number of communities it can create.'
-    if (raw.includes('InsufficientFee')) return 'The transaction value does not match the current creation fee.'
+      return 'You created a community recently — there’s a 1-hour wait between communities. Try again in a few minutes.'
+    if (raw.includes('MaxCommunitiesReached')) return 'You’ve reached the maximum number of communities one account can create.'
+    if (raw.includes('InsufficientFee')) return 'The fee didn’t match the current creation fee. Refresh the page and try again.'
     return createError.shortMessage || createError.message
   })()
 
@@ -374,6 +389,9 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       // Omitted when blank, like `links` — a community without a tag publishes no tag key at
       // all, and cidex reads its absence as "grants no badge".
       ...(tag.trim() ? { tag: tag.trim() } : {}),
+      // A curated slug (config/communityCategories.js) — cidex stores it as-is for the
+      // directory's category filter; anything off-list would be indexed as null
+      category,
       summary,
       description,
       'logo url': logoUrl,
@@ -408,49 +426,45 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
 
   return (
     <NativeDialog ref={dialogRef} className={styles.createModal} aria-label="New community form" onClose={onClose}>
-      <DialogHeader title="New community" onCancel={() => dialogRef.current?.close()} />
+      <DialogHeader title="New community" compact onCancel={() => dialogRef.current?.close()} />
 
       <div className={styles.createModal__body}>
         <p className={styles.manager__subtitle} style={{ marginBottom: '1.25rem' }}>
-          Deploy an onchain community registry with custom gating rules.
+          Start a community and decide who can join and who can post.
         </p>
 
         <form className={styles.manager__form} onSubmit={handleCreate}>
           <div className={styles.manager__row}>
             <div className={styles.manager__field}>
               <label className={styles.manager__label}>Admission (how people get in)</label>
-              <select className={styles.manager__select} value={admission} onChange={(e) => setAdmission(Number(e.target.value))}>
-                {ADMISSION_OPTIONS.map((option) => {
+              {/* Picker instead of a <select>: every option shows its explanation inline, which is
+                  what finally separates "Open" from "Token-gated" for people */}
+              <OptionPicker
+                ariaLabel="Admission mode"
+                triggerClassName={styles.manager__select}
+                value={admission}
+                onChange={setAdmission}
+                options={ADMISSION_OPTIONS.map((option) => {
                   const locked = option.value === ADMISSION.SelfServeIfEligible && selfServeLocked
-                  return (
-                    <option key={option.value} value={option.value} disabled={locked} title={locked ? SELF_SERVE_HINTS.locked : option.note}>
-                      {locked ? `${option.label} ${SELF_SERVE_HINTS.lockedSuffix}` : option.label}
-                    </option>
-                  )
+                  return { ...option, disabled: locked, disabledNote: SELF_SERVE_HINTS.locked }
                 })}
-              </select>
-              <p className={styles.optionNote}>{ADMISSION_OPTIONS[admission]?.note}</p>
+              />
             </div>
 
             <div className={styles.manager__field}>
-              <label className={styles.manager__label}>Channel type (permissions)</label>
-              <select
-                className={styles.manager__select}
+              <label className={styles.manager__label}>Who can post</label>
+              <OptionPicker
+                ariaLabel="Channel type"
+                triggerClassName={styles.manager__select}
                 value={communityType}
-                onChange={(e) => setCommunityType(Number(e.target.value))}
-              >
-                {COMMUNITY_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className={styles.optionNote}>{COMMUNITY_TYPE_OPTIONS[communityType]?.note}</p>
+                onChange={setCommunityType}
+                options={COMMUNITY_TYPE_OPTIONS}
+              />
             </div>
           </div>
 
           <div className={styles.manager__field}>
-            <label className={styles.manager__label}>Requirements — what members must hold or be (optional)</label>
+            <label className={styles.manager__label}>Requirements (optional) — what members must hold or be</label>
             {requirements.map((row, index) => {
               const meta = REQUIREMENT_TYPE_OPTIONS[row.rType]
               return (
@@ -464,17 +478,28 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
                     // break the integer BigInt conversion token/NFT rows use
                     onChange={(e) => updateRequirement(index, { rType: Number(e.target.value), minBalance: '1' })}
                   >
-                    {REQUIREMENT_TYPE_OPTIONS.map((option) => (
+                    {REQUIREMENT_TYPE_CHOICES.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </select>
-                  {meta?.needsAsset && (
+                  {meta?.needsAsset && row.rType === REQUIREMENT_TYPE.TokenBalance && (
+                    <TokenAssetInput
+                      chainId={chainId}
+                      value={row.asset}
+                      onChange={(asset) => updateRequirement(index, { asset })}
+                      inputClassName={styles.manager__input}
+                      style={{ flex: 1, minWidth: '220px' }}
+                      allowNative={Boolean(meta.assetOptional)}
+                      required={!meta.assetOptional}
+                    />
+                  )}
+                  {meta?.needsAsset && row.rType !== REQUIREMENT_TYPE.TokenBalance && (
                     <input
                       className={styles.manager__input}
                       style={{ flex: 1, minWidth: '180px' }}
-                      placeholder="0x... contract address"
+                      placeholder="0x... collection address"
                       value={row.asset}
                       onChange={(e) => updateRequirement(index, { asset: e.target.value })}
                       required
@@ -531,7 +556,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             {requirements.length > 0 && (
               <p className={styles.optionNote}>
                 {requirements.length >= 2 ? `${REQUIREMENT_MODE_OPTIONS[requirementMode]?.note} ` : ''}
-                Requirements are re-checked live on every post — selling the asset suspends posting.
+                Requirements are checked every time someone posts — a member who no longer meets them can’t post until they do again.
               </p>
             )}
           </div>
@@ -551,12 +576,16 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             <>
               <div className={styles.manager__row}>
                 <div className={styles.manager__field}>
-                  <label className={styles.manager__label}>Payment token address (blank = native coin)</label>
-                  <input
-                    className={styles.manager__input}
-                    placeholder="0x... or leave blank"
+                  <label className={styles.manager__label}>Payment token (blank = {nativeCurrency.symbol || 'the network’s coin'})</label>
+                  <TokenAssetInput
+                    chainId={chainId}
                     value={paymentToken}
-                    onChange={(e) => setPaymentToken(e.target.value)}
+                    onChange={(address, picked) => {
+                      setPaymentToken(address)
+                      // A search result knows whether it's an LSP7; a pasted address keeps the checkbox
+                      if (picked) setPaymentIsLsp7(Boolean(picked.isLsp7))
+                    }}
+                    inputClassName={styles.manager__input}
                   />
                 </div>
                 <div className={styles.manager__field}>
@@ -575,23 +604,24 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
                   />
                 </div>
               </div>
-              {paymentToken && (
+              {/* LSP7 is LUKSO's token standard, so the question only makes sense there — elsewhere
+                  every token takes the plain path and the checkbox would just be noise */}
+              {paymentToken && isLuksoChain && (
                 <label className={styles.manager__label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <input type="checkbox" checked={paymentIsLsp7} onChange={(e) => setPaymentIsLsp7(e.target.checked)} />
-                  This token is an LSP7 asset (not ERC-20)
+                  This is a LUKSO (LSP7) token
                 </label>
               )}
               <p className={styles.manager__subtitle}>
-                The price is a whole-token amount, exactly as a holder would say it. Payments go directly to you (the creator) when
-                someone joins.
+                Enter the price the way you’d say it (e.g. 0.5). Each new member’s payment goes to you.
               </p>
             </>
           )}
 
           {(requirements.length > 0 || needsPayment) && (
             <p className={styles.manager__subtitle}>
-              Creating this community takes one extra wallet confirmation after the create transaction, to store the
-              requirements onchain. Whitelist entries are managed after creation from Members & moderation.
+              You’ll get a second wallet confirmation right after the community is created, to save these settings.
+              Whitelists are managed afterwards under Members & moderation.
             </p>
           )}
 
@@ -618,9 +648,21 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
               maxLength={MAX_TAG_LENGTH}
             />
             <p className={styles.manager__subtitle}>
-              A short code your members can wear next to their name, like a Discord server tag. Up to {MAX_TAG_LENGTH}{' '}
+              A short code your members can wear next to their name. Up to {MAX_TAG_LENGTH}{' '}
               characters. Leave it empty and this community grants no badge.
             </p>
+          </div>
+
+          <div className={styles.manager__field}>
+            <label className={styles.manager__label}>Category</label>
+            <select className={styles.manager__select} value={category} onChange={(e) => setCategory(e.target.value)}>
+              {categories.map((option) => (
+                <option key={option.slug} value={option.slug}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className={styles.manager__subtitle}>Where this community shows up when people browse the directory by topic.</p>
           </div>
 
           <div className={styles.manager__field}>
@@ -680,7 +722,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
 
           {cooldownRemainingSec > 0 && (
             <div className="alert alert--info" style={{ fontSize: '0.85rem' }}>
-              ⏳ Anti-spam cooldown: each wallet can create one community per hour. You can create your next one{' '}
+              ⏳ One community per hour per account. You can create your next one{' '}
               {new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }).format(Math.ceil(cooldownRemainingSec / 60), 'minute')}.
             </div>
           )}
@@ -701,7 +743,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             {isPending
               ? 'Confirm in Wallet...'
               : isConfirming
-              ? 'Mining Tx...'
+              ? 'Creating…'
               : creationFee > 0n
               ? `Create Community (${`${formatEther(creationFee)} ${nativeCurrency.symbol}`.trim()})`
               : 'Create Community'}

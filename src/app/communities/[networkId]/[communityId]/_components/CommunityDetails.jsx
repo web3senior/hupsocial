@@ -9,15 +9,20 @@ import PageTitle from '@/components/PageTitle'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { displayLinks } from '@/lib/socialLinks'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { getCommunityCategory } from '@/config/communityCategories'
+import useCommunityCategories from '@/hooks/useCommunityCategories'
+import { ADMISSION_OPTIONS } from '../../../membershipOptions'
 import { CommunityCard, CreatorName } from '../../../page'
 import styles from './CommunityDetails.module.scss'
 
-// membership_type in the indexed row now stores the AdmissionMode enum (see membershipOptions.js)
-const admissionLabels = ['Open', 'Request Approval', 'Invite Only', 'Self-serve if eligible', 'Pay to Join']
+// membership_type in the indexed row stores the AdmissionMode enum — short pill wording comes
+// from the shared option list so a rename there can't leave this page behind
+const admissionLabels = ADMISSION_OPTIONS.map((option) => option.tag)
 const typeLabels = ['Discussion', 'Broadcast']
 
 export default function CommunityDetails({ networkId, communityId, initialName }) {
   const params = useParams()
+  const { categories } = useCommunityCategories()
   const resolvedNetworkId = networkId || params.networkId
   const resolvedCommunityId = communityId || params.communityId
 
@@ -83,6 +88,10 @@ export default function CommunityDetails({ networkId, communityId, initialName }
             </div>
 
             <div className={styles.details__tags}>
+              {/* Indexed `category` slug; NULL (pre-category communities, off-list values) renders as "Other" */}
+              <span className={styles.details__tag} title="Category">
+                {getCommunityCategory(community.category, categories).label}
+              </span>
               <span className={styles.details__tag}>{admissionLabels[community.membership_type]}</span>
               {community.community_type !== null && community.community_type !== undefined && (
                 <span className={styles.details__tag}>{typeLabels[community.community_type]}</span>

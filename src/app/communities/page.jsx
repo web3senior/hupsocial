@@ -20,7 +20,7 @@ import NativeDialog from '@/components/ui/NativeDialog'
 import DialogHeader from '@/components/ui/DialogHeader'
 import RecipientField from '@/components/ui/RecipientField'
 import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
-import { GearSixIcon, MagnifyingGlassIcon, UsersIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon, GearSixIcon, MagnifyingGlassIcon, UsersIcon } from '@phosphor-icons/react'
 import { PostCard } from '@/components/Post'
 import HupCommunityABI from '@/abis/HupCommunity'
 import NewPost from '@/components/NewPost'
@@ -48,6 +48,11 @@ import BrandingLinksFields from './_components/BrandingLinksFields'
 import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
 import { AssetUnitLabel, TokenRequirementTag, TokenUnitHint } from './_components/TokenAmount'
+import TokenAssetInput from './_components/TokenAssetInput'
+import OptionPicker from './_components/OptionPicker'
+import { DEFAULT_COMMUNITY_CATEGORY, getCommunityCategory, normalizeCommunityCategory } from '@/config/communityCategories'
+import useCommunityCategories from '@/hooks/useCommunityCategories'
+import useRailScroll from '@/hooks/useRailScroll'
 import {
   ZERO_ADDRESS,
   fetchTokenDecimals,
@@ -63,9 +68,12 @@ import {
   COMMUNITY_TYPE_OPTIONS,
   REQUIREMENT_TYPE,
   REQUIREMENT_TYPE_OPTIONS,
+  REQUIREMENT_TYPE_CHOICES,
   REQUIREMENT_MODE_OPTIONS,
   ENCRYPTION_NOTES,
   SELF_SERVE_HINTS,
+  toOnchainRequirement,
+  toUiRequirementType,
 } from './membershipOptions'
 import { MAX_TAG_LENGTH, normalizeTag } from './communityTag'
 import styles from './page.module.scss'
@@ -173,10 +181,10 @@ function VaultUnlockPrompt({ vault }) {
         </>
       ) : (
         <>
-          <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Encryption identity not registered on this network</h5>
+          <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>One more step on this network</h5>
           <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem' }}>
-            Your vault is unlocked, but this network's community contract doesn't know your public key yet — without it, moderators can't
-            grant you community keys here.
+            Your vault is unlocked, but your encryption key isn’t registered on this network yet — until it is, moderators can’t share
+            community keys with you here. One quick wallet confirmation fixes that.
           </p>
           <button type="button" className={styles.card__submit} onClick={vault.registerOnThisChain}>
             Register on this network
@@ -243,6 +251,8 @@ function NftTag({ tokenAddress, chainId, minBalance }) {
 export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null }) {
   const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
+  // Shared across every card on the page by SWR — one request, not one per card
+  const { categories } = useCommunityCategories()
   const activeChainId = useChainId()
   // Chain-aware: an explicit networkId (directory filter / detail route) pins every read and
   // write to that chain — reads via a chain-bound public client, writes via wagmi's chainId
@@ -264,6 +274,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // Update states for inline modifications
   const [editName, setEditName] = useState('')
   const [editTag, setEditTag] = useState('')
+  const [editCategory, setEditCategory] = useState(DEFAULT_COMMUNITY_CATEGORY)
   const [editSummary, setEditSummary] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editLogoUrl, setEditLogoUrl] = useState('')
@@ -295,6 +306,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // Member management state
   const [pendingRequests, setPendingRequests] = useState([])
   const [members, setMembers] = useState([])
+  // Banned wallets are not members (setBanStatus removes them from the roster), so they come
+  // from the contract's separate banned list — this is where a moderator unbans from
+  const [bannedMembers, setBannedMembers] = useState([])
   const [inviteAddress, setInviteAddress] = useState(EMPTY_RECIPIENT)
   const [approvingAddress, setApprovingAddress] = useState(null)
   const [rejectingAddress, setRejectingAddress] = useState(null)
@@ -509,6 +523,15 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const { mutate: rejectRequestWrite, data: rejectHash, isPending: isRejectPending } = useWriteContract()
   const { isSuccess: isRejectConfirmed } = useWaitForTransactionReceipt({ hash: rejectHash })
 
+  // The requester's own side of rejectRequest: cancelRequest clears their onchain isPending flag
+  const {
+    mutate: cancelRequestWrite,
+    data: cancelRequestHash,
+    isPending: isCancelRequestPending,
+    error: cancelRequestError,
+  } = useWriteContract()
+  const { isSuccess: isCancelRequestConfirmed } = useWaitForTransactionReceipt({ hash: cancelRequestHash })
+
   const { mutate: grantKeyToMember, data: grantHash } = useWriteContract()
   useWaitForTransactionReceipt({ hash: grantHash })
 
@@ -706,6 +729,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   }, [isEncryptionInitialized, isMember, activeAccountAddress, myWrappedKeyData, keyVersion, chainId, id])
 
   const myPendingRequest = pendingRequests.find((r) => r.wallet_address?.toLowerCase() === activeAccountAddress?.toLowerCase())
+  // Onchain isPending is authoritative; the offchain record only exists to make the request
+  // discoverable to moderators. Either one pending is enough to offer the requester a cancel.
+  const hasPendingRequest = Boolean(myStatusData?.[1]) || Boolean(myPendingRequest)
 
   // Pay to Join is also self-service, but pays first: native coin goes
   // straight into join()'s value; a token price needs an authorization step the contract can pull
@@ -824,6 +850,34 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     }
   }, [isJoinConfirmed, joinHash, admission, activeAccountAddress, refetchMyStatus, refetchMyCanPost])
 
+  // Withdrawing a filed request: the onchain flag is the source of truth, so the tx goes first
+  // and the offchain discovery record is dropped only once it confirms — mirroring how the
+  // record was filed after join() confirmed, so the two can't drift apart on a rejected prompt.
+  const handleCancelRequest = () => {
+    if (!activeAccountAddress || !chainId) return
+
+    cancelRequestWrite({
+      address: CONTRACT_ADDRESS,
+      chainId,
+      abi: HupCommunityABI,
+      functionName: 'cancelRequest',
+      args: [id],
+    })
+  }
+
+  const cancelRequestHandledRef = useRef(null)
+  useEffect(() => {
+    if (!isCancelRequestConfirmed || !activeAccountAddress || cancelRequestHandledRef.current === cancelRequestHash) return
+    cancelRequestHandledRef.current = cancelRequestHash
+
+    refetchMyStatus()
+    fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&wallet_address=${activeAccountAddress}`, {
+      method: 'DELETE',
+    })
+      .catch(() => {})
+      .finally(() => refetchPendingRequests())
+  }, [isCancelRequestConfirmed, cancelRequestHash, activeAccountAddress, chainId, id, refetchMyStatus])
+
   // Refresh the on-chain community row once an update confirms
   useEffect(() => {
     if (isUpdateConfirmed) refetchCommunity()
@@ -892,20 +946,21 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const refetchMembers = async () => {
     if (!isModerator || !chainId || !CONTRACT_ADDRESS || !publicClient) return
     try {
+      // A ban removes the wallet from the member roster, so nothing here can be banned — the
+      // banned list is its own paginated read below
       const addresses = await fetchAllPaginated('getMembers', 'memberCount')
-      const statuses = await Promise.all(
-        addresses.map((addr) =>
-          publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: HupCommunityABI,
-            functionName: 'registry',
-            args: [id, addr],
-          })
-        )
-      )
-      setMembers(addresses.map((addr, i) => ({ address: addr, isBanned: Boolean(statuses[i][3]) })))
+      setMembers(addresses.map((addr) => ({ address: addr })))
     } catch (err) {
       console.error('Failed to load community member list on-chain:', err)
+    }
+  }
+
+  const refetchBanned = async () => {
+    if (!isModerator || !chainId || !CONTRACT_ADDRESS || !publicClient) return
+    try {
+      setBannedMembers(await fetchAllPaginated('getBanned', 'bannedCount'))
+    } catch (err) {
+      console.error('Failed to load community banned list on-chain:', err)
     }
   }
 
@@ -925,6 +980,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       if (isModerator) {
         refetchKeyRequests()
         refetchWhitelist()
+        refetchBanned()
       }
     }
   }, [isManagingMembers, id, isApproveConfirmed, isBanConfirmed, isUnbanConfirmed, isModerator])
@@ -1373,7 +1429,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     )
   }
 
-  const admissionLabel = ADMISSION_OPTIONS[admission]?.label || '—'
+  const admissionLabel = ADMISSION_OPTIONS[admission]?.tag || ADMISSION_OPTIONS[admission]?.label || '—'
   const typeLabels = ['Discussion', 'Broadcast']
 
   // Every amount in the editor is a whole-unit string, so seeding means scaling the raw onchain
@@ -1389,14 +1445,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           const rType = Number(row.rType)
           const raw = row.minBalance ?? 0n
           return {
-            rType,
+            // NativeBalance opens as a blank-asset "Token or coin balance" row — the form has one
+            // choice for both, and toOnchainRequirement maps it back on save
+            rType: toUiRequirementType(rType),
             asset: row.asset === ZERO_ADDRESS ? '' : row.asset,
             minBalance:
-              rType === REQUIREMENT_TYPE.NativeBalance
-                ? formatEther(raw)
-                : rType === REQUIREMENT_TYPE.TokenBalance
-                  ? toAmountInput(raw, await fetchTokenDecimals(publicClient, chainId, row.asset))
-                  : raw.toString(),
+              rType === REQUIREMENT_TYPE.NativeBalance || rType === REQUIREMENT_TYPE.TokenBalance
+                ? toAmountInput(raw, await fetchTokenDecimals(publicClient, chainId, row.asset))
+                : raw.toString(),
           }
         })
       )
@@ -1411,6 +1467,8 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
     setEditName(metadata.name || '')
     setEditTag(metadata.tag || '')
+    // Off-list or missing slugs (communities created before categories existed) open as "Other"
+    setEditCategory(normalizeCommunityCategory(metadata.category, categories))
     setEditSummary(metadata.summary || '')
     setEditDescription(metadata.description || '')
     setEditLogoUrl(metadata['logo url'] || '')
@@ -1448,17 +1506,19 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     let priceValue
     try {
       editedTuples = await Promise.all(
-        editRequirements.map(async (row) => ({
-          rType: row.rType,
-          asset: row.asset || ZERO_ADDRESS,
-          // NFT minimums are plain collection counts — they scale by nothing
-          minBalance:
-            row.rType === REQUIREMENT_TYPE.NativeBalance
-              ? parseEther(row.minBalance || '0')
-              : row.rType === REQUIREMENT_TYPE.TokenBalance
-                ? parseUnits(row.minBalance || '0', await fetchTokenDecimals(publicClient, chainId, row.asset))
+        editRequirements.map(async (row) => {
+          // A blank-asset token row is the contract's NativeBalance type; fetchTokenDecimals
+          // resolves that blank to the coin's decimals. NFT minimums are plain counts.
+          const { rType, asset } = toOnchainRequirement(row)
+          return {
+            rType,
+            asset,
+            minBalance:
+              rType === REQUIREMENT_TYPE.NativeBalance || rType === REQUIREMENT_TYPE.TokenBalance
+                ? parseUnits(row.minBalance || '0', await fetchTokenDecimals(publicClient, chainId, asset))
                 : BigInt(row.minBalance || '0'),
-        }))
+          }
+        })
       )
       if (editAdmission === ADMISSION.PayToJoin && paymentPrice) {
         priceValue = paymentTokenAddress
@@ -1480,6 +1540,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       // Dropped from the JSON when cleared rather than written empty: cidex reads a missing tag
       // as "this community grants no badge", and clearing it takes the pill off every member.
       ...(editTag.trim() ? { tag: editTag.trim() } : {}),
+      category: editCategory,
       summary: editSummary,
       description: editDescription,
       'logo url': editLogoUrl,
@@ -1847,14 +1908,20 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           {isJoinPending ? 'Joining...' : 'Join'}
         </button>
       )}
-      {!isOwner && !isMember && admission === ADMISSION.RequestApproval && (
+      {!isOwner && !isMember && admission === ADMISSION.RequestApproval && !hasPendingRequest && (
+        <button type="button" className={styles.card__editBtn} disabled={!isActive || isJoinPending} onClick={handleRequestAccess}>
+          {isJoinPending ? 'Requesting...' : 'Request Access'}
+        </button>
+      )}
+      {!isOwner && !isMember && admission === ADMISSION.RequestApproval && hasPendingRequest && (
         <button
           type="button"
           className={styles.card__editBtn}
-          disabled={!isActive || isJoinPending || Boolean(myPendingRequest)}
-          onClick={handleRequestAccess}
+          disabled={isCancelRequestPending}
+          title="Your request is waiting for a moderator — withdraw it here"
+          onClick={handleCancelRequest}
         >
-          {isJoinPending ? 'Requesting...' : myPendingRequest ? 'Request Pending' : 'Request Access'}
+          {isCancelRequestPending ? 'Cancelling...' : 'Cancel Request'}
         </button>
       )}
       {!isOwner && !isMember && admission === ADMISSION.SelfServeIfEligible && (
@@ -1996,8 +2063,8 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                     className={styles.card__requirementsLabel}
                     title={
                       admission === ADMISSION.SelfServeIfEligible
-                        ? 'Checked by the contract when you join — meeting them admits you instantly'
-                        : 'Your wallet must meet these to participate here'
+                        ? 'Checked automatically when you join — meet them and you’re in instantly'
+                        : 'You need to meet these to take part here'
                     }
                   >
                     Requirements
@@ -2059,6 +2126,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 <p className={styles.card__summary}>{metadata.summary || metadata.description}</p>
 
                 <div className={styles.card__tags} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                  {/* Unknown/missing slugs render as "Other" — see config/communityCategories.js */}
+                  <span className={styles.card__tag} title="Category">
+                    {getCommunityCategory(metadata.category, categories).label}
+                  </span>
                   <span className={styles.card__tag}>{admissionLabel}</span>
                   <span className={styles.card__tag}>{typeLabels[cType]}</span>
                   {/* Indexed member count, passed down from the directory's API rows (the card
@@ -2113,6 +2184,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           )}
 
           {joinError && <div className={styles.card__error}>Error: {joinError.shortMessage || joinError.message}</div>}
+
+          {cancelRequestError && (
+            <div className={styles.card__error}>Error: {cancelRequestError.shortMessage || cancelRequestError.message}</div>
+          )}
 
           {statusError && <div className={styles.card__error}>Error: {statusError.shortMessage || statusError.message}</div>}
 
@@ -2219,8 +2294,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         label={`Manage members of ${metadata.name || `Space #${id}`}`}
       >
         <DialogHeader
-          title={`Manage Members — ${metadata.name || `Space #${id}`}`}
+          title={`Manage members — ${metadata.name || `Space #${id}`}`}
           cancelLabel="Close"
+          compact
           onCancel={() => setIsManagingMembers(false)}
         />
         <div className={clsx(styles.cardDialog__body, styles.card__form)}>
@@ -2283,30 +2359,44 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   <div className="flex align-items-center gap-050">
                     <Profile creator={member.address} networkId={chainId} variant="fullWithoutTime" />
                     {member.address.toLowerCase() === creator.toLowerCase() && <span className={styles.card__tag}>Creator</span>}
-                    {member.isBanned && <span className={styles.card__tag}>Banned</span>}
                   </div>
-                  {member.address.toLowerCase() !== creator.toLowerCase() &&
-                    (member.isBanned ? (
-                      <button
-                        type="button"
-                        className={styles.card__editBtn}
-                        disabled={isUnbanPending && banningAddress === member.address}
-                        onClick={() => handleUnban(member.address)}
-                      >
-                        {isUnbanPending && banningAddress === member.address ? 'Unbanning...' : 'Unban'}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.card__cancelBtn}
-                        disabled={isBanPending && banningAddress === member.address}
-                        onClick={() => handleBan(member.address)}
-                      >
-                        {isBanPending && banningAddress === member.address ? 'Banning...' : 'Ban'}
-                      </button>
-                    ))}
+                  {member.address.toLowerCase() !== creator.toLowerCase() && (
+                    <button
+                      type="button"
+                      className={styles.card__cancelBtn}
+                      disabled={isBanPending && banningAddress === member.address}
+                      onClick={() => handleBan(member.address)}
+                    >
+                      {isBanPending && banningAddress === member.address ? 'Banning...' : 'Ban'}
+                    </button>
+                  )}
                 </div>
               ))
+            )}
+
+            {/* Banned wallets live outside the member roster (a ban is a kick plus a flag), so
+                they are read from the contract's own banned list — unbanning only lifts the
+                flag; the wallet rejoins through the community's admission mode. */}
+            {bannedMembers.length > 0 && (
+              <div style={{ marginTop: '1rem' }}>
+                <h5 style={{ fontSize: '0.95rem' }}>Banned</h5>
+                {bannedMembers.map((address) => (
+                  <div key={address} className="flex justify-content-between align-items-center gap-050" style={{ padding: '0.5rem 0' }}>
+                    <div className="flex align-items-center gap-050">
+                      <Profile creator={address} networkId={chainId} variant="fullWithoutTime" />
+                      <span className={styles.card__tag}>Banned</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.card__editBtn}
+                      disabled={isUnbanPending && banningAddress === address}
+                      onClick={() => handleUnban(address)}
+                    >
+                      {isUnbanPending && banningAddress === address ? 'Unbanning...' : 'Unban'}
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
@@ -2564,7 +2654,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             <div className={styles.card__error}>
               Error:{' '}
               {`${approveError?.shortMessage || ''}${approveError?.message || ''}`.match(/NoPendingRequest|0xcc2c06e8/)
-                ? 'This request no longer exists onchain — the wallet’s join transaction never confirmed. The stale entry was removed; they can request again.'
+                ? 'This request was never completed — their join didn’t go through. The stale entry has been removed; they can request again.'
                 : approveError?.shortMessage ||
                   approveError?.message ||
                   banError?.shortMessage ||
@@ -2582,52 +2672,42 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         className={styles.cardDialog}
         label={`Modify ${metadata.name || `Space #${id}`}`}
       >
-        <DialogHeader title={`Modify ${metadata.name || `Space #${id}`}`} onCancel={() => setIsEditing(false)} />
+        <DialogHeader title={`Modify ${metadata.name || `Space #${id}`}`} compact onCancel={() => setIsEditing(false)} />
         <form className={clsx(styles.cardDialog__body, styles.card__form)} onSubmit={handleUpdateSubmit}>
 
           <div className={styles.card__row}>
             <div className={styles.card__field}>
-              <label className={styles.card__label}>Membership rule</label>
-              <select
-                className={styles.card__select}
+              <label className={styles.card__label}>Admission (how people get in)</label>
+              <OptionPicker
+                ariaLabel="Admission mode"
+                triggerClassName={styles.card__select}
                 value={editAdmission}
-                onChange={(e) => setEditAdmission(Number(e.target.value))}
-              >
-                {ADMISSION_OPTIONS.map((option) => {
-                  // Same rule as the create modal — self-serve with no requirements admits
+                onChange={setEditAdmission}
+                options={ADMISSION_OPTIONS.map((option) => {
+                  // Same rule as the create modal — token-gated with no requirements admits
                   // exactly who Open does. Exempt when it's already the community's mode: this
                   // form writes the enum onchain, so silently downgrading it isn't ours to do.
                   const locked =
                     option.value === ADMISSION.SelfServeIfEligible &&
                     editRequirements.length === 0 &&
                     editAdmission !== ADMISSION.SelfServeIfEligible
-                  return (
-                    <option key={option.value} value={option.value} disabled={locked} title={locked ? SELF_SERVE_HINTS.locked : option.note}>
-                      {locked ? `${option.label} ${SELF_SERVE_HINTS.lockedSuffix}` : option.label}
-                    </option>
-                  )
+                  return { ...option, disabled: locked, disabledNote: SELF_SERVE_HINTS.locked }
                 })}
-              </select>
-              <p className={styles.optionNote}>{ADMISSION_OPTIONS[editAdmission]?.note}</p>
+              />
               {editAdmission === ADMISSION.SelfServeIfEligible && editRequirements.length === 0 && (
                 <p className={clsx(styles.optionNote, styles['optionNote--warn'])}>{SELF_SERVE_HINTS.redundant}</p>
               )}
             </div>
 
             <div className={styles.card__field}>
-              <label className={styles.card__label}>Channel type</label>
-              <select
-                className={styles.card__select}
+              <label className={styles.card__label}>Who can post</label>
+              <OptionPicker
+                ariaLabel="Channel type"
+                triggerClassName={styles.card__select}
                 value={editCommunityType}
-                onChange={(e) => setEditCommunityType(Number(e.target.value))}
-              >
-                {COMMUNITY_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className={styles.optionNote}>{COMMUNITY_TYPE_OPTIONS[editCommunityType]?.note}</p>
+                onChange={setEditCommunityType}
+                options={COMMUNITY_TYPE_OPTIONS}
+              />
             </div>
           </div>
 
@@ -2635,7 +2715,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               ERC-721/LSP8 collections and ERC-20/LSP7 tokens (balanceOf is selector-compatible
               in both pairs). */}
           <div className={styles.card__field}>
-            <label className={styles.card__label}>Requirements — what members must hold or be (optional)</label>
+            <label className={styles.card__label}>Requirements (optional) — what members must hold or be</label>
             {editRequirements.map((row, index) => {
               const meta = REQUIREMENT_TYPE_OPTIONS[row.rType]
               return (
@@ -2653,17 +2733,28 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                       )
                     }
                   >
-                    {REQUIREMENT_TYPE_OPTIONS.map((option) => (
+                    {REQUIREMENT_TYPE_CHOICES.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </select>
-                  {meta?.needsAsset && (
+                  {meta?.needsAsset && row.rType === REQUIREMENT_TYPE.TokenBalance && (
+                    <TokenAssetInput
+                      chainId={chainId}
+                      value={row.asset}
+                      onChange={(asset) => setEditRequirements((rows) => rows.map((r, i) => (i === index ? { ...r, asset } : r)))}
+                      inputClassName={styles.card__input}
+                      style={{ flex: 1, minWidth: '220px' }}
+                      allowNative={Boolean(meta.assetOptional)}
+                      required={!meta.assetOptional}
+                    />
+                  )}
+                  {meta?.needsAsset && row.rType !== REQUIREMENT_TYPE.TokenBalance && (
                     <input
                       className={styles.card__input}
                       style={{ flex: 1, minWidth: '180px' }}
-                      placeholder="0x... contract address"
+                      placeholder="0x... collection address"
                       value={row.asset}
                       onChange={(e) =>
                         setEditRequirements((rows) => rows.map((r, i) => (i === index ? { ...r, asset: e.target.value } : r)))
@@ -2760,28 +2851,34 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')}
               style={{ marginTop: '1rem', marginBottom: '1rem' }}
             >
-              <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>Pay to Join Configuration</h5>
+              <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>Join price</h5>
               <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem' }}>
-                Payment goes straight to your wallet at join time. Leave the token address blank to price in {nativeCurrency.symbol || 'the native coin'}; fill it in to price in an ERC-20 or LSP7 token — check the LSP7 box below if it's an LSP7 asset, since its
-                transfer mechanism differs from ERC-20's. Either way the price is a whole-token amount, exactly as a holder would say it.
+                Each new member pays this once, and it goes to you. Leave the token blank to charge in{' '}
+                {nativeCurrency.symbol || 'the network’s coin'}, or search a token by name / paste its address. Enter the price the way
+                you’d say it (e.g. 0.5).
               </p>
               <div className={styles.card__field}>
-                <label className={styles.card__label}>Payment token address (blank = native coin)</label>
-                <input
-                  className={styles.card__input}
-                  placeholder="0x... (leave blank for native coin)"
+                <label className={styles.card__label}>Payment token (blank = {nativeCurrency.symbol || 'the network’s coin'})</label>
+                <TokenAssetInput
+                  chainId={chainId}
                   value={paymentTokenAddress}
-                  onChange={(e) => setPaymentTokenAddress(e.target.value)}
+                  onChange={(address, picked) => {
+                    setPaymentTokenAddress(address)
+                    // A search result knows whether it's an LSP7; a pasted address keeps the checkbox
+                    if (picked) setPaymentIsLsp7(Boolean(picked.isLsp7))
+                  }}
+                  inputClassName={styles.card__input}
                 />
               </div>
-              {paymentTokenAddress && (
+              {/* LSP7 is LUKSO's token standard — only worth asking there */}
+              {paymentTokenAddress && (chainId === 42 || chainId === 4201) && (
                 <div
                   className={styles.card__field}
                   style={{ marginTop: '0.5rem', flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}
                 >
                   <input type="checkbox" id="paymentIsLsp7" checked={paymentIsLsp7} onChange={(e) => setPaymentIsLsp7(e.target.checked)} />
                   <label htmlFor="paymentIsLsp7" className={styles.card__label} style={{ margin: 0 }}>
-                    This token is an LSP7 asset (not ERC-20)
+                    This is a LUKSO (LSP7) token
                   </label>
                 </div>
               )}
@@ -2821,6 +2918,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               Up to {MAX_TAG_LENGTH} characters, worn by members next to their name. Clearing it removes the badge from
               everyone wearing it.
             </p>
+          </div>
+
+          <div className={styles.card__field}>
+            <label className={styles.card__label}>Category</label>
+            <select className={styles.card__select} value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
+              {categories.map((option) => (
+                <option key={option.slug} value={option.slug}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className={styles.card__field}>
@@ -2889,26 +2997,26 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             <div className={styles.card__monitor}>
               {updateHash && (
                 <p className={styles.card__tx}>
-                  Metadata Tx: <span>{updateHash}</span>
+                  Details saved: <span>{updateHash}</span>
                 </p>
               )}
               {requirementsHash && (
                 <p className={styles.card__tx}>
-                  Requirements Tx: <span>{requirementsHash}</span>
+                  Requirements saved: <span>{requirementsHash}</span>
                 </p>
               )}
               {paymentReqHash && (
                 <p className={styles.card__tx}>
-                  Payment Requirement Tx: <span>{paymentReqHash}</span>
+                  Join price saved: <span>{paymentReqHash}</span>
                 </p>
               )}
               {(isUpdateConfirming || isRequirementsConfirming || isPaymentReqConfirming) && (
-                <p className={styles.card__status}>Waiting for confirmation...</p>
+                <p className={styles.card__status}>Saving your changes…</p>
               )}
               {isUpdateConfirmed &&
                 (!requirementsHash || isRequirementsConfirmed) &&
                 (editAdmission !== ADMISSION.PayToJoin || !paymentReqHash || isPaymentReqConfirmed) && (
-                  <p className={clsx(styles.card__status, styles['card__status--success'])}>Changes committed onchain!</p>
+                  <p className={clsx(styles.card__status, styles['card__status--success'])}>Changes saved!</p>
                 )}
             </div>
           )}
@@ -2956,6 +3064,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 export default function CommunitiesPage() {
   const vault = useCommunityVault()
   const { address: activeAccountAddress } = useAccount()
+  const { categories } = useCommunityCategories()
+
+  // The category chip row scrolls sideways; arrows + edge fades come from the same hook as the
+  // NFT collections rail, since a hidden scrollbar alone leaves people unaware of the rest
+  const categoryRailRef = useRef(null)
+  const { canScrollLeft, canScrollRight, scrollByPage } = useRailScroll(categoryRailRef, [categories])
+  const categoryRailOverflows = canScrollLeft || canScrollRight
 
   // Always-mounted creation modal (matches the app's other modals): opening and closing go
   // through this handle, so a half-filled form survives an accidental close
@@ -2981,6 +3096,9 @@ export default function CommunitiesPage() {
   // Public/Private split: 'public' = plaintext content, 'private' = encrypted content
   // (indexed is_encrypted flag from KeyInitialized) — resolved by the API's visibility param
   const [visibilityFilter, setVisibilityFilter] = useState('all')
+  // Category slug from config/communityCategories.js, or 'all' — resolved by the API's
+  // category param against cidex's indexed `communities.category`
+  const [categoryFilter, setCategoryFilter] = useState('all')
   const [communityRows, setCommunityRows] = useState([])
   const [directoryPage, setDirectoryPage] = useState(1)
   const [totalCommunities, setTotalCommunities] = useState(0)
@@ -3015,6 +3133,7 @@ export default function CommunitiesPage() {
       }
       if (searchQuery) params.set('search', searchQuery)
       if (visibilityFilter !== 'all') params.set('visibility', visibilityFilter)
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
       // Default sort brings communities the connected wallet created to the top of the directory
       if (activeAccountAddress) params.set('viewer_address', activeAccountAddress)
 
@@ -3039,7 +3158,7 @@ export default function CommunitiesPage() {
 
   useEffect(() => {
     fetchDirectory(1, false)
-  }, [selectedNetworkId, directoryContractAddress, searchQuery, visibilityFilter, activeAccountAddress])
+  }, [selectedNetworkId, directoryContractAddress, searchQuery, visibilityFilter, categoryFilter, activeAccountAddress])
 
   return (
     <>
@@ -3109,6 +3228,58 @@ export default function CommunitiesPage() {
               </div>
             </div>
 
+            {/* Category chips: one row that scrolls sideways rather than wrapping into a wall of
+                pills, with arrows once it overflows. 'all' is a chip too so the active state always
+                shows. The list comes from the community_categories table via the hook. */}
+            <div className={styles.directory__categoryRow}>
+              <div
+                ref={categoryRailRef}
+                className={clsx(
+                  styles.directory__categories,
+                  canScrollLeft && styles['directory__categories--moreLeft'],
+                  canScrollRight && styles['directory__categories--moreRight']
+                )}
+                role="group"
+                aria-label="Filter communities by category"
+              >
+                {[{ slug: 'all', label: 'All topics' }, ...categories].map((option) => (
+                  <button
+                    key={option.slug}
+                    type="button"
+                    className={clsx(styles.directory__category, categoryFilter === option.slug && styles['directory__category--active'])}
+                    aria-pressed={categoryFilter === option.slug}
+                    onClick={() => setCategoryFilter(option.slug)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {/* Only once the row actually overflows — arrows on a row that fits would promise
+                  more chips than there are */}
+              {categoryRailOverflows && (
+                <div className={styles.directory__categoryArrows}>
+                  <button
+                    type="button"
+                    className={styles.directory__categoryArrow}
+                    aria-label="Scroll categories left"
+                    disabled={!canScrollLeft}
+                    onClick={() => scrollByPage(-1)}
+                  >
+                    <CaretLeftIcon size={14} weight="bold" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.directory__categoryArrow}
+                    aria-label="Scroll categories right"
+                    disabled={!canScrollRight}
+                    onClick={() => scrollByPage(1)}
+                  >
+                    <CaretRightIcon size={14} weight="bold" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {directoryError && <div className={styles.manager__error}>Failed to load community directory: {directoryError}</div>}
 
             <div className={clsx(styles.directory__grid, isDirectoryLoading && styles['directory__grid--loading'])}>
@@ -3116,9 +3287,11 @@ export default function CommunitiesPage() {
                 <p className={styles.directory__empty}>
                   {searchQuery
                     ? 'No communities match your search.'
-                    : visibilityFilter !== 'all'
-                      ? `No ${visibilityFilter} communities here yet.`
-                      : 'No communities found. Be the first to create one!'}
+                    : categoryFilter !== 'all'
+                      ? `No ${getCommunityCategory(categoryFilter, categories).label} communities here yet.`
+                      : visibilityFilter !== 'all'
+                        ? `No ${visibilityFilter} communities here yet.`
+                        : 'No communities found. Be the first to create one!'}
                 </p>
               ) : (
                 communityRows.map((row) => (

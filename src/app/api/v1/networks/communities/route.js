@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { DEFAULT_COMMUNITY_CATEGORY, isCategorySlugShaped } from '@/config/communityCategories'
 
 export const runtime = 'nodejs'
 
@@ -74,6 +75,20 @@ export async function GET(request) {
       whereClause += ` AND c.is_encrypted = 0`
     } else if (visibility === 'private') {
       whereClause += ` AND c.is_encrypted = 1`
+    }
+    // Category slug from `community_categories`, indexed by cidex from the metadata JSON. Only
+    // shape-checked here: the list lives in the database, and a slug that isn't in it simply
+    // matches no rows. 'other' also picks up rows with no category at all — communities created
+    // before categories existed (or under a since-retired slug) file there, the same way the
+    // card renders them.
+    const category = searchParams.get('category')
+    if (category && isCategorySlugShaped(category)) {
+      if (category === DEFAULT_COMMUNITY_CATEGORY) {
+        whereClause += ` AND (c.category = ? OR c.category IS NULL)`
+      } else {
+        whereClause += ` AND c.category = ?`
+      }
+      whereParams.push(category)
     }
     if (creatorAddress) {
       whereClause += ` AND c.creator_address = ?`

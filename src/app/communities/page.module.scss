@@ -218,6 +218,104 @@
     }
   }
 
+  // Category filter — one horizontally scrolling row of chips under the header, with arrows
+  // once it overflows (same hook and edge fade as the NFT collections rail). Scrolls rather
+  // than wraps so fifteen topics never push the grid below the fold on a phone.
+  &__categoryRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  &__categories {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    gap: 0.4rem;
+    padding: 0.15rem 0;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    // The overflowing edge fades out — a chip cut off mid-way is the oldest cue there is that
+    // more sits past it. Driven by the same measurement as the arrows, so the fade lifts exactly
+    // when the end is reached and the last chip shows whole.
+    --fade-left: 0px;
+    --fade-right: 0px;
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade-left), #000 calc(100% - var(--fade-right)), transparent);
+
+    &--moreLeft {
+      --fade-left: 2rem;
+    }
+
+    &--moreRight {
+      --fade-right: 2rem;
+    }
+  }
+
+  &__categoryArrows {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.3rem;
+  }
+
+  &__categoryArrow {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease, opacity 0.18s ease;
+
+    &:hover:not(:disabled) {
+      border-color: var(--text-muted);
+      background-color: var(--surface-muted);
+    }
+
+    // Kept in place rather than removed at either end, so the pair never shifts under the
+    // pointer mid-click
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+
+  &__category {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--foreground);
+    }
+
+    &--active {
+      background: var(--foreground);
+      border-color: var(--foreground);
+      color: var(--background);
+    }
+  }
+
   // Public/Private visibility filter — segmented pills sitting next to the network select
   &__visibilityTabs {
     display: inline-flex;

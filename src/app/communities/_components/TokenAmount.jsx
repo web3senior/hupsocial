@@ -22,12 +22,13 @@ export function TokenRequirementTag({ address, chainId, minBalance, className })
 }
 
 /**
- * Unit suffix for a token amount field. Stays silent until the address resolves to a real token —
- * a blank asset is "not filled in yet", not the native coin.
+ * Unit suffix for a token amount field. A blank asset is the chain's native coin (that is how a
+ * "Token or coin balance" row spells NativeBalance), so it shows the coin's symbol; a half-typed
+ * address stays silent until it resolves to a real token.
  */
 export function TokenUnitHint({ address, chainId, className }) {
-  const { symbol, isNative } = useTokenMeta(address, chainId)
-  if (isNative || !symbol) return null
+  const { symbol } = useTokenMeta(address, chainId)
+  if (!symbol) return null
   return (
     <span className={className} style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
       {symbol}

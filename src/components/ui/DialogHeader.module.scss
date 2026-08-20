@@ -32,6 +32,25 @@
     justify-content: flex-end;
     gap: 18px;
   }
+
+  // Form dialogs: a quieter label-sized title so a long name ("Modify <community>") doesn't
+  // dominate the sheet. Cancel stays the same size so it doesn't outweigh the title.
+  &--compact {
+    min-height: 56px;
+    padding: 0 24px;
+
+    .header__title {
+      font-size: 1rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .header__cancel {
+      font-size: 0.9rem;
+    }
+  }
 }
 
 @media (max-width: 640px) {
@@ -45,6 +64,15 @@
 
     &__cancel {
       font-size: 1rem;
+    }
+
+    &--compact {
+      min-height: 52px;
+      padding: 0 16px;
+
+      .header__title {
+        font-size: 0.95rem;
+      }
     }
   }
 }

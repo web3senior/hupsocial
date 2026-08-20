@@ -11,24 +11,40 @@
   inset: auto;
   margin: 0;
 
-  // Fade only, no scale. A panel scaling up from its anchored corner sweeps its far
-  // edges ~10px across the static content behind it, and that sweep reads as the page
-  // itself moving — nothing under the panel actually shifts.
+  // Fade plus a 2px settle, no scale. A panel scaling up from its anchored corner sweeps its
+  // far edges ~10px across the static content behind it, and that sweep reads as the page
+  // itself moving — nothing under the panel actually shifts. Two pixels of travel toward the
+  // panel's resting spot is small enough to read as "appearing", not "moving".
   opacity: 0;
+  translate: 0 -2px;
 
   transition:
     opacity 0.18s ease,
+    translate 0.18s ease,
     overlay 0.18s ease allow-discrete,
     display 0.18s ease allow-discrete;
 
   &:global(:popover-open) {
     opacity: 1;
+    translate: 0 0;
     display: block !important;
   }
 
+  // Panels hung above their trigger settle upward instead, so every panel slides toward the
+  // thing that opened it
+  &[data-placement^='top'] {
+    translate: 0 2px;
+
+    &:global(:popover-open) {
+      translate: 0 0;
+    }
+  }
+
   // JS writes the resolved placement back onto data-placement; the trigger-independent
-  // placements below hang their centering and backdrop off it
-  &[data-placement='center'] {
+  // placements below hang their centering and backdrop off it. Center owns `translate` for
+  // its centering, so it fades only.
+  &[data-placement='center'],
+  &[data-placement='center']:global(:popover-open) {
     translate: -50% -50%;
   }
 
@@ -60,6 +76,15 @@
   @starting-style {
     .panel:global(:popover-open) {
       opacity: 0;
+      translate: 0 -2px;
+    }
+
+    .panel[data-placement^='top']:global(:popover-open) {
+      translate: 0 2px;
+    }
+
+    .panel[data-placement='center']:global(:popover-open) {
+      translate: -50% -50%;
     }
 
     .panel[data-placement='center']:global(:popover-open)::backdrop,

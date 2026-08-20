@@ -1,0 +1,99 @@
+// Select-shaped trigger + explanatory menu. The trigger takes its field styling (padding, size,
+// surface) from the consumer's form class via triggerClassName; this only adds the layout and
+// the chevron so it reads as a select.
+
+.picker {
+  // The wrapper carries --picker-width (set from the trigger's measured width on open)
+  width: 100%;
+
+  &__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  &__triggerLabel {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__chevron {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+  }
+
+  &__popover {
+    // Same width as the trigger; never wider than the viewport. The primitive's own
+    // min-width is overridden so a narrow field gets a narrow menu instead of an overflowing one.
+    width: var(--picker-width, 280px);
+    max-width: calc(100vw - 1rem);
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  &__option {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.6rem 0.65rem;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      background: var(--hover);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    &--active {
+      background: var(--surface-muted);
+    }
+  }
+
+  &__optionText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  &__optionLabel {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  &__optionNote {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  &__check {
+    flex: 0 0 auto;
+    margin-top: 0.15rem;
+    color: var(--network-color-primary, var(--text));
+  }
+}
