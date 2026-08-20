@@ -147,6 +147,9 @@ const NativePopover = forwardRef(function NativePopover({
   children,
   type = 'auto',
   action = 'toggle',
+  openOnHover = false,
+  hoverOpenDelay = 250,
+  hoverCloseDelay = 200,
   placement = 'bottom-start',
   onBeforeToggle,
   onToggle,
@@ -156,6 +159,7 @@ const NativePopover = forwardRef(function NativePopover({
   const popoverId = `popover-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const popoverRef = useRef(null)
   const triggerRef = useRef(null)
+  const hoverTimerRef = useRef(null)
 
   const reposition = useCallback(() => {
     anchorElement(popoverRef.current, triggerRef.current, placement)
@@ -237,6 +241,63 @@ const NativePopover = forwardRef(function NativePopover({
       if (frameId) cancelAnimationFrame(frameId)
     }
   }, [applyPosition, placement, reposition, onBeforeToggle, onToggle])
+
+  // Hover opening, opt-in. The pointer has to be able to cross the GAP between trigger and
+  // panel without the panel vanishing mid-flight, so open and close both go through one
+  // timer: leaving the trigger only schedules a close, and entering the panel cancels it.
+  useEffect(() => {
+    if (!openOnHover) return
+    const panel = popoverRef.current
+    const triggerEl = triggerRef.current
+    if (!panel || !triggerEl) return
+
+    // Touch has no hover: a tap fires an emulated mouseenter, which would open the panel a
+    // frame before the tap's own click toggles it straight back shut. Those pointers keep
+    // the native click-to-open path instead.
+    const canHover = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+    const clearTimer = () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current)
+        hoverTimerRef.current = null
+      }
+    }
+
+    const scheduleOpen = () => {
+      if (!canHover()) return
+      clearTimer()
+      if (panel.matches(':popover-open')) return
+      hoverTimerRef.current = setTimeout(() => {
+        hoverTimerRef.current = null
+        if (!panel.matches(':popover-open')) panel.showPopover()
+      }, hoverOpenDelay)
+    }
+
+    const scheduleClose = () => {
+      if (!canHover()) return
+      clearTimer()
+      hoverTimerRef.current = setTimeout(() => {
+        hoverTimerRef.current = null
+        // Backstop for the pointer that landed back on either half without a mouseenter
+        // reaching us (re-render, panel re-anchor)
+        if (panel.matches(':hover') || triggerEl.matches(':hover')) return
+        if (panel.matches(':popover-open')) panel.hidePopover()
+      }, hoverCloseDelay)
+    }
+
+    triggerEl.addEventListener('mouseenter', scheduleOpen)
+    triggerEl.addEventListener('mouseleave', scheduleClose)
+    panel.addEventListener('mouseenter', clearTimer)
+    panel.addEventListener('mouseleave', scheduleClose)
+
+    return () => {
+      clearTimer()
+      triggerEl.removeEventListener('mouseenter', scheduleOpen)
+      triggerEl.removeEventListener('mouseleave', scheduleClose)
+      panel.removeEventListener('mouseenter', clearTimer)
+      panel.removeEventListener('mouseleave', scheduleClose)
+    }
+  }, [openOnHover, hoverOpenDelay, hoverCloseDelay])
 
   const close = () => {
     popoverRef.current?.hidePopover()

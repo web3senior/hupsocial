@@ -101,6 +101,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             />
           </button>
         }
+        openOnHover
         placement="bottom-start"
         onToggle={(e) => {
           if (e.newState === 'open') setPopoverOpened(true)
@@ -164,9 +165,9 @@ export const CommunityBadge = ({ badge, size = 'sm' }) => {
   )
 }
 
-// Popup shown when the avatar is tapped — mirrors the follow/follower affordances
-// on the full profile page, scoped to the post's own chain instead of whichever
-// chain the wallet is currently connected to.
+// Popup shown when the avatar is hovered (tapped, on pointers without hover) — mirrors the
+// follow/follower affordances on the full profile page, scoped to the post's own chain
+// instead of whichever chain the wallet is currently connected to.
 const ProfileHoverCard = ({ creator, profile, networkId }) => {
   const router = useRouter()
   const { address, isConnected } = useConnection()
