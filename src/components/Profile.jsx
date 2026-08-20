@@ -12,6 +12,7 @@ import { getActiveChain } from '@/lib/communication'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
+import { handleBrokenAvatar } from '@/lib/utils'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
@@ -89,6 +90,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               width={36}
               height={36}
               unoptimized
+              onError={handleBrokenAvatar}
             />
             <Identicon
               name={profile.name}
@@ -234,7 +236,7 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
   return (
     <div className={clsx(styles.hoverCard, 'flex flex-column align-items-start gap-050')} onClick={(e) => e.stopPropagation()}>
       <button type="button" className={styles.hoverCard__avatar} onClick={() => creator && router.push(`/${creator}`)}>
-        <Image alt={profile.name} src={profile.profileImage} width={48} height={48} unoptimized />
+        <Image alt={profile.name} src={profile.profileImage} width={48} height={48} unoptimized onError={handleBrokenAvatar} />
       </button>
 
       <div className={styles.nameRow}>

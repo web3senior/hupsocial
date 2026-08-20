@@ -21,7 +21,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { getActiveChain } from '@/lib/communication'
 import { chunk, describeDropped } from '@/lib/batchLike'
 import { MAX_BATCH_FOLLOW_COUNT, preflightSelection } from '@/lib/batchFollow'
-import { shortTxError } from '@/lib/utils'
+import { shortTxError, handleBrokenAvatar } from '@/lib/utils'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import styles from './FollowListDialog.module.scss'
 
@@ -405,7 +405,7 @@ const ProfileRow = ({ profileAddress, initialFollowing, isSelected, isBatchSendi
 
       <Link href={`/${profileAddress}`} className={styles.row__profile} onClick={onNavigate}>
         <figure className={styles.row__avatar}>
-          <img src={profile.profileImage} alt={profile.name} loading="lazy" />
+          <img src={profile.profileImage} alt={profile.name} loading="lazy" onError={handleBrokenAvatar} />
         </figure>
 
         <div className={styles.row__info}>

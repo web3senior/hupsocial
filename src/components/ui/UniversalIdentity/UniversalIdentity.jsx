@@ -1,6 +1,7 @@
 import React from 'react'
 import clsx from 'clsx'
 import { Identicon } from './Identicon'
+import { handleBrokenAvatar } from '@/lib/utils'
 import styles from './UniversalIdentity.module.scss'
 
 export const UniversalIdentity = ({
@@ -22,7 +23,8 @@ export const UniversalIdentity = ({
             <img 
               src={resolvedAvatar} 
               className={styles['user-identity__avatar']} 
-              alt={`${displayName}'s avatar`} 
+              alt={`${displayName}'s avatar`}
+              onError={handleBrokenAvatar}
             />
           </div>
 

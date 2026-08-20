@@ -9,6 +9,7 @@ import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connect
 import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
+import { handleBrokenAvatar } from '@/lib/utils'
 import DialogSheet from '@/components/ui/DialogSheet'
 import NativePopover from '@/components/ui/NativePopover'
 import NetworkSelect from '@/components/ui/NetworkSelect'
@@ -72,9 +73,7 @@ function CommunityProof() {
             alt=""
             width="26"
             height="26"
-            onError={(event) => {
-              event.currentTarget.src = '/default-pfp.svg'
-            }}
+            onError={handleBrokenAvatar}
           />
         ))}
       </div>
@@ -318,7 +317,7 @@ export function Profile({ addr }) {
   return (
     <Link href={`/${addr}`}>
       <figure className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`} title={profile.name}>
-        <img alt={profile.name || `PFP`} src={profile.profileImage} className={`rounded`} />
+        <img alt={profile.name || `PFP`} src={profile.profileImage} className={`rounded`} onError={handleBrokenAvatar} />
       </figure>
     </Link>
   )

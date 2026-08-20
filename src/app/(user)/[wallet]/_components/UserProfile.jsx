@@ -25,6 +25,7 @@ import LinksTab from '@/components/tabs/LinksTab'
 import AssetsTab from '@/components/tabs/AssetsTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
+import { handleBrokenAvatar } from '@/lib/utils'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
@@ -972,7 +973,7 @@ const Status = ({ addr, profile, selfView }) => {
           <main className={`flex flex-column align-items-center gap-1 `}>
             <div className={`${styles.statusPopover__pfp} rounded relative`}>
               <figure className={`rounded`}>
-                <img src={`${profile.profileImage}`} />
+                <img src={`${profile.profileImage}`} alt="" onError={handleBrokenAvatar} />
               </figure>
 
               <div
@@ -1290,7 +1291,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 <div className={styles.profileModal__avatarWrap}>
                   <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
                     <figure className={styles.profileModal__avatar}>
-                      <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" />
+                      <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" onError={handleBrokenAvatar} />
                       <div className={styles.profileModal__avatarOverlay}>
                         <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">
                           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />

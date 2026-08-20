@@ -8,7 +8,7 @@ import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
 import { ArrowsClockwiseIcon, FunnelIcon, HandCoinsIcon, MagnifyingGlassIcon, StorefrontIcon, XIcon } from '@phosphor-icons/react'
 import { getNftListings, getNftPaymentTokens, getNftSellers } from '@/lib/api'
-import { handleBrokenImage } from '@/lib/utils'
+import { handleBrokenAvatar } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import { appChains } from '@/config/contracts'
@@ -247,7 +247,7 @@ function SellerAvatar({ user }) {
       </span>
     )
   }
-  return <img className={styles.filtersPanel__sellerAvatar} src={profile.profileImage} alt="" loading="lazy" onError={handleBrokenImage} />
+  return <img className={styles.filtersPanel__sellerAvatar} src={profile.profileImage} alt="" loading="lazy" onError={handleBrokenAvatar} />
 }
 
 /**

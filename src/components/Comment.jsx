@@ -28,6 +28,7 @@ import {
 import { renderMarkdown } from '@/lib/markdown'
 import { getIPFS } from '@/lib/ipfs'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
+import { handleBrokenAvatar } from '@/lib/utils'
 import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
 import { DotsThreeIcon } from '@phosphor-icons/react'
@@ -584,6 +585,7 @@ const ConnectedProfile = ({ addr }) => {
         alt={profile.name || `Default PFP`}
         src={`${profile.profileImage}`}
         className={`rounded`}
+        onError={handleBrokenAvatar}
       />
 
       <figcaption className={`flex flex-column`}>
