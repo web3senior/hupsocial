@@ -9,8 +9,8 @@
   color: var(--text-muted, #888);
   overflow: hidden;
 
-  // The logo covers the glyph rather than replacing it, so a 404 needs no re-render —
-  // the <img> hides itself and the coin underneath is already drawn
+  // The logo replaces the glyph rather than covering it — a transparent PNG over a coin
+  // reads as two icons — and fills the disc whatever the artwork's own aspect ratio is
   img {
     position: absolute;
     inset: 0;
