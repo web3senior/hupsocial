@@ -189,8 +189,8 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
       toast('Please choose an image file', 'error')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast(`${label} must be under 5 MB`, 'error')
+    if (file.size > 10 * 1024 * 1024) {
+      toast(`${label} must be under 10 MB`, 'error')
       return
     }
 

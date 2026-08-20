@@ -39,7 +39,7 @@ async function cachedGetIPFS(cid) {
   return data
 }
 const MAX_MEDIA_ITEMS = 4
-const MAX_MEDIA_SIZE_MB = 5
+const MAX_MEDIA_SIZE_MB = 10
 
 const forwarderAbi = [
   {

@@ -178,8 +178,8 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
       return
     }
     // Same cap as post media — the server upload route rejects larger payloads anyway
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Image must be under 5 MB', 'error')
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Image must be under 10 MB', 'error')
       return
     }
 

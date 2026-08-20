@@ -219,8 +219,8 @@ const CreateDropDialog = forwardRef(function CreateDropDialog(
       toast('Please choose an image file', 'error')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Image must be under 5 MB', 'error')
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Image must be under 10 MB', 'error')
       return
     }
 
@@ -245,8 +245,8 @@ const CreateDropDialog = forwardRef(function CreateDropDialog(
       toast('Please choose an image file', 'error')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Banner must be under 5 MB', 'error')
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Banner must be under 10 MB', 'error')
       return
     }
 
