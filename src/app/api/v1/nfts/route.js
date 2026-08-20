@@ -2,11 +2,10 @@
  * @file api/v1/nfts/route.js
  * @description Lists HupTrade NFT listings straight from the cidex-indexed nft_listings
  * table for the NFT Market grid — status/network/standard/payment-token/price/seller and
- * sort all resolve here in SQL. Name/collection search stays client-side (TradeCard-style
- * metadata — image, name — is fetched live per token, not indexed), so this route has no
- * `search` param; the client filters the resolved grid by name itself. Traits are the one
- * piece of token metadata that IS queryable here, because the read-through cache already
- * persisted them — see the `traits` param below.
+ * sort all resolve here in SQL. The free-text `q` search and the `traits` filter are the
+ * two places token metadata enters the query: names and attributes aren't indexed by cidex,
+ * but the app's read-through nft_metadata_cache has persisted them for every token that
+ * has ever been rendered, so both resolve against that table — see the params below.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
@@ -24,6 +23,13 @@ const STATUS_BY_KEY = { active: [1], sold: [2], active_sold: [1, 2], all: [1, 2]
 
 // A hand-edited URL shouldn't be able to hand MariaDB a hundred JSON_CONTAINS calls
 const MAX_TRAIT_PAIRS = 20
+
+// Longer than any NFT or collection name worth matching; keeps a pasted wall of text from
+// becoming a pathological LIKE pattern
+const MAX_SEARCH_LENGTH = 100
+
+// A typed "%" or "_" must match itself, not turn into a wildcard
+const escapeLike = (value) => value.replace(/[\\%_]/g, '\\$&')
 
 /**
  * Parse the `traits` param — a JSON array of {label, value} — into label → values.
@@ -115,6 +121,7 @@ export async function GET(request) {
     const minPrice = searchParams.get('minPrice') // base units, decimal string
     const maxPrice = searchParams.get('maxPrice')
     const seller = searchParams.get('seller') // address or username fragment
+    const q = (searchParams.get('q') || '').trim().slice(0, MAX_SEARCH_LENGTH) // NFT name, collection name, seller name or address fragment
     const referral = searchParams.get('referral') // 'any' (>0) | 'none' (=0) | minimum bps, e.g. '500' for 5%+
     const traits = parseTraitFilters(searchParams.get('traits')) // JSON [{label, value}] — see above
     const sort = searchParams.get('sort') || 'newest' // 'newest' | 'price_asc' | 'price_desc'
@@ -181,6 +188,26 @@ export async function GET(request) {
         whereClause += ` AND EXISTS (SELECT 1 FROM users us WHERE us.wallet_address = l.seller AND us.name LIKE ?)`
         whereParams.push(`%${seller}%`)
       }
+    }
+
+    // The search box. A token's own name is only known once that token has been rendered
+    // somewhere and cached, but a collection's name is shared by every token in it — so a
+    // listing whose token was never drawn still matches through any cached sibling's
+    // collection_name. That's what lets a search reach a collection four pages deep instead
+    // of only the tiles already on screen. The cache's utf8mb4_general_ci collation makes
+    // LIKE case-insensitive, so "dale" finds "Dale".
+    if (q) {
+      const pattern = `%${escapeLike(q)}%`
+      whereClause +=
+        ` AND (` +
+        `EXISTS (SELECT 1 FROM nft_metadata_cache m` +
+        ` WHERE m.network_id = l.network_id AND m.collection = l.collection AND m.token_id = l.token_id AND m.name LIKE ?)` +
+        ` OR EXISTS (SELECT 1 FROM nft_metadata_cache mc` +
+        ` WHERE mc.network_id = l.network_id AND mc.collection = l.collection AND mc.collection_name LIKE ?)` +
+        ` OR EXISTS (SELECT 1 FROM users us WHERE us.wallet_address = l.seller AND us.name LIKE ?)` +
+        ` OR l.seller LIKE ?` +
+        `)`
+      whereParams.push(pattern, pattern, pattern, pattern)
     }
 
     // Traits live in the app's own read-through metadata cache, not in the indexed listing

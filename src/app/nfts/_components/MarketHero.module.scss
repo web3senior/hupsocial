@@ -9,9 +9,52 @@
   // Matches the rail's inline padding so the heading and the first card share a left edge
   &__header {
     display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-inline: 0.6rem;
+  }
+
+  &__titles {
+    display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    padding-inline: 0.6rem;
+    min-width: 0;
+  }
+
+  // The arrows sit in the header rather than over the rail's edges: floating over the
+  // cards would hide the artwork they're meant to reveal, and a pair of chevrons next to
+  // the heading is the convention users already know from every storefront carousel
+  &__arrows {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.35rem;
+  }
+
+  &__arrow {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease, opacity 0.18s ease;
+
+    &:hover:not(:disabled) {
+      border-color: var(--text-muted);
+      background-color: var(--surface-muted);
+    }
+
+    // Kept in place rather than removed at either end, so the pair never shifts under the
+    // pointer mid-click
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
   }
 
   &__heading {
@@ -48,6 +91,22 @@
     &::-webkit-scrollbar-thumb {
       border-radius: 999px;
       background-color: color-mix(in srgb, var(--text) 15%, transparent);
+    }
+
+    // The overflowing edge fades out — a card cut off mid-way is the oldest cue there is
+    // that more sits past it, and a sharp clip reads as the end of the list instead. Driven
+    // by the same measurement as the arrows, so the fade lifts exactly when the end is
+    // reached and the last card shows whole.
+    --fade-left: 0px;
+    --fade-right: 0px;
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade-left), #000 calc(100% - var(--fade-right)), transparent);
+
+    &--moreLeft {
+      --fade-left: 2.5rem;
+    }
+
+    &--moreRight {
+      --fade-right: 2.5rem;
     }
   }
 

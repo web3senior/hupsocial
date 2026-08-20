@@ -47,14 +47,12 @@ const chainIconFor = (chain) => {
  * source TradeCard uses.
  * @param {Object} props
  * @param {Object} props.listing Row from GET /api/v1/nfts.
- * @param {string} [props.nameFilter] Case-insensitive substring — hides the card once
- * metadata resolves and neither its name nor collection name matches.
  * @param {Function} [props.onCollectionResolved] Called once with (collectionAddress,
  * collectionName) as soon as this card's metadata resolves a name — lets the grid build
  * a "Collection" filter option list from cards actually on screen, since collection
  * names aren't indexed anywhere server-side.
  */
-export default function NftMarketCard({ listing, nameFilter, onCollectionResolved }) {
+export default function NftMarketCard({ listing, onCollectionResolved }) {
   const networkId = Number(listing.network_id)
   const isLsp8 = Boolean(Number(listing.is_lsp8))
   const isSold = Number(listing.status) === 2
@@ -79,11 +77,6 @@ export default function NftMarketCard({ listing, nameFilter, onCollectionResolve
     onCollectionResolved?.(listing.collection.toLowerCase(), metadata.collectionName)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMetaLoading, metadata.collectionName])
-
-  if (nameFilter && !isMetaLoading) {
-    const haystack = `${metadata.name || ''} ${metadata.collectionName || ''}`.toLowerCase()
-    if (!haystack.includes(nameFilter.toLowerCase())) return null
-  }
 
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)

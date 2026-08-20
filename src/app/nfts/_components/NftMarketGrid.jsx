@@ -199,8 +199,9 @@ function usePriceDecimals(networkId, token, indexedDecimals) {
   return chainInfo?.nativeCurrency?.decimals ?? 18
 }
 
-function buildApiFilters(filters, priceDecimals) {
+function buildApiFilters(filters, priceDecimals, search) {
   const api = {}
+  if (search) api.q = search
   if (filters.networkId) api.networkId = filters.networkId
   if (filters.collection) api.collection = filters.collection
   if (filters.status && filters.status !== 'active') api.status = filters.status
@@ -281,8 +282,9 @@ function QuickSelect({ label, value, defaultValue, options, onChange, tooltip })
  * Search + filter toolbar over a responsive grid of NftMarketCard tiles, replacing the old
  * post-feed rendering on the NFT Market page. Status/network/standard/payment-token/seller/
  * price/sort all resolve server-side against the indexed nft_listings table (see GET /api/v1/nfts).
- * Name/seller search stays client-side over the currently loaded page — NFT metadata (name,
- * image) is resolved live per token, not indexed, so there's nothing to search server-side.
+ * The search box goes there too, as `q`: it matches NFT and collection names through the
+ * server's metadata cache, so a collection buried pages deep is found rather than only the
+ * tiles already on screen.
  */
 export default function NftMarketGrid() {
   const searchParams = useSearchParams()
@@ -382,7 +384,7 @@ export default function NftMarketGrid() {
   // is already on screen. Seeded with the mount inputs on a restore, so the initial run
   // doesn't refetch page 1 and throw away every loaded page beyond the first (idempotent
   // under StrictMode's replayed mount, unlike a consumable boolean).
-  const lastFetchKeyRef = useRef(restoredSnapshot ? JSON.stringify([filters, priceDecimals, 0]) : null)
+  const lastFetchKeyRef = useRef(restoredSnapshot ? JSON.stringify([filters, search, priceDecimals, 0]) : null)
 
   // Snap back to where the user was. The restored rows are already in this render's DOM
   // with their final height (fixed aspect-ratio tiles), and 'instant' overrides the app's
@@ -491,7 +493,7 @@ export default function NftMarketGrid() {
   useEffect(() => {
     // Same inputs as the result already on screen (a restored snapshot, or StrictMode
     // replaying the mount) — refetching would truncate the list back to page 1
-    const fetchKey = JSON.stringify([filters, priceDecimals, refreshKey])
+    const fetchKey = JSON.stringify([filters, search, priceDecimals, refreshKey])
     if (fetchKey === lastFetchKeyRef.current) return
     lastFetchKeyRef.current = fetchKey
 
@@ -507,7 +509,7 @@ export default function NftMarketGrid() {
         return label ? new Map([[filters.collection, label]]) : new Map()
       })
       try {
-        const res = await getNftListings(1, PAGE_SIZE, buildApiFilters(filters, priceDecimals))
+        const res = await getNftListings(1, PAGE_SIZE, buildApiFilters(filters, priceDecimals, search))
         if (cancelled) return
         setItems(res.data || [])
         setHasMore(res.meta?.hasMore || false)
@@ -529,7 +531,7 @@ export default function NftMarketGrid() {
       // even with identical inputs, fetches instead of skipping
       lastFetchKeyRef.current = null
     }
-  }, [filters, priceDecimals, refreshKey])
+  }, [filters, search, priceDecimals, refreshKey])
 
   useEffect(() => {
     isFetchingRef.current = isFetchingMore
@@ -542,7 +544,7 @@ export default function NftMarketGrid() {
     const nextPage = page + 1
 
     try {
-      const res = await getNftListings(nextPage, PAGE_SIZE, buildApiFilters(filters, priceDecimals))
+      const res = await getNftListings(nextPage, PAGE_SIZE, buildApiFilters(filters, priceDecimals, search))
       setItems((prev) => [...prev, ...(res.data || [])])
       setHasMore(res.meta?.hasMore || false)
       setPage(nextPage)
@@ -551,7 +553,7 @@ export default function NftMarketGrid() {
     } finally {
       setIsFetchingMore(false)
     }
-  }, [page, filters, priceDecimals])
+  }, [page, filters, search, priceDecimals])
 
   useEffect(() => {
     const onScroll = () => {
@@ -604,7 +606,6 @@ export default function NftMarketGrid() {
   // currency's decimals, and a specific token carries its own from the index
   const canFilterPrice = Boolean(filters.networkId) || Boolean(selectedToken && selectedToken.value !== 'native' && selectedToken.decimals != null)
   const collectionEntries = [...collectionOptions.entries()].sort((a, b) => COLLATOR.compare(a[1], b[1]))
-  const searchLower = search.toLowerCase()
   const hiddenCount = hiddenFilterCount(filters)
   const isFiltered = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS)
 
@@ -885,24 +886,12 @@ export default function NftMarketGrid() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <p className={styles.market__empty}>No listings match these filters.</p>
+        <p className={styles.market__empty}>{search ? `Nothing on the market matches "${search}".` : 'No listings match these filters.'}</p>
       ) : (
         <div className={styles.market__grid}>
-          {items.map((listing) => {
-            const sellerMatches = Boolean(
-              searchLower &&
-                ((listing.display_name && listing.display_name.toLowerCase().includes(searchLower)) ||
-                  listing.wallet_address?.toLowerCase().includes(searchLower)),
-            )
-            return (
-              <NftMarketCard
-                key={`${listing.network_id}-${listing.listing_id}`}
-                listing={listing}
-                nameFilter={searchLower && !sellerMatches ? searchLower : undefined}
-                onCollectionResolved={handleCollectionResolved}
-              />
-            )
-          })}
+          {items.map((listing) => (
+            <NftMarketCard key={`${listing.network_id}-${listing.listing_id}`} listing={listing} onCollectionResolved={handleCollectionResolved} />
+          ))}
         </div>
       )}
 

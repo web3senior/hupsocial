@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
-import { CaretDownIcon, CaretUpIcon, MinusIcon, StackIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, CaretLeftIcon, CaretRightIcon, CaretUpIcon, MinusIcon, StackIcon } from '@phosphor-icons/react'
 import { getNftCollections, getNftCollectionsHistory } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
@@ -171,6 +171,56 @@ function CollectionCard({ collection, trend }) {
 }
 
 /**
+ * Tracks which way a horizontal rail can still scroll, so the arrow buttons can disable at
+ * either end — and hide entirely when everything already fits. A scrollbar is easy to miss
+ * on a trackpad (hidden until it moves) and absent on touch, so without the arrows a rail
+ * with twelve cards reads as a rail with four.
+ * @param {import('react').RefObject<HTMLElement>} railRef The scroll container.
+ * @param {Array} deps Values whose change can alter the rail's content width.
+ */
+function useRailScroll(railRef, deps) {
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const measure = useCallback(() => {
+    const rail = railRef.current
+    if (!rail) return
+    // A pixel of slack: subpixel layout can leave scrollWidth a fraction over clientWidth
+    // on a rail that doesn't actually move
+    setCanScrollLeft(rail.scrollLeft > 1)
+    setCanScrollRight(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1)
+  }, [railRef])
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+    measure()
+    rail.addEventListener('scroll', measure, { passive: true })
+    // Cards resize at the 640px breakpoint and the container with the viewport
+    const observer = new ResizeObserver(measure)
+    observer.observe(rail)
+    return () => {
+      rail.removeEventListener('scroll', measure)
+      observer.disconnect()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [measure, ...deps])
+
+  // One viewport's worth minus a sliver, so the last card seen stays on screen as the first
+  // of the next set — the eye keeps its place
+  const scrollByPage = useCallback(
+    (direction) => {
+      const rail = railRef.current
+      if (!rail) return
+      rail.scrollBy({ left: direction * rail.clientWidth * 0.85, behavior: 'smooth' })
+    },
+    [railRef],
+  )
+
+  return { canScrollLeft, canScrollRight, scrollByPage }
+}
+
+/**
  * NFT Market Hero
  * The showcase rail above the grid: collections that currently have something listed, ranked
  * by how many. Each card links to the collection's own page — banner, description, creators
@@ -182,6 +232,9 @@ export default function MarketHero({ networkId }) {
   const [collections, setCollections] = useState([])
   const [trends, setTrends] = useState({})
   const [isLoading, setIsLoading] = useState(true)
+  const railRef = useRef(null)
+  const { canScrollLeft, canScrollRight, scrollByPage } = useRailScroll(railRef, [collections, isLoading])
+  const hasOverflow = canScrollLeft || canScrollRight
 
   useEffect(() => {
     let cancelled = false
@@ -241,11 +294,43 @@ export default function MarketHero({ networkId }) {
   return (
     <section className={styles.hero} aria-label="Listed collections">
       <header className={styles.hero__header}>
-        <h2 className={styles.hero__heading}>Collections on the market</h2>
-        <p className={styles.hero__subheading}>Tap a collection to open its page</p>
+        <div className={styles.hero__titles}>
+          <h2 className={styles.hero__heading}>Collections on the market</h2>
+          <p className={styles.hero__subheading}>
+            {hasOverflow ? `${collections.length} collections — scroll sideways to see them all` : 'Tap a collection to open its page'}
+          </p>
+        </div>
+
+        {/* Only once the rail actually overflows: arrows on a rail that fits would promise
+            more cards than there are */}
+        {hasOverflow && (
+          <div className={styles.hero__arrows}>
+            <button
+              type="button"
+              className={styles.hero__arrow}
+              aria-label="Scroll collections left"
+              disabled={!canScrollLeft}
+              onClick={() => scrollByPage(-1)}
+            >
+              <CaretLeftIcon size={16} weight="bold" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={styles.hero__arrow}
+              aria-label="Scroll collections right"
+              disabled={!canScrollRight}
+              onClick={() => scrollByPage(1)}
+            >
+              <CaretRightIcon size={16} weight="bold" aria-hidden="true" />
+            </button>
+          </div>
+        )}
       </header>
 
-      <div className={styles.hero__rail}>
+      <div
+        ref={railRef}
+        className={clsx(styles.hero__rail, canScrollLeft && styles['hero__rail--moreLeft'], canScrollRight && styles['hero__rail--moreRight'])}
+      >
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => <div key={i} className={styles.hero__skeleton} />)
           : collections.map((collection) => (
