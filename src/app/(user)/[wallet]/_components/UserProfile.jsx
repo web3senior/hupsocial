@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges } from '@/lib/api'
+import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries } from '@/lib/api'
+import { ORIGIN_OPTIONS } from '@/config/originOptions'
+import { countryFlagEmoji, isCountryCode } from '@/lib/origin'
 import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
@@ -31,7 +33,7 @@ import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
-import { CakeIcon } from '@phosphor-icons/react'
+import { CakeIcon, MapPinIcon } from '@phosphor-icons/react'
 import styles from './UserProfile.module.scss'
 
 // Compares month/day only — the stored year is irrelevant to "is it their birthday today".
@@ -616,6 +618,18 @@ const Profile = ({ addr }) => {
                 </span>
               ))}
 
+            {/* Where this wallet says it is from — a real country, or an onchain one. Resolved
+                server-side into { emoji, label } so the chip never has to know which kind it got.
+                Windows ships no flag glyphs and renders a country's pair as its two letters
+                instead, which is why the name is always spelled out beside it. */}
+            {profile.origin && (
+              <span className={styles.profile__origin}>
+                <MapPinIcon size={14} />
+                <span aria-hidden="true">{profile.origin.emoji}</span>
+                {profile.origin.label}
+              </span>
+            )}
+
             <p className={`${styles.profile__description} mt-20`}>{profile.description || 'This user has not set up a bio yet.'}</p>
 
             <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
@@ -1065,6 +1079,10 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const [badges, setBadges] = useState([])
   const [badgesLoaded, setBadgesLoaded] = useState(false)
   const [selectedBadge, setSelectedBadge] = useState(profile?.badge ?? null)
+  // The country half of the origin picker, from the same table the save validates against. The
+  // onchain half ships with the build, so the picker is usable the instant the modal opens and
+  // this only fills in the rest.
+  const [countries, setCountries] = useState([])
   const [editingLinkIndex, setEditingLinkIndex] = useState(null)
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
@@ -1085,6 +1103,22 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
       cancelled = true
     }
   }, [address])
+
+  // Countries change roughly never and the helper memoises the request, so reopening the editor
+  // costs nothing. A failed load is survivable here in a way the badge picker's is not: the
+  // select keeps an option for whatever origin is already set (see currentOrigin below), so
+  // submitting an unloaded picker cannot silently erase it.
+  useEffect(() => {
+    let cancelled = false
+
+    getCountries().then((list) => {
+      if (!cancelled) setCountries(list)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Refs
   const pfpRef = useRef()
@@ -1250,6 +1284,15 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     }
   }, [getActiveChain])
 
+  // A <select> can only submit a value it holds an option for. Until the country list lands — or
+  // if the request failed outright — the saved country has no option, the select falls back to
+  // its first one, and saving anything else on the form would quietly wipe it. Carrying the saved
+  // country as its own option closes that door; onchain origins ship with the build and are
+  // always present already.
+  const savedOrigin = profile?.origin ?? null
+  const savedCountryMissing =
+    Boolean(savedOrigin) && isCountryCode(savedOrigin.code) && !countries.some((country) => country.iso_code === savedOrigin.code)
+
   return (
     <div className={`${styles.profileModal} animate fade`} onMouseDown={() => setShowProfileModal(false)}>
       <div className={styles.profileModal__card} onMouseDown={(e) => e.stopPropagation()}>
@@ -1348,6 +1391,38 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 defaultValue={profile?.birthday || ''}
                 max={new Date().toISOString().slice(0, 10)}
               />
+            </div>
+
+            {/* From — Hup-native like the birthday above it, so a Universal Profile sets it here
+                too. Country-level and no finer: a post is permanent, and this is the one thing on
+                a profile that could tie a pseudonym to a place, so it stays coarse, opt-in and
+                erasable. The onchain origins sit on top for everyone whose honest answer is a
+                chain rather than a country. */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label} htmlFor="pm-origin">
+                From
+              </label>
+              <select id="pm-origin" name="origin" className={styles.profileModal__select} defaultValue={savedOrigin?.code || ''}>
+                <option value="">Not shown</option>
+                <optgroup label="Onchain">
+                  {ORIGIN_OPTIONS.map((option) => (
+                    <option key={option.slug} value={option.slug}>
+                      {`${option.emoji} ${option.label}`}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Countries">
+                  {savedCountryMissing && (
+                    <option value={savedOrigin.code}>{`${savedOrigin.emoji} ${savedOrigin.label}`}</option>
+                  )}
+                  {countries.map((country) => (
+                    <option key={country.iso_code} value={country.iso_code}>
+                      {`${countryFlagEmoji(country.iso_code)} ${country.name}`}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <small className={styles.profileModal__badgeHint}>Shown next to your name on your profile. Leave it unset to keep it to yourself.</small>
             </div>
 
             {/* Community tag — only offered when the wallet actually belongs somewhere that grants one */}

@@ -617,6 +617,16 @@
     }
   }
 
+  // Where this wallet says it is from. Deliberately the same weight as the birthday above it:
+  // both are small facts someone volunteered, and neither should outshout the name.
+  &__origin {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--system-12-font-size);
+    color: var(--gray-500);
+  }
+
   &__tags {
     small {
       background-color: var(--tag);
@@ -1069,6 +1079,26 @@
     &::placeholder {
       color: var(--text-muted);
     }
+
+    &:focus {
+      border-color: var(--color-primary);
+    }
+  }
+
+  // A native <select>: 249 countries type-to-jump on desktop and get the platform's own wheel
+  // on mobile, which no custom listbox matches. Same chrome as the text inputs beside it, minus
+  // the placeholder rule it has no use for.
+  &__select {
+    width: 100%;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    font-size: var(--system-14-font-size);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
 
     &:focus {
       border-color: var(--color-primary);

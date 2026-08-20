@@ -3,6 +3,30 @@ import pool from '@/lib/db'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { queryUniversalProfile } from '@/lib/lukso'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
+import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
+
+/**
+ * The origin a profile shows, resolved to something renderable. An onchain origin needs nothing
+ * but the build's own list; a country needs its name, and that is a second small query rather
+ * than a join on the profile read below. That read is a bare `SELECT u.*`, which keeps working
+ * against a database predating the origin column — welding a join onto it is exactly what 500'd
+ * every profile in the app, and every avatar with it, when the badge columns went in. A failed
+ * lookup here costs the country's name, never the profile.
+ */
+async function resolveOrigin(code) {
+  const normalized = normalizeOriginCode(code)
+  if (!normalized) return null
+  if (!isCountryCode(normalized)) return describeOrigin(normalized)
+
+  try {
+    const [rows] = await pool.execute('SELECT name FROM countries WHERE iso_code = ? LIMIT 1', [normalized])
+    return describeOrigin(normalized, rows[0]?.name)
+  } catch (error) {
+    console.error('[ORIGIN_RESOLVE_ERROR]:', error.message)
+    /* The flag and the code alone still say where someone is from. */
+    return describeOrigin(normalized)
+  }
+}
 
 export async function GET(request, { params }) {
   try {
@@ -43,6 +67,12 @@ export async function GET(request, { params }) {
       }),
     ])
 
+    /* Hup-native, like birthday: a Universal Profile describes a person, not where they told
+       Hup they are from, so both branches below take this from our own users row. Sequential
+       rather than part of the batch above because it reads that row's value; it costs one
+       indexed lookup, and only for profiles that actually publish a country. */
+    const origin = await resolveOrigin(rows[0]?.origin_code)
+
     /* Check if the profile data exists and has valid metadata */
     const profile = upData?.data?.Profile?.[0]
 
@@ -60,6 +90,7 @@ export async function GET(request, { params }) {
       profile.birthday = rows[0]?.birthday ?? null
       // Same for the community badge: a UP describes a person, not their Hup memberships.
       profile.badge = badge
+      profile.origin = origin
 
       return NextResponse.json({
         source: 'universal_profile',
@@ -91,6 +122,11 @@ export async function GET(request, { params }) {
     delete dbProfile.badge_community_id
     dbProfile.badge = badge
 
+    /* The raw code says nothing a client can render — no flag, no name — so only the resolved
+       form is exposed, exactly as the badge is. */
+    delete dbProfile.origin_code
+    dbProfile.origin = origin
+
     return NextResponse.json({
       source: 'database',
       data: dbProfile,
@@ -118,6 +154,7 @@ export async function PUT(request, { params }) {
     const tags = formData.get('tags')
     const links = formData.get('links')
     const badge = parseBadgeSelection(formData.get('badge'))
+    const origin = parseOriginSelection(formData.get('origin'))
 
     // Verify profile exists before executing update
     const [existing] = await pool.execute('SELECT wallet_address FROM users WHERE wallet_address = ?', [address])
@@ -176,6 +213,27 @@ export async function PUT(request, { params }) {
       }
       updateFields.push('`badge_network_id` = ?', '`badge_contract_address` = ?', '`badge_community_id` = ?')
       queryValues.push(wearable.networkId, wearable.contractAddress, wearable.communityId)
+    }
+
+    /* Where this wallet says it is from — a real country, or one of the onchain origins. Absent
+       leaves it alone, empty clears it. A country is re-checked against the same `countries`
+       table the picker was filled from, so the two can never disagree about which codes exist; an
+       onchain slug was already checked against the build's own list while parsing. */
+    if (origin.action === 'invalid') {
+      return NextResponse.json({ error: 'Invalid origin selection' }, { status: 400 })
+    }
+    if (origin.action === 'clear') {
+      updateFields.push('`origin_code` = NULL')
+    }
+    if (origin.action === 'set') {
+      if (isCountryCode(origin.code)) {
+        const [known] = await pool.execute('SELECT iso_code FROM countries WHERE iso_code = ? LIMIT 1', [origin.code])
+        if (known.length === 0) {
+          return NextResponse.json({ error: 'Unknown country' }, { status: 400 })
+        }
+      }
+      updateFields.push('`origin_code` = ?')
+      queryValues.push(origin.code)
     }
 
     if (updateFields.length === 0) {

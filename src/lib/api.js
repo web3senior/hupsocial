@@ -34,6 +34,34 @@ export const getUserBadges = async (address) => {
 }
 
 /**
+ * Every country the profile editor's origin picker may offer, straight from the `countries`
+ * table the save then validates against — so the picker can never offer one the setter rejects.
+ *
+ * Memoised for the page's lifetime, on the promise rather than the result, so opening the editor
+ * twice (or twice at once) is a single request. A failed load is not cached: it resolves empty,
+ * leaves the promise slot clear, and the next open tries again.
+ * @returns {Promise<Array<{name: string, iso_code: string}>>}
+ */
+let countriesPromise = null
+export const getCountries = () => {
+  if (!countriesPromise) {
+    countriesPromise = fetch('/api/v1/countries')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => (Array.isArray(data?.data) ? data.data : []))
+      .catch((error) => {
+        console.error('Country fetch failed:', error)
+        return []
+      })
+      .then((list) => {
+        if (list.length === 0) countriesPromise = null
+        return list
+      })
+  }
+
+  return countriesPromise
+}
+
+/**
  * Get Universal Profile via internal API proxy
  * @param {string} addr
  * @returns {Promise<Object>}
