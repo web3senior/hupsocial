@@ -91,24 +91,31 @@
 .communityTag {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
+  // Discord's server tag: a filled chip barely taller than the text inside it. --tag is the
+  // app's own chip token, so it follows the theme and matches the tag chips already on the
+  // profile page.
+  //
+  // Discord drops the outline and lets the fill be the whole shape, which works because its
+  // chip sits raised on a dark page. On the light feed --tag is #f9fafb against white, so the
+  // shape disappears and the tag reads as loose text beside the name — hence the hairline.
+  // It costs nothing in dark, where --border is #ffffff0f and all but invisible anyway.
+  gap: 0.25em;
   flex-shrink: 0;
-  // In em, like the logo below, so the breathing room tracks the font-size the pill is wearing
-  // and the large variant inherits it instead of restating a number.
-  padding: 0.15em 0.45em;
+  // Everything in em so the pill is one shape at any size: the large variant sets a font-size
+  // and the padding, gap and logo all follow it without restating a number.
+  padding: 0.2em 0.4em;
   border: 1px solid var(--border);
-  background-color: var(--surface-muted);
-  border-radius: 4px;
+  background-color: var(--tag);
+  border-radius: 5px;
   font-size: var(--system-10-font-size);
   font-weight: 600;
-  line-height: 1.6;
-  color: var(--gray-400);
+  line-height: 1.3;
+  color: var(--text-muted, var(--gray-400));
   text-decoration: none;
   white-space: nowrap;
 
   &:hover {
     color: var(--text, inherit);
-    border-color: var(--text-muted, var(--gray-400));
   }
 
   // Sized in em so the mark tracks whatever font-size the pill is wearing — the large variant
@@ -124,9 +131,7 @@
   // same pill is offered one step up. Scale only: colour, border, radius and hover all stay on the
   // base class, so a look tuned for the post card still reaches every surface wearing the tag.
   &--lg {
-    gap: 0.25rem;
-    font-size: var(--system-12-font-size);
-    line-height: 1.5;
+    font-size: var(--system-11-font-size);
   }
 }
 
