@@ -20,6 +20,12 @@
   --surface-muted: #f7f7f8;
   --text: #171717;
   --text-muted: #666666;
+  // Status palette, split per theme: no single hue clears 4.5:1 on both a white and a
+  // #191919 surface. Replaces the undefined --error-color / --toggle-active / --primary-color
+  // family, whose light-only fallbacks were winning in every theme.
+  --status-success: #15803d;
+  --status-warning: #b45309;
+  --status-error: #dc2626;
   --border: var(--gray-300, #e5e7eb);
   --hover: #f3f4f6;
   --tag: var(--gray-50, #f3f4f6);
@@ -91,6 +97,9 @@
   --surface-muted: #2a2a2a;
   --text: #ffffffa6;
   --text-muted: #a1a1aa;
+  --status-success: #4ade80;
+  --status-warning: #fbbf24;
+  --status-error: #f87171;
 
   --hover: #20232a;
   --tag: var(--black-800);
@@ -130,6 +139,9 @@
   --surface-muted: #0d1c12;
   --text: #a3ffad;
   --text-muted: #6ee77d;
+  --status-success: #4ade80;
+  --status-warning: #fbbf24;
+  --status-error: #f87171;
   --border: var(--green-500, #1f7a3a);
   --hover: #12301c;
   --tag: var(--black-800);

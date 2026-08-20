@@ -25,11 +25,11 @@
     font-size: 0.8rem;
     padding: 0.25rem 0.6rem;
     border-radius: 999px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     color: var(--text-muted);
 
     &--unlocked {
-      color: var(--toggle-active, #16a34a);
+      color: var(--status-success);
       border-color: currentColor;
     }
   }
@@ -45,7 +45,7 @@
     flex-direction: column;
     gap: 0.6rem;
     padding: 1rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 8px;
   }
 
@@ -59,10 +59,10 @@
   &__input {
     width: 100%;
     padding: 0.55rem 0.75rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--bg-light, transparent);
-    color: inherit;
+    background: var(--surface-muted);
+    color: var(--text);
   }
 
   &__hint {
@@ -76,7 +76,7 @@
     flex-direction: column;
     gap: 0.5rem;
     padding: 1rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 8px;
   }
 
@@ -101,7 +101,7 @@
     color: var(--text-muted);
 
     &--ok {
-      color: var(--toggle-active, #16a34a);
+      color: var(--status-success);
     }
   }
 
@@ -132,8 +132,8 @@
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 6px;
-    background: var(--primary-color, #333);
-    color: var(--primary-contrast, #fff);
+    background: var(--text);
+    color: var(--background);
     cursor: pointer;
 
     &:disabled {
@@ -144,10 +144,10 @@
 
   &__dangerBtn {
     padding: 0.5rem 1rem;
-    border: 1px solid var(--error-color, #dc2626);
+    border: 1px solid var(--status-error);
     border-radius: 6px;
     background: transparent;
-    color: var(--error-color, #dc2626);
+    color: var(--status-error);
     cursor: pointer;
   }
 
@@ -169,8 +169,8 @@
     gap: 0.5rem;
     padding: 0.6rem 0.8rem;
     border-radius: 6px;
-    border: 1px solid var(--error-color, #dc2626);
-    color: var(--error-color, #dc2626);
+    border: 1px solid var(--status-error);
+    color: var(--status-error);
     font-size: 0.85rem;
   }
 }

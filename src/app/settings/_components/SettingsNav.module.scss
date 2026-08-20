@@ -2,17 +2,22 @@
 $sidebar-width: 280px;
 $breakpoint-mobile: 768px;
 
-// Component-specific theme variable fallback mappings
-$color-text-primary: var(--color, #1a1a1a);
-$color-text-muted: var(--text-muted, #666666);
-$color-bg-hover: var(--surface-muted, #f5f5f5);
-$color-border: var(--border, #e0e0e0);
+// Theme tokens. Nothing here carries a hardcoded fallback on purpose: --color is defined
+// nowhere in the app, so "var(--color, #1a1a1a)" always won with its near-black fallback,
+// painting every label and icon #1a1a1a onto the dark theme's #191919 surface.
+$color-text-primary: var(--text);
+$color-text-muted: var(--text-muted);
+$color-bg-hover: var(--hover);
+$color-bg-active: var(--surface-muted);
+$color-border: var(--border);
 $border-radius-item: 8px;
 
 .settingsContainer {
   display: flex;
   min-height: 600px;
-  background-color: var(--background, #ffffff);
+  // Transparent, not --background: the parent .page__container already paints --surface, and
+  // --background is a step darker in the dark theme, so this drew a #131313 slab inside it.
+  background-color: transparent;
   color: $color-text-primary;
   border-radius: 16px;
   font-family: var(--font-sans);
@@ -53,7 +58,7 @@ $border-radius-item: 8px;
   }
 
   &.isActive:not(:disabled) {
-    background-color: $color-bg-hover;
+    background-color: $color-bg-active;
   }
 
   // Visual treatments for disabled navigation blocks
@@ -86,7 +91,7 @@ $border-radius-item: 8px;
   .label {
     font-size: 0.95rem;
     font-weight: 500;
-    color: var(--color);
+    color: $color-text-primary;
     line-height: 1.2;
   }
 
@@ -165,7 +170,7 @@ $border-radius-item: 8px;
       }
 
       .arrow {
-        color: #ccc;
+        color: $color-text-muted;
       }
     }
   }

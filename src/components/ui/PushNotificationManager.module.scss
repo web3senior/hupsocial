@@ -1,11 +1,14 @@
 // ■■■ [Block] ■■■
+// Colors come from the theme tokens, never hardcoded: this pane renders inside the
+// Settings card, so a fixed dark palette drew a black slab under the light theme and
+// a card a shade darker than --surface under the dark one.
 .notification-manager {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem;
-  background-color: #0d0d0d;
-  border: 1px solid #2a2a2a;
+  background-color: var(--surface-muted);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-family: 'Courier New', Courier, monospace;
 
@@ -19,26 +22,26 @@
   &__title {
     margin: 0;
     font-size: 1.25rem;
-    color: #ffffff;
+    color: var(--text);
     letter-spacing: -0.02em;
   }
 
   &__status {
     margin: 0;
     font-size: 0.875rem;
-    color: #888888;
+    color: var(--text-muted);
 
     // ■■■ [Modifiers] ■■■
     &--error {
-      color: #ff4a4a;
+      color: var(--status-error);
     }
 
     &--warning {
-      color: #ffb84d;
+      color: var(--status-warning);
     }
 
     &--success {
-      color: #00e676;
+      color: var(--status-success);
     }
   }
 
@@ -61,23 +64,25 @@
     }
 
     // ■■■ [Modifiers] ■■■
+    // The tint and the resting border derive from the button's own hue via color-mix, so
+    // each theme's status token carries them rather than a baked-in rgba().
     &--subscribe {
-      color: #00e676;
-      border: 1px solid rgba(0, 230, 118, 0.3);
+      color: var(--status-success);
+      border: 1px solid color-mix(in srgb, var(--status-success) 35%, transparent);
 
       &:hover:not(:disabled) {
-        background: rgba(0, 230, 118, 0.1);
-        border-color: #00e676;
+        background: color-mix(in srgb, var(--status-success) 12%, transparent);
+        border-color: var(--status-success);
       }
     }
 
     &--unsubscribe {
-      color: #ff4a4a;
-      border: 1px solid rgba(255, 74, 74, 0.3);
+      color: var(--status-error);
+      border: 1px solid color-mix(in srgb, var(--status-error) 35%, transparent);
 
       &:hover:not(:disabled) {
-        background: rgba(255, 74, 74, 0.1);
-        border-color: #ff4a4a;
+        background: color-mix(in srgb, var(--status-error) 12%, transparent);
+        border-color: var(--status-error);
       }
     }
   }
