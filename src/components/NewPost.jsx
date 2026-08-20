@@ -1159,6 +1159,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         author: address,
         metadata,
         kind: actionType === 'edit' ? 'edit' : isComment ? 'reply' : 'post',
+        parentId: isComment ? replyTarget?.id : null,
       }
 
       if (actionType === 'edit') {

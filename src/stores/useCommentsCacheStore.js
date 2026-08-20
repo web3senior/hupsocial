@@ -25,6 +25,21 @@ const inflight = new Map()
 export const useCommentsCacheStore = create((set, get) => ({
   caches: {},
 
+  // Bumped per thread when the viewer's own reply finishes indexing. A mounted <Comments> only
+  // ever fetches once, so dropping the snapshot alone would do nothing for the thread already on
+  // screen — the nonce is what tells it to go again.
+  threadNonces: {},
+
+  invalidateThread: (networkId, postId) =>
+    set((state) => {
+      const key = commentsCacheKey(networkId, postId)
+      const { [key]: _stale, ...caches } = state.caches
+      return {
+        caches,
+        threadNonces: { ...state.threadNonces, [key]: (state.threadNonces[key] ?? 0) + 1 },
+      }
+    }),
+
   saveCommentsCache: (key, list, address) =>
     set((state) => ({
       caches: { ...state.caches, [key]: { list, address: address ?? null, savedAt: Date.now() } },

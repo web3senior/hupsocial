@@ -15,6 +15,11 @@ function readThread(key, viewer) {
   return { key, list: cached?.list ?? [], isLoading: !cached, isFresh: !!cached?.isFresh }
 }
 
+// Identifies the exact data currently painted. The nonce rides along so that invalidating a
+// thread (a reply of the viewer's just landed in it) reads as "different data" and sends the
+// fetch effect back out, without anything having to reach into a ref mid-render.
+const appliedKey = (cacheKey, viewer, nonce) => `${cacheKey}|${viewer}|${nonce}`
+
 export default function Comments({ networkId, postId, viewerAddress }) {
   const router = useRouter()
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
@@ -22,28 +27,29 @@ export default function Comments({ networkId, postId, viewerAddress }) {
 
   const cacheKey = commentsCacheKey(networkId, postId)
   const viewer = viewerAddress ?? null
+  const threadNonce = useCommentsCacheStore((state) => state.threadNonces[cacheKey] ?? 0)
 
   // Thread from an earlier visit this session, if any. Safe to read in an
   // initializer: the store is in-memory, so it's always empty during SSR
   // hydration and cache hits only ever happen on client-side remounts.
   const [thread, setThread] = useState(() => readThread(cacheKey, viewer))
 
-  // Params whose data is already on screen ("key|viewer"). Set on data
-  // application, never on fetch start, so StrictMode's double-run can't mark an
-  // in-flight request as done. `isFresh` is read only here, to seed it.
-  const appliedRef = useRef(thread.isFresh ? `${cacheKey}|${viewer}` : null)
+  // Params whose data is already on screen. Set on data application, never on
+  // fetch start, so StrictMode's double-run can't mark an in-flight request as
+  // done. `isFresh` is read only here, to seed it.
+  const appliedRef = useRef(thread.isFresh ? appliedKey(cacheKey, viewer, threadNonce) : null)
 
   // Navigating comment → parent keeps this component mounted with a new postId,
   // so the thread has to swap during render: an effect would paint the previous
   // post's replies under the new one for a frame.
   if (thread.key !== cacheKey) {
     const next = readThread(cacheKey, viewer)
-    appliedRef.current = next.isFresh ? `${cacheKey}|${viewer}` : null
+    appliedRef.current = next.isFresh ? appliedKey(cacheKey, viewer, threadNonce) : null
     setThread(next)
   }
 
   useEffect(() => {
-    const params = `${cacheKey}|${viewer}`
+    const params = appliedKey(cacheKey, viewer, threadNonce)
     // Already applied — a snapshot fresh enough to trust, or a fetch this effect
     // already finished. Skipping here is what stops every visit from re-requesting
     // a thread the session already has.
@@ -68,7 +74,7 @@ export default function Comments({ networkId, postId, viewerAddress }) {
     return () => {
       cancelled = true
     }
-  }, [networkId, postId, viewer, cacheKey, fetchComments])
+  }, [networkId, postId, viewer, cacheKey, fetchComments, threadNonce])
 
   if (thread.isLoading) return <CommentSkeletonList count={3} />
 

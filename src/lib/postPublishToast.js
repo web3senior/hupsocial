@@ -8,8 +8,10 @@
  * closes — the poll and the toast handle have to outlive it.
  */
 
+import { mutate as globalMutate } from 'swr'
 import { toast } from '@/components/NextToast'
 import { usePostStore } from '@/stores/usePostStore'
+import { useCommentsCacheStore } from '@/stores/useCommentsCacheStore'
 
 // cidex only sees the post once the transaction is mined AND its next scan runs, so the wait is
 // a block time plus a poll interval — a couple of seconds on a fast chain, longer on a slow one.
@@ -51,6 +53,20 @@ const lookupPost = async ({ networkId, author, metadata }) => {
 }
 
 /**
+ * Drops a freshly indexed reply into the thread it belongs to: the cached snapshot goes, any
+ * mounted <Comments> for that post refetches, and the parent's comment counter revalidates so
+ * the number moves at the same moment the reply shows up.
+ */
+const revealReply = ({ networkId, parentId }) => {
+  if (!parentId) return
+
+  useCommentsCacheStore.getState().invalidateThread(networkId, parentId)
+  // Every viewer variant of the parent's stats entry — the key carries the connected address, and
+  // the author's card can be mounted under either it or the anonymous key.
+  globalMutate((key) => typeof key === 'string' && key.startsWith(`posts/${networkId}/${parentId}/`))
+}
+
+/**
  * Opens the loading toast and resolves it when the post lands.
  *
  * @param {object} submission
@@ -59,9 +75,10 @@ const lookupPost = async ({ networkId, author, metadata }) => {
  * @param {string} submission.metadata The `ipfs://…` URI written onchain — the only identifier
  *   that is known before the transaction is sent, is the same on the wallet and relayed paths,
  *   and is rewritten onto the existing row by an edit.
- * @param {'post'|'reply'|'edit'} [submission.kind] Picks the wording and whether the feed is pulled.
+ * @param {'post'|'reply'|'edit'} [submission.kind] Picks the wording and where the result is shown.
+ * @param {string|number} [submission.parentId] The replied-to post, for `reply` submissions.
  */
-export function trackPostPublication({ networkId, author, metadata, kind = 'post' }) {
+export function trackPostPublication({ networkId, author, metadata, kind = 'post', parentId = null }) {
   const copy = COPY[kind] ?? COPY.post
   const handle = toast(copy.pending, 'loading')
 
@@ -84,9 +101,12 @@ export function trackPostPublication({ networkId, author, metadata, kind = 'post
 
     if (found) {
       handle.update(copy.done, 'success')
-      // A reply belongs to a post page's comment list, not the home feed — pulling page 1 there
-      // would refresh a feed the author isn't even looking at
-      if (kind !== 'reply') usePostStore.getState().notifyAuthoredPost()
+      // A reply belongs to a post page's comment list, not the home feed — so it refreshes the
+      // thread it landed in instead of pulling page 1 of a feed the author isn't looking at.
+      // is_comment is the parent the indexer actually recorded, which beats the composer's own
+      // idea of what was replied to; parentId only stands in if an older row left it null.
+      if (kind === 'reply') revealReply({ networkId, parentId: found.is_comment ?? parentId })
+      else usePostStore.getState().notifyAuthoredPost()
       return
     }
 
