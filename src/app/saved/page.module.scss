@@ -1,6 +1,9 @@
 .page {
   min-height: 85svh;
 
+  // Fixed app header (0.7rem padding x2 + 38px controls) — what the sticky toolbar clears
+  --app-header-clearance: calc(1.4rem + 38px);
+
   hr {
     border: none;
     border-top: 0.5px solid var(--border);
@@ -13,7 +16,9 @@
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: 24px;
-    overflow: hidden;
+    // clip, not hidden: both round off the corners, but `hidden` makes this a scroll container
+    // and a scroll container that can't scroll never lets the toolbar inside it stick
+    overflow: clip;
     isolation: isolate;
 
     @media (max-width: 600px) {
@@ -24,27 +29,81 @@
   }
 }
 
-.post {
-  cursor: pointer;
+/* ---------- Sticky toolbar: search + folder rail ---------- */
+
+.toolbar {
+  position: sticky;
+  top: var(--app-header-clearance);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem 20px;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+
+  @media (max-width: 600px) {
+    // The container already pads on mobile; padding here again would double the inset
+    padding: 0.75rem 0;
+    // Cover the container's own padding so scrolled posts don't show through the gap beside it
+    margin: -1rem -1rem 0;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }
 
 .search {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.7rem 1.2rem;
-  margin-top: 1rem;
+  padding: 0.6rem 1rem;
   background-color: var(--search-bg, var(--surface-muted));
   border: 1px solid var(--border);
   color: var(--text-muted);
   width: 100%;
+  transition: border-color 0.15s ease-out;
+
+  &:focus-within {
+    border-color: var(--network-color-primary, var(--color-primary));
+  }
 
   &__input {
     width: 100%;
+    min-width: 0;
     border: none;
     outline: none;
     background: transparent;
     color: inherit;
+    font: inherit;
+
+    // The UA's own clear affordance would sit next to ours
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
+
+  &__clear {
+    all: unset;
+    display: flex;
+    flex-shrink: 0;
+    padding: 3px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-muted);
+
+    &:hover {
+      background-color: var(--border);
+    }
+  }
+
+  &__spinner {
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    border-top-color: var(--network-color-primary, var(--color-primary));
+    animation: savedSpin 0.7s linear infinite;
   }
 }
 
@@ -54,25 +113,77 @@
   }
 }
 
-.page__folders {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding: 1rem 0;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-.page__folder {
+.rail {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+
+  &__track {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 0.4rem;
+    padding: 0.15rem 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    // The overflowing edge fades out — a chip cut off mid-way is the oldest cue there is that
+    // more sits past it. Driven by the same measurement as the arrows, so the fade lifts exactly
+    // when the end is reached and the last chip shows whole.
+    --fade-left: 0px;
+    --fade-right: 0px;
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade-left), #000 calc(100% - var(--fade-right)), transparent);
+
+    &--moreLeft {
+      --fade-left: 2rem;
+    }
+
+    &--moreRight {
+      --fade-right: 2rem;
+    }
+  }
+
+  &__arrows {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.2rem;
+  }
+
+  &__arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background-color: var(--surface-muted);
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
   flex-shrink: 0;
-  padding: 0.4rem 0.9rem;
+  padding: 0 0.35rem 0 0.85rem;
+  height: 30px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -81,40 +192,82 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out;
+
+  // "All" is a bare button with no menu beside it, so it keeps even padding
+  &--all {
+    padding: 0 0.85rem;
+  }
 
   &:hover {
     background: var(--surface-muted);
   }
 
   &--active {
-    background: var(--network-color-primary);
-    border-color: var(--network-color-primary);
-    color: oklch(from var(--network-color-primary) clamp(0, calc((0.623 - l) * infinity), 1) 0 0);
+    // --network-color-primary is only set once a chain is active; without the fallback the chip
+    // paints transparent-on-transparent before a wallet connects
+    background: var(--network-color-primary, var(--color-primary));
+    border-color: var(--network-color-primary, var(--color-primary));
+    color: oklch(from var(--network-color-primary, var(--color-primary)) clamp(0, calc((0.623 - l) * infinity), 1) 0 0);
+
+    &:hover {
+      background: var(--network-color-primary, var(--color-primary));
+    }
+
+    .folder__count {
+      opacity: 0.85;
+    }
+  }
+
+  &__label {
+    all: unset;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 100%;
+    cursor: pointer;
+  }
+
+  &__name {
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__count {
+    opacity: 0.6;
+    font-size: var(--font-size-11, 0.6875rem);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-left: 0.15rem;
+    border: none;
+    background: transparent;
+    color: inherit;
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, currentColor 18%, transparent);
+    }
   }
 }
 
-.page__folder__count {
-  opacity: 0.7;
-  font-size: var(--font-size-11, 0.6875rem);
-}
-
-.page__folder__menu {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px;
-  border-radius: 50%;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.1);
-  }
-}
-
-.page__folderAdd {
+.folderAdd {
   display: flex;
   align-items: center;
   gap: 0.3rem;
   flex-shrink: 0;
-  padding: 0.4rem 0.9rem;
+  padding: 0 0.85rem;
+  height: 30px;
   border-radius: 999px;
   border: 1px dashed var(--border);
   background: transparent;
@@ -126,6 +279,7 @@
 
   &:hover {
     background: var(--surface-muted);
+    color: var(--black-600);
   }
 
   input {
@@ -134,7 +288,82 @@
     outline: none;
     color: inherit;
     font: inherit;
-    width: 100px;
+    width: 110px;
+  }
+}
+
+/* ---------- Results ---------- */
+
+.summary {
+  margin: 0;
+  padding: 0.7rem 20px 0;
+  font-size: var(--font-size-12, 0.75rem);
+  color: var(--text-muted);
+
+  @media (max-width: 600px) {
+    padding: 0.7rem 0 0;
+  }
+}
+
+.list {
+  transition: opacity 0.15s ease-out;
+
+  // Results already on screen stay readable while the next filter loads — a blank skeleton on
+  // every keystroke reads as if the page broke
+  &--busy {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+}
+
+.post {
+  cursor: pointer;
+  transition: background-color 0.12s ease-out;
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--text-muted) 6%, transparent);
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.8rem 20px 0 20px;
+    font-size: var(--font-size-11, 0.6875rem);
+    color: var(--text-muted);
+
+    @media (max-width: 640px) {
+      padding: 0.6rem 10px 0 10px;
+    }
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  &__metaDot {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.6;
+  }
+
+  &__metaFolder {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 18ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--network-color-primary, var(--color-primary));
+      text-decoration: underline;
+    }
   }
 }
 
@@ -146,19 +375,57 @@
   text-align: center;
   padding: 4rem 1.5rem;
   min-height: 50svh;
-  gap: 1rem;
+  gap: 0.75rem;
   color: var(--black-400);
 
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    margin-bottom: 0.25rem;
+    border-radius: 50%;
+    background: var(--surface-muted);
+    color: var(--black-400);
+
+    &--error {
+      color: var(--red-500, #ef4444);
+      background: color-mix(in srgb, var(--red-500, #ef4444) 12%, transparent);
+    }
+  }
+
   h3 {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 600;
-    color: var(--text-main);
+    color: inherit;
     margin: 0;
   }
 
   p {
-    max-width: 32ch;
+    max-width: 34ch;
     margin: 0;
+    line-height: 1.5;
+  }
+
+  &__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--font-size-13, 0.8125rem);
+    font-weight: 500;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
   }
 }
 
@@ -167,19 +434,32 @@
   text-align: center;
   margin: 0 auto;
   width: 100%;
-  color: oklch(from var(--network-color-primary) clamp(0, calc((0.623 - l) * infinity), 1) 0 0);
-  background-color: var(--network-color-primary);
+  color: oklch(from var(--network-color-primary, var(--color-primary)) clamp(0, calc((0.623 - l) * infinity), 1) 0 0);
+  background-color: var(--network-color-primary, var(--color-primary));
   font-weight: 600;
   border-radius: 999px;
   border: unset;
   padding: 0.5rem 1rem;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
 }
+
+/* ---------- Skeleton ---------- */
 
 .skeletonList {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.75rem;
+  padding: 1.5rem 20px;
+
+  @media (max-width: 640px) {
+    padding: 1.25rem 0;
+  }
 }
 
 .skeletonRow {
@@ -187,16 +467,16 @@
   align-items: flex-start;
   gap: 0.75rem;
 
-  span {
+  &__avatar {
     flex-shrink: 0;
     width: 36px;
     height: 36px;
     border-radius: 50%;
     background: var(--border);
-    animation: shimmer 1.4s ease-in-out infinite;
+    animation: savedShimmer 1.4s ease-in-out infinite;
   }
 
-  div {
+  &__lines {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -207,25 +487,31 @@
       height: 12px;
       border-radius: 6px;
       background: var(--border);
-      animation: shimmer 1.4s ease-in-out infinite;
-
-      &:first-child {
-        width: 40%;
-      }
-
-      &:last-child {
-        width: 75%;
-      }
+      animation: savedShimmer 1.4s ease-in-out infinite;
     }
+  }
+
+  &__head {
+    width: 35%;
+  }
+
+  &__short {
+    width: 60%;
   }
 }
 
-@keyframes shimmer {
+@keyframes savedShimmer {
   0%,
   100% {
     opacity: 0.6;
   }
   50% {
     opacity: 1;
+  }
+}
+
+@keyframes savedSpin {
+  to {
+    transform: rotate(1turn);
   }
 }

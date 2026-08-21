@@ -77,6 +77,24 @@ export async function GET(request) {
     const hasMore = rows.length > limit
     const postsToSend = hasMore ? rows.slice(0, limit) : rows
 
+    // Counted on the first page only - it feeds a single header line ("128 saved", "9 results"),
+    // so repeating the COUNT on every scroll page would buy nothing the UI reads.
+    let total = null
+    if (page === 1) {
+      const countParams = [walletAddress]
+      if (folderId) countParams.push(folderId)
+      if (searchTerm) countParams.push(`%${searchTerm}%`)
+
+      const [countRows] = await pool.execute(
+        `SELECT COUNT(*) AS total
+         FROM post_bookmarks b
+         JOIN posts p ON p.id = b.post_id AND p.network_id = b.network_id
+         WHERE b.wallet_address = ? AND p.is_deleted = 0 ${folderClause} ${searchClause}`,
+        countParams
+      )
+      total = Number(countRows[0]?.total) || 0
+    }
+
     await fulfillUniversalProfiles(postsToSend, pool)
 
     return NextResponse.json({
@@ -92,6 +110,7 @@ export async function GET(request) {
         page,
         count: postsToSend.length,
         hasMore,
+        total,
       },
     })
   } catch (error) {

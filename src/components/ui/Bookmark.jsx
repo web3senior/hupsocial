@@ -3,12 +3,11 @@
 import { useState } from 'react'
 import { BookmarkSimpleIcon as BookmarkIcon, CheckIcon, PlusIcon, XCircleIcon } from '@phosphor-icons/react'
 import useSWR, { useSWRConfig } from 'swr'
-import { unstable_serialize } from 'swr/infinite'
 import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import { getPostById } from '@/lib/api'
-import { getSavedPostsKey, getBookmarkFoldersKey } from '@/lib/savedPostsKey'
+import { getBookmarkFoldersKey } from '@/lib/savedPostsKey'
 import NativePopover from './NativePopover'
 import postStyles from '../Post.module.scss'
 
@@ -18,6 +17,12 @@ const foldersFetcher = async (url) => {
   if (!res.ok || !body.success) throw new Error(body.error || 'Failed to load folders')
   return body.data
 }
+
+// Every saved-list view — All, one folder, one search — is its own useSWRInfinite entry, cached
+// under the infinite prefix plus the URL of its first page. Matching them by shape instead of
+// rebuilding each key by hand is what stops a post unsaved under a folder or search filter from
+// lingering on screen until the next refetch.
+const isSavedListKey = (key) => typeof key === 'string' && key.startsWith('$inf$') && key.includes('/networks/posts/bookmarked?')
 
 /**
  * Bookmark Interaction Component
@@ -78,11 +83,9 @@ export const Bookmark = ({ post }) => {
   const foldersKey = isConnected ? getBookmarkFoldersKey(address) : null
   const { data: folders, mutate: mutateFolders } = useSWR(foldersKey, foldersFetcher)
 
-  const invalidateSavedLists = (folderId) => {
+  const invalidateSavedLists = () => {
     if (!address) return
-    mutateGlobal(unstable_serialize((pageIndex) => getSavedPostsKey(pageIndex, address)))
-    if (folderId) mutateGlobal(unstable_serialize((pageIndex) => getSavedPostsKey(pageIndex, address, folderId)))
-    if (interactionState.folderId) mutateGlobal(unstable_serialize((pageIndex) => getSavedPostsKey(pageIndex, address, interactionState.folderId)))
+    mutateGlobal(isSavedListKey)
   }
 
   const saveBookmark = async (folderId = null) => {
@@ -100,7 +103,7 @@ export const Bookmark = ({ post }) => {
       if (!res.ok || !body.success) throw new Error(body.error || 'Failed to save post')
 
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
-      invalidateSavedLists(folderId)
+      invalidateSavedLists()
       toast('Post saved!', 'success')
     } catch (err) {
       console.error('Save failed:', err)
@@ -128,36 +131,22 @@ export const Bookmark = ({ post }) => {
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
 
       if (address) {
-        const savedListKey = unstable_serialize((pageIndex) => getSavedPostsKey(pageIndex, address))
-
         mutateGlobal(
-          savedListKey,
+          isSavedListKey,
           (pages) =>
             Array.isArray(pages)
               ? pages.map((pageData) =>
                   pageData?.data
-                    ? { ...pageData, data: pageData.data.filter((p) => !(p.id === post.id && p.network_id === post.network_id)) }
+                    ? {
+                        ...pageData,
+                        data: pageData.data.filter((p) => !(p.id === post.id && p.network_id === post.network_id)),
+                        meta: pageData.meta ? { ...pageData.meta, total: Math.max(0, (pageData.meta.total ?? 1) - 1) } : pageData.meta,
+                      }
                     : pageData
                 )
               : pages,
           { revalidate: false }
         )
-
-        if (previousData.folderId) {
-          const folderListKey = unstable_serialize((pageIndex) => getSavedPostsKey(pageIndex, address, previousData.folderId))
-          mutateGlobal(
-            folderListKey,
-            (pages) =>
-              Array.isArray(pages)
-                ? pages.map((pageData) =>
-                    pageData?.data
-                      ? { ...pageData, data: pageData.data.filter((p) => !(p.id === post.id && p.network_id === post.network_id)) }
-                      : pageData
-                  )
-                : pages,
-            { revalidate: false }
-          )
-        }
       }
 
       toast('Removed from saved posts', 'success')
@@ -192,7 +181,7 @@ export const Bookmark = ({ post }) => {
       if (!res.ok || !body.success) throw new Error(body.error || 'Failed to move saved post')
 
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
-      invalidateSavedLists(folderId)
+      invalidateSavedLists()
       toast('Moved to folder', 'success')
     } catch (err) {
       console.error('Move failed:', err)
