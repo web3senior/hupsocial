@@ -14,6 +14,7 @@ import { ContentType, ZERO_ADDRESS } from '@/lib/content'
 import abi from '@/abi/post.json'
 import NativePopover from './NativePopover'
 import Counter from './Counter'
+import Tooltip from './Tooltip'
 import postStyles from '../Post.module.scss'
 
 /**
@@ -197,10 +198,12 @@ export const Repost = ({ post, onQuote }) => {
     <NativePopover
       placement="bottom-start"
       trigger={
-        <button data-action="repost" aria-label="Repost" disabled={isPending || isConfirming} onClick={(e) => e.stopPropagation()}>
-          <RepeatIcon width={20} height={20} />
-          {repostCount > 0 && <Counter value={repostCount} />}
-        </button>
+        <Tooltip content={isReposted ? 'Reposted' : 'Repost'} placement="bottom" size="compact" hoverOnly>
+          <button data-action="repost" aria-label="Repost" disabled={isPending || isConfirming} onClick={(e) => e.stopPropagation()}>
+            <RepeatIcon width={20} height={20} />
+            {repostCount > 0 && <Counter value={repostCount} />}
+          </button>
+        </Tooltip>
       }
     >
       {({ close }) => (

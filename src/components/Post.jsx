@@ -44,6 +44,7 @@ import { AI_TARGETS, buildPostAiUrl } from '@/lib/aiTargets'
 import useSWR, { useSWRConfig } from 'swr'
 import { getPostStatsKey } from '@/hooks/usePostStats'
 import NativePopover from './ui/NativePopover'
+import Tooltip from './ui/Tooltip'
 import SellItemPopover from './SellItemPopover'
 import EmbedPostDialog from './EmbedPostDialog'
 import TipModal from './TipModal'
@@ -642,14 +643,16 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
     <>
       <NativePopover
         trigger={
-          <button
-            onClick={(e) => e.stopPropagation()}
-            onMouseEnter={() => router.prefetch(`/networks/${item.network_id}/${item.id}`)}
-            className={clsx(styles.post__navTrigger, 'pointer rounded-full')}
-            aria-label="Post options"
-          >
-            <DotsThreeIcon width={20} height={20} />
-          </button>
+          <Tooltip content="More" placement="bottom" size="compact" hoverOnly>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              onMouseEnter={() => router.prefetch(`/networks/${item.network_id}/${item.id}`)}
+              className={clsx(styles.post__navTrigger, 'pointer rounded-full')}
+              aria-label="Post options"
+            >
+              <DotsThreeIcon width={20} height={20} />
+            </button>
+          </Tooltip>
         }
         placement="bottom-end"
       >

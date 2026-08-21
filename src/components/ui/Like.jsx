@@ -17,6 +17,7 @@ import { toast } from '@/components/NextToast'
 import { getPostById } from '@/lib/api'
 import { shortTxError } from '@/lib/utils'
 import Counter from './Counter'
+import Tooltip from './Tooltip'
 
 const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
 
@@ -380,25 +381,31 @@ export const Like = ({ post, onUpdate }) => {
   const heartColor = isLiked ? 'var(--liked-color, #ff007a)' : isQueued ? 'var(--batch-like-color, #facc15)' : 'currentColor'
   const heartWeight = isLiked || isQueued ? 'fill' : 'regular'
 
+  // Names what the next click does — the heart has three states and only one of them
+  // reads as "like" from the icon alone
+  const likeLabel = isLiked ? 'Unlike' : isQueued ? 'Remove from batch' : 'Like'
+
   if (!isMounted) return null
 
   return (
     <div className={clsx('flex', 'align-items-center', 'gap-050')}>
-      <button
-        data-action="like"
-        data-liked={isLiked ? 'true' : undefined}
-        data-queued={!isLiked && isQueued ? 'true' : undefined}
-        disabled={isLoading}
-        className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
-        onClick={handleLikeInteraction}
-        aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
-      >
-        {/* The optimistic heart is the pending feedback — no loader swap, so the
-            icon and counter never jump while the tx settles */}
-        <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
+      <Tooltip content={likeLabel} placement="bottom" size="compact" hoverOnly>
+        <button
+          data-action="like"
+          data-liked={isLiked ? 'true' : undefined}
+          data-queued={!isLiked && isQueued ? 'true' : undefined}
+          disabled={isLoading}
+          className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
+          onClick={handleLikeInteraction}
+          aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
+        >
+          {/* The optimistic heart is the pending feedback — no loader swap, so the
+              icon and counter never jump while the tx settles */}
+          <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
 
-        {likeCount > 0 && <Counter value={likeCount} />}
-      </button>
+          {likeCount > 0 && <Counter value={likeCount} />}
+        </button>
+      </Tooltip>
     </div>
   )
 }

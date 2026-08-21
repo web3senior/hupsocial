@@ -6,6 +6,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
 import Counter from './Counter'
+import Tooltip from './Tooltip'
 
 /**
  * Comment Interaction Component
@@ -36,10 +37,12 @@ export const CommentAction = ({ post, onComment }) => {
   if (!post.allow_comment) return null
 
   return (
-    <button data-action="comment" aria-label="Comment on post" onClick={handleComment}>
-      <ChatCircleIcon width={17} height={17} />
-      {commentCount > 0 && <Counter value={commentCount} />}
-    </button>
+    <Tooltip content="Reply" placement="bottom" size="compact" hoverOnly>
+      <button data-action="comment" aria-label="Comment on post" onClick={handleComment}>
+        <ChatCircleIcon width={17} height={17} />
+        {commentCount > 0 && <Counter value={commentCount} />}
+      </button>
+    </Tooltip>
   )
 }
 

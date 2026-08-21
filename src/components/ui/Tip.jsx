@@ -6,6 +6,7 @@ import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
 import { TipIcon } from '@/components/Icons'
 import Counter from './Counter'
+import Tooltip from './Tooltip'
 
 /**
  * Tip Interaction Component
@@ -36,17 +37,19 @@ export const Tip = ({ post, onTip }) => {
   if (!isMounted) return null
 
   return (
-    <button data-action="tip" aria-label="Tip the author" onClick={handleTip}>
-      <TipIcon />
-      {tipCount > 0 && (
-        <Counter value={tipCount}>
-          {new Intl.NumberFormat('en', {
-            notation: 'compact',
-            maximumFractionDigits: 1,
-          }).format(tipCount)}
-        </Counter>
-      )}
-    </button>
+    <Tooltip content="Tip creator" placement="bottom" size="compact" hoverOnly>
+      <button data-action="tip" aria-label="Tip the author" onClick={handleTip}>
+        <TipIcon />
+        {tipCount > 0 && (
+          <Counter value={tipCount}>
+            {new Intl.NumberFormat('en', {
+              notation: 'compact',
+              maximumFractionDigits: 1,
+            }).format(tipCount)}
+          </Counter>
+        )}
+      </button>
+    </Tooltip>
   )
 }
 

@@ -3,6 +3,7 @@
 import { ArrowSquareOutIcon, EnvelopeSimpleIcon, LinkSimpleIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
 import NativePopover from './NativePopover'
+import Tooltip from './Tooltip'
 import styles from './Share.module.scss'
 
 /**
@@ -84,9 +85,11 @@ export const Share = ({ item, url, title, creator, trigger, copyLabel = 'Copy po
       type="auto"
       trigger={
         trigger ?? (
-          <button data-action="share" aria-label="Share post">
-            <UploadSimpleIcon width={17} height={17} />
-          </button>
+          <Tooltip content="Share" placement="bottom" size="compact" hoverOnly>
+            <button data-action="share" aria-label="Share post">
+              <UploadSimpleIcon width={17} height={17} />
+            </button>
+          </Tooltip>
         )
       }
     >

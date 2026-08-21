@@ -28,10 +28,17 @@ const TOUCH_DURATION = 2600
  * </Tooltip>}` still hands NativePopover the real button. With no `content` (or with
  * `disabled`), it collapses to that pass-through and renders nothing of its own.
  *
+ * `size="compact"` swaps the descriptive bubble for the sidebar's name pill — the shape for
+ * one or two words naming an icon-only control. `hoverOnly` drops the touch-press reveal, for
+ * controls whose tap already does something visible.
+ *
  * The bubble is inert (`pointer-events: none`) — it describes, it never holds controls.
  * For content the user must click, reach for NativePopover instead.
  */
-const Tooltip = forwardRef(function Tooltip({ children, content, placement = 'top', delay = OPEN_DELAY, className, disabled = false, ...rest }, ref) {
+const Tooltip = forwardRef(function Tooltip(
+  { children, content, placement = 'top', delay = OPEN_DELAY, size = 'default', hoverOnly = false, className, disabled = false, ...rest },
+  ref
+) {
   const rawId = useId()
   const tooltipId = `tooltip-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const panelRef = useRef(null)
@@ -152,6 +159,9 @@ const Tooltip = forwardRef(function Tooltip({ children, content, placement = 'to
       rest.onPointerDown?.(e)
       childProps.onPointerDown?.(e)
       if (e.pointerType === 'touch') {
+        // A hoverOnly control acts on the tap itself — a bubble covering the row the user
+        // just pressed says nothing the press has not already said
+        if (hoverOnly) return
         open()
         closeTimerRef.current = setTimeout(close, TOUCH_DURATION)
         return
@@ -192,7 +202,15 @@ const Tooltip = forwardRef(function Tooltip({ children, content, placement = 'to
   return (
     <>
       {triggerNode}
-      <div id={tooltipId} ref={panelRef} popover="manual" role="tooltip" data-placement={placement} className={clsx(styles.tooltip, className)}>
+      <div
+        id={tooltipId}
+        ref={panelRef}
+        popover="manual"
+        role="tooltip"
+        data-placement={placement}
+        data-size={size}
+        className={clsx(styles.tooltip, className)}
+      >
         {content}
       </div>
     </>

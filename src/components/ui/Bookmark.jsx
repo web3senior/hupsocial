@@ -9,6 +9,7 @@ import { toast } from '@/components/NextToast'
 import { getPostById } from '@/lib/api'
 import { getBookmarkFoldersKey } from '@/lib/savedPostsKey'
 import NativePopover from './NativePopover'
+import Tooltip from './Tooltip'
 import postStyles from '../Post.module.scss'
 
 const foldersFetcher = async (url) => {
@@ -234,14 +235,20 @@ export const Bookmark = ({ post }) => {
         }
       }}
       trigger={
-        <button
-          data-action="bookmark"
-          disabled={isLoading}
-          aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
-          title={savedOn ? `Saved on ${savedOn}` : undefined}
+        <Tooltip
+          content={savedOn ? `Saved on ${savedOn}` : interactionState.isBookmarked ? 'Saved' : 'Save'}
+          placement="bottom"
+          size="compact"
+          hoverOnly
         >
-          <BookmarkIcon width={17} height={17} color={iconColor} weight={iconWeight} />
-        </button>
+          <button
+            data-action="bookmark"
+            disabled={isLoading}
+            aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
+          >
+            <BookmarkIcon width={17} height={17} color={iconColor} weight={iconWeight} />
+          </button>
+        </Tooltip>
       }
     >
       {({ close }) => (

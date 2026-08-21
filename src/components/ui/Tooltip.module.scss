@@ -59,6 +59,18 @@
   --tooltip-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
 }
 
+/* Compact: the sidebar rail's name pill, for icon-only controls whose label is a word or
+   two. Same surface as the bubble above, just tightened — nowrap, since a one-word label
+   that wraps has been given the wrong shape, not the wrong width. */
+.tooltip[data-size='compact'] {
+  padding: 4px 8px;
+  border-radius: 1000px;
+  font-size: var(--font-size-12);
+  line-height: 1.35;
+  white-space: nowrap;
+  max-width: none;
+}
+
 /* Only used when the child isn't an element to clone — inline-flex so the wrapper
    has a box to measure without changing how the child lays out inside it */
 .anchor {
