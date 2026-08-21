@@ -86,10 +86,10 @@ figure.pfp {
   opacity: 0;
   translate: 0 -2px;
   transition:
-    opacity 0.2s ease-out,
-    translate 0.2s ease-out,
-    overlay 0.2s ease allow-discrete,
-    display 0.2s ease allow-discrete;
+    opacity 0.14s ease-out,
+    translate 0.14s ease-out,
+    overlay 0.14s ease allow-discrete,
+    display 0.14s ease allow-discrete;
 
   &:global(:popover-open) {
     opacity: 1;

@@ -19,10 +19,10 @@
   translate: 0 -2px;
 
   transition:
-    opacity 0.18s ease,
-    translate 0.18s ease,
-    overlay 0.18s ease allow-discrete,
-    display 0.18s ease allow-discrete;
+    opacity 0.13s ease,
+    translate 0.13s ease,
+    overlay 0.13s ease allow-discrete,
+    display 0.13s ease allow-discrete;
 
   &:global(:popover-open) {
     opacity: 1;
@@ -56,9 +56,9 @@
   &[data-placement$='-corner']::backdrop {
     background: rgba(0, 0, 0, 0);
     transition:
-      background 0.18s ease,
-      overlay 0.18s ease allow-discrete,
-      display 0.18s ease allow-discrete;
+      background 0.13s ease,
+      overlay 0.13s ease allow-discrete,
+      display 0.13s ease allow-discrete;
   }
 
   &[data-placement='center']:global(:popover-open)::backdrop,

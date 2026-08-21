@@ -13,10 +13,10 @@
   // dialog's entire open life.
   will-change: transform;
   transition:
-    opacity 0.18s ease,
-    transform 0.18s ease,
-    overlay 0.18s ease allow-discrete,
-    display 0.18s ease allow-discrete;
+    opacity 0.13s ease,
+    transform 0.13s ease,
+    overlay 0.13s ease allow-discrete,
+    display 0.13s ease allow-discrete;
 
   &[open] {
     opacity: 1;
@@ -32,9 +32,9 @@
   &::backdrop {
     background: rgba(0, 0, 0, 0);
     transition:
-      background 0.18s ease,
-      overlay 0.18s ease allow-discrete,
-      display 0.18s ease allow-discrete;
+      background 0.13s ease,
+      overlay 0.13s ease allow-discrete,
+      display 0.13s ease allow-discrete;
   }
 
   &[open]::backdrop {
