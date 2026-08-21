@@ -60,22 +60,10 @@
   }
 
   &__icon {
-    position: relative;
     display: inline-flex;
     justify-content: center;
     padding-top: 0.1875rem;
     color: var(--tone-color);
-  }
-
-  // Just-landed actions keep a slow ring for ten minutes, then settle like everything else.
-  &--fresh &__icon::after {
-    content: '';
-    position: absolute;
-    inset: 0.0625rem -0.25rem auto;
-    height: 1.375rem;
-    border: 1px solid var(--tone-color);
-    border-radius: 999px;
-    animation: activity-row-ring 2.4s ease-out infinite;
   }
 
   &__body {
@@ -248,30 +236,9 @@
   }
 }
 
-@keyframes activity-row-ring {
-  0% {
-    transform: scale(0.72);
-    opacity: 0.65;
-  }
-
-  70%,
-  100% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
-}
-
 /* Hover only where a pointer can actually hover — a tap must not leave the row highlighted. */
 @media (hover: hover) and (pointer: fine) {
   .row--clickable:hover {
     background: color-mix(in srgb, var(--foreground) 4%, transparent);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .row--fresh .row__icon::after {
-    animation: none;
-    opacity: 0.4;
-    transform: none;
   }
 }

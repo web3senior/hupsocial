@@ -10,7 +10,7 @@ import { ArrowSquareOutIcon, CopySimpleIcon, EyeIcon, EyeSlashIcon } from '@phos
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { useProfile } from '@/hooks/useProfile'
 import { getPostById } from '@/lib/api'
-import { amountOf, assetOf, explorerTxUrl, getKindMeta, hrefOf, isFresh, shortAddress } from './activityModel'
+import { amountOf, assetOf, explorerTxUrl, getKindMeta, hrefOf, shortAddress } from './activityModel'
 import styles from './ActivityRow.module.scss'
 
 // No viewer address is passed on purpose: the post endpoint keeps gated and encrypted content
@@ -27,7 +27,6 @@ export default function ActivityRow({ row }) {
   const href = useMemo(() => hrefOf(row), [row])
   const amount = useMemo(() => amountOf(row), [row])
   const asset = useMemo(() => assetOf(row), [row])
-  const fresh = isFresh(row.ts)
 
   // Rows pointing at the same post share one SWR key, so a burst of likes on one post costs a
   // single request no matter how many lines it fills.
@@ -66,7 +65,7 @@ export default function ActivityRow({ row }) {
   return (
     <div className={styles.entry}>
       <article
-        className={clsx(styles.row, href && styles['row--clickable'], fresh && styles['row--fresh'])}
+        className={clsx(styles.row, href && styles['row--clickable'])}
         data-tone={meta.tone}
         role={href ? 'link' : undefined}
         tabIndex={href ? 0 : undefined}
