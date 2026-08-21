@@ -4,7 +4,12 @@
   // enter/exit animation and backdrop; content chrome is the consumer's.
   margin: auto;
   opacity: 0;
-  transform: scale(0.96);
+  // Fade plus a 2px rise, no scale — same motion NativePopover uses. A dialog scaling up
+  // sweeps its edges several pixels across the frozen page behind it, which reads as the
+  // page moving; 2px of travel toward the resting spot reads as "appearing" instead.
+  // Kept on `transform` (not the `translate` property) so DialogSheet's docked-sheet
+  // override replaces this motion outright rather than stacking 2px onto it.
+  transform: translateY(2px);
   // margin:auto centering usually lands the dialog on a fractional y offset. The
   // enter transition rasterizes it on a compositor layer with one subpixel snap;
   // if that layer is dropped once the transition ends, the first hover repaint
@@ -23,22 +28,29 @@
     transform: none;
   }
 
-  // Dim only — deliberately NO backdrop-filter. A filtered backdrop is clipped to its
-  // Backdrop Root (the nearest ancestor that isolates a group), and every page in the app
-  // renders inside a `.page__container` carrying `isolation: isolate`. The blur AND the dim
-  // then landed on that card alone: sidebar and header stayed bright while the page behind
-  // the dialog went soft, and the clipped region snapped back on close. A plain color has no
-  // backdrop root, so it covers the whole viewport from whatever depth the dialog is opened.
+  // Dim + blur. This once carried dim only: a filtered backdrop used to be clipped to its
+  // Backdrop Root, and every page in the app renders inside a `.page__container` carrying
+  // `isolation: isolate`, so both the blur and the dim landed on that card alone. Chromium
+  // no longer walks past the top layer for a backdrop root — re-probed on 149 with the
+  // isolated + overflow-hidden + transformed ancestor chain, and the effect now covers the
+  // viewport from whatever depth the dialog is opened. Engines without backdrop-filter
+  // support simply keep the dim. No `-webkit-backdrop-filter` twin: declaring the legacy
+  // property makes lightningcss drop both.
+  //
+  // blur(0px), not `none` — `none` is not interpolable, so the blur would snap in.
   &::backdrop {
     background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
     transition:
       background 0.13s ease,
+      backdrop-filter 0.13s ease,
       overlay 0.13s ease allow-discrete,
       display 0.13s ease allow-discrete;
   }
 
   &[open]::backdrop {
     background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
   }
 }
 
@@ -46,11 +58,12 @@
   @starting-style {
     .dialog[open] {
       opacity: 0;
-      transform: scale(0.96);
+      transform: translateY(2px);
     }
 
     .dialog[open]::backdrop {
       background: rgba(0, 0, 0, 0);
+      backdrop-filter: blur(0px);
     }
   }
 }

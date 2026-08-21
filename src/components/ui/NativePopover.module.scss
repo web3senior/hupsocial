@@ -42,21 +42,28 @@
 
   // JS writes the resolved placement back onto data-placement; the trigger-independent
   // placements below hang their centering and backdrop off it. Center owns `translate` for
-  // its centering, so it fades only.
-  &[data-placement='center'],
-  &[data-placement='center']:global(:popover-open) {
-    translate: -50% -50%;
+  // its centering (top/left are both 50%), so its 2px rise rides along in the same value.
+  &[data-placement='center'] {
+    translate: -50% calc(-50% + 2px);
+
+    &:global(:popover-open) {
+      translate: -50% -50%;
+    }
   }
 
-  // Backdrop for center + corner placements. Dim only, for the same reason NativeDialog
-  // carries no backdrop-filter: a filtered backdrop is clipped to its Backdrop Root, and
-  // the app's `.page__container` isolates one on every page — the dim then covered that
-  // card instead of the viewport.
+  // Backdrop for center + corner placements: the same dim + blur NativeDialog's ::backdrop
+  // carries. It was dim-only while a filtered backdrop still got clipped to its Backdrop
+  // Root — the app's `.page__container` isolates one on every page — but Chromium no longer
+  // walks past the top layer for that root, so the effect covers the viewport. No
+  // `-webkit-backdrop-filter` twin: declaring the legacy property makes lightningcss drop
+  // both. blur(0px), not `none`, so the blur interpolates instead of snapping in.
   &[data-placement='center']::backdrop,
   &[data-placement$='-corner']::backdrop {
     background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
     transition:
       background 0.13s ease,
+      backdrop-filter 0.13s ease,
       overlay 0.13s ease allow-discrete,
       display 0.13s ease allow-discrete;
   }
@@ -64,6 +71,7 @@
   &[data-placement='center']:global(:popover-open)::backdrop,
   &[data-placement$='-corner']:global(:popover-open)::backdrop {
     background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
   }
 }
 
@@ -84,12 +92,13 @@
     }
 
     .panel[data-placement='center']:global(:popover-open) {
-      translate: -50% -50%;
+      translate: -50% calc(-50% + 2px);
     }
 
     .panel[data-placement='center']:global(:popover-open)::backdrop,
     .panel[data-placement$='-corner']:global(:popover-open)::backdrop {
       background: rgba(0, 0, 0, 0);
+      backdrop-filter: blur(0px);
     }
   }
 }
