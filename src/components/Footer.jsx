@@ -7,6 +7,7 @@ import { useConnection } from 'wagmi'
 import { HouseIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
+import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
@@ -98,7 +99,18 @@ export default function Footer() {
     return [
       { name: 'Home', path: '/', icon: HouseIcon },
       { name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
-      { name: 'New', action: () => setIsComponentOpen(true), icon: PlusIcon },
+      {
+        name: 'New',
+        // Same gate as the sidebar: no wallet, no composer
+        action: () => {
+          if (!isConnected) {
+            toast('Please connect wallet', 'error')
+            return
+          }
+          setIsComponentOpen(true)
+        },
+        icon: PlusIcon,
+      },
       { name: 'Profile', path: profilePath, icon: UserIcon },
     ]
   }, [address, isConnected, setIsComponentOpen])

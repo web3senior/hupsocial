@@ -12,6 +12,7 @@ import { BookIcon, BugIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCente
 import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
+import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile } from '@/hooks/useProfile'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -66,6 +67,7 @@ const normalizeNavItem = (item) => {
 const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNavigate, onLinkClick }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
+  const { isConnected } = useConnection()
 
   if (item.type === 'divider') {
     return <hr className={styles.divider} aria-hidden="true" />
@@ -118,6 +120,12 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
           aria-label={item.name}
           data-tooltip={showTooltip ? item.name : undefined}
           onClick={() => {
+            // The composer can only publish with a wallet behind it — say so here rather than
+            // letting the author write a whole post into a dialog that cannot submit
+            if (!isConnected) {
+              toast('Please connect wallet', 'error')
+              return
+            }
             setIsComponentOpen(true)
             onNavigate?.()
           }}
@@ -476,7 +484,13 @@ export default function Aside() {
 
           <button
             className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
-            onClick={() => setIsComponentOpen(true)}
+            onClick={() => {
+              if (!isConnected) {
+                toast('Please connect wallet', 'error')
+                return
+              }
+              setIsComponentOpen(true)
+            }}
             aria-label="Create new post"
           >
             <PlusIcon />

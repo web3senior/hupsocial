@@ -351,7 +351,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // stack can't track — so Ctrl+Z is backed by these snapshots instead.
   const historyRef = useRef({ stack: [], index: -1, timer: null, restoring: false })
 
-  const { address, isConnected, chain: walletChain } = useConnection()
+  const { address, isConnected, status: connectionStatus, chain: walletChain } = useConnection()
   const switchChain = useSwitchChain({ config })
   // The composer's own NetworkSelect writes the disconnected selection to a module store, and
   // getActiveChain() is a plain getter that can't wake this component when it changes — so the
@@ -488,6 +488,24 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     [close, onClose]
   )
 
+  // Publishing takes a signature, so a composer opened without a wallet is a dead end — the
+  // entry points gate on the click, and this refuses to open for every other way in (the share
+  // target, a deep link, a community composer). wagmi still reports 'reconnecting' for a beat
+  // after a reload, so the verdict waits for a settled connection; the ref then latches it to
+  // the mount, because disconnecting mid-compose must not throw the draft away — handleCreatePost
+  // already blocks that submit.
+  const isConnectionSettled = connectionStatus !== 'connecting' && connectionStatus !== 'reconnecting'
+  const isWalletMissing = isConnectionSettled && !isConnected
+  const walletGateRef = useRef(false)
+
+  useEffect(() => {
+    if (walletGateRef.current || !isConnectionSettled) return
+    walletGateRef.current = true
+    if (isConnected) return
+    toast('Please connect wallet', 'error')
+    handleClose()
+  }, [isConnectionSettled, isConnected, handleClose])
+
   const updateTextContent = (nextText) => {
     setPostContent((prevContent) => {
       const nextElements = [...prevContent.elements]
@@ -574,7 +592,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // Show the modal dialog and initialize the editor once the component mounts —
   // callers keep the mount = open / unmount = close contract
   useEffect(() => {
-    if (!mounted || !editorRef.current) return
+    if (!mounted || isWalletMissing || !editorRef.current) return
     dialogRef.current?.open()
     editorRef.current.innerHTML = markdownToEditorHtml(postText)
     editorRef.current.focus()
