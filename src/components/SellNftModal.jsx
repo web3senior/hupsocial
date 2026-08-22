@@ -285,24 +285,30 @@ function MarketListingRow({ row, chainId, nativeCurrency, enabled, onAttach }) {
  * @param {Function} [props.onAttached] Composer hook: receives the nftListing content payload.
  *   Its absence is what puts the modal in standalone mode.
  * @param {Function} [props.onListed] Standalone hook: fires with the same payload after listing.
+ * @param {Object} [props.token] Open with one token already chosen — `{collection, tokenId,
+ *   isLsp8}`. For the callers that opened from a token rather than from the market: the token
+ *   detail panel's List action knows exactly what is being sold, and making its owner find their
+ *   own NFT again in the picker would be asking a question already answered. Only seeds the
+ *   initial state; the picker stays fully editable, and switching chains clears it like any
+ *   other selection.
  * @param {Function} props.onClose Clears the open-modal state on close.
  */
-const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, onClose }) => {
+const SellNftModal = ({ chainId: initialChainId = null, token = null, onAttached, onListed, onClose }) => {
   // Without a composer there is no post pinning the chain, so the network becomes the
   // user's choice — and there is nothing to attach a pre-existing listing to
   const isStandalone = !onAttached
   const [chainId, setChainId] = useState(() => initialChainId ?? tradeChains[0]?.id ?? null)
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
 
-  const [collection, setCollection] = useState('')
+  const [collection, setCollection] = useState(() => token?.collection ?? '')
   // The picker row already knows a collection's name and artwork; the preview below only
   // learns them once a token id resolves, so hold on to the row that was chosen
   const [pickedCollection, setPickedCollection] = useState(null)
-  const [tokenIdInput, setTokenIdInput] = useState('')
+  const [tokenIdInput, setTokenIdInput] = useState(() => (token?.tokenId ? String(token.tokenId) : ''))
   // LSP8 is the native NFT standard on LUKSO; everywhere else ERC721 is the only option, so
   // the picked value is derived rather than stored — switching away from LUKSO can't strand
   // an lsp8 selection on a chain that has no such standard
-  const [luksoStandard, setLuksoStandard] = useState('lsp8')
+  const [luksoStandard, setLuksoStandard] = useState(() => (token && token.isLsp8 === false ? 'erc721' : 'lsp8'))
   const standard = isLukso ? luksoStandard : 'erc721'
   const [price, setPrice] = useState('')
   const [paymentChoice, setPaymentChoice] = useState('native')
@@ -328,7 +334,9 @@ const SellNftModal = ({ chainId: initialChainId = null, onAttached, onListed, on
   // so the suggestions panel is opened/closed imperatively from the input's events
   const collectionPopoverRef = useRef(null)
   const lastActionRef = useRef(null)
-  const autoFilledRef = useRef(null)
+  // Seeded from a preselected token so the single-holding autofill below can't overwrite the
+  // very token the caller opened this for
+  const autoFilledRef = useRef(token?.collection ?? null)
 
   const chainInfo = appChains.find((c) => c.id === chainId)
   const isWrongChain = Boolean(walletChain && chainId && walletChain.id !== chainId)

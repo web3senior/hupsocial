@@ -1,0 +1,402 @@
+// The collection page's list layout: a real table, because these five facts are only
+// worth reading down a column. Prices, ranks and percentages line up row to row on tabular
+// numerals rather than on a second typeface.
+// styles/components/_table.scss dresses every bare <table> in the app: a grey #ccc frame, a
+// white row ground, centred cells, and — under 600px — a reflow that turns each row into a
+// stacked block with its column name printed in front of every value. That pattern suits a
+// document table; this is a data grid that already scrolls in its own box and drops columns
+// it can't fit, so it opts out of all of it here. Class selectors, so every override lands
+// without an !important.
+.table {
+  width: 100%;
+  border: 0;
+  min-width: 640px; // Below this the columns stop being comparable and the wrapper scrolls
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--font-size-13, 0.82rem);
+
+  // The wrapper carries the frame and the size query the columns respond to. It deliberately
+  // does NOT scroll: overflow-x: auto would make it a scroll container on both axes, and the
+  // header would then stick to a box that never scrolls vertically — which is no stickiness at
+  // all. clip keeps a stray wide cell inside the frame without creating that scrollport, and
+  // the size queries below drop columns long before it comes to that.
+  &__scroll {
+    container-type: inline-size;
+    container-name: nftTable;
+    width: 100%;
+    overflow-x: clip;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--surface);
+  }
+
+  &__head {
+    // The global sheet clips thead out of the document below 600px; this table keeps its
+    // headers, because a column of bare numbers with no heading is unreadable
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+
+    // The header row too: left as a block by the global reflow it would stop defining the
+    // columns, and a fixed layout with no first row falls back to equal thirds
+    tr {
+      display: table-row;
+      border: 0;
+      background-color: transparent;
+    }
+
+    // Pinned under the app's fixed header — 4rem, the same offset the leaderboard's sticky
+    // row header uses — so the column names stay with the numbers however far the page runs
+    th {
+      position: sticky;
+      top: 4rem;
+      z-index: 2;
+      background-color: var(--surface);
+    }
+  }
+
+  &__heading {
+    padding: 0.7rem 0.6rem;
+    box-shadow: inset 0 -1px 0 var(--border);
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 600;
+    // The global sheet shouts every table header in spaced-out caps; nothing else in this
+    // app does, and a column label reads faster as a word than as an acronym
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  // Visually hidden, still read aloud — the action column has no label worth printing
+  &__headingHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  &__row {
+    display: table-row;
+    border: 0;
+    background-color: transparent;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+
+    &:not(:last-child) .table__cell {
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    }
+  }
+
+  &__cell {
+    display: table-cell;
+    padding: 0.55rem 0.6rem;
+    font-size: inherit;
+    text-align: left;
+    vertical-align: middle;
+
+    // The global sheet prints the column name in front of every value once rows stack; these
+    // rows never stack, so the label would be a duplicate of the header above it
+    &::before {
+      content: none;
+    }
+
+    &--numeric {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    // Column widths, read off the header row by the fixed layout above. Each is sized for
+    // the longest value it can hold — a chain's biggest price, a five-figure rank — so the
+    // numbers never reflow as the reader pages through.
+    &--rarity {
+      width: 76px;
+    }
+
+    &--price {
+      width: 104px;
+    }
+
+    &--floor {
+      width: 92px;
+    }
+
+    &--lastSale {
+      width: 104px;
+    }
+
+    &--topOffer {
+      width: 104px;
+    }
+
+    &--owner {
+      width: 96px;
+    }
+
+    &--listed {
+      width: 92px;
+    }
+
+    &--action {
+      width: 100px;
+      text-align: right;
+      white-space: nowrap;
+    }
+  }
+
+  // Item: artwork, name, token id — the only cell that may wrap its content
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  // A button rather than a link: the row opens the token's detail dialog, which has no URL of
+  // its own — so the chrome a button brings has to be stripped back to the cell's own type
+  &__itemLink {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    text-decoration: none;
+    background: none;
+    border: 0;
+    cursor: pointer;
+
+    &:hover .table__name {
+      text-decoration: underline;
+    }
+  }
+
+  &__thumb {
+    flex: 0 0 auto;
+    display: block;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    border-radius: 8px;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is line-art,
+      // so contain it rather than cover-crop it
+      &[data-broken] {
+        object-fit: contain;
+        padding: 25%;
+      }
+    }
+  }
+
+  &__thumbFallback {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background-color: var(--surface-muted);
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__name {
+    min-width: 0; // flex items default to min-width:auto, which defeats the ellipsis
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tokenId {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--text-muted);
+    font-size: var(--font-size-11, 0.7rem);
+  }
+
+  &__sold {
+    flex: 0 0 auto;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background-color: var(--red-500);
+    color: var(--white);
+    font-size: var(--font-size-10, 10px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__model {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    flex: 0 0 auto;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-muted);
+    font-size: var(--font-size-10, 10px);
+    font-weight: 700;
+  }
+
+  &__rank,
+  &__price,
+  &__lastSale {
+    font-weight: 600;
+
+    small {
+      color: var(--text-muted);
+      font-size: inherit;
+    }
+  }
+
+  &__rank {
+    color: var(--text-muted);
+  }
+
+  // Above the floor is the plain case and stays in body ink; under it is the one number a
+  // buyer is hunting for, so that's the only place colour is spent
+  &__delta {
+    font-weight: 600;
+
+    &--under {
+      color: var(--success);
+    }
+  }
+
+  &__owner {
+    display: block;
+    overflow: hidden;
+    color: var(--text-muted);
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &:hover {
+      color: var(--text);
+      text-decoration: underline;
+    }
+  }
+
+  &__listed {
+    color: var(--text-muted);
+  }
+
+  &__blank {
+    color: var(--text-muted);
+  }
+
+  &__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+  }
+
+  &__skeleton {
+    display: block;
+    width: 100%;
+    height: 40px;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: collectionTablePulse 1.4s ease-in-out infinite;
+  }
+
+  // Columns leave in order of how little they decide a purchase: the item, its price and the
+  // button survive to the narrowest box. Size queries rather than media queries — this table
+  // sits in a fixed-width column, so the viewport says nothing useful about the room it has.
+  @container nftTable (max-width: 940px) {
+    &__cell--lastSale {
+      display: none;
+    }
+  }
+
+  @container nftTable (max-width: 840px) {
+    &__cell--listed {
+      display: none;
+    }
+  }
+
+  @container nftTable (max-width: 740px) {
+    &__cell--owner {
+      display: none;
+    }
+  }
+
+  @container nftTable (max-width: 640px) {
+    min-width: 0;
+
+    &__cell--rarity,
+    &__cell--floor {
+      display: none;
+    }
+  }
+
+  @container nftTable (max-width: 520px) {
+    &__cell--topOffer {
+      display: none;
+    }
+
+    // What's left is item, price and the button — so the two fixed columns give back every
+    // pixel they can spare, and the name gets room to actually be a name
+    &__cell {
+      padding: 0.5rem 0.6rem;
+    }
+
+    &__cell--price {
+      width: 100px;
+    }
+
+    &__cell--action {
+      width: 92px;
+    }
+  }
+}
+
+@keyframes collectionTablePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}

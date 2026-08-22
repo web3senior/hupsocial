@@ -1,0 +1,489 @@
+// Trait rarity bands. Fixed hues rather than theme tokens: the badge's whole job is to say
+// "rare" at a glance, and a colour that shifted with the theme would say it differently in each.
+// The tint underneath is color-mixed from the same hue, so it lands softly on either background.
+$rarity: (
+  'common': #16a34a,
+  'uncommon': #2563eb,
+  'rare': #9333ea,
+  'legendary': #e11d48,
+);
+
+.token {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    // Collection-controlled, so a name with no spaces can never widen the panel
+    overflow-wrap: anywhere;
+  }
+
+  &__identity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+    color: var(--gray-400);
+  }
+
+  &__collection {
+    overflow: hidden;
+    max-width: 16rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__rank {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    font-weight: 600;
+    color: #d97706;
+    background: color-mix(in srgb, #d97706 14%, transparent);
+    border-radius: 999px;
+    cursor: help;
+  }
+
+  // Pushed to the end of the line on anything wide enough to hold it, exactly where a reader
+  // looking for "is this mine?" scans first
+  &__owner {
+    margin-left: auto;
+
+    strong,
+    a {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__trade {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  &__status {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  &__action {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      opacity 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--text) 11%, transparent);
+    }
+
+    &:disabled {
+      cursor: progress;
+      opacity: 0.7;
+    }
+
+    // The one filled control — whatever the reader's next step is in the state they found the
+    // token in, it is this one
+    &--primary {
+      flex-basis: 100%;
+      color: var(--network-color-text);
+      background: var(--network-color-primary);
+      border-color: transparent;
+
+      &:hover:not(:disabled) {
+        background: var(--network-color-primary);
+        border-color: transparent;
+        opacity: 0.9;
+      }
+    }
+
+    &--spinning {
+      animation: token-detail-spin 0.9s linear infinite;
+    }
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 0.25rem;
+    // A narrow dialog can't hold five tabs; scrolling them beats wrapping them onto two rows
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__tab {
+    position: relative;
+    flex-shrink: 0;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      color: var(--text);
+
+      &::after {
+        content: '';
+        position: absolute;
+        right: 0.5rem;
+        bottom: -1px;
+        left: 0.5rem;
+        height: 2px;
+        background: var(--network-color-primary, var(--text));
+        border-radius: 2px 2px 0 0;
+      }
+    }
+  }
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+
+    // The panel takes focus when a tab is opened by keyboard; the ring belongs on the tab that
+    // was pressed, not on the region it revealed
+    &:focus {
+      outline: none;
+    }
+  }
+
+  &__empty,
+  &__single,
+  &__note {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--gray-400);
+  }
+
+  &__single strong {
+    color: var(--text);
+  }
+
+  &__description {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--gray-400);
+    overflow-wrap: anywhere;
+  }
+
+  &__traits {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__trait {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.7rem 0.8rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  &__traitLabel {
+    overflow: hidden;
+    font-size: 0.7rem;
+    color: var(--gray-400);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__traitValue {
+    overflow: hidden;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__traitFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+  }
+
+  &__share {
+    padding: 0.1rem 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: help;
+
+    @each $name, $hue in $rarity {
+      &--#{$name} {
+        color: $hue;
+        background: color-mix(in srgb, #{$hue} 16%, transparent);
+      }
+    }
+  }
+
+  // Holds the row's left column open while rarity is unavailable, so a card without a share
+  // doesn't slide its floor price across to where every other card's badge sits
+  &__shareUnknown {
+    display: block;
+    min-height: 1.1rem;
+  }
+
+  &__traitFloor {
+    overflow: hidden;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    small {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--gray-400);
+    }
+  }
+
+  &__activity {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  &__event {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 0.75rem;
+
+    & + & {
+      border-top: 1px solid var(--border);
+    }
+  }
+
+  &__eventIcon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    color: var(--gray-400);
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    border-radius: 999px;
+
+    &--sale {
+      color: var(--chart-up);
+      background: color-mix(in srgb, var(--chart-up) 14%, transparent);
+    }
+
+    &--cancelled {
+      color: var(--chart-down);
+      background: color-mix(in srgb, var(--chart-down) 14%, transparent);
+    }
+  }
+
+  &__eventBody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  &__eventTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  &__eventFlag {
+    padding: 0 0.3rem;
+    font-size: 0.65rem;
+    font-style: normal;
+    font-weight: 700;
+    color: var(--chart-up);
+    background: color-mix(in srgb, var(--chart-up) 14%, transparent);
+    border-radius: 4px;
+  }
+
+  &__eventMeta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    text-align: right;
+    white-space: nowrap;
+
+    strong {
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+
+    a {
+      margin-left: 0.25rem;
+      color: inherit;
+      vertical-align: -1px;
+    }
+  }
+
+  &__chart {
+    width: 100%;
+    height: 220px;
+  }
+
+  &__tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+
+    strong {
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+  }
+
+  &__details {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+
+    > div {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.55rem 0.9rem;
+
+      + div {
+        border-top: 1px solid var(--border);
+      }
+    }
+
+    dt {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      white-space: nowrap;
+    }
+
+    dd {
+      overflow: hidden;
+      margin: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        color: inherit;
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+
+  &__refreshRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+@keyframes token-detail-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

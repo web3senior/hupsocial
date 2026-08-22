@@ -35,6 +35,39 @@
     cursor: default;
   }
 
+  // On the page's own surface the fixed white above becomes a hole, and the blur and drop
+  // shadow have no artwork to lift off. An outlined pill in action blue instead: the ink and
+  // the rule are the same colour, so the button reads as the one thing in a row of grey
+  // numbers you can press.
+  &--inline {
+    --quick-buy-ink: var(--primary);
+
+    padding: 0.35rem 0.9rem;
+    border: 1px solid currentColor;
+    background-color: transparent;
+    backdrop-filter: none;
+    box-shadow: none;
+    color: var(--quick-buy-ink);
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 600;
+
+    &:not([disabled]):hover {
+      background-color: color-mix(in srgb, var(--quick-buy-ink) 12%, transparent);
+    }
+
+    // The terminal shades of done/gone below are painted for the white pill, so the inline
+    // one restates them against its own ground
+    &.quickBuy--done {
+      --quick-buy-ink: var(--success);
+
+      background-color: color-mix(in srgb, var(--success) 12%, transparent);
+    }
+
+    &.quickBuy--gone {
+      --quick-buy-ink: var(--text-muted);
+    }
+  }
+
   &--done {
     background-color: color-mix(in srgb, var(--green-500, #22c55e) 26%, var(--white));
   }
@@ -42,4 +75,11 @@
   &--gone {
     color: var(--gray-500);
   }
+}
+
+// next-themes stamps the choice on <html>, so the dark variant keys off the attribute rather
+// than the media query. #007bff is a hair dim against a near-black row; the lighter blue holds
+// the same meaning with the contrast the ink needs.
+:global([data-theme='dark']) .quickBuy--inline {
+  --quick-buy-ink: var(--blue-500);
 }

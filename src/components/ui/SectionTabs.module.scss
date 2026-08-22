@@ -1,5 +1,5 @@
 .sectionTabs {
-  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
 
   // Matches the horizontal inset of the card below on small screens, where that card
   // drops its border and runs edge to edge
@@ -26,7 +26,7 @@
     padding: 0.2rem;
     margin: 0;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--global-border-radius);
     background-color: var(--surface-muted);
     list-style: none;
   }
@@ -42,7 +42,7 @@
     justify-content: center;
     min-height: 32px;
     padding: 0 0.9rem;
-    border-radius: 7px;
+    border-radius: var(--global-border-radius);
     color: var(--text-muted);
     font-size: var(--system-13-font-size);
     font-weight: 600;

@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
-import { CubeIcon, DiamondIcon } from '@phosphor-icons/react'
+import { CubeIcon, DiamondIcon, TagIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
 import { formatStake } from '@/hooks/useStakeToken'
 import { useProfile } from '@/hooks/useProfile'
@@ -47,12 +47,14 @@ const chainIconFor = (chain) => {
  * source TradeCard uses.
  * @param {Object} props
  * @param {Object} props.listing Row from GET /api/v1/nfts.
+ * @param {string} [props.layout='comfortable'] Grid density the tile renders at — 'compact'
+ * drops the seller and last sale to stay legible in a narrower column.
  * @param {Function} [props.onCollectionResolved] Called once with (collectionAddress,
  * collectionName) as soon as this card's metadata resolves a name — lets the grid build
  * a "Collection" filter option list from cards actually on screen, since collection
  * names aren't indexed anywhere server-side.
  */
-export default function NftMarketCard({ listing, onCollectionResolved }) {
+export default function NftMarketCard({ listing, onCollectionResolved, layout = 'comfortable' }) {
   const networkId = Number(listing.network_id)
   const isLsp8 = Boolean(Number(listing.is_lsp8))
   const isSold = Number(listing.status) === 2
@@ -91,7 +93,7 @@ export default function NftMarketCard({ listing, onCollectionResolved }) {
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
 
   return (
-    <div className={styles.nftCard}>
+    <div className={clsx(styles.nftCard, layout === 'compact' && styles['nftCard--compact'])}>
       <Link href={`/nfts/${networkId}/${listing.listing_id}`} className={styles.nftCard__link} onClick={(e) => e.stopPropagation()}>
         <div className={styles.nftCard__media}>
           {metadata.image ? (
@@ -160,8 +162,11 @@ export default function NftMarketCard({ listing, onCollectionResolved }) {
           {/* Reserved even when empty so tiles in a row keep a common baseline */}
 
           {lastSalePrice && (
-            <div className={styles.nftCard__lastSale}>
-              Last sale <span className={styles.nftCard__lastSaleValue}>{lastSalePrice}</span> {listing.last_sale_symbol || ''}
+            <div className={styles.nftCard__lastSale} title={`Last sale ${lastSalePrice} ${listing.last_sale_symbol || ''}`.trim()}>
+              <TagIcon size={12} className={styles.nftCard__lastSaleIcon} aria-hidden="true" />
+              <span className={styles.nftCard__lastSaleLabel}>Last sale</span>
+              <span className={styles.nftCard__lastSaleValue}>{lastSalePrice}</span>
+              {listing.last_sale_symbol && <span className={styles.nftCard__lastSaleSymbol}>{listing.last_sale_symbol}</span>}
             </div>
           )}
         </div>

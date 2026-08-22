@@ -130,6 +130,10 @@ export default function SendNftModal({ nft, owner, onSent, onClose }) {
       className={styles.sendNft}
       aria-label={`Send ${nft.name}`}
       onClick={(event) => event.stopPropagation()}
+      // React's synthetic close/cancel bubble where the native events don't — without this,
+      // dismissing this dialog from inside another one (the token detail panel's Transfer)
+      // would close its host too
+      onCancel={(event) => event.stopPropagation()}
       onClose={(event) => {
         event.stopPropagation()
         onClose?.()

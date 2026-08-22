@@ -19,6 +19,15 @@
     flex-wrap: wrap;
   }
 
+  // The status tabs and the density switch, one group: same pill, same gap, and the
+  // switch last because it changes the shape of the answer rather than the question
+  &__filters {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
   &__tabs {
     display: flex;
     align-items: center;
@@ -53,31 +62,6 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-  }
-
-  &__tool {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    font-size: 0.78rem;
-    color: var(--text-muted, #888);
-    background: transparent;
-    text-decoration: none;
-    cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease;
-
-    &:hover:not(:disabled) {
-      color: var(--text);
-      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
-    }
-
-    &:disabled {
-      cursor: progress;
-      opacity: 0.7;
-    }
   }
 
   // Applied trait filters. Sits between the toolbar and the grid so what is narrowing the
@@ -144,6 +128,26 @@
        otherwise widen the track and overflow the row, same as the market grid */
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem 0.85rem;
+  }
+
+  // Density variants. Only the two tighter layouts are written out — comfortable stays on
+  // the base rule so its responsive 2/3/4 columns below keep applying; an attribute selector
+  // for it would outrank those media queries and freeze the grid at two across.
+  &__grid[data-layout='compact'] {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+  }
+
+  &__grid[data-layout='list'] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  // Skeletons take the shape of the tiles they stand in for, so the grid doesn't jump
+  // height the moment the real cards land
+  &__grid[data-layout='list'] &__skeletonTile {
+    aspect-ratio: auto;
+    height: 88px;
   }
 
   &__skeletonTile {

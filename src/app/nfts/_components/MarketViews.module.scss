@@ -1,0 +1,38 @@
+// The switch between the two readings of the market. Same pill tabs the collection page uses
+// for its listing-status group, so the two levels of the marketplace share one control shape.
+.views {
+  &__switch {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+  }
+
+  &__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 34px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--text-muted);
+    }
+
+    // --network-color-primary is only set once a wallet connects, so the fallback is what
+    // most readers actually see — it has to stand on its own
+    &--active {
+      border-color: var(--network-color-primary, var(--color-primary));
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 12%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+}

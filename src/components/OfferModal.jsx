@@ -429,7 +429,14 @@ const OfferModal = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, assetNa
       className={styles.offerModal}
       aria-label="Make an offer"
       onClick={(e) => e.stopPropagation()}
-      onClose={() => onClose()}
+      // React's synthetic close/cancel bubble where the native events don't — without this,
+      // dismissing this dialog from inside another one (the token detail panel's offer action)
+      // would close its host too
+      onCancel={(e) => e.stopPropagation()}
+      onClose={(e) => {
+        e.stopPropagation()
+        onClose()
+      }}
     >
       <header className={styles.offerModal__header}>
         <button type="button" className={styles.offerModal__cancel} onClick={() => dialogRef.current?.close()}>

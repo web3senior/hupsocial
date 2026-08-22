@@ -267,6 +267,9 @@
   }
 
   &__lastSale {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     min-height: 1.05rem;
     overflow: hidden;
     color: var(--text-muted);
@@ -278,6 +281,84 @@
   &__lastSaleValue {
     font-family: var(--ff-mono);
     font-weight: 700;
+  }
+
+  &__lastSaleSymbol {
+    color: inherit;
+  }
+
+  // Stands in for the words where they don't fit — see the small grid below
+  &__lastSaleIcon {
+    display: none;
+    flex-shrink: 0;
+  }
+}
+
+// Density modifier. The tile keeps its markup and drops the facts that stop being legible
+// in a narrower column; the list layout is a table elsewhere, not a turned-around tile.
+
+// Small grid: roughly half the comfortable column. What survives is what a buyer scans down
+// a wall of tiles — which id it is, what it costs, what it last went for. The collection name
+// goes (every tile on a collection page carries the same one) and so does the seller.
+.nftCard--compact {
+  gap: 0.45rem;
+  padding: 0.35rem;
+
+  .nftCard__seller,
+  .nftCard__title,
+  .nftCard__skeleton,
+  .nftCard__priceIcon,
+  .nftCard__lastSaleLabel,
+  .nftCard__lastSaleSymbol {
+    display: none;
+  }
+
+  .nftCard__body {
+    gap: 0.15rem;
+  }
+
+  // The id is the tile's name here, so it drops the chip it wears next to a title and
+  // takes the title's weight
+  .nftCard__tokenId {
+    padding: 0;
+    background-color: transparent;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 700;
+
+    svg {
+      display: none;
+    }
+  }
+
+  // Both lines stack hard left, one under the other, so the eye reads a column of prices
+  // rather than hunting the right edge of each tile
+  .nftCard__titleRow,
+  .nftCard__footer {
+    justify-content: flex-start;
+    margin-top: 0;
+  }
+
+  .nftCard__pricePill {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    font-size: 0.85rem;
+  }
+
+  // The words don't fit, the tag does: "3.15" under a sale tag reads as a past price without
+  // spending a line on saying so — the full sentence is still in the tile's title attribute
+  .nftCard__lastSale {
+    margin-top: 0;
+    font-size: var(--font-size-11, 0.72rem);
+  }
+
+  .nftCard__lastSaleIcon {
+    display: block;
+  }
+
+  .nftCard__lastSaleValue {
+    font-weight: 600;
   }
 }
 

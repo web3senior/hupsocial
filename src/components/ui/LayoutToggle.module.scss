@@ -1,0 +1,66 @@
+// A single track holding three icon segments, with one background that travels between
+// them. The active icon is told apart by ink alone — no fill weight, no shadow — so the
+// only thing that moves when you press is the surface underneath.
+//
+// The track is cut to the same 34px pill as the toolbar filters beside it and carries no
+// padding of its own: the segments fill it edge to edge, so the control sits on the row
+// without reading as the heaviest thing on it.
+$segment-size: 34px;
+
+.layoutToggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: $segment-size;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--surface-muted);
+  overflow: hidden;
+
+  // Rides on transform rather than left, so the browser can hand the move to the
+  // compositor and the travel stays smooth next to a grid that is re-laying itself out
+  &__slider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: $segment-size;
+    border-radius: 999px;
+    background-color: var(--surface);
+    transform: translateX(calc(var(--layout-toggle-index, 0) * #{$segment-size}));
+    // Eased in and out over a beat long enough to read as travel — a fast-out curve
+    // arrives before the eye has followed it, which is the same as not animating at all
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  &__option {
+    position: relative; // Above the slider, which is painted first
+    display: grid;
+    place-items: center;
+    width: $segment-size;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background-color: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.24s ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    // Solid ink rather than an accent: --accent-primary resolves only once a wallet
+    // connects, which would leave the pressed segment unreadable when it isn't
+    &--active {
+      color: var(--text);
+    }
+  }
+
+  // A slider that jumps is the same information without the motion sickness
+  @media (prefers-reduced-motion: reduce) {
+    &__slider {
+      transition: none;
+    }
+  }
+}

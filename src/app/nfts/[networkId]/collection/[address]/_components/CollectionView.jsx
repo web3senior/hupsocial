@@ -3,18 +3,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
-import { StorefrontIcon, XIcon } from '@phosphor-icons/react'
+import { XIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import useCollectionStats from '@/hooks/useCollectionStats'
+import useCollectionFloor from '@/hooks/useCollectionFloor'
+import useCollectionRarity from '@/hooks/useCollectionRarity'
+import useCollectionTopOffers from '@/hooks/useCollectionTopOffers'
 import useCollectionTraits from '@/hooks/useCollectionTraits'
+import useGridLayout from '@/hooks/useGridLayout'
 import { toast } from '@/components/NextToast'
 import PageTitle from '@/components/PageTitle'
 import NftMarketCard from '@/components/NftMarketCard'
+import LayoutToggle from '@/components/ui/LayoutToggle'
 import CollectionBrowser from './CollectionBrowser'
 import CollectionHeader from './CollectionHeader'
+import CollectionTable from './CollectionTable'
 import FloorChart from './FloorChart'
 import OwnedTokens from './OwnedTokens'
 import TraitFilter from './TraitFilter'
@@ -50,6 +56,9 @@ export default function CollectionView({ networkId, address }) {
   const stats = useCollectionStats({ chainId, collection, chainInfo })
 
   const [status, setStatus] = useState('active')
+  // Density is the reader's habit rather than the collection's, so the choice is remembered
+  // across collections and shared by both grids — switching tabs never reshapes the page
+  const [layout, setLayout] = useGridLayout('nft-collection-layout')
   // Bumped after a sweep, to remount the browse grid. Its token list is a plain fetch, not an
   // SWR key, so a sweep that dropped rows for tokens that don't exist would otherwise keep
   // showing them until a reload — the one refresh outcome the user can actually see.
@@ -65,11 +74,40 @@ export default function CollectionView({ networkId, address }) {
 
   const isBrowsingCollection = status === 'collection'
 
+  const tableRows = items.map((listing) => ({
+    key: `${listing.network_id}-${listing.listing_id}`,
+    tokenId: listing.token_id,
+    isLsp8: Boolean(Number(listing.is_lsp8)),
+    listingId: listing.listing_id,
+    price: listing.price,
+    symbol: listing.symbol || chainInfo?.nativeCurrency?.symbol || '',
+    decimals: listing.decimals ?? chainInfo?.nativeCurrency?.decimals,
+    lastSalePrice: listing.last_sale_price || null,
+    lastSaleSymbol: listing.last_sale_symbol || chainInfo?.nativeCurrency?.symbol || '',
+    lastSaleDecimals: listing.last_sale_decimals ?? chainInfo?.nativeCurrency?.decimals,
+    isSold: Number(listing.status) === 2,
+    // Escrowed by HupTrade while listed, so the seller is the owner in every sense a buyer
+    // cares about — and the row already carries their name from the users join
+    owner: listing.wallet_address || null,
+    ownerName: listing.display_name || null,
+    listedAt: listing.listed_at || null,
+    // The whole row, so the action cell can carry a real quick buy
+    listing,
+  }))
+
   // The facet list is scoped to the same status the grid shows, so a count next to a value
   // is always the number of NFTs ticking it would leave on screen. The browse tab has no
   // listing status — the panel is hidden there, so what this fetches doesn't matter, but the
   // API only speaks listing statuses.
   const traitFacets = useCollectionTraits({ chainId, collection, status: isBrowsingCollection ? 'active' : status })
+
+  // Rarity and floor are the table's two columns nothing else on the page needs, so both
+  // wait for the layout that shows them. Fetched here rather than in each grid: the browse
+  // tab reads the same two answers, and one collection has one ranking and one floor.
+  const isTable = layout === 'list'
+  const rarity = useCollectionRarity({ chainId, collection, totalSupply: info.totalSupply, enabled: isTable })
+  const floor = useCollectionFloor({ chainId, collection, chainInfo, enabled: isTable })
+  const topOffers = useCollectionTopOffers({ chainId, collection, chainInfo, enabled: isTable })
 
   const buildFilters = useCallback(
     () => ({
@@ -176,18 +214,25 @@ export default function CollectionView({ networkId, address }) {
 
       <section className={styles.collection__market} aria-label="Collection listings">
         <div className={styles.collection__toolbar}>
-          <div className={styles.collection__tabs} role="group" aria-label="Listing status">
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                className={clsx(styles.collection__tab, status === tab.value && styles['collection__tab--active'])}
-                aria-pressed={status === tab.value}
-                onClick={() => setStatus(tab.value)}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* What is being shown, then how it is shown — one row of identically cut pills,
+              with the density switch last because it reshapes rather than re-queries */}
+          <div className={styles.collection__filters}>
+            <div className={styles.collection__tabs} role="group" aria-label="Listing status">
+              {STATUS_TABS.map((tab) => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  className={clsx(styles.collection__tab, status === tab.value && styles['collection__tab--active'])}
+                  aria-pressed={status === tab.value}
+                  onClick={() => setStatus(tab.value)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Drives whichever grid is showing — the listings or the whole collection */}
+            <LayoutToggle value={layout} onChange={setLayout} label="Grid layout" />
           </div>
 
           <div className={styles.collection__tools}>
@@ -203,13 +248,6 @@ export default function CollectionView({ networkId, address }) {
                 resolved={traitFacets.resolved}
               />
             )}
-
-            {/* The market grid's full funnel (price, currency, seller) pre-filtered to
-                this collection */}
-            <Link href={`/nfts?networkId=${chainId}&collection=${collection}`} className={styles.collection__tool}>
-              <StorefrontIcon size={14} />
-              Open in market
-            </Link>
           </div>
         </div>
 
@@ -246,15 +284,12 @@ export default function CollectionView({ networkId, address }) {
             isLsp8={info.isLsp8}
             totalSupply={info.totalSupply}
             chainInfo={chainInfo}
+            layout={layout}
+            rarity={rarity}
+            floor={floor}
+            topOffers={topOffers}
           />
-        ) : isLoading ? (
-          <div className={styles.collection__grid}>
-            {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className={styles.collection__skeletonTile} />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && !isLoading ? (
           <p className={styles.collection__empty}>
             {traits.length > 0
               ? 'No NFT here matches those traits — try removing one.'
@@ -262,10 +297,28 @@ export default function CollectionView({ networkId, address }) {
               ? 'Nothing from this collection is up for sale right now.'
               : 'No listings match this view.'}
           </p>
+        ) : isTable ? (
+          <CollectionTable
+            chainId={chainId}
+            collection={collection}
+            collectionName={info.name}
+            rows={tableRows}
+            rarity={rarity}
+            floor={floor}
+            topOffers={topOffers}
+            isLoading={isLoading}
+          />
+        ) : isLoading ? (
+          <div className={styles.collection__grid} data-layout={layout}>
+            {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className={styles.collection__skeletonTile} />
+            ))}
+          </div>
         ) : (
-          <div className={styles.collection__grid}>
+          <div className={styles.collection__grid} data-layout={layout}>
             {items.map((listing) => (
-              <NftMarketCard key={`${listing.network_id}-${listing.listing_id}`} listing={listing} />
+              <NftMarketCard key={`${listing.network_id}-${listing.listing_id}`} listing={listing} layout={layout} />
             ))}
           </div>
         )}

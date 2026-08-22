@@ -5,27 +5,31 @@
   padding: 0.85rem;
   border-radius: 16px;
 
+  // Same pill as the status tabs and the layout options it shares a toolbar with — height,
+  // radius, type and surface all matched, so no one control reads as the important one
   &__trigger {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
+    height: 34px;
+    padding: 0 0.9rem;
     border: 1px solid var(--border);
     border-radius: 999px;
-    background: transparent;
-    color: var(--text-muted, #888);
+    background-color: var(--surface-muted);
+    color: var(--text);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: 0.82rem;
+    font-weight: 600;
     cursor: pointer;
     transition: color 0.15s ease, border-color 0.15s ease;
 
     &:hover {
-      color: var(--text);
-      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
+      border-color: var(--text-muted);
     }
 
     &--active {
       border-color: var(--network-color-primary, var(--color-primary));
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 12%, transparent);
       color: var(--network-color-primary, var(--color-primary));
     }
   }

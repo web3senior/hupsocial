@@ -34,29 +34,34 @@
   }
 
   // Holds whichever representation is on show — artwork or 3D model — so swapping between
-  // them keeps the same square footprint and the toggle can anchor to a corner of it
+  // them keeps the same square footprint and the toggle can anchor to a corner of it.
+  // The frame and the ground sit here rather than on the image: a detail view contains the
+  // artwork instead of cropping it, and a portrait token would otherwise letterbox onto
+  // the page's own background.
   &__stage {
     position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
     min-width: 0;
-
-    a {
-      display: block;
-    }
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 16px;
 
     img {
       display: block;
       width: 100%;
-      aspect-ratio: 1;
-      object-fit: cover;
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      height: 100%;
+      // Contain, not cover: a detail view is where the whole artwork is meant to be seen,
+      // matching the dialog the collection grid opens over the same token
+      object-fit: contain;
 
       // Stamped by handleBrokenImage once the source 404s — the placeholder is
-      // line-art, so contain it at icon scale rather than cover-crop it
+      // line-art, so hold it at icon scale rather than stretching it to the frame
       &[data-broken] {
-        object-fit: contain;
         padding: 30%;
-        background-color: var(--surface-muted);
       }
     }
   }
@@ -94,80 +99,15 @@
     margin-top: 10px;
   }
 
-  // Secondary by design: useful when a collection has just changed its onchain metadata,
-  // noise the rest of the time, so it sits quietly under the artwork.
-  // Full-width secondary CTA under the buy panel — offers are the counterpart to the
-  // TradeCard's primary buy action
-  &__offer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    padding: 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: var(--global-border-radius);
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    transition: border-color 0.15s ease;
-
-    &:hover {
-      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
-    }
-  }
-
-  &__refresh {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    align-self: flex-start;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    font-size: 0.78rem;
-    color: var(--text-muted, #888);
-    background: transparent;
-    text-decoration: none;
-    cursor: pointer;
-    transition:
-      color 0.15s ease,
-      border-color 0.15s ease;
-
-    &:hover:not(:disabled) {
-      color: var(--color-text);
-      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 50%, var(--border));
-    }
-
-    &:disabled {
-      cursor: progress;
-      opacity: 0.7;
-    }
-
-    &--spinning {
-      animation: listing-refresh-spin 0.9s linear infinite;
-    }
-  }
-
+  // Fills the stage rather than framing itself — the stage above already carries the border,
+  // the radius and the square footprint
   &__mediaFallback {
     display: grid;
     place-items: center;
     width: 100%;
-    aspect-ratio: 1;
-    border: 1px solid var(--border);
-    border-radius: 16px;
+    height: 100%;
     color: var(--text-muted, #888);
     background: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 8%, transparent);
-  }
-
-  &__info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-    min-width: 0;
   }
 
   &__badges {
@@ -215,28 +155,6 @@
     color: var(--text-muted, #888);
   }
 
-  &__eyebrow {
-    align-self: flex-start;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted, #888);
-    text-decoration: none;
-
-    &:hover {
-      color: var(--text);
-      text-decoration: underline;
-    }
-  }
-
-  &__title {
-    margin: 0;
-    font-size: 1.8rem;
-    line-height: 1.15;
-    overflow-wrap: anywhere;
-  }
-
   &__meta {
     display: flex;
     align-items: center;
@@ -253,13 +171,6 @@
     }
   }
 
-  &__description {
-    margin: 0;
-    font-size: var(--font-size-14, 0.875rem);
-    line-height: 1.55;
-    color: var(--text-muted, #888);
-  }
-
   &__seller {
     display: flex;
     flex-direction: column;
@@ -273,93 +184,6 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
       color: var(--text-muted, #888);
-    }
-  }
-
-  // Trait cards, Universal-Page-style: label small caps over the value, tiled to fill
-  &__traits {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-
-    li {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-      min-width: 0;
-      padding: 0.6rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: color-mix(in srgb, var(--text) 3%, transparent);
-
-      small {
-        overflow: hidden;
-        font-size: var(--font-size-10, 0.65rem);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: var(--text-muted, #888);
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      strong {
-        overflow: hidden;
-        font-size: var(--font-size-14, 0.875rem);
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-    }
-  }
-
-  // Key/value fact rows in one bordered table, like a token page's Details tab
-  &__details {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-
-    > div {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.55rem 0.9rem;
-
-      + div {
-        border-top: 1px solid var(--border);
-      }
-    }
-
-    dt {
-      font-size: var(--font-size-12, 0.75rem);
-      color: var(--text-muted, #888);
-      white-space: nowrap;
-    }
-
-    dd {
-      overflow: hidden;
-      margin: 0;
-      font-size: var(--font-size-12, 0.75rem);
-      font-weight: 600;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-
-      a {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.2rem;
-        color: inherit;
-        text-decoration: none;
-
-        &:hover {
-          text-decoration: underline;
-        }
-      }
     }
   }
 
@@ -487,13 +311,6 @@
     }
   }
 
-  &__actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
   &__action {
     all: unset;
     cursor: pointer;
@@ -513,8 +330,7 @@
     }
   }
 
-  &__sales,
-  &__offers {
+  &__record {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -613,11 +429,5 @@
     min-height: 50svh;
     text-align: center;
     color: var(--text-muted, #888);
-  }
-}
-
-@keyframes listing-refresh-spin {
-  to {
-    transform: rotate(360deg);
   }
 }

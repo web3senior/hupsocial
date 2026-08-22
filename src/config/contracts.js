@@ -36,6 +36,14 @@ export const robinhood = defineChain({
 // of `bsc` on the pinned endpoint.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
 
+// Same failure, one chain over: viem's default LUKSO endpoint (rpc.mainnet.lukso.network)
+// answers this host with a 403 HTML page instead of JSON-RPC, so every server-side read on
+// chain 42 came back empty — which is what wrote a table full of nameless collections into
+// nft_collection_cache while browsers, whose wallets bring their own RPC, looked fine. The
+// official endpoint stays in the list behind it: a wallet that can still reach it loses
+// nothing, and only http[0] is what serverPublicClient reads.
+lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.com', 'https://rpc.mainnet.lukso.network'] } }
+
 // Chains the app runs on â€” single source of truth for the wagmi config's
 // `chains` tuple and for server-side RPC lookups (chain.rpcUrls.default.http).
 // L1s first, then L2s.

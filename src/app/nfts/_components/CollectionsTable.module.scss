@@ -1,0 +1,443 @@
+// The market's league table. Eleven columns of figures that are only worth reading down a
+// column, so every money cell is right-aligned. The figures stay in the app's own type —
+// tabular numerals line them up without putting a second typeface in the middle of the page.
+//
+// styles/components/_table.scss dresses every bare <table> in the app: a grey frame, centred
+// cells, and — under 600px — a reflow that turns each row into a stacked block with its column
+// name printed in front of every value. That suits a document table; this is a data grid, and
+// it opts out through class selectors so nothing here needs an !important.
+.collections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  &__caption {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-13, 0.82rem);
+  }
+
+  &__select {
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--font-size-13, 0.82rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &--active {
+      border-color: var(--text-muted);
+      color: var(--text);
+    }
+  }
+
+  // Unlike the collection page's token table, this one scrolls sideways rather than dropping
+  // columns to fit: the point of a league table is that every stat is there to be compared, so
+  // the columns below are sized to land all eleven inside the widest card the app's layout
+  // allows (data-width="large", ~980px of room) and anything narrower scrolls rather than hides.
+  // The cost is a header that can't be sticky — an element with overflow-x: auto is a scroll
+  // container on both axes, so a thead pinned to the viewport would pin to a box that never
+  // scrolls vertically. The rank and name columns pin to the left edge instead, which is the
+  // identity a reader actually loses when they scroll sideways.
+  &__scroll {
+    container-type: inline-size;
+    container-name: collectionsTable;
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--surface);
+  }
+
+  &__table {
+    width: 100%;
+    min-width: 975px; // Below this the columns stop being comparable and the wrapper scrolls
+    border: 0;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: var(--font-size-13, 0.82rem);
+  }
+
+  &__head {
+    // The global sheet clips thead out of the document below 600px; this table keeps its
+    // headers, because a column of bare numbers with no heading is unreadable
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+
+    // Left as a block by the global reflow the header row would stop defining the columns,
+    // and a fixed layout with no first row falls back to equal shares
+    tr {
+      display: table-row;
+      border: 0;
+      background-color: transparent;
+    }
+  }
+
+  &__heading {
+    padding: 0.7rem 0.5rem;
+    box-shadow: inset 0 -1px 0 var(--border);
+    background-color: var(--surface);
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 600;
+    // The global sheet shouts every table header in spaced-out caps; nothing else in this app
+    // does, and a column label reads faster as a word than as an acronym
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  // Reordering is the header's whole job, so the control is the label itself rather than an
+  // icon beside it — a wider target in the narrowest cells on the page
+  &__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      color: var(--text);
+    }
+  }
+
+  &__row {
+    display: table-row;
+    border: 0;
+    background-color: transparent;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--surface-muted);
+
+      // The pinned columns sit above the scrolling ones and paint their own ground, so the
+      // hover has to reach them too or the row lights up in two halves
+      .collections__cell--rank,
+      .collections__cell--collection {
+        background-color: var(--surface-muted);
+      }
+    }
+
+    &:not(:last-child) .collections__cell {
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    }
+  }
+
+  &__cell {
+    display: table-cell;
+    padding: 0.55rem 0.5rem;
+    font-size: inherit;
+    text-align: left;
+    vertical-align: middle;
+
+    // The global sheet prints the column name in front of every value once rows stack; these
+    // rows never stack, so the label would only duplicate the header above it
+    &::before {
+      content: none;
+    }
+
+    &--numeric {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    // Rank and name pin to the left edge, so scrolling out to Total vol never leaves a reader
+    // holding a row of numbers with nothing to attach them to. A sticky cell is still part of
+    // the row, so both have to paint the card's own ground — left transparent, the columns
+    // passing underneath print straight through the collection's name.
+    &--rank {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      width: 40px;
+      padding-right: 0;
+      background-color: var(--surface);
+      color: var(--text-muted);
+    }
+
+    &--collection {
+      position: sticky;
+      left: 40px;
+      z-index: 1;
+      width: 176px;
+      background-color: var(--surface);
+
+      // The seam where the scrolling columns disappear. A box-shadow here would replace the
+      // header's underline — same property, later rule — so the line is painted instead, off
+      // the sticky cell's own positioning.
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 0 0 0 auto;
+        width: 1px;
+        background-color: color-mix(in srgb, var(--border) 60%, transparent);
+      }
+    }
+
+    // Column widths, read off the header row by the fixed layout above. Each is sized for the
+    // longest value it can hold — a chain's biggest price beside its symbol — so the figures
+    // never reflow as a reader pages down.
+    &--supply {
+      width: 68px;
+    }
+
+    &--floor {
+      width: 92px;
+    }
+
+    &--bestOffer {
+      width: 96px;
+    }
+
+    &--volume24h {
+      width: 92px;
+    }
+
+    &--change24h {
+      width: 76px;
+    }
+
+    &--sales24h {
+      width: 58px;
+    }
+
+    &--marketCap {
+      width: 96px;
+    }
+
+    &--volumeTotal {
+      width: 96px;
+    }
+
+    &--listed {
+      width: 84px;
+    }
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+
+    &:hover .collections__name {
+      text-decoration: underline;
+    }
+  }
+
+  &__thumb {
+    position: relative;
+    flex: 0 0 auto;
+    display: block;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      object-fit: cover;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is line-art, so
+      // contain it rather than cover-crop it
+      &[data-broken] {
+        object-fit: contain;
+        padding: 25%;
+      }
+    }
+  }
+
+  &__thumbFallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    color: var(--text-muted);
+  }
+
+  &__chain {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    width: 15px !important;
+    height: 15px !important;
+    border-radius: 50%;
+    border: 1.5px solid var(--surface);
+    background-color: var(--surface);
+  }
+
+  &__name {
+    min-width: 0; // flex items default to min-width:auto, which defeats the ellipsis
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &--pending {
+      color: var(--text-muted);
+    }
+  }
+
+  &__amount {
+    font-weight: 600;
+
+    small {
+      color: var(--text-muted);
+      font-size: inherit;
+    }
+  }
+
+  // Up is the plain case for a market and stays in body ink; a fall is the one number a reader
+  // is scanning for, so that's where the colour is spent. The caret carries the direction too,
+  // so the hue never says it alone — teal/red sit in the CVD floor band (see globals.scss).
+  &__change {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    font-weight: 600;
+
+    &--down {
+      color: var(--red-500);
+    }
+  }
+
+  &__new {
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-muted);
+    font-size: var(--font-size-11, 0.7rem);
+    font-weight: 700;
+  }
+
+  &__listed {
+    font-weight: 600;
+
+    small {
+      margin-left: 0.25rem;
+      color: var(--text-muted);
+      font-size: inherit;
+      font-weight: 400;
+    }
+  }
+
+  &__blank {
+    color: var(--text-muted);
+  }
+
+  &__empty {
+    padding: 2.5rem 1rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  &__skeleton {
+    display: block;
+    width: 100%;
+    height: 34px;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: collectionsTablePulse 1.4s ease-in-out infinite;
+  }
+
+  // Sideways scrolling is the deal this table makes, but a phone shouldn't have to drag
+  // through 1100px of it. Columns leave in order of how little they decide anything — a
+  // supply, then the all-time totals, then the bid — and the minimum shrinks with each one so
+  // what's left fills the box instead of scrolling anyway. Size queries rather than media
+  // queries: the table sits in a fixed-width card, so the viewport says nothing about its room.
+  @container collectionsTable (max-width: 900px) {
+    &__table {
+      min-width: 907px;
+    }
+
+    &__cell--supply {
+      display: none;
+    }
+  }
+
+  @container collectionsTable (max-width: 760px) {
+    &__table {
+      min-width: 811px;
+    }
+
+    &__cell--volumeTotal {
+      display: none;
+    }
+  }
+
+  @container collectionsTable (max-width: 620px) {
+    &__table {
+      min-width: 715px;
+    }
+
+    &__cell--marketCap {
+      display: none;
+    }
+  }
+
+  @container collectionsTable (max-width: 520px) {
+    &__table {
+      min-width: 587px;
+    }
+
+    &__cell--bestOffer {
+      display: none;
+    }
+
+    // What's left is the identity, the floor, what moved today and how much is up — so the
+    // pinned pair gives back every pixel it can spare
+    &__cell--collection {
+      left: 34px;
+      width: 150px;
+    }
+
+    &__cell--rank {
+      width: 34px;
+    }
+  }
+}
+
+@keyframes collectionsTablePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}

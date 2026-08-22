@@ -5,10 +5,11 @@ import useOwnedTokenIds from '@/hooks/useOwnedTokenIds'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { useConnection } from 'wagmi'
 import { displayTokenId, normalizeTokenId } from '@/lib/walletNfts'
+import NftDetailModal from '@/components/NftDetailModal'
 import SendNftModal from '@/components/SendNftModal'
 import styles from './OwnedTokens.module.scss'
 
-function OwnedTile({ chainId, collection, collectionName, rawId, isLsp8, onSend }) {
+function OwnedTile({ chainId, collection, collectionName, rawId, isLsp8, onOpen, onSend }) {
   const meta = useNftMetadata({ chainId, collection, tokenId: rawId, isLsp8, imageWidth: 320, still: true })
   const label = displayTokenId(rawId)
   const name = meta.name || (collectionName ? `${collectionName} #${label}` : `#${label}`)
@@ -27,21 +28,29 @@ function OwnedTile({ chainId, collection, collectionName, rawId, isLsp8, onSend 
     isLsp8: Boolean(isLsp8),
   }
 
+  // The tile itself is the door to the token's details; Send stays a sibling rather than a
+  // nested button, which no browser would accept
   return (
-    <figure className={styles.owned__item}>
-      <span className={styles.owned__art}>
-        {meta.image ? <img src={meta.image} alt="" loading="lazy" decoding="async" /> : <span className={styles.owned__artFallback} aria-hidden="true" />}
-      </span>
+    <div className={styles.owned__item}>
+      <button type="button" className={styles.owned__open} onClick={() => onOpen({ rawId, nft })} aria-label={`Details for ${name}`}>
+        <span className={styles.owned__art}>
+          {meta.image ? (
+            <img src={meta.image} alt="" loading="lazy" decoding="async" />
+          ) : (
+            <span className={styles.owned__artFallback} aria-hidden="true" />
+          )}
+        </span>
 
-      <figcaption className={styles.owned__caption}>
-        <span className={styles.owned__name}>{name}</span>
-        <span className={styles.owned__tokenId}>#{label}</span>
-      </figcaption>
+        <span className={styles.owned__caption}>
+          <span className={styles.owned__name}>{name}</span>
+          <span className={styles.owned__tokenId}>#{label}</span>
+        </span>
+      </button>
 
       <button type="button" className={styles.owned__send} onClick={() => onSend(nft)}>
         Send
       </button>
-    </figure>
+    </div>
   )
 }
 
@@ -62,6 +71,7 @@ function OwnedTile({ chainId, collection, collectionName, rawId, isLsp8, onSend 
  */
 export default function OwnedTokens({ chainId, collection, collectionName, isLsp8 }) {
   const { address, isConnected } = useConnection()
+  const [detail, setDetail] = useState(null)
   const [sendNft, setSendNft] = useState(null)
 
   // The read needs the standard to pick between tokenIdsOf and tokenOfOwnerByIndex
@@ -92,6 +102,7 @@ export default function OwnedTokens({ chainId, collection, collectionName, isLsp
               collectionName={collectionName}
               rawId={rawId}
               isLsp8={isLsp8}
+              onOpen={setDetail}
               onSend={setSendNft}
             />
           ))}
@@ -104,6 +115,21 @@ export default function OwnedTokens({ chainId, collection, collectionName, isLsp
             This collection doesn&apos;t publish which token ids you hold, so they can&apos;t be listed here.
           </p>
         )
+      )}
+
+      {/* The detail modal carries its own Transfer now — this strip keeps a Send on each tile
+          only so an owner clearing out several doesn't have to open each one first */}
+      {detail && (
+        <NftDetailModal
+          chainId={chainId}
+          collection={collection}
+          tokenId={detail.rawId}
+          isLsp8={Boolean(isLsp8)}
+          collectionName={collectionName}
+          // Already on the collection's page — the link would lead back here
+          showCollectionLink={false}
+          onClose={() => setDetail(null)}
+        />
       )}
 
       {sendNft && (

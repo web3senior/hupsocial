@@ -23,19 +23,26 @@ export const getServerPublicClient = (chainId) => {
   const id = Number(chainId)
   if (!Number.isFinite(id)) return null
 
-  const cached = clients.get(id)
-  if (cached) return cached
-
   const chain = appChains.find((c) => c.id === id)
   if (!chain) return null
+
+  // Keyed by endpoint as well as chain, because the map outlives a hot reload: repointing a
+  // chain's RPC in config/contracts would otherwise keep handing back a client still bound to
+  // the endpoint that was there at boot, and the edit would look like it did nothing until the
+  // dev server was restarted.
+  const rpcUrl = chain.rpcUrls.default.http[0]
+  const cacheKey = `${id}|${rpcUrl}`
+
+  const cached = clients.get(cacheKey)
+  if (cached) return cached
 
   const client = createPublicClient({
     chain,
     // Metadata resolution fires several reads per token — batching folds them into
     // one JSON-RPC request so public endpoints don't rate-limit a feed render.
-    transport: http(chain.rpcUrls.default.http[0], { batch: true }),
+    transport: http(rpcUrl, { batch: true }),
   })
 
-  clients.set(id, client)
+  clients.set(cacheKey, client)
   return client
 }

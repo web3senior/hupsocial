@@ -27,8 +27,11 @@ const STATUS_ACTIVE = 1
  * Renders nothing for inactive listings and the seller's own tiles.
  * @param {Object} props
  * @param {Object} props.listing Row from GET /api/v1/nfts.
+ * @param {'overlay'|'inline'} [props.variant='overlay'] 'overlay' is the pill that lands on
+ * artwork and holds its own ground in any theme; 'inline' is for a row on the page's own
+ * surface — a table cell — where fixed white would read as a hole.
  */
-export default function NftQuickBuy({ listing }) {
+export default function NftQuickBuy({ listing, variant = 'overlay' }) {
   // idle → (tap) checking → approve | confirm | buying; done and gone are terminal
   const [phase, setPhase] = useState('idle')
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
@@ -219,6 +222,7 @@ export default function NftQuickBuy({ listing }) {
     <button
       type="button"
       className={clsx(styles.quickBuy, {
+        [styles['quickBuy--inline']]: variant === 'inline',
         [styles['quickBuy--done']]: phase === 'done',
         [styles['quickBuy--gone']]: phase === 'gone',
       })}

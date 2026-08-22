@@ -229,6 +229,33 @@ export const getNftCollections = async (limit = 12, networkId) => {
 }
 
 /**
+ * The collections leaderboard — one row per collection with floor, best live offer, 24h
+ * volume and its move against the previous 24h, 24h sales, lifetime volume, supply and
+ * active listings. Ranked server-side, because a stat can only order the market if it was
+ * computed across all of it (see the ranking route).
+ *
+ * Prices arrive as base-unit strings in each collection's dominant payment token, with the
+ * symbol and decimals alongside — native-coin rows carry null for both and the caller fills
+ * them from its chain config.
+ * @param {Object} [options]
+ * @param {number} [options.limit=50] Rows to return (server caps at 100).
+ * @param {string|number} [options.networkId] Restrict to one chain.
+ * @param {string} [options.sort='volume24h'] One of volume24h, volumeTotal, sales24h,
+ * change24h, floor, bestOffer, marketCap, listed, supply. Anything else falls back to the
+ * default rather than erroring.
+ */
+export const getNftCollectionRanking = async ({ limit = 50, networkId, sort } = {}) => {
+  const params = new URLSearchParams({ limit })
+  if (networkId) params.set('networkId', networkId)
+  if (sort) params.set('sort', sort)
+
+  const response = await fetch(`/api/v1/nfts/collections/ranking?${params.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch the collections ranking')
+
+  return response.json()
+}
+
+/**
  * Daily floor series for several collections at once, for the market rail's card sparklines.
  * Batched deliberately — a request per card would be a dozen round trips on every page load.
  *
@@ -322,14 +349,53 @@ export const getNftCollectionInfo = async (networkId, address, isLsp8) => {
  * @param {string} address Collection contract address.
  * @param {'active'|'sold'|'active_sold'|'all'} [status] Scope the counts to the same listing
  * status the grid is showing; defaults to active. Cancelled listings are never counted.
+ * @param {Object} [options]
+ * @param {'listed'|'collection'} [options.scope] 'listed' (default) counts only tokens the grid
+ * can show — what a filter panel needs. 'collection' counts every cached token, listed or not,
+ * which is the only honest denominator for a rarity share.
+ * @param {boolean} [options.floor] Adds each value's lowest live ask (`floor`, base units) so a
+ * trait card can price itself. `meta.floor` names the single currency they were taken in.
  */
-export const getNftCollectionTraits = async (networkId, address, status) => {
+export const getNftCollectionTraits = async (networkId, address, status, options = {}) => {
   const params = new URLSearchParams()
   if (status) params.set('status', status)
+  if (options.scope) params.set('scope', options.scope)
+  if (options.floor) params.set('floor', '1')
   const query = params.toString()
 
   const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/traits${query ? `?${query}` : ''}`)
   if (!response.ok) throw new Error('Failed to fetch collection traits')
+
+  return response.json()
+}
+
+/**
+ * Get NFT Collection Top Offers
+ * The best live offer on each token of one collection — one row per token that has one, in
+ * the currency it was bid in. Active and unexpired only, so every number is one a seller
+ * could accept right now. `symbol`/`decimals` are null for the native coin; fill both in
+ * from the chain config like every other price.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ */
+export const getNftCollectionTopOffers = async (networkId, address) => {
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/offers`)
+  if (!response.ok) throw new Error('Failed to fetch collection offers')
+
+  return response.json()
+}
+
+/**
+ * Get NFT Collection Rarity
+ * The collection's trait-rarity ranking as one array of token ids, best first — index + 1 is
+ * a token's rank. Ranks cover only the tokens whose metadata Hup has resolved (`meta.ranked`),
+ * never the full supply, so print that denominator rather than the collection's size.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ */
+export const getNftCollectionRarity = async (networkId, address) => {
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/rarity`)
+  if (!response.ok) throw new Error('Failed to fetch collection rarity')
 
   return response.json()
 }
@@ -350,6 +416,29 @@ export const getNftCollectionTokens = async (networkId, address, page = 1, limit
 
   const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/tokens?${params.toString()}`)
   if (!response.ok) throw new Error('Failed to fetch collection tokens')
+
+  return response.json()
+}
+
+/**
+ * Get NFT Token Market
+ * Everything the market knows about one token, in one request: its live listing (shaped like a
+ * row of getNftListings, so TradeCard takes it directly), the best offer anyone could accept
+ * right now, its whole activity timeline, and its sale series for the price chart.
+ *
+ * Every priced row carries its own `symbol`/`decimals` — both null for the native coin, filled
+ * in from the chain config like every other price in the app — because one token can be listed
+ * in one currency and bid on in another.
+ * @param {string|number} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ * @param {string} tokenId Raw token id — bytes32 hex for LSP8, decimal for ERC721. Either
+ * dialect resolves; the route matches both forms.
+ */
+export const getNftTokenMarket = async (networkId, address, tokenId) => {
+  const path = `/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/tokens/${encodeURIComponent(tokenId)}`
+
+  const response = await fetch(path)
+  if (!response.ok) throw new Error('Failed to fetch token market data')
 
   return response.json()
 }
