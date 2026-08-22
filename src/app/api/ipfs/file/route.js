@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
 import sharp from 'sharp'
+import { FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
@@ -104,29 +105,63 @@ export async function POST(request) {
 // placeholder. Failing fast frees the connection and lets the rest of the grid render.
 const GATEWAY_TIMEOUT_MS = 8000
 
+/* The bytes are a pure function of cid + params, so they can sit in the shared cache
+   forever. Without s-maxage only browsers cached it, and every social crawler that scraped
+   a link paid the full gateway fetch + sharp re-encode again. */
+const SUCCESS_CACHE_CONTROL = 'public, max-age=31536000, s-maxage=31536000, immutable'
+
+/* Failures are cacheable too, and not caching them is what actually hurt. Unpinned content
+   is ordinary on IPFS, so a dead CID cost its full GATEWAY_TIMEOUT_MS on every render of
+   every page it appeared on, forever — a ranking table carrying four of them spent 32s of
+   the browser's six connections doing nothing, and every other thumbnail queued behind
+   that. Held only for the negative-cache window, so a CID pinned this morning still shows
+   up without a deploy. */
+const FAILURE_CACHE_CONTROL = `public, max-age=${Math.floor(FAILURE_TTL_MS / 1000)}, s-maxage=${Math.floor(FAILURE_TTL_MS / 1000)}`
+
 function intParam(value, fallback, min, max) {
   const parsed = Number.parseInt(value ?? '', 10)
   if (!Number.isFinite(parsed)) return fallback
   return Math.min(Math.max(parsed, min), max)
 }
 
-export async function GET(req) {
-  const { searchParams } = new URL(req.url)
-  const cid = searchParams.get('cid')
-
-  const width = intParam(searchParams.get('w'), null, 1, 4096)
-  const quality = intParam(searchParams.get('q'), 80, 1, 100)
-
-  /* Social crawlers are inconsistent about WebP — X in particular will drop a card rather
-     than render one — so link previews ask for fmt=jpeg. JPEG has no animation, so it
-     forces the still path regardless of what the caller passed. */
-  const format = searchParams.get('fmt') === 'jpeg' ? 'jpeg' : 'webp'
-  const stillOnly = searchParams.get('still') === '1' || format === 'jpeg'
-
-  if (!cid) {
-    return NextResponse.json({ error: 'CID is required' }, { status: 400 })
+/**
+ * Turns a cache entry into its HTTP response. The same three shapes come back whether the
+ * entry was just produced or read out of memory, so a hit and a miss can never disagree
+ * about what a CID resolves to.
+ * @param {{kind: 'body'|'redirect'|'error'}} entry A mediaCache entry.
+ * @returns {Response} The response to serve.
+ */
+function respond(entry) {
+  if (entry.kind === 'redirect') {
+    return new NextResponse(null, { status: 302, headers: { Location: entry.location, 'Cache-Control': SUCCESS_CACHE_CONTROL } })
   }
 
+  if (entry.kind === 'error') {
+    return NextResponse.json({ error: entry.message }, { status: entry.status, headers: { 'Cache-Control': FAILURE_CACHE_CONTROL } })
+  }
+
+  return new Response(entry.body, {
+    headers: {
+      'Content-Type': entry.contentType,
+      'Cache-Control': SUCCESS_CACHE_CONTROL,
+      'CDN-Cache-Control': 'public, s-maxage=31536000',
+    },
+  })
+}
+
+/**
+ * The cache-miss path: fetch from the gateway, transcode, optimize, and record the outcome
+ * — success or failure — so the next caller for this key repeats none of it.
+ * @param {Object} params
+ * @param {string} params.cacheKey Identity of the entry being produced.
+ * @param {string} params.cid Content address to resolve.
+ * @param {number|null} params.width Resize target, or null to keep the original width.
+ * @param {number} params.quality Encoder quality, 1-100.
+ * @param {'webp'|'jpeg'} params.format Output encoding.
+ * @param {boolean} params.stillOnly Decode the first frame only.
+ * @returns {Promise<{kind: 'body'|'redirect'|'error'}>} The entry, already written to cache.
+ */
+async function resolveMedia({ cacheKey, cid, width, quality, format, stillOnly }) {
   const gatewayUrl = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${cid}`
 
   try {
@@ -140,7 +175,8 @@ export async function GET(req) {
 
     /* Only images go through sharp — video/audio stream straight from the gateway */
     if (!contentType.startsWith('image/')) {
-      return NextResponse.redirect(gatewayUrl, 302)
+      writeMediaRedirect(cacheKey, gatewayUrl)
+      return { kind: 'redirect', location: gatewayUrl }
     }
 
     const arrayBuffer = await upstream.arrayBuffer()
@@ -187,22 +223,46 @@ export async function GET(req) {
             })
             .toBuffer()
 
-    return new Response(optimizedBuffer, {
-      headers: {
-        'Content-Type': format === 'jpeg' ? 'image/jpeg' : 'image/webp',
-        /* The output is a pure function of cid + params, so it can sit in the shared cache
-           forever. Without s-maxage only browsers cached it, and every social crawler that
-           scraped a link paid the full gateway fetch + sharp re-encode again. */
-        'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable',
-        'CDN-Cache-Control': 'public, s-maxage=31536000',
-      },
-    })
+    const outputType = format === 'jpeg' ? 'image/jpeg' : 'image/webp'
+    writeMediaBody(cacheKey, optimizedBuffer, outputType)
+    return { kind: 'body', body: optimizedBuffer, contentType: outputType }
   } catch (error) {
     // TimeoutError means the gateway never answered; report it as a gateway timeout so the
     // difference between "we broke" and "the gateway is unreachable" is visible in the logs.
     const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError'
     if (!timedOut) console.error('IPFS_API_ROUTE_ERROR:', error)
     else console.warn(`IPFS_GATEWAY_TIMEOUT after ${GATEWAY_TIMEOUT_MS}ms:`, cid)
-    return NextResponse.json({ error: timedOut ? 'IPFS gateway timed out' : error.message || 'Internal Server Error' }, { status: timedOut ? 504 : 500 })
+
+    const status = timedOut ? 504 : 500
+    const message = timedOut ? 'IPFS gateway timed out' : error.message || 'Internal Server Error'
+    writeMediaFailure(cacheKey, status, message)
+    return { kind: 'error', status, message }
   }
+}
+
+export async function GET(req) {
+  const { searchParams } = new URL(req.url)
+  const cid = searchParams.get('cid')
+
+  const width = intParam(searchParams.get('w'), null, 1, 4096)
+  const quality = intParam(searchParams.get('q'), 80, 1, 100)
+
+  /* Social crawlers are inconsistent about WebP — X in particular will drop a card rather
+     than render one — so link previews ask for fmt=jpeg. JPEG has no animation, so it
+     forces the still path regardless of what the caller passed. */
+  const format = searchParams.get('fmt') === 'jpeg' ? 'jpeg' : 'webp'
+  const stillOnly = searchParams.get('still') === '1' || format === 'jpeg'
+
+  if (!cid) {
+    return NextResponse.json({ error: 'CID is required' }, { status: 400 })
+  }
+
+  /* Every input the bytes depend on and nothing else, so two surfaces asking for the same
+     thumbnail at the same width share one gateway fetch and one sharp encode */
+  const cacheKey = `${cid}|${width ?? ''}|${quality}|${stillOnly ? 1 : 0}|${format}`
+
+  const cached = readMedia(cacheKey)
+  if (cached) return respond(cached)
+
+  return respond(await coalesceMedia(cacheKey, () => resolveMedia({ cacheKey, cid, width, quality, format, stillOnly })))
 }
