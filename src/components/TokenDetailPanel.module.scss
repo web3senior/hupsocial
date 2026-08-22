@@ -231,6 +231,46 @@ $rarity: (
     line-height: 1.55;
     color: var(--gray-400);
     overflow-wrap: anywhere;
+
+    &--clamped {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+  }
+
+  // Its own line under the blurb, where the clamp can never swallow it
+  &__readMore {
+    all: unset;
+    align-self: flex-start;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  // The collection's words, set apart from the token's by a rule rather than a box — same
+  // reading weight, but unmistakably a different voice
+  &__about {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  &__aboutLabel {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   &__traits {

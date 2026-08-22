@@ -39,6 +39,10 @@ import styles from './TokenDetailPanel.module.scss'
 
 const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
 
+// Past this, the collection's blurb collapses behind "Read more" — the same ceiling the collection
+// header gives it, so the two surfaces cut the same text at the same place
+const COLLECTION_CLAMP = 240
+
 // How rare a trait has to be to earn each badge colour. Read top-down: the first band a share
 // falls under wins, so the thresholds are "at most this common".
 const RARITY_TIERS = [
@@ -131,6 +135,9 @@ function PriceTooltip({ active, payload, symbol }) {
  * @param {boolean} [props.showListingLink=false] Offers a link through to the listing's own page
  * — /nfts/[chain]/[listingId], the shareable one. The dialog passes true, since it is the only
  * surface a reader can't link anyone to; the listing page itself leaves it off.
+ * @param {boolean} [props.showCollectionAbout=true] Carries the collection's own description into
+ * the Details tab. The listing page passes false — its "About the collection" aside already
+ * prints it, and the same blurb twice on one page reads as a bug.
  */
 export default function TokenDetailPanel({
   chainId,
@@ -141,11 +148,13 @@ export default function TokenDetailPanel({
   as: Heading = 'h2',
   showCollectionLink = true,
   showListingLink = false,
+  showCollectionAbout = true,
 }) {
   const [tab, setTab] = useState('traits')
   const [sellOpen, setSellOpen] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [offerOpen, setOfferOpen] = useState(false)
+  const [aboutExpanded, setAboutExpanded] = useState(false)
   const tablistRef = useRef(null)
 
   const chain = Number(chainId)
@@ -177,6 +186,19 @@ export default function TokenDetailPanel({
   const name = metadata.name || (collectionName ? `${collectionName} #${label}` : `#${label}`)
   const collectionLabel = metadata.collectionName || collectionInfo.name || collectionName || null
   const collectionHref = `/nfts/${chain}/collection/${collection.toLowerCase()}`
+
+  // What the drop says about itself, for the many tokens that carry no words of their own. Dropped
+  // when the collection stamped the same paragraph onto every token — printing it twice under one
+  // heading would read as the token repeating itself.
+  const collectionAbout = useMemo(() => {
+    const text = collectionInfo.description?.trim()
+    if (!showCollectionAbout || !text) return null
+    return text === metadata.description?.trim() ? null : text
+  }, [showCollectionAbout, collectionInfo.description, metadata.description])
+
+  // Roughly the three lines the clamp gives it, so a one-line blurb never sprouts a toggle
+  const isLongAbout = (collectionAbout?.length || 0) > COLLECTION_CLAMP
+
   // LUKSO's standard reads as "NFT 2.0" in the UI; the literal LSP8 name lives in the tooltip
   const standard = isLsp8 ? 'NFT 2.0' : 'ERC721'
   const standardTitle = isLsp8 ? 'LSP8' : undefined
@@ -582,6 +604,32 @@ export default function TokenDetailPanel({
         {tab === 'details' && (
           <>
             {metadata.description && <p className={styles.token__description}>{metadata.description}</p>}
+
+            {/* The collection's blurb under the token's own, attributed — the sentence "this is a
+                Hup Pass" belongs to every token of the contract, not to this one, and a reader who
+                opened one NFT shouldn't have to walk back to the collection page to read it */}
+            {collectionAbout && (
+              <section className={styles.token__about}>
+                <small className={styles.token__aboutLabel}>About {collectionLabel || 'the collection'}</small>
+
+                <p className={clsx(styles.token__description, isLongAbout && !aboutExpanded && styles['token__description--clamped'])}>
+                  {collectionAbout}
+                </p>
+
+                {/* Outside the clamped paragraph, not inline at the end of it: a line-clamp cuts
+                    everything past its last line, and a toggle a reader can't see can't be pressed */}
+                {isLongAbout && (
+                  <button
+                    type="button"
+                    className={styles.token__readMore}
+                    aria-expanded={aboutExpanded}
+                    onClick={() => setAboutExpanded((current) => !current)}
+                  >
+                    {aboutExpanded ? 'Show less' : 'Read more'}
+                  </button>
+                )}
+              </section>
+            )}
 
             <dl className={styles.token__details}>
               <div>

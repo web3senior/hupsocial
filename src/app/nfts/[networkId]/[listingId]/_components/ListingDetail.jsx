@@ -240,6 +240,8 @@ export default function ListingDetail({ networkId, listingId }) {
           tokenId={listing.token_id}
           isLsp8={isLsp8}
           collectionName={metadata.collectionName || collectionInfo.name}
+          // The "About the collection" aside below already prints the same blurb — once per page
+          showCollectionAbout={false}
           as="h1"
           // Already the listing's own page — the panel's link through would lead back to here
           showListingLink={false}
