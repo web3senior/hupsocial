@@ -415,10 +415,14 @@
         }
       }
 
+      // Orange, not the green a repost usually gets: green now belongs to the tip, which
+      // wears it at rest on every earning post, and two greens a few pixels apart in the
+      // same row stop reading as two different actions. Orange is free once the tip's own
+      // hover moves onto its green below.
       &[data-action='repost']:hover {
-        color: color-mix(in srgb, var(--green-400) 60%, transparent);
+        color: color-mix(in srgb, var(--orange-400) 70%, transparent);
         &:before {
-          background-color: color-mix(in srgb, var(--green-400) 10%, transparent);
+          background-color: color-mix(in srgb, var(--orange-400) 12%, transparent);
         }
       }
 
@@ -457,17 +461,17 @@
         // Teal, not green: --trend-up is the palette's validated "up" hue and sidesteps the
         // green-vs-red colorblind collision documented in Globals.scss. Lightened in dark,
         // where the light theme's 600-weight teal sits too close to the surface.
-        --tip-earned-color: var(--trend-up, #0d9488);
+        // One flat green in every theme — it clears 7:1 on the dark card, and on white it
+        // carries the pill's tint and its own weight rather than leaning on hue alone.
+        --tip-earned-color: #21c95e;
 
-        [data-theme='dark'] & {
-          --tip-earned-color: color-mix(in srgb, var(--trend-up, #0d9488) 55%, white);
-        }
-
+        // Hovers in its own green, the colour it already wears once the post has earned —
+        // one action, one hue, in both states
         &:hover {
-          color: color-mix(in srgb, var(--orange-400) 60%, transparent);
+          color: color-mix(in srgb, var(--tip-earned-color) 75%, transparent);
 
           &:before {
-            background-color: color-mix(in srgb, var(--orange-400) 10%, transparent);
+            background-color: color-mix(in srgb, var(--tip-earned-color) 12%, transparent);
           }
         }
 
@@ -482,6 +486,7 @@
             margin-inline-start: 2px;
             border-radius: 999px;
             background-color: color-mix(in srgb, var(--tip-earned-color) 14%, transparent);
+            color: var(--tip-earned-color);
             font-weight: 600;
             font-variant-numeric: tabular-nums;
           }
