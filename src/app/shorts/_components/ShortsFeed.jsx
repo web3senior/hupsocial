@@ -20,9 +20,15 @@ const PREFETCH_WITHIN = 3
 
 // Where the rail leaves a bookmark for itself. Tapping through to a post's comments is a real
 // navigation, so coming back remounts this component with an empty rail — the slide the reader
-// was on has to survive somewhere outside React. sessionStorage scopes it to the tab, which is
-// the same lifetime as "this visit".
+// was on has to survive somewhere outside React. sessionStorage scopes it to the tab, so the
+// bookmark cannot outlive the visit it belongs to.
 const LAST_SLIDE_KEY = 'hup:shorts:last-slide'
+
+// The bookmark answers one round trip, not the whole tab. It is written only when the reader
+// follows a link out of the rail, spent by the restore that reads it, and ignored once it is
+// this old — so opening Shorts deliberately always starts at the newest video, which is where
+// anything posted since the reader was last here has landed.
+const BOOKMARK_TTL_MS = 30 * 60 * 1000
 
 // How far the restore is allowed to page forward hunting for the saved post. Someone who
 // scrolled deeper than this lands at the top rather than waiting out a long silent load.
@@ -32,17 +38,31 @@ const RESTORE_MAX_PAGES = 5
    returning, and a rail that cannot remember its position is still a working rail. */
 const readLastSlide = () => {
   try {
-    return sessionStorage.getItem(LAST_SLIDE_KEY)
+    const raw = sessionStorage.getItem(LAST_SLIDE_KEY)
+    if (!raw) return null
+
+    const { key, at } = JSON.parse(raw)
+    if (!key || !at || Date.now() - at > BOOKMARK_TTL_MS) return null
+    return key
   } catch {
+    /* including a payload left by an older build, which parses as garbage rather than a slide */
     return null
   }
 }
 
 const writeLastSlide = (key) => {
   try {
-    sessionStorage.setItem(LAST_SLIDE_KEY, key)
+    sessionStorage.setItem(LAST_SLIDE_KEY, JSON.stringify({ key, at: Date.now() }))
   } catch {
     /* not being able to remember the slide is not worth breaking playback over */
+  }
+}
+
+const clearLastSlide = () => {
+  try {
+    sessionStorage.removeItem(LAST_SLIDE_KEY)
+  } catch {
+    /* nothing to recover from: a store that cannot be read held no bookmark to clear */
   }
 }
 
@@ -89,11 +109,6 @@ export default function ShortsFeed() {
      until the next render. */
   const postsRef = useRef([])
   const hasMoreRef = useRef(true)
-
-  /* Set once the restore has run. Until then nothing is written back to storage — the observer
-     fires for slide 0 the moment the first page renders, and letting that through would
-     overwrite the saved slide with the top of the rail before it is ever read. */
-  const isRestoredRef = useRef(false)
 
   /* The index the rail owes the reader a scroll to, handed from the async restore to the layout
      effect that can only run once the slides exist. */
@@ -179,8 +194,7 @@ export default function ShortsFeed() {
   )
 
   // Loads page 1, then — if the reader left the rail on a slide — keeps paging forward until
-  // that post is back on the rail. Reading the saved key before the first await matters: this
-  // effect re-runs when the viewer changes, and by then the persist effect below is live.
+  // that post is back on the rail.
   useEffect(() => {
     let cancelled = false
 
@@ -211,7 +225,11 @@ export default function ShortsFeed() {
         pendingRestoreRef.current = index
       }
 
-      isRestoredRef.current = true
+      /* Spent here rather than at the read: React's development double-mount runs this pass
+         twice and cancels the first one mid-flight, so clearing on read would let the cancelled
+         pass swallow the bookmark and land the surviving one at the top. Everything above has
+         already cleared its cancellation checks by this point. */
+      clearLastSlide()
       setIsRestoring(false)
     }
 
@@ -240,13 +258,33 @@ export default function ShortsFeed() {
     rail.scrollTo({ top: index * rail.clientHeight, behavior: 'instant' })
   }, [posts, activeIndex])
 
-  /* Remembers where the reader is, so tapping through to a post and coming back returns them
-     here. Only once the restore has run, or this writes the rail's default over the real one. */
-  useEffect(() => {
-    if (!isRestoredRef.current) return
+  /* Remembers where the reader is at the one moment worth remembering: following a link out of
+     the rail — a slide's author, its comments — is the departure they expect to come back from.
+     Leaving any other way writes nothing, so the next deliberate visit opens on the newest video
+     rather than pinning the reader to a slide they already watched while everything posted since
+     sits above it, unseen.
 
+     Capture phase, on the rail rather than per slide: the links belong to ShortsPlayer, and a
+     handler there would have to be threaded through Profile and Share as well. */
+  useEffect(() => {
+    const rail = railRef.current
     const post = posts[activeIndex]
-    if (post) writeLastSlide(postKey(post))
+    if (!rail || !post) return
+
+    const rememberOnLeave = (event) => {
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor) return
+
+      /* A share link opening elsewhere is not a departure — this rail is still standing behind
+         it, and a bookmark written here would be left for the next real visit to spend. */
+      if (anchor.target && anchor.target !== '_self') return
+      if (anchor.origin !== window.location.origin) return
+
+      writeLastSlide(postKey(post))
+    }
+
+    rail.addEventListener('click', rememberOnLeave, true)
+    return () => rail.removeEventListener('click', rememberOnLeave, true)
   }, [activeIndex, posts])
 
   // One observer for the whole rail: whichever slide is mostly on screen becomes the active one,
