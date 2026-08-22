@@ -28,6 +28,50 @@ const TRENDING_COMMENT_WEIGHT = 3 // comments are costlier to fake than likes
 
 const trendingCache = new Map()
 
+// --- Shorts feed column probe ---
+// posts.has_video is a stored generated column applied by hand (sql/2026-08-21-posts-has-video.sql),
+// and a deploy is a separate action from a migration — so this code can and does reach a database
+// where that ALTER has not been run yet. Naming a column that isn't there fails the entire query,
+// which took the whole shorts feed down with a 500 rather than merely losing the index. The feed is
+// therefore expressed against whichever form the database actually has: the column where it exists,
+// otherwise the same JSON walk inline, which is what the column stores anyway.
+const HAS_VIDEO_COLUMN_PREDICATE = 'p.has_video = 1'
+const HAS_VIDEO_INLINE_PREDICATE =
+  "(JSON_VALID(p.content) AND JSON_SEARCH(p.content, 'one', 'video', NULL, '$.elements[1].data.items[*].type') IS NOT NULL)"
+
+// Re-probed at most this often while the answer is "no". A "yes" is cached for the life of the
+// process — a column cannot un-exist — so applying the migration to a live database promotes the
+// fast path on its own, without waiting for a redeploy to recycle the instance.
+const HAS_VIDEO_PROBE_RETRY_MS = 5 * 60_000
+
+let hasVideoColumn = false
+let hasVideoProbedAt = 0
+
+const shortsPredicate = async () => {
+  if (hasVideoColumn) return HAS_VIDEO_COLUMN_PREDICATE
+  if (hasVideoProbedAt && Date.now() - hasVideoProbedAt < HAS_VIDEO_PROBE_RETRY_MS) return HAS_VIDEO_INLINE_PREDICATE
+
+  hasVideoProbedAt = Date.now()
+  try {
+    const [rows] = await pool.execute(
+      `SELECT 1 FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'posts' AND COLUMN_NAME = 'has_video' LIMIT 1`
+    )
+    hasVideoColumn = rows.length > 0
+  } catch (error) {
+    /* A failed probe says nothing about the column, so fall back to the form that always parses.
+       A real connection problem surfaces on the feed query itself a moment later. */
+    console.error('[posts] has_video probe failed:', error)
+    hasVideoColumn = false
+  }
+
+  if (!hasVideoColumn) {
+    console.warn('[posts] posts.has_video is missing — the shorts feed is scanning content JSON. Apply sql/2026-08-21-posts-has-video.sql.')
+  }
+
+  return hasVideoColumn ? HAS_VIDEO_COLUMN_PREDICATE : HAS_VIDEO_INLINE_PREDICATE
+}
+
 // --- Author cooldown (chronological discovery feeds) ---
 // Posting is onchain, so nothing can rate-limit a spammer at write time — the feed has to do it
 // at read time. Each author gets at most AUTHOR_BURST_CAP posts per AUTHOR_BURST_WINDOW_HOURS
@@ -113,12 +157,13 @@ export async function GET(request) {
       )`
     }
 
-    // "Shorts" = posts carrying at least one video attachment. has_video is a generated column
-    // (sql/2026-08-21-posts-has-video.sql) that runs the JSON walk at write time, so this stays a
-    // plain indexed per-row check inside the paginated derived table rather than a scan that
-    // parses every post's content on every page.
+    // "Shorts" = posts carrying at least one video attachment. Normally has_video, a generated
+    // column (sql/2026-08-21-posts-has-video.sql) that runs the JSON walk at write time, so this
+    // stays a plain indexed per-row check inside the paginated derived table rather than a scan
+    // that parses every post's content on every page. Where that column has not been applied yet
+    // the same walk runs inline instead — slower, but a feed that scans beats a feed that 500s.
     if (feedType === 'shorts') {
-      whereClause += ` AND p.has_video = 1`
+      whereClause += ` AND ${await shortsPredicate()}`
     }
 
     // Home-tab feeds pass exclude_nft=1 so posts carrying a HupTrade NFT listing live only
