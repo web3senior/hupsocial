@@ -38,20 +38,14 @@ export function normalizeOriginCode(raw) {
 export const isCountryCode = (code) => typeof code === 'string' && /^[A-Z]{2}$/.test(code)
 
 /**
- * The flag for an ISO code, built from the code itself: each letter offset into the
- * regional-indicator block, which every platform composes into that country's flag. Windows ships
- * no flag glyphs and renders the pair as the letters "NG" instead — still the right answer, just
- * a plainer one — which is the whole reason the country's name is always rendered beside it.
- */
-export function countryFlagEmoji(code) {
-  if (!isCountryCode(code)) return ''
-  return String.fromCodePoint(...[...code].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65))
-}
-
-/**
  * The wire shape, in one place, so the picker, the profile chip and the API can never disagree.
  * `countryName` is the row the caller resolved from `countries`; without it a country still
- * renders, as its flag and its code.
+ * renders, as its bare code.
+ *
+ * A country carries NO emoji. A flag is composed from two regional-indicator letters, and Windows
+ * ships no flag glyphs, so rather than a flag every country rendered as its own ISO code sitting
+ * next to its own name. The key stays on the shape either way — empty for a country, set for an
+ * onchain origin — so consumers keep getting one object and branch on truthiness, never on kind.
  * @returns {{code: string, kind: 'country'|'onchain', label: string, emoji: string}|null}
  */
 export function describeOrigin(code, countryName = null) {
@@ -63,7 +57,7 @@ export function describeOrigin(code, countryName = null) {
       code: normalized,
       kind: 'country',
       label: countryName || normalized,
-      emoji: countryFlagEmoji(normalized),
+      emoji: '',
     }
   }
 

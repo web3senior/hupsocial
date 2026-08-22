@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries } from '@/lib/api'
 import { ORIGIN_OPTIONS } from '@/config/originOptions'
-import { countryFlagEmoji, isCountryCode } from '@/lib/origin'
+import { isCountryCode } from '@/lib/origin'
 import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
@@ -620,12 +620,12 @@ const Profile = ({ addr }) => {
 
             {/* Where this wallet says it is from — a real country, or an onchain one. Resolved
                 server-side into { emoji, label } so the chip never has to know which kind it got.
-                Windows ships no flag glyphs and renders a country's pair as its two letters
-                instead, which is why the name is always spelled out beside it. */}
+                A country arrives without one — Windows has no flag glyphs, so the flag emoji drew
+                itself as the ISO letters beside the name — and the pin alone marks those. */}
             {profile.origin && (
               <span className={styles.profile__origin}>
                 <MapPinIcon size={14} />
-                <span aria-hidden="true">{profile.origin.emoji}</span>
+                {profile.origin.emoji && <span aria-hidden="true">{profile.origin.emoji}</span>}
                 {profile.origin.label}
               </span>
             )}
@@ -1413,11 +1413,11 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 </optgroup>
                 <optgroup label="Countries">
                   {savedCountryMissing && (
-                    <option value={savedOrigin.code}>{`${savedOrigin.emoji} ${savedOrigin.label}`}</option>
+                    <option value={savedOrigin.code}>{savedOrigin.label}</option>
                   )}
                   {countries.map((country) => (
                     <option key={country.iso_code} value={country.iso_code}>
-                      {`${countryFlagEmoji(country.iso_code)} ${country.name}`}
+                      {country.name}
                     </option>
                   ))}
                 </optgroup>
