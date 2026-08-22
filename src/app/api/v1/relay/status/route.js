@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { gaslessChainIds } from '@/config/gasless'
 import { fetchUsdPrices, priceKeyFor } from '@/lib/prices'
+import { providerForEndpoint, resolveServerRpc } from '@/lib/serverRpc'
 
 const NATIVE_TOKEN = '0x0000000000000000000000000000000000000000'
 
@@ -32,12 +33,30 @@ const TRUSTED_FORWARDER_ABI = ['function isTrustedForwarder(address) view return
 const readChain = async (chainId, relayer) => {
   const contracts = CONTRACTS[`chain${chainId}`]
   const chain = appChains.find((entry) => entry.id === chainId)
-  const rpcUrl = chain?.rpcUrls?.default?.http?.[0]
   const forwarder = contracts?.hupForwarder ?? contracts?.forwarder
 
-  if (!chain || !rpcUrl || !contracts?.hup || !forwarder) return null
+  if (!chain || !contracts?.hup || !forwarder) return null
 
-  const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true })
+  const base = {
+    id: chainId,
+    name: chain.name,
+    symbol: chain.nativeCurrency?.symbol ?? 'ETH',
+    balance: null,
+    costPerPost: null,
+    postsRemaining: null,
+    // A chain can be funded and still not relay: the contract has to trust the forwarder
+    trusted: null,
+    // And it can be both, and still read as empty because no endpoint answered us at all.
+    // That case used to render identically to a drained tank, which is how an unreachable
+    // LUKSO passed for a zero balance in production for as long as it did.
+    reachable: false,
+    rpcHost: null,
+  }
+
+  const endpoint = await resolveServerRpc(chainId)
+  if (!endpoint) return base
+
+  const provider = providerForEndpoint(endpoint, chainId)
 
   try {
     const [balance, feeData, trusted] = await Promise.all([
@@ -52,20 +71,19 @@ const readChain = async (chainId, relayer) => {
     const costPerPost = gasPrice ? gasPrice * GAS_PER_POST : null
 
     return {
-      id: chainId,
-      name: chain.name,
-      symbol: chain.nativeCurrency?.symbol ?? 'ETH',
+      ...base,
+      reachable: true,
+      rpcHost: endpoint.host,
       balance: ethers.formatEther(balance),
       costPerPost: costPerPost ? ethers.formatEther(costPerPost) : null,
       // Null rather than zero when the gas price is unreadable, so the UI can say "unknown"
       // instead of implying the tank is empty
       postsRemaining: costPerPost && costPerPost > 0n ? Number(balance / costPerPost) : null,
-      // A chain can be funded and still not relay: the contract has to trust the forwarder
       trusted,
     }
   } catch (err) {
-    console.error(`RELAY_STATUS_FAILED chain ${chainId}:`, err.shortMessage || err.message)
-    return { id: chainId, name: chain.name, symbol: chain.nativeCurrency?.symbol ?? 'ETH', balance: null, costPerPost: null, postsRemaining: null, trusted: null }
+    console.error(`RELAY_STATUS_FAILED chain ${chainId} via ${endpoint.host}:`, err.shortMessage || err.message)
+    return { ...base, rpcHost: endpoint.host }
   } finally {
     provider.destroy()
   }

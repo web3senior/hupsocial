@@ -5,6 +5,7 @@ import chatAbi from '../../../../abis/Chat.json'
 import hupAbi from '../../../../abi/post.json'
 import { CONTRACTS } from '../../../../config/contracts'
 import { GASLESS_BUCKETS, formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '../../../../config/gasless'
+import { getServerProvider } from '../../../../lib/serverRpc'
 
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
 
@@ -209,13 +210,15 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
-    const { request: forwardRequest, signature, rpcUrl, forwarderAddress: fwdAddr, chainId: bodyChainId, forwarderName } = body
+    const { request: forwardRequest, signature, forwarderAddress: fwdAddr, chainId: bodyChainId, forwarderName } = body
     forwarderAddress = fwdAddr
-    console.log(`Received relay request with RPC URL: ${rpcUrl}`)
-    const fetchRequest = new ethers.FetchRequest(rpcUrl)
-    provider = new ethers.JsonRpcProvider(fetchRequest)
-    const relayer = new ethers.Wallet(RELAYER_PRIVATE_KEY, provider)
-    const forwarder = new ethers.Contract(forwarderAddress, forwarderAbi, relayer)
+
+    // The chain id now has to come from the body: the endpoint is resolved from it, so there
+    // is no provider to ask first. All three call sites already send it.
+    const chainId = Number(bodyChainId)
+    if (!Number.isInteger(chainId) || chainId <= 0) {
+      return NextResponse.json({ error: 'Missing chain id.' }, { status: 400 })
+    }
 
     fullRequest = {
       from: forwardRequest.from,
@@ -228,12 +231,8 @@ export async function POST(request) {
       signature: signature,
     }
 
-    // Off-chain EIP-712 verification using the client-provided nonce.
-    // chainId is trusted from the client — the on-chain forwarder enforces it anyway.
-    // Accepting it here eliminates the getNetwork() round-trip on every relay call.
-    const chainId = bodyChainId ?? Number((await provider.getNetwork()).chainId)
-
-    // Spend gates — both run before any RPC work that could cost us gas.
+    // Spend gates — all of them local, and all of them ahead of any RPC work that could cost
+    // us gas.
     const bucket = sponsoredBucket(chainId, fullRequest.to, fullRequest.data)
 
     if (!bucket) {
@@ -263,6 +262,20 @@ export async function POST(request) {
         { status: 429, headers: { 'Retry-After': String(throttle.retryAfter) } },
       )
     }
+
+    // The endpoint used to come from the request body, and the relayer's provider was built
+    // from it — which let a crafted request point our key at a node of the caller's choosing.
+    // That node answers getFeeData(), so it would have set the gas price on a transaction we
+    // sign and pay for. Resolved from the chain id here instead; body.rpcUrl is ignored.
+    provider = await getServerProvider(chainId)
+
+    if (!provider) {
+      console.error('RELAY_RPC_UNREACHABLE:', chainId)
+      return NextResponse.json({ error: 'Could not reach this network right now. Please try again shortly.' }, { status: 503 })
+    }
+
+    const relayer = new ethers.Wallet(RELAYER_PRIVATE_KEY, provider)
+    const forwarder = new ethers.Contract(forwarderAddress, forwarderAbi, relayer)
 
     const message = {
       from: fullRequest.from,

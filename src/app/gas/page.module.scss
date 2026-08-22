@@ -136,6 +136,13 @@
       background: color-mix(in srgb, var(--batch-like-color, #facc15) 22%, transparent);
       color: var(--text);
     }
+
+    // Louder than "running low" on purpose: a low tank is a fact about the tank, an
+    // unreachable chain is a fault on our side and the figures beside it mean nothing.
+    &--unreachable {
+      background: color-mix(in srgb, var(--status-error, #dc2626) 16%, transparent);
+      color: var(--text);
+    }
   }
 
   &__figures {

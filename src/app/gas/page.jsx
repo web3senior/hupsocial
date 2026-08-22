@@ -64,6 +64,9 @@ function ChainRow({ chain, relayer }) {
   const balance = chain.balance === null ? null : Number(chain.balance)
   const isEmpty = balance !== null && balance === 0
   const isLow = chain.postsRemaining !== null && chain.postsRemaining < LOW_RUNWAY
+  // No endpoint answered our server for this chain, so every figure below is unknown rather
+  // than zero — worth saying out loud, because the two used to render identically
+  const isUnreachable = chain.reachable === false
 
   // Dollars where the token has a listed price, the token itself where it does not — every
   // testnet lands in the second case, and no exchange rate exists to invent one from
@@ -111,6 +114,15 @@ function ChainRow({ chain, relayer }) {
       <div className={styles.chain__header}>
         <span className={styles.chain__name}>{chain.name}</span>
 
+        {isUnreachable && (
+          <span
+            className={clsx(styles.chain__badge, styles['chain__badge--unreachable'])}
+            title={`Our server could not reach this network${chain.rpcHost ? ` through ${chain.rpcHost}` : ''}, so the tank could not be read. Topping it up still works.`}
+          >
+            <WarningIcon size={12} />
+            can&apos;t reach
+          </span>
+        )}
         {chain.trusted === false && (
           <span className={styles.chain__badge} title="This network's contract has not been pointed at the forwarder yet">
             <WarningIcon size={12} />
