@@ -1,62 +1,60 @@
-// PollTimer.js
-import React, { useState, useEffect } from 'react'
-import moment from 'moment'
-import web3 from 'web3'
+'use client'
 
-function PollTimer({ startTime, endTime, pollId }) {
-  const [timeLeft, setTimeLeft] = useState(0)
-  const [isPollActive, setIsPollActive] = useState(false)
+import { useEffect, useState } from 'react'
+
+/**
+ * @file components/PollTimer.jsx
+ * @description Live countdown for a poll's open window — "Ends in 4h:10m:3s". Ticks every
+ * second rather than settling on a coarse phrase: a closing poll is the one thing on the card
+ * worth watching, and a number that moves is what says a vote still counts.
+ * Timestamps are unix seconds, the way the contract stores them.
+ */
+
+/**
+ * Ticking "4h:10m:3s" — unit-labelled and unpadded, so the number reads at a glance without
+ * being mistaken for a wall clock. Trimmed to the three largest live units: a poll closing in
+ * six days does not need its seconds, and one closing in four hours does.
+ * @param {number} seconds Seconds from now until the edge.
+ * @returns {string} The countdown.
+ */
+const countdown = (seconds) => {
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+
+  if (days > 0) return `${days}d:${hours}h:${minutes}m`
+  return `${hours}h:${minutes}m:${secs}s`
+}
+
+/**
+ * Poll Timer
+ * @param {Object} props
+ * @param {number|string} props.opensAt Unix seconds the poll starts accepting votes.
+ * @param {number|string} props.closesAt Unix seconds the poll stops accepting votes.
+ */
+export default function PollTimer({ opensAt, closesAt }) {
+  const opens = Number(opensAt) || 0
+  const closes = Number(closesAt) || 0
+
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
 
   useEffect(() => {
-    // Convert the Unix timestamps to moment objects
-    const startMoment = moment.unix(web3.utils.toNumber(startTime))
-    const endMoment = moment.unix(web3.utils.toNumber(endTime))
-
-    const updateTimer = () => {
-      const now = moment()
-      if (now.isBefore(startMoment)) {
-        // Poll is in the future, count down to the start time
-        setTimeLeft(startMoment.diff(now))
-        setIsPollActive(false)
-      } else if (now.isBetween(startMoment, endMoment)) {
-        // Poll is currently active, count down to the end time
-        setTimeLeft(endMoment.diff(now))
-        setIsPollActive(true)
-      } else {
-        // Poll has ended
-        setTimeLeft(0)
-        setIsPollActive(false)
-      }
-    }
-
-    // Run the update immediately
-    updateTimer()
-
-    // Set up a timer to update every second
-    const timer = setInterval(updateTimer, 1000)
-
-    // Clean up the interval when the component unmounts
+    // One interval regardless of phase: a poll that opens while the card is on screen
+    // has to flip to its closing countdown without a remount.
+    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
     return () => clearInterval(timer)
-  }, [startTime, endTime]) // The effect depends on both startTime and endTime
+  }, [])
 
-  // Format the remaining time
-  const duration = moment.duration(timeLeft)
-  const days = Math.floor(duration.asDays())
-  const hours = duration.hours()
-  const minutes = duration.minutes()
-  const seconds = duration.seconds()
+  if (!closes) return null
+  if (now >= closes) return <>Final results</>
 
-  const formattedTime = `${days > 0 ? `${days}d ` : ''}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-
-  if (timeLeft <= 0 && !isPollActive) {
-    return <>Poll ended</>
-  }
+  const upcoming = opens > now
+  const remaining = (upcoming ? opens : closes) - now
 
   return (
     <>
-      {isPollActive ? 'Ends' : 'Starts'} in {formattedTime}
+      {upcoming ? 'Opens in' : 'Ends in'} {countdown(remaining)}
     </>
   )
 }
-
-export default PollTimer

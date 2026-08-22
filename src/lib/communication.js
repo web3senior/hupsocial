@@ -262,41 +262,6 @@ export async function getPostCount() {
   }
 }
 
-export async function getVoteCountsForPoll(id) {
-  const { web3, contract } = initHupContract()
-
-  try {
-    const result = await contract.methods.getVoteCountsForPoll(id).call()
-    return result
-  } catch (error) {
-    console.error('Error fetching contract data with Web3.js:', error)
-    return { error }
-  }
-}
-
-export async function getVoteCount(id, optionIndex) {
-  const { web3, contract } = initHupContract()
-
-  try {
-    const result = await contract.methods.getVoteCount(id, optionIndex).call()
-    return result
-  } catch (error) {
-    console.error('Error fetching contract data with Web3.js:', error)
-    return { error }
-  }
-}
-export async function getVoterChoices(id, address) {
-  const { web3, contract } = initHupContract()
-
-  try {
-    const result = await contract.methods.getVoterChoice(id, address).call()
-    return result
-  } catch (error) {
-    console.error('Error fetching contract data with Web3.js:', error)
-    return { error }
-  }
-}
-
 export async function getHasLikedPost(postId, addr) {
   const { web3, contract } = initHupContract()
 

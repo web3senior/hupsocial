@@ -7,9 +7,8 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, ListChecksIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
-import { ContentSpinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublishToast'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -18,6 +17,7 @@ import useVisualViewport from '@/hooks/useVisualViewport'
 import { getActiveChain } from '@/lib/communication'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
+import { POLLS_ENABLED } from '@/config/features'
 import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
@@ -31,6 +31,7 @@ import AttachMarketModal from '@/components/AttachMarketModal'
 import AttachLaunchModal from '@/components/AttachLaunchModal'
 import AttachDropModal from '@/components/AttachDropModal'
 import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
+import CreatePollDialog from '@/components/CreatePollDialog'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
@@ -85,6 +86,25 @@ const getContentElement = (content, type) =>
   content?.elements?.find((element) => element?.type === type)
 
 const getDraftStorageKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`
+
+// Attachment references live beside the content draft rather than inside it:
+// getSerializablePostContent spreads whatever is on the content object into the published
+// payload, so an extra key there would end up onchain in every post.
+//
+// Only the poll is kept so far, and for a specific reason — a poll is created onchain before
+// it is attached, so a refresh between the two strands a real transaction with nothing
+// pointing at it. The other attachments have the same shape and the same gap.
+const getAttachmentDraftKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-attachments`
+
+const loadAttachmentDraft = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const parsed = JSON.parse(localStorage.getItem(getAttachmentDraftKey()) || 'null')
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 // Media items are already uploaded to IPFS by the time they land in state, so a saved
 // draft's cids stay resolvable even after a refresh drops the in-memory blob URLs.
@@ -336,6 +356,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // a moderator revoking an app takes effect in every post that embedded it
   const [miniApp, setMiniApp] = useState(() => (actionType === 'edit' ? getContentPayload(existingPost)?.miniApp ?? null : null))
   const attachMiniAppRef = useRef(null)
+  // Polls travel like every other attachment: a { pollId, chainId } reference the PollCard
+  // resolves live, so the tally in a post is the tally onchain rather than a frozen snapshot.
+  // A fresh composer restores an attachment left over from a refresh — the poll it names is
+  // already onchain and paid for.
+  const [poll, setPoll] = useState(() =>
+    actionType === 'edit' ? (getContentPayload(existingPost)?.poll ?? null) : (loadAttachmentDraft()?.poll ?? null)
+  )
+  const createPollRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedMediaType, setSelectedMediaType] = useState(null)
@@ -442,7 +470,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     Boolean(predictMarket) ||
     Boolean(tokenLaunch) ||
     Boolean(nftDrop) ||
-    Boolean(miniApp)
+    Boolean(miniApp) ||
+    Boolean(poll)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
   // Every submission is pinned to one chain: an edit updates the post where it already lives,
@@ -483,6 +512,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const launchAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.launch)
   // NFT drops too — only offered where the HupDrops engine is deployed
   const dropsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.drops)
+  // Polls the same: the ballot has to settle on the chain the post lands on. Behind the
+  // feature flag as well, so the button stays out of the toolbar while the feature is dark.
+  const pollsAvailable = POLLS_ENABLED && Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.polls)
   // The composer already holds an image and text, so the create dialog opens with two of its four
   // required fields filled — the author only types a name and a ticker
   const launchPrefillImage = mediaItems.find((item) => item.type === 'image' && item.cid)?.cid ?? ''
@@ -767,9 +799,38 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     editor.focus()
   }
 
+  // Upload progress belongs in the toast stack, not in the composer body: the sheet scrolls,
+  // so an inline row is often off-screen exactly when it matters. Ref-counted because a GIF pick
+  // opens an upload and then nests the file upload inside it — one card covers the whole burst.
+  const uploadCountRef = useRef(0)
+  const uploadToastRef = useRef(null)
+
+  const beginUpload = (label = 'Uploading media...') => {
+    uploadCountRef.current += 1
+    if (uploadCountRef.current === 1) uploadToastRef.current = toast(label, 'loading')
+    setIsUploading(true)
+  }
+
+  const endUpload = () => {
+    uploadCountRef.current = Math.max(0, uploadCountRef.current - 1)
+    if (uploadCountRef.current > 0) return
+    uploadToastRef.current?.dismiss()
+    uploadToastRef.current = null
+    setIsUploading(false)
+  }
+
+  // A composer that closes mid-upload would otherwise leave the loading card up forever
+  useEffect(
+    () => () => {
+      uploadToastRef.current?.dismiss()
+      uploadToastRef.current = null
+    },
+    []
+  )
+
   const uploadFileToIPFS = async (file) => {
     if (!file) return null
-    setIsUploading(true)
+    beginUpload()
     try {
       return await uploadToIPFS(file)
     } catch (error) {
@@ -777,12 +838,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       toast('Error uploading file', 'error')
       return null
     } finally {
-      setIsUploading(false)
+      endUpload()
     }
   }
 
   const uploadObjectToIPFS = async (json) => {
-    setIsUploading(true)
+    beginUpload('Uploading post...')
     try {
       const uploadRequest = await fetch('/api/ipfs/object', {
         method: 'POST',
@@ -799,7 +860,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       toast('Error uploading post metadata', 'error')
       throw error
     } finally {
-      setIsUploading(false)
+      endUpload()
     }
   }
 
@@ -943,7 +1004,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       return
     }
 
-    setIsUploading(true)
+    beginUpload()
     try {
       const response = await fetch(gif.full.url)
       if (!response.ok) throw new Error('GIF download failed')
@@ -988,7 +1049,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       console.error('Trouble adding GIF:', error)
       toast('Error adding GIF', 'error')
     } finally {
-      setIsUploading(false)
+      endUpload()
     }
   }
 
@@ -1031,7 +1092,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // Shared by the wallet path (receipt confirmed) and the relayed path (relayer accepted the
   // transaction) — both end the composer the same way
   const finishSubmission = useCallback(() => {
-    if (actionType === 'post') localStorage.removeItem(getDraftStorageKey())
+    if (actionType === 'post') {
+      localStorage.removeItem(getDraftStorageKey())
+      localStorage.removeItem(getAttachmentDraftKey())
+    }
 
     // Handed to a module-scope tracker, not awaited here: the composer unmounts on the next line,
     // so the loading toast and its poll have to live outside it. Clearing the ref also makes a
@@ -1145,6 +1209,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // Mini apps as well — MiniAppEmbed resolves the frame URL at render time, so an app
       // that later loses its embeddable grant stops rendering without touching stored posts
       if (miniApp) serializableContent.miniApp = miniApp
+
+      // Polls as well — the poll already exists onchain (opened in CreatePollDialog); PollCard
+      // resolves the tally live, so a post never carries a count that has since moved
+      if (poll) serializableContent.poll = poll
 
       // Edits rebuild the payload from the composer's text/media state, so reference keys
       // that only exist in the stored JSON must be carried over or the edit erases them
@@ -1299,6 +1367,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       console.error('Failed to save post draft:', error)
     }
   }, [mounted, actionType, postContent])
+
+  // Same idea for the attached poll, kept in its own key (see getAttachmentDraftKey)
+  useEffect(() => {
+    if (!mounted || actionType !== 'post') return
+    try {
+      if (poll) localStorage.setItem(getAttachmentDraftKey(), JSON.stringify({ poll }))
+      else localStorage.removeItem(getAttachmentDraftKey())
+    } catch (error) {
+      console.error('Failed to save post attachments:', error)
+    }
+  }, [mounted, actionType, poll])
 
   useEffect(() => {
     if (!isConfirmed) return
@@ -1511,6 +1590,18 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                   <span>Drop</span>
                 </button>
               )}
+              {canAttachNft && pollsAvailable && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => createPollRef.current?.open()}
+                  aria-label="Attach a poll"
+                  disabled={isBusy || Boolean(poll)}
+                >
+                  <ListChecksIcon size={20} />
+                  <span>Poll</span>
+                </button>
+              )}
               {canAttachNft && (
                 <button
                   type="button"
@@ -1575,6 +1666,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
               </div>
             )}
 
+            {poll && (
+              <div className={styles.nftAttachment}>
+                <ListChecksIcon size={16} />
+                <span>Poll attached (poll #{poll.pollId})</span>
+                <button type="button" onClick={() => setPoll(null)} aria-label="Detach poll" disabled={isBusy}>
+                  <XIcon size={14} />
+                </button>
+              </div>
+            )}
+
             <div className={styles.composerMeta}>
               <span>{mediaItems.length}/{MAX_MEDIA_ITEMS} media</span>
               <span className={clsx({ [styles.metaDanger]: isTextOverLimit })}>
@@ -1624,13 +1725,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                     </div>
                   )
                 })}
-              </div>
-            )}
-
-            {isUploading && (
-              <div className={styles.uploading}>
-                <ContentSpinner />
-                <span>Uploading media...</span>
               </div>
             )}
           </div>
@@ -1751,6 +1845,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       )}
 
       <AttachMiniAppDialog ref={attachMiniAppRef} onAttached={(reference) => setMiniApp(reference)} />
+
+      <CreatePollDialog ref={createPollRef} fixedChainId={targetChainId} onCreated={(reference) => reference && setPoll(reference)} />
     </NativeDialog>
   )
 }

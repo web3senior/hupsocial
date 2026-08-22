@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { BroadcastIcon, CaretLeftIcon, CaretRightIcon, CheckIcon, FlameIcon, PlusIcon, StorefrontIcon, UserCheckIcon } from '@phosphor-icons/react'
+import { BroadcastIcon, CaretLeftIcon, CaretRightIcon, CheckIcon, FlameIcon, ListChecksIcon, PlusIcon, StorefrontIcon, UserCheckIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { useHomeTabsStore } from '@/stores/useHomeTabsStore'
 import { config } from '@/config/wagmi'
+import { POLLS_ENABLED } from '@/config/features'
 import styles from './AddTabMenu.module.scss'
 
 /**
@@ -47,6 +48,7 @@ export default function AddTabMenu() {
               {!hasTab('trending') && <MenuItem icon={FlameIcon} label="Trending" onClick={() => handleSelect(close, 'trending')} />}
               {!hasTab('status') && <MenuItem icon={BroadcastIcon} label="Status" onClick={() => handleSelect(close, 'status')} />}
               {!hasTab('nft') && <MenuItem icon={StorefrontIcon} label="NFTs" onClick={() => handleSelect(close, 'nft')} />}
+              {POLLS_ENABLED && !hasTab('polls') && <MenuItem icon={ListChecksIcon} label="Polls" onClick={() => handleSelect(close, 'polls')} />}
               <MenuItem label="Networks" onClick={() => setView('networks')} trailing={<CaretRightIcon size={16} />} />
             </>
           )}

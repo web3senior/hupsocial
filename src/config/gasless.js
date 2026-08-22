@@ -47,11 +47,16 @@ export const isGaslessChainId = (networkId) => {
 // are the pre-send simulation (a toggle the contract would revert never costs gas) and the
 // tank itself: relayer balances are kept small per chain, so the worst any farm can do is
 // empty a tank and turn the trial back into user-paid.
+//
+// A poll vote is the cheapest tap on the platform and, unlike a like, it is final onchain —
+// there is no unvote to farm a cycle with, so the window only has to bound how many polls one
+// account can answer in an hour.
 export const GASLESS_POLICY = {
   create: { cooldownMs: 60000, windowMs: 3600000, max: 20 },
   like: { cooldownMs: 0, windowMs: 3600000, max: 30 },
   unlike: { cooldownMs: 0, windowMs: 3600000, max: 5 },
   repost: { cooldownMs: 0, windowMs: 3600000, max: 30 },
+  poll: { cooldownMs: 0, windowMs: 3600000, max: 40 },
   chat: { cooldownMs: 0, windowMs: 60000, max: 30 },
 }
 
@@ -69,6 +74,15 @@ export const GASLESS_BUCKETS = {
   unlike: 'unlike',
 }
 
+// Sponsored selectors on the HupPolls contract. Deliberately a separate map from
+// GASLESS_BUCKETS: that one is resolved against the Hup Core ABI on both sides of the wire,
+// so a poll function name looked up there would throw rather than simply miss. Only `vote`
+// is here — createPoll writes a string to storage and closePoll is a moderation-shaped
+// action, and neither is a tap the trial exists to make free.
+export const GASLESS_POLL_BUCKETS = {
+  vote: 'poll',
+}
+
 // ContentType.Repost in the Hup contract, mirrored here because this file must stay
 // dependency-free (see header).
 export const CONTENT_TYPE_REPOST = 2
@@ -81,7 +95,7 @@ export const CONTENT_TYPE_REPOST = 2
  * decoded calldata.
  */
 export const gaslessBucketFor = (functionName, args) => {
-  const bucket = GASLESS_BUCKETS[functionName]
+  const bucket = GASLESS_BUCKETS[functionName] ?? GASLESS_POLL_BUCKETS[functionName]
   if (bucket === 'create' && Number(args?.[1]) === CONTENT_TYPE_REPOST) return 'repost'
   return bucket
 }

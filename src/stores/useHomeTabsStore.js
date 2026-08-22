@@ -2,8 +2,9 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { BroadcastIcon, FlameIcon, HouseIcon, StorefrontIcon, UserCheckIcon } from '@phosphor-icons/react'
+import { BroadcastIcon, FlameIcon, HouseIcon, ListChecksIcon, StorefrontIcon, UserCheckIcon } from '@phosphor-icons/react'
 import { config } from '@/config/wagmi'
+import { POLLS_ENABLED } from '@/config/features'
 
 // Static schema for non-network tab types. Icons/labels stay out of localStorage
 // (same reasoning as NAV_ITEMS_SCHEMA in useSidebarStore.js) to avoid serialization issues.
@@ -13,6 +14,9 @@ export const TAB_TYPE_SCHEMA = {
   trending: { label: 'Trending', icon: FlameIcon },
   status: { label: 'Status', icon: BroadcastIcon },
   nft: { label: 'NFTs', icon: StorefrontIcon },
+  // Dropped from the schema while polls are dark, which also makes the store's migrate() drop
+  // any persisted polls tab — a tab that renders nothing is worse than no tab
+  ...(POLLS_ENABLED ? { polls: { label: 'Polls', icon: ListChecksIcon } } : {}),
 }
 
 const DEFAULT_TABS = [{ id: 'foryou', type: 'foryou' }]

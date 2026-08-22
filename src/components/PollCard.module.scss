@@ -1,0 +1,209 @@
+/* Option rows are cards, not bars: each carries a label, a share, a fill and its own count,
+   which is more than a single line can hold legibly. The winner is the only coloured thing on
+   the card, so the eye lands on the result before anything else. */
+.pollCard {
+  --poll-radius: 12px;
+  /* Greens are literal rather than tokenised because the palette has no success ramp. Tints
+     are alpha over the card's own background, so they hold in both themes instead of turning
+     into a pale block on a dark surface. */
+  --poll-win-line: #16a34a;
+  --poll-win-fill: #15803d;
+  --poll-win-track: rgba(22, 163, 74, 0.25);
+  --poll-win-tint: rgba(22, 163, 74, 0.08);
+  --poll-win-text: #15803d;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+
+  &__question {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  &__chip {
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 0.12rem 0.5rem;
+    white-space: nowrap;
+
+    /* The kind of gate — deliberately the louder of the two, since "who is shut out" is the
+       thing a reader needs before they read the question */
+    &--gate {
+      background: rgba(236, 72, 153, 0.14);
+      color: #db2777;
+    }
+
+    /* The specific condition behind it */
+    &--condition {
+      background: rgba(42, 120, 214, 0.14);
+      color: #2a78d6;
+    }
+  }
+
+  &__options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--poll-radius);
+    background: transparent;
+    color: inherit;
+    padding: 0.75rem 0.9rem;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+    }
+
+    /* Once results are showing the row is a readout, not a control */
+    &--result {
+      cursor: default;
+
+      &:hover {
+        background: transparent;
+      }
+    }
+
+    &--chosen {
+      border-color: var(--primary, #ec4899);
+    }
+
+    &--winner {
+      border-color: var(--poll-win-line);
+      background: var(--poll-win-tint);
+
+      .pollCard__optionLabel,
+      .pollCard__optionShare,
+      .pollCard__optionVotes {
+        color: var(--poll-win-text);
+      }
+
+      .pollCard__bar {
+        background: var(--poll-win-track);
+      }
+
+      .pollCard__barFill {
+        background: var(--poll-win-fill);
+      }
+    }
+
+    &:disabled {
+      cursor: default;
+    }
+  }
+
+  &__optionHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__optionLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    svg {
+      flex-shrink: 0;
+      color: var(--primary, #ec4899);
+    }
+  }
+
+  &__optionShare {
+    flex-shrink: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__bar {
+    display: block;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--surface-muted, rgba(0, 0, 0, 0.06));
+    overflow: hidden;
+  }
+
+  &__barFill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--text-muted, #a1a1aa);
+    transition: width 0.3s ease;
+  }
+
+  &__optionVotes {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__total {
+    font-weight: 700;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: var(--primary, #ec4899);
+    }
+  }
+
+  &__meta {
+    color: var(--text-muted, #888);
+  }
+
+  &__blocked {
+    margin-left: auto;
+    color: #b45309;
+  }
+
+  &__hidden {
+    margin-top: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+}

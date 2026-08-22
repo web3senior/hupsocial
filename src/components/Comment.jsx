@@ -9,8 +9,6 @@ import {
   initHupContract,
   initPostCommentContract,
   getHasLikedPost,
-  getVoteCountsForPoll,
-  getVoterChoices,
 } from '@/lib/communication'
 import { getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'

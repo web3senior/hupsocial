@@ -22,6 +22,7 @@
 
 import { ethers } from 'ethers'
 import hupAbi from '@/abi/post.json'
+import pollsAbi from '@/abis/HupPolls.json'
 import { CONTRACTS } from '@/config/contracts'
 import { formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '@/config/gasless'
 import { getBurnerSignerSilent } from '@/lib/burnerSession'
@@ -43,6 +44,10 @@ const RELAY_GAS = {
   create: 600000n,
   batchLike: (args) => 150000n + 45000n * BigInt(args?.[1]?.length || 1),
   unlike: 150000n,
+  // A ballot is two cold slots (the voter's choice and that option's counter) plus the poll's
+  // own packed row. Headroom above that covers a gated poll, which also pays for up to three
+  // gas-capped requirement reads and a Merkle proof before it writes anything.
+  vote: 300000n,
 }
 
 // Sponsored actions are fire-and-forget, so a request has no reason to stay signable for long
@@ -153,20 +158,23 @@ const TRUSTED_FORWARDER_ABI = [
   },
 ]
 
-const chainTrustsForwarder = async (publicClient, chainId, hupAddress, forwarderAddress) => {
-  if (forwarderTrust.has(chainId)) return forwarderTrust.get(chainId)
+const chainTrustsForwarder = async (publicClient, chainId, targetAddress, forwarderAddress) => {
+  // Keyed by target as well as chain: each sponsored contract registers the forwarder
+  // separately, so a chain whose Hup trusts it says nothing about its polls contract
+  const cacheKey = `${chainId}:${String(targetAddress).toLowerCase()}`
+  if (forwarderTrust.has(cacheKey)) return forwarderTrust.get(cacheKey)
 
   try {
     const trusted = Boolean(
       await publicClient.readContract({
-        address: hupAddress,
+        address: targetAddress,
         abi: TRUSTED_FORWARDER_ABI,
         functionName: 'isTrustedForwarder',
         args: [forwarderAddress],
       }),
     )
 
-    forwarderTrust.set(chainId, trusted)
+    forwarderTrust.set(cacheKey, trusted)
     return trusted
   } catch (err) {
     console.warn('Could not read forwarder trust:', err.message)
@@ -200,19 +208,31 @@ export const gaslessCooldown = (functionName, networkId, owner, args) => {
  * @param {Array} params.args Arguments for that function, owner-first as Hup expects.
  * @param {Function} [params.signTypedDataAsync] wagmi signer, used when no session exists.
  * @param {boolean} [params.useSessionKey] Sign with the burner instead of the wallet.
+ * @param {'hup'|'polls'} [params.contract] Which sponsored contract to target. Extensions ride
+ *   the same forwarder and the same relay route; only the address and ABI differ.
  * @returns {Promise<string>} Relayed transaction hash.
  */
-export const relayHupAction = async ({ chain, publicClient, owner, functionName, args, signTypedDataAsync, useSessionKey = false }) => {
+export const relayHupAction = async ({
+  chain,
+  publicClient,
+  owner,
+  functionName,
+  args,
+  signTypedDataAsync,
+  useSessionKey = false,
+  contract = 'hup',
+}) => {
   const chainId = Number(chain?.id)
   const contracts = CONTRACTS[`chain${chainId}`]
   const { address: forwarderAddress, name: forwarderName } = hupForwarderFor(contracts)
-  const hupAddress = contracts?.hup
+  const targetAbi = contract === 'polls' ? pollsAbi : hupAbi
+  const targetAddress = contracts?.[contract]
   const rpcUrl = chain?.rpcUrls?.default?.http?.[0]
   const gasEntry = RELAY_GAS[functionName]
   const gas = typeof gasEntry === 'function' ? gasEntry(args) : gasEntry
   const bucket = gaslessBucketFor(functionName, args)
 
-  if (!chainId || !forwarderAddress || !hupAddress || !rpcUrl) throw unsupported('Relay is not configured for this network')
+  if (!chainId || !forwarderAddress || !targetAddress || !rpcUrl) throw unsupported('Relay is not configured for this network')
   if (!publicClient || !owner) throw unsupported('Relay needs a connected wallet')
   if (!gas || !bucket) throw unsupported(`${functionName} is not a sponsored action`)
 
@@ -221,11 +241,11 @@ export const relayHupAction = async ({ chain, publicClient, owner, functionName,
   const waiting = remainingCooldown(bucket, chainId, owner)
   if (waiting > 0) throw throttled(waiting)
 
-  if (!(await chainTrustsForwarder(publicClient, chainId, hupAddress, forwarderAddress))) {
+  if (!(await chainTrustsForwarder(publicClient, chainId, targetAddress, forwarderAddress))) {
     throw unsupported('This network does not trust the relayer forwarder yet')
   }
 
-  const data = new ethers.Interface(hupAbi).encodeFunctionData(functionName, args)
+  const data = new ethers.Interface(targetAbi).encodeFunctionData(functionName, args)
 
   let from = null
   let sign = null
@@ -285,7 +305,7 @@ export const relayHupAction = async ({ chain, publicClient, owner, functionName,
 
   const message = {
     from,
-    to: hupAddress,
+    to: targetAddress,
     value: 0n,
     gas,
     nonce: BigInt(nonce),

@@ -12,6 +12,7 @@ import styles from './page.module.scss'
 const FollowingFeedTab = dynamic(() => import('@/components/tabs/FollowingFeedTab'))
 const TrendingFeedTab = dynamic(() => import('@/components/tabs/TrendingFeedTab'))
 const StatusFeedTab = dynamic(() => import('@/components/tabs/StatusFeedTab'))
+const PollsTab = dynamic(() => import('@/components/tabs/PollsTab'))
 
 export default function Page() {
   const tabs = useHomeTabsStore((state) => state.tabs)
@@ -37,6 +38,7 @@ export default function Page() {
       {activeTab?.type === 'following' && <FollowingFeedTab />}
       {activeTab?.type === 'trending' && <TrendingFeedTab />}
       {activeTab?.type === 'status' && <StatusFeedTab />}
+      {activeTab?.type === 'polls' && <PollsTab />}
     </div>
   )
 }
