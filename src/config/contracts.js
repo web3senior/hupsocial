@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file config/contracts.js
  * @description Server-safe chain and contract-address data. API routes and lib/
  * readers import from here instead of config/wagmi so evaluating them never
@@ -28,27 +28,25 @@ export const robinhood = defineChain({
   },
 })
 
-// viem's default BNB Chain endpoint (56.rpc.thirdweb.com) rejects keyless datacenter
-// callers, so every server-side read on chain 56 — relay status included — failed in
-// production while browsers, whose wallets bring their own RPC, looked fine. Pinned to
-// publicnode, which already serves the Ethereum and Robinhood reads here. Mutating the
-// shared chain object (config/wagmi does the same for brand colors) keeps every importer
-// of `bsc` on the pinned endpoint.
+// RPC pins: viem's defaults for these two chains reject keyless server-side callers (56 refuses
+// datacenter IPs, 42 answers with a 403 HTML page), so every server read came back empty while
+// browsers, whose wallets bring their own RPC, looked fine. Mutating the shared chain object
+// keeps every importer pinned. Only http[0] is read server-side.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
-
-// Same failure, one chain over: viem's default LUKSO endpoint (rpc.mainnet.lukso.network)
-// answers this host with a 403 HTML page instead of JSON-RPC, so every server-side read on
-// chain 42 came back empty — which is what wrote a table full of nameless collections into
-// nft_collection_cache while browsers, whose wallets bring their own RPC, looked fine. The
-// official endpoint stays in the list behind it: a wallet that can still reach it loses
-// nothing, and only http[0] is what serverPublicClient reads.
 lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.com', 'https://rpc.mainnet.lukso.network'] } }
 
-// Chains the app runs on â€” single source of truth for the wagmi config's
-// `chains` tuple and for server-side RPC lookups (chain.rpcUrls.default.http).
-// L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia, luksoTestnet] //somniaTestnet
+// Single source of truth for the wagmi config's `chains` tuple and for server-side RPC lookups
+// (chain.rpcUrls.default.http). L1s first, then L2s.
+export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia, luksoTestnet]
 
+// Field notes:
+//   ''              — not deployed or not applicable on that chain.
+//   hupForwarder    — set only where Hup core trusts a forwarder other than `forwarder`.
+//   univ3*/univ4*/sushiV2Router/wnative — swap venues raced by the swap page. Resolve every
+//     address from the DEX's own official registry and verify onchain before enabling a chain
+//     (router.factory() == quoter.factory(), router.WETH() == wnative): a wrong quoter fails
+//     safe, a wrong router is where user funds would go.
+//   nativeIsErc20   — the chain's native coin is itself an ERC20: approve, never msg.value.
 export const CONTRACTS = {
   chain1: {
     name: 'ethereum',
@@ -65,19 +63,9 @@ export const CONTRACTS = {
     events: '',
     predict: '0xc77372d05ccc2d30938aa58686671625769f88bd',
     apps: '',
-    // HupDrops NFT launchpad: `drops` is the engine; deployer satellites are registered inside
-    // it per standard (1 = ERC721, 2 = ERC1155, 3 = LSP7, 4 = LSP8) and never read by the app.
+    // HupDrops: `drops` is the engine; deployer satellites are registered inside it per standard
+    // (1 = ERC721, 2 = ERC1155, 3 = LSP7, 4 = LSP8) and never read by the app.
     drops: '',
-    // Launch tokens trade as ordinary Uniswap v3 swaps. Router executes, quoter previews —
-    // resolve BOTH from Uniswap's official deployments registry before enabling a chain: a
-    // wrong quoter fails safe, a wrong router is where user funds would go.
-    // All six mainnet stacks below taken from the official registry and verified onchain
-    // 2026-08-12: router.factory() == quoter.factory() == registry factory, and
-    // router.WETH9() == wnative (Celo excepted, see its entry).
-    // The univ4* stacks were verified the same day: quoter.poolManager() == registry
-    // PoolManager, the UniversalRouter bytecode embeds it, and Permit2 (canonical
-    // 0x000000000022D473030F116dDEE9F6B43aC78BA3 everywhere) has code. The swap page quotes
-    // v3 and v4 side by side and executes on whichever venue answers best.
     launch: '',
     univ3Router: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
     univ3Quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
@@ -86,23 +74,14 @@ export const CONTRACTS = {
     univ4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
     univ4Quoters: ['0x52F0E24D1c21C8A0cB1e5a5dD6198556BD9E1203'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-    // SushiSwap classic (V2 AMM), the third venue in the swap page's quote race. One address
-    // does both jobs: getAmountsOut previews, the same router executes. Every sushiV2Router
-    // below was verified onchain 2026-08-16 — router.factory() matches Sushi's canonical
-    // factory on that chain, router.WETH() == wnative (Celo's router has no WETH at all,
-    // mirroring Uniswap's Celo deploy — CELO the ERC20 is what pools pair against), and a
-    // live getAmountsOut through the wnative/stable pair answered on every one. Monad has
-    // no code at Sushi's addresses; Robinhood and the testnets have no Sushi deployment.
     sushiV2Router: '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F',
   },
   chain42: {
     name: 'lukso',
     forwarder: '0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972',
     forwarderName: 'HupChatForwarder',
-    // Hup was deployed against its own forwarder, not the chat one above, and only ever
-    // trusted that address — relaying `create` through `forwarder` fails with
-    // ERC2771UntrustfulTarget. Verified onchain 2026-08-15 via hup.trustedForwarder().
-    // Chains without this pair trust `forwarder` for both.
+    // Hup core trusts this one, not the chat forwarder above — relaying `create` through
+    // `forwarder` reverts with ERC2771UntrustfulTarget.
     hupForwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     hupForwarderName: 'HupForwarder',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
@@ -112,102 +91,76 @@ export const CONTRACTS = {
     store: '',
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
     trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
-    // HupOffers 1.0.0, deployed 2026-08-16. Escrow-backed buy offers and OTC deals — the
-    // buy-side complement of trade/editions, and independent of both: offers work on any
-    // token, listed or not. Alone among the extensions it takes no forwarder and honors no
-    // burner session (see "Why HupOffers Is Not Gasless" in the README), so `msg.sender` is
-    // the only identity it acts on and gasless relaying never applies to these calls.
+    // Takes no forwarder and honors no burner session, so `msg.sender` is the only identity it
+    // acts on and gasless relaying never applies to these calls.
     offers: '0xf0c1dB3059608bb589726B651108D3984060D5d8',
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
     predict: '0xD76dcBB664a002247269c1fBB161B0440674C570',
     apps: '0xe30350Cf486210C299Aef91De61799Daed1Df6C5',
     drops: '',
-    // No Uniswap on LUKSO, and launches are one-phase Uniswap pools — so no launches here.
-    // Stays empty unless LUKSO ever gets a v3 deployment.
+    // No Uniswap on LUKSO, and launches are one-phase Uniswap pools — so no launches or swaps here.
     launch: '',
     univ3Router: '',
     univ3Quoter: '',
   },
-  // LUKSO Testnet, re-registered 2026-08-13 as a dev chain alongside Base Sepolia. The 4201
-  // deployments from the app's first generation (and their cidex rows, deleted 2026-08-11)
-  // are retired — fill addresses in as fresh contracts land.
   chain4201: {
     name: 'lukso-testnet',
     forwarder: '0xab100B28D06e93fF52DAE95DB8e90F83680671FC',
     forwarderName: 'HupChatForwarder',
     hup: '0xb0b992E90e11b6bCE51cb5ea4de160D06098B955',
     status: '',
-    // Redeployed 2026-08-17 (block 8332629): fail-closed gas-capped requirement asset reads,
-    // InvalidAsset probe in setRequirements, stale-request + governor guards. The 2026-08-13
-    // deploy 0x898d77dd27f5C8d8edb71b11B876DF1fc306eb8b is retired.
     community: '0xd664Bddf31A44140E2e918CdC52d30a006b7eE53',
     chat: '',
-    // Canonical LSP26 (same address as every other chain); the own deploy 0x78430Ef5… is retired.
+    // Canonical LSP26, same address as every other chain.
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '',
     trade: '',
-    // Retired. 0x7d52B675d44126A1cCBb33462D9D251e54277237 (2026-08-14, block 8310250) is the
-    // pre-rework HupOffers: it took a Hup core reference and a trusted forwarder, and its
-    // makeOffer/acceptOffer carried a leading actor address. The 2026-08-16 rework dropped all
-    // three, so src/abis/HupOffers.json no longer matches that deployment — pointing at it
-    // would encode selectors it doesn't have. Left empty rather than repointed: no HupTrade
-    // here, so there is nothing to make offers against until this chain gets one.
-    //
-    // Escrow still sitting in the old contract is not stranded. cancelOffer(uint256) survived
-    // the rework unchanged, so the offerer can still reclaim it by calling that address
-    // directly (offer 4 was the only one still Active at retirement).
+    // Nothing to make offers against until this chain gets a HupTrade.
     offers: '',
     events: '',
     predict: '',
     apps: '',
-    // HupDrops engine, redeployed 2026-08-13 with creator-controlled phase start/pause (the
-    // Phase struct changed, so createDrop's selector did too — 0x7854…C847 is retired along
-    // with its drops). Satellites: LSP7 0xb489…3F06, LSP8 0x761B…62b1.
+    // Satellites: LSP7 0xb489…3F06, LSP8 0x761B…62b1.
     drops: '0x073F3E3FF95b7EA8cb0Afb22389774E694782DaC',
-    // No Uniswap on LUKSO testnet either (see chain42) — no launches or swaps here.
     launch: '',
     univ3Router: '',
     univ3Quoter: '',
   },
-  // Base Sepolia is the active dev chain (replaced Linea Sepolia 2026-08-11 — Linea had no
-  // Uniswap v3 stack, so HupLaunch could never run there). Deployments in progress — fill
-  // addresses in as contracts land.
+  // Active dev chain alongside 4201: Hup core, communities and polls are live here.
   chain84532: {
     name: 'base-sepolia',
-    forwarder: '',
-    hup: '',
+    forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
+    forwarderName: 'HupChatForwarder',
+    hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
     status: '',
-    community: '',
+    community: '0x48b7720547c11251A8aBe5A1C7D0c791500f5A3b',
+    // First chain to carry HupPolls. Its hupContract() points at the `hup` above, as HupTipper's
+    // does, and every Hup contract here trusts the one forwarder — so no `hupForwarder` split.
+    polls: '0xf3F8f5D39e63a3D2A2b988771240c17A32e559B0',
     chat: '',
+    // No LSP26 on Base Sepolia: the canonical address has no code here and HupCommunity was
+    // deployed with followerSystem 0x0, so follower-gated join requirements are unavailable.
     followerSystem: '',
     store: '',
-    tipper: '',
+    tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
     trade: '',
     offers: '',
     events: '',
     predict: '',
     apps: '',
     drops: '',
-    // Uniswap's official Base Sepolia deployment, verified onchain 2026-08-11: router/quoter/
-    // posMgr all cross-reference factory 0x4752…aD24 and the OP-stack WETH predeploy, and the
-    // 0.30% tier is enabled. Deploy HupLaunch with:
-    //   factory  0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
-    //   posMgr   0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2
-    //   wnative  0x4200000000000000000000000000000000000006
+    // HupLaunch ctor args when deploying here: factory 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,
+    // posMgr 0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2, wnative as below. 0.30% tier is enabled.
     launch: '',
     univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
     univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
-    // WNATIVE (the OP-stack WETH predeploy, same address as in the HupLaunch constructor
-    // params above). The swap page routes native legs and token↔token hops through it and
-    // requires it alongside univ3Router/univ3Quoter before offering swaps on a chain.
     wnative: '0x4200000000000000000000000000000000000006',
   },
   chain143: {
     name: 'monad',
     forwarder: '0x09FAf2fddED624958589aD9ca704Bc4C6C232e72',
     forwarderName: 'HupChatForwarder',
-    // Same split as LUKSO: Hup trusts its own forwarder, chat uses the one above
     hupForwarder: '0x8466799e31a86a4d51B76154e57B14DcAF9A8756',
     hupForwarderName: 'HupForwarder',
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
@@ -225,9 +178,7 @@ export const CONTRACTS = {
     launch: '',
     univ3Router: '0xfE31F71C1b106EAc32F1A19239c9a9A72ddfb900',
     univ3Quoter: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
-    // No sushiV2Router: Sushi's classic factory/router addresses have no code on Monad
-    // (checked 2026-08-16). Add one only after resolving it from Sushi's own registry and
-    // re-running the chain1 verification drill.
+    // No sushiV2Router: Sushi's addresses have no code on Monad.
     wnative: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A', // WMON
     univ4Router: '0x0D97Dc33264bfC1c226207428A79b26757fb9dc3',
     univ4PoolManager: '0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e',
@@ -252,20 +203,15 @@ export const CONTRACTS = {
     launch: '',
     univ3Router: '0x5615CDAb10dc425a742d643d949a7F474C01abc4',
     univ3Quoter: '0x82825d0554fA07f7FC52Ab63c961F330fdEFa8E8',
-    // Native CELO IS an ERC20 — Uniswap's Celo deployment has no WETH9 (router.WETH9() is
-    // zero, verified onchain 2026-08-12); pools pair against the CELO token itself. The flag
-    // makes the swap page trade CELO as a plain ERC20: approve instead of msg.value, no unwrap.
+    // Uniswap's and Sushi's Celo deploys have no WETH9 — pools pair against the CELO token itself.
     wnative: '0x471EcE3750Da237f93B8E339c536989b8978a438',
     nativeIsErc20: true,
-    // v4 exists on Celo, but its native-as-ERC20 model means v4's currency-0x0 pools don't
-    // apply the same way; the swap page only probes v4 where the coin is genuinely native,
-    // so these stay recorded for later use.
+    // v4 exists here, but its currency-0x0 model does not apply where the coin is an ERC20; the
+    // swap page only probes v4 on genuinely-native chains, so these stay recorded for later use.
     univ4Router: '0xcb695bc5D3Aa22cAD1E6DF07801b061a05A0233A',
     univ4PoolManager: '0x288dc841A52FCA2707c6947B3A777c5E56cd87BC',
     univ4Quoters: ['0x28566da1093609182dFf2cB2A91CFD72e61d66cd'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-    // Verified per the chain1 drill; nativeIsErc20 keeps every Sushi trade here on the
-    // plain token-to-token path, so the router's missing WETH() never comes into play.
     sushiV2Router: '0x1421bDe4B10e8dd459b3BCb598810B1337D56842',
   },
   chain8453: {
@@ -290,7 +236,7 @@ export const CONTRACTS = {
     univ4PoolManager: '0x498581fF718922c3f8e6A244956aF099B2652b2b',
     univ4Quoters: ['0x0d5e0F971ED27FBfF6c2837bf31316121532048D'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-    sushiV2Router: '0x6BDED42c6DA8FBf0d2bA55B2fa120C5e0c8D7891', // verified per the chain1 drill
+    sushiV2Router: '0x6BDED42c6DA8FBf0d2bA55B2fa120C5e0c8D7891',
   },
   chain56: {
     name: 'bnb',
@@ -314,7 +260,7 @@ export const CONTRACTS = {
     univ4PoolManager: '0x28e2Ea090877bF75740558f6BFB36A5ffeE9e9dF',
     univ4Quoters: ['0x9F75dD27D6664c475B90e105573E550ff69437B0'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-    sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506', // verified per the chain1 drill
+    sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506',
   },
   chain4663: {
     name: 'robinhood',
@@ -332,11 +278,9 @@ export const CONTRACTS = {
     apps: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     drops: '',
     launch: '',
-    // Robinhood Chain has only a Uniswap V4 stack — no official v3 deployment. Addresses
-    // come from the hooder project (read off a live UniversalRouter swap tx, verified on
-    // Blockscout there) and re-verified onchain 2026-08-12 with the same cross-checks as the
-    // registry chains. Two quoters exist; both are wired and the batch quote uses whichever
-    // answers. Meme-launch pools here use the 2500/25 fee tier (probed by lib/uniswap-v4.js).
+    // V4 only — no official Uniswap v3 or Sushi deployment here. Two quoters exist; both are
+    // wired and the batch quote uses whichever answers. Meme-launch pools use the 2500/25 fee
+    // tier (probed by lib/uniswap-v4.js).
     univ3Router: '',
     univ3Quoter: '',
     univ4Router: '0x8876789976dEcBfCbBbe364623C63652db8C0904',
@@ -383,18 +327,16 @@ export const CONTRACTS = {
     univ4PoolManager: '0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32',
     univ4Quoters: ['0x3972C00f7ed4885e145823eb7C655375d275A1C5'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-    sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506', // verified per the chain1 drill
+    sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506',
   },
 }
 
 /**
  * Contracts an embedded mini app may call with the viewer's burner session key via the bridge's
  * hup_sessionCall method — value-less, rate-limited, and gated behind a one-time per-app consent.
- * Keyed by chainId, then the app's onchain registry appId, listing the ONLY `to` addresses that
- * app may target. An app absent here cannot session-call at all.
- *
- * Keep this list host-owned and explicit: the session key can act as the viewer on Hup Core, so
- * a wildcard or app-supplied target would hand every embedded frame the viewer's identity.
+ * Keyed by chainId, then the app's onchain registry appId; an app absent here cannot session-call.
+ * Keep it host-owned and explicit: a wildcard or app-supplied target would hand every embedded
+ * frame the viewer's identity on Hup Core.
  */
 export const SESSION_CALL_ALLOWLIST = {
   10143: {
