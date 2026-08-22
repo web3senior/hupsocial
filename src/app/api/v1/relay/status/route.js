@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { gaslessChainIds } from '@/config/gasless'
 import { fetchUsdPrices, priceKeyFor } from '@/lib/prices'
-import { providerForEndpoint, resolveServerRpc } from '@/lib/serverRpc'
+import { serverRpcEndpoints, withServerProvider } from '@/lib/serverRpc'
 
 const NATIVE_TOKEN = '0x0000000000000000000000000000000000000000'
 
@@ -53,39 +53,49 @@ const readChain = async (chainId, relayer) => {
     rpcHost: null,
   }
 
-  const endpoint = await resolveServerRpc(chainId)
-  if (!endpoint) return base
-
-  const provider = providerForEndpoint(endpoint, chainId)
-
   try {
-    const [balance, feeData, trusted] = await Promise.all([
-      provider.getBalance(relayer),
-      provider.getFeeData(),
-      new ethers.Contract(contracts.hup, TRUSTED_FORWARDER_ABI, provider)
-        .isTrustedForwarder(forwarder)
-        .catch(() => null),
-    ])
+    return await withServerProvider(chainId, async (provider, endpoint) => {
+      // Settled, not all: some nodes serve state but not eth_feeHistory, and a balance we can
+      // read is worth showing even when the gas price beside it is unknowable.
+      const [balance, feeData, trusted] = await Promise.allSettled([
+        provider.getBalance(relayer),
+        provider.getFeeData(),
+        new ethers.Contract(contracts.hup, TRUSTED_FORWARDER_ABI, provider).isTrustedForwarder(forwarder),
+      ])
 
-    const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? null
-    const costPerPost = gasPrice ? gasPrice * GAS_PER_POST : null
+      // Nothing getting through is the endpoint's problem, so let withServerProvider try the
+      // next one rather than reporting a chain that may well be fine elsewhere.
+      if (balance.status === 'rejected' && feeData.status === 'rejected' && trusted.status === 'rejected') {
+        throw balance.reason
+      }
 
-    return {
-      ...base,
-      reachable: true,
-      rpcHost: endpoint.host,
-      balance: ethers.formatEther(balance),
-      costPerPost: costPerPost ? ethers.formatEther(costPerPost) : null,
-      // Null rather than zero when the gas price is unreadable, so the UI can say "unknown"
-      // instead of implying the tank is empty
-      postsRemaining: costPerPost && costPerPost > 0n ? Number(balance / costPerPost) : null,
-      trusted,
-    }
+      for (const [label, outcome] of [['balance', balance], ['feeData', feeData], ['isTrustedForwarder', trusted]]) {
+        if (outcome.status === 'rejected') {
+          console.warn(`RELAY_STATUS_PARTIAL chain ${chainId} via ${endpoint.host}: ${label} —`, outcome.reason?.shortMessage || outcome.reason?.message)
+        }
+      }
+
+      const gasPrice = feeData.status === 'fulfilled' ? feeData.value.maxFeePerGas ?? feeData.value.gasPrice ?? null : null
+      const costPerPost = gasPrice ? gasPrice * GAS_PER_POST : null
+      const funds = balance.status === 'fulfilled' ? balance.value : null
+
+      return {
+        ...base,
+        reachable: true,
+        rpcHost: endpoint.host,
+        balance: funds === null ? null : ethers.formatEther(funds),
+        costPerPost: costPerPost ? ethers.formatEther(costPerPost) : null,
+        // Null rather than zero when the gas price is unreadable, so the UI can say "unknown"
+        // instead of implying the tank is empty
+        postsRemaining: funds !== null && costPerPost && costPerPost > 0n ? Number(funds / costPerPost) : null,
+        trusted: trusted.status === 'fulfilled' ? trusted.value : null,
+      }
+    })
   } catch (err) {
-    console.error(`RELAY_STATUS_FAILED chain ${chainId} via ${endpoint.host}:`, err.shortMessage || err.message)
-    return { ...base, rpcHost: endpoint.host }
-  } finally {
-    provider.destroy()
+    console.error(`RELAY_STATUS_FAILED chain ${chainId}:`, err.shortMessage || err.message)
+    // Naming every host we tried, since the point of this field is to be actionable from a
+    // deployed environment we cannot curl from
+    return { ...base, rpcHost: serverRpcEndpoints(chainId).map((entry) => entry.host).join(', ') || null }
   }
 }
 

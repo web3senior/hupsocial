@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server'
 import forwarderAbi from '../../../../abis/Forwarder.json'
 import chatAbi from '../../../../abis/Chat.json'
 import hupAbi from '../../../../abi/post.json'
+import pollsAbi from '../../../../abis/HupPolls.json'
 import { CONTRACTS } from '../../../../config/contracts'
-import { GASLESS_BUCKETS, formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '../../../../config/gasless'
-import { getServerProvider } from '../../../../lib/serverRpc'
+import { GASLESS_BUCKETS, GASLESS_POLL_BUCKETS, formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '../../../../config/gasless'
+import { forgetServerRpc, getServerProvider, isTransportError } from '../../../../lib/serverRpc'
 
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
 
@@ -19,9 +20,17 @@ const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
 // Un-repost is deliberately unsponsored: it rides deleteContent, which deletes any of the
 // caller's content, and sponsoring deletions is a different decision.
 const hupInterface = new ethers.Interface(hupAbi)
+const pollsInterface = new ethers.Interface(pollsAbi)
 
 const SPONSORED_SELECTORS = new Map(
   Object.entries(GASLESS_BUCKETS).map(([name, bucket]) => [hupInterface.getFunction(name).selector, bucket]),
+)
+
+// The polls contract gets its own narrow list for the same reason Hup does: it also carries
+// createPoll (which writes a CID to storage) and admin functions, and only the ballot is a tap
+// the trial exists to make free.
+const POLL_SELECTORS = new Map(
+  Object.entries(GASLESS_POLL_BUCKETS).map(([name, bucket]) => [pollsInterface.getFunction(name).selector, bucket]),
 )
 
 // The relayer sends `execute` to whatever forwarder the caller names, so that address has to
@@ -61,6 +70,13 @@ const sponsoredBucket = (chainId, to, data) => {
     } catch {
       return null
     }
+  }
+
+  // Polls are narrowed the same way Hup is, and BEFORE the chat fallback below: without this
+  // branch, adding the address to config/contracts.js would quietly sponsor every function on
+  // the contract at chat limits.
+  if (contracts.polls && target === contracts.polls.toLowerCase()) {
+    return POLL_SELECTORS.get((data || '').slice(0, 10).toLowerCase()) ?? null
   }
 
   return 'chat'
@@ -166,6 +182,8 @@ export async function POST(request) {
   let fullRequest = null
   let provider = null
   let forwarderAddress = null
+  // Kept out here so the catch can tell the resolver which chain went bad
+  let relayChainId = null
 
   // Decode a revert error into a human-readable string.
   // Checks forwarder custom errors, then Chat and Hup custom errors, then falls back
@@ -267,6 +285,7 @@ export async function POST(request) {
     // from it — which let a crafted request point our key at a node of the caller's choosing.
     // That node answers getFeeData(), so it would have set the gas price on a transaction we
     // sign and pay for. Resolved from the chain id here instead; body.rpcUrl is ignored.
+    relayChainId = chainId
     provider = await getServerProvider(chainId)
 
     if (!provider) {
@@ -429,6 +448,11 @@ export async function POST(request) {
       txHash: tx.hash,
     })
   } catch (error) {
+    // The endpoint, not the request, is what failed — drop it so the next attempt starts
+    // further down the list instead of re-picking the same bad host for the rest of the TTL.
+    // A revert is left alone: it arrived intact, and the answer was simply no.
+    if (relayChainId !== null && isTransportError(error)) forgetServerRpc(relayChainId)
+
     const errorMessage = await decodeRevert(error).catch(() => error.message)
     console.error('RELAY_ERROR:', errorMessage, error.code)
     return NextResponse.json({ error: errorMessage }, { status: 500 })
