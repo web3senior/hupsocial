@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.8",
+    "@aws-sdk/client-s3": "^3.1114.0",
+    "@aws-sdk/s3-request-presigner": "^3.1114.0",
     "@base-org/account": "^2.5.6",
     "@coinbase/coinbase-sdk": "^0.25.0",
     "@coinbase/wallet-sdk": "^4.3.7",

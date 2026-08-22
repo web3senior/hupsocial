@@ -36,9 +36,15 @@ import MediaGallery from './Gallery'
 import clsx from 'clsx'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
+import { captureVideoPoster } from '@/lib/videoPoster'
 
 const MAX_MEDIA_ITEMS = 8
 const MAX_MEDIA_SIZE_MB = 10
+// Video needs its own ceiling — a few seconds of phone footage already clears the image limit.
+// Uploads above ~4MB bypass the serverless route and go straight to storage, so the cap is a
+// storage-cost decision rather than a platform one. Kept in step with MAX_UPLOAD_BYTES in
+// /api/ipfs/presign, which enforces it server-side.
+const MAX_VIDEO_SIZE_MB = 100
 const MAX_POST_LENGTH = 5000
 const MAX_HISTORY_ENTRIES = 100
 const HISTORY_DEBOUNCE_MS = 300
@@ -127,6 +133,8 @@ const getMediaType = (file) => {
   if (file.type.startsWith('audio/')) return 'audio'
   return null
 }
+
+const getMaxSizeMb = (mediaType) => (mediaType === 'video' ? MAX_VIDEO_SIZE_MB : MAX_MEDIA_SIZE_MB)
 
 const getMediaPreviewSrc = (item) =>
   item.localUrl || (item.type === 'image' ? resolveIPFSImageUrl(item.cid, { width: 800 }) : resolveIPFSUrl(item.cid))
@@ -853,12 +861,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
     const newItems = []
     for (const file of filesToProcess) {
-      const sizeInMB = file.size / (1024 * 1024)
-      if (sizeInMB > MAX_MEDIA_SIZE_MB) {
-        toast(`"${file.name}" exceeds the ${MAX_MEDIA_SIZE_MB}MB limit`, 'error')
-        continue
-      }
-
       const mediaType = getMediaType(file)
       if (!mediaType) {
         toast(`"${file.name}" isn't an image, video, or audio file`, 'error')
@@ -869,14 +871,32 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         continue
       }
 
+      // Classified first: video carries a much larger ceiling than an image does
+      const maxSizeMb = getMaxSizeMb(mediaType)
+      const sizeInMB = file.size / (1024 * 1024)
+      if (sizeInMB > maxSizeMb) {
+        toast(`"${file.name}" exceeds the ${maxSizeMb}MB limit`, 'error')
+        continue
+      }
+
       const dimensions = await getMediaDimensions(file, mediaType)
       const cid = await uploadFileToIPFS(file)
       if (!cid) continue
+
+      /* A still, pinned separately, so feed cards render a thumbnail without pulling the video
+         through a gateway. Best-effort: a container the browser can't decode just posts without
+         one, exactly as every video posted before this did. */
+      let poster
+      if (mediaType === 'video') {
+        const posterFile = await captureVideoPoster(file)
+        if (posterFile) poster = (await uploadFileToIPFS(posterFile)) || undefined
+      }
 
       const localUrl = URL.createObjectURL(file)
       newItems.push({
         type: mediaType,
         cid,
+        poster,
         alt: `Hup asset ${mediaType} | ${postText.slice(0, 30)}...`,
         storage: 'IPFS',
         mimeType: file.type,

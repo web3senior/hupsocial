@@ -2,17 +2,18 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AtIcon, BroadcastIcon, CaretLeftIcon, CaretRightIcon, EnvelopeSimpleIcon, FadersHorizontalIcon, FadersIcon, GlobeIcon, KeyIcon, LockIcon, PaperPlaneTiltIcon, ProhibitIcon, QuestionIcon, UserCheckIcon, UserMinusIcon, WalletIcon } from '@phosphor-icons/react'
+import { AtIcon, BroadcastIcon, CaretLeftIcon, CaretRightIcon, EnvelopeSimpleIcon, FadersHorizontalIcon, FadersIcon, GlobeIcon, KeyIcon, LockIcon, PaperPlaneTiltIcon, PlayCircleIcon, ProhibitIcon, QuestionIcon, UserCheckIcon, UserMinusIcon, WalletIcon } from '@phosphor-icons/react'
 import styles from './SettingsNav.module.scss'
 import InAppWallet from './InAppWallet'
 import SecurityVault from './SecurityVault'
 import LanguagePreference from './LanguagePreference'
+import PlaybackPreference from './PlaybackPreference'
 import EmailNotifications from './EmailNotifications'
 import EmailWallet from './EmailWallet'
 import PushNotificationManager from '@/components/ui/PushNotificationManager'
 
 // The tabs that render a real pane — everything else in navItems is a disabled placeholder
-const VALID_TABS = ['security', 'in-app-wallet', 'email-wallet', 'notification', 'email-notifications', 'language']
+const VALID_TABS = ['security', 'in-app-wallet', 'email-wallet', 'notification', 'email-notifications', 'language', 'playback']
 
 export default function SettingsNav() {
   // Deep-linkable: other pages send users here with /settings?tab=security instead of
@@ -62,6 +63,12 @@ export default function SettingsNav() {
       label: 'Language',
       desc: 'Pick the language posts are translated into.',
       icon: <GlobeIcon size={20} />,
+    },
+    {
+      id: 'playback',
+      label: 'Playback',
+      desc: 'Choose whether videos start on their own.',
+      icon: <PlayCircleIcon size={20} />,
     },
         {
       id: 'privacy',
@@ -153,6 +160,7 @@ export default function SettingsNav() {
         {activeTab === 'notification' && <PushNotificationManager />}
         {activeTab === 'email-notifications' && <EmailNotifications />}
         {activeTab === 'language' && <LanguagePreference />}
+        {activeTab === 'playback' && <PlaybackPreference />}
 
         <div className={styles.subMenuList}>
           {subMenuContent[activeTab]?.map((subItem) => (

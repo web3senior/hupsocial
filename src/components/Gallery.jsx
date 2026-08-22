@@ -7,6 +7,8 @@ import styles from './Gallery.module.scss'
 import useMediaZoom from '@/hooks/useMediaZoom'
 import { lockPageScroll, unlockPageScroll } from '@/lib/scrollLock'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
+import { DEFAULT_SOUND_PREFS, loadSoundPrefs, saveSoundPrefs } from '@/lib/soundPrefs'
+import { useAutoplayPreference } from '@/hooks/useAutoplayPreference'
 
 // Reserve the media's natural ratio so the whole image is always visible
 // (X-style, no cropping); max-height in CSS keeps very tall assets in check.
@@ -26,33 +28,12 @@ const isGif = (item) => item?.mimeType === 'image/gif'
 // frame — a GIF hotlinked from an external URL has no paused rendition to show.
 const supportsStill = (item) => Boolean(item?.cid) && !item.cid.startsWith('http')
 
-// Persisted sound preferences shared by every gallery instance
-const SOUND_PREFS_KEY = 'hup_media_sound'
-const DEFAULT_SOUND_PREFS = { volume: 1, muted: true }
-
-const loadSoundPrefs = () => {
-  if (typeof window === 'undefined') return DEFAULT_SOUND_PREFS
-  try {
-    const stored = JSON.parse(localStorage.getItem(SOUND_PREFS_KEY))
-    return {
-      volume: typeof stored?.volume === 'number' ? Math.min(1, Math.max(0, stored.volume)) : DEFAULT_SOUND_PREFS.volume,
-      muted: typeof stored?.muted === 'boolean' ? stored.muted : DEFAULT_SOUND_PREFS.muted,
-    }
-  } catch {
-    return DEFAULT_SOUND_PREFS
-  }
-}
-
-const saveSoundPrefs = (prefs) => {
-  try {
-    localStorage.setItem(SOUND_PREFS_KEY, JSON.stringify(prefs))
-  } catch {
-    // Storage may be unavailable (private mode / quota) — preference just won't persist
-  }
-}
-
 export default function MediaGallery({ data = [] }) {
   // State for gallery behavior
+  const autoplay = useAutoplayPreference()
+  /* Keyed by index and fed by the elements' own play/pause events, so the play button reflects
+     what each video is actually doing rather than what we last asked it to do. */
+  const [playingVideos, setPlayingVideos] = useState({})
   const [isMuted, setIsMuted] = useState(true)
   const volumeRef = useRef(DEFAULT_SOUND_PREFS.volume)
   const [revealedItems, setRevealedItems] = useState({})
@@ -227,14 +208,16 @@ export default function MediaGallery({ data = [] }) {
     scrollLightboxTo((selectedIndex + 1) % visualData.length)
   }
 
-  // Video Autoplay Observer
+  // Video visibility observer. Scrolling a video out of view always pauses it — a player the
+  // reader can no longer see should not keep running — but starting one is gated on the
+  // autoplay preference, which is off unless they turned it on in Settings.
   useEffect(() => {
     const observerOptions = { threshold: 0.6 }
     const handleIntersection = (entries) => {
       entries.forEach((entry) => {
         const video = entry.target
         if (entry.isIntersecting) {
-          video.play().catch(() => {})
+          if (autoplay) video.play().catch(() => {})
         } else {
           video.pause()
         }
@@ -245,7 +228,7 @@ export default function MediaGallery({ data = [] }) {
       if (video) observer.observe(video)
     })
     return () => observer.disconnect()
-  }, [data, resolvedUrls])
+  }, [data, resolvedUrls, autoplay])
 
   const handleReveal = (index, e) => {
     e.stopPropagation()
@@ -289,6 +272,15 @@ export default function MediaGallery({ data = [] }) {
     return ''
   }
 
+  /* Videos pinned since posters shipped carry their own still CID. Older ones have none, and
+     fall back to the browser's default behaviour of showing the first decoded frame. */
+  const resolvePosterUrl = (item) => {
+    if (item?.type !== 'video' || !item?.poster) return undefined
+    if (item.storage === '0G') return `/api/0g/file?hash=${item.poster}`
+    if (item.poster.startsWith('http')) return item.poster
+    return resolveIPFSImageUrl(item.poster, { width: 640 })
+  }
+
   const toggleGif = (index, item, e) => {
     e.stopPropagation()
     if (playingGifs[index]) {
@@ -322,6 +314,10 @@ export default function MediaGallery({ data = [] }) {
       return <div className={styles.loadingPlaceholder} />
     }
 
+    /* The lightbox has native controls; an inline card has none, so without this a reader
+       whose autoplay is off would be looking at a still frame with no way to start it. */
+    const showPlayButton = isVideo && !isFullscreen && !isBlurred && !playingVideos[i]
+
     return (
       <div className={styles.mediaContainer}>
         {isVideo ? (
@@ -335,11 +331,18 @@ export default function MediaGallery({ data = [] }) {
                   }
             }
             src={url}
+            poster={resolvePosterUrl(item)}
+            /* In-feed players are started by the visibility observer, so there is nothing to
+               gain from buffering ahead of that — the poster is what the card shows until then.
+               Fullscreen sets autoPlay, which overrides this and loads immediately. */
+            preload="none"
             loop
             muted={isMuted}
             autoPlay={isFullscreen}
             controls={isFullscreen}
             onVolumeChange={isFullscreen ? handleVideoVolumeChange : undefined}
+            onPlay={() => setPlayingVideos((previous) => ({ ...previous, [i]: true }))}
+            onPause={() => setPlayingVideos((previous) => ({ ...previous, [i]: false }))}
             playsInline
             className={isFullscreen ? styles.fullscreenVideo : styles.videoPlayer}
             style={{ filter: isBlurred ? 'blur(40px)' : 'none' }}
@@ -353,6 +356,22 @@ export default function MediaGallery({ data = [] }) {
             style={{ filter: isBlurred ? 'blur(40px)' : 'none', ...(isZoomTarget ? zoom.style : null) }}
             draggable={false}
           />
+        )}
+        {showPlayButton && (
+          <button
+            type="button"
+            className={styles.playOverlay}
+            aria-label="Play video"
+            onClick={(e) => {
+              /* The card itself opens the post on click — starting a video should not */
+              e.stopPropagation()
+              videoRefs.current[i]?.play().catch(() => {})
+            }}
+          >
+            <span className={styles.playOverlay__icon}>
+              <PlayIcon size={26} weight="fill" />
+            </span>
+          </button>
         )}
         {isBlurred && (
           <div className={styles.spoilerOverlay} onClick={(e) => handleReveal(i, e)}>

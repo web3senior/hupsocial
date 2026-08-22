@@ -1,5 +1,5 @@
 import PageTitle from '@/components/PageTitle'
-import LikedPosts from './_components/ShortsFeed'
+import ShortsFeed from './_components/ShortsFeed'
 import styles from './page.module.scss'
 
 export default function Page() {
@@ -8,7 +8,7 @@ export default function Page() {
       <PageTitle name={`Shorts`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width="medium">
-          <LikedPosts />
+          <ShortsFeed />
         </div>
       </div>
     </>

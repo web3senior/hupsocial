@@ -1,27 +1,133 @@
-// components/ShortsFeed.module.scss
-.scrollContainer {
-  height: 100vh;
+/* Height of the app's fixed header, which the rail sits directly beneath */
+$header-clearance: 4.5rem;
+
+/* The fixed bottom tab bar, which only exists at the phone breakpoint. The rail has to clear
+   it as well as the header, or the author line ends up underneath it. */
+$footer-clearance: 4.5rem;
+
+/* The gutter the arrows float in. Reserved on BOTH sides of the frame even though the arrows
+   only occupy the right one, so the video stays centred on the page rather than being pushed
+   left by the chrome beside it. A 48px button plus the gap to the frame. */
+$nav-gutter: 4rem;
+
+.shortsFeed {
+  /* svh rather than vh: on mobile, vh includes the browser chrome that slides away, so a
+     100vh slide sits partly under the address bar and snapping lands off-centre. */
+  height: calc(100svh - #{$header-clearance});
+  /* The rail fills the container and the frame centres inside each slide. Sizing the rail to
+     the frame instead would re-introduce the offset this layout exists to remove. */
   overflow-y: scroll;
-  scroll-snap-type: y mandatory; // Enables the snapping effect
+  scroll-snap-type: y mandatory;
 
-  .videoSlide {
-    height: 100vh;
-    scroll-snap-align: start; // Each video snaps to the start of the view
+  /* The rail is the scroll surface, so the page's own scrollbar has nothing to do with it —
+     hiding it keeps the slide edges clean without disabling the scrolling itself. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Anchors the arrows, which are taken out of flow so they cost the video no width */
+  &__stage {
     position: relative;
-    background: black;
+    height: calc(100svh - #{$header-clearance});
 
-    .videoPlayer {
-      width: 100%;
-      height: 100%;
-      object-fit: cover; // Fills the screen like Shorts
+    /* Published as custom properties because the slide's own styles live in ShortsPlayer's
+       module, and a SCSS variable can't cross that boundary. The player sizes its frame
+       against both of these, so they have to be the same numbers the rail was built from. */
+    --shorts-rail-height: calc(100svh - #{$header-clearance});
+    --shorts-nav-gutter: #{$nav-gutter};
+  }
+
+  &__slide {
+    height: 100%;
+    /* `start` with mandatory snapping is what makes one video fill the frame at a time */
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  /* Out of flow, in the gutter the frame already reserves for it. In flow it would take width
+     from the same row as the video and shift the picture off the page's centre line. */
+  &__nav {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  &__navButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--surface-muted, rgba(127, 127, 127, 0.14));
+    color: var(--text);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background-color: var(--border, rgba(127, 127, 127, 0.28));
     }
 
-    .overlay {
-      position: absolute;
-      bottom: 2rem;
-      left: 1rem;
-      color: white;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    /* Dimmed rather than hidden at the ends of the rail, so the pair doesn't reflow the moment
+       you reach the first or last video */
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 40svh;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-color-pale);
+
+    h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--black-900);
+    }
+
+    p {
+      margin: 0;
+      max-width: 34ch;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+  }
+
+  /* On a phone the viewport is already the portrait frame, the actions move back over the
+     video, and a touch flick replaces the arrows entirely. */
+  @media (max-width: 600px) {
+    height: calc(100svh - #{$header-clearance} - #{$footer-clearance});
+
+    &__stage {
+      height: calc(100svh - #{$header-clearance} - #{$footer-clearance});
+
+      /* The tab bar only exists at this breakpoint, and a flick replaces the arrows — so the
+         rail is shorter and the gutter they were reserving is given back to the video. */
+      --shorts-rail-height: calc(100svh - #{$header-clearance} - #{$footer-clearance});
+      --shorts-nav-gutter: 0px;
+    }
+
+    &__nav {
+      display: none;
     }
   }
 }

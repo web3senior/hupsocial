@@ -1,0 +1,207 @@
+/* The frame sits on video, which is its own backdrop regardless of the app theme — so anything
+   over the picture commits to light-on-dark. The action column beside it is on page background,
+   so that half follows the theme tokens like everything else. */
+.shortsPlayer {
+  position: relative;
+  height: 100%;
+
+  &__frame {
+    position: relative;
+    height: 100%;
+    /* Sized by whichever budget runs out first: the height the rail was given, or the width the
+       slide has left once the arrow gutters are set aside. Deriving the width from height alone
+       — the portrait ratio the first term still expresses — let a tall viewport compute a frame
+       wider than the rail, and since this box does not shrink the overflow spilled past the
+       rail's clipped edge. `100%` is the slide, so the second term is the real budget at any
+       container width rather than a copy of the container token.
+
+       When the second term wins the frame keeps full height and the video letterboxes inside
+       it, which is what every shorts surface does with a clip that doesn't match the frame. */
+    width: min(var(--shorts-rail-height) * 9 / 16, 100% - var(--shorts-nav-gutter) * 2);
+    /* The only thing in flow, so this is what centres the video on the page */
+    margin: 0 auto;
+    background-color: #000;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  &__video {
+    width: 100%;
+    height: 100%;
+    /* `contain` rather than `cover`: landscape clips get posted here too, and cropping one to a
+       portrait frame throws away most of the picture. */
+    object-fit: contain;
+    cursor: pointer;
+  }
+
+  /* Darkens only the strip the author line and caption occupy. A flat overlay would dim the
+     whole picture; this keeps the video itself untouched above the text. */
+  &__scrim {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.5) 16%, rgba(0, 0, 0, 0) 42%);
+  }
+
+  &__info {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 1.25rem;
+    color: #fff;
+    /* The scrim and this block both sit over the video; only this one has anything clickable */
+    pointer-events: none;
+
+    a,
+    button {
+      pointer-events: auto;
+    }
+  }
+
+  &__caption {
+    margin: 0.5rem 0 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    /* A caption is context for the video, not the main event — long ones stay clamped */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__sound {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    /* Above the resume overlay, which spans the frame — below it, muting a stopped video was
+       impossible because every press landed on the overlay instead. */
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    cursor: pointer;
+  }
+
+  /* Covers the whole frame so the poster is one big play target. Only shown when playback has
+     actually stopped — a video still loading is not a video waiting to be pressed. */
+  &__resume {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+    z-index: 3;
+  }
+
+  &__resumeIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    /* No optical nudge: Phosphor already draws the triangle so its centroid — not its bounding
+       box — sits on the viewBox centre, so plain flex centring is what looks straight. */
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    backdrop-filter: blur(4px);
+    transition: background-color 0.15s ease;
+  }
+
+  /* Colour only — a button that grows under the pointer makes the target move while you are
+     aiming at it, and this one covers the whole frame, so hover fires constantly. */
+  &__resume:hover &__resumeIcon,
+  &__resume:focus-visible &__resumeIcon {
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+
+  // ■■■ Action rail ■■■
+  /* Over the video rather than beside it, so it costs the frame no width and the picture can
+     sit on the page's centre line. Above the resume overlay, which covers the whole frame and
+     would otherwise swallow every press on these while playback is stopped. */
+  &__actions {
+    position: absolute;
+    right: 0.25rem;
+    /* Clears the author line and caption stacked below it */
+    bottom: 5rem;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.15rem;
+    width: 4.5rem;
+    color: #fff;
+  }
+
+  /* Like, Bookmark and Share are the app's real action components — they carry the onchain
+     logic, the batching, and the counters — so they are reused as they are and restyled for
+     this surface: glyph in a round plate, count stacked underneath. */
+  &__action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    button,
+    a {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0;
+      border: none;
+      background: none;
+      /* On the picture at every width now, so these commit to light-on-dark rather than
+         following the theme tokens the way they did when the column sat on page background. */
+      color: #fff;
+      font-size: var(--system-12-font-size, 0.75rem);
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    /* The plate is drawn on the glyph itself rather than the button, so the count below it
+       stays outside the circle — the shape every shorts surface uses. */
+    svg {
+      box-sizing: content-box;
+      width: 24px;
+      height: 24px;
+      padding: 12px;
+      border-radius: 50%;
+      background-color: rgba(0, 0, 0, 0.45);
+      transition: background-color 0.15s ease;
+    }
+
+    button:hover svg,
+    a:hover svg,
+    button:focus-visible svg,
+    a:focus-visible svg {
+      background-color: rgba(0, 0, 0, 0.7);
+    }
+  }
+
+  &__actionLabel {
+    font-size: var(--system-12-font-size, 0.75rem);
+    font-weight: 500;
+  }
+
+  /* The viewport is already the portrait frame, so the video takes the full width and gives up
+     the rounded corners. The actions overlay it at every width, so nothing else changes here. */
+  @media (max-width: 600px) {
+    &__frame {
+      width: 100%;
+      border-radius: 0;
+    }
+  }
+}

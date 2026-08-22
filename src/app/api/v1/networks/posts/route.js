@@ -113,6 +113,14 @@ export async function GET(request) {
       )`
     }
 
+    // "Shorts" = posts carrying at least one video attachment. has_video is a generated column
+    // (sql/2026-08-21-posts-has-video.sql) that runs the JSON walk at write time, so this stays a
+    // plain indexed per-row check inside the paginated derived table rather than a scan that
+    // parses every post's content on every page.
+    if (feedType === 'shorts') {
+      whereClause += ` AND p.has_video = 1`
+    }
+
     // Home-tab feeds pass exclude_nft=1 so posts carrying a HupTrade NFT listing live only
     // in the dedicated NFT tab. nft_listing_id is a generated column, so the first predicate
     // is a plain per-row check inside the paginated derived table. Reposts and quotes render

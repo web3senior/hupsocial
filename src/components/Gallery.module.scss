@@ -305,3 +305,43 @@
     right: 20px;
   }
 }
+
+/* Inline cards carry no native controls, and videos no longer start on their own unless the
+   reader opted in — so a paused video needs a target of its own. Covers the whole frame so the
+   poster is the button, with the badge only marking where the tap lands. */
+.playOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  z-index: 4;
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    /* No optical nudge: Phosphor already draws the triangle so its centroid — not its bounding
+       box — sits on the viewBox centre, so plain flex centring is what looks straight. */
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    backdrop-filter: blur(4px);
+    transition: background-color 0.15s ease;
+  }
+
+  /* Colour only — this button covers the whole frame, so a scale on hover would have the
+     target shifting under the pointer the entire time it is over the video. */
+  &:hover &__icon,
+  &:focus-visible &__icon {
+    background-color: rgba(0, 0, 0, 0.72);
+  }
+}
