@@ -121,7 +121,7 @@ export const useBatchLike = () => {
             // A failed read is no reason to block the batch; the size cap below
             // still applies and the wallet surfaces anything left
             console.error('Batch like preflight failed:', err)
-            toast('Could not verify basket, sending as staged', 'info')
+            toast('Sending basket unverified', 'info')
           }
         }
 
