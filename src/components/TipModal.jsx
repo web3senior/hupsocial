@@ -21,6 +21,11 @@ const TIP_PRESETS = [1, 2, 5, 10]
 
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
+// cidex polls its chains every second, so the Tipped event is indexed within a few seconds
+// of the receipt. Long enough that the refetch reads the new row, short enough that the
+// dollar badge updates while the tipper is still looking at the post.
+const TIP_INDEX_DELAY_MS = 10000
+
 // Popularity line for a search result — the signal that separates the real token from
 // same-name copycats (LUKSO returns holder counts, GeckoTerminal pool liquidity)
 const formatTokenPopularity = (result) => {
@@ -115,11 +120,17 @@ const TipModal = ({ item, setShowTipModal }) => {
   // Optimistic counter bump — the indexer lands the Tipped event a few seconds after the
   // receipt, so revalidating immediately would race it and snap the counter back
   const bumpTipCount = () => {
+    const statsKey = getPostStatsKey(item, address)
+
     mutateStats(
-      getPostStatsKey(item, address),
+      statsKey,
       (current) => ({ ...(current || item), total_tips: Number((current || item)?.total_tips || 0) + 1 }),
       { revalidate: false },
     )
+
+    // The badge shows dollars, and only the API can price them — so once the indexer has had
+    // time to land the event, pull the row again to move the earned figure
+    setTimeout(() => mutateStats(statsKey), TIP_INDEX_DELAY_MS)
   }
 
   // Tips settle on the post's own chain, not whichever chain is currently active

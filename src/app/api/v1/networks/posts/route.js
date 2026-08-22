@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { communityJoin } from '@/lib/communityJoin'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
+import { attachTipUsdTotals } from '@/lib/tipTotals'
 import { getFollowingAddresses } from '@/lib/followSystem'
 
 export const runtime = 'nodejs'
@@ -308,6 +309,9 @@ export async function GET(request) {
     // Fulfill any missing Universal Profile fields
     await fulfillUniversalProfiles(postsToSend, pool)
 
+    // Dollars for the tip badge — costs nothing on pages where nothing was tipped
+    await attachTipUsdTotals(postsToSend)
+
     // Hydrate repost rows with their original post and commented rows with their
     // newest reply, so the client renders both without per-card round trips.
     await attachRepostOriginals(postsToSend, viewerAddress)
@@ -418,6 +422,7 @@ async function attachRepostOriginals(rows, viewerAddress) {
 
   const [origRows] = await pool.execute(query, queryParams)
   await fulfillUniversalProfiles(origRows, pool)
+  await attachTipUsdTotals(origRows)
 
   const byKey = new Map(origRows.map((row) => [`${row.network_id}:${row.id}`, row]))
   repostRows.forEach((row) => {
@@ -662,6 +667,7 @@ async function handleTrendingFeed({ networkId, viewerAddress, page, limit, offse
     .filter(Boolean)
 
   await fulfillUniversalProfiles(orderedPosts, pool)
+  await attachTipUsdTotals(orderedPosts)
   await attachRepostOriginals(orderedPosts, viewerAddress)
   await attachLastComments(orderedPosts, viewerAddress)
 

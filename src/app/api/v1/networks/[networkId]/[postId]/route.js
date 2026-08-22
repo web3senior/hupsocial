@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { communityJoin } from '@/lib/communityJoin'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
+import { attachTipUsdTotals } from '@/lib/tipTotals'
 
 export const runtime = 'nodejs'
 
@@ -73,6 +74,9 @@ export async function GET(request, { params }) {
 
     // Fulfill any missing Universal Profile fields
     await fulfillUniversalProfiles([post], pool)
+
+    // Dollars for the tip badge — the post-tip revalidation reads this row
+    await attachTipUsdTotals([post])
 
     return NextResponse.json({
       success: true,
