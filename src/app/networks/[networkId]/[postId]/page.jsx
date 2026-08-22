@@ -1,24 +1,16 @@
 import { cache } from 'react'
 import { getPostById } from '@/lib/api'
+import { summarizePost } from '@/lib/postSummary'
 import PageTitle from '@/components/PageTitle'
 import PostDetails from './_components/PostDetails'
 import styles from './page.module.scss'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
 
 // Deduplicate the fetch so generateMetadata and Page share one request per render
 const fetchPost = cache((networkId, postId) => getPostById(networkId, postId, null))
 
-/* Crawlers give an OG image only a few seconds before abandoning the card, and several
-   (WhatsApp, Telegram) cap the payload outright. 800w/q60 cuts the transfer roughly 4x
-   versus 1200/q80 while still clearing X's summary_large_image minimum (300x157) and
-   Facebook's recommended 600x315, so links keep rendering as large cards.
-   still:1 skips the per-frame animated encode — no OG card plays animation anyway.
-   JPEG rather than WebP because X drops cards whose image it can't decode, and JPEG is
-   the one format every crawler handles. */
-const OG_IMAGE_OPTIONS = { width: 800, quality: 60, still: true, format: 'jpeg' }
-
-/* 1.91:1, the ratio crawlers assume, used when the post never recorded media dimensions */
-const OG_FALLBACK_RATIO = 630 / 1200
+/* Long enough to read as a sentence, short enough that no crawler truncates it mid-card */
+const TITLE_MAX = 70
+const DESCRIPTION_MAX = 200
 
 export async function generateMetadata({ params }, parent) {
   // Fetch and resolve the parent metadata object
@@ -32,50 +24,20 @@ export async function generateMetadata({ params }, parent) {
     const post = await fetchPost(networkId, postId)
     const item = post?.data
 
-    // Initialize an array to hold mapped images for metadata tags
-    let images = []
-
-    /* Only the first image is advertised: Facebook and LinkedIn fetch every og:image
-       candidate before picking one, so a multi-image post multiplied the cold IPFS
-       round trips a crawler had to survive before rendering anything */
-    const mediaElement = item?.content?.elements?.find((el) => el?.type === 'media')
-    const firstImage = mediaElement?.data?.items?.find((mediaItem) => mediaItem?.type === 'image')
-
-    if (firstImage?.cid) {
-      /* Relative proxy URLs are absolutized by metadataBase for crawlers */
-      const url = resolveStorageImageUrl(firstImage.cid, OG_IMAGE_OPTIONS)
-      if (url) {
-        /* The proxy never enlarges, so the served width is whichever is smaller */
-        const width = Math.min(firstImage.width || OG_IMAGE_OPTIONS.width, OG_IMAGE_OPTIONS.width)
-        const height =
-          firstImage.width && firstImage.height ? Math.round((width * firstImage.height) / firstImage.width) : Math.round(width * OG_FALLBACK_RATIO)
-
-        images.push({
-          url,
-          width,
-          height,
-          alt: firstImage.alt || 'Post Image',
-        })
-      }
-    }
-
-    // Fall back to empty text string if body content cannot be resolved
-    const bodyText = post?.data?.content?.elements?.[0]?.data?.text || ''
-
-    const ogImages = images.length > 0
-      ? images
-      : [{ url: '/open-graph.png', width: 1200, height: 630, alt: 'Open Graph Image' }]
-
-    const title = bodyText.slice(0, 60).trim() || 'Post Details'
-    const description = bodyText.slice(0, 160).trim() || parentMetadata.description || 'View the details of this post on our platform.'
+    /* summarizePost reads the text element by type rather than by index — an NFT listing or a
+       media-only post does not necessarily lead with words — and describes the post when it
+       has none of its own */
+    const title = summarizePost(item, TITLE_MAX)
+    const description = summarizePost(item, DESCRIPTION_MAX)
     const postUrl = `/networks/${networkId}/${postId}`
 
-    // Construct unified dynamic metadata configuration payload
+    /* No images here on purpose. opengraph-image.jsx in this segment supplies og:image, its
+       type, dimensions and alt, and file-based metadata overrides anything set here anyway.
+       Leaving `images` off twitter is what lets Next mirror that same card into twitter:image
+       (resolve-metadata only auto-fills twitter when the level has no `images` key of its own),
+       so the two never drift apart. */
     const metadata = {
-      // Slice the first 60 characters for the SEO title
       title,
-
-      // Slice the first 160 characters for the description, then fall back if empty
       description,
 
       /* The root layout pins canonical to '/', which every page inherits. X honours
@@ -83,7 +45,6 @@ export async function generateMetadata({ params }, parent) {
          home page and X rendered the generic site card instead of the post's own. */
       alternates: { canonical: postUrl },
 
-      // Build out Open Graph specific data representations
       /* Next replaces the parent openGraph wholesale rather than merging it, so siteName
          and locale have to be restated here or the card loses its branding */
       openGraph: {
@@ -93,11 +54,10 @@ export async function generateMetadata({ params }, parent) {
         locale: 'en_US',
         title,
         description,
-        images: ogImages,
       },
 
-      // Always use summary_large_image since we always have an OG image now
-      twitter: { card: 'summary_large_image', title, description, images: ogImages },
+      // Every post now has a generated 1200x630 card, so the large format always applies
+      twitter: { card: 'summary_large_image', title, description },
     }
 
     return metadata
