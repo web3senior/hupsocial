@@ -143,6 +143,7 @@ interface IHupCommunity {
     error MaxCommunitiesReached();
     error IncorrectPaymentAmount();
     error PaymentNotConfigured();
+    error PriceExceedsMax();
     error ArrayLengthMismatch();
     error InvalidKeyVersion();
     error BacklinkAlreadyPublished();

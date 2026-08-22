@@ -667,7 +667,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const refetchPendingRequests = async () => {
     if (!chainId) return
     try {
-      const res = await fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}`)
+      const res = await fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&contract_address=${CONTRACT_ADDRESS}`)
       const json = await res.json()
       setPendingRequests(json.success ? json.data : [])
     } catch (err) {
@@ -788,7 +788,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         chainId,
         abi: HupCommunityABI,
         functionName: 'join',
-        args: [id],
+        // _maxPrice pins the ceiling to the price this screen read and approved for, so a
+        // setPaymentRequirement landing between the approval and this tx reverts instead of
+        // silently charging the new price against the standing allowance.
+        args: [id, price],
         value: isNative ? price : 0n,
       })
     } catch (err) {
@@ -807,7 +810,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       chainId,
       abi: HupCommunityABI,
       functionName: 'join',
-      args: [id],
+      // _maxPrice 0: this path never pays, and it makes a community that flipped to PayToJoin
+      // since the screen loaded revert instead of charging.
+      args: [id, 0n],
     })
   }
 
@@ -824,35 +829,28 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       chainId,
       abi: HupCommunityABI,
       functionName: 'join',
-      args: [id],
+      // _maxPrice 0: this path never pays, and it makes a community that flipped to PayToJoin
+      // since the screen loaded revert instead of charging.
+      args: [id, 0n],
     })
   }
 
-  // Once the confirmed join() was a RequestApproval request (it only sets isPending, not
-  // membership), file the offchain discovery record — guarded per-hash so a re-render can't
-  // double-post the same confirmation.
-  const requestRecordedRef = useRef(null)
+  // A RequestApproval join only sets isPending onchain — no membership, no roster change. cidex
+  // indexes MembershipRequested straight into community_members.is_pending, so there is nothing to
+  // file here; just re-read the queue once the tx confirms.
   useEffect(() => {
     if (!isJoinConfirmed) return
 
     refetchMyStatus()
     refetchMyCanPost()
 
-    if (admission === ADMISSION.RequestApproval && activeAccountAddress && requestRecordedRef.current !== joinHash) {
-      requestRecordedRef.current = joinHash
-      fetch('/api/communities/join-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ networkId: chainId, communityId: id, walletAddress: activeAccountAddress }),
-      })
-        .then(() => refetchPendingRequests())
-        .catch((err) => console.error('Failed to record the access request:', err))
+    if (admission === ADMISSION.RequestApproval) {
+      refetchPendingRequests()
     }
-  }, [isJoinConfirmed, joinHash, admission, activeAccountAddress, refetchMyStatus, refetchMyCanPost])
+  }, [isJoinConfirmed, admission, refetchMyStatus, refetchMyCanPost])
 
-  // Withdrawing a filed request: the onchain flag is the source of truth, so the tx goes first
-  // and the offchain discovery record is dropped only once it confirms — mirroring how the
-  // record was filed after join() confirmed, so the two can't drift apart on a rejected prompt.
+  // Withdrawing a filed request: cancelRequest clears the onchain isPending flag the queue is
+  // built from, so there is no second record left to drift out of step with it.
   const handleCancelRequest = () => {
     if (!activeAccountAddress || !chainId) return
 
@@ -871,11 +869,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     cancelRequestHandledRef.current = cancelRequestHash
 
     refetchMyStatus()
-    fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&wallet_address=${activeAccountAddress}`, {
-      method: 'DELETE',
-    })
-      .catch(() => {})
-      .finally(() => refetchPendingRequests())
+    refetchPendingRequests()
   }, [isCancelRequestConfirmed, cancelRequestHash, activeAccountAddress, chainId, id, refetchMyStatus])
 
   // Refresh the on-chain community row once an update confirms
@@ -991,16 +985,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     if (isUnbanConfirmed) setBanningAddress(null)
   }, [isUnbanConfirmed])
 
-  // After a join request is approved on-chain: drop it from the discovery index, and if this
-  // community is encrypted, grant the new member the current content key
+  // After a join request is approved on-chain: drop it from this panel right away (approveRequest
+  // clears isPending, so the indexed queue follows a beat later), and if this community is
+  // encrypted, grant the new member the current content key
   useEffect(() => {
     const run = async () => {
       if (!isApproveConfirmed || !approvingAddress || approveHandledRef.current === approveHash) return
       approveHandledRef.current = approveHash
-
-      fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&wallet_address=${approvingAddress}`, {
-        method: 'DELETE',
-      }).catch(() => {})
 
       setPendingRequests((prev) => prev.filter((r) => r.wallet_address?.toLowerCase() !== approvingAddress.toLowerCase()))
 
@@ -1036,41 +1027,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     run()
   }, [isApproveConfirmed, approveHash, approvingAddress])
 
-  // After a rejection confirms: drop the request from the off-chain discovery index so it
-  // disappears for every moderator, and from this panel immediately. The wallet stays free to
-  // request again later — rejection only clears isPending, it doesn't ban.
+  // After a rejection confirms: drop it from this panel immediately — rejectRequest clears
+  // isPending, so it leaves the indexed queue for every other moderator a beat later. The wallet
+  // stays free to request again; rejection doesn't ban.
   const rejectHandledRef = useRef(null)
   useEffect(() => {
     if (!isRejectConfirmed || !rejectingAddress || rejectHandledRef.current === rejectHash) return
     rejectHandledRef.current = rejectHash
 
-    fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&wallet_address=${rejectingAddress}`, {
-      method: 'DELETE',
-    }).catch(() => {})
-
     setPendingRequests((prev) => prev.filter((r) => r.wallet_address?.toLowerCase() !== rejectingAddress.toLowerCase()))
     setRejectingAddress(null)
   }, [isRejectConfirmed, rejectHash, rejectingAddress])
-
-  // Self-heal phantom queue entries: an approveRequest that reverts NoPendingRequest (0xcc2c06e8)
-  // means the offchain record exists but the wallet's onchain isPending was never set — its join()
-  // tx was rejected or failed after the record was written (possible for rows created before the
-  // record-after-confirm fix). Drop the orphaned record so the queue matches the chain; the wallet
-  // can simply request again.
-  const staleRequestHandledRef = useRef(null)
-  useEffect(() => {
-    if (!approveError || !approvingAddress || staleRequestHandledRef.current === approveError) return
-    const text = `${approveError.shortMessage || ''} ${approveError.message || ''}`
-    if (!text.includes('NoPendingRequest') && !text.includes('0xcc2c06e8')) return
-    staleRequestHandledRef.current = approveError
-
-    fetch(`/api/communities/join-requests?network_id=${chainId}&community_id=${id}&wallet_address=${approvingAddress}`, {
-      method: 'DELETE',
-    }).catch(() => {})
-
-    setPendingRequests((prev) => prev.filter((r) => r.wallet_address?.toLowerCase() !== approvingAddress.toLowerCase()))
-    setApprovingAddress(null)
-  }, [approveError, approvingAddress])
 
   // After a ban/leave confirms on encrypted communities: rotate the key so the departed member
   // can't read future posts. Only a moderator can rotate (bumpKeyVersion is moderator-gated), so
@@ -2654,7 +2621,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             <div className={styles.card__error}>
               Error:{' '}
               {`${approveError?.shortMessage || ''}${approveError?.message || ''}`.match(/NoPendingRequest|0xcc2c06e8/)
-                ? 'This request was never completed — their join didn’t go through. The stale entry has been removed; they can request again.'
+                ? 'That wallet is no longer pending — they withdrew the request, or another moderator handled it first. The queue refreshes on its own.'
                 : approveError?.shortMessage ||
                   approveError?.message ||
                   banError?.shortMessage ||

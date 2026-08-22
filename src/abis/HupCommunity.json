@@ -173,6 +173,11 @@
   },
   {
     "inputs": [],
+    "name": "PriceExceedsMax",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ReentrancyGuardReentrantCall",
     "type": "error"
   },
@@ -1730,6 +1735,11 @@
       {
         "internalType": "uint256",
         "name": "_id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_maxPrice",
         "type": "uint256"
       }
     ],

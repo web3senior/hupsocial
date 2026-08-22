@@ -455,12 +455,16 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
      *         paymentRequirements[_id].price in native coin when its `token` is address(0);
      *         otherwise approve this contract for that price on the ERC-20/LSP7 token first, and
      *         send no value.
+     * @param _maxPrice Highest price the caller is willing to pay, in the payment asset's smallest
+     *        unit. Ignored by every unpaid admission mode — pass 0 there, which also makes a
+     *        community that flips to PayToJoin between signing and mining revert instead of
+     *        charging silently.
      * @dev nonReentrant + checks-effects-interactions (membership is granted before the payment
      *      transfer runs) since the payout goes straight to the creator — who could be a contract
      *      with its own receive/token-transfer hooks (LSP7 in particular calls back into both
      *      sender and recipient on transfer).
      */
-    function join(uint256 _id) external payable communityExists(_id) whenNotPaused nonReentrant {
+    function join(uint256 _id, uint256 _maxPrice) external payable communityExists(_id) whenNotPaused nonReentrant {
         address sender = _msgSender();
         MemberStatus storage status = registry[_id][sender];
         if (status.isBanned) revert Banned();
@@ -488,6 +492,11 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
             // back into both sender and recipient on transfer).
             PaymentRequirement memory req = paymentRequirements[_id];
             if (req.price == 0) revert PaymentNotConfigured();
+            // Price ceiling: setPaymentRequirement can land between the joiner signing and the tx
+            // being mined. A native join already fails closed on msg.value != req.price, but a
+            // token join is bounded only by the standing allowance — a wallet carrying one larger
+            // than the price it agreed to would silently pay the new one. The caller pins the max.
+            if (req.price > _maxPrice) revert PriceExceedsMax();
             // A paid admission is the one path where admitting-then-gating would cost the joiner
             // money: canPost re-checks the requirement list live, so a wallet that pays while
             // failing it would be admitted, unable to post, and unrefundable. Check before any
