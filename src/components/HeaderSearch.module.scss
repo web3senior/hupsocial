@@ -1,0 +1,93 @@
+@use './../styles/components/responsive' as *;
+
+// Mobile-first the box is a flex item, so it can only ever take the room the menu
+// button and the wallet controls leave it. From md up it switches to the same
+// absolute centring the page title uses (Header.module.scss), which lines it up
+// with the feed column instead of with the gap between those two controls.
+.search {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 420px;
+  margin: 0 0.5rem;
+  // Same construction as the NetworkSelect pill beside it - padding-block over an 18px
+  // control and an inherited-size line box - so the two land on one height without
+  // either of them hardcoding a number that the other has to chase.
+  padding-block: 0.4rem;
+  padding-inline: calc(var(--spacing) * 3);
+  border: 1px solid var(--border);
+  border-radius: 1000px;
+  // Surface, not surface-muted: a filled grey slab sits heavy in a white header, where
+  // an outlined field reads light - and it is what NetworkSelect already wears.
+  background-color: var(--surface);
+  color: var(--text-muted);
+
+  &:focus-within {
+    border-color: var(--text-muted);
+  }
+
+  &__submit {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: var(--foreground);
+    }
+  }
+
+  &__input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--foreground);
+    // Inherited size on purpose: it matches the line box NetworkSelect's label makes, and
+    // anything under 16px makes iOS Safari zoom the page on focus.
+    font: inherit;
+    // Below sm that label is hidden and NetworkSelect shrinks to its 18px icon, so the
+    // line box is capped to the same 18px there and the two controls stay one height.
+    line-height: 18px;
+
+    @include sm-up() {
+      line-height: inherit;
+    }
+
+    &::placeholder {
+      color: var(--text-muted);
+    }
+
+    // The UA clear button sits on the pill's edge and fights the rounded corner
+    &::-webkit-search-cancel-button {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+  }
+
+  @include md-up() {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    // Centred on the header so it lines up with the feed column below it. That puts its
+    // left edge under the sidebar on narrow desktops, so the width is capped to the widest
+    // centred box that still clears the sidebar's 250px expanded state. Percentage, not vw:
+    // the header's box already excludes the scrollbar, 100vw does not.
+    width: min(420px, calc(100% - 520px));
+    max-width: none;
+    margin: 0;
+  }
+}
