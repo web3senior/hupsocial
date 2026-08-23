@@ -60,7 +60,10 @@
 }
 
 .connectWallet {
-
+  // Never shrinks: on "/" the search box shares this row, and it is the flexible one
+  // (min-width: 0). Without this, overflow squeezes both sides and the 38px avatar
+  // gets crushed along with the search.
+  flex: none;
 }
 
 @include md-down() {
