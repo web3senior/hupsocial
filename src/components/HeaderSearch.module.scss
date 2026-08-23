@@ -85,11 +85,12 @@
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    // Centred on the header so it lines up with the feed column below it. That puts its
-    // left edge under the sidebar on narrow desktops, so the width is capped to the widest
-    // centred box that still clears the sidebar's 250px expanded state. Percentage, not vw:
-    // the header's box already excludes the scrollbar, 100vw does not.
-    width: min(420px, calc(100% - 520px));
+    // Centred on the header so it lines up with the feed column below it, and capped at
+    // that column's width - the home page's __container[data-width="small"], 640px in
+    // Global.scss - so the box and the feed share both edges. Below that the 260px reserved
+    // on each side keeps it clear of the wallet cluster. Percentage, not vw: the header's
+    // box already excludes the scrollbar, 100vw does not.
+    width: min(640px, calc(100% - 520px));
     max-width: none;
     margin: 0;
   }
