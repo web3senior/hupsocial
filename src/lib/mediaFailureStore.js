@@ -1,8 +1,8 @@
 /**
  * @file lib/mediaFailureStore.js
  * @description The durable half of the media proxies' negative cache — the layer under
- * lib/mediaCache.js, backed by the `media_failures` table (DDL in
- * sql/2026-08-23-media-failures.sql).
+ * lib/mediaCache.js, backed by the `media_failures` table. The DDL ships with the rest of
+ * the shared schema in cidex/scripts/add-media-failures.sql.
  *
  * mediaCache remembers a dead content address in the process, which is exactly right for a
  * long-lived server and no help at all on a serverless one: every cold instance starts having

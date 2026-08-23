@@ -1,7 +1,7 @@
 /**
  * @file config/communityCategories.js
  * @description Shape rules for community categories. The LIST itself is data, not config: it
- * lives in the `community_categories` table (sql/2026-08-20-community-categories.sql), is served
+ * lives in the `community_categories` table (cidex/scripts/add-community-categories.sql), is served
  * by GET /api/v1/communities/categories, and reaches components through
  * hooks/useCommunityCategories — so a row added or retired in the database shows up in the
  * picker and the directory chips without a deploy. cidex validates metadata slugs against the

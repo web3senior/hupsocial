@@ -30,7 +30,7 @@ const TRENDING_COMMENT_WEIGHT = 3 // comments are costlier to fake than likes
 const trendingCache = new Map()
 
 // --- Shorts feed column probe ---
-// posts.has_video is a stored generated column applied by hand (sql/2026-08-21-posts-has-video.sql),
+// posts.has_video is a stored generated column applied by hand (cidex/scripts/add-posts-has-video.sql),
 // and a deploy is a separate action from a migration — so this code can and does reach a database
 // where that ALTER has not been run yet. Naming a column that isn't there fails the entire query,
 // which took the whole shorts feed down with a 500 rather than merely losing the index. The feed is
@@ -67,7 +67,7 @@ const shortsPredicate = async () => {
   }
 
   if (!hasVideoColumn) {
-    console.warn('[posts] posts.has_video is missing — the shorts feed is scanning content JSON. Apply sql/2026-08-21-posts-has-video.sql.')
+    console.warn('[posts] posts.has_video is missing — the shorts feed is scanning content JSON. Apply cidex/scripts/add-posts-has-video.sql.')
   }
 
   return hasVideoColumn ? HAS_VIDEO_COLUMN_PREDICATE : HAS_VIDEO_INLINE_PREDICATE
@@ -159,7 +159,7 @@ export async function GET(request) {
     }
 
     // "Shorts" = posts carrying at least one video attachment. Normally has_video, a generated
-    // column (sql/2026-08-21-posts-has-video.sql) that runs the JSON walk at write time, so this
+    // column (cidex/scripts/add-posts-has-video.sql) that runs the JSON walk at write time, so this
     // stays a plain indexed per-row check inside the paginated derived table rather than a scan
     // that parses every post's content on every page. Where that column has not been applied yet
     // the same walk runs inline instead — slower, but a feed that scans beats a feed that 500s.
