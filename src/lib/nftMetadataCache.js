@@ -12,6 +12,7 @@
  * answers from RPC, just without the cache.
  */
 
+import { after } from 'next/server'
 import pool from '@/lib/db'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
 import { resolveNftMetadata, tokenExists } from '@/lib/nftMetadata'
@@ -161,17 +162,43 @@ const touchRow = async (key) => {
   )
 }
 
+// Resolutions in progress, by cache key. A grid mounting, the image proxy redirecting and an
+// OG card rendering can all ask for the same token inside one instance at once; the RPC
+// fan-out and the gateway round trip are paid once, and the row is written once.
+const inflight = new Map()
+
+const inflightKeyOf = (key) => `${key.networkId}|${key.collection}|${key.tokenId}`
+
+// Runs `task` once the response is out the door. `after` is the platform's way of keeping the
+// function alive past the response; it only exists inside a request scope, which every caller
+// of this module is today — anything else (a script, say) runs it detached instead.
+const runAfterResponse = (task) => {
+  try {
+    after(task)
+  } catch {
+    task()
+  }
+}
+
 /**
- * Resolves a token's metadata, preferring a fresh cached row over an RPC read.
+ * Resolves a token's metadata, preferring a cached row over an RPC read.
+ *
+ * Freshness is served-then-checked, not checked-then-served: a row that resolved once is
+ * answered from immediately even past its TTL, and the re-read happens after the response.
+ * The re-read is what used to make a collection with a dead metadata host unusable — every
+ * token of it stalled a render on a gateway timeout every time its TTL lapsed, when the
+ * cached answer was sitting right there. Only a row that never resolved (or no row at all)
+ * has nothing to say, and waits.
+ *
  * @param {Object} params
  * @param {number|string} params.chainId Chain the collection lives on.
  * @param {string} params.collection NFT contract address.
  * @param {string} params.tokenId bytes32 hex for LSP8, decimal for ERC721.
  * @param {boolean} params.isLsp8 True for LSP8 collections.
  * @param {string} [params.baseUrl] Absolute origin, for resolving proxy-relative storage URLs.
- * @param {boolean} [params.allowStale=false] Serve an expired row instead of re-reading —
- * used by the image proxy, which only needs the artwork reference and would rather answer
- * from a stale row than block a render on RPC.
+ * @param {boolean} [params.allowStale=false] Serve an expired row without scheduling the
+ * re-read — for the image proxy and OG renderer, which only need the artwork reference and
+ * fire far too often to own refreshing; the metadata route does that.
  * @param {boolean} [params.forceRefresh=false] Ignore the cached row's freshness and
  * re-read from chain. The row is still loaded, because it is what protects good artwork
  * from being demoted if this read comes back empty.
@@ -191,14 +218,42 @@ export const getNftMetadata = async ({ chainId, collection, tokenId, isLsp8, bas
   if (row && !forceRefresh) {
     const age = Date.now() - new Date(row.fetched_at).getTime()
     const complete = isComplete(row)
-    // `allowStale` is a latency shortcut for callers that just need the artwork reference,
-    // so it only applies to rows that actually resolved. Serving an expired failure forever
-    // would turn one bad gateway response into permanently missing art.
-    if ((allowStale && complete) || age < ttlFor(row.source)) {
+    if (age < ttlFor(row.source)) {
+      return { metadata: rowToMetadata(row), cached: true }
+    }
+    // Expired. A resolved row is still the right answer for this render — only a row that
+    // never resolved has nothing to show, and that one waits. Serving an expired failure
+    // forever would turn one bad gateway response into permanently missing art.
+    if (complete) {
+      if (!allowStale) {
+        runAfterResponse(() =>
+          resolveAndStore({ key, row, tokenId, isLsp8, baseUrl }).catch((error) => {
+            console.warn('[nft-metadata-cache] background re-read failed:', error.message)
+          }),
+        )
+      }
       return { metadata: rowToMetadata(row), cached: true }
     }
   }
 
+  return resolveAndStore({ key, row, tokenId, isLsp8, baseUrl })
+}
+
+// The resolve half of getNftMetadata, deduplicated per token across whatever is asking.
+const resolveAndStore = (params) => {
+  const id = inflightKeyOf(params.key)
+  const pending = inflight.get(id)
+  if (pending) return pending
+
+  const task = resolveToken(params).finally(() => inflight.delete(id))
+  inflight.set(id, task)
+  return task
+}
+
+// Reads the token from chain (and, failing the document, the LUKSO indexer), proves it
+// exists, and writes the row — or leaves a better row alone. `row` is what the caller had
+// cached, if anything.
+const resolveToken = async ({ key, row, tokenId, isLsp8, baseUrl }) => {
   const publicClient = getServerPublicClient(key.networkId)
   if (!publicClient) {
     // Unknown chain — a stale row still beats nothing.

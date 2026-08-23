@@ -1,6 +1,6 @@
 // Shared LSP4 (LUKSO digital asset metadata) helpers — used by useNftMetadata for
-// LSP8 collections and useTokenIcon for LSP7 payment tokens. Client-side only
-// (fetchMetadataJson relies on browser fetch/atob).
+// LSP8 collections and useTokenIcon for LSP7 payment tokens in the browser, and by the
+// metadata caches on the server. Isomorphic: only global fetch/atob, which both runtimes have.
 
 import { hexToString } from 'viem'
 import { resolveStorageUrl } from '@/lib/storageHelper'
@@ -41,12 +41,55 @@ export const pickLsp4Image = (lsp4) => lsp4?.images?.[0]?.[0]?.url || lsp4?.icon
 // For token avatars the square icon is the primary asset and images are the fallback.
 export const pickLsp4Icon = (lsp4) => lsp4?.icon?.[0]?.url || lsp4?.images?.[0]?.[0]?.url || null
 
+// A document fetch has to be bounded. The gateway behind NEXT_PUBLIC_IPFS_GATEWAY_URL hands
+// back a pinned object in a second or two but takes a full thirty seconds to admit it cannot
+// find one — and a collection whose base URI has gone away (XYZ Generation on LUKSO) makes
+// every one of its tokens pay that, per visitor, per cache expiry, eight at a time through
+// the batch endpoint. Ten seconds is several times a healthy cold fetch and a third of the
+// hang; the callers all treat a rejection as "no document" and move on to their fallbacks.
+const FETCH_TIMEOUT_MS = 10000
+
+// Once one token's document has timed out, its siblings behind the same prefix will too: a
+// base URI is one host or one directory, and the tokens are paths under it. Remembering the
+// prefix for a few minutes turns a grid of such tokens from N timeouts into one. In-process
+// only, so a recovered host is retried by the next instance — and by this one shortly.
+const DEAD_PREFIX_TTL_MS = 5 * 60 * 1000
+const deadPrefixes = new Map()
+
+// The part of a URI that a collection's other tokens share, or null when there is nothing
+// safe to share. `ipfs://<cid>` names one object, and `https://gateway/ipfs/<cid>` names one
+// object on a gateway every collection goes through — marking either "directory" dead would
+// take every unrelated collection down with it for the duration.
+const sharedPrefixOf = (uri) => {
+  const path = String(uri).split(/[?#]/)[0]
+  const authorityStart = path.indexOf('://') + 3
+  if (authorityStart < 3) return null
+  const slash = path.lastIndexOf('/')
+  if (slash < authorityStart) return null
+  const prefix = path.slice(0, slash)
+  return /\/(ipfs|ipns)$/i.test(prefix) ? null : prefix
+}
+
+const isDeadPrefix = (prefix) => {
+  const until = deadPrefixes.get(prefix)
+  if (!until) return false
+  if (until > Date.now()) return true
+  deadPrefixes.delete(prefix)
+  return false
+}
+
 /**
  * Fetches and parses a metadata JSON document from any storage URI.
+ *
+ * Bounded to FETCH_TIMEOUT_MS, and a prefix that timed out, refused the connection or
+ * answered 429/5xx is skipped outright for a few minutes — a 404 is an answer about one
+ * token, those are statements about its host. Either way the caller sees what it would have
+ * seen after waiting: a rejection or null.
+ *
  * @param {string} uri ipfs://, https://, 0g:// or a data: URI.
- * @param {{ baseUrl?: string }} [options] `baseUrl` makes the resolver's relative
- * output (the 0G proxy path) absolute — required on the server, where fetch has no
- * document origin to resolve against.
+ * @param {{ baseUrl?: string, timeoutMs?: number }} [options] `baseUrl` makes the
+ * resolver's relative output (the 0G proxy path) absolute — required on the server, where
+ * fetch has no document origin to resolve against. `timeoutMs` overrides the default bound.
  */
 export const fetchMetadataJson = async (uri, options = {}) => {
   if (!uri) return null
@@ -70,7 +113,29 @@ export const fetchMetadataJson = async (uri, options = {}) => {
   const resolved = resolveStorageUrl(uri)
   if (!resolved) return null
   const target = resolved.startsWith('/') && options.baseUrl ? new URL(resolved, options.baseUrl).toString() : resolved
-  const response = await fetch(target)
+
+  // Keyed on the onchain URI rather than the gateway URL it resolves to, so the prefix is the
+  // collection's own (`ipfs://<cid>`, `https://api.collection.xyz/token`) and never the
+  // gateway's.
+  const prefix = sharedPrefixOf(uri)
+  if (prefix && isDeadPrefix(prefix)) return null
+
+  let response
+  try {
+    response = await fetch(target, { signal: AbortSignal.timeout(options.timeoutMs ?? FETCH_TIMEOUT_MS) })
+  } catch (error) {
+    // Timed out, or the host refused the connection: the tokens next to this one are not
+    // going to fare any better.
+    if (prefix) deadPrefixes.set(prefix, Date.now() + DEAD_PREFIX_TTL_MS)
+    throw error
+  }
+
+  if (response.status === 429 || response.status >= 500) {
+    // The host is telling us to back off (chillwhales' bucket answers 503 SlowDownRead under
+    // load) — hammering it with the rest of the grid is how that gets worse.
+    if (prefix) deadPrefixes.set(prefix, Date.now() + DEAD_PREFIX_TTL_MS)
+    return null
+  }
   if (!response.ok) return null
   return response.json()
 }
