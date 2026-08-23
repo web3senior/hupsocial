@@ -3,7 +3,7 @@
   display: inline-flex;
   position: relative;
   overflow: hidden;
-  height: 20px;         /* Match text line height precisely */
+  height: 18px;         /* Match the 18px footer icons — anything taller grows the button when counters mount after hydration, shifting the page below by 2px */
   min-width: 14px;      /* Prevent layout jumps when count shifts */
   align-items: center;
   justify-content: center;
@@ -12,7 +12,7 @@
 .counterNumber {
   display: inline-block;
   font-size: 14px;
-  line-height: 20px;
+  line-height: 18px;
 }
 
 /* Applied only when the value changes after mount — initial paint stays static */
