@@ -22,6 +22,10 @@
  * success path already ships an immutable `s-maxage` for the shared CDN cache. This is the
  * layer under that one — it catches hard reloads, cache-busting crawlers, and the failures
  * a CDN was never told to hold.
+ *
+ * The negative cache has a durable sibling in lib/mediaFailureStore.js, because everything
+ * here dies with the process — and on a serverless deployment that is often one request.
+ * This layer answers a repeat within an instance; that one answers a cold start.
  */
 
 /** Total encoded bytes held. Thumbnails run 0.5–30KB, so this is thousands of them. */

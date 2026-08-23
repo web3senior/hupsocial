@@ -1,3 +1,40 @@
+@use '@/styles/components/responsive' as *;
+
+// How much of the viewport's left edge the fixed sidebar owns, plus the gutter a card should
+// keep off it. components/Aside is 250px expanded and narrower in every other state, so
+// clearing its widest is clearing all of them.
+$aside-clearance: 250px;
+$gutter: 1rem;
+
+// The ranking's card, sized against the sidebar rather than by a shared data-width step.
+//
+// Every page card in the app is `margin: 0 auto` inside a <main> that spans the whole
+// viewport, while the sidebar is fixed over its left 250px — so a card stays clear only while
+// it is narrower than `100% - 2 × 250px`. data-width="large" is 1024px, which crosses that
+// line below about 1550px of viewport: on a 1440 laptop the ranking's left edge sat at 201px
+// and on a 1280 at 121px, putting the rank column, the view switch and the toolbar caption
+// underneath the nav.
+//
+// So: the shared 1024px wherever centring already clears the sidebar, and below that the card
+// stops centring and takes the column the sidebar leaves. The table inside is built to scroll
+// sideways under 975px, which is what pays for the last of it on a small laptop.
+//
+// Doubled class on purpose: Global.scss dresses anything with `__container` in its class list
+// — this element included, through the route's own shell class — and its `margin: 0 auto`
+// outweighs a single module class.
+.views__shell--wide.views__shell--wide {
+  --views-clearance: calc(#{$aside-clearance} + #{$gutter});
+  --views-width: min(1024px, calc(100% - var(--views-clearance) - #{$gutter}));
+
+  @include md-up {
+    max-width: var(--views-width);
+    // max() rather than `auto`, so the card centres exactly as it always did while there is
+    // room to, and only gives that up to the sidebar when centring would reach under it
+    margin-inline-start: max(var(--views-clearance), calc((100% - var(--views-width)) / 2));
+    margin-inline-end: auto;
+  }
+}
+
 // The switch between the two readings of the market. Same pill tabs the collection page uses
 // for its listing-status group, so the two levels of the marketplace share one control shape.
 .views {

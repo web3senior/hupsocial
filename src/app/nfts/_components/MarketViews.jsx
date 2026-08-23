@@ -1,12 +1,19 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import { SquaresFourIcon, RankingIcon } from '@phosphor-icons/react'
-import NftMarketGrid from './NftMarketGrid'
-import CollectionsTable from './CollectionsTable'
 import styles from './MarketViews.module.scss'
+
+// Both views load on demand, not just the second one. Only one is ever mounted, and they are
+// nothing alike underneath: the grid drags in the market cards, the hero rail and the sell
+// modal — wagmi, viem and a wallet flow behind them — while the ranking is a table and a
+// fetch. Bundling them together made a reader who asked for the ranking download the whole
+// of the shop to look at a league table.
+const NftMarketGrid = dynamic(() => import('./NftMarketGrid'))
+const CollectionsTable = dynamic(() => import('./CollectionsTable'))
 
 const VIEWS = [
   { value: 'items', label: 'Items', Icon: SquaresFourIcon, hint: 'Every NFT on the market, filtered how you like' },
@@ -74,8 +81,12 @@ export default function MarketViews({ shellClassName }) {
     [view],
   )
 
+  const isRanking = view === 'collections'
+
   return (
-    <div className={clsx('__container', shellClassName)} data-width={view === 'collections' ? 'large' : 'medium'}>
+    // The ranking sizes itself rather than taking a shared data-width step — see
+    // views__shell--wide, which has to clear the fixed sidebar the steps know nothing about.
+    <div className={clsx('__container', shellClassName, isRanking && styles['views__shell--wide'])} data-width={isRanking ? undefined : 'medium'}>
       <div className={styles.views__switch} role="group" aria-label="Market view">
         {tabs.map(({ value, label, Icon, hint, isActive }) => (
           <button
@@ -92,7 +103,7 @@ export default function MarketViews({ shellClassName }) {
         ))}
       </div>
 
-      {view === 'collections' ? (
+      {isRanking ? (
         <CollectionsTable networkId={networkId} onNetworkChange={(value) => setParam('networkId', value, CHAIN_SCOPED_PARAMS)} />
       ) : (
         <NftMarketGrid />

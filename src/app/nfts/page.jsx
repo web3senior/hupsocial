@@ -19,7 +19,7 @@ export default function Page() {
       <div className={`${styles.page} animate fade`}>
         {/* The card shell is the sibling section pages' (drops, swap, launches), but its width
             belongs to whichever view is up — a league table needs room a feed-width column
-            can't give it — so MarketViews carries it and picks the data-width */}
+            can't give it — so MarketViews carries it and picks the width */}
         <Suspense>
           <MarketViews shellClassName={styles.page__container} />
         </Suspense>

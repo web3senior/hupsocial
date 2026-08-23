@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
 import sharp from 'sharp'
 import { FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
+import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
@@ -236,6 +237,13 @@ async function resolveMedia({ cacheKey, cid, width, quality, format, stillOnly }
     const status = timedOut ? 504 : 500
     const message = timedOut ? 'IPFS gateway timed out' : error.message || 'Internal Server Error'
     writeMediaFailure(cacheKey, status, message)
+
+    /* Timeouts also go in the database, so the next instance to be asked doesn't spend the
+       timeout finding out for itself — the in-process record dies with this process, and on a
+       serverless deployment that is often one request. Only timeouts: a 500 is our own decode
+       failing, which is the class a deploy fixes, and a deploy doesn't clear a table. */
+    if (timedOut) await recordDurableFailure({ cacheKey, cid, status, message })
+
     return { kind: 'error', status, message }
   }
 }
@@ -264,5 +272,20 @@ export async function GET(req) {
   const cached = readMedia(cacheKey)
   if (cached) return respond(cached)
 
-  return respond(await coalesceMedia(cacheKey, () => resolveMedia({ cacheKey, cid, width, quality, format, stillOnly })))
+  /* Coalesced, so a page of cards pointing at one CID spends a single database lookup and,
+     if it is not a known-dead one, a single gateway fetch behind it. */
+  return respond(
+    await coalesceMedia(cacheKey, async () => {
+      /* An address this process has never seen may still be one another instance has already
+         proved unresolvable. Reading that costs a primary-key lookup; not reading it costs
+         GATEWAY_TIMEOUT_MS, on every cold start, for as long as the CID stays unpinned. */
+      const known = await readDurableFailure(cacheKey)
+      if (known) {
+        writeMediaFailure(cacheKey, known.status, known.message)
+        return { kind: 'error', ...known }
+      }
+
+      return resolveMedia({ cacheKey, cid, width, quality, format, stillOnly })
+    }),
+  )
 }

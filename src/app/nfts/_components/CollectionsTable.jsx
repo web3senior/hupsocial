@@ -9,7 +9,6 @@ import { appChains, CONTRACTS } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { handleBrokenImage } from '@/lib/utils'
-import useCollectionInfo from '@/hooks/useCollectionInfo'
 import Tooltip from '@/components/ui/Tooltip'
 import HupMark from '@/components/ui/HupMark'
 import styles from './CollectionsTable.module.scss'
@@ -112,12 +111,16 @@ function Amount({ value, symbol, decimals, chain }) {
 }
 
 /**
- * One collection's row.
+ * One collection's row, printed entirely from the ranking's own response.
  *
- * Name and artwork come out of nft_collection_cache where cidex or an earlier visit has
- * already put them. Where it hasn't, the row falls back to the same read-through the
- * collection page uses — which fills the cache on its way past, so a collection only pays for
- * this once and every later ranking prints it server-side.
+ * Name, artwork and supply come out of nft_collection_cache with the figures beside them, in
+ * the same query. A row the cache doesn't cover yet shows its address and waits: the ranking
+ * route reads a few of those from chain after each response and writes them down, so the
+ * gaps close over a page view or two.
+ *
+ * It used to close them from here instead, one useCollectionInfo per nameless row — which
+ * turned a fifty-row table into up to fifty browser round trips, each one an RPC fan-out
+ * behind it. A league table can afford to be a page late on a name; it can't afford that.
  */
 function CollectionRow({ row, rank }) {
   const networkId = Number(row.network_id)
@@ -126,18 +129,10 @@ function CollectionRow({ row, rank }) {
   const address = String(row.collection).toLowerCase()
 
   const hasIdentity = Boolean(row.name)
-  const info = useCollectionInfo({
-    chainId: networkId,
-    collection: address,
-    isLsp8: Boolean(Number(row.is_lsp8)),
-    enabled: !hasIdentity,
-    iconWidth: 96,
-  })
+  const name = row.name || `${address.slice(0, 6)}…${address.slice(-4)}`
+  const icon = resolveStorageImageUrl(row.icon_uri, { width: 96, still: true })
 
-  const name = row.name || info.name || `${address.slice(0, 6)}…${address.slice(-4)}`
-  const icon = hasIdentity ? resolveStorageImageUrl(row.icon_uri, { width: 96, still: true }) : info.icon
-
-  const supply = row.total_supply || info.totalSupply || null
+  const supply = row.total_supply || null
   const activeCount = Number(row.active_count) || 0
   const listedShare = supply && Number(supply) > 0 ? activeCount / Number(supply) : null
 
@@ -166,7 +161,12 @@ function CollectionRow({ row, rank }) {
             {chainIcon && <img className={styles.collections__chain} src={chainIcon} alt="" title={chain?.name} />}
           </span>
 
-          <span className={clsx(styles.collections__name, !hasIdentity && !info.name && styles['collections__name--pending'])}>{name}</span>
+          <span
+            className={clsx(styles.collections__name, !hasIdentity && styles['collections__name--pending'])}
+            title={hasIdentity ? undefined : 'Hup has not read this collection’s name yet — it fills in shortly'}
+          >
+            {name}
+          </span>
         </Link>
       </td>
 

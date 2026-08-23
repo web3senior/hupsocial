@@ -22,11 +22,15 @@
  * chart and the hero cards.
  *
  * Every figure here is read from what cidex indexed (nft_listings, nft_trades, nft_offers,
- * nft_collection_cache); nothing in this route touches a chain.
+ * nft_collection_cache); nothing on the way to the response touches a chain. The one thing
+ * that does is the identity backfill below, and it runs after the response — a collection
+ * with no cached name used to be read from chain by the browser instead, once per nameless
+ * row, which is a page of RPC round trips for a table that is otherwise a single query.
  */
 
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import pool from '@/lib/db'
+import { getCollectionMetadata } from '@/lib/collectionMetadataCache'
 
 export const runtime = 'nodejs'
 
@@ -61,6 +65,46 @@ const DEFAULT_SORT = 'volume24h'
 // Ranks reshuffle only as fast as trades and listings land, and the table is a scan-and-click
 // surface — half a minute of staleness costs a reader nothing and saves the whole rollup
 const CACHE_CONTROL = 'public, max-age=30, s-maxage=120, stale-while-revalidate=600'
+
+/**
+ * How many unnamed collections one request will go and read. nft_collection_cache is filled
+ * read-through, so a collection listed for the first time has no row until something resolves
+ * it — and the table used to be that something, one browser fetch per nameless row.
+ *
+ * Kept small deliberately. This is a repair, not a sweep: every request takes a few more off
+ * the pile and the next one prints them from the database, so a market whose whole index is
+ * cold fills in over a handful of page views rather than in one RPC storm.
+ */
+const IDENTITY_BACKFILL_LIMIT = 4
+
+/**
+ * Reads the identities the ranking couldn't print, after the response has gone out.
+ *
+ * getCollectionMetadata writes what it resolves into nft_collection_cache, so the work is
+ * paid once for every later reader — which is the whole point of doing it here instead of in
+ * the browser. A row that stays unresolved is left to its own negative TTL; nothing here
+ * retries, and nothing here can slow the ranking down, because `after` runs once the JSON is
+ * already on its way.
+ * @param {Array<Object>} rows The ranking rows, as the query returned them.
+ * @param {string} origin Absolute origin, for resolving proxy-relative storage URLs.
+ */
+function backfillIdentities(rows, origin) {
+  const nameless = rows.filter((row) => !row.name).slice(0, IDENTITY_BACKFILL_LIMIT)
+  if (!nameless.length) return
+
+  after(async () => {
+    await Promise.allSettled(
+      nameless.map((row) =>
+        getCollectionMetadata({
+          chainId: row.network_id,
+          collection: row.collection,
+          isLsp8: Boolean(Number(row.is_lsp8)),
+          baseUrl: origin,
+        }),
+      ),
+    )
+  })
+}
 
 export async function GET(request) {
   try {
@@ -195,6 +239,8 @@ export async function GET(request) {
       delete row.supply
       delete row.market_cap
     }
+
+    backfillIdentities(rows, new URL(request.url).origin)
 
     return NextResponse.json({ success: true, sort, data: rows }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (error) {
