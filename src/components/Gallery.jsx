@@ -46,6 +46,9 @@ export default function MediaGallery({ data = [] }) {
   const [selectedIndex, setSelectedIndex] = useState(null)
 
   const videoRefs = useRef([])
+  // The lightbox renders a second <video> per slide; these are kept apart from the inline
+  // players so handing playback from one to the other is explicit rather than accidental.
+  const lightboxVideoRefs = useRef([])
   const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
 
   const visualData = data.filter((item) => item.type !== 'audio')
@@ -244,12 +247,50 @@ export default function MediaGallery({ data = [] }) {
     return unlockPageScroll
   }, [isLightboxOpen])
 
+  /* One player at a time. Opening the lightbox silences every inline card — otherwise the
+     card keeps running (audibly, once unmuted) underneath the modal — and only the slide
+     in view plays, picking up from wherever its inline twin had got to. */
+  useEffect(() => {
+    if (!isLightboxOpen) return
+    videoRefs.current.forEach((video) => video && video.pause())
+    lightboxVideoRefs.current.forEach((video, i) => {
+      if (!video) return
+      if (i !== selectedIndex) {
+        video.pause()
+        return
+      }
+      const inline = videoRefs.current[i]
+      if (inline && Number.isFinite(inline.currentTime)) video.currentTime = inline.currentTime
+      video.play().catch(() => {})
+    })
+  }, [isLightboxOpen, selectedIndex])
+
   const openLightbox = (index) => {
     setSelectedIndex(index)
   }
 
   const closeLightbox = () => {
+    /* Carry the position (and whether it was running) back to the inline card, so closing
+       the modal continues the same video rather than restarting it or leaving two running. */
+    if (selectedIndex !== null) {
+      const fullscreen = lightboxVideoRefs.current[selectedIndex]
+      const inline = videoRefs.current[selectedIndex]
+      if (fullscreen && inline) {
+        inline.currentTime = fullscreen.currentTime
+        if (!fullscreen.paused) inline.play().catch(() => {})
+      }
+      lightboxVideoRefs.current.forEach((video) => video && video.pause())
+    }
     setSelectedIndex(null)
+  }
+
+  const toggleInlinePlayback = (index, e) => {
+    /* The card itself opens the post on click — starting a video should not */
+    e.stopPropagation()
+    const video = videoRefs.current[index]
+    if (!video) return
+    if (video.paused) video.play().catch(() => {})
+    else video.pause()
   }
 
   if (!data.length) return null
@@ -322,27 +363,25 @@ export default function MediaGallery({ data = [] }) {
       <div className={styles.mediaContainer}>
         {isVideo ? (
           <video
-            ref={
-              isFullscreen
-                ? applyStoredVolume
-                : (el) => {
-                    videoRefs.current[i] = el
-                    applyStoredVolume(el)
-                  }
-            }
+            ref={(el) => {
+              if (isFullscreen) lightboxVideoRefs.current[i] = el
+              else videoRefs.current[i] = el
+              applyStoredVolume(el)
+            }}
             src={url}
             poster={resolvePosterUrl(item)}
             /* In-feed players are started by the visibility observer, so there is nothing to
                gain from buffering ahead of that — the poster is what the card shows until then.
-               Fullscreen sets autoPlay, which overrides this and loads immediately. */
+               The lightbox starts its visible slide explicitly, which loads on demand. */
             preload="none"
             loop
             muted={isMuted}
-            autoPlay={isFullscreen}
             controls={isFullscreen}
             onVolumeChange={isFullscreen ? handleVideoVolumeChange : undefined}
-            onPlay={() => setPlayingVideos((previous) => ({ ...previous, [i]: true }))}
-            onPause={() => setPlayingVideos((previous) => ({ ...previous, [i]: false }))}
+            /* Only the inline element reports into the card's play button; the lightbox twin
+               shares the index but not the state, so it must not overwrite it. */
+            onPlay={isFullscreen ? undefined : () => setPlayingVideos((previous) => ({ ...previous, [i]: true }))}
+            onPause={isFullscreen ? undefined : () => setPlayingVideos((previous) => ({ ...previous, [i]: false }))}
             playsInline
             className={isFullscreen ? styles.fullscreenVideo : styles.videoPlayer}
             style={{ filter: isBlurred ? 'blur(40px)' : 'none' }}
@@ -362,11 +401,7 @@ export default function MediaGallery({ data = [] }) {
             type="button"
             className={styles.playOverlay}
             aria-label="Play video"
-            onClick={(e) => {
-              /* The card itself opens the post on click — starting a video should not */
-              e.stopPropagation()
-              videoRefs.current[i]?.play().catch(() => {})
-            }}
+            onClick={(e) => toggleInlinePlayback(i, e)}
           >
             <span className={styles.playOverlay__icon}>
               <PlayIcon size={26} weight="fill" />
@@ -417,6 +452,14 @@ export default function MediaGallery({ data = [] }) {
 
                   {item.type === 'video' && (
                     <div className={styles.controls}>
+                      {/* A tap on the card maximises it, so stopping needs a control of its own */}
+                      <button
+                        className={styles.iconButton}
+                        onClick={(e) => toggleInlinePlayback(i, e)}
+                        aria-label={playingVideos[i] ? 'Pause video' : 'Play video'}
+                      >
+                        {playingVideos[i] ? <PauseIcon size={16} weight="fill" /> : <PlayIcon size={16} weight="fill" />}
+                      </button>
                       <button
                         className={styles.iconButton}
                         onClick={toggleMute}

@@ -36,6 +36,11 @@
   opacity: 0;
   transition: opacity 0.2s;
   z-index: 5;
+
+  /* No hover on touch screens, and a running video would otherwise have no way to stop */
+  @media (hover: none) {
+    opacity: 1;
+  }
 }
 
 .iconButton {
