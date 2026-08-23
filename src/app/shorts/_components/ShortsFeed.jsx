@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useConnection } from 'wagmi'
 import { getPosts } from '@/lib/api'
 import { ArrowDownIcon, ArrowUpIcon } from '@phosphor-icons/react'
@@ -21,8 +21,10 @@ const PREFETCH_WITHIN = 3
 // Where the rail leaves a bookmark for itself. Tapping through to a post's comments is a real
 // navigation, so coming back remounts this component with an empty rail — the slide the reader
 // was on has to survive somewhere outside React. sessionStorage scopes it to the tab, so the
-// bookmark cannot outlive the visit it belongs to.
-const LAST_SLIDE_KEY = 'hup:shorts:last-slide'
+// bookmark cannot outlive the visit it belongs to. The v2 suffix retires bookmarks written
+// before slides were keyed per video — an old post-level key matches no slide, and hunting for
+// it would page the rail forward for nothing.
+const LAST_SLIDE_KEY = 'hup:shorts:last-slide:v2'
 
 // The bookmark answers one round trip, not the whole tab. It is written only when the reader
 // follows a link out of the rail, spent by the restore that reads it, and ignored once it is
@@ -68,15 +70,24 @@ const clearLastSlide = () => {
 
 /* Media lives at elements[1].data.items[]; the text element is elements[0]. Posts predating a
    given element shape still parse, so both lookups stay defensive. */
-const getVideoItem = (post) =>
-  post?.content?.elements?.[1]?.data?.items?.find((item) => item?.type === 'video') || null
+const getVideoItems = (post) =>
+  post?.content?.elements?.[1]?.data?.items?.filter((item) => item?.type === 'video') || []
 
 const getCaption = (post) => post?.content?.elements?.[0]?.data?.text?.trim() || ''
 
 const postKey = (post) => `${post.network_id}:${post.id}`
 
+/* A post carrying several videos contributes one slide per video, so the rail's unit is the
+   slide, not the post. videoIndex is the position among the post's videos — images interleaved
+   in the same gallery don't shift it. */
+const toSlides = (list) =>
+  list.flatMap((post) => getVideoItems(post).map((video, videoIndex) => ({ post, video, videoIndex })))
+
+const slideKey = (slide) => `${postKey(slide.post)}:${slide.videoIndex}`
+
 /**
- * Vertical, one-video-at-a-time rail over every post carrying a video attachment.
+ * Vertical, one-video-at-a-time rail over every video attached to a post. A post with several
+ * videos appears once per video, each as its own slide.
  *
  * The feed comes from the same posts endpoint the home feed uses (feed_type=shorts), so
  * visibility rules, reposts, and moderation behave identically here — this component only
@@ -92,6 +103,10 @@ export default function ShortsFeed() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+
+  /* What the rail actually renders: the loaded posts fanned out one slide per video. Paging,
+     merging and dedup stay post-level above — this is presentation only. */
+  const slides = useMemo(() => toSlides(posts), [posts])
 
   /* Held from mount until the restore below has settled on a slide. Without it a restore that
      has to page forward renders the rail as soon as page 1 lands, so slide 0 appears and starts
@@ -147,10 +162,10 @@ export default function ShortsFeed() {
           const response = await getPosts(nextPage, PAGE_SIZE, null, null, address, null, 'shorts')
           if (!response.success) throw new Error(response.error || 'Request failed')
 
-          /* A post can match feed_type=shorts (has_video is set at the row level) while its video
-             sits in a shape this component can't read — drop those rather than render a slide
-             with nothing in it. */
-          const playable = response.data.filter(getVideoItem)
+          /* A post can match feed_type=shorts (has_video is set at the row level) while its
+             videos sit in a shape this component can't read — drop those rather than render a
+             slide with nothing in it. */
+          const playable = response.data.filter((post) => getVideoItems(post).length)
 
           /* Merged against the ref rather than inside a functional update, so the merged list is
              available to this call's caller immediately — a setState updater does not run until
@@ -208,7 +223,7 @@ export default function ShortsFeed() {
       while (
         savedKey &&
         list &&
-        !list.some((post) => postKey(post) === savedKey) &&
+        !toSlides(list).some((slide) => slideKey(slide) === savedKey) &&
         hasMoreRef.current &&
         pagesLoaded < RESTORE_MAX_PAGES
       ) {
@@ -217,7 +232,7 @@ export default function ShortsFeed() {
         if (cancelled) return
       }
 
-      const index = savedKey && list ? list.findIndex((post) => postKey(post) === savedKey) : -1
+      const index = savedKey && list ? toSlides(list).findIndex((slide) => slideKey(slide) === savedKey) : -1
       if (index > 0) {
         /* Set here rather than left to the observer, so the slide being restored to is the one
            that starts playing — not slide 0 for a frame first. */
@@ -268,8 +283,8 @@ export default function ShortsFeed() {
      handler there would have to be threaded through Profile and Share as well. */
   useEffect(() => {
     const rail = railRef.current
-    const post = posts[activeIndex]
-    if (!rail || !post) return
+    const slide = slides[activeIndex]
+    if (!rail || !slide) return
 
     const rememberOnLeave = (event) => {
       const anchor = event.target?.closest?.('a[href]')
@@ -280,19 +295,19 @@ export default function ShortsFeed() {
       if (anchor.target && anchor.target !== '_self') return
       if (anchor.origin !== window.location.origin) return
 
-      writeLastSlide(postKey(post))
+      writeLastSlide(slideKey(slide))
     }
 
     rail.addEventListener('click', rememberOnLeave, true)
     return () => rail.removeEventListener('click', rememberOnLeave, true)
-  }, [activeIndex, posts])
+  }, [activeIndex, slides])
 
   // One observer for the whole rail: whichever slide is mostly on screen becomes the active one,
   // and it is the only slide allowed to play. Paging happens from here too — the reader reaching
   // the tail of the rail is exactly the signal to fetch more, and a subscription callback is the
   // right place to react to it.
   useEffect(() => {
-    if (!posts.length) return
+    if (!slides.length) return
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -303,21 +318,21 @@ export default function ShortsFeed() {
           if (!Number.isInteger(index)) return
 
           setActiveIndex(index)
-          if (hasMore && index >= posts.length - PREFETCH_WITHIN) loadPage(page + 1)
+          if (hasMore && index >= slides.length - PREFETCH_WITHIN) loadPage(page + 1)
         })
       },
       { root: railRef.current, threshold: 0.6 }
     )
 
-    slideRefs.current.filter(Boolean).forEach((slide) => observer.observe(slide))
+    slideRefs.current.filter(Boolean).forEach((element) => observer.observe(element))
     return () => observer.disconnect()
-  }, [posts.length, hasMore, page, loadPage])
+  }, [slides.length, hasMore, page, loadPage])
 
-  if (isRestoring || (isLoading && !posts.length)) return <ContentSpinner />
+  if (isRestoring || (isLoading && !slides.length)) return <ContentSpinner />
 
   if (loadError) return <FeedError onRetry={() => loadPage(1)} />
 
-  if (!posts.length) {
+  if (!slides.length) {
     return (
       <div className={styles.shortsFeed__empty}>
         <h2>No videos yet</h2>
@@ -329,9 +344,9 @@ export default function ShortsFeed() {
   return (
     <div className={styles.shortsFeed__stage}>
       <div className={styles.shortsFeed} ref={railRef}>
-        {posts.map((post, index) => (
+        {slides.map((slide, index) => (
           <div
-            key={postKey(post)}
+            key={slideKey(slide)}
             className={styles.shortsFeed__slide}
             data-index={index}
             ref={(element) => {
@@ -339,9 +354,9 @@ export default function ShortsFeed() {
             }}
           >
             <ShortsPlayer
-              post={post}
-              video={getVideoItem(post)}
-              caption={getCaption(post)}
+              post={slide.post}
+              video={slide.video}
+              caption={getCaption(slide.post)}
               isActive={index === activeIndex}
               isMuted={isMuted}
               onToggleMute={toggleMute}
@@ -365,7 +380,7 @@ export default function ShortsFeed() {
           type="button"
           className={styles.shortsFeed__navButton}
           onClick={() => goToSlide(activeIndex + 1)}
-          disabled={activeIndex >= posts.length - 1}
+          disabled={activeIndex >= slides.length - 1}
           aria-label="Next video"
         >
           <ArrowDownIcon size={22} />
