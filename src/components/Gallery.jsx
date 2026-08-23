@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { ArrowLeftIcon, ArrowRightIcon, PauseIcon, PlayIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowLeftIcon, ArrowRightIcon, CornersOutIcon, PauseIcon, PlayIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
 import useMediaZoom from '@/hooks/useMediaZoom'
 import { lockPageScroll, unlockPageScroll } from '@/lib/scrollLock'
@@ -265,7 +265,9 @@ export default function MediaGallery({ data = [] }) {
     })
   }, [isLightboxOpen, selectedIndex])
 
-  const openLightbox = (index) => {
+  const openLightbox = (index, e) => {
+    /* Fired from inside the card, whose own click would otherwise open the post */
+    e.stopPropagation()
     setSelectedIndex(index)
   }
 
@@ -285,7 +287,7 @@ export default function MediaGallery({ data = [] }) {
   }
 
   const toggleInlinePlayback = (index, e) => {
-    /* The card itself opens the post on click — starting a video should not */
+    /* The post behind the gallery opens on click — starting a video should not */
     e.stopPropagation()
     const video = videoRefs.current[index]
     if (!video) return
@@ -433,7 +435,9 @@ export default function MediaGallery({ data = [] }) {
                 <div
                   className={styles.mediaItem}
                   style={!isCarousel && getAspectRatio(item) ? { '--media-ratio': getAspectRatio(item) } : undefined}
-                  onClick={(e) => { e.stopPropagation(); openLightbox(i) }}
+                  /* An image maximises on tap. A video plays or pauses instead — the control bar's
+                     maximise button is the way into the lightbox for it. */
+                  onClick={(e) => (item.type === 'video' ? toggleInlinePlayback(i, e) : openLightbox(i, e))}
                 >
                   {renderMedia(item, i)}
 
@@ -452,13 +456,13 @@ export default function MediaGallery({ data = [] }) {
 
                   {item.type === 'video' && (
                     <div className={styles.controls}>
-                      {/* A tap on the card maximises it, so stopping needs a control of its own */}
+                      {/* A tap on the card plays or pauses it, so maximising needs a control of its own */}
                       <button
                         className={styles.iconButton}
-                        onClick={(e) => toggleInlinePlayback(i, e)}
-                        aria-label={playingVideos[i] ? 'Pause video' : 'Play video'}
+                        onClick={(e) => openLightbox(i, e)}
+                        aria-label="Maximize video"
                       >
-                        {playingVideos[i] ? <PauseIcon size={16} weight="fill" /> : <PlayIcon size={16} weight="fill" />}
+                        <CornersOutIcon size={16} />
                       </button>
                       <button
                         className={styles.iconButton}
