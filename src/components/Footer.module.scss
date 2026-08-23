@@ -59,6 +59,7 @@
     overflow: hidden;
     max-width: 400px;
     margin: auto;
+    zoom: .9;
 
     // Without a backdrop filter that thin surface would leave the feed legible straight
     // through the bar, so those browsers get a near-solid one instead.
@@ -111,7 +112,7 @@
       opacity: 0;
       transform: scale(0.72);
       transition:
-        transform 0.28s cubic-bezier(0.34, 1.46, 0.64, 1),
+        transform 0.18s cubic-bezier(0.34, 1.46, 0.64, 1),
         opacity 0.2s ease;
     }
 
