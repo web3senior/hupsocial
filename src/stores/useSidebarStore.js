@@ -38,7 +38,8 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'search', name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
   { id: 'notifications', name: 'Notifications', path: '/notifications', icon: BellIcon, hasBadge: true },
   { id: 'divider-primary', type: 'divider' },
-  { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
+  // `badge` keys into NAV_BADGES in Aside.jsx; drop 'new' once the feature has settled in.
+  { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon, badge: 'new' },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   // Sits with the social rows rather than the market ones: a poll costs nothing and asks for
   // an opinion. A checklist, not a bar chart — Insights owns ChartBar here, and the sideways
@@ -50,7 +51,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'jobs', name: 'Jobs', path: '/jobs', icon: BriefcaseIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
-  { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon },
+  { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon, badge: 'beta' },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   // Reads with Insights as a pair: what the network did, then what you did.
   { id: 'activity', name: 'Activity', path: '/activity', icon: PulseIcon },

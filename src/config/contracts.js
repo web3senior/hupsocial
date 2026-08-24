@@ -7,7 +7,7 @@
  * client code.
  */
 
-import { arbitrum, base, baseSepolia, bsc, celo, lukso, luksoTestnet, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, bsc, celo, lukso, luksoTestnet, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Robinhood Chain (Arbitrum Orbit L2, ETH as native gas token)
@@ -37,7 +37,7 @@ lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.c
 
 // Single source of truth for the wagmi config's `chains` tuple and for server-side RPC lookups
 // (chain.rpcUrls.default.http). L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia, luksoTestnet]
+export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, luksoTestnet]
 
 // Field notes:
 //   ''              — not deployed or not applicable on that chain.
@@ -86,6 +86,12 @@ export const CONTRACTS = {
     hupForwarderName: 'HupForwarder',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
+    // Deployed 2026-08-24 (block 8236155, tx 0xd68b12d2a69a1028bb6621a7a278f5111577711d3f5644db8402d46e68e1dfad)
+    // — the first HupCommunity on a mainnet. Direct-push payout-destination build; trusts the
+    // HupChatForwarder above (`forwarder`), like every other extension here. cidex row 126.
+    // setFollowerSystem(LSP26 below) is still the admin's click; FollowsCreator fails closed
+    // until then.
+    community: '0xB7Af957f4157aeAdA5Cab17D3B55fB1f1315F41A',
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
@@ -109,7 +115,10 @@ export const CONTRACTS = {
     forwarderName: 'HupChatForwarder',
     hup: '0xb0b992E90e11b6bCE51cb5ea4de160D06098B955',
     status: '',
-    community: '0xd664Bddf31A44140E2e918CdC52d30a006b7eE53',
+    // Redeployed 2026-08-24 (block 8378861) with the direct-push payout destination
+    // (setPayoutDestination). The 0xd664… deploy from 08-13 is retired and deactivated in
+    // cidex. Fresh core: setFollowerSystem(LSP26 below) still needs the admin's click.
+    community: '0xe155bA21032bcf244e279A92Df4F9A721619D7Ee',
     chat: '',
     // Canonical LSP26, same address as every other chain.
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
@@ -126,36 +135,6 @@ export const CONTRACTS = {
     launch: '',
     univ3Router: '',
     univ3Quoter: '',
-  },
-  // Active dev chain alongside 4201: Hup core, communities and polls are live here.
-  chain84532: {
-    name: 'base-sepolia',
-    forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
-    forwarderName: 'HupChatForwarder',
-    hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
-    status: '',
-    community: '0x48b7720547c11251A8aBe5A1C7D0c791500f5A3b',
-    // First chain to carry HupPolls. Its hupContract() points at the `hup` above, as HupTipper's
-    // does, and every Hup contract here trusts the one forwarder — so no `hupForwarder` split.
-    polls: '0xf3F8f5D39e63a3D2A2b988771240c17A32e559B0',
-    chat: '',
-    // No LSP26 on Base Sepolia: the canonical address has no code here and HupCommunity was
-    // deployed with followerSystem 0x0, so follower-gated join requirements are unavailable.
-    followerSystem: '',
-    store: '',
-    tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
-    trade: '',
-    offers: '',
-    events: '',
-    predict: '',
-    apps: '',
-    drops: '',
-    // HupLaunch ctor args when deploying here: factory 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,
-    // posMgr 0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2, wnative as below. 0.30% tier is enabled.
-    launch: '',
-    univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
-    univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
-    wnative: '0x4200000000000000000000000000000000000006',
   },
   chain143: {
     name: 'monad',

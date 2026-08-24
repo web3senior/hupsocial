@@ -1,0 +1,13 @@
+// Inline status pill — shape only; colors arrive as custom properties from the component props
+.badge {
+  background-color: var(--nav-badge-background);
+  color: var(--nav-badge-color);
+  font-size: var(--font-size-10);
+  font-weight: 400;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--global-border-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

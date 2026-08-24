@@ -25,6 +25,9 @@ import styles from './page.module.scss'
 // HupTestLSP7 is a throwaway faucet token: deploying one costs the caller their own gas and
 // grants no authority anywhere in the app, so this tool gates on a connected wallet rather than
 // the admin address. The deployer becomes the token's owner, which is rarely the admin wallet.
+// The owner is a constructor argument rather than msg.sender (so tests/deploy.html can deploy
+// the same bytecode through the CREATE2 factory without the factory ending up as owner); here
+// it is always the connected wallet, so a direct deploy behaves exactly as it did before.
 
 const DEFAULT_CHAIN_ID = 10143 // Monad testnet — where cidex actually indexes tips
 
@@ -199,7 +202,7 @@ export default function Page() {
 
   const handleDeploy = async (e) => {
     e.preventDefault()
-    if (!tokenName.trim() || !tokenSymbol.trim()) return
+    if (!tokenName.trim() || !tokenSymbol.trim() || !address) return
 
     setDeployError(null)
     setDeployHash(null)
@@ -210,7 +213,7 @@ export default function Page() {
       const hash = await deployContractAsync({
         abi: artifact.abi,
         bytecode: artifact.bytecode,
-        args: [tokenName.trim(), tokenSymbol.trim()],
+        args: [tokenName.trim(), tokenSymbol.trim(), address],
         chainId,
       })
       setDeployHash(hash)

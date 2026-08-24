@@ -14,6 +14,7 @@
 import pool from '@/lib/db'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
 import { resolveCollectionMetadata } from '@/lib/collectionMetadata'
+import { isLuksoIndexerChain, fetchLuksoCollectionMetadata } from '@/lib/luksoIndexer'
 import { LSP4_TOKEN_NAME_KEY, erc725yGetDataAbi } from '@/lib/lsp4'
 
 // Shorter than the token cache's week: total_supply moves while a collection is minting,
@@ -23,6 +24,17 @@ const TTL_MS = 24 * 60 * 60 * 1000
 // A row whose source is null means an LSP4Metadata pointer exists but the document behind
 // it didn't come back — transient, so it backs off briefly instead of holding the TTL.
 const NEGATIVE_TTL_MS = 10 * 60 * 1000
+
+// Indexer answers stand in for a document that was failing at resolve time, so they are
+// re-checked against the canonical onchain path on a shorter clock — same rule as the token
+// cache — so the collection's own document takes over within hours of coming back.
+const INDEXER_TTL_MS = 6 * 60 * 60 * 1000
+
+const ttlFor = (row) => {
+  if (!row.source) return NEGATIVE_TTL_MS
+  if (row.source === 'indexer') return INDEXER_TTL_MS
+  return TTL_MS
+}
 
 // Manual refresh triggers real RPC work, so it is rate limited — derived from the row's
 // own fetched_at rather than an in-memory counter, same as the token cache's refresh.
@@ -164,7 +176,7 @@ export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null
 
   if (row && !forceRefresh) {
     const age = Date.now() - new Date(row.fetched_at).getTime()
-    if (age < (isComplete(row) ? TTL_MS : NEGATIVE_TTL_MS)) {
+    if (age < ttlFor(row)) {
       return { metadata: rowToMetadata(row), cached: true }
     }
   }
@@ -183,6 +195,20 @@ export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null
   } catch (error) {
     console.warn('[collection-metadata-cache] RPC resolution failed:', error.message)
     return row ? { metadata: rowToMetadata(row), cached: true } : null
+  }
+
+  // The pointer resolved to nothing fetchable — the collection's own document is gone or its
+  // host is down. LUKSO mainnet has an indexer holding what it scraped while that document
+  // was alive, which is the difference between a header with its icon, banner and blurb and a
+  // bare name. Strictly additive: it only runs once the onchain path has come back empty, and
+  // name, symbol, creators and supply stay what the contract said.
+  if (!metadata.source && resolvedIsLsp8 && isLuksoIndexerChain(key.networkId)) {
+    try {
+      const indexed = await fetchLuksoCollectionMetadata({ collection: key.collection })
+      if (indexed) metadata = { ...metadata, ...indexed }
+    } catch (error) {
+      console.warn('[collection-metadata-cache] LUKSO indexer fallback failed:', error.message)
+    }
   }
 
   // A resolution that lost the offchain document must never overwrite one that had it —

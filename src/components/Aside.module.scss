@@ -558,19 +558,3 @@
   border: 1px solid var(--surface);
 }
 
-.betaBadge {
-  background-color: var(--beta-badge-background);
-  color: var(--beta-badge-color);
-  font-size: var(--font-size-10);
-  font-weight: 400;
-  line-height: 1;
-  padding: 2px 6px;
-  border-radius: var(--global-border-radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:after {
-    content: 'BETA';
-  }
-}

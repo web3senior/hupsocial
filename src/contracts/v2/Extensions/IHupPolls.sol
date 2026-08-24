@@ -27,7 +27,7 @@ import "./../IHup.sol";
  *      RequirementMode shape as HupCommunity. Empty is the norm and costs nothing; the list is
  *      announced separately in PollRequirementsSet so an indexer can ignore the feature until a
  *      poll uses it, and it freezes at the first ballot alongside the question.
- * @custom:version 1.1.0
+ * @custom:version 1.0.0
  * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social

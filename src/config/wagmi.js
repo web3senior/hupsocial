@@ -3,7 +3,6 @@ import {
   arbitrum,
   arbitrumSepolia,
   base,
-  baseSepolia,
   bsc,
   celo,
   lukso,
@@ -33,7 +32,7 @@ lukso.faucetUrl = `https://faucet.testnet.lukso.network/`
 lukso.primaryColor = `#FD1669`
 lukso.textColor = `#fff`
 
-// LUKSO Testnet — same hexagon as mainnet, greyed like the Base Sepolia icon
+// LUKSO Testnet — same hexagon as mainnet, greyed
 luksoTestnet.icon = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12569_3555)"><path d="M27.6553 6.05588L18.3339 0.712379C16.6833 -0.23746 14.6428 -0.23746 12.9922 0.712379L3.67087 6.05588C2.02027 7.00572 1 8.75682 1 10.6512V21.3435C1 23.2379 2.02027 24.989 3.67087 25.9388L12.9922 31.2876C14.6428 32.2375 16.6833 32.2375 18.3339 31.2876L27.6553 25.9388C29.3059 24.989 30.3261 23.2379 30.3261 21.3435V10.6512C30.3261 8.75682 29.3112 7.00572 27.6553 6.05588ZM23.0614 17.0613L20.289 21.8317C19.9097 22.4897 19.2046 22.893 18.4408 22.893H12.8907C12.1268 22.893 11.4217 22.4897 11.0425 21.8317L8.26476 17.0613C7.8855 16.4033 7.8855 15.5967 8.26476 14.9387L11.0371 10.1683C11.4164 9.51032 12.1215 9.10704 12.8854 9.10704H18.4301C19.1939 9.10704 19.8991 9.51032 20.2783 10.1683L23.0507 14.9387C23.4406 15.5967 23.4406 16.4033 23.0614 17.0613Z" fill="#9A9C9F"/></g><defs><clipPath id="clip0_12569_3555"><rect width="32" height="32" fill="white"/></clipPath></defs></svg>`
 luksoTestnet.faucetUrl = `https://faucet.testnet.lukso.network/`
 luksoTestnet.primaryColor = `#FD1669`
@@ -60,12 +59,6 @@ monad.icon = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns=
 monad.faucetUrl = `https://faucet.quicknode.com/monad/testnet`
 monad.primaryColor = `#836EF9`
 monad.textColor = `#fff`
-
-// Base Sepolia
-baseSepolia.icon = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_12582_3557)"><path d="M28 0H4C1.79086 0 0 1.79086 0 4V28C0 30.2091 1.79086 32 4 32H28C30.2091 32 32 30.2091 32 28V4C32 1.79086 30.2091 0 28 0Z" fill="#9A9C9F"/><path fill-rule="evenodd" clip-rule="evenodd" d="M15.9832 26C21.5061 26 25.9832 21.5229 25.9832 16C25.9832 10.4772 21.5061 6 15.9832 6C10.7438 6 6.44544 10.0294 6.01808 15.1585H20.8574V16.8237H6.0166C6.43544 21.9612 10.7376 26 15.9832 26Z" fill="white"/></g><defs><clipPath id="clip0_12582_3557"><rect width="32" height="32" fill="white"/></clipPath></defs></svg>`
-baseSepolia.faucetUrl = `https://faucets.chain.link/base-sepolia`
-baseSepolia.primaryColor = `#0052FF`
-baseSepolia.textColor = `#fff`
 
 // OptimismSepolia
 optimismSepolia.icon = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10964_3437)"><path d="M18 0H0V18H18V0Z" fill="#FE0420"/><path fill-rule="evenodd" clip-rule="evenodd" d="M3.64398 11.5333C4.07903 11.8444 4.63715 12 5.31834 12C6.14264 12 6.80091 11.8139 7.29322 11.4417C7.78551 11.0639 8.13181 10.4944 8.33218 9.73332C8.45238 9.26667 8.55541 8.78611 8.6413 8.29167C8.66992 8.11389 8.68421 7.96667 8.68421 7.85C8.68421 7.46111 8.58403 7.12778 8.38369 6.85C8.18333 6.56667 7.90858 6.35556 7.5594 6.21667C7.21021 6.07222 6.81524 6 6.37447 6C4.75449 6 3.74988 6.76389 3.36063 8.29167C3.22325 8.85278 3.11735 9.33333 3.04293 9.73332C3.01431 9.9111 3 10.0611 3 10.1833C3 10.7667 3.21466 11.2167 3.64398 11.5333ZM6.74367 9.68334C6.5793 10.3215 6.12578 10.7368 5.43855 10.7368C4.75869 10.7368 4.52622 10.2771 4.64859 9.68334C4.75163 9.14445 4.85467 8.68889 4.95771 8.31667C5.13523 7.62748 5.55191 7.26316 6.26284 7.26316C6.93965 7.26316 7.16201 7.71644 7.04422 8.31667C6.9755 8.70556 6.87535 9.1611 6.74367 9.68334ZM9.34562 11.94C9.37902 11.98 9.42633 12 9.48761 12H10.6235C10.6792 12 10.732 11.98 10.7822 11.94C10.8323 11.9 10.8629 11.8486 10.874 11.7857L11.2693 10H12.425C13.1544 10 13.6887 9.75144 14.1063 9.43716C14.5295 9.12285 14.8107 8.63714 14.9499 7.98C14.9833 7.82571 15 7.67714 15 7.53429C15 7.03714 14.8107 6.65714 14.432 6.39429C14.059 6.13143 13.5634 6 12.9453 6H10.7237C10.668 6 10.6151 6.02 10.565 6.06C10.5149 6.1 10.4843 6.15143 10.4731 6.21429L9.32055 11.7857C9.30941 11.8429 9.31778 11.8943 9.34562 11.94ZM13.4047 7.96286C13.3008 8.4217 12.9369 8.74352 12.4671 8.74352H11.5066L11.8011 7.26316H12.8034C13.1446 7.26316 13.4298 7.33041 13.4298 7.70571C13.4298 7.78 13.4214 7.86571 13.4047 7.96286Z" fill="white"/></g><defs><clipPath id="clip0_10964_3437"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>`
@@ -126,7 +119,6 @@ const iconChains = [
   luksoTestnet,
   celo,
   base,
-  baseSepolia,
   monad,
   optimismSepolia,
   unichainSepolia,
@@ -162,7 +154,6 @@ export const config = createConfig({
     [monad.id]: http(),
     [arbitrum.id]: http(),
     [base.id]: http(),
-    [baseSepolia.id]: http(),
     [celo.id]: http(),
   },
   ssr: true,

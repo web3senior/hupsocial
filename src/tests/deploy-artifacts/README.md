@@ -54,3 +54,66 @@ constructor and a different ABI; they are retired, not upgradable.
    run the script, and let cidex restart so `runOffersSync` picks it up.
 4. Fees start at zero — set `setOfferFeeBps` if the deployment should charge. Whitelist any ERC677
    payment token (e.g. G$ on Celo) with `setErc677Token` before the one-transaction path works.
+
+## HupCommunity
+
+Single contract. Every PayToJoin fee — native coin, ERC20 or LSP7 — is pushed by `join()`
+**straight to the community's payout destination** in the same transaction: the creator by
+default, or any address the creator sets via `setPayoutDestination` (a wallet, a Safe, a DAO
+treasury, a splitter contract with its own rules). The contract never holds fee money and there is
+nothing to claim; the trade-off is that a destination that can't receive the payment asset makes
+joins revert until the creator re-points it (self-inflicted, fixable in one tx).
+
+Compiled with **solc 0.8.36, optimizer on / 200 runs, viaIR, cancun**, OpenZeppelin 5.6.1 from
+`src/contracts/node_modules`, built with forge. Runtime 23,554 bytes (EIP-170 ok). Verification
+input: `src/contracts/v2/for-verification/hupcommunity.json`.
+
+After deploying: `setFollowerSystem` / `setFee` as for any fresh core, register it in cidex,
+and swap `contracts.js`. Token-priced joins approve / `authorizeOperator` the community
+contract. Deploys from 2026-08-23/24 (the separate-ledger era) and earlier are retired, not
+upgradable.
+
+## Test tokens
+
+Four throwaway faucet assets — one per standard the app gates on — so any chain can exercise
+`TokenBalance` / `NftBalance` requirements (polls, communities), Trade listings, Offers, tips,
+and the Assets tab without waiting for a real token to exist there:
+
+| Artifact | Standard | Constructor | Faucet |
+| --- | --- | --- | --- |
+| `HupTestToken.json` | ERC20 | name, symbol, decimals, owner | `faucet()` → 1,000 whole tokens |
+| `HupTestERC721.json` | ERC721 | name, symbol, baseURI, owner | `faucet()` → next sequential id |
+| `HupTestLSP7.json` | LSP7 | name, symbol, owner | `faucet()` → 1,000 whole tokens |
+| `HupTestLSP8.json` | LSP8 | name, symbol, owner | `faucet()` → next sequential id (bytes32) |
+
+All four: **solc 0.8.36, optimizer on / 200 runs, viaIR, cancun**, built with forge. The LSP pair
+compiles against the OpenZeppelin 4.9.6 nested under `@lukso/lsp8-contracts` (the LSP stack
+pins it), the ERC pair against the workspace 5.6.1 — two remapping sets, which is why they are
+precompiled here rather than built in Remix. `src/contracts/v2/for-verification/huptest*.json`
+are the matching standard-JSON inputs, checked to produce the same bytecode as these artifacts.
+
+**Owner is explicit.** Through the CREATE2 factory, `msg.sender` inside a constructor is the
+factory, so an `Ownable(msg.sender)` token would belong to `0x4e59…956C` and its initial supply
+would be stranded there. Every test token therefore takes `owner_` as its last argument; the
+picker prefills it with the connected wallet (the `signerArgs` flag in `deploy.html`). Name and
+symbol prefill too, so a deploy is pick → Load bytecode → Deploy.
+
+Because the arguments are part of the init code, identical defaults give the **same address on
+every chain** — convenient for config — and also mean a second copy on one chain needs a
+different salt. The faucets are open to anyone and uncapped; the owner additionally holds
+`mint` (ERC20/ERC721) or `MINTER_ROLE` + `mintNext` (LSP7/LSP8), and `disableMinting()` on the
+LSP pair switches the faucet off as well. Minting is `force: true` on LSP so plain EOAs receive.
+
+**Mint and transfer from the page.** Once a test token exists on the connected chain, the last
+panel of `deploy.html` drives it: pick it in the contract list (or paste any address and choose its
+standard) and the panel reads name, symbol, supply, your balance — owned ids for the NFTs — and
+whether the connected wallet may mint. **Faucet** calls `faucet()` as anyone; **Mint** calls
+`mint(to, amount)` / `mint(to)` / `mint(to, amount, true, "")` / `mintNext(to)` for the owner or
+minter; **Transfer** sends from the connected wallet (`transfer` / `transferFrom` / LSP `transfer`
+with `force: true`). Amounts are whole tokens, scaled by the token's decimals; NFT ids are plain
+numbers. The panel fills itself in after a deploy, or whenever the predicted address already holds
+code — a hand-typed address is never overwritten.
+
+The `/admin/deploy-lsp7` page deploys the same LSP7 source directly (no factory), reading
+`src/abis/HupTestLSP7.deploy.json`; it passes the connected wallet as `owner_`, so its behaviour
+is unchanged. Deploys made before 2026-08-23 have the two-argument constructor.

@@ -40,7 +40,7 @@ import "./Follower System/ILSP26FollowerSystem.sol";
  *      Moderator `hidden` is a display flag only. It suppresses a poll in the indexer and in
  *      clients and never touches the tally or the ability to vote, so a moderator can quiet a
  *      poll but can never change its result.
- * @custom:version 1.1.0
+ * @custom:version 1.0.0
  * @custom:chain multichain
  * @custom:website https://hup.social
  * @custom:security-contact security@hup.social
@@ -255,7 +255,7 @@ contract HupPolls is IHupPolls, Pausable, AccessControl, ERC2771Context {
     // --- VIEW FUNCTIONS ---
 
     function version() external pure override returns (string memory) {
-        return "1.1.0";
+        return "1.0.0";
     }
 
     function getPoll(uint256 _pollId) external view override returns (Poll memory) {

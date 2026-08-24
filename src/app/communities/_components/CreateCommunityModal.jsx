@@ -21,8 +21,10 @@ import BrandingLinksFields from './BrandingLinksFields'
 import ImagePicker from './ImagePicker'
 import { AssetUnitLabel, TokenUnitHint } from './TokenAmount'
 import TokenAssetInput from './TokenAssetInput'
+import RecipientField from '@/components/ui/RecipientField'
+import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
 import OptionPicker from './OptionPicker'
-import { ZERO_ADDRESS, fetchTokenDecimals, getNativeCurrency } from '../tokenUnits'
+import { ZERO_ADDRESS, fetchIsLsp7, fetchTokenDecimals, getNativeCurrency } from '../tokenUnits'
 import { MAX_TAG_LENGTH, normalizeTag } from '../communityTag'
 import { DEFAULT_COMMUNITY_CATEGORY } from '@/config/communityCategories'
 import useCommunityCategories from '@/hooks/useCommunityCategories'
@@ -82,6 +84,9 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const [paymentToken, setPaymentToken] = useState('')
   const [paymentPrice, setPaymentPrice] = useState('')
   const [paymentIsLsp7, setPaymentIsLsp7] = useState(false)
+  // Join-fee destination (RecipientField shape); empty = fees go to the creator. A contract
+  // address (Safe, DAO, splitter) is fine — it withdraws from the ledger under its own rules.
+  const [payoutDestination, setPayoutDestination] = useState(EMPTY_RECIPIENT)
   const [isConfiguring, setIsConfiguring] = useState(false)
   const [configError, setConfigError] = useState('')
 
@@ -111,6 +116,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       setPaymentToken(draft.paymentToken ?? '')
       setPaymentPrice(draft.paymentPrice ?? '')
       setPaymentIsLsp7(Boolean(draft.paymentIsLsp7))
+      setPayoutDestination(draft.payoutDestination?.input ? draft.payoutDestination : EMPTY_RECIPIENT)
     } catch {
       // Unreadable draft (corrupt JSON, blocked storage) — start clean
     }
@@ -144,12 +150,13 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
           paymentToken,
           paymentPrice,
           paymentIsLsp7,
+          payoutDestination,
         })
       )
     } catch {
       // Storage full or blocked — the form still works, it just won't survive a refresh
     }
-  }, [name, tag, category, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7])
+  }, [name, tag, category, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7, payoutDestination])
 
   // Fields go back to their initial values once a community is fully created — the parent
   // closes the modal at that point, and reopening it with the created community's data still
@@ -157,6 +164,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   // suppressed so it doesn't immediately re-write a pristine draft.
   const resetForm = () => {
     suppressNextDraftSaveRef.current = true
+    setTxSteps([])
     setName('')
     setTag('')
     setCategory(DEFAULT_COMMUNITY_CATEGORY)
@@ -237,6 +245,12 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   // Tx progress lives in one morphing toast (loading → success) instead of status rows
   // pinned under the form — a toast also outlives the modal, so closing it early doesn't
   // hide the confirmation the user is still waiting on.
+  // Multi-transaction progress: creating can take up to four signatures (create, requirements,
+  // price, destination). Rendered as a checklist in place of the form so each wallet prompt is
+  // announced instead of appearing out of nowhere.
+  const [txSteps, setTxSteps] = useState([])
+  const stepTo = (key, status) => setTxSteps((steps) => steps.map((step) => (step.key === key ? { ...step, status } : step)))
+
   const txToastRef = useRef(null)
   const showTxToast = (message, type) => {
     // update() returns false once the user has closed the toast — start a fresh one then,
@@ -272,6 +286,8 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       if (!isConfirmed || !receipt || configuredRef.current === hash) return
       configuredRef.current = hash
 
+      stepTo('create', 'done')
+
       // The community exists onchain from this point (even if the gating follow-ups below
       // fail), so the refresh-survival draft would only resurrect an already-created form
       try {
@@ -293,13 +309,17 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
         }
       }
 
-      const hasFollowUps = newCommunityId !== null && (requirements.length > 0 || (needsPayment && paymentPrice))
+      const hasDestination = needsPayment && Boolean(payoutDestination.address)
+      const hasFollowUps = newCommunityId !== null && (requirements.length > 0 || (needsPayment && paymentPrice) || hasDestination)
 
+      let activeStep = null
       if (hasFollowUps) {
         setIsConfiguring(true)
         setConfigError('')
         try {
           if (requirements.length > 0) {
+            activeStep = 'requirements'
+            stepTo('requirements', 'active')
             // Every minimum is entered in whole units of the asset it gates on, so each one is
             // scaled by that asset's decimals; NFT minimums are plain counts and scale by nothing
             const requirementTuples = await Promise.all(
@@ -323,20 +343,41 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
               functionName: 'setRequirements',
               args: [newCommunityId, requirementTuples, requirementMode],
             })
+            stepTo('requirements', 'done')
           }
           if (needsPayment && paymentPrice) {
+            activeStep = 'payment'
+            stepTo('payment', 'active')
             // Prices are whole-unit amounts of the coin or token they're set in, same as above
             const priceValue = paymentToken
               ? parseUnits(paymentPrice, await fetchTokenDecimals(publicClient, chainId, paymentToken))
               : parseEther(paymentPrice)
+            // Read from the token, not just the form: the LSP7 checkbox only shows on LUKSO, and
+            // an LSP7 anywhere else would otherwise be saved as an ERC-20 — join() then pulls
+            // with transferFrom, which the token doesn't have, and no one can ever pay to join.
+            const priceIsLsp7 = paymentIsLsp7 || (await fetchIsLsp7(publicClient, chainId, paymentToken))
             await writeSetterAsync({
               address: CONTRACT_ADDRESS,
               abi: HupCommunityABI,
               functionName: 'setPaymentRequirement',
-              args: [newCommunityId, paymentToken || ZERO_ADDRESS, priceValue, paymentIsLsp7],
+              args: [newCommunityId, paymentToken || ZERO_ADDRESS, priceValue, priceIsLsp7],
             })
+            stepTo('payment', 'done')
+          }
+          if (hasDestination) {
+            activeStep = 'destination'
+            stepTo('destination', 'active')
+            // Validated in handleCreate before anything signed.
+            await writeSetterAsync({
+              address: CONTRACT_ADDRESS,
+              abi: HupCommunityABI,
+              functionName: 'setPayoutDestination',
+              args: [newCommunityId, payoutDestination.address],
+            })
+            stepTo('destination', 'done')
           }
         } catch (err) {
+          if (activeStep) stepTo(activeStep, 'error')
           console.error('Community created, but configuring its gating requirements failed:', err)
           setConfigError(
             'Community created, but its gating setup was not completed — finish it from the Modify form.',
@@ -360,6 +401,12 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     run()
   }, [isConfirmed, receipt, hash])
 
+  // A rejected or failed create dissolves the checklist so the form (and its error line)
+  // comes back instead of a stuck step list
+  useEffect(() => {
+    if (createError) setTxSteps([])
+  }, [createError])
+
   // Known createCommunity reverts, translated to something a user can act on — the raw
   // shortMessage for a custom error is just the error name (or worse, hex)
   const friendlyCreateError = (() => {
@@ -377,6 +424,14 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
 
     if (isCreatingEncrypted && !vault.identity) {
       vault.setShowPinPrompt(true)
+      return
+    }
+
+    // An unresolved destination must stop the whole flow here — after createCommunity is
+    // signed, the community already exists and the failure could only surface as a
+    // half-configured follow-up.
+    if (needsPayment && payoutDestination.input.trim() && !payoutDestination.address) {
+      alert('Fee destination: pick a wallet from the suggestions or paste a full address — or clear the field to keep fees yourself.')
       return
     }
 
@@ -415,6 +470,15 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     // second signature, and no window where the community is gated but not yet encrypted.
     const initialWrappedKey = isCreatingEncrypted ? wrapContentKey(generateContentKey(), vault.identity.pubKeyHex) : '0x'
 
+    setTxSteps([
+      { key: 'create', label: 'Create the community', status: 'active' },
+      ...(requirements.length > 0 ? [{ key: 'requirements', label: 'Save the join requirements', status: 'pending' }] : []),
+      ...(needsPayment && paymentPrice ? [{ key: 'payment', label: 'Set the join price', status: 'pending' }] : []),
+      ...(needsPayment && payoutDestination.address
+        ? [{ key: 'destination', label: 'Point join fees at the destination', status: 'pending' }]
+        : []),
+    ])
+
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: HupCommunityABI,
@@ -433,7 +497,30 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
           Start a community and decide who can join and who can post.
         </p>
 
-        <form className={styles.manager__form} onSubmit={handleCreate}>
+        {txSteps.length > 0 && (
+          <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.5rem 0 1rem' }}>
+            <p className={styles.manager__subtitle} style={{ margin: 0 }}>
+              Setting up your community — confirm each step in your wallet when it asks.
+            </p>
+            {txSteps.map((step, index) => (
+              <div
+                key={step.key}
+                className="flex align-items-center gap-050"
+                style={{ fontSize: '0.9rem', opacity: step.status === 'pending' ? 0.55 : 1 }}
+              >
+                <span aria-hidden="true" style={{ width: '1.5rem', textAlign: 'center' }}>
+                  {step.status === 'done' ? '✅' : step.status === 'error' ? '❌' : step.status === 'active' ? '⏳' : `${index + 1}.`}
+                </span>
+                <span>
+                  {step.label}
+                  {step.status === 'active' ? '…' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form className={styles.manager__form} onSubmit={handleCreate} style={{ display: txSteps.length > 0 ? 'none' : undefined }}>
           <div className={styles.manager__row}>
             <div className={styles.manager__field}>
               <label className={styles.manager__label}>Admission (how people get in)</label>
@@ -613,8 +700,25 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
                 </label>
               )}
               <p className={styles.manager__subtitle}>
-                Enter the price the way you’d say it (e.g. 0.5). Each new member’s payment goes to you.
+                Enter the price the way you’d say it (e.g. 0.5). Each new member’s payment is sent to you the
+                moment they join — or to a destination you set below.
               </p>
+              <div className={styles.manager__field}>
+                <label className={styles.manager__label}>Fee destination (optional)</label>
+                <p className={styles.manager__subtitle} style={{ marginBottom: '0.5rem' }}>
+                  Every join fee is sent to this address in full — leave empty to receive it yourself. Public and
+                  editable later from Modify.
+                </p>
+                <RecipientField
+                  label={null}
+                  inputClassName={styles.manager__input}
+                  value={payoutDestination}
+                  onChange={setPayoutDestination}
+                  viewer={accountAddress ?? null}
+                  placeholder="Name, ENS, or 0x… wallet / contract address"
+                  hint="Contracts work too: a Safe, DAO treasury, or splitter contract can share fees between wallets under rules you control. Make sure it can receive the payment asset — joins fail while it can't."
+                />
+              </div>
             </>
           )}
 

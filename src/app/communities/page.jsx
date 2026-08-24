@@ -55,6 +55,7 @@ import useCommunityCategories from '@/hooks/useCommunityCategories'
 import useRailScroll from '@/hooks/useRailScroll'
 import {
   ZERO_ADDRESS,
+  fetchIsLsp7,
   fetchTokenDecimals,
   formatTokenDisplay,
   getNativeCurrency,
@@ -293,6 +294,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const [paymentTokenAddress, setPaymentTokenAddress] = useState('')
   const [paymentPrice, setPaymentPrice] = useState('')
   const [paymentIsLsp7, setPaymentIsLsp7] = useState(false)
+  // Join-fee destination being edited (RecipientField shape); empty means fees go to the
+  // creator. Richer rules (multisig, DAO, splits) live in the destination contract itself.
+  const [editPayoutDestination, setEditPayoutDestination] = useState(EMPTY_RECIPIENT)
   const [isPayingToJoin, setIsPayingToJoin] = useState(false)
 
   // New post content inputs
@@ -384,6 +388,19 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const savedPaymentIsLsp7 = Boolean(paymentRequirementData?.[2])
   const hasValidPaymentRequirement = Boolean(paymentRequirementData) && savedPaymentPrice !== '0'
   const isPaymentNative = isNativeAsset(savedPaymentToken)
+
+  // Where the fee goes: the community's payout destination (zero = creator). join() pushes
+  // the fee straight there. Read for everyone — a joiner deserves to see where their money
+  // lands before they pay.
+  const { data: payoutDestinationData, refetch: refetchPayoutDestination } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    chainId,
+    abi: HupCommunityABI,
+    functionName: 'payoutDestination',
+    args: [id],
+  })
+  const payoutDestination =
+    payoutDestinationData && payoutDestinationData !== ZERO_ADDRESS ? payoutDestinationData : null
 
   // The join price is stored in the smallest unit of whichever asset it's priced in — it only
   // becomes a number anyone can read once scaled by that asset's decimals
@@ -501,6 +518,20 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   const { isLoading: isPaymentReqConfirming, isSuccess: isPaymentReqConfirmed } = useWaitForTransactionReceipt({ hash: paymentReqHash })
 
+  // Ledger write for re-pointing the community's join-fee destination (creator-only on the
+  // contract; zero address clears back to the creator)
+  const {
+    mutate: updatePayoutDestination,
+    data: payoutDestinationHash,
+    error: payoutDestinationError,
+  } = useWriteContract()
+
+  const { isSuccess: isPayoutDestinationConfirmed } = useWaitForTransactionReceipt({ hash: payoutDestinationHash })
+
+  useEffect(() => {
+    if (isPayoutDestinationConfirmed) refetchPayoutDestination()
+  }, [isPayoutDestinationConfirmed, refetchPayoutDestination])
+
   // Contract modification hook for paying to join a Fixed Price community
   const { mutate: payToJoin, data: payToJoinHash, isPending: isPayToJoinPending, error: payToJoinError } = useWriteContract()
 
@@ -577,24 +608,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       refetchMyCanPost()
     }
   }, [isInviteRespConfirmed])
-
-  // --- Join-fee earnings (pull-payment ledger: join() accrues, the creator withdraws) ---
-
-  const { data: joinPayoutsData, refetch: refetchJoinPayouts } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    chainId,
-    abi: HupCommunityABI,
-    functionName: 'joinPayouts',
-    args: [activeAccountAddress],
-    query: { enabled: !!activeAccountAddress && isOwner },
-  })
-
-  const { mutate: withdrawPayouts, data: withdrawHash, isPending: isWithdrawPending, error: withdrawError } = useWriteContract()
-  const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawConfirmed } = useWaitForTransactionReceipt({ hash: withdrawHash })
-
-  useEffect(() => {
-    if (isWithdrawConfirmed) refetchJoinPayouts()
-  }, [isWithdrawConfirmed, refetchJoinPayouts])
 
   // --- DAO governance (set/clear the community's governance executor) ---
 
@@ -745,9 +758,25 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
     setIsPayingToJoin(true)
     try {
+      // The stored flag picks both this approval and the transfer join() pulls with. If it
+      // disagrees with what the token itself reports, the wrong selector is about to be sent to
+      // a contract that has no such function — the wallet's gas estimate reverts before anything
+      // reaches the chain, and the creator re-saving the join price is the only fix. Say so.
+      if (!isNative && (await fetchIsLsp7(publicClient, chainId, token)) !== Boolean(isLsp7)) {
+        alert(
+          `This community's join price is saved as ${isLsp7 ? 'an LSP7' : 'an ERC-20'} token, but the token reports the opposite. Joining would fail — the creator needs to re-save the join price from the Modify form.`
+        )
+        setIsPayingToJoin(false)
+        return
+      }
+
+      // Both approvals pin chainId like join does, so a wallet sitting on another network is
+      // switched rather than authorizing the spend on whatever chain it happens to be on.
+      let approvalHash
       if (!isNative && isLsp7) {
-        await approveTokenAsync({
+        approvalHash = await approveTokenAsync({
           address: token,
+          chainId,
           abi: [
             {
               name: 'authorizeOperator',
@@ -762,11 +791,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             },
           ],
           functionName: 'authorizeOperator',
+          // join() pulls the fee from the joiner and forwards it to the payout destination, so
+          // the community contract is the operator.
           args: [CONTRACT_ADDRESS, price, '0x'],
         })
       } else if (!isNative) {
-        await approveTokenAsync({
+        approvalHash = await approveTokenAsync({
           address: token,
+          chainId,
           abi: [
             {
               name: 'approve',
@@ -783,6 +815,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           args: [CONTRACT_ADDRESS, price],
         })
       }
+      // writeContractAsync resolves when the wallet has signed, not when the approval is mined.
+      // Sending join() straight away makes the wallet estimate it against an allowance that
+      // isn't there yet, and MetaMask refuses a call whose estimate reverts. Wait for inclusion.
+      if (approvalHash) await publicClient.waitForTransactionReceipt({ hash: approvalHash })
       payToJoin({
         address: CONTRACT_ADDRESS,
         chainId,
@@ -1452,6 +1488,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     setPaymentTokenAddress(isPaymentNative ? '' : savedPaymentToken)
     setPaymentPrice(seededPaymentPrice)
     setPaymentIsLsp7(savedPaymentIsLsp7)
+    setEditPayoutDestination(
+      payoutDestination ? { input: payoutDestination, address: payoutDestination, profile: null } : EMPTY_RECIPIENT
+    )
     setIsEditing(true)
     setIsPosting(false)
     setIsManagingMembers(false)
@@ -1466,11 +1505,25 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const handleUpdateSubmit = async (e) => {
     e.preventDefault()
 
+    // The destination validates before anything uploads or signs, for the same reason the
+    // decimal conversions below do: unresolved input must abort the whole save, not surface
+    // after the metadata is already replaced.
+    if (editAdmission === ADMISSION.PayToJoin) {
+      if (editPayoutDestination.input.trim() && !editPayoutDestination.address) {
+        alert('Fee destination: pick a wallet from the suggestions or paste a full address — or clear the field to keep fees yourself.')
+        return
+      }
+    }
+
     // Amounts convert first, before anything is uploaded or signed: every one of them is entered
     // in whole units of the asset it gates on, so each needs that asset's decimals, and a failed
     // read here must abort the whole save rather than leave the metadata already updated.
     let editedTuples
     let priceValue
+    // The stored standard drives join()'s transfer path, so it is read from the token rather than
+    // trusted to the form — the checkbox only exists on LUKSO, and an LSP7 on any other chain
+    // would otherwise be saved as an ERC-20 and leave every paid join reverting.
+    let priceIsLsp7 = paymentIsLsp7
     try {
       editedTuples = await Promise.all(
         editRequirements.map(async (row) => {
@@ -1491,6 +1544,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         priceValue = paymentTokenAddress
           ? parseUnits(paymentPrice, await fetchTokenDecimals(publicClient, chainId, paymentTokenAddress))
           : parseEther(paymentPrice)
+        if (paymentTokenAddress) priceIsLsp7 = priceIsLsp7 || (await fetchIsLsp7(publicClient, chainId, paymentTokenAddress))
       }
     } catch (err) {
       console.error('Failed to convert the entered amounts to their onchain units:', err)
@@ -1558,8 +1612,24 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         chainId,
         abi: HupCommunityABI,
         functionName: 'setPaymentRequirement',
-        args: [id, paymentTokenAddress || ZERO_ADDRESS, priceValue, paymentIsLsp7],
+        args: [id, paymentTokenAddress || ZERO_ADDRESS, priceValue, priceIsLsp7],
       })
+    }
+
+    // Re-point the join-fee destination when the editor differs from what's onchain (empty
+    // editor = zero address = back to the creator). Validated in the guard above, so the input
+    // is either empty or fully resolved here.
+    if (editAdmission === ADMISSION.PayToJoin) {
+      const editedDestination = editPayoutDestination.address || null
+      if ((editedDestination ?? '').toLowerCase() !== (payoutDestination ?? '').toLowerCase()) {
+        updatePayoutDestination({
+          address: CONTRACT_ADDRESS,
+          chainId,
+          abi: HupCommunityABI,
+          functionName: 'setPayoutDestination',
+          args: [id, editedDestination || ZERO_ADDRESS],
+        })
+      }
     }
   }
 
@@ -2006,6 +2076,11 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           💰 {paymentPriceWithSymbol} to join
         </span>
       )}
+      {hasJoinPrice && payoutDestination && (
+        <span className={styles.card__tag} title={`All join fees go to ${payoutDestination}`}>
+          Fees go to {`${payoutDestination.slice(0, 6)}…${payoutDestination.slice(-4)}`}
+        </span>
+      )}
     </>
   )
 
@@ -2366,38 +2441,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               </div>
             )}
           </div>
-
-          {/* Join-fee earnings: paid joins accrue to an onchain ledger (pull-over-push, so a
-              non-payable creator address can never brick admissions) — withdraw from here.
-              The ledger is per-creator across all their communities on this contract. */}
-          {isOwner && Boolean(joinPayoutsData) && joinPayoutsData > 0n && (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h5 style={{ fontSize: '0.95rem' }}>Earnings</h5>
-              <div className="flex justify-content-between align-items-center" style={{ padding: '0.5rem 0' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Collected join fees (all your communities): {formatEther(joinPayoutsData)} {nativeCurrency.symbol}
-                </span>
-                <button
-                  type="button"
-                  className={styles.card__submit}
-                  style={{ width: 'auto', padding: '0.4rem 0.9rem' }}
-                  disabled={isWithdrawPending || isWithdrawConfirming}
-                  onClick={() =>
-                    withdrawPayouts({
-                      address: CONTRACT_ADDRESS,
-                      chainId,
-                      abi: HupCommunityABI,
-                      functionName: 'withdrawJoinPayouts',
-                      args: [],
-                    })
-                  }
-                >
-                  {isWithdrawPending ? 'Confirm Wallet...' : isWithdrawConfirming ? 'Withdrawing...' : 'Withdraw'}
-                </button>
-              </div>
-              {withdrawError && <div className={styles.card__error}>Error: {withdrawError?.shortMessage || withdrawError?.message}</div>}
-            </div>
-          )}
 
           {/* DAO governance: point creator-level authority at a governance executor. UI writes
               are creator-only in practice (a governor is a contract executing by proposal). */}
@@ -2863,6 +2906,27 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   onChange={(e) => setPaymentPrice(e.target.value)}
                   required={editAdmission === ADMISSION.PayToJoin}
                 />
+              </div>
+              <div className={styles.card__field} style={{ marginTop: '0.75rem' }}>
+                <label className={styles.card__label}>Fee destination (optional)</label>
+                <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem' }}>
+                  Every join fee is sent to this address in full, the moment someone joins — leave empty to
+                  receive it yourself. Changes apply to joins from then on and are public.
+                </p>
+                <RecipientField
+                  label={null}
+                  inputClassName={styles.card__input}
+                  value={editPayoutDestination}
+                  onChange={setEditPayoutDestination}
+                  viewer={activeAccountAddress ?? null}
+                  placeholder="Name, ENS, or 0x… wallet / contract address"
+                  hint="Contracts work too: a Safe, DAO treasury, or splitter contract can share fees between wallets under rules you control. Make sure it can receive the payment asset — joins fail while it can't."
+                />
+                {payoutDestinationError && (
+                  <div className={styles.card__error}>
+                    Error: {payoutDestinationError?.shortMessage || payoutDestinationError?.message}
+                  </div>
+                )}
               </div>
             </div>
           )}

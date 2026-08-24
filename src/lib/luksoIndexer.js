@@ -90,3 +90,58 @@ export const fetchLuksoTokenMetadata = async ({ collection, tokenId }) => {
     source: 'indexer',
   }
 }
+
+// Mirrors MAX_LINKS in lib/collectionMetadata — the header shows a few link chips, not a list.
+const MAX_COLLECTION_LINKS = 6
+
+const COLLECTION_QUERY = `query ($id: String!) {
+  Asset(where: { id: { _eq: $id } }) {
+    description
+    icons(order_by: { width: desc }) { src url }
+    backgroundImages(order_by: { width: desc }) { src url }
+    images(order_by: { width: desc }) { src url }
+    links { title url }
+  }
+}`
+
+/**
+ * The collection-level counterpart of fetchLuksoTokenMetadata: the identity the whole
+ * collection shares — description, icon, banner and links — for when the contract's
+ * LSP4Metadata document is gone but the indexer scraped it while it was alive (Unio Arcani
+ * Praesidii Aeterna's document went away with its artwork; its icon and banner are still
+ * pinned, and only the indexer remembers which CIDs they are).
+ *
+ * Same last-resort rule as the token form: reached only after the onchain document failed,
+ * never ahead of it. Name, symbol, creators and supply are not read here — those are
+ * contract storage and already came back with the onchain reads.
+ *
+ * @param {{ collection: string }} params Collection address.
+ * @returns {Promise<{ description, banner, icon, links, source } | null>} null when the
+ * collection isn't indexed, has nothing worth showing, or the request fails or times out.
+ */
+export const fetchLuksoCollectionMetadata = async ({ collection }) => {
+  const res = await fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query: COLLECTION_QUERY, variables: { id: collection.toLowerCase() } }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  })
+  if (!res.ok) return null
+
+  const asset = (await res.json())?.data?.Asset?.[0]
+  if (!asset) return null
+
+  const icon = pickUrl(asset.icons?.[0])
+  // Same precedence the onchain resolver gives the document: a declared background image,
+  // else the first artwork
+  const banner = pickUrl(asset.backgroundImages?.[0]) || pickUrl(asset.images?.[0])
+  const description = typeof asset.description === 'string' && asset.description.trim() ? asset.description.trim() : null
+  const links = (asset.links || [])
+    .filter((link) => link && typeof link.url === 'string' && /^https?:\/\//i.test(link.url.trim()))
+    .slice(0, MAX_COLLECTION_LINKS)
+    .map((link) => ({ title: String(link.title || '').trim() || null, url: link.url.trim() }))
+
+  if (!icon && !banner && !description) return null
+
+  return { description, banner, icon, links, source: 'indexer' }
+}

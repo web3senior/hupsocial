@@ -94,6 +94,10 @@ interface IHupCommunity {
     event RequirementsUpdated(uint256 indexed id, RequirementMode mode, uint256 count);
     event EligibilityModuleUpdated(uint256 indexed id, address module);
     event PaymentRequirementUpdated(uint256 indexed id, address token, uint256 price, bool isLsp7);
+    /// @notice The creator pointed the community's join fees at a new destination — a wallet or
+    ///         a contract (Safe, DAO, splitter) with its own rules. address(0) means cleared:
+    ///         fees go to the creator again.
+    event PayoutDestinationUpdated(uint256 indexed id, address indexed destination);
     event CommunityStatusUpdated(uint256 indexed id, bool isActive);
     event CommunityOwnershipTransferStarted(uint256 indexed id, address indexed oldCreator, address indexed newCreator);
     event CommunityOwnershipTransferred(uint256 indexed id, address indexed oldCreator, address indexed newCreator);
@@ -107,11 +111,6 @@ interface IHupCommunity {
     event MemberInvited(uint256 indexed id, address indexed actor);
     event InviteRevoked(uint256 indexed id, address indexed actor);
     event Withdrawal(address indexed recipient, uint256 amount);
-    /// @notice Emitted alongside Withdrawal when a creator claims accrued join fees, so indexers
-    ///         can tell creator payouts from the admin's creation-fee sweep (both of which emit
-    ///         the generic Withdrawal). `creator` owns the ledger entry; `recipient` is where the
-    ///         coin was sent, and the two differ when withdrawJoinPayoutsTo redirects it.
-    event JoinPayoutWithdrawn(address indexed creator, address indexed recipient, uint256 amount);
     event IdentityKeyRegistered(address indexed user);
     event KeyInitialized(uint256 indexed communityId);
     event KeyGranted(uint256 indexed communityId, address indexed holder, uint256 indexed version);

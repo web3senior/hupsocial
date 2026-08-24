@@ -4,7 +4,8 @@ pragma solidity ^0.8.35;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// $HUP: 0x88C0963857049368470E2851aFf5EDFc2D32346C : Monad testnet
+// $HUP: 0x88C0963857049368470E2851aFf5EDFc2D32346C : Monad testnet (three-argument constructor,
+//       deployed before owner_ was added — verify it from the git version of that deploy)
 
 /**
  * @title Hup Test Token
@@ -12,7 +13,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @notice Throwaway ERC20 used to test HupBazaar token-priced listings and purchases on testnets.
  * @dev Name, symbol, and decimals are constructor-configurable so it can mimic real payment tokens
  *      (e.g. 6-decimal USDC). Anyone can pull tokens from the open faucet; the owner can mint
- *      arbitrary amounts. Not for production use — no supply cap, no access control on faucet.
+ *      arbitrary amounts. The owner — who also receives the initial supply — is an explicit
+ *      argument rather than `msg.sender`, so a deploy through the CREATE2 factory
+ *      (tests/deploy.html) does not hand ownership and a million tokens to the factory.
+ *      Not for production use — no supply cap, no access control on faucet.
  * @custom:version 1.0.0
  * @custom:chain testnet-only
  * @custom:website https://hup.social
@@ -37,12 +41,13 @@ contract HupTestToken is ERC20, Ownable {
     /// @param name_ Token name (e.g. "Hup Test Token")
     /// @param symbol_ Token symbol (e.g. "tHUP")
     /// @param decimals_ Token decimals (18 for a standard token, 6 to mimic USDC)
-    constructor(string memory name_, string memory symbol_, uint8 decimals_)
+    /// @param owner_ Owner and recipient of the initial supply — never a factory address
+    constructor(string memory name_, string memory symbol_, uint8 decimals_, address owner_)
         ERC20(name_, symbol_)
-        Ownable(msg.sender)
+        Ownable(owner_)
     {
         _tokenDecimals = decimals_;
-        _mint(msg.sender, 1_000_000 * 10 ** decimals_);
+        _mint(owner_, 1_000_000 * 10 ** decimals_);
     }
 
     /// @inheritdoc ERC20

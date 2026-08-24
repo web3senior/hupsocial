@@ -12,10 +12,10 @@
  */
 
 /**
- * Hup Polls. Everything works end to end, but 1.1.0 (voter requirements) is not deployed
- * anywhere yet, and shipping a poll composer that points at a retired contract would be worse
- * than not shipping one. Set NEXT_PUBLIC_POLLS_ENABLED=true to turn every poll surface on —
- * the sidebar row, the home tab, the composer button, /polls, and the in-post card — without
- * touching code.
+ * Hup Polls. Everything works end to end, but the build carrying voter requirements is not
+ * deployed anywhere yet, and shipping a poll composer that points at a superseded contract
+ * would be worse than not shipping one. Set NEXT_PUBLIC_POLLS_ENABLED=true to turn every poll
+ * surface on — the sidebar row, the home tab, the composer button, /polls, and the in-post
+ * card — without touching code.
  */
 export const POLLS_ENABLED = process.env.NEXT_PUBLIC_POLLS_ENABLED === 'true'

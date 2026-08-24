@@ -13,21 +13,12 @@ import HupCommunityABI from '@/abis/HupCommunity'
 
 export const communityVaultSessionKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''}community_vault_unlocked`
 
-// These gated membership types support encryption: HupCommunity.sol's approveRequest/addMember
-// (identical bodies — either works as the "approval" hook) are callable by a moderator regardless
-// of membershipType, so every one of these has a discrete moment to grant the community key.
-// Public/WhitelistGated/PaidGated self-admit via join() with no moderator approval step to hook
-// a key grant onto, so they stay plaintext.
-export function isEncryptedMembershipType(membershipType) {
-  return (
-    membershipType === 1 ||
-    membershipType === 2 ||
-    membershipType === 3 ||
-    membershipType === 4 ||
-    membershipType === 5 ||
-    membershipType === 8
-  )
-}
+// Encryption is NOT inferable from the membership type. It was, back when MembershipType
+// conflated admission with sealing — but the rework split them: `membershipType` now carries
+// AdmissionMode (0 Open ... 4 PayToJoin) and any of those may be encrypted, which is
+// keyVersion > 0 onchain and the indexed `communities.is_encrypted` flag off KeyInitialized.
+// The old isEncryptedMembershipType() lived here and returned true for types 1-5 and 8; it is
+// gone rather than updated, because there is no correct membership-type answer to give.
 
 function identityFromSeed(seedBytes) {
   const privKeyHex = Buffer.from(seedBytes).toString('hex')

@@ -30,6 +30,10 @@ import { _LSP4_TOKEN_TYPE_TOKEN } from "@lukso/lsp4-contracts/contracts/LSP4Cons
  *      funds — plain EOAs, and Universal Profiles with no LSP1 delegate wired up. Same call as
  *      `SunriseLSP8.mint` makes, for the same reason.
  *
+ *      The owner — who also receives the initial supply and the `MINTER_ROLE` — is an explicit
+ *      argument rather than `msg.sender`, so a deploy through the CREATE2 factory
+ *      (tests/deploy.html) does not hand both to the factory.
+ *
  *      Not for production use — no supply cap, no cooldown, and the faucet is open to anyone.
  * @custom:version 1.0.0
  * @custom:chain testnet-only
@@ -56,11 +60,13 @@ contract HupTestLSP7 is LSP7Mintable {
   /// @param name_ Token name, written to LSP4 metadata (e.g. "Hup Test LSP7")
   /// @param symbol_ Token symbol, written to LSP4 metadata (e.g. "tLSP7") — this is what the app
   ///        reads back through ERC725Y `getData(LSP4TokenSymbol)`, since LSP7 has no `symbol()`
+  /// @param owner_ Owner, minter, and recipient of the initial supply — never a factory address
   constructor(
     string memory name_,
-    string memory symbol_
-  ) LSP7Mintable(name_, symbol_, msg.sender, _LSP4_TOKEN_TYPE_TOKEN, false) {
-    _mint(msg.sender, INITIAL_SUPPLY * 10 ** decimals(), true, "");
+    string memory symbol_,
+    address owner_
+  ) LSP7Mintable(name_, symbol_, owner_, _LSP4_TOKEN_TYPE_TOKEN, false) {
+    _mint(owner_, INITIAL_SUPPLY * 10 ** decimals(), true, "");
   }
 
   // --- MUTATIVE LOGIC ---

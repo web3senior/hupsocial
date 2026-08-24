@@ -56,6 +56,52 @@ export async function fetchTokenDecimals(publicClient, chainId, address) {
   return value
 }
 
+// LSP7 advertises itself through ERC165; an ERC-20 typically has no supportsInterface at all, so
+// the read reverting is the ERC-20 answer. Both ids are checked because lsp7-contracts changed the
+// interface id at 0.15 and older deployments (Bridged USDC on LUKSO among them) still carry the
+// previous one.
+const LSP7_INTERFACE_IDS = ['0xc52d6008', '0xb3c4928f']
+const erc165Abi = [
+  {
+    type: 'function',
+    name: 'supportsInterface',
+    stateMutability: 'view',
+    inputs: [{ name: 'interfaceId', type: 'bytes4' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+]
+const isLsp7Cache = new Map()
+
+/**
+ * Whether an asset is an LSP7 Digital Asset, read from the contract itself. The standard decides
+ * which approval call the joiner must make (authorizeOperator vs approve) and which transfer the
+ * contract pulls with (transfer vs transferFrom), and the two are not interchangeable — a flag
+ * stored wrong leaves every paid join reverting. Asking the creator was only ever reliable on
+ * LUKSO; an LSP7 deployed on any other chain looks like an ERC-20 to a form. Native coin is
+ * never an LSP7. A failed read is an ERC-20, never an error: that is the common case.
+ */
+export async function fetchIsLsp7(publicClient, chainId, address) {
+  if (isNativeAsset(address) || !publicClient) return false
+
+  const key = decimalsKey(chainId, address)
+  if (isLsp7Cache.has(key)) return isLsp7Cache.get(key)
+
+  let value = false
+  for (const interfaceId of LSP7_INTERFACE_IDS) {
+    try {
+      if (await publicClient.readContract({ address, abi: erc165Abi, functionName: 'supportsInterface', args: [interfaceId] })) {
+        value = true
+        break
+      }
+    } catch {
+      // No ERC165 on this contract — it cannot be an LSP7
+      break
+    }
+  }
+  isLsp7Cache.set(key, value)
+  return value
+}
+
 /**
  * decimals + symbol for an asset address. A blank or zero address resolves to the chain's native
  * coin, so callers can pass whatever the contract handed back without branching first.

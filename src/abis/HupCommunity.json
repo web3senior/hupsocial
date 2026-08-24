@@ -1,2635 +1,2614 @@
 [
   {
+    "type": "constructor",
     "inputs": [
       {
-        "internalType": "address",
         "name": "_trustedForwarder",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "address",
         "name": "_admin",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
+    "stateMutability": "nonpayable"
   },
   {
-    "inputs": [],
-    "name": "AccessControlBadConfirmation",
-    "type": "error"
+    "type": "receive",
+    "stateMutability": "payable"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "neededRole",
-        "type": "bytes32"
-      }
-    ],
-    "name": "AccessControlUnauthorizedAccount",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "AlreadyInitialized",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "AlreadyMember",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ArrayLengthMismatch",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "BacklinkAlreadyPublished",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Banned",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "BatchTooLarge",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "CommunityDoesNotExist",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "CommunityInactive",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "CreationCooldownActive",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "EnforcedPause",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ExpectedPause",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "IdentityNotRegistered",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "IncorrectPaymentAmount",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InsufficientFee",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidAddress",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidAsset",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidKeyVersion",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "MaxCommunitiesReached",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "MetadataTooLong",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NoPendingRequest",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotEligible",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotInitialized",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotInvited",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotMember",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotPendingCreator",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NothingToWithdraw",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "PaymentNotConfigured",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "PriceExceedsMax",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ReentrancyGuardReentrantCall",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      }
-    ],
-    "name": "SafeERC20FailedOperation",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "TooManyRequirements",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "TransferFailed",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Unauthorized",
-    "type": "error"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "creator",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "enum IHupCommunity.AdmissionMode",
-        "name": "admission",
-        "type": "uint8"
-      }
-    ],
-    "name": "CommunityCreated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "governor",
-        "type": "address"
-      }
-    ],
-    "name": "CommunityGovernorUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "oldCreator",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "newCreator",
-        "type": "address"
-      }
-    ],
-    "name": "CommunityOwnershipTransferStarted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "oldCreator",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "newCreator",
-        "type": "address"
-      }
-    ],
-    "name": "CommunityOwnershipTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "isActive",
-        "type": "bool"
-      }
-    ],
-    "name": "CommunityStatusUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "enum IHupCommunity.AdmissionMode",
-        "name": "admission",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "enum IHupCommunity.CommunityType",
-        "name": "cType",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "metadata",
-        "type": "string"
-      }
-    ],
-    "name": "CommunityUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "cooldown",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "maxPerWallet",
-        "type": "uint256"
-      }
-    ],
-    "name": "CreationLimitsUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "module",
-        "type": "address"
-      }
-    ],
-    "name": "EligibilityModuleUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "oldValue",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "newValue",
-        "type": "uint256"
-      }
-    ],
-    "name": "FeeUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "oldValue",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "newValue",
-        "type": "address"
-      }
-    ],
-    "name": "FollowerSystemUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "communityId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "visible",
-        "type": "bool"
-      }
-    ],
-    "name": "HistoryVisibilityUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      }
-    ],
-    "name": "IdentityKeyRegistered",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "actor",
-        "type": "address"
-      }
-    ],
-    "name": "InviteRevoked",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "creator",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "recipient",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "JoinPayoutWithdrawn",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "communityId",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "version",
-        "type": "uint256"
-      }
-    ],
-    "name": "KeyBacklinkPublished",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "communityId",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "holder",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "version",
-        "type": "uint256"
-      }
-    ],
-    "name": "KeyGranted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "communityId",
-        "type": "uint256"
-      }
-    ],
-    "name": "KeyInitialized",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "communityId",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "newVersion",
-        "type": "uint256"
-      }
-    ],
-    "name": "KeyRotated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "actor",
-        "type": "address"
-      }
-    ],
-    "name": "MemberInvited",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "actor",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "isMember",
-        "type": "bool"
-      }
-    ],
-    "name": "MemberStatusUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "payer",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "MembershipPaid",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "actor",
-        "type": "address"
-      }
-    ],
-    "name": "MembershipRequested",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "actor",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "isModerator",
-        "type": "bool"
-      }
-    ],
-    "name": "ModeratorUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "Paused",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "price",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "isLsp7",
-        "type": "bool"
-      }
-    ],
-    "name": "PaymentRequirementUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "enum IHupCommunity.RequirementMode",
-        "name": "mode",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "count",
-        "type": "uint256"
-      }
-    ],
-    "name": "RequirementsUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "previousAdminRole",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "newAdminRole",
-        "type": "bytes32"
-      }
-    ],
-    "name": "RoleAdminChanged",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      }
-    ],
-    "name": "RoleGranted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      }
-    ],
-    "name": "RoleRevoked",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "from",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "UnattributedDeposit",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "Unpaused",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "actor",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "isWhitelisted",
-        "type": "bool"
-      }
-    ],
-    "name": "WhitelistUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "recipient",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "Withdrawal",
-    "type": "event"
-  },
-  {
-    "inputs": [],
+    "type": "function",
     "name": "ADMIN_ROLE",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "bytes32",
         "name": "",
-        "type": "bytes32"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "ASSET_READ_GAS_CAP",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "DEFAULT_ADMIN_ROLE",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "bytes32",
         "name": "",
-        "type": "bytes32"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "ELIGIBILITY_MODULE_GAS_CAP",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "MAX_BATCH_SIZE",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "MAX_METADATA_LENGTH",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "MAX_REQUIREMENTS",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      }
-    ],
+    "type": "function",
     "name": "acceptCommunityOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
         "name": "_id",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "acceptInvite",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
         "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "approveRequest",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
         "name": "_id",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "bannedCount",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
         "name": "_id",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "bumpKeyVersion",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "newVersion",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "stateMutability": "nonpayable"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "actor",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "communityId",
-        "type": "uint256"
-      }
-    ],
+    "type": "function",
     "name": "canPost",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
+        "name": "actor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "communityId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "cancelCommunityOwnershipTransfer",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
         "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "cancelInvite",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
         "name": "_id",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "cancelRequest",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "communities",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "id",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "internalType": "address",
         "name": "creator",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "enum IHupCommunity.AdmissionMode",
         "name": "admission",
-        "type": "uint8"
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.AdmissionMode"
       },
       {
-        "internalType": "enum IHupCommunity.CommunityType",
         "name": "cType",
-        "type": "uint8"
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.CommunityType"
       },
       {
-        "internalType": "bool",
         "name": "isActive",
-        "type": "bool"
+        "type": "bool",
+        "internalType": "bool"
       },
       {
-        "internalType": "string",
         "name": "metadata",
-        "type": "string"
+        "type": "string",
+        "internalType": "string"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
+    "type": "function",
     "name": "communitiesCreatedCount",
-    "outputs": [
+    "inputs": [
       {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "communityCount",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
+    "type": "function",
     "name": "communityIdentityKeys",
-    "outputs": [
-      {
-        "internalType": "bytes",
-        "name": "",
-        "type": "bytes"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "enum IHupCommunity.AdmissionMode",
-        "name": "_admission",
-        "type": "uint8"
-      },
-      {
-        "internalType": "enum IHupCommunity.CommunityType",
-        "name": "_communityType",
-        "type": "uint8"
-      },
-      {
-        "internalType": "string",
-        "name": "_metadataCid",
-        "type": "string"
-      },
-      {
-        "internalType": "bytes",
-        "name": "initialWrappedKey",
-        "type": "bytes"
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "createCommunity",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "creationCooldown",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      }
-    ],
-    "name": "declineInvite",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "eligibilityModules",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "fee",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "followerSystem",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "offset",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "limit",
-        "type": "uint256"
-      }
-    ],
-    "name": "getBanned",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "offset",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "limit",
-        "type": "uint256"
-      }
-    ],
-    "name": "getMembers",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      }
-    ],
-    "name": "getRequirements",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "enum IHupCommunity.RequirementType",
-            "name": "rType",
-            "type": "uint8"
-          },
-          {
-            "internalType": "address",
-            "name": "asset",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "minBalance",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct IHupCommunity.AssetRequirement[]",
-        "name": "",
-        "type": "tuple[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      }
-    ],
-    "name": "getRoleAdmin",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "offset",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "limit",
-        "type": "uint256"
-      }
-    ],
-    "name": "getWhitelist",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "governors",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "member",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes",
-        "name": "wrappedKey",
-        "type": "bytes"
-      }
-    ],
-    "name": "grantKey",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address[]",
-        "name": "_members",
-        "type": "address[]"
-      },
-      {
-        "internalType": "bytes[]",
-        "name": "_wrappedKeys",
-        "type": "bytes[]"
-      }
-    ],
-    "name": "grantKeyBatch",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "grantRole",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "hasRole",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "historyVisibleToNewMembers",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bytes",
-        "name": "creatorWrappedKey",
-        "type": "bytes"
-      }
-    ],
-    "name": "initializeKey",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      }
-    ],
-    "name": "inviteMember",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "invites",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      }
-    ],
-    "name": "isEligible",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "forwarder",
-        "type": "address"
-      }
-    ],
-    "name": "isTrustedForwarder",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_maxPrice",
-        "type": "uint256"
-      }
-    ],
-    "name": "join",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "joinPayouts",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "keyBacklinks",
-    "outputs": [
-      {
-        "internalType": "bytes",
-        "name": "",
-        "type": "bytes"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "keyVersion",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      }
-    ],
-    "name": "kick",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "lastCommunityCreatedAt",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      }
-    ],
-    "name": "leave",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "maxCommunitiesPerWallet",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      }
-    ],
-    "name": "memberCount",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "pause",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "paused",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "paymentRequirements",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "price",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isLsp7",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "pendingCreator",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_version",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bytes",
-        "name": "_link",
-        "type": "bytes"
-      }
-    ],
-    "name": "publishKeyBacklink",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes",
-        "name": "pubKey",
-        "type": "bytes"
-      }
-    ],
-    "name": "registerIdentityKey",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "registry",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "isMember",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "isPending",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "isModerator",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "isBanned",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "canPost",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      }
-    ],
-    "name": "rejectRequest",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "callerConfirmation",
-        "type": "address"
-      }
-    ],
-    "name": "renounceRole",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "requirementMode",
-    "outputs": [
-      {
-        "internalType": "enum IHupCommunity.RequirementMode",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "role",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "revokeRole",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_banned",
-        "type": "bool"
-      }
-    ],
-    "name": "setBanStatus",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "_isActive",
-        "type": "bool"
-      }
-    ],
-    "name": "setCommunityStatus",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_cooldown",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_maxPerWallet",
-        "type": "uint256"
-      }
-    ],
-    "name": "setCreationLimits",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_module",
-        "type": "address"
-      }
-    ],
-    "name": "setEligibilityModule",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_fee",
-        "type": "uint256"
-      }
-    ],
-    "name": "setFee",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_followerSystem",
-        "type": "address"
-      }
-    ],
-    "name": "setFollowerSystem",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_governor",
-        "type": "address"
-      }
-    ],
-    "name": "setGovernor",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "_visible",
-        "type": "bool"
-      }
-    ],
-    "name": "setHistoryVisibility",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_isMod",
-        "type": "bool"
-      }
-    ],
-    "name": "setModerator",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_price",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "_isLsp7",
-        "type": "bool"
-      }
-    ],
-    "name": "setPaymentRequirement",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_canPost",
-        "type": "bool"
-      }
-    ],
-    "name": "setPostingPermission",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "components": [
-          {
-            "internalType": "enum IHupCommunity.RequirementType",
-            "name": "rType",
-            "type": "uint8"
-          },
-          {
-            "internalType": "address",
-            "name": "asset",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "minBalance",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct IHupCommunity.AssetRequirement[]",
-        "name": "_requirements",
-        "type": "tuple[]"
-      },
-      {
-        "internalType": "enum IHupCommunity.RequirementMode",
-        "name": "_mode",
-        "type": "uint8"
-      }
-    ],
-    "name": "setRequirements",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_actor",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_allowed",
-        "type": "bool"
-      }
-    ],
-    "name": "setWhitelisted",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address[]",
-        "name": "_actors",
-        "type": "address[]"
-      },
-      {
-        "internalType": "bool",
-        "name": "_allowed",
-        "type": "bool"
-      }
-    ],
-    "name": "setWhitelistedBatch",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes4",
-        "name": "interfaceId",
-        "type": "bytes4"
-      }
-    ],
-    "name": "supportsInterface",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "totalJoinPayouts",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_newCreator",
-        "type": "address"
-      }
-    ],
-    "name": "transferCommunityOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "trustedForwarder",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "unpause",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "enum IHupCommunity.AdmissionMode",
         "name": "_admission",
-        "type": "uint8"
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.AdmissionMode"
       },
       {
-        "internalType": "enum IHupCommunity.CommunityType",
         "name": "_communityType",
-        "type": "uint8"
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.CommunityType"
       },
       {
-        "internalType": "string",
         "name": "_metadataCid",
-        "type": "string"
-      }
-    ],
-    "name": "updateCommunity",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "version",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "pure",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
+        "type": "string",
+        "internalType": "string"
       },
       {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
+        "name": "initialWrappedKey",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    "name": "whitelist",
     "outputs": [
       {
-        "internalType": "bool",
         "name": "",
-        "type": "bool"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "payable"
   },
   {
+    "type": "function",
+    "name": "creationCooldown",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "declineInvite",
     "inputs": [
       {
-        "internalType": "uint256",
         "name": "_id",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "name": "whitelistCount",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "eligibilityModules",
     "inputs": [
       {
-        "internalType": "address payable",
-        "name": "_receiver",
-        "type": "address"
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "name": "withdrawAll",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "fee",
     "inputs": [],
-    "name": "withdrawJoinPayouts",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address payable",
-        "name": "_to",
-        "type": "address"
-      }
-    ],
-    "name": "withdrawJoinPayoutsTo",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "wrappedKeys",
     "outputs": [
       {
-        "internalType": "bytes",
         "name": "",
-        "type": "bytes"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "stateMutability": "payable",
-    "type": "receive"
+    "type": "function",
+    "name": "followerSystem",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getBanned",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getMembers",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getRequirements",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "internalType": "struct IHupCommunity.AssetRequirement[]",
+        "components": [
+          {
+            "name": "rType",
+            "type": "uint8",
+            "internalType": "enum IHupCommunity.RequirementType"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "minBalance",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getRoleAdmin",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getWhitelist",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "governors",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "grantKey",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "member",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "wrappedKey",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "grantKeyBatch",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_members",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "_wrappedKeys",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "grantRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "hasRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "historyVisibleToNewMembers",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initializeKey",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "creatorWrappedKey",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "inviteMember",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "invites",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isEligible",
+    "inputs": [
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isTrustedForwarder",
+    "inputs": [
+      {
+        "name": "forwarder",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "join",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_maxPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "keyBacklinks",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "keyVersion",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "kick",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "lastCommunityCreatedAt",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "leave",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "maxCommunitiesPerWallet",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "memberCount",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "paused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "paymentRequirements",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "isLsp7",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "payoutDestination",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingCreator",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "publishKeyBacklink",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_version",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_link",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "registerIdentityKey",
+    "inputs": [
+      {
+        "name": "pubKey",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "registry",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "isMember",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "isPending",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "isModerator",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "isBanned",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "canPost",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "rejectRequest",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "renounceRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "callerConfirmation",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "requirementMode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.RequirementMode"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "revokeRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setBanStatus",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_banned",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setCommunityStatus",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_isActive",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setCreationLimits",
+    "inputs": [
+      {
+        "name": "_cooldown",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_maxPerWallet",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setEligibilityModule",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_module",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setFee",
+    "inputs": [
+      {
+        "name": "_fee",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setFollowerSystem",
+    "inputs": [
+      {
+        "name": "_followerSystem",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setGovernor",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_governor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setHistoryVisibility",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_visible",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setModerator",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_isMod",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPaymentRequirement",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_price",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_isLsp7",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPayoutDestination",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_destination",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPostingPermission",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_canPost",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setRequirements",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_requirements",
+        "type": "tuple[]",
+        "internalType": "struct IHupCommunity.AssetRequirement[]",
+        "components": [
+          {
+            "name": "rType",
+            "type": "uint8",
+            "internalType": "enum IHupCommunity.RequirementType"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "minBalance",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_mode",
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.RequirementMode"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setWhitelisted",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_allowed",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setWhitelistedBatch",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_actors",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "_allowed",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "supportsInterface",
+    "inputs": [
+      {
+        "name": "interfaceId",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "transferCommunityOwnership",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_newCreator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "trustedForwarder",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "unpause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateCommunity",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_admission",
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.AdmissionMode"
+      },
+      {
+        "name": "_communityType",
+        "type": "uint8",
+        "internalType": "enum IHupCommunity.CommunityType"
+      },
+      {
+        "name": "_metadataCid",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "version",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "whitelist",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "whitelistCount",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "withdrawAll",
+    "inputs": [
+      {
+        "name": "_receiver",
+        "type": "address",
+        "internalType": "address payable"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "wrappedKeys",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "CommunityCreated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "creator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "admission",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IHupCommunity.AdmissionMode"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CommunityGovernorUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "governor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CommunityOwnershipTransferStarted",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "oldCreator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newCreator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CommunityOwnershipTransferred",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "oldCreator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newCreator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CommunityStatusUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "isActive",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CommunityUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "admission",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IHupCommunity.AdmissionMode"
+      },
+      {
+        "name": "cType",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IHupCommunity.CommunityType"
+      },
+      {
+        "name": "metadata",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CreationLimitsUpdated",
+    "inputs": [
+      {
+        "name": "cooldown",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxPerWallet",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EligibilityModuleUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "module",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FeeUpdated",
+    "inputs": [
+      {
+        "name": "oldValue",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newValue",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FollowerSystemUpdated",
+    "inputs": [
+      {
+        "name": "oldValue",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "newValue",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "HistoryVisibilityUpdated",
+    "inputs": [
+      {
+        "name": "communityId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "visible",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "IdentityKeyRegistered",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "InviteRevoked",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "actor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "KeyBacklinkPublished",
+    "inputs": [
+      {
+        "name": "communityId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "version",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "KeyGranted",
+    "inputs": [
+      {
+        "name": "communityId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "holder",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "version",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "KeyInitialized",
+    "inputs": [
+      {
+        "name": "communityId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "KeyRotated",
+    "inputs": [
+      {
+        "name": "communityId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MemberInvited",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "actor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MemberStatusUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "actor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "isMember",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MembershipPaid",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MembershipRequested",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "actor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ModeratorUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "actor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "isModerator",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Paused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PaymentRequirementUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "isLsp7",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PayoutDestinationUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "destination",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RequirementsUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "mode",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IHupCommunity.RequirementMode"
+      },
+      {
+        "name": "count",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RoleAdminChanged",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "previousAdminRole",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newAdminRole",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RoleGranted",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RoleRevoked",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UnattributedDeposit",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Unpaused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "WhitelistUpdated",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "actor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "isWhitelisted",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Withdrawal",
+    "inputs": [
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AccessControlBadConfirmation",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AccessControlUnauthorizedAccount",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "neededRole",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AlreadyInitialized",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AlreadyMember",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ArrayLengthMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "BacklinkAlreadyPublished",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Banned",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "BatchTooLarge",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CommunityDoesNotExist",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CommunityInactive",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CreationCooldownActive",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EnforcedPause",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExpectedPause",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IdentityNotRegistered",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IncorrectPaymentAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientFee",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAsset",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidKeyVersion",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MaxCommunitiesReached",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MetadataTooLong",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoPendingRequest",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotEligible",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotInitialized",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotInvited",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotMember",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotPendingCreator",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NothingToWithdraw",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PaymentNotConfigured",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PriceExceedsMax",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TooManyRequirements",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TransferFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": []
   }
 ]

@@ -1,17 +1,5 @@
 {
   "contractName": "HupTestLSP7",
-  "source": "src/contracts/v2/Extensions/HupTestLSP7.sol",
-  "compiler": "0.8.36+commit.8a079791",
-  "settings": {
-    "optimizer": {
-      "enabled": true,
-      "runs": 200
-    },
-    "viaIR": true
-  },
-  "dependencies": {
-    "@lukso/lsp7-contracts": "0.18.1"
-  },
   "abi": [
     {
       "type": "constructor",

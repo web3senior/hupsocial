@@ -92,6 +92,9 @@
     .deployer__log-line--ok { color: var(--ok); }
     .deployer__log-line--warn { color: var(--warn); }
     .deployer__log-line--err { color: var(--err); }
+    .deployer__label--section { margin-top: .35rem; }
+    .deployer__note { color: var(--muted); margin: 0; }
+    .deployer__input--amount { flex: 0 1 210px; }
     a { color: #58a6ff; }
   </style>
 </head>
@@ -102,7 +105,8 @@
       Deploys any contract at the same address on every chain via the canonical factory
       <span id="factoryAddr"></span>. Pick a precompiled contract below and fill its constructor
       arguments, or paste <b>init bytecode</b> from Remix by hand (Compilation Details → BYTECODE
-      → "object", with ABI-encoded constructor arguments appended).
+      → "object", with ABI-encoded constructor arguments appended). A test token that already
+      exists on the chain can be faucet-minted, minted and transferred from the last panel.
     </p>
 
     <section class="deployer__panel">
@@ -151,6 +155,41 @@
     </section>
 
     <section class="deployer__panel">
+      <span class="deployer__label">Test token · mint &amp; transfer</span>
+      <p class="deployer__note">
+        Talks to a deployed test token — ERC20, ERC721, LSP7 or LSP8. Fills itself in once the
+        contract picked above is a test token that already exists on this chain; or paste any
+        address and pick its standard.
+      </p>
+      <div class="deployer__row">
+        <input id="tokenAddress" class="deployer__input" spellcheck="false" placeholder="0x… token address" style="flex: 1 1 320px" />
+        <select id="tokenKind" class="deployer__input" style="flex: 0 1 170px"></select>
+        <button id="tokenReadBtn" class="deployer__button deployer__button--secondary">Read</button>
+      </div>
+      <div id="tokenInfo" class="deployer__meta">—</div>
+
+      <span class="deployer__label deployer__label--section">Mint</span>
+      <div class="deployer__row">
+        <button id="faucetBtn" class="deployer__button deployer__button--secondary" disabled>Faucet → me</button>
+        <span id="faucetHint" class="deployer__meta"></span>
+      </div>
+      <div class="deployer__row">
+        <input id="mintTo" class="deployer__input" spellcheck="false" placeholder="0x… recipient" style="flex: 1 1 320px" />
+        <input id="mintAmount" class="deployer__input deployer__input--amount" spellcheck="false" placeholder="amount (whole tokens)" />
+        <button id="mintBtn" class="deployer__button" disabled>Mint</button>
+      </div>
+      <span id="mintHint" class="deployer__meta"></span>
+
+      <span class="deployer__label deployer__label--section">Transfer</span>
+      <div class="deployer__row">
+        <input id="transferTo" class="deployer__input" spellcheck="false" placeholder="0x… recipient" style="flex: 1 1 320px" />
+        <input id="transferValue" class="deployer__input deployer__input--amount" spellcheck="false" placeholder="amount (whole tokens)" />
+        <button id="transferBtn" class="deployer__button" disabled>Transfer</button>
+      </div>
+      <span id="transferHint" class="deployer__meta"></span>
+    </section>
+
+    <section class="deployer__panel">
       <span class="deployer__label">Log</span>
       <div id="log" class="deployer__log"></div>
     </section>
@@ -173,11 +212,17 @@
       8453: "Base", 42161: "Arbitrum", 42220: "Celo", 10143: "Monad Testnet",
     };
 
-    // Contracts with precompiled artifacts in ./deploy-artifacts/artifacts. The HupDrops suite
-    // is solc 0.8.36 / optimizer 200 / viaIR (Remix can't compile the LUKSO satellites — see
-    // that folder's README); HupOffers is solc 0.8.35 / optimizer 200, no viaIR. Each entry's
-    // bytecode date is the artifact file's own mtime, read over HTTP below rather than written
-    // here, so it can never drift from the bytes actually being deployed.
+    // Contracts with precompiled artifacts in ./deploy-artifacts/artifacts. The HupDrops suite,
+    // the test tokens and the HupCommunity pair are solc 0.8.36 / optimizer 200 / viaIR (Remix
+    // can't compile the LUKSO contracts — see that folder's README); HupOffers is solc 0.8.35 /
+    // optimizer 200, no viaIR. Each entry's bytecode date is the artifact file's own mtime, read over HTTP
+    // below rather than written here, so it can never drift from the bytes actually being
+    // deployed.
+    //
+    // `signerArgs` names constructor arguments that prefill with the connected wallet. Through
+    // the factory, `msg.sender` inside a constructor is the factory itself — so every test
+    // token takes its owner explicitly, and the natural owner is whoever is deploying. A
+    // per-chain CTOR_DEFAULTS value still wins over the prefill.
     const ARTIFACTS = [
       { id: "", label: "— pick a contract —" },
       { id: "HupDrops", label: "HupDrops (engine)", file: "HupDrops.json" },
@@ -186,6 +231,11 @@
       { id: "HupDropsDeployer721", label: "HupDrops deployer · ERC721 (numbered, EVM)", file: "HupDropsDeployer721.json" },
       { id: "HupDropsDeployer1155", label: "HupDrops deployer · ERC1155 (editions, EVM)", file: "HupDropsDeployer1155.json" },
       { id: "HupOffers", label: "HupOffers (escrowed offers / OTC)", file: "HupOffers.json" },
+      { id: "HupCommunity", label: "HupCommunity", file: "HupCommunity.json" },
+      { id: "HupTestToken", label: "Test token · ERC20 (faucet, any EVM)", file: "HupTestToken.json", signerArgs: ["owner_"] },
+      { id: "HupTestERC721", label: "Test NFT · ERC721 (faucet, any EVM)", file: "HupTestERC721.json", signerArgs: ["owner_"] },
+      { id: "HupTestLSP7", label: "Test token · LSP7 (faucet, LUKSO-style)", file: "HupTestLSP7.json", signerArgs: ["owner_"] },
+      { id: "HupTestLSP8", label: "Test NFT · LSP8 (faucet, LUKSO-style)", file: "HupTestLSP8.json", signerArgs: ["owner_"] },
       { id: "LSP26", label: "LSP26 Follower System (canonical address)", raw: true },
     ];
 
@@ -221,6 +271,31 @@
         42: ["0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // admin
         4201: ["0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // admin
       },
+      // Forwarder = the chain's HupChatForwarder (`forwarder` in contracts.js) — the one every
+      // Hup extension trusts (HupApps on 42 confirmed onchain), NOT `hupForwarder`, which only
+      // the Hup core itself trusts.
+      HupCommunity: {
+        42: [
+          "0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972", // HupChatForwarder (LUKSO mainnet)
+          "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
+        ],
+        4201: [
+          "0xab100B28D06e93fF52DAE95DB8e90F83680671FC", // HupChatForwarder
+          "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
+        ],
+      },
+    };
+
+    // Chain-independent constructor values — the test tokens look the same everywhere, and a
+    // filled name/symbol is what makes them one click. The owner slot is left blank so the
+    // connected wallet prefills it (see `signerArgs`). Every argument set produces its own
+    // CREATE2 address, so the same defaults on two chains yield the same address on both —
+    // change the salt to deploy a second copy on one chain.
+    const CTOR_PRESETS = {
+      HupTestToken: ["Hup Test Token", "tHUP", "18", ""],
+      HupTestERC721: ["Hup Test ERC721", "tNFT", "", ""],
+      HupTestLSP7: ["Hup Test LSP7", "tLSP7", ""],
+      HupTestLSP8: ["Hup Test LSP8", "tLSP8", ""],
     };
 
     const els = {
@@ -324,6 +399,7 @@
       if (targetCode !== "0x") {
         els.targetStatus.textContent = "✅ contract already deployed at this address";
         els.deployBtn.disabled = true;
+        adoptToken(predicted);
       } else {
         els.targetStatus.textContent = "empty — ready to deploy";
         els.deployBtn.disabled = !factoryOk;
@@ -424,7 +500,8 @@
 
       const inputs = (loadedArtifact.abi ?? []).find((item) => item.type === "constructor")?.inputs ?? [];
       const chainId = provider ? Number((await provider.getNetwork()).chainId) : null;
-      const defaults = (chainId && CTOR_DEFAULTS[id]?.[chainId]) || [];
+      const defaults = (chainId && CTOR_DEFAULTS[id]?.[chainId]) || CTOR_PRESETS[id] || [];
+      const signerAddress = signer ? await signer.getAddress() : "";
 
       inputs.forEach((input, index) => {
         const label = document.createElement("label");
@@ -435,7 +512,9 @@
         field.spellcheck = false;
         field.dataset.type = input.type;
         field.placeholder = input.type === "address" ? "0x…" : input.type;
-        field.value = defaults[index] ?? "";
+        const prefillSigner = entry.signerArgs?.includes(input.name) && !defaults[index];
+        field.value = (prefillSigner ? signerAddress : defaults[index]) ?? "";
+        if (prefillSigner) caption.textContent += signerAddress ? " · connected wallet" : " · connect a wallet to prefill";
         field.addEventListener("input", () => {
           els.artifactHint.textContent = "Arguments changed — press Load bytecode again.";
         });
@@ -497,6 +576,430 @@
         log(`Could not encode constructor arguments: ${err.shortMessage || err.message}`, "err");
       }
     }
+
+    // --- Test token · mint & transfer ---
+
+    // LSP7/LSP8 have no name()/symbol(); the app reads these ERC725Y keys, so the panel does too
+    const LSP4_TOKEN_NAME_KEY = "0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b6ecceaf653468af1";
+    const LSP4_TOKEN_SYMBOL_KEY = "0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756";
+    const MINTER_ROLE = ethers.id("MINTER_ROLE");
+    // ERC721 has no enumeration, so owned ids come from scanning ownerOf — bounded, this is a test collection
+    const ERC721_SCAN_CAP = 200;
+
+    const amountFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
+    const countFormat = new Intl.NumberFormat("en-US");
+
+    const short = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
+    const sameAddress = (a, b) => a.toLowerCase() === b.toLowerCase();
+    const formatAmount = (raw, decimals) => amountFormat.format(Number(ethers.formatUnits(raw, decimals)));
+
+    // ERC: Ownable — whoever owns the token mints. LSP: AccessControl — the owner was granted
+    // MINTER_ROLE at construction, and disableMinting() switches both mint and faucet off.
+    const ownableAccess = async (contract, who) => ({
+      mint: sameAddress(await contract.owner(), who) ? null : "owner only, and the connected wallet is not the owner",
+      faucet: null,
+    });
+    const roleAccess = async (contract, who) => {
+      if (!(await contract.isMintable())) {
+        return { mint: "minting has been disabled on this token", faucet: "minting has been disabled on this token" };
+      }
+      return {
+        mint: (await contract.hasRole(MINTER_ROLE, who)) ? null : "MINTER_ROLE only, which the connected wallet lacks",
+        faucet: null,
+      };
+    };
+    const readLsp4 = async (contract) => {
+      const [name, symbol] = await contract.getDataBatch([LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY]);
+      return { name: ethers.toUtf8String(name), symbol: ethers.toUtf8String(symbol) };
+    };
+
+    // One entry per standard, keyed by the artifact that deploys it. Each ABI is only the slice
+    // this panel calls — the standard surface plus the faucet/mint the HupTest* sources add — so a
+    // foreign token at the address still reads, and only the calls it lacks fail. Transfers always
+    // leave from the connected wallet. LSP calls pass force=true so plain EOAs receive; ERC721 uses
+    // transferFrom rather than safeTransferFrom so a recipient without an ERC721 receiver hook (a
+    // Universal Profile, say) is not rejected. Transfer event arguments are named uniformly
+    // (`to`, `amount` / `tokenId`) so one receipt reader serves all four.
+    const TOKEN_KINDS = {
+      erc20: {
+        label: "ERC20 token", artifact: "HupTestToken", nft: false, rule: "owner only",
+        abi: [
+          "function name() view returns (string)",
+          "function symbol() view returns (string)",
+          "function decimals() view returns (uint8)",
+          "function totalSupply() view returns (uint256)",
+          "function balanceOf(address) view returns (uint256)",
+          "function owner() view returns (address)",
+          "function FAUCET_DRIP() view returns (uint256)",
+          "function faucet()",
+          "function mint(address to, uint256 amount)",
+          "function transfer(address to, uint256 amount) returns (bool)",
+          "event Transfer(address indexed from, address indexed to, uint256 amount)",
+        ],
+        meta: async (c) => {
+          const [name, symbol, decimals] = await Promise.all([c.name(), c.symbol(), c.decimals()]);
+          return { name, symbol, decimals: Number(decimals) };
+        },
+        access: ownableAccess,
+        mint: (c, to, amount) => c.mint(to, amount),
+        transfer: (c, from, to, amount) => c.transfer(to, amount),
+      },
+      erc721: {
+        label: "ERC721 NFT", artifact: "HupTestERC721", nft: true, rule: "owner only",
+        abi: [
+          "function name() view returns (string)",
+          "function symbol() view returns (string)",
+          "function totalSupply() view returns (uint256)",
+          "function balanceOf(address) view returns (uint256)",
+          "function ownerOf(uint256 tokenId) view returns (address)",
+          "function owner() view returns (address)",
+          "function FAUCET_DRIP() view returns (uint256)",
+          "function faucet() returns (uint256)",
+          "function mint(address to) returns (uint256)",
+          "function transferFrom(address from, address to, uint256 tokenId)",
+          "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+        ],
+        meta: async (c) => {
+          const [name, symbol] = await Promise.all([c.name(), c.symbol()]);
+          return { name, symbol, decimals: 0 };
+        },
+        access: ownableAccess,
+        mint: (c, to) => c.mint(to),
+        transfer: (c, from, to, tokenId) => c.transferFrom(from, to, tokenId),
+        toTokenId: (raw) => BigInt(raw),
+        // Ids are sequential from 1 and never burned here, so supply bounds the scan
+        ownedIds: async (c, who) => {
+          const total = Number(await c.totalSupply());
+          const limit = Math.min(total, ERC721_SCAN_CAP);
+          const ids = [];
+          for (let start = 1; start <= limit; start += 25) {
+            const batch = Array.from({ length: Math.min(25, limit - start + 1) }, (_, i) => BigInt(start + i));
+            const owners = await Promise.all(batch.map((id) => c.ownerOf(id).catch(() => null)));
+            owners.forEach((owner, i) => { if (owner && sameAddress(owner, who)) ids.push(batch[i]); });
+          }
+          return { ids, partial: total > limit };
+        },
+      },
+      lsp7: {
+        label: "LSP7 token", artifact: "HupTestLSP7", nft: false, rule: "MINTER_ROLE only",
+        abi: [
+          "function getDataBatch(bytes32[] dataKeys) view returns (bytes[])",
+          "function decimals() view returns (uint8)",
+          "function totalSupply() view returns (uint256)",
+          "function balanceOf(address) view returns (uint256)",
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+          "function isMintable() view returns (bool)",
+          "function FAUCET_DRIP() view returns (uint256)",
+          "function faucet()",
+          "function mint(address to, uint256 amount, bool force, bytes data)",
+          "function transfer(address from, address to, uint256 amount, bool force, bytes data)",
+          "event Transfer(address indexed operator, address indexed from, address indexed to, uint256 amount, bool force, bytes data)",
+        ],
+        meta: async (c) => ({ ...(await readLsp4(c)), decimals: Number(await c.decimals()) }),
+        access: roleAccess,
+        mint: (c, to, amount) => c.mint(to, amount, true, "0x"),
+        transfer: (c, from, to, amount) => c.transfer(from, to, amount, true, "0x"),
+      },
+      lsp8: {
+        label: "LSP8 NFT", artifact: "HupTestLSP8", nft: true, rule: "MINTER_ROLE only",
+        abi: [
+          "function getDataBatch(bytes32[] dataKeys) view returns (bytes[])",
+          "function totalSupply() view returns (uint256)",
+          "function balanceOf(address) view returns (uint256)",
+          "function tokenIdsOf(address) view returns (bytes32[])",
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+          "function isMintable() view returns (bool)",
+          "function FAUCET_DRIP() view returns (uint256)",
+          "function faucet() returns (bytes32)",
+          "function mintNext(address to) returns (bytes32)",
+          "function transfer(address from, address to, bytes32 tokenId, bool force, bytes data)",
+          "event Transfer(address operator, address indexed from, address indexed to, bytes32 indexed tokenId, bool force, bytes data)",
+        ],
+        meta: async (c) => ({ ...(await readLsp4(c)), decimals: 0 }),
+        access: roleAccess,
+        mint: (c, to) => c.mintNext(to),
+        transfer: (c, from, to, tokenId) => c.transfer(from, to, tokenId, true, "0x"),
+        // The test collection uses the number format, so a plain id is accepted alongside raw bytes32
+        toTokenId: (raw) => (/^0x[0-9a-f]{64}$/i.test(raw) ? raw : ethers.toBeHex(BigInt(raw), 32)),
+        ownedIds: async (c, who) => ({ ids: (await c.tokenIdsOf(who)).map((id) => BigInt(id)), partial: false }),
+      },
+    };
+
+    const tokenEls = {
+      address: document.getElementById("tokenAddress"),
+      kind: document.getElementById("tokenKind"),
+      readBtn: document.getElementById("tokenReadBtn"),
+      info: document.getElementById("tokenInfo"),
+      faucetBtn: document.getElementById("faucetBtn"),
+      faucetHint: document.getElementById("faucetHint"),
+      mintTo: document.getElementById("mintTo"),
+      mintAmount: document.getElementById("mintAmount"),
+      mintBtn: document.getElementById("mintBtn"),
+      mintHint: document.getElementById("mintHint"),
+      transferTo: document.getElementById("transferTo"),
+      transferValue: document.getElementById("transferValue"),
+      transferBtn: document.getElementById("transferBtn"),
+      transferHint: document.getElementById("transferHint"),
+    };
+
+    for (const [id, kind] of Object.entries(TOKEN_KINDS)) {
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = kind.label;
+      tokenEls.kind.appendChild(option);
+    }
+
+    let tokenState = null;
+    let tokenBusy = false;
+    // The address this panel filled in by itself — a hand-typed one is never overwritten
+    let autoTokenAddress = null;
+
+    const currentKind = () => TOKEN_KINDS[tokenEls.kind.value];
+
+    function syncTokenButtons() {
+      const ready = !!tokenState && !!signer && !tokenBusy;
+      tokenEls.readBtn.disabled = tokenBusy;
+      tokenEls.faucetBtn.disabled = !ready || !!tokenState.access.faucet;
+      tokenEls.mintBtn.disabled = !ready || !!tokenState.access.mint;
+      tokenEls.transferBtn.disabled = !ready;
+    }
+
+    function setTokenBusy(busy) {
+      tokenBusy = busy;
+      syncTokenButtons();
+    }
+
+    // NFTs mint one sequential id at a time and transfer by id; fungibles take whole-token amounts
+    function applyKindUi() {
+      const { nft } = currentKind();
+      tokenEls.mintAmount.hidden = nft;
+      tokenEls.transferValue.placeholder = nft ? "token id" : "amount (whole tokens)";
+    }
+
+    function describeToken({ address, kind, meta, balance, supply, owned, access }) {
+      const parts = [`${meta.name || "?"} (${meta.symbol || "?"}) · ${kind.label} at ${short(address)}`];
+      if (kind.nft) {
+        if (supply != null) parts.push(`${countFormat.format(Number(supply))} minted`);
+        let held = `you hold ${countFormat.format(Number(balance))}`;
+        if (owned?.ids.length) held += ` (${owned.ids.map((id) => `#${id}`).join(", ")}${owned.partial ? ", …" : ""})`;
+        parts.push(held);
+      } else {
+        parts.push(`${meta.decimals} decimals`);
+        if (supply != null) parts.push(`supply ${formatAmount(supply, meta.decimals)}`);
+        parts.push(`you hold ${formatAmount(balance, meta.decimals)} ${meta.symbol}`);
+      }
+      parts.push(access.mint ? `mint ✗ ${access.mint}` : `mint ✓ ${kind.rule}`);
+      return parts.join(" · ");
+    }
+
+    async function readToken() {
+      const address = tokenEls.address.value.trim();
+      const kind = currentKind();
+      tokenState = null;
+      tokenEls.faucetHint.textContent = "";
+      tokenEls.mintHint.textContent = "";
+      tokenEls.transferHint.textContent = "";
+      syncTokenButtons();
+
+      if (!provider) {
+        tokenEls.info.textContent = "Connect a wallet first.";
+        return;
+      }
+      if (!ethers.isAddress(address)) {
+        tokenEls.info.textContent = address ? "Not a valid address." : "—";
+        return;
+      }
+
+      tokenEls.info.textContent = "Reading…";
+      try {
+        if ((await provider.getCode(address)) === "0x") {
+          tokenEls.info.textContent = "No contract at this address on the current chain.";
+          return;
+        }
+        const contract = new ethers.Contract(address, kind.abi, signer ?? provider);
+        const who = await signer.getAddress();
+        // name/symbol first and alone: if these fail the standard picked is simply wrong
+        const meta = await kind.meta(contract);
+        const [balance, supply, owned, access, drip] = await Promise.all([
+          contract.balanceOf(who),
+          contract.totalSupply().catch(() => null),
+          kind.ownedIds ? kind.ownedIds(contract, who).catch(() => null) : null,
+          kind.access(contract, who).catch((err) => ({
+            mint: `could not check mint rights (${err.shortMessage || err.message})`,
+            faucet: null,
+          })),
+          contract.FAUCET_DRIP().catch(() => null),
+        ]);
+        tokenState = { address, kind, contract, who, meta, balance, supply, owned, access };
+        tokenEls.info.textContent = describeToken(tokenState);
+
+        let dripText;
+        if (drip == null) {
+          dripText = "no FAUCET_DRIP() here — the faucet call may not exist on this contract";
+        } else if (kind.nft) {
+          const count = Number(drip);
+          dripText = `${countFormat.format(count)} token${count === 1 ? "" : "s"} per call, next sequential id, to the connected wallet`;
+        } else {
+          dripText = `${countFormat.format(Number(drip))} ${meta.symbol} per call to the connected wallet`;
+        }
+        tokenEls.faucetHint.textContent = access.faucet ? `unavailable: ${access.faucet}` : `anyone · ${dripText}`;
+        if (access.mint) {
+          tokenEls.mintHint.textContent = `Mint is ${access.mint}. The faucet still works for anyone.`;
+        } else if (kind.nft) {
+          tokenEls.mintHint.textContent = `${kind.rule} · mints the next sequential id to the recipient.`;
+        } else {
+          tokenEls.mintHint.textContent = `${kind.rule} · amount is in whole ${meta.symbol}, scaled by ${meta.decimals} decimals.`;
+        }
+        tokenEls.transferHint.textContent = kind.nft
+          ? `Sends one of your ids from ${short(who)}.`
+          : `Sends whole ${meta.symbol} from ${short(who)}.`;
+        if (!tokenEls.mintTo.value.trim()) tokenEls.mintTo.value = who;
+      } catch (err) {
+        tokenEls.info.textContent = `Could not read this as ${kind.label}: ${err.shortMessage || err.message}`;
+        log(`Token read failed: ${err.shortMessage || err.message}`, "err");
+      } finally {
+        syncTokenButtons();
+      }
+    }
+
+    // Called from checkChain: when the contract above is a test token and its predicted address
+    // already holds code (just deployed, or deployed earlier), point the panel at it
+    function adoptToken(address) {
+      const kindId = Object.keys(TOKEN_KINDS).find((id) => TOKEN_KINDS[id].artifact === loadedArtifact?.id);
+      if (!kindId) return;
+      const current = tokenEls.address.value.trim();
+      if (current && current !== autoTokenAddress) return;
+      autoTokenAddress = address;
+      tokenEls.address.value = address;
+      tokenEls.kind.value = kindId;
+      applyKindUi();
+      readToken().catch((e) => log(e.message, "err"));
+    }
+
+    // What moved, from the token's own Transfer logs — the only way to learn a minted id
+    function describeReceipt(receipt) {
+      const { contract, kind, meta, address } = tokenState;
+      const notes = [];
+      for (const entry of receipt.logs) {
+        if (!sameAddress(entry.address, address)) continue;
+        let parsed = null;
+        try { parsed = contract.interface.parseLog(entry); } catch { /* not one of ours */ }
+        if (parsed?.name !== "Transfer") continue;
+        notes.push(
+          kind.nft
+            ? `#${BigInt(parsed.args.tokenId)} → ${short(parsed.args.to)}`
+            : `${formatAmount(parsed.args.amount, meta.decimals)} ${meta.symbol} → ${short(parsed.args.to)}`,
+        );
+      }
+      return notes.length ? ` — ${notes.join(", ")}` : "";
+    }
+
+    async function runTokenTx(label, send) {
+      if (!tokenState || !signer) {
+        log("Read a token with a connected wallet first.", "warn");
+        return;
+      }
+      setTokenBusy(true);
+      try {
+        log(`${label}…`);
+        const tx = await send();
+        log(`Tx sent: ${tx.hash} — waiting for confirmation...`);
+        const receipt = await tx.wait();
+        if (receipt.status !== 1) {
+          log(`${label}: transaction reverted.`, "err");
+          return;
+        }
+        log(`✅ ${label}: confirmed${describeReceipt(receipt)}`, "ok");
+        setTokenBusy(false);
+        await readToken();
+      } catch (err) {
+        log(`${label} failed: ${err.shortMessage || err.message}`, "err");
+      } finally {
+        setTokenBusy(false);
+      }
+    }
+
+    function parseRecipient(raw, what) {
+      const to = raw.trim();
+      if (!ethers.isAddress(to)) {
+        log(`${what}: recipient is not an address.`, "err");
+        return null;
+      }
+      return to;
+    }
+
+    // Whole tokens in, base units out — null (and a log line) when the text is not a positive amount
+    function parseAmount(raw, what) {
+      const { meta } = tokenState;
+      try {
+        const amount = ethers.parseUnits(raw.trim() || "0", meta.decimals);
+        if (amount <= 0n) throw new Error("amount must be above zero");
+        return amount;
+      } catch (err) {
+        log(`${what}: ${err.shortMessage || err.message}`, "err");
+        return null;
+      }
+    }
+
+    function parseTokenId(raw, what) {
+      try {
+        const value = raw.trim();
+        if (!value) throw new Error("token id is empty");
+        return tokenState.kind.toTokenId(value);
+      } catch (err) {
+        log(`${what}: ${err.shortMessage || err.message}`, "err");
+        return null;
+      }
+    }
+
+    function faucet() {
+      return runTokenTx("Faucet", () => tokenState.contract.faucet());
+    }
+
+    function mint() {
+      const { kind, contract, meta } = tokenState;
+      const to = parseRecipient(tokenEls.mintTo.value, "Mint");
+      if (!to) return;
+      if (kind.nft) {
+        return runTokenTx(`Mint next ${meta.symbol} to ${short(to)}`, () => kind.mint(contract, to));
+      }
+      const amount = parseAmount(tokenEls.mintAmount.value, "Mint");
+      if (amount == null) return;
+      return runTokenTx(
+        `Mint ${formatAmount(amount, meta.decimals)} ${meta.symbol} to ${short(to)}`,
+        () => kind.mint(contract, to, amount),
+      );
+    }
+
+    function transfer() {
+      const { kind, contract, meta, who } = tokenState;
+      const to = parseRecipient(tokenEls.transferTo.value, "Transfer");
+      if (!to) return;
+      if (kind.nft) {
+        const tokenId = parseTokenId(tokenEls.transferValue.value, "Transfer");
+        if (tokenId == null) return;
+        return runTokenTx(
+          `Transfer ${meta.symbol} #${BigInt(tokenId)} to ${short(to)}`,
+          () => kind.transfer(contract, who, to, tokenId),
+        );
+      }
+      const amount = parseAmount(tokenEls.transferValue.value, "Transfer");
+      if (amount == null) return;
+      return runTokenTx(
+        `Transfer ${formatAmount(amount, meta.decimals)} ${meta.symbol} to ${short(to)}`,
+        () => kind.transfer(contract, who, to, amount),
+      );
+    }
+
+    tokenEls.kind.addEventListener("change", () => {
+      applyKindUi();
+      readToken().catch((e) => log(e.message, "err"));
+    });
+    tokenEls.readBtn.addEventListener("click", () => readToken().catch((e) => log(e.message, "err")));
+    tokenEls.faucetBtn.addEventListener("click", faucet);
+    tokenEls.mintBtn.addEventListener("click", mint);
+    tokenEls.transferBtn.addEventListener("click", transfer);
+    applyKindUi();
 
     els.artifactSelect.addEventListener("change", (e) => selectArtifact(e.target.value));
     els.loadArtifactBtn.addEventListener("click", loadArtifactBytecode);

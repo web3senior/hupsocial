@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./IHupCommunity.sol";
-import "./Follower System/ILSP26FollowerSystem.sol";
 import "./ILSP7Minimal.sol";
+import "./Follower System/ILSP26FollowerSystem.sol";
 
 /**
  * @title Hup Community Protocol
@@ -70,17 +70,13 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     mapping(uint256 => PaymentRequirement) public paymentRequirements;
     mapping(uint256 => address) public pendingCreator;
 
-    /// @notice creator => withdrawable native-coin join fees (pull-over-push: paying out inside
-    ///         join() would let a creator whose address can't receive native coin — a Safe/
-    ///         Timelock without a payable path, or a griefing contract — permanently brick
-    ///         joins for their community). Token-priced fees still transfer directly, since
-    ///         the creator picked the token and its failure modes themselves.
-    mapping(address => uint256) public joinPayouts;
-
-    /// @notice Sum of all unclaimed joinPayouts balances. Fences withdrawAll off the escrow:
-    ///         the admin sweep may only take address(this).balance minus this amount, so
-    ///         creators' accrued join fees can never be drained out from under them.
-    uint256 public totalJoinPayouts;
+    /// @notice communityId => where PayToJoin fees are sent. address(0) (the default) means the
+    ///         community's creator. Fees are pushed straight to this address inside join() —
+    ///         the contract never holds them — so a destination that can't receive the asset
+    ///         (a Safe with no payable path, a token that reverts on it) makes joins revert
+    ///         until the creator re-points it. Self-inflicted and fixable in one tx, which is
+    ///         why no escrow/claim ledger is needed: the failure is never permanent.
+    mapping(uint256 => address) public payoutDestination;
 
     // --- Composable eligibility requirements ---
     // What a wallet must hold or be, independent of how it is admitted (AdmissionMode) and of
@@ -460,9 +456,10 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
      *        community that flips to PayToJoin between signing and mining revert instead of
      *        charging silently.
      * @dev nonReentrant + checks-effects-interactions (membership is granted before the payment
-     *      transfer runs) since the payout goes straight to the creator — who could be a contract
-     *      with its own receive/token-transfer hooks (LSP7 in particular calls back into both
-     *      sender and recipient on transfer).
+     *      transfer runs) since the fee goes straight to the payout destination — the creator, or
+     *      a contract they chose — which could run arbitrary receive/token-transfer hooks (LSP7
+     *      in particular calls back into both sender and recipient on transfer). The fee never
+     *      rests in this contract: it lands in the destination's wallet in the same transaction.
      */
     function join(uint256 _id, uint256 _maxPrice) external payable communityExists(_id) whenNotPaused nonReentrant {
         address sender = _msgSender();
@@ -487,9 +484,9 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
             _admit(_id, sender);
         } else {
             // PayToJoin — membership is granted before the payout runs (checks-effects-
-            // interactions + nonReentrant): the recipient is the creator, who could be a
-            // contract with its own receive/token-transfer hooks (LSP7 in particular calls
-            // back into both sender and recipient on transfer).
+            // interactions + nonReentrant): the destination could be a contract with its own
+            // receive/token-transfer hooks (LSP7 in particular calls back into both sender and
+            // recipient on transfer).
             PaymentRequirement memory req = paymentRequirements[_id];
             if (req.price == 0) revert PaymentNotConfigured();
             // Price ceiling: setPaymentRequirement can land between the joiner signing and the tx
@@ -507,53 +504,28 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
             _admit(_id, sender);
             emit MembershipPaid(_id, sender, req.token, req.price);
 
+            // Direct push: the whole fee goes to one address, resolved now. Rules richer than
+            // "one wallet" (a co-founder split, a DAO treasury) live in the destination
+            // contract, not here.
+            address recipient = payoutDestination[_id];
+            if (recipient == address(0)) recipient = c.creator;
+
             if (req.token == address(0)) {
                 if (msg.value != req.price) revert IncorrectPaymentAmount();
-                // Pull-over-push: accrue to the creator's payout ledger instead of forwarding —
-                // a non-payable or reverting creator address must never block admissions
-                joinPayouts[c.creator] += req.price;
-                totalJoinPayouts += req.price;
+                (bool success, ) = recipient.call{value: msg.value}("");
+                if (!success) revert TransferFailed();
             } else {
                 if (msg.value != 0) revert IncorrectPaymentAmount();
                 if (req.isLsp7) {
                     // LSP7 (LUKSO): joiner must have called authorizeOperator(address(this), price, "")
                     // beforehand — LSP7 has no transferFrom; balanceOf is ERC-20-selector-compatible
                     // but transfers are not, so this can't reuse the plain ERC-20 branch below.
-                    ILSP7Minimal(req.token).transfer(sender, c.creator, req.price, true, "");
+                    ILSP7Minimal(req.token).transfer(sender, recipient, req.price, true, "");
                 } else {
-                    IERC20(req.token).safeTransferFrom(sender, c.creator, req.price);
+                    IERC20(req.token).safeTransferFrom(sender, recipient, req.price);
                 }
             }
         }
-    }
-
-    /// @notice Withdraws the caller's accrued native-coin join fees (see joinPayouts) to the
-    ///         caller's own address.
-    function withdrawJoinPayouts() external {
-        withdrawJoinPayoutsTo(payable(_msgSender()));
-    }
-
-    /// @notice Withdraws the caller's accrued native-coin join fees to `_to`.
-    /// @dev The recipient is overridable because the ledger's whole reason for existing is a
-    ///      creator address that can't receive native coin (Safe/Timelock without a payable
-    ///      path). Paying out to _msgSender() alone would strand exactly those balances: the
-    ///      escrow keeps joins working, this keeps the coin recoverable. Only the caller's own
-    ///      ledger entry is ever spent — there is no approval or delegation to abuse.
-    function withdrawJoinPayoutsTo(address payable _to) public nonReentrant {
-        if (_to == address(0)) revert InvalidAddress();
-
-        address sender = _msgSender();
-        uint256 amount = joinPayouts[sender];
-        if (amount == 0) revert NothingToWithdraw();
-
-        joinPayouts[sender] = 0;
-        totalJoinPayouts -= amount;
-        (bool success, ) = _to.call{value: amount}("");
-        if (!success) revert TransferFailed();
-
-        // Withdrawal stays for existing indexers; JoinPayoutWithdrawn is the precise one.
-        emit Withdrawal(_to, amount);
-        emit JoinPayoutWithdrawn(sender, _to, amount);
     }
 
     /// @dev Shared admission effect for every path that ends in membership (open/eligible/paid
@@ -804,9 +776,9 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     /// @notice Sets the join price for a PaidGated community. `_token` address(0) means native
     ///         coin; `_isLsp7` only matters when `_token` is set and selects the LSP7 transfer
     ///         path over plain ERC-20.
-    /// @dev Creator-only (unlike the NFT/token gates): the payout goes to the creator, so the
-    ///      price is theirs to set — a moderator repricing someone else's revenue is out of scope
-    ///      for moderation powers.
+    /// @dev Creator-only (unlike the NFT/token gates): the payout goes to the creator (or the
+    ///      destination they configured), so the price is theirs to set — a moderator repricing
+    ///      someone else's revenue is out of scope for moderation powers.
     function setPaymentRequirement(
         uint256 _id,
         address _token,
@@ -817,6 +789,22 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
         paymentRequirements[_id] = PaymentRequirement(_token, _price, isLsp7);
 
         emit PaymentRequirementUpdated(_id, _token, _price, isLsp7);
+    }
+
+    /**
+     * @notice Points the community's join fees at `_destination` — a wallet, a Safe, a DAO
+     *         treasury, or a splitter contract enforcing whatever rules it likes. address(0)
+     *         clears it: fees go to the creator again. Takes effect for joins after this tx.
+     * @dev Creator-only, like setPaymentRequirement: where the revenue goes is the creator's
+     *      call. Not carried across transferCommunityOwnership — it is an explicit address, and
+     *      a new creator should consciously re-point it. Fees are pushed, not escrowed, so a
+     *      destination that can't receive the payment asset makes joins revert until this is
+     *      changed — visible immediately, and only the creator's own community is affected.
+     */
+    function setPayoutDestination(uint256 _id, address _destination) external communityExists(_id) onlyCreator(_id) {
+        payoutDestination[_id] = _destination;
+
+        emit PayoutDestinationUpdated(_id, _destination);
     }
 
     function setPostingPermission(uint256 _id, address _actor, bool _canPost) external communityExists(_id) onlyModerator(_id) {
@@ -1076,9 +1064,9 @@ contract HupCommunity is IHupCommunity, Pausable, ReentrancyGuard, AccessControl
     function withdrawAll(address payable _receiver) external onlyDirectAdmin nonReentrant {
         if (_receiver == address(0)) revert InvalidAddress();
 
-        // Escrowed join fees belong to creators (withdrawJoinPayouts) — sweep only the surplus:
-        // creation fees plus any stray coin.
-        uint256 balance = address(this).balance - totalJoinPayouts;
+        // Join fees never rest here (they're pushed to the payout destination inside join), so
+        // the whole balance is creation fees plus stray coin.
+        uint256 balance = address(this).balance;
         if (balance == 0) revert NothingToWithdraw();
 
         (bool success, ) = _receiver.call{value: balance}("");

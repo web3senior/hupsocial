@@ -98,9 +98,4 @@ export const SWAP_TOKENS = {
     { symbol: 'USDm', address: '0x765DE816845861e75A25fCA122bb6898B8B1282a' }, // ex-cUSD (Mento)
   ],
   // 143 (monad): no canonical USDC configured yet — picker offers WMON-paired pastes only
-  84532: [
-    // Circle testnet USDC — symbol/decimals verified onchain 2026-08-12; WETH/USDC pools
-    // live on the official Base Sepolia v3 factory (100 + 500 tiers seen with liquidity)
-    { symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' },
-  ],
 }
