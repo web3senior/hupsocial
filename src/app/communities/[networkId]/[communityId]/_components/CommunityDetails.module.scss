@@ -128,6 +128,10 @@
     color: var(--text-muted);
     line-height: 1.55;
     margin: 0;
+    // Authored in a textarea: keep the creator's paragraphs and bullet lines instead of
+    // collapsing them into one run-on block (pre-line keeps newlines, still wraps long lines)
+    white-space: pre-line;
+    overflow-wrap: anywhere;
   }
 
   &__tags {
