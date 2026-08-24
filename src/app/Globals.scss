@@ -119,9 +119,10 @@
   --fingerprint-border: var(--surface-muted);
   --beta-badge-background: var(--black-400);
   --beta-badge-color: var(--white);
-  // Solid lime on the dark surface — it's meant to pop, unlike the muted BETA
-  --new-badge-background: var(--lime-400);
-  --new-badge-color: var(--lime-900);
+  // Same purple as light mode — it's meant to pop, unlike the muted BETA, and the one
+  // brand colour keeps NEW recognisable across theme switches
+  --new-badge-background: var(--purple-500);
+  --new-badge-color: var(--white);
 
   --footer-link-color: #a1a1aa;
   --color-icon-muted: #52525b;
