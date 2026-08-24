@@ -10,6 +10,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { isWalletAddress } from '@/lib/address'
 import { listWearableBadges } from '@/lib/badge'
 
 export const runtime = 'nodejs'
@@ -18,7 +19,7 @@ export async function GET(request, { params }) {
   try {
     const { address } = await params
 
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address || '')) {
+    if (!isWalletAddress(address)) {
       return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 })
     }
 

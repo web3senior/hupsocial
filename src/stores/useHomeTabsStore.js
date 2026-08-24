@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { BroadcastIcon, FlameIcon, HouseIcon, ListChecksIcon, StorefrontIcon, UserCheckIcon } from '@phosphor-icons/react'
 import { config } from '@/config/wagmi'
+import { solanaChainFor } from '@/config/solana'
 import { POLLS_ENABLED } from '@/config/features'
 
 // Static schema for non-network tab types. Icons/labels stay out of localStorage
@@ -29,7 +30,7 @@ const networkTabId = (chainId) => `net-${chainId}`
 export const resolveTabs = (tabs) =>
   tabs.map((tab) => {
     if (tab.type === 'network') {
-      const chain = config.chains.find((c) => c.id === tab.chainId)
+      const chain = config.chains.find((c) => c.id === tab.chainId) ?? solanaChainFor(tab.chainId)
       return { ...tab, label: chain?.name ?? `Chain ${tab.chainId}`, icon: null, chainIcon: chain?.iconUrl ?? null }
     }
     const schema = TAB_TYPE_SCHEMA[tab.type]

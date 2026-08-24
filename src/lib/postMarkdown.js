@@ -8,6 +8,7 @@
  * here may touch `window` or `process` outside the guarded helpers.
  */
 import { resolveStorageUrl } from './storageHelper'
+import { txExplorerUrl } from './explorer'
 
 // Mirrors the placeholder the card itself renders for sealed community content — the markdown
 // must never leak an envelope object (or its ciphertext) just because it took a different path.
@@ -101,7 +102,8 @@ export function postToMarkdown(item, { origin = '' } = {}) {
   if (item.network_name) meta.push(`**Network:** ${item.network_name}`)
   if (item.community_name) meta.push(`**Community:** ${item.community_name}`)
   meta.push(`**Permalink:** ${permalink}`)
-  if (item.tx_hash && item.explorer_url) meta.push(`**Onchain proof:** ${item.explorer_url}/tx/${item.tx_hash}`)
+  const proofUrl = txExplorerUrl(item)
+  if (proofUrl) meta.push(`**Onchain proof:** ${proofUrl}`)
   if (item.content?.quoteOf) {
     meta.push(`**Quotes:** ${getPostPermalink({ network_id: item.network_id, id: item.content.quoteOf }, origin)}`)
   }

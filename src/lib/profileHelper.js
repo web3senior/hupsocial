@@ -3,16 +3,20 @@
  * @description Helper to fetch Universal Profiles from LUKSO API and cache them in the database.
  */
 
+import { isEvmAddress } from './address'
+
 export async function fulfillUniversalProfiles(items, pool) {
   try {
     const endpoint = process.env.NEXT_PUBLIC_LUKSO_API_ENDPOINT
     if (!endpoint) return
 
-    // Find unique wallet addresses that have display_name === null
+    // Find unique wallet addresses that have display_name === null. Only EVM addresses can be
+    // Universal Profiles; a Solana (base58) author is skipped so it is neither sent to the LUKSO
+    // indexer nor written back lowercased — base58 is case-sensitive.
     const missingAddresses = [
       ...new Set(
         items
-          .filter(item => item.display_name === null && item.wallet_address)
+          .filter(item => item.display_name === null && isEvmAddress(item.wallet_address))
           .map(item => item.wallet_address.toLowerCase())
       )
     ]

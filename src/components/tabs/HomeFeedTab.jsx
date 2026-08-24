@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
+import { isSolanaNetworkId } from '@/config/solana'
+import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import clsx from 'clsx'
 import { getPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
@@ -62,10 +64,13 @@ export default function HomeFeedTab({
   const authoredPostNonce = usePostStore((state) => state.authoredPostNonce)
 
   const mounted = useClientMounted()
-  const { address } = useConnection()
+  const { address: evmAddress } = useConnection()
+  const solanaWallet = useSolanaWallet()
   const router = useRouter()
 
   const scopedNetworkId = feedMode === 'network' ? networkId : null
+  // The viewer of a Solana feed is the Solana wallet — has_liked and the basket key off it
+  const address = isSolanaNetworkId(scopedNetworkId) ? solanaWallet.address : evmAddress
   const feedType = feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : null
   // Home-style feeds hide NFT-sale posts — those live in the dedicated NFTs tab.
   const excludeNft = feedMode === 'foryou' || feedMode === 'network'

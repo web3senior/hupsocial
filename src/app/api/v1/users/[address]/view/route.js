@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -21,7 +22,7 @@ export async function GET(request, { params }) {
 
     const [rows] = await pool.execute(
       'SELECT COUNT(*) AS total FROM profile_views WHERE wallet_address = ?',
-      [address.toLowerCase()]
+      [normalizeAddress(address)]
     );
 
     return NextResponse.json({ success: true, total: rows[0].total });
@@ -53,7 +54,7 @@ export async function POST(request, { params }) {
       VALUES (?, ?, ?)
     `;
 
-    await pool.execute(query, [address.toLowerCase(), viewer_id, userAgent]);
+    await pool.execute(query, [normalizeAddress(address), viewer_id, userAgent]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

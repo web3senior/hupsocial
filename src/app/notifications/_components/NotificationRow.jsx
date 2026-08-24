@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { sameAddress } from '@/lib/address'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef } from 'react'
@@ -34,7 +35,7 @@ export default function NotificationRow({ group, viewerAddress, onRead }) {
   // Your own activity needs no avatar — the row already says "You …", and a strip of your own
   // profile picture down the feed reads as noise.
   const isSelfOnly =
-    actors.length <= 1 && (!actors[0] || actors[0].toLowerCase() === viewerAddress?.toLowerCase())
+    actors.length <= 1 && (!actors[0] || sameAddress(actors[0], viewerAddress))
 
   // One fetch per group — SWR dedupes rows that point at the same post, so a burst of likes on the
   // same post costs a single request instead of one per notification.

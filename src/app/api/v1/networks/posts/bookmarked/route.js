@@ -3,6 +3,7 @@
  * @description Fetches the full post rows a wallet has bookmarked, newest saved first, in the same shape as the main feed so it can be rendered with the existing Post component.
  */
 import { NextResponse } from 'next/server'
+import { isWalletAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
@@ -61,7 +62,7 @@ export async function GET(request) {
         (SELECT COUNT(*) FROM post_views WHERE post_id = p.id AND network_id = p.network_id) as total_views,
         (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
         (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,
-        (SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ?)) as has_liked
+        (SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ? AND is_active = 1)) as has_liked
       FROM post_bookmarks b
       JOIN posts p ON p.id = b.post_id AND p.network_id = b.network_id
       LEFT JOIN users u ON p.wallet_address = u.wallet_address
@@ -119,9 +120,6 @@ export async function GET(request) {
   }
 }
 
-function isWalletAddress(value) {
-  return /^0x[a-fA-F0-9]{40}$/.test(value || '')
-}
 
 function clampNumber(value, min, max, fallback) {
   if (!Number.isFinite(value)) return fallback

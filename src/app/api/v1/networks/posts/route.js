@@ -213,21 +213,31 @@ export async function GET(request) {
       whereClause += ` AND p.community_id = ?`
       whereParams.push(communityId)
     } else if (viewerAddress) {
-      // Outside a community's own feed (home, profile, following), PUBLIC community posts (0)
-      // surface for everyone. Posts in ENCRYPTED membership types (1-5, 8 — see
-      // isEncryptedMembershipType in communityVault.js) are listed only for viewers who can
-      // actually read them: the post author or an active member of that community. Everyone
-      // else doesn't see them at all — even a sealed envelope leaks author + existence
-      // metadata if listed. Plaintext gated types (whitelist 6, paid 7) and unresolvable
+      // Outside a community's own feed (home, profile, following), a community post surfaces on
+      // TWO independent axes — the same split the contract itself makes, and the reason this
+      // rule can't be read off `membership_type` alone any more:
+      //
+      //   is_encrypted   whether posts are sealed (cidex sets it from KeyInitialized)
+      //   membership_type  the AdmissionMode enum: 0 Open, 1-4 gated
+      //
+      // ENCRYPTED communities never appear here at all — not even for their own members and
+      // authors. Their content only decrypts inside the community room (it needs the vault
+      // unlocked and the right key version), so listing it elsewhere shows a member ciphertext
+      // and shows everyone else the author-plus-existence metadata that the sealing was meant
+      // to withhold. The room is the one place these belong.
+      //
+      // UNENCRYPTED communities: Open (0) is public and surfaces for everyone; gated ones (1-4)
+      // are readable by anyone who queries the chain, but the community drew a line around
+      // itself, so their posts are listed only for the author or an active member. Unresolvable
       // communities (comm row not indexed yet) stay hidden for all viewers. LOWER() on both
       // sides because cidex stores checksummed addresses in binary-collated columns.
       whereClause += ` AND (
         p.community_id IS NULL
-        OR comm.membership_type = 0
         OR (
-          comm.membership_type IN (1, 2, 3, 4, 5, 8)
+          comm.is_encrypted = 0
           AND (
-            LOWER(p.wallet_address) = LOWER(?)
+            comm.membership_type = 0
+            OR LOWER(p.wallet_address) = LOWER(?)
             OR EXISTS (
               SELECT 1 FROM community_members cm
               WHERE cm.network_id = p.network_id
@@ -241,8 +251,8 @@ export async function GET(request) {
       )`
       whereParams.push(viewerAddress, viewerAddress)
     } else {
-      // Anonymous viewers (no connected wallet) only ever see public-community posts.
-      whereClause += ` AND (p.community_id IS NULL OR comm.membership_type = 0)`
+      // Anonymous viewers (no connected wallet) only ever see open, unencrypted communities.
+      whereClause += ` AND (p.community_id IS NULL OR (comm.membership_type = 0 AND comm.is_encrypted = 0))`
     }
 
     // Push the viewer address parameter first (twice) if it exists to match the conditional subquery placements
@@ -408,7 +418,7 @@ async function attachRepostOriginals(rows, viewerAddress) {
         (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
         (SELECT COUNT(*) FROM tips WHERE post_id = p.id AND network_id = p.network_id) as total_tips,
         (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,
-        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ?))` : '0'} as has_liked,
+        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ? AND is_active = 1))` : '0'} as has_liked,
         ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?))` : '0'} as has_bookmarked,
         ${viewerAddress ? `(SELECT folder_id FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?)` : 'NULL'} as folder_id,
         ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND wallet_address = ? AND is_deleted = 0))` : '0'} as has_reposted,
@@ -734,7 +744,8 @@ async function queryTrendingWindow(networkId, windowHours) {
     JOIN posts p ON p.id = agg.post_id AND p.network_id = agg.network_id
     ${COMMUNITY_JOIN}
     WHERE p.is_comment IS NULL AND p.is_deleted = 0
-      AND (p.community_id IS NULL OR comm.membership_type = 0)
+      -- Trending is seen by everyone, so it takes the anonymous rule: open, unencrypted only
+      AND (p.community_id IS NULL OR (comm.membership_type = 0 AND comm.is_encrypted = 0))
       AND agg.score >= ${TRENDING_MIN_SCORE}
       AND NOT EXISTS (
         SELECT 1 FROM user_reports ur

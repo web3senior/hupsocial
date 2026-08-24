@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
@@ -90,7 +91,8 @@ export default function SavedPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const mounted = useClientMounted()
-  const { address, isConnected } = useConnection()
+  // Bookmarks belong to the wallet for the active network
+  const { address, isConnected } = useActiveWallet()
   const [isAddingFolder, setIsAddingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [renamingFolderId, setRenamingFolderId] = useState(null)

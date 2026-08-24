@@ -1,4 +1,23 @@
 import { appChains } from '@/config/contracts'
+import { SOLANA_CHAINS, isSolanaNetworkId, solanaChainFor } from '@/config/solana'
+
+/**
+ * Every chain the app can act on — the wagmi (EVM) chains plus the Solana clusters Hup is
+ * deployed on — for pickers and tab menus that list networks.
+ * @returns {object[]}
+ */
+export const allAppChains = () => [...appChains, ...SOLANA_CHAINS]
+
+/**
+ * The chain object for any network id the app knows, EVM or Solana, or null.
+ * @param {string|number} chainId
+ * @returns {object|null}
+ */
+export const resolveChain = (chainId) => {
+  if (chainId === undefined || chainId === null) return null
+  if (isSolanaNetworkId(chainId)) return solanaChainFor(chainId)
+  return appChains.find((candidate) => candidate.id.toString() === chainId.toString()) ?? null
+}
 
 /**
  * Resolves a chain's logo as a usable image src, by chain id.
@@ -13,6 +32,7 @@ import { appChains } from '@/config/contracts'
  */
 export const getChainIconUrl = (chainId) => {
   if (chainId === undefined || chainId === null) return null
+  if (isSolanaNetworkId(chainId)) return solanaChainFor(chainId).iconUrl
 
   const chain = appChains.find((candidate) => candidate.id.toString() === chainId.toString())
   if (!chain) return null
@@ -31,6 +51,7 @@ export const getNetworkDisplayName = (config, id) => {
   if (!config?.chains || id === undefined || id === null) {
     return `Network ${id}`
   }
+  if (isSolanaNetworkId(id)) return solanaChainFor(id).name
 
   // Filter out the matching chain profile block matching the target identifier
   const targetChain = config.chains.find(

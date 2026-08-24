@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { useConnection } from 'wagmi'
 import { config, setNetworkColor } from '@/config/wagmi'
 import { getActiveChain } from '@/lib/communication'
+import { isSolanaNetworkId, solanaChainFor } from '@/config/solana'
 
 const STORAGE_KEY = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`
 
@@ -17,7 +18,12 @@ const notify = () => listeners.forEach((listener) => listener())
 
 // getActiveChain owns the wallet / localStorage / default precedence for the whole
 // app; seeding from it keeps the switcher agreeing with everything else onchain.
-const readSelection = () => getActiveChain()[0]?.id ?? null
+const readSelection = () => {
+  // A Solana pick lives only in localStorage — getActiveChain() knows the wagmi chains alone
+  const stored = typeof window === 'undefined' ? null : localStorage.getItem(STORAGE_KEY)
+  if (stored && isSolanaNetworkId(stored)) return Number(stored)
+  return getActiveChain()[0]?.id ?? null
+}
 
 const handleStorage = (event) => {
   if (event.key && event.key !== STORAGE_KEY) return
@@ -56,15 +62,17 @@ export const setActiveChainId = (chainId) => {
 
 /**
  * The chain the app is acting on: the wallet's chain when connected, the stored
- * selection otherwise.
+ * selection otherwise — or the stored Solana cluster whenever that is what was picked.
  * @returns {{chain: object|null, chainId: number|null, isConnected: boolean}}
  */
 export const useActiveChain = () => {
   const { isConnected, chain: walletChain } = useConnection()
   const storedId = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
-  const chainId = isConnected && walletChain ? walletChain.id : storedId
-  const chain = config.chains.find((item) => item.id === chainId) ?? null
+  // A Solana selection outranks the EVM wallet's chain: no EVM wallet can switch to Solana, so
+  // following the wallet would make Solana unreachable for as long as one is connected
+  const chainId = isSolanaNetworkId(storedId) ? storedId : isConnected && walletChain ? walletChain.id : storedId
+  const chain = isSolanaNetworkId(chainId) ? solanaChainFor(chainId) : (config.chains.find((item) => item.id === chainId) ?? null)
 
   useEffect(() => {
     if (chain) setNetworkColor(chain)

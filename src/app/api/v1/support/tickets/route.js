@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isWalletAddress } from '@/lib/address'
 import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -107,8 +108,4 @@ export async function POST(request) {
       { status: 500 }
     )
   }
-}
-
-function isWalletAddress(value) {
-  return /^0x[a-fA-F0-9]{40}$/.test(value || '')
 }

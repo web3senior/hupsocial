@@ -58,6 +58,14 @@ import NewPost from './NewPost'
 import { shouldOfferTranslation } from '@/lib/languageHelper'
 import { usePreferredLanguage } from '@/hooks/usePreferredLanguage'
 import Like from './ui/Like'
+import { isSolanaNetworkId } from '@/config/solana'
+import { useSolanaWallet } from '@/hooks/useSolanaWallet'
+import { useActiveWallet } from '@/hooks/useActiveWallet'
+import { hupInstruction } from '@/lib/solana/hup'
+import { sendHupAction } from '@/lib/solana/relay'
+import { sameAddress } from '@/lib/address'
+import { txExplorerUrl } from '@/lib/explorer'
+import { shortTxError } from '@/lib/utils'
 import CommentAction from './ui/CommentAction'
 import Repost from './ui/Repost'
 import Tip from './ui/Tip'
@@ -111,7 +119,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const [showQuoteModal, setShowQuoteModal] = useState(null)
   const { web3, contract } = initHupContract()
   const mounted = useClientMounted()
-  const { address } = useConnection()
+  // The viewer is the wallet for the active network — stats keys, view records, quote lookups
+  const { address } = useActiveWallet()
   const { mutate: mutateStats } = useSWRConfig()
   const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -584,11 +593,42 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   })
   const publicClient = usePublicClient()
   const sellPopoverRef = useRef(null)
+  // A Solana post is owned and deleted by the Solana wallet, an EVM post by the EVM one
+  const solanaWallet = useSolanaWallet()
+  const isSolanaPost = isSolanaNetworkId(item.network_id)
+  const isOwner = sameAddress(isSolanaPost ? solanaWallet.address : address, item.wallet_address)
 
   const deletePost = async (e, id) => {
     e.stopPropagation()
 
     if (isDeleting || isPending || isConfirming) return
+
+    if (isSolanaPost) {
+      const signer = solanaWallet.getSigner()
+      if (!signer) {
+        toast('Connect your Solana wallet first', 'error')
+        return
+      }
+
+      setIsDeleting(true)
+      try {
+        const networkId = Number(item.network_id)
+        // Never sponsored, like un-repost on EVM: deletions are the author's own spend
+        await sendHupAction({
+          networkId,
+          signer,
+          sponsor: false,
+          instructions: [hupInstruction.delete({ networkId, actor: signer.account.address, id })],
+        })
+        toast('Post deleted onchain', 'success')
+      } catch (err) {
+        console.error('Delete failed:', err)
+        toast(shortTxError(err, 'Could not delete the post'), 'error')
+      } finally {
+        setIsDeleting(false)
+      }
+      return
+    }
 
     if (!isConnected || !address) {
       console.log('Please connect your wallet first', 'error')
@@ -675,7 +715,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                   icon={<PackageIcon size={20} />}
                   label="Proof"
                   description="See the onchain receipt"
-                  href={`${item.explorer_url}/tx/${item.tx_hash}`}
+                  href={txExplorerUrl(item)}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="View transaction proof on block explorer"
@@ -696,7 +736,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                   }}
                 />
               )}
-              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
+              {isOwner && (
                 <MenuItem
                   icon={<TagIcon size={20} />}
                   label="Sell"
@@ -708,7 +748,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                   }}
                 />
               )}
-              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && item.is_repost < 1 && (
+              {isOwner && item.is_repost < 1 && (
                 <MenuItem
                   icon={<NotePencilIcon size={20} />}
                   label="Edit"
@@ -720,7 +760,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                   }}
                 />
               )}
-              {address?.toLowerCase() === item.wallet_address?.toLowerCase() && (
+              {isOwner && (
                 <MenuItem
                   icon={<TrashSimpleIcon size={20} />}
                   label={isDeleting || isPending || isConfirming ? 'Deleting…' : 'Delete'}
@@ -729,7 +769,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                   onClick={(e) => deletePost(e, item.id)}
                 />
               )}
-              {address?.toLowerCase() !== item.wallet_address?.toLowerCase() && (
+              {!isOwner && (
                 <MenuItem
                   icon={<FlagIcon size={20} />}
                   label="Report"
@@ -754,7 +794,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
 export function PostCard({ item, actions, chainId, networkName }) {
   const router = useRouter()
   const { setCurrentPost } = usePostStore()
-  const { address } = useConnection()
+  const { address } = useActiveWallet()
 
   const shouldFetch = Number(item?.total_comments || 0) > 0
 
@@ -814,7 +854,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
 }
 
 const ReportModal = ({ item, setShowReportModal }) => {
-  const { address } = useConnection()
+  const { address } = useActiveWallet()
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState('')
   const [reason, setReason] = useState('')
@@ -916,7 +956,7 @@ const ReportModal = ({ item, setShowReportModal }) => {
 // quoted post has to be fetched by id from the same network.
 const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
   const router = useRouter()
-  const { address } = useConnection()
+  const { address } = useActiveWallet()
   const [fetchedQuotedPost, setFetchedQuotedPost] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 

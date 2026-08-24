@@ -17,6 +17,10 @@ import { getPublicClient } from 'wagmi/actions'
 import { isSessionActive, localStorageBatchLikeKey, writeWithBurnerSession } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { CONTRACTS, config } from '@/config/wagmi'
+import { isSolanaNetworkId } from '@/config/solana'
+import { useSolanaWallet } from '@/hooks/useSolanaWallet'
+import { hupInstruction } from '@/lib/solana/hup'
+import { sendHupAction } from '@/lib/solana/relay'
 import abi from '@/abi/post.json'
 import { useSidebarStore, getWalletBatchMap, getLikeOverride } from '@/stores/useSidebarStore'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -62,12 +66,19 @@ export const Like = ({ post, onUpdate }) => {
 
   const chainId = Number(post.network_id)
 
+  // A Solana post is liked by the Solana wallet: everything keyed by the viewer (cache key,
+  // basket, optimistic overrides) uses whichever wallet acts on this post's chain
+  const isSolanaPost = isSolanaNetworkId(chainId)
+  const solanaWallet = useSolanaWallet()
+  const actor = isSolanaPost ? solanaWallet.address : address
+  const actorConnected = isSolanaPost ? Boolean(solanaWallet.address) : isConnected
+
   // ■■■ SWR Data Fetching Configuration ■■■
-  const cacheKey = post?.id ? `posts/${post.network_id}/${post.id}/${address || 'anonymous'}/likes` : null
+  const cacheKey = post?.id ? `posts/${post.network_id}/${post.id}/${actor || 'anonymous'}/likes` : null
 
   const fetcher = async () => {
     try {
-      const res = await getPostById(post.network_id, post.id, address)
+      const res = await getPostById(post.network_id, post.id, actor)
       const freshPost = Array.isArray(res?.data) ? res.data[0] : res?.data
 
       if (!freshPost) return null
@@ -107,8 +118,8 @@ export const Like = ({ post, onUpdate }) => {
 
   // State & Memo Hooks
   const currentNetworkQueue = useMemo(() => {
-    return getWalletBatchMap(likedPostIdsMap, address)[post.network_id] ?? []
-  }, [likedPostIdsMap, address, post.network_id])
+    return getWalletBatchMap(likedPostIdsMap, actor)[post.network_id] ?? []
+  }, [likedPostIdsMap, actor, post.network_id])
 
   const isQueued = currentNetworkQueue.includes(post.id)
 
@@ -129,7 +140,7 @@ export const Like = ({ post, onUpdate }) => {
 
       // Pin the optimistic state past the cidex indexing lag so the immediate
       // revalidation below cannot flip the heart back
-      markLikeOverride(address, post.network_id, post.id, confirmedLike)
+      markLikeOverride(actor, post.network_id, post.id, confirmedLike)
 
       mutate(
         (prev) => ({
@@ -220,12 +231,53 @@ export const Like = ({ post, onUpdate }) => {
   }
 
   /**
+   * The Solana heart: one like/unlike instruction, sponsored when the relay serves the cluster,
+   * otherwise signed by the Solana wallet. Confirmed before it settles, so the optimistic state
+   * is pinned exactly as the EVM receipt effect pins it.
+   * @param {boolean} liked The state the tap moves the post INTO.
+   */
+  const sendSolanaHeart = async (liked) => {
+    const signer = solanaWallet.getSigner()
+    if (!signer) {
+      toast('Connect your Solana wallet first', 'error')
+      return
+    }
+
+    const previousData = interactionState
+    const nextCount = liked ? previousData.likeCount + 1 : Math.max(0, previousData.likeCount - 1)
+    mutate({ isLiked: liked, likeCount: nextCount, isProcessing: true }, { revalidate: false })
+
+    try {
+      const build = liked ? hupInstruction.like : hupInstruction.unlike
+      const { sponsored } = await sendHupAction({
+        networkId: chainId,
+        signer,
+        instructions: [build({ networkId: chainId, actor: signer.account.address, id: post.id })],
+      })
+
+      markLikeOverride(actor, post.network_id, post.id, liked)
+      mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
+      if (typeof onUpdate === 'function') onUpdate(post.id, { is_liked: liked ? 1 : 0, total_likes: nextCount })
+      toast(`${liked ? 'Liked' : 'Like removed'}${sponsored ? ' — gas covered by Hup!' : ' onchain!'}`, 'success')
+    } catch (err) {
+      console.error(`${liked ? 'Like' : 'Unlike'} failed:`, err)
+      toast(shortTxError(err, liked ? 'Could not like post' : 'Could not remove like'), 'error')
+      mutate(previousData, { revalidate: false })
+    }
+  }
+
+  /**
    * Sends one heart action immediately and settles the optimistic state.
    * @param {boolean} liked The state the tap moves the post INTO.
    */
   const sendHeart = async (liked) => {
-    if (!isConnected || !address) {
-      toast('Please connect your wallet first', 'error')
+    if (!actorConnected || !actor) {
+      toast(isSolanaPost ? 'Connect your Solana wallet first' : 'Please connect your wallet first', 'error')
+      return
+    }
+
+    if (isSolanaPost) {
+      await sendSolanaHeart(liked)
       return
     }
 
@@ -245,7 +297,7 @@ export const Like = ({ post, onUpdate }) => {
     const settle = (via) => {
       // Pin the optimistic state past the cidex indexing lag so the revalidation cannot
       // flip the heart back
-      markLikeOverride(address, post.network_id, post.id, liked)
+      markLikeOverride(actor, post.network_id, post.id, liked)
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
 
       if (typeof onUpdate === 'function') {
@@ -302,7 +354,7 @@ export const Like = ({ post, onUpdate }) => {
   // ■■■ Derived Display State ■■■
   // A fresh optimistic override outranks the API snapshot: the indexer lags a
   // few blocks behind the tx, so raw revalidations briefly report stale data
-  const likeOverride = getLikeOverride(likeOverridesMap, address, post.network_id, post.id)
+  const likeOverride = getLikeOverride(likeOverridesMap, actor, post.network_id, post.id)
   const isLiked = likeOverride ? likeOverride.liked : interactionState.isLiked
   const likeCount =
     likeOverride && likeOverride.liked !== interactionState.isLiked
@@ -312,17 +364,17 @@ export const Like = ({ post, onUpdate }) => {
   const handleLikeInteraction = (e) => {
     e.stopPropagation()
 
-    if (!isConnected) {
-      toast('Please connect wallet', 'error')
+    if (!actorConnected) {
+      toast(isSolanaPost ? 'Connect your Solana wallet' : 'Please connect wallet', 'error')
       return
     }
 
     if (isLiked) {
       sendHeart(false)
     } else if (isQueued) {
-      removeFromBatch(address, post.network_id, post.id)
+      removeFromBatch(actor, post.network_id, post.id)
     } else if (localStorage.getItem(localStorageBatchLikeKey) !== 'false') {
-      addToBatch(address, post.network_id, post.id)
+      addToBatch(actor, post.network_id, post.id)
     } else {
       sendHeart(true)
     }

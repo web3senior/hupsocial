@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { useConnection } from 'wagmi'
+import { useActiveWallet } from '@/hooks/useActiveWallet'
 import clsx from 'clsx'
 import { BookIcon, BugIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
@@ -19,12 +19,20 @@ import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import BatchLikeTrigger from './BatchLikeTrigger'
 import NativePopover from './ui/NativePopover'
+import NavBadge from './ui/NavBadge'
 import { handleBrokenAvatar } from '@/lib/utils'
 import { GitHub } from './Icons'
 import styles from './Aside.module.scss'
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
+}
+
+// Inline pills a nav item can opt into via `badge` in the store. Colors are theme tokens
+// (Globals.scss defines each pair per theme), so nothing here changes per theme.
+const NAV_BADGES = {
+  beta: { label: 'BETA', background: 'var(--beta-badge-background)', color: 'var(--beta-badge-color)' },
+  new: { label: 'NEW', background: 'var(--new-badge-background)', color: 'var(--new-badge-color)' },
 }
 
 const themeOptions = [
@@ -61,13 +69,15 @@ const normalizeNavItem = (item) => {
     activePaths: item.activePaths,
     icon: item.icon,
     component: item.component,
+    badge: item.badge,
   }
 }
 
 const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNavigate, onLinkClick }) => {
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
-  const { isConnected } = useConnection()
+  // The wallet for the active network: a Solana wallet on a Solana cluster, EVM elsewhere
+  const { isConnected: canCompose } = useActiveWallet()
 
   if (item.type === 'divider') {
     return <hr className={styles.divider} aria-hidden="true" />
@@ -77,7 +87,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
   const Component = typeof item.component === 'string' ? NAV_COMPONENTS[item.component] : item.component
 
   // Match target item flags against common dynamic identifier properties
-  const isChatItem = item.id === 'chat' || item.path === '/chat' || item.name === 'Chat'
+  const badge = NAV_BADGES[item.badge]
   const isNotificationItem = item.id === 'notifications' || item.path === '/notifications' || item.name === 'Notifications'
 
   const content = (
@@ -102,7 +112,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
       </div>
       {!isCompact && <span className={styles.linkText}>{item.name}</span>}
 
-      {isChatItem && !isCompact && <span className={styles.betaBadge}></span>}
+      {badge && !isCompact && <NavBadge label={badge.label} background={badge.background} color={badge.color} />}
 
       {/* Render full numeric indicator tag layout when sidebar is wide/expanded */}
       {isNotificationItem && !isCompact && unreadCount > 0 && (
@@ -122,7 +132,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
           onClick={() => {
             // The composer can only publish with a wallet behind it — say so here rather than
             // letting the author write a whole post into a dialog that cannot submit
-            if (!isConnected) {
+            if (!canCompose) {
               toast('Please connect wallet', 'error')
               return
             }
@@ -157,7 +167,10 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
 
 export default function Aside() {
   const pathname = usePathname()
-  const { address, isConnected } = useConnection()
+  // Identity follows the active network (hooks/useActiveWallet): profile link, avatar and
+  // the notification badge all belong to the wallet that signs on this network
+  const { address, isConnected } = useActiveWallet()
+  const canCompose = isConnected
   const mounted = useClientMounted()
   const { theme, setTheme } = useTheme()
 
@@ -481,7 +494,7 @@ export default function Aside() {
           <button
             className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
             onClick={() => {
-              if (!isConnected) {
+              if (!canCompose) {
                 toast('Please connect wallet', 'error')
                 return
               }

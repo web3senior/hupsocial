@@ -1,3 +1,4 @@
+import { txExplorerUrl } from '@/lib/explorer'
 import {
   ArrowsDownUpIcon,
   ChartLineUpIcon,
@@ -197,6 +198,5 @@ export function skippedBlocksBetween(previous, block) {
 
 /** The row's transaction on its chain's explorer, or null when the chain has none on file. */
 export function explorerTxUrl(row) {
-  if (!row.explorer_url || !row.tx_hash) return null
-  return `${row.explorer_url.replace(/\/$/, '')}/tx/${row.tx_hash}`
+  return txExplorerUrl(row)
 }

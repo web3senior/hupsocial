@@ -9,6 +9,8 @@ import { useProfile } from '@/hooks/useProfile'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { getActiveChain } from '@/lib/communication'
+import { isSolanaNetworkId, solanaChainFor } from '@/config/solana'
+import { addressTag, sameAddress, shortAddress } from '@/lib/address'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
@@ -30,12 +32,13 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 
   // Extract network configuration based on current chain identifier
   const chainInfo = useMemo(() => {
-    return networkId ? config.chains.find((c) => c.id === networkId) : null
+    if (!networkId) return null
+    return isSolanaNetworkId(networkId) ? solanaChainFor(networkId) : config.chains.find((c) => c.id === Number(networkId)) ?? null
   }, [networkId])
 
   // Truncate public wallet keys into compact readable hashes
   const truncatedAddress = useMemo(() => {
-    return creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
+    return shortAddress(creator)
   }, [creator])
 
   // Name plus a short address discriminator, the way non-UP handles are shown.
@@ -44,7 +47,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   const displayName = useMemo(() => {
     if (profile?.fullName) return profile.fullName
     const walletAddress = profile?.wallet_address || creator
-    return walletAddress ? `${profile?.name}#${walletAddress.slice(2, 6)}` : profile?.name
+    return walletAddress ? `${profile?.name}#${addressTag(walletAddress)}` : profile?.name
   }, [profile, creator])
 
   const handleUniversalProfile = (e) => {
@@ -174,10 +177,10 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
   const [fallbackChain] = getActiveChain()
   const targetNetworkId = networkId || fallbackChain?.id
   const followerSystemAddress = CONTRACTS[`chain${targetNetworkId}`]?.followerSystem
-  const isSelf = address && creator && address.toLowerCase() === creator.toLowerCase()
+  const isSelf = sameAddress(address, creator)
   const [copied, setCopied] = useState(false)
 
-  const truncatedAddress = creator ? `${creator.slice(0, 6)}…${creator.slice(-4)}` : ''
+  const truncatedAddress = shortAddress(creator)
 
   const handleCopy = async () => {
     try {

@@ -3,6 +3,7 @@
  * @description Lists and creates a wallet's bookmark folders, used to organize saved posts (see post_bookmarks.folder_id).
  */
 import { NextResponse } from 'next/server'
+import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -25,7 +26,7 @@ export async function GET(request) {
        WHERE f.wallet_address = ?
        GROUP BY f.id
        ORDER BY f.created_at ASC`,
-      [walletAddress.toLowerCase()]
+      [normalizeAddress(walletAddress)]
     )
 
     return NextResponse.json({ success: true, data: rows })
@@ -50,10 +51,10 @@ export async function POST(request) {
 
     const [result] = await pool.execute(
       `INSERT INTO bookmark_folders (wallet_address, name) VALUES (?, ?)`,
-      [wallet_address.toLowerCase(), trimmedName]
+      [normalizeAddress(wallet_address), trimmedName]
     )
 
-    return NextResponse.json({ success: true, data: { id: result.insertId, wallet_address: wallet_address.toLowerCase(), name: trimmedName, post_count: 0 } })
+    return NextResponse.json({ success: true, data: { id: result.insertId, wallet_address: normalizeAddress(wallet_address), name: trimmedName, post_count: 0 } })
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') {
       return NextResponse.json({ success: false, error: 'You already have a folder with that name' }, { status: 409 })
@@ -63,6 +64,3 @@ export async function POST(request) {
   }
 }
 
-function isWalletAddress(value) {
-  return /^0x[a-fA-F0-9]{40}$/.test(value || '')
-}

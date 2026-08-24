@@ -2,6 +2,8 @@
 
 import useSWR from 'swr'
 import { useConnection } from 'wagmi'
+import { isSolanaNetworkId } from '@/config/solana'
+import { useSolanaWalletStore } from '@/stores/useSolanaWalletStore'
 import { getPostById } from '@/lib/api'
 
 /**
@@ -23,7 +25,10 @@ export function getPostStatsKey(post, address) {
  * @returns {{ stats: Object, mutate: Function }} Fresh post row plus the bound SWR mutate.
  */
 export function usePostStats(post) {
-  const { address } = useConnection()
+  const { address: evmAddress } = useConnection()
+  const solanaAddress = useSolanaWalletStore((state) => state.address)
+  // The viewer of a Solana post is the Solana wallet — has_reposted / viewer_repost_id key off it
+  const address = isSolanaNetworkId(post?.network_id) ? solanaAddress : evmAddress
 
   const cacheKey = getPostStatsKey(post, address)
 

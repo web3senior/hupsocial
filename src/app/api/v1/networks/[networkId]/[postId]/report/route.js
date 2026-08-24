@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isWalletAddress } from '@/lib/address'
 import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -15,7 +16,7 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (!/^0x[a-fA-F0-9]{40}$/.test(reporter_address)) {
+    if (!isWalletAddress(reporter_address)) {
       return NextResponse.json(
         { success: false, error: 'Invalid wallet address format.' },
         { status: 400 }

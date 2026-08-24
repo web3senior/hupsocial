@@ -1,0 +1,218 @@
+{
+  "address": "9kNAEGDmFZ5iCrmPJRpcEjtFAfPUEhydLAm3YYEcDo5L",
+  "metadata": {
+    "name": "hup",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Hup on Solana - log-first social core"
+  },
+  "instructions": [
+    {
+      "name": "create",
+      "discriminator": [24, 30, 200, 40, 5, 28, 7, 119],
+      "accounts": [
+        { "name": "config", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "creator", "signer": true },
+        { "name": "payer", "writable": true, "signer": true },
+        { "name": "treasury", "writable": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "kind", "type": "u8" },
+        { "name": "parent_id", "type": "u64" },
+        { "name": "metadata", "type": "string" },
+        { "name": "allow_comments", "type": "bool" }
+      ]
+    },
+    {
+      "name": "delete",
+      "discriminator": [165, 204, 60, 98, 134, 15, 83, 134],
+      "accounts": [
+        { "name": "config", "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "actor", "signer": true }
+      ],
+      "args": [{ "name": "id", "type": "u64" }]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [
+        { "name": "config", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "payer", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "admin", "type": "pubkey" },
+        { "name": "treasury", "type": "pubkey" }
+      ]
+    },
+    {
+      "name": "like",
+      "discriminator": [116, 148, 16, 9, 250, 48, 5, 114],
+      "accounts": [
+        { "name": "config", "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "actor", "signer": true }
+      ],
+      "args": [{ "name": "id", "type": "u64" }]
+    },
+    {
+      "name": "set_config",
+      "discriminator": [108, 158, 154, 175, 212, 98, 52, 66],
+      "accounts": [
+        { "name": "config", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "admin", "signer": true, "relations": ["config"] }
+      ],
+      "args": [
+        { "name": "fee_lamports", "type": { "option": "u64" } },
+        { "name": "max_metadata_bytes", "type": { "option": "u16" } },
+        { "name": "treasury", "type": { "option": "pubkey" } },
+        { "name": "paused", "type": { "option": "bool" } }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        { "name": "config", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "admin", "signer": true, "relations": ["config"] }
+      ],
+      "args": [{ "name": "new_admin", "type": "pubkey" }]
+    },
+    {
+      "name": "unlike",
+      "discriminator": [140, 55, 191, 17, 60, 100, 149, 8],
+      "accounts": [
+        { "name": "config", "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "actor", "signer": true }
+      ],
+      "args": [{ "name": "id", "type": "u64" }]
+    },
+    {
+      "name": "update",
+      "discriminator": [219, 200, 88, 176, 158, 63, 253, 127],
+      "accounts": [
+        { "name": "config", "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "actor", "signer": true }
+      ],
+      "args": [
+        { "name": "id", "type": "u64" },
+        { "name": "metadata", "type": "string" },
+        { "name": "allow_comments", "type": "bool" }
+      ]
+    }
+  ],
+  "accounts": [
+    { "name": "Config", "discriminator": [155, 12, 170, 224, 30, 250, 204, 130] }
+  ],
+  "events": [
+    { "name": "ConfigUpdated", "discriminator": [40, 241, 230, 122, 11, 19, 198, 194] },
+    { "name": "ContentCreated", "discriminator": [157, 185, 30, 198, 225, 95, 224, 120] },
+    { "name": "ContentDeleted", "discriminator": [240, 112, 24, 64, 114, 150, 36, 148] },
+    { "name": "ContentLiked", "discriminator": [252, 244, 249, 194, 242, 158, 150, 51] },
+    { "name": "ContentUnliked", "discriminator": [169, 168, 9, 22, 226, 48, 144, 83] },
+    { "name": "ContentUpdated", "discriminator": [24, 63, 46, 115, 240, 169, 95, 241] }
+  ],
+  "errors": [
+    { "code": 6000, "name": "Paused", "msg": "The program is paused" },
+    { "code": 6001, "name": "Unauthorized", "msg": "Caller is not the admin" },
+    { "code": 6002, "name": "InvalidKind", "msg": "Unknown content kind" },
+    { "code": 6003, "name": "InvalidParent", "msg": "A post cannot have a parent" },
+    { "code": 6004, "name": "ContentNotFound", "msg": "Content not found" },
+    { "code": 6005, "name": "InputEmpty", "msg": "Metadata is empty" },
+    { "code": 6006, "name": "MetadataTooLarge", "msg": "Metadata exceeds the configured cap" },
+    { "code": 6007, "name": "RepostMetadataNotAllowed", "msg": "A repost carries no metadata" },
+    { "code": 6008, "name": "InteractionNotAllowed", "msg": "Interaction not allowed" },
+    { "code": 6009, "name": "InvalidMetadataCap", "msg": "Metadata cap out of range" },
+    { "code": 6010, "name": "InvalidTreasury", "msg": "Invalid treasury" },
+    { "code": 6011, "name": "InvalidAdmin", "msg": "Invalid admin" },
+    { "code": 6012, "name": "Overflow", "msg": "Counter overflow" }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "admin", "type": "pubkey" },
+          { "name": "treasury", "type": "pubkey" },
+          { "name": "fee_lamports", "type": "u64" },
+          { "name": "next_id", "type": "u64" },
+          { "name": "max_metadata_bytes", "type": "u16" },
+          { "name": "paused", "type": "bool" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "admin", "type": "pubkey" },
+          { "name": "treasury", "type": "pubkey" },
+          { "name": "fee_lamports", "type": "u64" },
+          { "name": "max_metadata_bytes", "type": "u16" },
+          { "name": "paused", "type": "bool" },
+          { "name": "next_id", "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "ContentCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "id", "type": "u64" },
+          { "name": "creator", "type": "pubkey" },
+          { "name": "kind", "type": "u8" },
+          { "name": "parent_id", "type": "u64" },
+          { "name": "metadata", "type": "string" },
+          { "name": "allow_comments", "type": "bool" },
+          { "name": "created_at", "type": "i64" }
+        ]
+      }
+    },
+    {
+      "name": "ContentDeleted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "id", "type": "u64" },
+          { "name": "actor", "type": "pubkey" }
+        ]
+      }
+    },
+    {
+      "name": "ContentLiked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "id", "type": "u64" },
+          { "name": "actor", "type": "pubkey" }
+        ]
+      }
+    },
+    {
+      "name": "ContentUnliked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "id", "type": "u64" },
+          { "name": "actor", "type": "pubkey" }
+        ]
+      }
+    },
+    {
+      "name": "ContentUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "id", "type": "u64" },
+          { "name": "actor", "type": "pubkey" },
+          { "name": "metadata", "type": "string" },
+          { "name": "allow_comments", "type": "bool" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import { isEvmAddress, isSolanaAddress, shortAddress } from '@/lib/address'
+import { useActiveWallet } from '@/hooks/useActiveWallet'
+import { useSolanaWalletStore } from '@/stores/useSolanaWalletStore'
+import { SOLANA_DEVNET_ID, solanaExplorerUrl } from '@/config/solana'
 import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries } from '@/lib/api'
@@ -141,11 +145,13 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const router = useRouter()
-  const { address, isConnected } = useConnection()
+  const { address: evmAddress } = useConnection()
+  // The viewer is the wallet for the active network; the balance card stays EVM
+  const { address, isConnected } = useActiveWallet()
   const { web3, contract } = initHupContract()
   const activeChain = getActiveChain()
   const balance = useBalance({
-    address: address,
+    address: evmAddress,
   })
 
   const postsFeed = useProfileFeed({ wallet: params.wallet, viewer: address, postType: 'original' })
@@ -419,8 +425,10 @@ const Profile = ({ addr }) => {
   const followListDialogRef = useRef(null)
 
   const params = useParams()
-  const { address, isConnected } = useConnection()
-  const { disconnect } = useDisconnect()
+  // Self-view and disconnect follow the active network's wallet
+  const { address, isConnected, kind: walletKind } = useActiveWallet()
+  const { disconnect: disconnectEvm } = useDisconnect()
+  const disconnectSolana = useSolanaWalletStore((state) => state.disconnect)
   const activeChain = getActiveChain()
   const { profile, isLoading, mutate } = useProfile(addr)
   /* Error during submission (e.g., user rejected)  */
@@ -502,7 +510,8 @@ const Profile = ({ addr }) => {
   }, [submitError, receiptError])
 
   const handleDisconnect = async () => {
-    disconnect()
+    if (walletKind === 'solana') await disconnectSolana()
+    else disconnectEvm()
   }
 
   // UP-sourced profiles are managed on universaleverything.io, but birthday is a
@@ -553,9 +562,13 @@ const Profile = ({ addr }) => {
   if (isLoading) return <ProfileSkeleton />
 
   const targetWallet = params?.wallet || addr || ''
-  const displayWalletString = targetWallet.length >= 42 ? `${targetWallet.slice(0, 6)}…${targetWallet.slice(-4)}` : targetWallet
+  const displayWalletString = shortAddress(targetWallet)
 
   const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
+  // A base58 wallet lives on Solana whatever chain the viewer is on; devnet until mainnet ships
+  const walletExplorerUrl = isSolanaAddress(targetWallet)
+    ? solanaExplorerUrl(SOLANA_DEVNET_ID, 'address', targetWallet)
+    : `${explorerBaseUrl}/address/${targetWallet}`
   const birthdayLabel = formatBirthday(profile.birthday)
   const isCelebratingBirthday = isBirthdayToday(profile.birthday)
 
@@ -595,7 +608,7 @@ const Profile = ({ addr }) => {
             </div>
 
             <code className={styles.profile__wallet}>
-              <Link href={`${explorerBaseUrl}/address/${targetWallet}`} target="_blank" rel="noopener noreferrer">
+              <Link href={walletExplorerUrl} target="_blank" rel="noopener noreferrer">
                 {displayWalletString}
               </Link>
             </code>
@@ -920,6 +933,8 @@ const Status = ({ addr, profile, selfView }) => {
   // Both reads hit the status contract of the active chain, so they re-run on every switch
   // and once a write confirms.
   useEffect(() => {
+    // Status lives on the EVM contracts; a Solana profile has none to read
+    if (!isEvmAddress(addr)) return
     getStatus(addr).then((res) => {
       if (res?.error) {
         console.error('Failed to fetch status:', res.error)

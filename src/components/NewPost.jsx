@@ -17,6 +17,11 @@ import useVisualViewport from '@/hooks/useVisualViewport'
 import { getActiveChain } from '@/lib/communication'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
+import { HUP_SOLANA_KIND, isSolanaNetworkId, solanaChainFor } from '@/config/solana'
+import { useSolanaWallet } from '@/hooks/useSolanaWallet'
+import { hupInstruction, readHupConfig } from '@/lib/solana/hup'
+import { sendHupAction } from '@/lib/solana/relay'
+import SolanaConnectButton from '@/components/ui/SolanaConnectButton'
 import { POLLS_ENABLED } from '@/config/features'
 import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
@@ -39,6 +44,7 @@ import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
 import { captureVideoPoster } from '@/lib/videoPoster'
 import { shortUploadError } from '@/lib/uploadErrors'
+import { canOptimizeVideo, optimizeVideo } from '@/lib/videoOptimizer'
 
 const MAX_MEDIA_ITEMS = 8
 const MAX_MEDIA_SIZE_MB = 10
@@ -207,6 +213,9 @@ const withUploadResults = (content, results) => {
 // Tiles are keyed by upload id, not index: indices shift when a neighbour is removed mid-upload
 const newUploadId = () =>
   typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+// A tile is busy while its video is being re-encoded and while its bytes are moving
+const isTransferring = (item) => item.status === 'optimizing' || item.status === 'uploading'
 
 // Tags the browser creates on Enter — each one is its own line in the editor
 const BLOCK_ELEMENTS = new Set(['DIV', 'P', 'LI', 'BLOCKQUOTE', 'PRE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'])
@@ -430,6 +439,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // getActiveChain() is a plain getter that can't wake this component when it changes — so the
   // target chain below reads the subscribed value instead of re-polling on every render
   const { chainId: activeChainId } = useActiveChain()
+  // The Solana wallet sits beside the EVM one; a submission bound for a Solana cluster signs with it
+  const solanaWallet = useSolanaWallet()
   const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
@@ -501,7 +512,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const mediaItems = postContent.elements[1].data.items
   // Uploads run behind their tiles and gate nothing but Esc and the final submit — the author
   // keeps writing, the toolbar stays live, and Post waits for the last transfer itself
-  const hasPendingUploads = mediaItems.some((item) => item.status === 'uploading')
+  const hasPendingUploads = mediaItems.some(isTransferring)
   const hasFailedUploads = mediaItems.some((item) => item.status === 'failed')
   const isBusy = isSigning || isConfirming || isSubmitting
   const hasPostBody =
@@ -528,7 +539,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       : communityTarget
       ? Number(communityTarget.networkId)
       : activeChainId || Number(getActiveChain()?.[0]?.id) || null
-  const targetChain = appChains.find((chain) => chain.id === targetChainId)
+  const isSolanaTarget = isSolanaNetworkId(targetChainId)
+  const targetChain = isSolanaTarget ? solanaChainFor(targetChainId) : appChains.find((chain) => chain.id === targetChainId)
+  // Whoever signs this submission: the Solana wallet on a Solana cluster, the EVM wallet elsewhere
+  const signerAddress = isSolanaTarget ? solanaWallet.address : address
 
   // Only a plain post is free to pick its chain — an edit, a reply, a quote, and a community
   // post all inherit theirs, so the switcher would lie about where the submission lands
@@ -541,7 +555,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // The wallet only ever signs on the chain it is connected to — editing a Celo post from a
   // LUKSO connection would otherwise fire `update` at Celo's contract address on LUKSO, so the
   // composer prompts for a switch instead (same pattern as the Bazaar/Predict dialogs)
-  const isWrongChain = Boolean(walletChain && targetChainId && walletChain.id !== targetChainId)
+  const isWrongChain = !isSolanaTarget && Boolean(walletChain && targetChainId && walletChain.id !== targetChainId)
 
   // NFT listings ride on plain posts and post edits — the listing settles on the chain the
   // post lands on
@@ -576,16 +590,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // the mount, because disconnecting mid-compose must not throw the draft away — handleCreatePost
   // already blocks that submit.
   const isConnectionSettled = connectionStatus !== 'connecting' && connectionStatus !== 'reconnecting'
-  const isWalletMissing = isConnectionSettled && !isConnected
+  // A Solana submission is gated by the Solana wallet inside the composer instead
+  const isWalletMissing = isConnectionSettled && !isConnected && !isSolanaTarget
   const walletGateRef = useRef(false)
 
   useEffect(() => {
     if (walletGateRef.current || !isConnectionSettled) return
     walletGateRef.current = true
-    if (isConnected) return
+    if (isConnected || isSolanaTarget) return
     toast('Please connect wallet', 'error')
     handleClose()
-  }, [isConnectionSettled, isConnected, handleClose])
+  }, [isConnectionSettled, isConnected, isSolanaTarget, handleClose])
 
   const updateTextContent = (nextText) => {
     setPostContent((prevContent) => {
@@ -865,22 +880,43 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // transfer does not re-render the composer a few hundred times.
   const startUpload = (uploadId, file, mediaType) => {
     const controller = new AbortController()
+    /* A retry reuses the entry's optimised file rather than encoding the clip a second time */
+    const entry = { file, mediaType, controller, optimized: uploadsRef.current.get(uploadId)?.optimized, promise: null }
+    uploadsRef.current.set(uploadId, entry)
+
     let lastPercent = -1
+    const reportProgress = (fraction) => {
+      const percent = Math.floor(fraction * 100)
+      if (percent === lastPercent) return
+      lastPercent = percent
+      updateMediaItem(uploadId, (item) => ({ ...item, progress: fraction }))
+    }
 
     const promise = (async () => {
       try {
-        /* The still is captured while the bytes move, not after — it only needs the local file */
+        /* The still is captured from the original while the rest runs — it only needs the local file */
         const posterCapture = mediaType === 'video' ? captureVideoPoster(file) : null
 
-        const cid = await uploadToIPFS(file, {
-          signal: controller.signal,
-          onProgress: (fraction) => {
-            const percent = Math.floor(fraction * 100)
-            if (percent === lastPercent) return
-            lastPercent = percent
-            updateMediaItem(uploadId, (item) => ({ ...item, progress: fraction }))
-          },
-        })
+        /* Video is re-encoded for the web first (see lib/videoOptimizer): a fraction of the bytes,
+           and H.264 plays where an iPhone's HEVC .mov does not. Falls back to the original whenever
+           the browser can't do it, so the tile just skips straight to uploading. */
+        let upload = file
+        if (mediaType === 'video' && canOptimizeVideo()) {
+          if (!entry.optimized) {
+            updateMediaItem(uploadId, (item) => ({ ...item, status: 'optimizing', progress: 0 }))
+            const result = await optimizeVideo(file, { signal: controller.signal, onProgress: reportProgress })
+            entry.optimized = result ?? { file }
+            lastPercent = -1
+          }
+          if (entry.optimized.file !== file) {
+            upload = entry.optimized.file
+            const { width, height } = entry.optimized
+            updateMediaItem(uploadId, (item) => ({ ...item, mimeType: upload.type, width, height }))
+          }
+          updateMediaItem(uploadId, (item) => ({ ...item, status: 'uploading', progress: 0 }))
+        }
+
+        const cid = await uploadToIPFS(upload, { signal: controller.signal, onProgress: reportProgress })
 
         /* A still, pinned separately, so feed cards render a thumbnail without pulling the video
            through a gateway. Best-effort: a container the browser can't decode posts without one. */
@@ -900,7 +936,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       }
     })()
 
-    uploadsRef.current.set(uploadId, { file, mediaType, controller, promise })
+    entry.promise = promise
     return promise
   }
 
@@ -1194,11 +1230,51 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     }
   }
 
+  /**
+   * The Solana counterpart of the four write branches below: one instruction, sponsored by the
+   * relay where it serves the cluster (posts, comments, quotes), otherwise signed and paid by
+   * the Solana wallet. Edits are never sponsored, as on EVM. Resolves once the transaction is
+   * confirmed, so the caller can treat it like a receipt.
+   * @param {string} metadata The pinned metadata CID.
+   */
+  const submitSolana = async (metadata) => {
+    const signer = solanaWallet.getSigner()
+    if (!signer) throw new Error('Connect a Solana wallet before posting')
+
+    const networkId = Number(targetChainId)
+    const actor = signer.account.address
+
+    if (actionType === 'edit') {
+      await sendHupAction({
+        networkId,
+        signer,
+        sponsor: false,
+        instructions: [hupInstruction.update({ networkId, actor, id: existingPost.id, metadata, allowComments })],
+      })
+      return
+    }
+
+    // Comments carry their parent; quotes are plain posts whose target rides in the content JSON
+    const { treasury } = await readHupConfig(networkId)
+    const instruction = hupInstruction.create({
+      networkId,
+      creator: actor,
+      treasury,
+      kind: isComment ? HUP_SOLANA_KIND.COMMENT : HUP_SOLANA_KIND.POST,
+      parentId: isComment ? replyTarget.id : 0,
+      metadata,
+      allowComments,
+    })
+
+    // A cooldown is an answer, not a failure — the author was just told to wait
+    await sendHupAction({ networkId, signer, instructions: [instruction], onCooldown: 'throw' })
+  }
+
   const handleCreatePost = async (event) => {
     event.preventDefault()
 
-    if (!isConnected || !address) {
-      toast('Connect your wallet before posting', 'error')
+    if (isSolanaTarget ? !solanaWallet.address : !isConnected || !address) {
+      toast(isSolanaTarget ? 'Connect a Solana wallet before posting' : 'Connect your wallet before posting', 'error')
       return
     }
 
@@ -1210,7 +1286,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
     // Same reason: a sponsored post still cooling down should not pin its media first
     if (actionType !== 'edit') {
-      const cooldown = gaslessCooldown('create', targetChainId, address)
+      const cooldown = gaslessCooldown('create', targetChainId, signerAddress)
       if (cooldown > 0) {
         toast(`Slow down — you can post again in ${formatWait(cooldown)}.`, 'error')
         return
@@ -1231,7 +1307,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     try {
       // Tiles still uploading are collected here rather than gating the button: the author
       // finished writing while the bytes moved, and Post simply waits for the last of them
-      const pendingIds = mediaItems.filter((item) => item.status === 'uploading').map((item) => item.uploadId)
+      const pendingIds = mediaItems.filter(isTransferring).map((item) => item.uploadId)
       const uploaded = await Promise.all(pendingIds.map((uploadId) => uploadsRef.current.get(uploadId)?.promise ?? null))
       if (uploaded.some((result) => !result)) {
         toast('An attachment failed to upload — retry or remove it', 'error')
@@ -1323,10 +1399,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // stores verbatim, and an edit rewrites it onto the row it already has.
       pendingPublishRef.current = {
         networkId: targetChainId,
-        author: address,
+        author: signerAddress,
         metadata,
         kind: actionType === 'edit' ? 'edit' : isComment ? 'reply' : 'post',
         parentId: isComment ? replyTarget?.id : null,
+      }
+
+      if (isSolanaTarget) {
+        await submitSolana(metadata)
+        finishSubmission()
+        return
       }
 
       if (actionType === 'edit') {
@@ -1487,6 +1569,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         actions={isChainPinned ? null : <NetworkSelect placement="bottom-end" />}
       />
 
+      {isSolanaTarget && !solanaWallet.address && (
+        <div className={styles.chainWarning} role="alert">
+          <WarningIcon size={16} />
+          <span>{`This post lands on ${targetChain?.name || 'Solana'} — connect a Solana wallet to sign.`}</span>
+          <SolanaConnectButton placement="bottom-end" />
+        </div>
+      )}
+
       {isWrongChain && (
         <div className={styles.chainWarning} role="alert">
           <WarningIcon size={16} />
@@ -1532,7 +1622,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             </div>
           )}
 
-          <Profile variant="full" creator={address} />
+          <Profile variant="full" creator={signerAddress} />
 
           <div className={styles.composerBody}>
             <div
@@ -1753,7 +1843,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 {mediaItems.map((item, index) => {
                   if (item.type === 'audio') return null
                   const mediaSrc = getMediaPreviewSrc(item)
-                  const isUploadingItem = item.status === 'uploading'
+                  const isUploadingItem = isTransferring(item)
                   const isFailedItem = item.status === 'failed'
                   const percent = Math.floor((item.progress || 0) * 100)
                   return (
@@ -1769,7 +1859,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                       ) : (
                         <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
                       )}
-                      {isUploadingItem && <span className={styles.mediaItem__badge}>{percent}%</span>}
+                      {isUploadingItem && (
+                        <span className={styles.mediaItem__badge}>
+                          {item.status === 'optimizing' ? `Optimizing ${percent}%` : `${percent}%`}
+                        </span>
+                      )}
                       {isFailedItem && (
                         <span className={clsx(styles.mediaItem__badge, styles['mediaItem__badge--failed'])}>Upload failed</span>
                       )}

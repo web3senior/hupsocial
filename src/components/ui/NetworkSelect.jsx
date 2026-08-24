@@ -8,13 +8,16 @@ import { useSwitchChain } from 'wagmi'
 import { config, setNetworkColor } from '@/config/wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
+import { SOLANA_CHAINS } from '@/config/solana'
 import NativePopover from '@/components/ui/NativePopover'
 import styles from './NetworkSelect.module.scss'
 
 /**
  * The one network switcher. Drop `<NetworkSelect />` anywhere a chain can be
- * changed — the chains come from the wagmi config, so adding a chain there adds
- * it here with no edit to this file.
+ * changed — the chains come from the wagmi config plus the Solana clusters in
+ * config/solana.js, so adding a chain there adds it here with no edit to this file.
+ * A Solana pick only stores the selection: no wallet switch, since no EVM wallet
+ * can go there.
  *
  * @param {string} [className] extra class for the trigger pill
  * @param {string} [placement] NativePopover placement for the list
@@ -39,7 +42,7 @@ export default function NetworkSelect({ className, placement = 'bottom-end', max
       onChange?.(target.id)
     }
 
-    if (isConnected) {
+    if (isConnected && !target.isSolana) {
       switchChain.mutate(
         { chainId: target.id },
         {
@@ -58,9 +61,11 @@ export default function NetworkSelect({ className, placement = 'bottom-end', max
 
   if (!mounted || !chain) return null
 
+  const chains = [...config.chains, ...SOLANA_CHAINS]
+
   // The active chain leads the stack; the rest trail it in config order
-  const stack = [...config.chains].sort((a, b) => (b.id === chainId) - (a.id === chainId)).slice(0, maxIcons)
-  const overflow = config.chains.length - stack.length
+  const stack = [...chains].sort((a, b) => (b.id === chainId) - (a.id === chainId)).slice(0, maxIcons)
+  const overflow = chains.length - stack.length
 
   return (
     <NativePopover
@@ -92,7 +97,7 @@ export default function NetworkSelect({ className, placement = 'bottom-end', max
       {({ close }) => (
         <>
           <div className={clsx(styles['network-select-panel__container'])}>
-            {config.chains.map((item) => {
+            {chains.map((item) => {
               const isCurrent = item.id === chainId
 
               return (

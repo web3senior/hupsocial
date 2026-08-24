@@ -5,7 +5,7 @@ import { BroadcastIcon, CaretLeftIcon, CaretRightIcon, CheckIcon, FlameIcon, Lis
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { useHomeTabsStore } from '@/stores/useHomeTabsStore'
-import { config } from '@/config/wagmi'
+import { allAppChains } from '@/lib/chains'
 import { POLLS_ENABLED } from '@/config/features'
 import styles from './AddTabMenu.module.scss'
 
@@ -56,7 +56,7 @@ export default function AddTabMenu() {
           {view === 'networks' && (
             <>
               <MenuItem label="Back" leading={<CaretLeftIcon size={16} />} onClick={() => setView('root')} muted />
-              {config.chains.map((chain) => {
+              {allAppChains().map((chain) => {
                 const added = hasNetworkTab(chain.id)
                 return (
                   <MenuItem

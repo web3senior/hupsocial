@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -24,7 +25,7 @@ export async function GET(request, { params }) {
     const offset = (page - 1) * limit;
     const viewerAddress = searchParams.get('viewer_address');
 
-    const source = address.toLowerCase();
+    const source = normalizeAddress(address);
 
     const [[{ total }]] = await pool.execute(
       `SELECT COUNT(DISTINCT followed_address) AS total FROM follows WHERE follower_address = ? AND is_following = 1`,

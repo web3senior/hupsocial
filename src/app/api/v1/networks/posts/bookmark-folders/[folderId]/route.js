@@ -3,6 +3,7 @@
  * @description Renames or deletes a wallet's bookmark folder. Deleting a folder un-files its posts (post_bookmarks.folder_id -> NULL via FK) rather than deleting the bookmarks.
  */
 import { NextResponse } from 'next/server'
+import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -25,7 +26,7 @@ export async function PATCH(request, { params }) {
 
     const [result] = await pool.execute(
       `UPDATE bookmark_folders SET name = ? WHERE id = ? AND wallet_address = ?`,
-      [trimmedName, folderId, wallet_address.toLowerCase()]
+      [trimmedName, folderId, normalizeAddress(wallet_address)]
     )
 
     if (result.affectedRows === 0) {
@@ -54,7 +55,7 @@ export async function DELETE(request, { params }) {
 
     const [result] = await pool.execute(
       `DELETE FROM bookmark_folders WHERE id = ? AND wallet_address = ?`,
-      [folderId, walletAddress.toLowerCase()]
+      [folderId, normalizeAddress(walletAddress)]
     )
 
     if (result.affectedRows === 0) {
@@ -68,6 +69,3 @@ export async function DELETE(request, { params }) {
   }
 }
 
-function isWalletAddress(value) {
-  return /^0x[a-fA-F0-9]{40}$/.test(value || '')
-}

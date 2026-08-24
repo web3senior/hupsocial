@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { queryUniversalProfile } from '@/lib/lukso'
@@ -83,7 +84,7 @@ export async function GET(request, { params }) {
           ? resolveStorageImageUrl(profile.profileImages[0].src, { width: 512 })
           : null
 
-      profile.wallet_address = address.toLowerCase() // Ensure wallet address is included in the response for consistency
+      profile.wallet_address = normalizeAddress(address) // Ensure wallet address is included in the response for consistency
 
       // Birthday is a Hup-native field with no UP metadata equivalent — always
       // sourced from our own users row, even when the profile itself is a UP.
@@ -265,11 +266,11 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
 
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!isWalletAddress(address)) {
       return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 })
     }
 
-    const walletAddress = address.toLowerCase()
+    const walletAddress = normalizeAddress(address)
 
     await pool.execute(
       `

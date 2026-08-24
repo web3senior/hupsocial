@@ -18,10 +18,9 @@
 
 import { SLUG_CHAIN_IDS } from './cashtags'
 import { config } from './wagmi'
+import { SOLANA_ICON_URL } from './solana'
 
-// Solana is not a wagmi chain, so its mark has no home to borrow from. Three slanted bars in
-// the brand gradient, on a dark disc so it reads against pale token artwork.
-const SOLANA_ICON = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#0B0B14"/><defs><linearGradient id="sol" x1="7" y1="22.5" x2="24" y2="9.5" gradientUnits="userSpaceOnUse"><stop stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/></linearGradient></defs><path d="M9.6 20.4a.7.7 0 0 1 .5-.2h13a.35.35 0 0 1 .25.6l-2.55 2.55a.7.7 0 0 1-.5.2h-13a.35.35 0 0 1-.25-.6l2.55-2.55Z" fill="url(#sol)"/><path d="M9.6 8.45a.72.72 0 0 1 .5-.2h13a.35.35 0 0 1 .25.6l-2.55 2.55a.7.7 0 0 1-.5.2h-13a.35.35 0 0 1-.25-.6L9.6 8.45Z" fill="url(#sol)"/><path d="M20.85 14.39a.7.7 0 0 0-.5-.2h-13a.35.35 0 0 0-.25.6l2.55 2.55a.7.7 0 0 0 .5.2h13a.35.35 0 0 0 .25-.6l-2.55-2.55Z" fill="url(#sol)"/></svg>`
+// Solana is not a wagmi chain, so its mark has no home to borrow from; config/solana.js owns it.
 
 // Slugs the app has no chain for — and every `coingecko:` native — simply render no badge.
 
@@ -35,7 +34,7 @@ const LABELS = {
   solana: 'Solana',
 }
 
-const SOLANA_URL = `data:image/svg+xml,${encodeURIComponent(SOLANA_ICON)}`
+const SOLANA_URL = SOLANA_ICON_URL
 
 /**
  * The badge for a chain slug, or null when it needs none.

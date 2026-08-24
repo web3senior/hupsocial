@@ -11,6 +11,10 @@ import { CONTRACTS, config } from '@/config/wagmi'
 import { isSessionActive } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { ContentType, ZERO_ADDRESS } from '@/lib/content'
+import { HUP_SOLANA_KIND, isSolanaNetworkId } from '@/config/solana'
+import { useSolanaWallet } from '@/hooks/useSolanaWallet'
+import { hupInstruction, readHupConfig } from '@/lib/solana/hup'
+import { sendHupAction } from '@/lib/solana/relay'
 import abi from '@/abi/post.json'
 import NativePopover from './NativePopover'
 import Counter from './Counter'
@@ -26,6 +30,10 @@ import postStyles from '../Post.module.scss'
 export const Repost = ({ post, onQuote }) => {
   const isMounted = useClientMounted()
   const { address, isConnected } = useConnection()
+  // A Solana post is reposted by the Solana wallet
+  const solanaWallet = useSolanaWallet()
+  const isSolanaPost = isSolanaNetworkId(post.network_id)
+  const actorConnected = isSolanaPost ? Boolean(solanaWallet.address) : isConnected
   const publicClient = usePublicClient()
   const { signTypedDataAsync } = useSignTypedData()
   const { stats, mutate } = usePostStats(post)
@@ -102,7 +110,104 @@ export const Repost = ({ post, onQuote }) => {
     }
   }
 
+  // Solana: the repost is create(kind = 2, parent), sponsored as a repost by the relay; undoing
+  // it deletes the viewer's own repost row, unsponsored as on EVM. Both confirm before toasting,
+  // so there is no receipt effect to wait on.
+  const repostSolana = async (id) => {
+    const signer = solanaWallet.getSigner()
+    if (!signer) {
+      toast('Connect your Solana wallet first', 'error')
+      return
+    }
+
+    const networkId = Number(post.network_id)
+    const previousData = stats
+
+    try {
+      lastActionRef.current = 'repost'
+      mutate(
+        (prev) => ({
+          ...prev,
+          total_reposts: (Number(prev?.total_reposts) || 0) + 1,
+          has_reposted: 1,
+        }),
+        { revalidate: false },
+      )
+
+      const { treasury } = await readHupConfig(networkId)
+      const { sponsored } = await sendHupAction({
+        networkId,
+        signer,
+        instructions: [
+          hupInstruction.create({
+            networkId,
+            creator: signer.account.address,
+            treasury,
+            kind: HUP_SOLANA_KIND.REPOST,
+            parentId: id,
+            metadata: '',
+            allowComments: false,
+          }),
+        ],
+      })
+
+      toast(sponsored ? 'Reposted — gas covered by Hup!' : 'Repost saved onchain!', 'success')
+    } catch (err) {
+      console.error('Repost failed:', err)
+      toast(err.shortMessage || err.message || 'Transaction rejected or encountered an error.', 'error')
+      mutate(previousData, { revalidate: false })
+    }
+  }
+
+  const removeRepostSolana = async () => {
+    const signer = solanaWallet.getSigner()
+    if (!signer) {
+      toast('Connect your Solana wallet first', 'error')
+      return
+    }
+
+    const repostRowId = stats?.viewer_repost_id
+    if (!repostRowId) {
+      toast('Repost is still confirming — try again shortly', 'error')
+      return
+    }
+
+    const networkId = Number(post.network_id)
+    const previousData = stats
+
+    try {
+      lastActionRef.current = 'undo'
+      mutate(
+        (prev) => ({
+          ...prev,
+          total_reposts: Math.max(0, (Number(prev?.total_reposts) || 0) - 1),
+          has_reposted: 0,
+          viewer_repost_id: null,
+        }),
+        { revalidate: false },
+      )
+
+      await sendHupAction({
+        networkId,
+        signer,
+        sponsor: false,
+        instructions: [hupInstruction.delete({ networkId, actor: signer.account.address, id: repostRowId })],
+      })
+
+      toast('Repost removed onchain!', 'success')
+    } catch (err) {
+      console.error('Undo repost failed:', err)
+      toast(err.shortMessage || err.message || 'Transaction rejected or encountered an error.', 'error')
+      mutate(previousData, { revalidate: false })
+    }
+  }
+
   const repost = async (id) => {
+    if (isSolanaPost) {
+      await repostSolana(id)
+      return
+    }
+
     const hupAddress = resolveHupAddress()
     if (!hupAddress) return
 
@@ -149,6 +254,11 @@ export const Repost = ({ post, onQuote }) => {
   }
 
   const removeRepost = async () => {
+    if (isSolanaPost) {
+      await removeRepostSolana()
+      return
+    }
+
     const hupAddress = resolveHupAddress()
     if (!hupAddress) return
 
@@ -213,8 +323,8 @@ export const Repost = ({ post, onQuote }) => {
             onClick={(e) => {
               e.stopPropagation()
               close()
-              if (!isConnected) {
-                toast(`Please connect wallet`, `error`)
+              if (!actorConnected) {
+                toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
                 return
               }
               isReposted ? removeRepost() : repost(post.id)
@@ -228,8 +338,8 @@ export const Repost = ({ post, onQuote }) => {
             onClick={(e) => {
               e.stopPropagation()
               close()
-              if (!isConnected) {
-                toast(`Please connect wallet`, `error`)
+              if (!actorConnected) {
+                toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
                 return
               }
               onQuote?.()

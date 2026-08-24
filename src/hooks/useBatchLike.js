@@ -15,6 +15,10 @@ import { useChainId, useConfig, useConnection, usePublicClient, useSignTypedData
 import { getPublicClient } from 'wagmi/actions'
 import abi from '@/abi/post.json'
 import { CONTRACTS } from '@/config/wagmi'
+import { MAX_SOLANA_BATCH_LIKE, isSolanaNetworkId } from '@/config/solana'
+import { useSolanaWallet } from '@/hooks/useSolanaWallet'
+import { hupInstruction } from '@/lib/solana/hup'
+import { sendHupAction } from '@/lib/solana/relay'
 import { getNetworkDisplayName } from '@/lib/chains'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
@@ -26,6 +30,10 @@ import { shortTxError } from '@/lib/utils'
 export const useBatchLike = () => {
   const config = useConfig()
   const { address, isConnected } = useConnection()
+  // Solana clusters queue under the Solana wallet, EVM chains under the EVM one
+  const solanaWallet = useSolanaWallet()
+  const solanaAddress = solanaWallet.address
+  const ownerFor = (networkId) => (isSolanaNetworkId(networkId) ? solanaAddress : address)
   // Reactive, unlike a render-time chain snapshot: the value is read again after
   // switchChainAsync resolves
   const walletChainId = useChainId()
@@ -44,7 +52,11 @@ export const useBatchLike = () => {
 
   // Only the connected wallet's own basket, one entry per chain that still holds something
   const groups = useMemo(() => {
-    const walletQueueMap = getWalletBatchMap(likedPostIdsMap, address)
+    // Two baskets, one per wallet — a chain only ever appears in one of them
+    const walletQueueMap = {
+      ...getWalletBatchMap(likedPostIdsMap, address),
+      ...(solanaAddress ? getWalletBatchMap(likedPostIdsMap, solanaAddress) : {}),
+    }
 
     return Object.entries(walletQueueMap)
       .filter(([, ids]) => Array.isArray(ids) && ids.length > 0)
@@ -54,20 +66,68 @@ export const useBatchLike = () => {
         count: ids.length,
         name: getNetworkDisplayName(config, networkId),
       }))
-  }, [likedPostIdsMap, address, config])
+  }, [likedPostIdsMap, address, solanaAddress, config])
 
   const total = useMemo(() => groups.reduce((sum, group) => sum + group.count, 0), [groups])
 
-  const send = useCallback(
-    async (networkId) => {
-      if (!isConnected || !address) {
-        toast('Please connect your wallet first', 'error')
-        return
+  // Solana has no batchLike: the basket goes out as several `like` instructions per
+  // transaction, sponsored where the relay serves the cluster. No preflight either — the
+  // program accepts any existing id and the indexer de-duplicates, so nothing here reverts.
+  const sendSolanaBatch = async (group) => {
+    const networkId = Number(group.networkId)
+    const signer = solanaWallet.getSigner()
+    if (!signer) {
+      toast('Connect your Solana wallet first', 'error')
+      return
+    }
+    const actor = signer.account.address
+
+    try {
+      setPendingNetworkId(String(group.networkId))
+      const batches = chunk(group.ids, MAX_SOLANA_BATCH_LIKE)
+      let sponsoredCount = 0
+
+      for (let index = 0; index < batches.length; index++) {
+        const batch = batches[index]
+        if (batches.length > 1) toast(`Signing batch ${index + 1} of ${batches.length}`, 'info')
+
+        const { sponsored } = await sendHupAction({
+          networkId,
+          signer,
+          instructions: batch.map((id) => hupInstruction.like({ networkId, actor, id })),
+        })
+        if (sponsored) sponsoredCount++
+
+        // Same as the EVM path: flag every signed post as liked right away, clear per batch
+        markLikeOverride(actor, group.networkId, batch, true)
+        batch.forEach((id) => removeFromBatch(actor, group.networkId, id))
       }
 
+      const likedLabel = group.ids.length === 1 ? 'Post Liked' : 'Posts Liked'
+      toast(sponsoredCount === batches.length ? `${likedLabel} — gas covered by Hup!` : likedLabel, 'success')
+    } catch (err) {
+      console.error('Solana batch like failed:', err)
+      toast(shortTxError(err, 'Batch like failed'), 'error')
+    } finally {
+      setPendingNetworkId(null)
+    }
+  }
+
+  const send = useCallback(
+    async (networkId) => {
       const group = groups.find((entry) => entry.networkId === String(networkId))
       if (!group) {
         toast('No queued interactions found for this network', 'error')
+        return
+      }
+
+      if (isSolanaNetworkId(networkId)) {
+        await sendSolanaBatch(group)
+        return
+      }
+
+      if (!isConnected || !address) {
+        toast('Please connect your wallet first', 'error')
         return
       }
 
@@ -227,10 +287,11 @@ export const useBatchLike = () => {
         setPendingNetworkId(null)
       }
     },
-    [address, config, groups, isConnected, markLikeOverride, publicClient, removeFromBatch, signTypedDataAsync, switchChainAsync, walletChainId, writeContractAsync],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendSolanaBatch closes over the same store setters and the Solana signer getter, which are stable
+    [address, solanaAddress, config, groups, isConnected, markLikeOverride, publicClient, removeFromBatch, signTypedDataAsync, switchChainAsync, walletChainId, writeContractAsync],
   )
 
-  const clear = useCallback((networkId) => clearBatch(address, networkId), [address, clearBatch])
+  const clear = useCallback((networkId) => clearBatch(ownerFor(networkId), networkId), [address, solanaAddress, clearBatch])
 
   return {
     total,

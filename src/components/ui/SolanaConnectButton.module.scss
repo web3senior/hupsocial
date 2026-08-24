@@ -1,0 +1,127 @@
+// Solana wallet pill + panel. Colors are hard-coded to the Solana brand with translucent
+// fallbacks rather than the runtime network variables, which only exist once an EVM wallet
+// has connected.
+
+$solana-purple: #9945ff;
+$solana-green: #14f195;
+
+.solanaConnect {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba($solana-purple, 0.45);
+  background: rgba($solana-purple, 0.12);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba($solana-purple, 0.22);
+    border-color: rgba($solana-purple, 0.8);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  &--connected {
+    border-color: rgba($solana-green, 0.5);
+  }
+
+  &__icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.solanaConnectPanel {
+  min-width: 220px;
+
+  &__container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+
+  &__hint {
+    margin: 0;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    opacity: 0.75;
+
+    a {
+      color: $solana-purple;
+      text-decoration: underline;
+    }
+  }
+
+  &__address {
+    padding: 0.35rem 0.5rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font-family: monospace;
+    font-size: 0.7rem;
+    text-align: left;
+    word-break: break-all;
+    cursor: copy;
+
+    &:hover {
+      background: rgba($solana-purple, 0.1);
+    }
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      background: rgba($solana-purple, 0.12);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  &__walletIcon {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+  }
+
+  &__busy {
+    margin-left: auto;
+    opacity: 0.7;
+  }
+}

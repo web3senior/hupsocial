@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isWalletAddress } from '@/lib/address'
 import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -102,9 +103,6 @@ function serializeLikedAction(row) {
   }
 }
 
-function isWalletAddress(value) {
-  return /^0x[a-fA-F0-9]{40}$/.test(value || '')
-}
 
 // Keep comments compliant with constraints
 function clampNumber(value, min, max, fallback) {

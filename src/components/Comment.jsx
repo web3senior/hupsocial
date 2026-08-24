@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useId, useRef, useCallback } from 'react'
+import { shortAddress } from '@/lib/address'
 import Link from 'next/link'
 import moment from 'moment'
 import { useParams, useRouter } from 'next/navigation'
@@ -359,7 +360,7 @@ const CommentModal = ({ item, postContent, setShowCommentModal }) => {
             autoFocus
             defaultValue={commentContent}
             onInput={(e) => setCommentContent(e.target.value)}
-            placeholder={`Reply to ${item.creator.slice(0, 4)}…${item.creator.slice(38)}`}
+            placeholder={`Reply to ${shortAddress(item.creator, { head: 4, tail: 4 })}`}
           />
           <button className="btn" onClick={(e) => postComment(e, item.postId)}>
             Post comment
@@ -594,7 +595,7 @@ const ConnectedProfile = ({ addr }) => {
             {activeChain?.[0]?.iconUrl && <img src={activeChain[0].iconUrl} alt="" />}
           </div>
         </div>
-        <code className={`text-secondary`}>{`${addr.slice(0, 4)}…${addr.slice(38)}`}</code>
+        <code className={`text-secondary`}>{shortAddress(addr, { head: 4, tail: 4 })}</code>
       </figcaption>
     </figure>
   )

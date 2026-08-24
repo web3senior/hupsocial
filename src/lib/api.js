@@ -1,10 +1,11 @@
 import { getViewerId } from './viewer'
+import { normalizeAddress } from './address'
 
 export const getProfile= async (address) => {
   // Determine the base URL based on the environment
   const isServer = typeof window === 'undefined'
   const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' : ''
-  const url = `${baseUrl}/api/v1/users/profile/${address.toLowerCase()}`
+  const url = `${baseUrl}/api/v1/users/profile/${normalizeAddress(address)}`
 
   // Server-side (generateMetadata) hits the Next data cache so repeat navigations
   // to the same profile skip the DB + LUKSO round-trip; browsers ignore `next`.
@@ -23,7 +24,7 @@ export const getProfile= async (address) => {
  */
 export const getUserBadges = async (address) => {
   try {
-    const response = await fetch(`/api/v1/users/${address.toLowerCase()}/badges`)
+    const response = await fetch(`/api/v1/users/${normalizeAddress(address)}/badges`)
     if (!response.ok) return []
     const data = await response.json()
     return Array.isArray(data?.data) ? data.data : []
@@ -86,7 +87,7 @@ export async function getUniversalProfile(addr) {
 }
 
 export async function ensureProfile(address) {
-  const res = await fetch(`/api/v1/users/profile/${address.toLowerCase()}`, {
+  const res = await fetch(`/api/v1/users/profile/${normalizeAddress(address)}`, {
     method: 'POST',
     cache: 'no-store',
   })
@@ -537,7 +538,7 @@ export const getCommunityById = async (networkId, communityId) => {
 export const recordProfileView = async (address, walletAddress = null) => {
   try {
     const viewerId = getViewerId(walletAddress)
-    const url = `/api/v1/users/${address.toLowerCase()}/view`
+    const url = `/api/v1/users/${normalizeAddress(address)}/view`
 
     const response = await fetch(url, {
       method: 'POST',

@@ -13,6 +13,11 @@ import { handleBrokenAvatar } from '@/lib/utils'
 import DialogSheet from '@/components/ui/DialogSheet'
 import NativePopover from '@/components/ui/NativePopover'
 import NetworkSelect from '@/components/ui/NetworkSelect'
+import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
+import { useActiveWallet } from '@/hooks/useActiveWallet'
+import { useSolanaWallet } from '@/hooks/useSolanaWallet'
+import { SOLANA_CHAINS, SOLANA_ICON_URL } from '@/config/solana'
+import { setNetworkColor } from '@/config/wagmi'
 import styles from './ConnectWallet.module.scss'
 
 // Matches the sm breakpoint in styles/components/_responsive.scss
@@ -106,14 +111,18 @@ export const ConnectWallet = () => {
   const mounted = useClientMounted()
   const isCompact = useCompactViewport()
 
-  const { address, isConnected } = useConnection()
+  const { address: evmAddress, isConnected: isEvmConnected } = useConnection()
+  // What the header shows follows the active network: the Solana wallet on a Solana cluster,
+  // the EVM wallet everywhere else — one Connect button, one profile chip
+  const { address, isConnected } = useActiveWallet()
 
   const ensuredProfileRef = useRef(null)
 
+  // EVM only — the Solana bootstrap ensures its own profile on connect
   useEffect(() => {
-    if (!isConnected || !address) return
+    if (!isEvmConnected || !evmAddress) return
 
-    const walletAddress = address.toLowerCase()
+    const walletAddress = evmAddress.toLowerCase()
 
     if (ensuredProfileRef.current === walletAddress) return
     ensuredProfileRef.current = walletAddress
@@ -122,7 +131,7 @@ export const ConnectWallet = () => {
       console.error('Failed to create user profile:', error.message)
       ensuredProfileRef.current = null
     })
-  }, [isConnected, address])
+  }, [isEvmConnected, evmAddress])
 
   return !mounted ? null : (
     <>
@@ -226,9 +235,17 @@ const CONNECTOR_LABELS = { injected: 'Browser wallet' }
 
 const connectorLabel = (connector) => CONNECTOR_LABELS[connector.id] || connector.name
 
+const PHANTOM_URL = 'https://phantom.com/download'
+
 export function WalletOptions({ onConnected }) {
   const connectors = useConnectors()
   const { mutate: connect, isPending, variables, error } = useConnect()
+  const { chain: activeChain } = useActiveChain()
+  // Solana wallets come from the Wallet Standard registry and sit in the same list: one
+  // Connect flow whichever chain the wallet is for
+  const solana = useSolanaWallet()
+  const [solanaPending, setSolanaPending] = useState(null)
+  const [solanaError, setSolanaError] = useState(null)
 
   // List order: Email leads (the no-extension path), then wallets provably
   // installed (EIP-6963 announced — Universal Profile, MetaMask, ...), then the
@@ -254,7 +271,18 @@ export function WalletOptions({ onConnected }) {
       return
     }
 
-    connect({ connector }, { onSuccess: () => onConnected?.() })
+    // The network follows the wallet that just connected: an EVM wallet picked while a Solana
+    // cluster was active moves the app onto the wallet's chain, so the header never shows a
+    // connected wallet the active network cannot use
+    connect(
+      { connector },
+      {
+        onSuccess: (data) => {
+          if (activeChain?.isSolana && data?.chainId) setActiveChainId(data.chainId)
+          onConnected?.()
+        },
+      },
+    )
 
     // WalletConnect draws its QR sheet as a <w3m-modal> inside the page, but this list lives in
     // the top layer either way (showModal() sheet, or popover), and the top layer paints above
@@ -262,6 +290,49 @@ export function WalletOptions({ onConnected }) {
     // the screen over to any connector that brings its own UI; the rest resolve in place.
     if (connector.type === 'walletConnect') onConnected?.()
   }
+
+  // Same rule the other way round: connecting a Solana wallet moves the app onto Solana
+  const handleConnectSolana = async (name) => {
+    setSolanaPending(name)
+    setSolanaError(null)
+    try {
+      await solana.connect(name)
+      if (!activeChain?.isSolana && SOLANA_CHAINS[0]) {
+        setActiveChainId(SOLANA_CHAINS[0].id)
+        setNetworkColor(SOLANA_CHAINS[0])
+      }
+      onConnected?.()
+    } catch (connectError) {
+      setSolanaError(connectError.message || 'Could not connect the wallet')
+    } finally {
+      setSolanaPending(null)
+    }
+  }
+
+  // Always the second box, right after the EVM wallets
+  const solanaGroup = (
+    <DialogSheet.Group>
+      {solana.wallets.length === 0 ? (
+        <DialogSheet.Row
+          icon={<img src={SOLANA_ICON_URL} alt="" />}
+          name="Phantom (Solana)"
+          meta="Install"
+          onClick={() => window.open(PHANTOM_URL, '_blank', 'noopener,noreferrer')}
+        />
+      ) : (
+        solana.wallets.map((wallet) => (
+          <DialogSheet.Row
+            key={wallet.name}
+            icon={<img src={wallet.icon} alt="" />}
+            name={`${wallet.name} (Solana)`}
+            meta={solanaPending === wallet.name ? <span className={styles.spinner} aria-label="Connecting" /> : 'Detected'}
+            onClick={() => handleConnectSolana(wallet.name)}
+            disabled={isPending || solanaPending !== null}
+          />
+        ))
+      )}
+    </DialogSheet.Group>
+  )
 
   return (
     <DialogSheet.Body>
@@ -298,8 +369,9 @@ export function WalletOptions({ onConnected }) {
           )
         })}
       </DialogSheet.Group>
+      {solanaGroup}
 
-      {error && <p className={styles.error}>{error.shortMessage || error.message}</p>}
+      {(error || solanaError) && <p className={styles.error}>{solanaError || error?.shortMessage || error?.message}</p>}
     </DialogSheet.Body>
   )
 }

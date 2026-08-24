@@ -1,4 +1,5 @@
 import { ethers } from 'ethers'
+import { isWalletAddress } from '@/lib/address'
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 
@@ -277,9 +278,6 @@ function serializeNotification(row) {
   }
 }
 
-function isWalletAddress(value) {
-  return /^0x[a-fA-F0-9]{40}$/.test(value || '')
-}
 
 function clampNumber(value, min, max, fallback) {
   if (!Number.isFinite(value)) return fallback

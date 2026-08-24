@@ -3,6 +3,7 @@
  * @description Saves/unsaves a post for a wallet. Bookmarks are purely offchain (see Hup.sol notice), so this is a plain DB toggle with no onchain transaction required.
  */
 import { NextResponse } from 'next/server'
+import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -21,7 +22,7 @@ export async function POST(request, { params }) {
     await pool.execute(
       `INSERT INTO post_bookmarks (network_id, post_id, wallet_address, folder_id) VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE folder_id = VALUES(folder_id)`,
-      [networkId, postId, wallet_address.toLowerCase(), folderId]
+      [networkId, postId, normalizeAddress(wallet_address), folderId]
     )
 
     return NextResponse.json({ success: true, data: { is_bookmarked: true, folder_id: folderId } })
@@ -44,7 +45,7 @@ export async function PATCH(request, { params }) {
 
     const [result] = await pool.execute(
       `UPDATE post_bookmarks SET folder_id = ? WHERE network_id = ? AND post_id = ? AND wallet_address = ?`,
-      [folderId, networkId, postId, wallet_address.toLowerCase()]
+      [folderId, networkId, postId, normalizeAddress(wallet_address)]
     )
 
     if (result.affectedRows === 0) {
@@ -70,7 +71,7 @@ export async function DELETE(request, { params }) {
 
     await pool.execute(
       `DELETE FROM post_bookmarks WHERE network_id = ? AND post_id = ? AND wallet_address = ?`,
-      [networkId, postId, walletAddress.toLowerCase()]
+      [networkId, postId, normalizeAddress(walletAddress)]
     )
 
     return NextResponse.json({ success: true, data: { is_bookmarked: false } })
@@ -80,6 +81,3 @@ export async function DELETE(request, { params }) {
   }
 }
 
-function isWalletAddress(value) {
-  return /^0x[a-fA-F0-9]{40}$/.test(value || '')
-}
