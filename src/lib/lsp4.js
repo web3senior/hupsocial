@@ -21,7 +21,9 @@ export const erc725yGetDataAbi = [
 
 // A VerifiableURI (LSP2) is `0x0000` + bytes4 verification method + bytes2 hash length +
 // hash + utf8 url. Rather than trusting every collection to encode it perfectly, decode the
-// whole payload as text and pull the trailing url out of it.
+// whole payload as text and pull the trailing url out of it. The tail must admit any
+// non-control character, not just ASCII: an embedded `data:application/json` payload is the
+// url, and collections put µ, emoji and accented names straight into that JSON.
 export const decodeVerifiableUri = (bytes) => {
   if (!bytes || bytes === '0x') return null
   let text
@@ -30,7 +32,7 @@ export const decodeVerifiableUri = (bytes) => {
   } catch {
     return null
   }
-  const match = text.match(/(ipfs:\/\/|https?:\/\/|ar:\/\/|data:)[\x20-\x7E]*$/)
+  const match = text.match(/(ipfs:\/\/|https?:\/\/|ar:\/\/|data:)[^\u0000-\u001F\u007F]*$/)
   return match ? match[0] : null
 }
 
