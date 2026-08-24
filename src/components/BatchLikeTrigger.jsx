@@ -24,8 +24,9 @@ const compact = (count) => (count > 99 ? '99+' : count)
  *
  * One chain per heart is the honest shape of a hard constraint, not decoration: batchLike
  * runs on a single Hup contract, so there is no "send all" that would not turn into a run
- * of switch-and-sign prompts. Each heart carries the chain's name, its queued count, and
- * a small clear chip — the only way to drop a queued like whose post has scrolled out of
+ * of switch-and-sign prompts. Each heart carries the chain's name with a "Sign now" line
+ * under it (so the tap reads as signing, not choosing), its queued count, and a small
+ * clear chip — the only way to drop a queued like whose post has scrolled out of
  * reach.
  *
  * Hearts are ordered by chain id (the store keys the basket by id, and integer-like keys
@@ -70,6 +71,7 @@ export default function BatchLikeTrigger({ className, badgeClassName }) {
                 <HeartIcon weight="fill" color="var(--batch-like-color, #facc15)" />
               )}
               <span className={styles.chainHeart__caption}>{group.name}</span>
+              <span className={styles.chainHeart__cta}>{isSending ? 'Signing…' : 'Sign now'}</span>
               <span className={badgeClassName}>{compact(group.count)}</span>
             </button>
 

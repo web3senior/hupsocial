@@ -36,6 +36,19 @@
     text-overflow: ellipsis;
   }
 
+  // The action line under the chain name. Says what the tap does — sign — because the
+  // chain name alone read as a label to pick from, not a button to press. Quieter than
+  // the name so the stack still scans name-first.
+  &__cta {
+    color: var(--text-muted);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
   // Always visible, never hover-only: on touch there is no hover, and this chip is the
   // only way to drop a queued like whose post is no longer on screen. Styled as the count
   // badge's twin — same size, offset, ring and shadow — in a neutral fill so the yellow
