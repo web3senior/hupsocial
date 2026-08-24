@@ -110,7 +110,11 @@ const TipModal = ({ item, setShowTipModal }) => {
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
   const [tokenSearchResults, setTokenSearchResults] = useState([])
-  const [isBurnerBusy, setIsBurnerBusy] = useState(false)
+  // Flipped on synchronously at the top of every send handler so the button locks on the
+  // click itself — the session check is two RPC round trips, and wagmi only reports isPending
+  // once mutate() runs after them. Cleared when the wallet settles (hash or rejection); from
+  // there isPending/isConfirming cover the rest.
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const { address } = useConnection()
   const { mutate: mutateStats } = useSWRConfig()
   const dialogRef = useRef(null)
@@ -270,7 +274,7 @@ const TipModal = ({ item, setShowTipModal }) => {
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = isPending || isConfirming || isBurnerBusy
+  const isBusy = isPending || isConfirming || isSubmitting
 
   // Mount = open / unmount = close, matching the NewPost dialog contract
   useEffect(() => {
@@ -300,22 +304,30 @@ const TipModal = ({ item, setShowTipModal }) => {
     if (amountUnits === null || !tokenAddress) return
 
     lastActionRef.current = 'approve'
+    setIsSubmitting(true)
+    const settle = { onSettled: () => setIsSubmitting(false) }
     if (isLsp7) {
-      writeContract({
-        abi: lsp7Abi,
-        address: tokenAddress,
-        functionName: 'authorizeOperator',
-        args: [tipperAddress, amountUnits, '0x'],
-        chainId,
-      })
+      writeContract(
+        {
+          abi: lsp7Abi,
+          address: tokenAddress,
+          functionName: 'authorizeOperator',
+          args: [tipperAddress, amountUnits, '0x'],
+          chainId,
+        },
+        settle
+      )
     } else {
-      writeContract({
-        abi: erc20Abi,
-        address: tokenAddress,
-        functionName: 'approve',
-        args: [tipperAddress, amountUnits],
-        chainId,
-      })
+      writeContract(
+        {
+          abi: erc20Abi,
+          address: tokenAddress,
+          functionName: 'approve',
+          args: [tipperAddress, amountUnits],
+          chainId,
+        },
+        settle
+      )
     }
   }
 
@@ -323,18 +335,24 @@ const TipModal = ({ item, setShowTipModal }) => {
     e.stopPropagation()
     if (amountUnits === null || !tipperAddress || (isTokenTip && !tokenAddress)) return
 
+    setIsSubmitting(true)
+    const settle = { onSettled: () => setIsSubmitting(false) }
+
     // ERC677: one transaction, no approve. The tipper is credited from onTokenTransfer, which
     // reads the post id out of the payload. Burner sessions can't apply here — the tokens have
     // to leave the wallet that actually holds them — so this path always uses wagmi.
     if (isErc677) {
       lastActionRef.current = 'tip'
-      writeContract({
-        abi: erc677Abi,
-        address: tokenAddress,
-        functionName: 'transferAndCall',
-        args: [tipperAddress, amountUnits, encodeErc677TipData(BigInt(item.id))],
-        chainId,
-      })
+      writeContract(
+        {
+          abi: erc677Abi,
+          address: tokenAddress,
+          functionName: 'transferAndCall',
+          args: [tipperAddress, amountUnits, encodeErc677TipData(BigInt(item.id))],
+          chainId,
+        },
+        settle
+      )
       return
     }
 
@@ -347,7 +365,6 @@ const TipModal = ({ item, setShowTipModal }) => {
     const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
     if (session.active) {
-      setIsBurnerBusy(true)
       try {
         await writeWithBurnerSession({
           chain: chainInfo,
@@ -363,20 +380,23 @@ const TipModal = ({ item, setShowTipModal }) => {
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
       } finally {
-        setIsBurnerBusy(false)
+        setIsSubmitting(false)
       }
       return
     }
 
     lastActionRef.current = 'tip'
-    writeContract({
-      abi: tipperAbi,
-      address: tipperAddress,
-      functionName: 'tip',
-      args,
-      chainId,
-      ...(isTokenTip ? {} : { value: amountUnits }),
-    })
+    writeContract(
+      {
+        abi: tipperAbi,
+        address: tipperAddress,
+        functionName: 'tip',
+        args,
+        chainId,
+        ...(isTokenTip ? {} : { value: amountUnits }),
+      },
+      settle
+    )
   }
 
   return (
