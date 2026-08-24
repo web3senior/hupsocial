@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 import { PinataSDK } from 'pinata'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { shortUploadError } from '@/lib/uploadErrors'
 
 const pinata = new PinataSDK({ pinataJwt: process.env.PINATA_JWT })
 
@@ -108,10 +109,6 @@ export async function POST(request) {
     return NextResponse.json(await pinataPresign({ name, mimeType, size: declaredSize }))
   } catch (e) {
     console.error('Presign error:', e)
-    const overLimit = typeof e?.message === 'string' && e.message.includes('plan limits')
-    return NextResponse.json(
-      { error: overLimit ? 'Storage provider is over its plan limits' : 'Could not create signed URL' },
-      { status: 502 }
-    )
+    return NextResponse.json({ error: shortUploadError(e, 'Could not create an upload URL') }, { status: 502 })
   }
 }

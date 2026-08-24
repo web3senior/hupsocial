@@ -38,6 +38,7 @@ import clsx from 'clsx'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
 import { captureVideoPoster } from '@/lib/videoPoster'
+import { shortUploadError } from '@/lib/uploadErrors'
 
 const MAX_MEDIA_ITEMS = 8
 const MAX_MEDIA_SIZE_MB = 10
@@ -835,7 +836,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       return await uploadToIPFS(file)
     } catch (error) {
       console.error('Trouble uploading file:', error)
-      toast('Error uploading file', 'error')
+      toast(shortUploadError(error, 'Error uploading file'), 'error')
       return null
     } finally {
       endUpload()
@@ -857,7 +858,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       return uploadRequest.json()
     } catch (error) {
       console.error('Trouble uploading post metadata:', error)
-      toast('Error uploading post metadata', 'error')
+      toast(shortUploadError(error, 'Error uploading post metadata'), 'error')
       throw error
     } finally {
       endUpload()

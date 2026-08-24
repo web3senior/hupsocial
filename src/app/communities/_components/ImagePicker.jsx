@@ -32,7 +32,7 @@ export default function ImagePicker({ label, value, onChange, fieldClassName, la
       onChange(await uploadFileToIPFS(file))
     } catch (err) {
       console.error('Community image upload failed:', err)
-      setUploadError('Upload failed. Please try again.')
+      setUploadError(err.message || 'Upload failed. Please try again.')
     } finally {
       setIsUploading(false)
     }

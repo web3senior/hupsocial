@@ -1157,7 +1157,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
           profileImageHash = rootHash
         } catch (uploadErr) {
           console.error('0G Storage Error:', uploadErr)
-          setError('Failed to upload image to decentralized storage.')
+          setError(uploadErr.message || 'Failed to upload image to decentralized storage.')
           setIsPending(false)
           return
         }

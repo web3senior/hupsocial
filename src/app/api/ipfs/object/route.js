@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
+import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
@@ -52,9 +53,14 @@ export async function POST(request) {
     let rawCID
     try {
       rawCID = await uploadToFilebase(json)
-    } catch (e) {
-      console.warn('[filebase] upload failed, falling back to Pinata:', e.message)
-      rawCID = await uploadToPinata(json)
+    } catch (filebaseError) {
+      console.warn('[filebase] upload failed, falling back to Pinata:', filebaseError.message)
+      try {
+        rawCID = await uploadToPinata(json)
+      } catch (pinataError) {
+        console.error('[pinata] fallback upload failed:', pinataError.message)
+        return NextResponse.json({ error: bothProvidersFailed(filebaseError, pinataError) }, { status: 502 })
+      }
     }
 
     const cid = `ipfs://${rawCID}`
@@ -63,6 +69,6 @@ export async function POST(request) {
     return NextResponse.json({ url, cid }, { status: 200 })
   } catch (e) {
     console.error('JSON upload error:', e)
-    return NextResponse.json({ error: 'Internal Server Error during JSON upload' }, { status: 500 })
+    return NextResponse.json({ error: shortUploadError(e, 'Upload failed on the server') }, { status: 500 })
   }
 }

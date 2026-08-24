@@ -9,6 +9,7 @@
 
 import { NextResponse } from 'next/server'
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
+import { shortUploadError } from '@/lib/uploadErrors'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -20,6 +21,15 @@ const ATTEMPTS = 8
 const RETRY_DELAY_MS = 750
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/* HEAD responses carry no body, so the SDK has nothing better than "UnknownError" to say — the
+   status code is the whole story. The client only asks here after its PUT succeeded, so a 403
+   means the keys this server holds are not the ones that signed the upload: stale env. */
+function describeHeadFailure(error, status) {
+  if (status === 403) return 'Storage refused to read the upload back — check the Filebase S3 keys'
+  if (status) return `Storage answered ${status} while reading the upload back`
+  return shortUploadError(error, 'Could not read the upload back')
+}
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
@@ -46,6 +56,9 @@ export async function GET(req) {
   })
 
   let lastError = 'CID was not available'
+  /* True when the object is simply not there yet — the one failure the client can fix by asking
+     again instead of by uploading the whole file a second time */
+  let pending = false
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(RETRY_DELAY_MS)
@@ -59,15 +72,17 @@ export async function GET(req) {
       const cid = head.Metadata?.cid
       if (cid) return NextResponse.json({ cid: `ipfs://${cid}` }, { status: 200 })
 
-      lastError = 'Object exists but has not been pinned yet'
+      lastError = 'Uploaded, but storage has not finished pinning it yet — try again'
+      pending = true
     } catch (error) {
       // A 404 right after the PUT is read-after-write lag, not a missing object — keep retrying
       const status = error?.$metadata?.httpStatusCode
-      lastError = status === 404 ? 'Object not visible yet' : error.message || 'Head request failed'
+      pending = status === 404
+      lastError = pending ? 'Uploaded, but storage has not registered it yet — try again' : describeHeadFailure(error, status)
       if (status && status !== 404 && status !== 403) break
     }
   }
 
   console.warn(`[ipfs/cid] could not resolve ${key}: ${lastError}`)
-  return NextResponse.json({ error: lastError }, { status: 502 })
+  return NextResponse.json({ error: lastError, pending }, { status: 502 })
 }

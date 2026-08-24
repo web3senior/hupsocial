@@ -1,10 +1,19 @@
+import { shortUploadError } from '@/lib/uploadErrors'
+
+// The reason a response was not OK, in the short form every caller's toast shows verbatim. Our
+// routes carry it as JSON `error`; the storage edge answers a presigned request with S3 XML.
+async function readFailure(res, fallback) {
+  const body = await res.text().catch(() => '')
+  return shortUploadError(body, `${fallback} (${res.status})`)
+}
+
 // Upload through the server-side /api/ipfs/file route (Filebase primary, Pinata fallback).
 // Subject to the Vercel 4.5 MB function payload limit.
 async function uploadViaServer(file, filename) {
   const form = new FormData()
   form.append('file', file, filename)
   const res = await fetch('/api/ipfs/file', { method: 'POST', body: form })
-  if (!res.ok) throw new Error(`Server upload failed: ${res.status}`)
+  if (!res.ok) throw new Error(await readFailure(res, 'Upload failed'))
   const { cid } = await res.json()
   if (!cid) throw new Error('CID not found in server upload response')
   return cid
@@ -24,32 +33,51 @@ async function requestPresign(file, filename) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: filename, mimeType: file.type, size: file.size }),
   })
-  if (!res.ok) {
-    const { error } = await res.json().catch(() => ({}))
-    throw new Error(error || 'Failed to get presigned upload URL')
-  }
+  if (!res.ok) throw new Error(await readFailure(res, 'Could not create an upload URL'))
   return res.json()
 }
 
 // S3 presigned PUT: the body is the raw file, and the headers have to match what was signed
 // or the edge rejects the request. Filebase attaches the CID as object metadata once pinning
 // finishes, so the key is resolved to a CID in a second step.
+/* Filebase pins after the PUT returns, and one /api/ipfs/cid call only waits a few seconds — a
+   100 MB video can need longer. Asking again costs a request; giving up costs the whole upload
+   over again, since the browser has nothing but the key to show for it. */
+const CID_LOOKUPS = 12
+const CID_LOOKUP_GAP_MS = 2000
+
+async function resolveFilebaseCid(key) {
+  for (let attempt = 1; ; attempt++) {
+    const cidRes = await fetch(`/api/ipfs/cid?key=${encodeURIComponent(key)}`)
+    if (cidRes.ok) {
+      const { cid } = await cidRes.json()
+      if (!cid) throw new Error('CID not found in Filebase response')
+      return cid
+    }
+
+    const body = await cidRes.text().catch(() => '')
+    let pending = false
+    try {
+      pending = JSON.parse(body)?.pending === true
+    } catch {
+      /* Not JSON — a proxy or platform error page, and nothing to wait for */
+    }
+    if (!pending || attempt >= CID_LOOKUPS) {
+      throw new Error(shortUploadError(body, `Uploaded, but the CID could not be resolved (${cidRes.status})`))
+    }
+    await new Promise((resolve) => setTimeout(resolve, CID_LOOKUP_GAP_MS))
+  }
+}
+
 async function uploadViaFilebasePresign(file, { url, key }) {
   const uploadRes = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': file.type || 'application/octet-stream' },
     body: file,
   })
-  if (!uploadRes.ok) throw new Error(`Filebase upload failed: ${uploadRes.status}`)
+  if (!uploadRes.ok) throw new Error(await readFailure(uploadRes, 'Storage rejected the upload'))
 
-  const cidRes = await fetch(`/api/ipfs/cid?key=${encodeURIComponent(key)}`)
-  if (!cidRes.ok) {
-    const { error } = await cidRes.json().catch(() => ({}))
-    throw new Error(error || 'Uploaded, but the CID could not be resolved')
-  }
-  const { cid } = await cidRes.json()
-  if (!cid) throw new Error('CID not found in Filebase response')
-  return cid
+  return resolveFilebaseCid(key)
 }
 
 // Pinata's signed URL takes a multipart POST and answers with the CID directly.
@@ -61,7 +89,7 @@ async function uploadViaPinataPresign(file, filename, { url }) {
   form.append('network', 'public')
   form.append('name', filename)
   const uploadRes = await fetch(url, { method: 'POST', body: form })
-  if (!uploadRes.ok) throw new Error(`Pinata upload failed: ${uploadRes.status}`)
+  if (!uploadRes.ok) throw new Error(await readFailure(uploadRes, 'Storage rejected the upload'))
 
   const { data } = await uploadRes.json()
   return `ipfs://${data.cid}`
@@ -79,18 +107,24 @@ async function uploadViaPresign(file, filename) {
 export async function uploadFileToIPFS(file) {
   const filename = file.name ?? 'upload'
 
-  /* Large files skip the server route entirely — it cannot accept them, and finding that out
-     costs a full upload. Small ones keep going through it: that route transcodes HEIC before
-     pinning, which a direct-to-storage upload would bypass. */
-  if (file.size >= PRESIGN_THRESHOLD_BYTES) {
-    return await uploadViaPresign(file, filename)
-  }
-
   try {
-    return await uploadViaServer(file, filename)
-  } catch (e) {
-    console.warn('[ipfs] server upload failed, falling back to presigned upload:', e.message)
-    return await uploadViaPresign(file, filename)
+    /* Large files skip the server route entirely — it cannot accept them, and finding that out
+       costs a full upload. Small ones keep going through it: that route transcodes HEIC before
+       pinning, which a direct-to-storage upload would bypass. */
+    if (file.size >= PRESIGN_THRESHOLD_BYTES) {
+      return await uploadViaPresign(file, filename)
+    }
+
+    try {
+      return await uploadViaServer(file, filename)
+    } catch (e) {
+      console.warn('[ipfs] server upload failed, falling back to presigned upload:', e.message)
+      return await uploadViaPresign(file, filename)
+    }
+  } catch (error) {
+    /* Callers put error.message straight into a toast, so a fetch that never reached storage
+       ("Failed to fetch") is translated here; the original stays on `cause` for the console */
+    throw new Error(shortUploadError(error), { cause: error })
   }
 }
 
@@ -99,15 +133,19 @@ export async function uploadFileToIPFS(file) {
  * CID string — used for post/community metadata payloads (small, so no presign needed).
  */
 export async function uploadObjectToIPFS(contentObj) {
-  const res = await fetch('/api/ipfs/object', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(contentObj),
-  })
-  if (!res.ok) throw new Error('Failed to upload content to IPFS')
-  const { cid } = await res.json()
-  if (!cid) throw new Error('CID not found')
-  return cid
+  try {
+    const res = await fetch('/api/ipfs/object', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(contentObj),
+    })
+    if (!res.ok) throw new Error(await readFailure(res, 'Upload failed'))
+    const { cid } = await res.json()
+    if (!cid) throw new Error('CID not found')
+    return cid
+  } catch (error) {
+    throw new Error(shortUploadError(error), { cause: error })
+  }
 }
 
 /**

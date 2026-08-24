@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
 import sharp from 'sharp'
+import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
 import { FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
 import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
 
@@ -85,9 +86,14 @@ export async function POST(request) {
     let rawCID
     try {
       rawCID = await uploadToFilebase(file)
-    } catch (e) {
-      console.warn('[filebase] upload failed, falling back to Pinata:', e.message)
-      rawCID = await uploadToPinata(file)
+    } catch (filebaseError) {
+      console.warn('[filebase] upload failed, falling back to Pinata:', filebaseError.message)
+      try {
+        rawCID = await uploadToPinata(file)
+      } catch (pinataError) {
+        console.error('[pinata] fallback upload failed:', pinataError.message)
+        return NextResponse.json({ error: bothProvidersFailed(filebaseError, pinataError) }, { status: 502 })
+      }
     }
 
     const cid = `ipfs://${rawCID}`
@@ -96,7 +102,7 @@ export async function POST(request) {
     return NextResponse.json({ url, cid }, { status: 200 })
   } catch (e) {
     console.error('File upload error:', e)
-    return NextResponse.json({ error: 'Internal Server Error during upload' }, { status: 500 })
+    return NextResponse.json({ error: shortUploadError(e, 'Upload failed on the server') }, { status: 500 })
   }
 }
 
