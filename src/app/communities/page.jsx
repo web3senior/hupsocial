@@ -2139,7 +2139,11 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                     </div>
                   )}
                   <div className={styles.card__titleGroup}>
-                    <h3 className={styles.card__title}>{metadata.name || `Community #${id}`}</h3>
+                    {/* Clamped to two lines in the stylesheet — the title attribute carries the
+                        full name on hover, and the community page shows it in full */}
+                    <h3 className={styles.card__title} title={metadata.name || undefined}>
+                      {metadata.name || `Community #${id}`}
+                    </h3>
                     {/* Not a <Link>: the whole card header is already wrapped in one, and
                         anchors can't nest — route imperatively instead */}
                     <span

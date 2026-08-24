@@ -114,6 +114,8 @@
     color: var(--text);
     margin: 0;
     line-height: 1.25;
+    // Full name here, however long — wrap unbroken strings rather than overflow the card
+    overflow-wrap: anywhere;
   }
 
   &__summary {
