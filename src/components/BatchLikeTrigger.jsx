@@ -1,138 +1,150 @@
 'use client'
 
 import clsx from 'clsx'
-import { HeartIcon, SpinnerIcon, TrashIcon } from '@phosphor-icons/react'
+import { HeartIcon, SpinnerIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import NativePopover from '@/components/ui/NativePopover'
+import { toast } from '@/components/NextToast'
 import { useBatchLike } from '@/hooks/useBatchLike'
 import styles from './BatchLikeTrigger.module.scss'
 
+// Chains that get their own floating heart; anything beyond folds into one "more" heart
+// that opens a list. Three keeps the stack shorter than a phone screen, and nobody queues
+// likes on four chains in one sitting anyway.
+const MAX_DIRECT_HEARTS = 3
+
+const likesLabel = (count) => `${count} like${count === 1 ? '' : 's'}`
+const compact = (count) => (count > 99 ? '99+' : count)
+
 /**
- * The basket's only surface now that /batch-like is gone: an orange heart carrying the
- * queued count, opening a panel that lists what is queued per chain.
+ * The basket's surface: one floating heart per chain that has likes queued, and tapping a
+ * heart sends that chain's queue straight away. The wallet prompt (or the relay's signature
+ * request) is the confirmation — the same consent every other tap in the app relies on.
+ * The old chooser panel confused people: they tapped the heart expecting to sign and got a
+ * box to read instead.
  *
- * The panel opens even for a single queued chain rather than firing on tap. Sending costs
- * gas, so a floating button deserves a deliberate second tap, and it keeps clearing the
- * basket reachable in every state — otherwise a queued like nobody wants can never be
- * removed. There is deliberately no "send all" either: batchLike runs on one Hup contract
- * at a time and the wallet must switch networks for each, so a single tap across three
- * chains would be a run of switch-and-sign prompts, with a rejection halfway through
- * leaving the rest in an unexplained state.
+ * One chain per heart is the honest shape of a hard constraint, not decoration: batchLike
+ * runs on a single Hup contract, so there is no "send all" that would not turn into a run
+ * of switch-and-sign prompts. Each heart carries the chain's name, its queued count, and
+ * a small clear chip — the only way to drop a queued like whose post has scrolled out of
+ * reach.
+ *
+ * Hearts are ordered by chain id (the store keys the basket by id, and integer-like keys
+ * enumerate ascending) rather than by count, so a tap target never jumps under the thumb
+ * when another chain's count changes.
  *
  * @param {Object} props
- * @param {string} [props.className] Classes for the trigger button, supplied by the host surface.
- * @param {string} [props.iconWrapperClassName] When set, icon and badge are wrapped in it (tab bars).
- * @param {string} [props.badgeClassName] Classes for the count/dot element.
- * @param {'count'|'dot'|'none'} [props.badge] How the queue size is shown.
- * @param {number} [props.iconSize] Heart size in px.
- * @param {string} [props.placement] NativePopover placement for the chain chooser.
+ * @param {string} [props.className] Classes for each heart button, supplied by the host surface.
+ * @param {string} [props.badgeClassName] Classes for the count badge.
  */
-export default function BatchLikeTrigger({
-  className,
-  iconWrapperClassName,
-  badgeClassName,
-  badge = 'count',
-  iconSize = 20,
-  placement = 'top-end',
-  caption,
-}) {
+export default function BatchLikeTrigger({ className, badgeClassName }) {
   const { total, groups, pendingNetworkId, isProcessing, send, clear } = useBatchLike()
 
   if (total === 0) return null
 
-  const badgeNode =
-    badge === 'count' ? (
-      <span className={badgeClassName ?? styles.badge}>{total > 99 ? '99+' : total}</span>
-    ) : badge === 'dot' ? (
-      <span className={badgeClassName} aria-hidden="true" />
-    ) : null
+  const direct = groups.slice(0, MAX_DIRECT_HEARTS)
+  const folded = groups.slice(MAX_DIRECT_HEARTS)
+  const foldedTotal = folded.reduce((sum, group) => sum + group.count, 0)
 
-  const face = (
-    <>
-      {isProcessing ? (
-        <SpinnerIcon size={iconSize} className="animate spin" />
-      ) : (
-        <HeartIcon size={iconSize} weight="fill" color="var(--batch-like-color, #facc15)" />
-      )}
-      {badgeNode}
-    </>
-  )
-
-  const content = iconWrapperClassName ? <span className={iconWrapperClassName}>{face}</span> : face
-
-  const label = `Open pending likes, ${total} waiting to be sent`
+  const clearChain = (group) => {
+    clear(group.networkId)
+    toast(`Cleared ${likesLabel(group.count)} queued on ${group.name}`, 'info')
+  }
 
   return (
-    <NativePopover
-      placement={placement}
-      className={styles.panel}
-      trigger={
-        // A bare heart on a floating button reads as "like something", not "you have likes
-        // waiting" — the caption is what tells a first-time user which one it is
-        <button type="button" className={clsx(className, caption && styles.trigger)} disabled={isProcessing} aria-label={label}>
-          {content}
-          {caption && <span className={styles.caption}>{caption}</span>}
-        </button>
-      }
-    >
-      {({ close }) => (
-        <div className={styles.basket}>
-          <p className={styles.basket__title}>Pending likes</p>
-          <p className={styles.basket__lede}>Hearts you tapped in the feed. Nothing is onchain until you send them.</p>
+    <>
+      {direct.map((group) => {
+        const isSending = pendingNetworkId === group.networkId
 
-          <ul className={styles.basket__list}>
-            {groups.map((group) => (
-              <li key={group.networkId} className={styles.basket__item}>
-                <button
-                  type="button"
-                  className={styles.network}
-                  disabled={isProcessing}
-                  aria-label={`Send ${group.count} like${group.count === 1 ? '' : 's'} on ${group.name}`}
-                  onClick={() => {
-                    close()
-                    send(group.networkId)
-                  }}
-                >
-                  <span className={styles.network__name}>{group.name}</span>
-                  <span className={styles.network__count}>
-                    <HeartIcon size={11} weight="fill" />
-                    {group.count}
-                  </span>
-                  {/* No send arrow: sitting beside the trash it turned the pair into a
-                      guess, and the row itself is the send target */}
-                  {pendingNetworkId === group.networkId && <SpinnerIcon size={14} className="animate spin" />}
-                </button>
+        return (
+          <div key={group.networkId} className={styles.chainHeart}>
+            <button
+              type="button"
+              className={clsx(className, styles.chainHeart__send)}
+              disabled={isProcessing}
+              aria-label={`Send ${likesLabel(group.count)} on ${group.name}`}
+              onClick={() => send(group.networkId)}
+            >
+              {isSending ? (
+                <SpinnerIcon className="animate spin" />
+              ) : (
+                <HeartIcon weight="fill" color="var(--batch-like-color, #facc15)" />
+              )}
+              <span className={styles.chainHeart__caption}>{group.name}</span>
+              <span className={badgeClassName}>{compact(group.count)}</span>
+            </button>
 
-                <button
-                  type="button"
-                  className={styles.network__clear}
-                  disabled={isProcessing}
-                  onClick={() => clear(group.networkId)}
-                  aria-label={`Clear queued likes on ${group.name}`}
-                >
-                  <TrashIcon size={14} />
-                </button>
-              </li>
-            ))}
-          </ul>
+            {/* A sibling rather than a child: buttons cannot nest */}
+            <button
+              type="button"
+              className={styles.chainHeart__clear}
+              disabled={isProcessing}
+              aria-label={`Clear queued likes on ${group.name}`}
+              onClick={() => clearChain(group)}
+            >
+              <XIcon size={10} weight="bold" />
+            </button>
+          </div>
+        )
+      })}
 
-          {groups.length > 1 && (
-            <p className={styles.basket__hint}>One transaction per network — your wallet switches between them.</p>
+      {folded.length > 0 && (
+        <NativePopover
+          placement="top-end"
+          className={styles.panel}
+          trigger={
+            <button
+              type="button"
+              className={clsx(className, styles.chainHeart__send)}
+              disabled={isProcessing}
+              aria-label={`Open ${folded.length} more networks with ${likesLabel(foldedTotal)} waiting`}
+            >
+              <HeartIcon weight="fill" color="var(--batch-like-color, #facc15)" />
+              <span className={styles.chainHeart__caption}>+{folded.length} more</span>
+              <span className={badgeClassName}>{compact(foldedTotal)}</span>
+            </button>
+          }
+        >
+          {({ close }) => (
+            <div className={styles.basket}>
+              <p className={styles.basket__title}>More pending likes</p>
+
+              <ul className={styles.basket__list}>
+                {folded.map((group) => (
+                  <li key={group.networkId} className={styles.basket__item}>
+                    <button
+                      type="button"
+                      className={styles.network}
+                      disabled={isProcessing}
+                      aria-label={`Send ${likesLabel(group.count)} on ${group.name}`}
+                      onClick={() => {
+                        close()
+                        send(group.networkId)
+                      }}
+                    >
+                      <span className={styles.network__name}>{group.name}</span>
+                      <span className={styles.network__count}>
+                        <HeartIcon size={11} weight="fill" />
+                        {group.count}
+                      </span>
+                      {pendingNetworkId === group.networkId && <SpinnerIcon size={14} className="animate spin" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.network__clear}
+                      disabled={isProcessing}
+                      onClick={() => clearChain(group)}
+                      aria-label={`Clear queued likes on ${group.name}`}
+                    >
+                      <TrashIcon size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
-
-          <button
-            type="button"
-            className={styles.basket__clearAll}
-            disabled={isProcessing}
-            onClick={() => {
-              clear()
-              close()
-            }}
-          >
-            <TrashIcon size={14} />
-            <span>Clear all {total}</span>
-          </button>
-        </div>
+        </NativePopover>
       )}
-    </NativePopover>
+    </>
   )
 }

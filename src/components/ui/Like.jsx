@@ -4,10 +4,17 @@ import { useEffect, useMemo, useRef } from 'react'
 import clsx from 'clsx'
 import { HeartIcon } from '@phosphor-icons/react'
 import useSWR from 'swr'
-import { useWaitForTransactionReceipt, useConnection, useSignTypedData, useWriteContract, usePublicClient } from 'wagmi'
+import {
+  useChainId,
+  useConnection,
+  usePublicClient,
+  useSignTypedData,
+  useSwitchChain,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from 'wagmi'
 import { getPublicClient } from 'wagmi/actions'
-import { getActiveChain } from '@/lib/communication'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { isSessionActive, localStorageBatchLikeKey, writeWithBurnerSession } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { CONTRACTS, config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
@@ -19,15 +26,24 @@ import { shortTxError } from '@/lib/utils'
 import Counter from './Counter'
 import Tooltip from './Tooltip'
 
-const localStorageBatchLikeKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}batch_like_enabled`
-
 /**
  * Like Interaction Component
+ *
+ * A like is queued into the per-chain basket by default (Settings → Batch Like) and goes
+ * onchain when the user taps that chain's floating heart (components/BatchLikeTrigger).
+ * With the basket off, and always for unlike, the tap sends immediately — batchLike([id])
+ * or unlike(id): sponsored by the relay where the chain allows it, signed silently by an
+ * active session key, or confirmed in the wallet.
+ *
+ * Feeds mix chains, so every read and write here is pinned to the post's own network rather
+ * than the wallet's: the relay and the session key sign against that chain locally, and only
+ * the wallet path asks the wallet to switch — lazily, right before it signs, so a sponsored
+ * heart never opens a network prompt at all.
+ *
  * @param {Object} props
  * @param {Object} props.post Core content model with network metadata and like metrics.
  * @param {Function} [props.onUpdate] Optional parent update callback to sync list states.
  */
-
 export const Like = ({ post, onUpdate }) => {
   // ■■■ Store Subscriptions ■■■
   const addToBatch = useSidebarStore((state) => state.addToBatch)
@@ -37,10 +53,14 @@ export const Like = ({ post, onUpdate }) => {
   const markLikeOverride = useSidebarStore((state) => state.markLikeOverride)
 
   const isMounted = useClientMounted()
-  const activeChain = getActiveChain()
   const { address, isConnected } = useConnection()
   const publicClient = usePublicClient()
+  // Reactive, unlike a render-time chain snapshot: read again after switchChainAsync resolves
+  const walletChainId = useChainId()
+  const { switchChainAsync } = useSwitchChain()
   const { signTypedDataAsync } = useSignTypedData()
+
+  const chainId = Number(post.network_id)
 
   // ■■■ SWR Data Fetching Configuration ■■■
   const cacheKey = post?.id ? `posts/${post.network_id}/${post.id}/${address || 'anonymous'}/likes` : null
@@ -94,9 +114,9 @@ export const Like = ({ post, onUpdate }) => {
 
   // Web3 Hooks
   const { data: hash, isPending: isWalletPending, mutateAsync: writeContractAsync } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  })
+  // Watched on the post's chain: the wallet is there too after the switch, but the receipt
+  // must not depend on it
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash, chainId })
 
   // The same receipt hook confirms both like and unlike txs; the ref remembers
   // which intent the pending hash belongs to
@@ -126,33 +146,58 @@ export const Like = ({ post, onUpdate }) => {
       toast('Interaction saved onchain!', 'success')
     }
   }, [isConfirmed])
-  
+
   /**
-   * Relays a heart action (batchLike([id]) or unlike(id)) through the forwarder so the tap
-   * costs the user nothing. Returns false whenever the relay is unavailable — cooldown
-   * included: the free window can be a long wait, so the tap falls back to the usual
-   * session/wallet path instead of blocking, and the wallet prompt there is the user's
-   * consent to pay. Unlike has a much smaller window than like on purpose — that asymmetry
-   * is what caps heart-toggle farming (see config/gasless.js).
+   * Everything a heart needs about the post's own chain, resolved once per tap.
+   * @returns {{targetChain: Object, chainDefinition: Object, targetPublicClient: Object}|null}
+   *   Null (after a toast) when the post's network is not configured.
+   */
+  const resolveTarget = () => {
+    const targetChain = CONTRACTS[`chain${post.network_id}`]
+    if (!targetChain?.hup) {
+      toast('Contract configuration missing for network', 'error')
+      return null
+    }
+
+    const chainDefinition = config.chains.find((item) => item.id === chainId)
+    if (!chainDefinition) {
+      toast('Post network is not configured', 'error')
+      return null
+    }
+
+    return {
+      targetChain,
+      chainDefinition,
+      // Pinned to the post's chain regardless of where the wallet is connected
+      targetPublicClient: getPublicClient(config, { chainId }) ?? publicClient,
+    }
+  }
+
+  // Only the wallet write path needs the wallet on the post's chain
+  const ensureWalletChain = async () => {
+    if (walletChainId === chainId) return
+    toast('Switching network to match the post...', 'info')
+    await switchChainAsync({ chainId })
+  }
+
+  /**
+   * Relays a heart action through the forwarder so the tap costs the user nothing. Returns
+   * false whenever the relay is unavailable — cooldown included: the free window can be a
+   * long wait, so the tap falls back to the usual session/wallet path instead of blocking,
+   * and the wallet prompt there is the user's consent to pay. Unlike has a much smaller
+   * window than like on purpose — that asymmetry is what caps heart-toggle farming (see
+   * config/gasless.js).
    * @param {string} functionName 'batchLike' or 'unlike'.
    * @param {Array} args Owner-first args for that function.
+   * @param {Object} target The post's chain, from resolveTarget().
+   * @param {boolean} useSessionKey Whether an active session key should sign the request.
    * @returns {Promise<boolean>} Whether the action went out sponsored.
    */
-  const tryGaslessHeart = async (functionName, args) => {
-    const chainId = Number(post.network_id)
+  const tryGaslessHeart = async (functionName, args, { chainDefinition, targetPublicClient }, useSessionKey) => {
     if (!isGaslessEnabled(chainId)) return false
     if (gaslessCooldown(functionName, chainId, address) > 0) return false
 
-    const chainDefinition = config.chains.find((item) => item.id === chainId)
-    if (!chainDefinition) return false
-
-    // Pinned to the post's own chain: the relay reads nonce and forwarder trust there,
-    // regardless of which network the wallet is connected to
-    const targetPublicClient = getPublicClient(config, { chainId }) ?? publicClient
-
     try {
-      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
-
       await relayHupAction({
         chain: chainDefinition,
         publicClient: targetPublicClient,
@@ -160,7 +205,7 @@ export const Like = ({ post, onUpdate }) => {
         functionName,
         args,
         signTypedDataAsync,
-        useSessionKey: session.active,
+        useSessionKey,
       })
 
       return true
@@ -175,169 +220,81 @@ export const Like = ({ post, onUpdate }) => {
   }
 
   /**
-   * Like post
-   * @param {integer} id
-   * @returns
+   * Sends one heart action immediately and settles the optimistic state.
+   * @param {boolean} liked The state the tap moves the post INTO.
    */
-  const likePost = async (id) => {
+  const sendHeart = async (liked) => {
     if (!isConnected || !address) {
       toast('Please connect your wallet first', 'error')
       return
     }
 
-    const targetChain = CONTRACTS[`chain${post.network_id}`]
-    if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error')
-      return
-    }
+    const target = resolveTarget()
+    if (!target) return
 
+    const { targetChain, chainDefinition, targetPublicClient } = target
+    const functionName = liked ? 'batchLike' : 'unlike'
+    const args = liked ? [address, [post.id]] : [address, post.id]
     const previousData = interactionState
+    const nextCount = liked ? previousData.likeCount + 1 : Math.max(0, previousData.likeCount - 1)
 
-    try {
-      mutate(
-        {
-          isLiked: true,
-          likeCount: previousData.likeCount + 1,
-          isProcessing: true,
-        },
-        { revalidate: false },
-      )
+    // The optimistic flip is the pending feedback — no loader swap, so the icon and
+    // counter never jump while the action settles
+    mutate({ isLiked: liked, likeCount: nextCount, isProcessing: true }, { revalidate: false })
 
-      if (await tryGaslessHeart('batchLike', [address, [id]])) {
-        markLikeOverride(address, post.network_id, id, true)
-        mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
-
-        if (typeof onUpdate === 'function') {
-          onUpdate(id, { is_liked: 1, total_likes: previousData.likeCount + 1 })
-        }
-
-        toast('Liked — gas covered by Hup!', 'success')
-        return
-      }
-
-      const session = await isSessionActive({
-        userAddress: address,
-        publicClient,
-      })
-
-      if (session.active) {
-        await writeWithBurnerSession({
-          chain: activeChain[0],
-          contractAddress: targetChain.hup,
-          abi,
-          functionName: 'batchLike',
-          args: [address, [id]],
-        })
-
-        markLikeOverride(address, post.network_id, id, true)
-        mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
-
-        if (typeof onUpdate === 'function') {
-          onUpdate(id, { is_liked: 1, total_likes: previousData.likeCount + 1 })
-        }
-
-        toast('Liked via active session key!', 'success')
-        return
-      }
-
-      pendingActionRef.current = 'like'
-
-      await writeContractAsync({
-        abi,
-        address: targetChain.hup,
-        functionName: 'batchLike',
-        args: [address, [id]],
-      })
-
-      toast('Confirming block execution...', 'success')
-    } catch (err) {
-      console.error('Like failed:', err)
-      pendingActionRef.current = null
-      toast(shortTxError(err, 'Could not like post'), 'error')
-      mutate(previousData, { revalidate: false })
-    }
-  }
-
-  const unlikePost = async (id) => {
-    if (!isConnected || !address) {
-      toast('Please connect your wallet first', 'error')
-      return
-    }
-
-    const targetChain = CONTRACTS[`chain${post.network_id}`]
-    if (!targetChain?.hup) {
-      toast('Contract configuration missing for network', 'error')
-      return
-    }
-
-    const previousData = interactionState
-
-    try {
-      mutate(
-        {
-          isLiked: false,
-          likeCount: Math.max(0, previousData.likeCount - 1),
-          isProcessing: true,
-        },
-        { revalidate: false },
-      )
-
-      if (await tryGaslessHeart('unlike', [address, id])) {
-        markLikeOverride(address, post.network_id, id, false)
-        mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
-
-        if (typeof onUpdate === 'function') {
-          onUpdate(id, { is_liked: 0, total_likes: Math.max(0, previousData.likeCount - 1) })
-        }
-
-        toast('Like removed — gas covered by Hup!', 'success')
-        return
-      }
-
-      const session = await isSessionActive({
-        userAddress: address,
-        publicClient,
-      })
-
-      // The contract resolves the burner key back to _owner, so the session key
-      // signs unlike() exactly like it signs batchLike()
-      if (session.active) {
-        await writeWithBurnerSession({
-          chain: activeChain[0],
-          contractAddress: targetChain.hup,
-          abi,
-          functionName: 'unlike',
-          args: [address, id],
-        })
-
-        markLikeOverride(address, post.network_id, id, false)
-        mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
-
-        if (typeof onUpdate === 'function') {
-          onUpdate(id, { is_liked: 0, total_likes: Math.max(0, previousData.likeCount - 1) })
-        }
-
-        toast('Like removed via active session key!', 'success')
-        return
-      }
-
-      pendingActionRef.current = 'unlike'
-
-      await writeContractAsync({
-        abi,
-        address: targetChain.hup,
-        functionName: 'unlike',
-        args: [address, id],
-      })
-
-      markLikeOverride(address, post.network_id, id, false)
+    const settle = (via) => {
+      // Pin the optimistic state past the cidex indexing lag so the revalidation cannot
+      // flip the heart back
+      markLikeOverride(address, post.network_id, post.id, liked)
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
 
-      toast('Removing like onchain...', 'success')
+      if (typeof onUpdate === 'function') {
+        onUpdate(post.id, { is_liked: liked ? 1 : 0, total_likes: nextCount })
+      }
+
+      toast(`${liked ? 'Liked' : 'Like removed'}${via}`, 'success')
+    }
+
+    try {
+      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
+
+      if (await tryGaslessHeart(functionName, args, target, session.active)) {
+        settle(' — gas covered by Hup!')
+        return
+      }
+
+      // The contract resolves the burner key back to the owner, so the session key signs
+      // unlike() exactly like it signs batchLike() — and neither needs a wallet confirmation
+      if (session.active) {
+        await writeWithBurnerSession({
+          chain: chainDefinition,
+          contractAddress: targetChain.hup,
+          abi,
+          functionName,
+          args,
+        })
+
+        settle(' via active session key!')
+        return
+      }
+
+      pendingActionRef.current = liked ? 'like' : 'unlike'
+
+      await ensureWalletChain()
+      await writeContractAsync({
+        abi,
+        chainId,
+        address: targetChain.hup,
+        functionName,
+        args,
+      })
+
+      // The receipt effect above settles the state once the block lands
+      toast(liked ? 'Confirming block execution...' : 'Removing like onchain...', 'success')
     } catch (err) {
-      console.error('Unlike failed:', err)
+      console.error(`${liked ? 'Like' : 'Unlike'} failed:`, err)
       pendingActionRef.current = null
-      toast(shortTxError(err, 'Could not remove like'), 'error')
+      toast(shortTxError(err, liked ? 'Could not like post' : 'Could not remove like'), 'error')
       mutate(previousData, { revalidate: false })
     }
   }
@@ -361,18 +318,13 @@ export const Like = ({ post, onUpdate }) => {
     }
 
     if (isLiked) {
-      unlikePost(post.id)
+      sendHeart(false)
     } else if (isQueued) {
       removeFromBatch(address, post.network_id, post.id)
+    } else if (localStorage.getItem(localStorageBatchLikeKey) !== 'false') {
+      addToBatch(address, post.network_id, post.id)
     } else {
-      const batchLikePref = localStorage.getItem(localStorageBatchLikeKey)
-      const isBatchLikeEnabled = batchLikePref !== 'false'
-
-      if (isBatchLikeEnabled) {
-        addToBatch(address, post.network_id, post.id)
-      } else {
-        likePost(post.id)
-      }
+      sendHeart(true)
     }
   }
 

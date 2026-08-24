@@ -476,11 +476,7 @@ export default function Aside() {
 
       {pathname !== '/chat' && (
         <div className={styles.floatingActions}>
-          <BatchLikeTrigger
-            className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])}
-            badgeClassName={styles.floatingActions__badge}
-            caption="Pending"
-          />
+          <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
 
           <button
             className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}

@@ -412,6 +412,12 @@
   z-index: 100;
   pointer-events: none; // Prevents container bounding box from blocking feed clicks
 
+  // Sits above the floating bottom bar instead of behind it. On the container rather than
+  // each button: the basket stacks one heart per chain, and only the stack needs the offset
+  @include md-down() {
+    padding-bottom: var(--bottom-nav-space);
+  }
+
   // Element: Shared layout base for all actions
   &__button {
     pointer-events: auto; // Re-enables pointer interactions for buttons
@@ -449,14 +455,6 @@
   &__button--new {
     @include md-down() {
       display: none;
-    }
-  }
-
-  // Modifier: Batch Button styling variations if needed
-  &__button--batch {
-    // Sits above the floating bottom bar instead of behind it
-    @include md-down() {
-      margin-bottom: var(--bottom-nav-space);
     }
   }
 
