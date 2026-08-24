@@ -34,8 +34,8 @@ const filebaseConfigured = () =>
    hostname so a bucket name with dots can't break TLS validation. */
 const s3 = () =>
   new S3Client({
-    region: 'us-east-1',
-    endpoint: 'https://s3.filebase.com',
+    region: 'auto',
+    endpoint: 'https://s3.filebase.io',
     forcePathStyle: true,
     credentials: {
       accessKeyId: process.env.FILEBASE_S3_KEY,

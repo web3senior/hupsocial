@@ -36,8 +36,8 @@ export async function GET(req) {
   }
 
   const client = new S3Client({
-    region: 'us-east-1',
-    endpoint: 'https://s3.filebase.com',
+    region: 'auto',
+    endpoint: 'https://s3.filebase.io',
     forcePathStyle: true,
     credentials: {
       accessKeyId: process.env.FILEBASE_S3_KEY,
