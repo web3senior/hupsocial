@@ -5,7 +5,7 @@
  * the app signs an ERC-2771 ForwardRequest and posts it to /api/v1/relay, where our relayer
  * pays the gas. Deliberately self-contained: the experiment reverts by deleting this file
  * plus its call sites in components/NewPost.jsx, components/ui/Like.jsx,
- * components/ui/Repost.jsx, hooks/useBatchLike.js and the settings toggle.
+ * components/ui/Repost.jsx and the settings toggle.
  *
  * Un-repost is NOT sponsored: it rides deleteContent, which deletes any of the caller's
  * content, and sponsoring deletions is a different decision from sponsoring taps.
@@ -17,7 +17,7 @@
  *      Profiles, since a contract account can never be `from` on the forwarder.
  *   2. No session — the connected wallet signs for itself. EOAs only.
  * Anything outside those two cases throws RELAY_UNSUPPORTED so the caller can fall back to
- * the basket or an ordinary transaction.
+ * a session key or an ordinary transaction.
  */
 
 import { ethers } from 'ethers'
@@ -36,7 +36,8 @@ export const localStorageGaslessKey = `${prefix}gasless_enabled`
 export const GASLESS_DEFAULT = true
 
 // Forwarder overhead plus the call itself: `create` stores a struct and a CID string;
-// `batchLike` scales with the basket, dominated by one cold storage slot per liked post.
+// `batchLike` scales with its id array (the app only ever sends one), dominated by one
+// cold storage slot per liked post.
 // Values are a bigint or a function of the call args. The relay route adds its own headroom
 // for the outer transaction, and unused gas is never charged — these only need to be safe
 // ceilings, not estimates.

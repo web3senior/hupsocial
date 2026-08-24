@@ -34,10 +34,10 @@ export const isGaslessChainId = (networkId) => {
 // Posting has no natural bound the way a like does (a like can only land once per post), so
 // the cooldown is what keeps one account from emptying the relayer.
 //
-// The interaction buckets have no cooldown on purpose: a basket bigger than one batchLike
-// chunk sends its chunks back-to-back, and a gap between them would throttle chunk two of
-// the same tap. The window cap is the brake instead — and it caps transactions, not
-// hearts, since one batchLike carries up to 50 of them.
+// The interaction buckets have no cooldown on purpose: someone scrolling a feed hearts
+// several posts seconds apart, and each heart is its own transaction. The window cap is the
+// brake instead — every like goes out as batchLike([id]), so it caps hearts one-to-one, and
+// 60 an hour is a heavy scroller's pace rather than a farm's. Past it the wallet pays.
 //
 // Unlike gets its own deliberately small window, and that asymmetry is the whole defense
 // against heart-toggle farming: a like→unlike→like drain cycle needs exactly one sponsored
@@ -53,7 +53,7 @@ export const isGaslessChainId = (networkId) => {
 // account can answer in an hour.
 export const GASLESS_POLICY = {
   create: { cooldownMs: 60000, windowMs: 3600000, max: 20 },
-  like: { cooldownMs: 0, windowMs: 3600000, max: 30 },
+  like: { cooldownMs: 0, windowMs: 3600000, max: 60 },
   unlike: { cooldownMs: 0, windowMs: 3600000, max: 5 },
   repost: { cooldownMs: 0, windowMs: 3600000, max: 30 },
   poll: { cooldownMs: 0, windowMs: 3600000, max: 40 },

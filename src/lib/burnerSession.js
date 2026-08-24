@@ -8,7 +8,6 @@ const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 export const localStorageBurnerAddress = `${prefix}burner_address`
 export const localStorageBurnerKey = `${prefix}burner_key`
-export const localStorageBatchLikeKey = `${prefix}batch_like_enabled`
 export const sessionStorageUnlockedKey = `${prefix}unlocked_burner_key`
 
 const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl || chain?.rpc || process.env.NEXT_PUBLIC_LUKSO_RPC_URL

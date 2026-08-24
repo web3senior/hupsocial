@@ -17,7 +17,6 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile } from '@/hooks/useProfile'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
-import BatchLikeTrigger from './BatchLikeTrigger'
 import NativePopover from './ui/NativePopover'
 import { handleBrokenAvatar } from '@/lib/utils'
 import { GitHub } from './Icons'
@@ -162,7 +161,6 @@ export default function Aside() {
   const { theme, setTheme } = useTheme()
 
   const getNavItems = useSidebarStore((state) => state.getNavItems)
-  const claimLegacyBatch = useSidebarStore((state) => state.claimLegacyBatch)
 
   // Safe item fallback array structure avoids runtime evaluation crash errors
   const navItems = getNavItems(address) ?? []
@@ -173,11 +171,6 @@ export default function Aside() {
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
-
-  // Hand any pre-wallet basket over to the first wallet that connects
-  useEffect(() => {
-    if (isConnected && address) claimLegacyBatch(address)
-  }, [isConnected, address, claimLegacyBatch])
 
   const { data: notifData, mutate: revalidateUnread } = useSWR(
     // `filter=inbox` counts only what other people did — the same set the notifications page
@@ -476,12 +469,6 @@ export default function Aside() {
 
       {pathname !== '/chat' && (
         <div className={styles.floatingActions}>
-          <BatchLikeTrigger
-            className={clsx(styles.floatingActions__button, styles['floatingActions__button--batch'])}
-            badgeClassName={styles.floatingActions__badge}
-            caption="Pending"
-          />
-
           <button
             className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
             onClick={() => {
