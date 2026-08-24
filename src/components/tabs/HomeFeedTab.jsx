@@ -23,6 +23,21 @@ const POSTS_PAGE_SIZE = 20
 // being queued — roughly "hasn't really left the top of the feed yet".
 const AUTHORED_MERGE_MAX_SCROLL_PX = 200
 
+// Post ids are per network — every chain's HupCommunity numbers its own posts from 1 — so a
+// cross-network feed routinely holds two different posts with the same id. Identity is the pair.
+const postKey = (post) => `${post.network_id}:${post.id}`
+
+// First occurrence wins, so callers put the copy they want to keep first.
+const dedupePosts = (list) => {
+  const seen = new Set()
+  return list.filter((post) => {
+    const key = postKey(post)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 /**
  * Renders a single feed of posts: the unscoped "For you" feed, one locked to a
  * specific network (chainId), or the cross-network "premium" feed (posts with
@@ -83,6 +98,15 @@ export default function HomeFeedTab({
   // its closure — `address` still undefined pre-wagmi-reconnect (appended pages
   // then fetch without viewer_address and lose is_liked) and `page` stuck at 1.
   const loadMorePostsRef = useRef(() => {})
+  // The list as committed, readable from async callbacks. A poll response is diffed against
+  // this at the moment it lands, so a merge or refresh that happened while the request was in
+  // flight is already accounted for — otherwise those posts come straight back behind the pill.
+  const postsListRef = useRef(initialCache?.list ?? [])
+  // Page 1 as the latest poll saw it; the merge restarts from it when it no longer overlaps the
+  // list at all (more arrived than a page holds), instead of prepending across a hole.
+  const pendingPageRef = useRef(null)
+  // Polls can overtake each other on a slow gateway; only the newest response may speak.
+  const pollSeqRef = useRef(0)
 
   // Params of the feed data currently applied ("address|networkId"); the init
   // effect only fetches when they differ, so a cache hydration skips the mount
@@ -142,31 +166,51 @@ export default function HomeFeedTab({
     }
   }, [mounted])
 
-  const setInitialData = useCallback((postsResponse) => {
-    const rawPosts = postsResponse?.data || []
-    const seenIds = new Set()
-    const initialPosts = rawPosts.filter((p) => {
-      if (seenIds.has(p.id)) return false
-      seenIds.add(p.id)
-      return true
-    })
-
-    setPosts({ list: initialPosts })
-    setPostsLoaded(initialPosts.length)
-    setHasMore(postsResponse?.meta?.hasMore || false)
-    setHasInitialized(true)
+  // Every list write goes through here so the ref never lags the state.
+  const commitPosts = useCallback((list) => {
+    postsListRef.current = list
+    setPosts({ list })
   }, [])
 
-  const appendPosts = useCallback((postsResponse) => {
-    const newPosts = postsResponse?.data || []
-    setPosts((prev) => {
-      const existingIds = new Set(prev.list.map((p) => p.id))
-      const uniqueNewPosts = newPosts.filter((p) => !existingIds.has(p.id))
+  const setInitialData = useCallback(
+    (postsResponse) => {
+      const initialPosts = dedupePosts(postsResponse?.data || [])
+
+      commitPosts(initialPosts)
+      setPostsLoaded(initialPosts.length)
+      setHasMore(postsResponse?.meta?.hasMore || false)
+      setHasInitialized(true)
+    },
+    [commitPosts],
+  )
+
+  const appendPosts = useCallback(
+    (postsResponse) => {
+      const current = postsListRef.current
+      const existing = new Set(current.map(postKey))
+      const uniqueNewPosts = (postsResponse?.data || []).filter((post) => !existing.has(postKey(post)))
+
+      commitPosts([...current, ...uniqueNewPosts])
       setPostsLoaded((loaded) => loaded + uniqueNewPosts.length)
-      return { list: [...prev.list, ...uniqueNewPosts] }
-    })
-    setHasMore(postsResponse?.meta?.hasMore || false)
-  }, [])
+      setHasMore(postsResponse?.meta?.hasMore || false)
+    },
+    [commitPosts],
+  )
+
+  // Pill merge: newer posts go on top and the pagination below stays exactly as it was —
+  // routing this through setInitialData reset hasMore and killed infinite scroll.
+  const prependPosts = useCallback(
+    (newPosts) => {
+      const current = postsListRef.current
+      const existing = new Set(current.map(postKey))
+      const uniqueNewPosts = newPosts.filter((post) => !existing.has(postKey(post)))
+      if (uniqueNewPosts.length === 0) return
+
+      commitPosts([...uniqueNewPosts, ...current])
+      setPostsLoaded((loaded) => loaded + uniqueNewPosts.length)
+    },
+    [commitPosts],
+  )
 
   // Snapshot this feed's state when it goes away — unmount (navigation to
   // another route, tab switch) or scope change (React reuses the instance when
@@ -258,27 +302,31 @@ export default function HomeFeedTab({
     setRetryNonce((nonce) => nonce + 1)
   }, [])
 
-  // Fetches page 1 and parks anything newer than the top card behind the "Show N posts" pill,
+  // Fetches page 1 and parks whatever the feed doesn't hold yet behind the "Show N posts" pill,
   // leaving the reader's scroll position untouched. Shared by the 30s background poll and the
   // nonce below, which needs the same non-intrusive pull on demand.
+  //
+  // "New" is a set difference against the list as it stands when the response lands — not an
+  // index hunt for a top-card id captured when the request left. The id hunt broke two ways: a
+  // same-id post on another chain matched in its place, and a merge or refresh landing mid-flight
+  // left the snapshot stale, so the posts just shown were queued a second time.
   const pollNewPosts = useCallback(async () => {
+    const seq = ++pollSeqRef.current
+
     try {
-      const latestKnownId = posts.list[0]?.id
       const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
+      if (seq !== pollSeqRef.current || !response.success) return
 
-      if (response.success && response.data.length > 0) {
-        const newItemsIndex = response.data.findIndex((item) => item.id === latestKnownId)
+      const known = new Set(postsListRef.current.map(postKey))
+      const fresh = dedupePosts(response.data).filter((post) => !known.has(postKey(post)))
 
-        if (newItemsIndex > 0) {
-          setNewPostsQueue(response.data.slice(0, newItemsIndex))
-        } else if (newItemsIndex === -1 && latestKnownId !== undefined) {
-          setNewPostsQueue(response.data)
-        }
-      }
+      pendingPageRef.current = { data: response.data, hasMore: Boolean(response.meta?.hasMore) }
+      // Keep the same empty array between quiet polls so the feed doesn't re-render every 30s.
+      setNewPostsQueue((prev) => (prev.length === 0 && fresh.length === 0 ? prev : fresh))
     } catch (error) {
       console.error('Polling error:', error)
     }
-  }, [posts.list, address, scopedNetworkId, feedType, excludeNft])
+  }, [address, scopedNetworkId, feedType, excludeNft])
 
   // Background polling for new posts
   useEffect(() => {
@@ -329,19 +377,29 @@ export default function HomeFeedTab({
   const handleMergeNewPosts = useCallback(() => {
     if (newPostsQueue.length === 0) return
 
-    setInitialData({ success: true, data: [...newPostsQueue, ...posts.list] })
+    const pending = pendingPageRef.current
+    const pageKeys = new Set((pending?.data ?? []).map(postKey))
+    const overlaps = postsListRef.current.some((post) => pageKeys.has(postKey(post)))
+
+    if (pending && !overlaps) {
+      // More arrived than one page holds: prepending would leave a hole between the two, so
+      // the feed restarts from the server's page 1 the way a refresh does.
+      setInitialData({ success: true, data: pending.data, meta: { hasMore: pending.hasMore } })
+      setPage(1)
+    } else {
+      prependPosts(newPostsQueue)
+    }
+
     setNewPostsQueue([])
     setReservedHeight(null)
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [newPostsQueue, posts.list, setInitialData])
+  }, [newPostsQueue, prependPosts, setInitialData])
 
+  // Always a real page-1 fetch. Draining the pill instead used to hand the author a queue that
+  // was polled before their post existed, so the post itself surfaced one poll later — behind
+  // a second pill.
   const handleManualRefresh = useCallback(async () => {
-    if (newPostsQueue.length > 0) {
-      handleMergeNewPosts()
-      return
-    }
-
     setIsRefreshing(true)
     setIsFetching(true)
     try {
@@ -357,7 +415,7 @@ export default function HomeFeedTab({
       setIsFetching(false)
       setIsRefreshing(false)
     }
-  }, [newPostsQueue, handleMergeNewPosts, address, scopedNetworkId, feedType, excludeNft, setInitialData])
+  }, [address, scopedNetworkId, feedType, excludeNft, setInitialData])
 
   // Refresh requested from outside (Aside home link while already at top).
   // Nonce ref guard: only fire on an actual bump, not on callback identity changes.
@@ -424,7 +482,7 @@ export default function HomeFeedTab({
 
             {posts?.list?.map((item, i) => (
               <section
-                key={item.id}
+                key={postKey(item)}
                 // Restored feeds must repaint identically in place — no entrance replay.
                 className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
                 onPointerDown={rememberCardPointerDown}
