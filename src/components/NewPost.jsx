@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, ListChecksIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, ListChecksIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublishToast'
@@ -49,6 +49,9 @@ const MAX_MEDIA_SIZE_MB = 10
 const MAX_VIDEO_SIZE_MB = 100
 const MAX_POST_LENGTH = 5000
 const MAX_HISTORY_ENTRIES = 100
+// iOS Safari can hold a video's metadata back indefinitely (Low Power Mode, cellular); the
+// dimensions are a nicety and the tile must not wait on them
+const MEDIA_PROBE_TIMEOUT_MS = 5000
 const HISTORY_DEBOUNCE_MS = 300
 
 // ■■■ [Utility Helpers] ■■■
@@ -107,7 +110,7 @@ const loadAttachmentDraft = () => {
   }
 }
 
-// Media items are already uploaded to IPFS by the time they land in state, so a saved
+// Only media items that finished uploading are saved (see getSerializablePostContent), so a
 // draft's cids stay resolvable even after a refresh drops the in-memory blob URLs.
 const loadDraftContent = () => {
   if (typeof window === 'undefined') return null
@@ -160,6 +163,8 @@ const getMaxSizeMb = (mediaType) => (mediaType === 'video' ? MAX_VIDEO_SIZE_MB :
 const getMediaPreviewSrc = (item) =>
   item.localUrl || (item.type === 'image' ? resolveIPFSImageUrl(item.cid, { width: 800 }) : resolveIPFSUrl(item.cid))
 
+// What leaves the composer — as a draft or as the post payload. A tile still uploading (or one
+// that failed) has no cid and nothing to say offchain; a restored draft could not resume it anyway.
 const getSerializablePostContent = (content) => ({
   ...content,
   elements: content.elements.map((element) => {
@@ -168,11 +173,40 @@ const getSerializablePostContent = (content) => ({
       ...element,
       data: {
         ...element.data,
-        items: element.data.items.map(({ localUrl, ...item }) => item),
+        items: element.data.items
+          .filter((item) => Boolean(item.cid))
+          .map(({ localUrl, status, progress, error, uploadId, ...item }) => item),
       },
     }
   }),
 })
+
+// Submit may run a render before the last upload's cid reached state — its promise resolved
+// with the cid first. Fold the resolved results in so the payload is built from what landed.
+const withUploadResults = (content, results) => {
+  if (!results.length) return content
+  const byId = new Map(results.map((result) => [result.uploadId, result]))
+  return {
+    ...content,
+    elements: content.elements.map((element) => {
+      if (element.type !== 'media') return element
+      return {
+        ...element,
+        data: {
+          ...element.data,
+          items: element.data.items.map((item) => {
+            const result = byId.get(item.uploadId)
+            return result ? { ...item, cid: result.cid, poster: result.poster } : item
+          }),
+        },
+      }
+    }),
+  }
+}
+
+// Tiles are keyed by upload id, not index: indices shift when a neighbour is removed mid-upload
+const newUploadId = () =>
+  typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
 // Tags the browser creates on Enter — each one is its own line in the editor
 const BLOCK_ELEMENTS = new Set(['DIV', 'P', 'LI', 'BLOCKQUOTE', 'PRE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'])
@@ -365,7 +399,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     actionType === 'edit' ? (getContentPayload(existingPost)?.poll ?? null) : (loadAttachmentDraft()?.poll ?? null)
   )
   const createPollRef = useRef(null)
-  const [isUploading, setIsUploading] = useState(false)
+  // Every in-flight attachment upload, keyed by uploadId: the File so a failed tile can retry,
+  // the AbortController so Remove cancels the transfer, the promise so submit can await it
+  const uploadsRef = useRef(new Map())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedMediaType, setSelectedMediaType] = useState(null)
   // { categories, resolve } while the advisory moderation warning awaits the author's decision
@@ -463,7 +499,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   const postText = postContent.elements[0].data.text
   const mediaItems = postContent.elements[1].data.items
-  const isBusy = isSigning || isConfirming || isUploading || isSubmitting
+  // Uploads run behind their tiles and gate nothing but Esc and the final submit — the author
+  // keeps writing, the toolbar stays live, and Post waits for the last transfer itself
+  const hasPendingUploads = mediaItems.some((item) => item.status === 'uploading')
+  const hasFailedUploads = mediaItems.some((item) => item.status === 'failed')
+  const isBusy = isSigning || isConfirming || isSubmitting
   const hasPostBody =
     postText.trim().length > 0 ||
     mediaItems.length > 0 ||
@@ -691,33 +731,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         return
       }
       const dimensions = await getMediaDimensions(file, 'image')
-      const cid = await uploadFileToIPFS(file)
-      if (!cid) return
-      const localUrl = URL.createObjectURL(file)
-      setPostContent((prevContent) => {
-        const nextElements = [...prevContent.elements]
-        const mediaElement = nextElements[1]
-        nextElements[1] = {
-          ...mediaElement,
-          data: {
-            ...mediaElement.data,
-            items: [
-              ...mediaElement.data.items,
-              {
-                type: 'image',
-                cid,
-                alt: `Hup asset image | ${postText.slice(0, 30)}...`,
-                storage: 'IPFS',
-                mimeType: file.type,
-                localUrl,
-                width: dimensions.width,
-                height: dimensions.height,
-                spoiler: false,
-              },
-            ],
-          },
-        }
-        return { ...prevContent, elements: nextElements }
+      attachFile(file, 'image', {
+        alt: `Hup asset image | ${postText.slice(0, 30)}...`,
+        width: dimensions.width,
+        height: dimensions.height,
       })
       return
     }
@@ -800,16 +817,15 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     editor.focus()
   }
 
-  // Upload progress belongs in the toast stack, not in the composer body: the sheet scrolls,
-  // so an inline row is often off-screen exactly when it matters. Ref-counted because a GIF pick
-  // opens an upload and then nests the file upload inside it — one card covers the whole burst.
+  // The loading card in the toast stack covers the metadata pin at submit — the sheet scrolls,
+  // so an inline row is often off-screen exactly when it matters. Attachment transfers do not
+  // use it: each reports on its own tile. Ref-counted so overlapping callers share one card.
   const uploadCountRef = useRef(0)
   const uploadToastRef = useRef(null)
 
-  const beginUpload = (label = 'Uploading media...') => {
+  const beginUpload = (label = 'Uploading post...') => {
     uploadCountRef.current += 1
     if (uploadCountRef.current === 1) uploadToastRef.current = toast(label, 'loading')
-    setIsUploading(true)
   }
 
   const endUpload = () => {
@@ -817,7 +833,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     if (uploadCountRef.current > 0) return
     uploadToastRef.current?.dismiss()
     uploadToastRef.current = null
-    setIsUploading(false)
   }
 
   // A composer that closes mid-upload would otherwise leave the loading card up forever
@@ -829,18 +844,101 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     []
   )
 
-  const uploadFileToIPFS = async (file) => {
-    if (!file) return null
-    beginUpload()
-    try {
-      return await uploadToIPFS(file)
-    } catch (error) {
-      console.error('Trouble uploading file:', error)
-      toast(shortUploadError(error, 'Error uploading file'), 'error')
-      return null
-    } finally {
-      endUpload()
+  const updateMediaItem = (uploadId, update) => {
+    setPostContent((prevContent) => {
+      const nextElements = [...prevContent.elements]
+      const mediaElement = nextElements[1]
+      nextElements[1] = {
+        ...mediaElement,
+        data: {
+          ...mediaElement.data,
+          items: mediaElement.data.items.map((item) => (item.uploadId === uploadId ? update(item) : item)),
+        },
+      }
+      return { ...prevContent, elements: nextElements }
+    })
+  }
+
+  // Moves one attachment's bytes behind its tile. Resolves with what the tile needs once the
+  // transfer lands, null when it failed or was cancelled — submit awaits these and treats null
+  // as a reason to stop. Progress only reaches state when the whole percent changes, so a fast
+  // transfer does not re-render the composer a few hundred times.
+  const startUpload = (uploadId, file, mediaType) => {
+    const controller = new AbortController()
+    let lastPercent = -1
+
+    const promise = (async () => {
+      try {
+        /* The still is captured while the bytes move, not after — it only needs the local file */
+        const posterCapture = mediaType === 'video' ? captureVideoPoster(file) : null
+
+        const cid = await uploadToIPFS(file, {
+          signal: controller.signal,
+          onProgress: (fraction) => {
+            const percent = Math.floor(fraction * 100)
+            if (percent === lastPercent) return
+            lastPercent = percent
+            updateMediaItem(uploadId, (item) => ({ ...item, progress: fraction }))
+          },
+        })
+
+        /* A still, pinned separately, so feed cards render a thumbnail without pulling the video
+           through a gateway. Best-effort: a container the browser can't decode posts without one. */
+        let poster
+        const posterFile = posterCapture ? await posterCapture : null
+        if (posterFile) poster = await uploadToIPFS(posterFile, { signal: controller.signal }).catch(() => undefined)
+
+        updateMediaItem(uploadId, ({ status, progress, error, ...item }) => ({ ...item, cid, poster }))
+        return { uploadId, cid, poster }
+      } catch (error) {
+        if (error?.name === 'AbortError') return null
+        console.error('Trouble uploading file:', error)
+        const message = shortUploadError(error, 'Error uploading file')
+        toast(message, 'error')
+        updateMediaItem(uploadId, (item) => ({ ...item, status: 'failed', progress: 0, error: message }))
+        return null
+      }
+    })()
+
+    uploadsRef.current.set(uploadId, { file, mediaType, controller, promise })
+    return promise
+  }
+
+  // Every attachment starts as a tile with a blob-URL preview and no cid, and the upload runs
+  // behind it — nothing in the composer waits for the bytes
+  const attachFile = (file, mediaType, meta) => {
+    const uploadId = newUploadId()
+    const item = {
+      uploadId,
+      type: mediaType,
+      alt: meta.alt,
+      storage: 'IPFS',
+      mimeType: file.type,
+      localUrl: URL.createObjectURL(file),
+      width: meta.width,
+      height: meta.height,
+      duration: meta.duration,
+      spoiler: false,
+      status: 'uploading',
+      progress: 0,
     }
+    setPostContent((prevContent) => {
+      const nextElements = [...prevContent.elements]
+      const mediaElement = nextElements[1]
+      nextElements[1] = {
+        ...mediaElement,
+        data: { ...mediaElement.data, items: [...mediaElement.data.items, item] },
+      }
+      return { ...prevContent, elements: nextElements }
+    })
+    startUpload(uploadId, file, mediaType)
+  }
+
+  const retryUpload = (uploadId) => {
+    const upload = uploadsRef.current.get(uploadId)
+    if (!upload) return
+    updateMediaItem(uploadId, ({ error, ...item }) => ({ ...item, status: 'uploading', progress: 0 }))
+    startUpload(uploadId, upload.file, upload.mediaType)
   }
 
   const uploadObjectToIPFS = async (json) => {
@@ -878,7 +976,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     }
   }
 
-  const getMediaDimensions = (file, type) => {
+  const readMediaDimensions = (file, type) => {
     return new Promise((resolve) => {
       const localUrl = URL.createObjectURL(file)
       if (type === 'image') {
@@ -904,6 +1002,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     })
   }
 
+  const getMediaDimensions = (file, type) =>
+    Promise.race([
+      readMediaDimensions(file, type),
+      new Promise((resolve) =>
+        setTimeout(() => resolve({ width: undefined, height: undefined, duration: 0 }), MEDIA_PROBE_TIMEOUT_MS)
+      ),
+    ])
+
   // The one ingest path for attachments, whether the author picked them or the OS share
   // sheet handed them over. `expectedType` holds the picker to the kind it asked for; a
   // share passes null, so each file is classified by its own MIME type instead.
@@ -921,7 +1027,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       toast(`Only ${remainingSlots} slot(s) remaining — processing first ${remainingSlots} file(s)`, 'info')
     }
 
-    const newItems = []
     for (const file of filesToProcess) {
       const mediaType = getMediaType(file)
       if (!mediaType) {
@@ -942,45 +1047,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       }
 
       const dimensions = await getMediaDimensions(file, mediaType)
-      const cid = await uploadFileToIPFS(file)
-      if (!cid) continue
-
-      /* A still, pinned separately, so feed cards render a thumbnail without pulling the video
-         through a gateway. Best-effort: a container the browser can't decode just posts without
-         one, exactly as every video posted before this did. */
-      let poster
-      if (mediaType === 'video') {
-        const posterFile = await captureVideoPoster(file)
-        if (posterFile) poster = (await uploadFileToIPFS(posterFile)) || undefined
-      }
-
-      const localUrl = URL.createObjectURL(file)
-      newItems.push({
-        type: mediaType,
-        cid,
-        poster,
+      attachFile(file, mediaType, {
         alt: `Hup asset ${mediaType} | ${postText.slice(0, 30)}...`,
-        storage: 'IPFS',
-        mimeType: file.type,
-        localUrl,
         width: dimensions.width,
         height: dimensions.height,
         duration: mediaType !== 'image' ? (dimensions.duration || 0) : undefined,
-        spoiler: false,
       })
     }
-
-    if (newItems.length === 0) return
-
-    setPostContent((prevContent) => {
-      const nextElements = [...prevContent.elements]
-      const mediaElement = nextElements[1]
-      nextElements[1] = {
-        ...mediaElement,
-        data: { ...mediaElement.data, items: [...mediaElement.data.items, ...newItems] },
-      }
-      return { ...prevContent, elements: nextElements }
-    })
   }
 
   const handleFileSelect = async (event) => {
@@ -1005,7 +1078,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       return
     }
 
-    beginUpload()
     try {
       const response = await fetch(gif.full.url)
       if (!response.ok) throw new Error('GIF download failed')
@@ -1017,46 +1089,25 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       }
 
       const file = new File([blob], `giphy-${gif.id}.gif`, { type: 'image/gif' })
-      const cid = await uploadFileToIPFS(file)
-      if (!cid) return
-
-      const localUrl = URL.createObjectURL(file)
-      setPostContent((prevContent) => {
-        const nextElements = [...prevContent.elements]
-        const mediaElement = nextElements[1]
-        nextElements[1] = {
-          ...mediaElement,
-          data: {
-            ...mediaElement.data,
-            items: [
-              ...mediaElement.data.items,
-              {
-                type: 'image',
-                cid,
-                alt: gif.title || 'GIF',
-                storage: 'IPFS',
-                mimeType: 'image/gif',
-                localUrl,
-                width: gif.full.width || undefined,
-                height: gif.full.height || undefined,
-                spoiler: false,
-              },
-            ],
-          },
-        }
-        return { ...prevContent, elements: nextElements }
+      attachFile(file, 'image', {
+        alt: gif.title || 'GIF',
+        width: gif.full.width || undefined,
+        height: gif.full.height || undefined,
       })
     } catch (error) {
       console.error('Trouble adding GIF:', error)
-      toast('Error adding GIF', 'error')
-    } finally {
-      endUpload()
+      toast(shortUploadError(error, 'Error adding GIF'), 'error')
     }
   }
 
   const handleRemoveMedia = (itemIndex) => {
     const item = mediaItems[itemIndex]
     if (item?.localUrl) URL.revokeObjectURL(item.localUrl)
+    if (item?.uploadId) {
+      /* Removing a tile mid-transfer cancels the transfer — nobody will reference what it pins */
+      uploadsRef.current.get(item.uploadId)?.controller.abort()
+      uploadsRef.current.delete(item.uploadId)
+    }
     setPostContent((prevContent) => {
       const nextElements = [...prevContent.elements]
       const mediaElement = nextElements[1]
@@ -1178,7 +1229,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
     setIsSubmitting(true)
     try {
-      const serializableContent = getSerializablePostContent(postContent)
+      // Tiles still uploading are collected here rather than gating the button: the author
+      // finished writing while the bytes moved, and Post simply waits for the last of them
+      const pendingIds = mediaItems.filter((item) => item.status === 'uploading').map((item) => item.uploadId)
+      const uploaded = await Promise.all(pendingIds.map((uploadId) => uploadsRef.current.get(uploadId)?.promise ?? null))
+      if (uploaded.some((result) => !result)) {
+        toast('An attachment failed to upload — retry or remove it', 'error')
+        return
+      }
+
+      const serializableContent = getSerializablePostContent(withUploadResults(postContent, uploaded))
 
       // Sanitize at the last exit before publication: typed/pasted text can carry lone
       // surrogates the initial-state factory never sees
@@ -1386,7 +1446,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   }, [isConfirmed, finishSubmission])
 
   useEffect(() => {
+    const uploads = uploadsRef.current
     return () => {
+      /* A closed composer has no tile to hand a cid to — stop the transfers with it */
+      uploads.forEach(({ controller }) => controller.abort())
+      uploads.clear()
       mediaItemsRef.current.forEach((item) => {
         if (item.localUrl) URL.revokeObjectURL(item.localUrl)
       })
@@ -1403,7 +1467,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       onClick={(e) => e.stopPropagation()}
       onCancel={(e) => {
         // Esc must not discard the composer while media uploads or the transaction is in flight
-        if (isBusy) e.preventDefault()
+        if (isBusy || hasPendingUploads) e.preventDefault()
       }}
       onClose={handleClose}
     >
@@ -1689,21 +1753,54 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 {mediaItems.map((item, index) => {
                   if (item.type === 'audio') return null
                   const mediaSrc = getMediaPreviewSrc(item)
+                  const isUploadingItem = item.status === 'uploading'
+                  const isFailedItem = item.status === 'failed'
+                  const percent = Math.floor((item.progress || 0) * 100)
                   return (
-                    <figure key={`${item.cid || item.localUrl || index}`} className={styles.mediaItem}>
+                    <figure
+                      key={`${item.uploadId || item.cid || item.localUrl || index}`}
+                      className={clsx(styles.mediaItem, {
+                        [styles['mediaItem--uploading']]: isUploadingItem,
+                        [styles['mediaItem--failed']]: isFailedItem,
+                      })}
+                    >
                       {item.type === 'image' ? (
                         <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
                       ) : (
                         <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
                       )}
+                      {isUploadingItem && <span className={styles.mediaItem__badge}>{percent}%</span>}
+                      {isFailedItem && (
+                        <span className={clsx(styles.mediaItem__badge, styles['mediaItem__badge--failed'])}>Upload failed</span>
+                      )}
+                      {isUploadingItem && (
+                        <div
+                          className={styles.mediaItem__progress}
+                          role="progressbar"
+                          aria-label="Upload progress"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={percent}
+                        >
+                          <span className={styles.mediaItem__progressBar} style={{ width: `${percent}%` }} />
+                        </div>
+                      )}
+                      {/* Actions sit under the media, always visible — there is no hover on a phone */}
                       <figcaption>
-                        <button type="button" onClick={() => toggleSpoiler(index)}>
-                          <XIcon size={14} />
-                          <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
-                        </button>
+                        {isFailedItem ? (
+                          <button type="button" onClick={() => retryUpload(item.uploadId)}>
+                            <ArrowClockwiseIcon size={14} />
+                            <span>Retry</span>
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => toggleSpoiler(index)}>
+                            <XIcon size={14} />
+                            <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
+                          </button>
+                        )}
                         <button type="button" onClick={() => handleRemoveMedia(index)}>
                           <TrashIcon size={14} />
-                          <span>Remove</span>
+                          <span>{isUploadingItem ? 'Cancel' : 'Remove'}</span>
                         </button>
                       </figcaption>
                     </figure>
@@ -1718,9 +1815,28 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                   if (item.type !== 'audio') return null
                   const mediaSrc = getMediaPreviewSrc(item)
                   return (
-                    <div key={`${item.cid || item.localUrl || index}`} className={styles.audioListItem}>
+                    <div
+                      key={`${item.uploadId || item.cid || item.localUrl || index}`}
+                      className={clsx(styles.audioListItem, {
+                        [styles['audioListItem--uploading']]: item.status === 'uploading',
+                        [styles['audioListItem--failed']]: item.status === 'failed',
+                      })}
+                    >
                       <audio src={mediaSrc} controls />
-                      <button type="button" className={styles.audioRemoveButton} onClick={() => handleRemoveMedia(index)}>
+                      {item.status === 'uploading' && (
+                        <span className={styles.audioListItem__status}>{Math.floor((item.progress || 0) * 100)}%</span>
+                      )}
+                      {item.status === 'failed' && (
+                        <button type="button" className={styles.audioRemoveButton} onClick={() => retryUpload(item.uploadId)} aria-label="Retry upload">
+                          <ArrowClockwiseIcon size={14} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.audioRemoveButton}
+                        onClick={() => handleRemoveMedia(index)}
+                        aria-label={item.status === 'uploading' ? 'Cancel upload' : 'Remove audio'}
+                      >
                         <TrashIcon size={14} />
                       </button>
                     </div>
@@ -1747,9 +1863,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             )}
           </div>
 
-          <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain}>
-            {isConfirming
-              ? actionType === 'edit' ? 'Updating...' : isComment ? 'Replying...' : 'Posting...'
+          <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain || hasFailedUploads}>
+            {isSubmitting && hasPendingUploads
+              ? 'Uploading...'
+              : isConfirming
+                ? actionType === 'edit' ? 'Updating...' : isComment ? 'Replying...' : 'Posting...'
               : isSigning
                 ? 'Signing...'
                 : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : 'Post'}

@@ -427,8 +427,9 @@
 
 .mediaItem {
   position: relative;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  min-height: 120px;
   margin: 0;
   background: var(--surface-muted);
   border: 1px solid var(--border);
@@ -438,42 +439,82 @@
   video {
     display: block;
     width: 100%;
-    height: 100%;
     aspect-ratio: 1 / 1;
     object-fit: cover;
   }
 
-
+  /* Actions sit under the media, always visible. They used to fade in on hover, floating over
+     the picture — there is no hover on a phone, and the always-on mobile fallback was white
+     pills over whatever the photo happened to be. */
   figcaption {
-    position: absolute;
-    inset: auto 8px 8px 8px;
     display: flex;
     gap: 6px;
-    opacity: 0;
-    transform: translateY(4px);
-    transition:
-      opacity 0.16s ease,
-      transform 0.16s ease;
-  }
-
-  &:hover figcaption,
-  &:focus-within figcaption {
-    opacity: 1;
-    transform: translateY(0);
+    padding: 6px;
+    border-top: 1px solid var(--border);
   }
 
   figcaption button {
+    flex: 1;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    padding: 6px 8px;
-    color: var(--black);
-    background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 999px;
+    min-width: 0;
+    padding: 6px 4px;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
     cursor: pointer;
     font-size: 0.75rem;
-    backdrop-filter: blur(8px);
+    white-space: nowrap;
+
+    &:hover {
+      color: inherit;
+      border-color: var(--text-muted);
+    }
+  }
+
+  &--uploading img,
+  &--uploading video {
+    opacity: 0.55;
+  }
+
+  &--failed {
+    border-color: #cb2e2e;
+  }
+
+  /* Percent while uploading, "Upload failed" after — over the media, top-left */
+  &__badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 2px 8px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    backdrop-filter: blur(6px);
+  }
+
+  &__badge--failed {
+    background: #cb2e2e;
+  }
+
+  /* A thin track between the media and the action row */
+  &__progress {
+    height: 4px;
+    background: var(--border);
+  }
+
+  &__progressBar {
+    display: block;
+    height: 100%;
+    background: var(--network-color-primary, var(--color-primary));
+    transition: width 0.15s linear;
   }
 }
 
@@ -497,6 +538,24 @@
     flex: 1;
     min-width: 0;
     height: 36px;
+  }
+
+  &--uploading audio {
+    opacity: 0.55;
+  }
+
+  &--failed {
+    border-color: #cb2e2e;
+  }
+
+  &__status {
+    flex-shrink: 0;
+    min-width: 3.5ch;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
   }
 }
 
@@ -522,15 +581,6 @@
 
 .spoiler {
   filter: blur(10px);
-}
-
-.uploading {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
 }
 
 .addThreadButton {
@@ -650,11 +700,6 @@
 
   .toolbar {
     gap: 8px;
-  }
-
-  .mediaItem figcaption {
-    opacity: 1;
-    transform: translateY(0);
   }
 
   .footer {
