@@ -1,0 +1,179 @@
+// Chrome for the basket chooser. Positioning, animation and modality stay with
+// NativePopover; only size, spacing and colors live here.
+.panel {
+  min-width: 240px;
+  max-width: 300px;
+
+  // The popover renders as a sibling of its trigger, which on the floating action stack
+  // sits inside a `pointer-events: none` container (it must not block the feed behind it).
+  // Being in the top layer does not exempt the panel from that inherited value, so without
+  // this every click inside it falls straight through to the page.
+  pointer-events: auto;
+}
+
+// Stacks the caption under the heart on the floating action button
+.trigger {
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.caption {
+  color: var(--text-muted);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 1000px;
+  background-color: var(--batch-like-color, #facc15);
+  color: #000000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.basket {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__title {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__lede {
+    margin: -0.25rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  &__hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+  }
+
+  &__clearAll {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.network {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  // Both controls in a row are outlined: without the send arrow there was nothing marking
+  // them as pressable, and hover cannot say it on touch
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &__name {
+    flex: 1;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__count {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: 1000px;
+    background-color: var(--batch-like-color, #facc15);
+    color: #000000;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  &__clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}

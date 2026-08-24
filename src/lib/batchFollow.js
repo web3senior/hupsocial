@@ -1,7 +1,7 @@
 /**
  * @file lib/batchFollow.js
  * @description Pure helpers for following a selection of profiles in one LSP26
- * followBatch transaction (chunking and toast copy come from lib/batch.js). followBatch is all-or-nothing —
+ * followBatch transaction. Mirrors lib/batchLike.js: followBatch is all-or-nothing —
  * a single already-followed (or self) address reverts the whole array with
  * LSP26AlreadyFollowing / LSP26CannotSelfFollow, so the selection is validated
  * here instead of failing at wallet gas estimation.
@@ -10,7 +10,7 @@
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 
 // Each follow can trigger the target's LSP1 universalReceiver hook, so gas per
-// entry is heavier than a like — 50 per transaction is a safe ceiling.
+// entry is heavier than a like — keep batches at the same cap batchLike uses.
 export const MAX_BATCH_FOLLOW_COUNT = 50
 const MAX_FOLLOWING_READ_COUNT = 500
 

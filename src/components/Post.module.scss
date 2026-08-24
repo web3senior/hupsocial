@@ -383,13 +383,13 @@
         cursor: pointer;
       }
 
-      // Hover previews the liked color; an already-liked heart keeps it and only
-      // deepens the halo
+      // Hover tint tracks the button's own state so an already-liked heart keeps
+      // its liked color instead of flipping to the batch-queue yellow
       &[data-action='like'] {
         &:hover {
-          color: color-mix(in srgb, var(--liked-color, #ff007a) 60%, transparent);
+          color: color-mix(in srgb, var(--batch-like-color, #facc15) 60%, transparent);
           &:before {
-            background-color: color-mix(in srgb, var(--liked-color, #ff007a) 10%, transparent);
+            background-color: color-mix(in srgb, var(--batch-like-color, #facc15) 10%, transparent);
           }
         }
 
@@ -402,6 +402,15 @@
             &:before {
               background-color: color-mix(in srgb, var(--liked-color, #ff007a) 10%, transparent);
             }
+          }
+        }
+
+        // Queued for the batch like: already yellow, keep it solid on hover
+        &[data-queued='true'] {
+          color: var(--batch-like-color, #facc15);
+
+          &:hover {
+            color: var(--batch-like-color, #facc15);
           }
         }
       }

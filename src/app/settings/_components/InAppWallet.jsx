@@ -13,7 +13,7 @@ import { ArrowsClockwiseIcon, CheckIcon, CopyIcon, KeyIcon, ShieldWarningIcon, U
 import { ethers } from 'ethers'
 import Balance from '@/app/(user)/[wallet]/_components/balance'
 import { toRelativeTime } from '@/lib/dateHelper'
-import { isSessionActive, localStorageBurnerAddress, localStorageBurnerKey, sessionStorageUnlockedKey } from '@/lib/burnerSession'
+import { isSessionActive, localStorageBurnerAddress,localStorageBurnerKey, localStorageBatchLikeKey, sessionStorageUnlockedKey} from '@/lib/burnerSession'
 import { localStorageGaslessKey, readGaslessPreference } from '@/lib/relayGasless'
 import { encryptData, decryptData } from '@/lib/cryptoHelper'
 import { getCachedMasterHex, deriveChildKeyBytes, CHILD_KEY_LABELS } from '@/lib/securityVault'
@@ -23,6 +23,9 @@ import styles from './InAppWallet.module.scss'
 import clsx from 'clsx'
 
 export default function InAppWallet({ onOpenSecurity }) {
+  // Establish state to track whether the switch is turned on or off
+  const [isOn, setIsOn] = useState(true)
+
   // Trial: while on, posts, likes, unlikes and reposts are relayed through our forwarder
   // and cost the user nothing
   const [isGaslessOn, setIsGaslessOn] = useState(true)
@@ -52,10 +55,22 @@ export default function InAppWallet({ onOpenSecurity }) {
 
   const { data: hash, mutate: writeContract } = useWriteContract()
 
-  // Load the saved toggle preference from localStorage on mount
+  // Load the initial toggle preferences from localStorage on mount
   useEffect(() => {
+    const savedPreference = localStorage.getItem(localStorageBatchLikeKey)
+    if (savedPreference !== null) {
+      setIsOn(savedPreference === 'true')
+    }
+
     setIsGaslessOn(readGaslessPreference())
   }, [])
+
+  // Update localStorage whenever the toggle switch state changes
+  const handleToggleChange = (e) => {
+    const nextState = e.target.checked
+    setIsOn(nextState)
+    localStorage.setItem(localStorageBatchLikeKey, String(nextState))
+  }
 
   const handleGaslessToggleChange = (e) => {
     const nextState = e.target.checked
@@ -400,6 +415,11 @@ export default function InAppWallet({ onOpenSecurity }) {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className={clsx('col-desktop-4 flex align-items-center justify-content-between gap-1')}>
+          <span>Batch Like</span>
+          <ToggleSwitch checked={isOn} onChange={handleToggleChange} />
         </div>
 
         <div className={clsx('col-desktop-4 flex align-items-center justify-content-between gap-1')}>
