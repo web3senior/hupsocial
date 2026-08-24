@@ -47,6 +47,13 @@ const MAX_ENTRY_BYTES = 8 * 1024 * 1024
  */
 export const FAILURE_TTL_MS = 10 * 60 * 1000
 
+/**
+ * How long a failure that says something about the minute rather than the address is
+ * believed — a gateway that had the content but couldn't deliver it in time. Long enough to
+ * stop a page of cards re-asking in a loop, short enough that the next visitor gets a retry.
+ */
+export const TRANSIENT_FAILURE_TTL_MS = 60 * 1000
+
 // Pinned to globalThis so `next dev`'s module reloading doesn't drop the cache — and with it
 // the memory of which CIDs are dead — on every edit. Same reasoning as the db pool.
 const globalForMedia = globalThis
@@ -123,9 +130,12 @@ export function writeMediaRedirect(key, location) {
  * @param {string} key Cache key.
  * @param {number} status HTTP status to replay.
  * @param {string} message Error message to replay.
+ * @param {number} [ttlMs] How long to believe it — FAILURE_TTL_MS unless the failure was
+ * transient, in which case TRANSIENT_FAILURE_TTL_MS. Kept on the entry so the response can
+ * advertise the same window downstream.
  */
-export function writeMediaFailure(key, status, message) {
-  store.set(key, { kind: 'error', status, message, bytes: 0, expiresAt: Date.now() + FAILURE_TTL_MS })
+export function writeMediaFailure(key, status, message, ttlMs = FAILURE_TTL_MS) {
+  store.set(key, { kind: 'error', status, message, ttlMs, bytes: 0, expiresAt: Date.now() + ttlMs })
   evict()
 }
 
