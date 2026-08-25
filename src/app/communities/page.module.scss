@@ -430,13 +430,11 @@
     font-weight: 600;
     color: var(--text);
     margin: 0 0 0.25rem 0;
-    // Long names: wrap onto at most two lines, then ellipsis — the full name is in the
-    // title attribute and on the community page. overflow-wrap handles unbroken strings.
-    overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    // Long names stay on one line and end in an ellipsis — the full name is in the title
+    // attribute and on the community page.
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__creator {
@@ -635,13 +633,11 @@
     font-weight: 600;
     color: var(--text);
     margin: 0 0 0.25rem 0;
-    // Long names: wrap onto at most two lines, then ellipsis — the full name is in the
-    // title attribute and on the community page. overflow-wrap handles unbroken strings.
-    overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    // Long names stay on one line and end in an ellipsis — the full name is in the title
+    // attribute and on the community page.
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__creator {
