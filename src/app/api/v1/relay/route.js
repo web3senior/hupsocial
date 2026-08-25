@@ -11,10 +11,13 @@ import { forgetServerRpc, getServerProvider, isTransportError } from '../../../.
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
 
 // --- Relay policy ---
-// The relayer's key pays for everything that lands here, so a request may only target a
-// contract this app deployed on that chain. The Hup contract is narrowed further to the
-// sponsored selectors in config/gasless.js — `create`, `batchLike` and `unlike` only, since
-// it also carries paid, owner-only and admin functions that must never run on our key.
+// The relayer's key pays for everything that lands here, so a request may only target one of
+// the contracts we actually sponsor on that chain: Hup, HupPolls and HupChat. Everything else
+// in config/contracts.js (HupCommunity, HupTipper, the LSP26 registry, …) is refused outright
+// — a forwarder executes against whatever target the request names, so this list is the whole
+// defence. The Hup contract is narrowed further to the sponsored selectors in
+// config/gasless.js — `create`, `batchLike` and `unlike` only, since it also carries paid,
+// owner-only and admin functions that must never run on our key.
 // Unlike has its own small window, which is what caps heart-toggle farming: every
 // like→unlike→like cycle spends one sponsored unlike, so cycles stop at that bucket's max.
 // Un-repost is deliberately unsponsored: it rides deleteContent, which deletes any of the
@@ -51,13 +54,9 @@ const sponsoredBucket = (chainId, to, data) => {
   if (!contracts || !to) return null
 
   const target = to.toLowerCase()
-  const configured = Object.values(contracts)
-    .filter((value) => typeof value === 'string' && value.startsWith('0x') && value.length === 42)
-    .map((value) => value.toLowerCase())
+  const isTarget = (address) => Boolean(address) && target === address.toLowerCase()
 
-  if (!configured.includes(target)) return null
-
-  if (contracts.hup && target === contracts.hup.toLowerCase()) {
+  if (isTarget(contracts.hup)) {
     const bucket = SPONSORED_SELECTORS.get((data || '').slice(0, 10).toLowerCase()) ?? null
     if (bucket !== 'create') return bucket
 
@@ -72,14 +71,19 @@ const sponsoredBucket = (chainId, to, data) => {
     }
   }
 
-  // Polls are narrowed the same way Hup is, and BEFORE the chat fallback below: without this
-  // branch, adding the address to config/contracts.js would quietly sponsor every function on
-  // the contract at chat limits.
-  if (contracts.polls && target === contracts.polls.toLowerCase()) {
+  // Polls are narrowed the same way Hup is: only the ballot is a tap the trial makes free
+  if (isTarget(contracts.polls)) {
     return POLL_SELECTORS.get((data || '').slice(0, 10).toLowerCase()) ?? null
   }
 
-  return 'chat'
+  // Chat is sponsored wholesale — every selector on it is a message-shaped tap, and the chat
+  // app's identity setup (`activateIdentity` / `revokeSession`) rides through here too. It is
+  // an explicit match, not a fallback: this used to return the chat bucket for ANY address in
+  // config/contracts.js, which would have paid for community joins, tips and follows at chat
+  // limits the moment a forwarder request named one of them.
+  if (isTarget(contracts.chat)) return 'chat'
+
+  return null
 }
 
 // --- Throttle ---
