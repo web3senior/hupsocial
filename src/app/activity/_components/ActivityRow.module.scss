@@ -59,6 +59,11 @@
     --tone-color: #12b8a0;
   }
 
+  // Communities share the nav's purple so the verb reads the same in the feed and the sidebar.
+  &[data-tone='community'] {
+    --tone-color: #8b5cf6;
+  }
+
   &__icon {
     display: inline-flex;
     justify-content: center;

@@ -12,8 +12,12 @@
  *   like                 post_likes       — is_active tells an unliked row from a live one.
  *   follow/tip/nft_sale/ notifications    — cidex already resolved token symbol and decimals
  *   offer_made/                             into `data` for these, and each row carries both
- *   offer_filled                            parties. Re-deriving that from tips/nft_trades
- *                                           would mean re-reading token metadata per row.
+ *   offer_filled/                           parties. Re-deriving that from tips/nft_trades
+ *   community_created/                      would mean re-reading token metadata per row.
+ *   community_joined                        Community rows carry the community's name in
+ *                                           `data`, so the feed never joins the communities
+ *                                           table (keyed by deployment address, which the
+ *                                           notification does not have).
  *   bet                  market_bets      — the notification for a bet carries no amount, and
  *                                           exists only when the bettor is not the market owner.
  *   swap                 swap_activity    — swaps have no Hup contract, so there is no
@@ -21,9 +25,8 @@
  *
  * Deferred verbs. Each becomes one more SOURCES entry when its turn comes; nothing else in this
  * file has to change.
- *   Waiting on mainnet — mint (drop_mints), community_created / community_joined
- *   (notifications), launch_trade (launch_trades), miner_run (miner_runs), store_sale
- *   (store_sales, since Bazaar only runs on LUKSO and Monad testnet).
+ *   Waiting on mainnet — mint (drop_mints), launch_trade (launch_trades), miner_run
+ *   (miner_runs), store_sale (store_sales, since Bazaar only runs on LUKSO and Monad testnet).
  *   Waiting on rows — event_created (events), app_listed (apps), status (statuses): those
  *   features are on mainnet, but nothing records an actor-and-time row for them yet, so they
  *   need a cidex-side notification before a feed can show them.
@@ -74,6 +77,12 @@ const NOTIFICATION_KIND_BY_ACTION = {
   nft_sold: 'nft_sale',
   nft_offer_made: 'offer_made',
   nft_offer_accepted: 'offer_filled',
+  // Communities went to mainnet on 2026-08-24. community_created is the creator's own row (one
+  // per community). For joins, community_member_joined is the row that carries both parties —
+  // the joiner as actor and the creator as recipient — where community_joined is the joiner's
+  // self-row, and followed_user_created_community fans one creation out to every follower.
+  community_created: 'community_created',
+  community_member_joined: 'community_joined',
 }
 
 // Posts, comments and reposts share one table; each kind is a predicate on the same row.

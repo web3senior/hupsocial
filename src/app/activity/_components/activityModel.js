@@ -12,6 +12,7 @@ import {
   ShoppingBagOpenIcon,
   TagIcon,
   UserPlusIcon,
+  UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { formatUnits } from 'viem'
 
@@ -19,7 +20,12 @@ import { formatUnits } from 'viem'
 // its label does not promise. `kinds: null` asks for everything the API serves.
 export const TABS = [
   { id: 'all', label: 'All', kinds: null, empty: 'Nothing has happened on Hup yet.' },
-  { id: 'social', label: 'Social', kinds: ['post', 'comment', 'repost', 'like', 'follow'], empty: 'No posts, likes or follows yet.' },
+  {
+    id: 'social',
+    label: 'Social',
+    kinds: ['post', 'comment', 'repost', 'like', 'follow', 'community_created', 'community_joined'],
+    empty: 'No posts, likes, follows or communities yet.',
+  },
   { id: 'nfts', label: 'NFTs', kinds: ['nft_sale', 'offer_made', 'offer_filled'], empty: 'No sales or offers yet.' },
   { id: 'money', label: 'Money', kinds: ['tip', 'bet', 'swap'], empty: 'No tips, bets or swaps yet.' },
 ]
@@ -44,6 +50,8 @@ export const KIND_META = {
   offer_filled: { icon: HandshakeIcon, tone: 'offer', weight: 'fill', label: 'Offer filled' },
   bet: { icon: ChartLineUpIcon, tone: 'market', weight: 'bold', label: 'Bet' },
   swap: { icon: ArrowsDownUpIcon, tone: 'trade', weight: 'bold', label: 'Swap' },
+  community_created: { icon: UsersThreeIcon, tone: 'community', weight: 'fill', label: 'Community created' },
+  community_joined: { icon: UsersThreeIcon, tone: 'community', label: 'Joined a community' },
 }
 
 export function getKindMeta(kind) {
@@ -133,6 +141,7 @@ export function hrefOf(row) {
   if (kind === 'nft_sale' && networkId && entityId) return `/nfts/${networkId}/${entityId}`
   if (kind === 'bet' && networkId && entityId) return `/predict/${networkId}/${entityId}`
   if (kind === 'swap') return '/swap'
+  if (row.entity_type === 'community' && networkId && entityId) return `/communities/${networkId}/${entityId}`
 
   // Offers are collection- or token-wide bids; the app has no page for a single offer.
   return null

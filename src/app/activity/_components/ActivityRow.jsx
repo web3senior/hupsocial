@@ -278,6 +278,28 @@ function Sentence({ row, amount, asset, nftName }) {
           </span>
         </>
       )
+    case 'community_created':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>created the community</span>{' '}
+          <span className={styles.row__asset}>{row.meta?.community_name || `#${row.entity_id}`}</span>
+        </>
+      )
+    // The row's subject is the community's creator; naming them reads as ownership without
+    // repeating the actor when someone joins their own community.
+    case 'community_joined':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>joined</span>{' '}
+          {subject ? (
+            <>
+              {subject}
+              <span className={styles.row__verb}>&apos;s community</span>{' '}
+            </>
+          ) : null}
+          <span className={styles.row__asset}>{row.meta?.community_name || `#${row.entity_id}`}</span>
+        </>
+      )
     default:
       return withActor(actor, row.kind)
   }
