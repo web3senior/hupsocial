@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import { communityJoin } from '@/lib/communityJoin'
+import { communityJoin, communityJoinPin } from '@/lib/communityJoin'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { attachTipUsdTotals } from '@/lib/tipTotals'
 import { getFollowingAddresses } from '@/lib/followSystem'
@@ -16,11 +16,25 @@ export const runtime = 'nodejs'
 // community post by the number of deployments that chain has hosted (see lib/communityJoin.js)
 const COMMUNITY_JOIN = communityJoin()
 
+// The viewer holds an active seat in the row's community. Binds ONE placeholder (the viewer
+// address). Pinned to the current deployment per network the same way COMMUNITY_JOIN is, so a
+// seat on a retired deployment that happened to reuse the id can't unlock the post. LOWER() on
+// the wallet because cidex stores checksummed addresses in binary-collated columns.
+const VIEWER_IS_MEMBER = `EXISTS (
+  SELECT 1 FROM community_members cm
+  WHERE cm.network_id = p.network_id
+    AND cm.community_id = p.community_id
+    AND LOWER(cm.wallet_address) = LOWER(?)
+    AND cm.is_member = 1
+    AND cm.is_banned = 0${communityJoinPin('cm')}
+)`
+
 // --- Trending feed configuration ---
 // Velocity ranking: posts are scored by engagement RECEIVED inside a trailing
 // window (not by post age), so an older post that catches fire can still trend.
 // The ranked candidate list is identical for every viewer, so it is cached in
-// module scope and only viewer flags (has_liked/has_bookmarked) run per request.
+// module scope; only the viewer's community-membership filter and viewer flags
+// (has_liked/has_bookmarked) run per request.
 const TRENDING_CACHE_TTL_MS = 60_000
 const TRENDING_CANDIDATE_LIMIT = 100
 const TRENDING_MIN_SCORE = 2
@@ -212,10 +226,10 @@ export async function GET(request) {
     if (communityId) {
       whereClause += ` AND p.community_id = ?`
       whereParams.push(communityId)
-    } else if (viewerAddress) {
-      // Outside a community's own feed (home, profile, following), a community post surfaces on
-      // TWO independent axes — the same split the contract itself makes, and the reason this
-      // rule can't be read off `membership_type` alone any more:
+    } else if (walletAddress && !followingAddresses) {
+      // A profile timeline is a deliberate look at one author, so it keeps the widest rule the
+      // chain allows. A community post surfaces on TWO independent axes — the same split the
+      // contract itself makes, and the reason this can't be read off `membership_type` alone:
       //
       //   is_encrypted   whether posts are sealed (cidex sets it from KeyInitialized)
       //   membership_type  the AdmissionMode enum: 0 Open, 1-4 gated
@@ -229,30 +243,35 @@ export async function GET(request) {
       // UNENCRYPTED communities: Open (0) is public and surfaces for everyone; gated ones (1-4)
       // are readable by anyone who queries the chain, but the community drew a line around
       // itself, so their posts are listed only for the author or an active member. Unresolvable
-      // communities (comm row not indexed yet) stay hidden for all viewers. LOWER() on both
-      // sides because cidex stores checksummed addresses in binary-collated columns.
+      // communities (comm row not indexed yet) stay hidden for all viewers.
+      if (viewerAddress) {
+        whereClause += ` AND (
+          p.community_id IS NULL
+          OR (
+            comm.is_encrypted = 0
+            AND (comm.membership_type = 0 OR LOWER(p.wallet_address) = LOWER(?) OR ${VIEWER_IS_MEMBER})
+          )
+        )`
+        whereParams.push(viewerAddress, viewerAddress)
+      } else {
+        // Anonymous viewers (no connected wallet) only ever see open, unencrypted communities.
+        whereClause += ` AND (p.community_id IS NULL OR (comm.membership_type = 0 AND comm.is_encrypted = 0))`
+      }
+    } else if (viewerAddress) {
+      // Home-style feeds (For you, network tabs, NFTs, Bazaar, Shorts, Following) are the
+      // viewer's own timeline, and a community belongs in it only once the viewer has joined:
+      // an Open community is joinable by anyone, but it is still a room, not a broadcast, so
+      // its posts reach the home feeds of members alone (plus the author's own). Encrypted
+      // communities stay out for everyone, for the reasons the profile rule spells out, and
+      // unresolvable ones (comm row not indexed yet) fail the is_encrypted test the same way.
       whereClause += ` AND (
         p.community_id IS NULL
-        OR (
-          comm.is_encrypted = 0
-          AND (
-            comm.membership_type = 0
-            OR LOWER(p.wallet_address) = LOWER(?)
-            OR EXISTS (
-              SELECT 1 FROM community_members cm
-              WHERE cm.network_id = p.network_id
-                AND cm.community_id = p.community_id
-                AND LOWER(cm.wallet_address) = LOWER(?)
-                AND cm.is_member = 1
-                AND cm.is_banned = 0
-            )
-          )
-        )
+        OR (comm.is_encrypted = 0 AND (LOWER(p.wallet_address) = LOWER(?) OR ${VIEWER_IS_MEMBER}))
       )`
       whereParams.push(viewerAddress, viewerAddress)
     } else {
-      // Anonymous viewers (no connected wallet) only ever see open, unencrypted communities.
-      whereClause += ` AND (p.community_id IS NULL OR (comm.membership_type = 0 AND comm.is_encrypted = 0))`
+      // No wallet, no seats: an anonymous home feed carries no community posts at all.
+      whereClause += ` AND p.community_id IS NULL`
     }
 
     // Push the viewer address parameter first (twice) if it exists to match the conditional subquery placements
@@ -641,8 +660,13 @@ function buildPostSelect(viewerAddress) {
 async function handleTrendingFeed({ networkId, viewerAddress, page, limit, offset }) {
   const { candidates, windowHours } = await getTrendingCandidates(networkId)
 
-  const slice = candidates.slice(offset, offset + limit)
-  const hasMore = offset + limit < candidates.length
+  // The cached ranking is viewer-independent; which community rows the viewer may see is not.
+  // Filter first, then hand out one slot per author, so an author whose top post sits in a
+  // room the viewer hasn't joined still trends with their next-best public post.
+  const visible = dedupeAuthors(await keepMemberCommunities(candidates, viewerAddress))
+
+  const slice = visible.slice(offset, offset + limit)
+  const hasMore = offset + limit < visible.length
   const trendingMeta = { feed_type: 'trending', trending_window_hours: windowHours, filter_chain_id: networkId || 'all' }
 
   if (slice.length === 0) {
@@ -719,15 +743,17 @@ async function getTrendingCandidates(networkId) {
 
 /**
  * Scores posts by engagement received inside the window (velocity), keeping
- * only publicly visible, non-actioned posts above the minimum score — trending
- * is an amplification surface, so moderation gates it harder than the feed.
- * Window/weight values are module constants, never user input, so they are
- * interpolated directly.
+ * only non-actioned posts above the minimum score — trending is an
+ * amplification surface, so moderation gates it harder than the feed.
+ * Community rows carry the room they belong to so keepMemberCommunities can
+ * apply the per-viewer rule to the cached list; the ranking itself is the same
+ * for everyone. Window/weight values are module constants, never user input,
+ * so they are interpolated directly.
  */
 async function queryTrendingWindow(networkId, windowHours) {
   const params = []
   let query = `
-    SELECT p.id, p.network_id, p.wallet_address, agg.score
+    SELECT p.id, p.network_id, p.wallet_address, p.community_id, comm.contract_address AS community_contract, agg.score
     FROM (
       SELECT post_id, network_id, SUM(pts) AS score
       FROM (
@@ -744,8 +770,8 @@ async function queryTrendingWindow(networkId, windowHours) {
     JOIN posts p ON p.id = agg.post_id AND p.network_id = agg.network_id
     ${COMMUNITY_JOIN}
     WHERE p.is_comment IS NULL AND p.is_deleted = 0
-      -- Trending is seen by everyone, so it takes the anonymous rule: open, unencrypted only
-      AND (p.community_id IS NULL OR (comm.membership_type = 0 AND comm.is_encrypted = 0))
+      -- Encrypted rooms never leave the room; an unresolved community (no comm row) fails this too
+      AND (p.community_id IS NULL OR comm.is_encrypted = 0)
       AND agg.score >= ${TRENDING_MIN_SCORE}
       AND NOT EXISTS (
         SELECT 1 FROM user_reports ur
@@ -759,9 +785,42 @@ async function queryTrendingWindow(networkId, windowHours) {
   query += ` ORDER BY agg.score DESC, p.created_at DESC LIMIT ${TRENDING_CANDIDATE_LIMIT}`
 
   const [rows] = await pool.execute(query, params)
+  return rows
+}
 
-  // One trending slot per author (their highest-scored post) so a posting
-  // spree can't occupy the whole surface
+/**
+ * The home-feed community rule applied to the cached trending list: community rows survive only
+ * for the author or an active member of that room. One seat lookup per request; anonymous
+ * viewers hold no seats, so they keep only the rows outside any community. Seats are keyed on
+ * the pinned contract, so a retired deployment that reused an id can't match.
+ */
+async function keepMemberCommunities(candidates, viewerAddress) {
+  if (!candidates.some((candidate) => candidate.community_id != null)) return candidates
+  if (!viewerAddress) return candidates.filter((candidate) => candidate.community_id == null)
+
+  const [seats] = await pool.execute(
+    `SELECT cm.network_id, cm.contract_address, cm.community_id
+     FROM community_members cm
+     WHERE LOWER(cm.wallet_address) = LOWER(?) AND cm.is_member = 1 AND cm.is_banned = 0${communityJoinPin('cm')}`,
+    [viewerAddress],
+  )
+  const seatKey = (networkId, contract, communityId) => `${networkId}:${String(contract).toLowerCase()}:${communityId}`
+  const seatKeys = new Set(seats.map((seat) => seatKey(seat.network_id, seat.contract_address, seat.community_id)))
+  const viewer = viewerAddress.toLowerCase()
+
+  return candidates.filter(
+    (candidate) =>
+      candidate.community_id == null ||
+      String(candidate.wallet_address).toLowerCase() === viewer ||
+      seatKeys.has(seatKey(candidate.network_id, candidate.community_contract, candidate.community_id)),
+  )
+}
+
+/**
+ * One trending slot per author (their highest-scored post) so a posting spree
+ * can't occupy the whole surface.
+ */
+function dedupeAuthors(rows) {
   const seenAuthors = new Set()
   return rows.filter((row) => {
     if (seenAuthors.has(row.wallet_address)) return false
