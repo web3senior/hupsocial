@@ -6,7 +6,8 @@ import useSWRInfinite from 'swr/infinite'
 import clsx from 'clsx'
 import { useConnection } from 'wagmi'
 import { appChains } from '@/config/contracts'
-import { formatVotes, pollOptions, pollStatus, toRelative } from '@/lib/polls'
+import { formatVotes, pollOptions, pollStatus } from '@/lib/polls'
+import PollTimer from '@/components/PollTimer'
 import NoData from '../NoData'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import styles from './PollsTab.module.scss'
@@ -67,7 +68,11 @@ export default function PollsTab() {
                       {formatVotes(poll.total_votes)} {Number(poll.total_votes) === 1 ? 'vote' : 'votes'}
                     </span>
                     <span>{options.length} options</span>
-                    {status.key === 'open' && <span>closes {toRelative(poll.closes_at)}</span>}
+                    {status.key !== 'closed' && (
+                      <span>
+                        <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} />
+                      </span>
+                    )}
                   </p>
                 </Link>
               </li>

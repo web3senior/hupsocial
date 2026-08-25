@@ -48,6 +48,15 @@ export default function PollCard({ pollRef }) {
   // until the API row carries it
   const [localBallot, setLocalBallot] = useState(null)
 
+  // The card's status is derived from the clock at render time, so a window that opens or
+  // ends on screen needs a re-render as well as fresh data — SWR alone would not re-render
+  // if the payload came back unchanged, and the vote buttons would outlive the poll
+  const [, setPhaseTick] = useState(0)
+  const refreshPhase = () => {
+    setPhaseTick((tick) => tick + 1)
+    mutate()
+  }
+
   const { writeContractAsync } = useWriteContract()
 
   const poll = detail?.data?.poll
@@ -265,7 +274,11 @@ export default function PollCard({ pollRef }) {
             {isCounting ? (
               'Counting your vote…'
             ) : (
-              <PollTimer opensAt={poll.opens_at} closesAt={Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at} />
+              <PollTimer
+                opensAt={poll.opens_at}
+                closesAt={Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at}
+                onPhaseChange={refreshPhase}
+              />
             )}
           </span>
         )}
@@ -276,7 +289,7 @@ export default function PollCard({ pollRef }) {
 
         {showResults && status.key !== 'closed' && (
           <span className={styles.pollCard__meta}>
-            <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} />
+            <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} onPhaseChange={refreshPhase} />
           </span>
         )}
       </footer>

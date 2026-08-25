@@ -8,6 +8,7 @@ import { useConnection } from 'wagmi'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import CreatePollDialog from '@/components/CreatePollDialog'
 import { formatVotes, pollOptions, pollStatus, requirementChips, toRelative } from '@/lib/polls'
+import PollTimer from '@/components/PollTimer'
 import { ListChecksIcon, MagnifyingGlassIcon, PlusIcon } from '@phosphor-icons/react'
 import styles from './PollsDirectory.module.scss'
 
@@ -113,8 +114,11 @@ export default function PollsDirectory() {
         <p className={styles.directory__meta}>
           <span>{poll.display_name || shortWallet(poll.wallet_address)}</span>
           <span>{toRelative(poll.opened_at)}</span>
-          {status.key === 'open' && <span>closes {toRelative(poll.closes_at)}</span>}
-          {status.key === 'upcoming' && <span>opens {toRelative(poll.opens_at)}</span>}
+          {status.key !== 'closed' && (
+            <span>
+              <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} />
+            </span>
+          )}
         </p>
 
         <p className={styles.directory__stats}>

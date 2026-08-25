@@ -13,6 +13,7 @@ import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import PollCard from '@/components/PollCard'
+import PollTimer from '@/components/PollTimer'
 import { CaretLeftIcon, ListChecksIcon } from '@phosphor-icons/react'
 import styles from './PollDetail.module.scss'
 
@@ -53,6 +54,15 @@ export default function PollDetail({ networkId, pollId }) {
 
   const poll = detail?.data?.poll
   const recentVotes = detail?.data?.recentVotes ?? []
+
+  // The status badge and the close-early control are derived from the clock at render time,
+  // so a window that ends on screen needs a re-render as well as fresh data — the refetch
+  // alone would not re-render if nothing in the payload changed
+  const [, setPhaseTick] = useState(0)
+  const refreshPhase = () => {
+    setPhaseTick((tick) => tick + 1)
+    mutate()
+  }
 
   if (detail && !poll) {
     return (
@@ -152,8 +162,10 @@ export default function PollDetail({ networkId, pollId }) {
           <dd>{chain?.name || `#${chainId}`}</dd>
         </div>
         <div>
-          <dt>Closes</dt>
-          <dd>{toRelative(Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at)}</dd>
+          <dt>Voting</dt>
+          <dd>
+            <PollTimer opensAt={poll.opens_at} closesAt={Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at} onPhaseChange={refreshPhase} />
+          </dd>
         </div>
       </dl>
 
