@@ -249,7 +249,41 @@ function NftTag({ tokenAddress, chainId, minBalance }) {
 // detail page instead of duplicating all of its state/logic. hideHeader skips the logo/title/
 // summary/tags block (the detail page renders its own, indexed-data-backed version of that) but
 // keeps the action buttons/feed/forms.
-export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null }) {
+/**
+ * The directory's DB row, reshaped into the metadata JSON the card renders. cidex stores the
+ * resolved IPFS document in `metadata` and projects the hot fields into columns; the column
+ * values win for anything the JSON lacks (a legacy document, or a row repaired by hand).
+ */
+export function metadataFromRow(row) {
+  if (!row) return null
+  let parsed = null
+  if (row.metadata) {
+    try {
+      parsed = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata
+    } catch {
+      parsed = null
+    }
+  }
+  const base = parsed && typeof parsed === 'object' ? parsed : {}
+  return {
+    ...base,
+    name: base.name || row.name || '',
+    tag: base.tag || row.tag || '',
+    category: base.category || row.category || '',
+    summary: base.summary || row.summary || '',
+    description: base.description || row.description || '',
+    'logo url': base['logo url'] || row.logo_url || '',
+    'cover url': base['cover url'] || row.cover_url || '',
+  }
+}
+
+/**
+ * @param {object|null} initialMetadata — the directory hands over the row it already has, so the
+ *   card paints at once instead of waiting on communities() (RPC) and then the metadata CID
+ *   (IPFS gateway) in series. Chain + IPFS still resolve afterwards and replace it when they
+ *   succeed, so a just-edited community catches up without a reload.
+ */
+export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null, initialMetadata = null }) {
   const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
   // Shared across every card on the page by SWR — one request, not one per card
@@ -264,7 +298,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const router = useRouter()
   const CONTRACT_ADDRESS = CONTRACTS[`chain${chainId}`]?.community
 
-  const [metadata, setMetadata] = useState(null)
+  const [metadata, setMetadata] = useState(initialMetadata)
 
   const [isEditing, setIsEditing] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
@@ -1397,12 +1431,15 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     const cid = data[5]
 
     const resolve = async () => {
-      let resolved = { name: `Space #${id}`, summary: 'Invalid metadata payload structure' }
+      let resolved = null
       if (cid) {
         const result = await getIPFS(cid.replace('ipfs://', '').replace('://', ''))
         if (result && result.result !== false) resolved = result
       }
-      if (!cancelled) setMetadata(resolved)
+      if (cancelled) return
+      // The gateway answer is the freshest copy, so it always wins; when it fails, a card seeded
+      // from the directory keeps what it has rather than degrading to the placeholder.
+      setMetadata((current) => resolved ?? current ?? { name: `Space #${id}`, summary: 'Invalid metadata payload structure' })
     }
     resolve()
 
@@ -3335,6 +3372,7 @@ export default function CommunitiesPage() {
                     id={Number(row.id)}
                     networkId={Number(row.network_id)}
                     memberCount={Number(row.member_count ?? 0)}
+                    initialMetadata={metadataFromRow(row)}
                   />
                 ))
               )}
