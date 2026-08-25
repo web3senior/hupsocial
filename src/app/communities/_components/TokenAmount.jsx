@@ -9,9 +9,16 @@ import { formatTokenDisplay, useTokenMeta } from '../tokenUnits'
 /**
  * Card tag for an ERC-20/LSP7 balance requirement, in whole tokens ("min 100 USDC") instead of
  * the raw onchain integer.
+ *
+ * `resolvedMeta` ({ symbol, decimals }) short-circuits the reads. cidex resolves every gating
+ * asset once at index time, so the directory hands them down rather than making each chip ask
+ * the token for its own decimals and symbol — that was two eth_calls per requirement, per card.
  */
-export function TokenRequirementTag({ address, chainId, minBalance, className }) {
-  const { decimals, symbol } = useTokenMeta(address, chainId)
+export function TokenRequirementTag({ address, chainId, minBalance, className, resolvedMeta = null }) {
+  // A resolved asset passes a null address, which keeps the hook mounted (rules of hooks) while
+  // giving it nothing to fetch
+  const live = useTokenMeta(resolvedMeta ? null : address, chainId)
+  const { decimals, symbol } = resolvedMeta ?? live
   const amount = formatTokenDisplay(minBalance, decimals)
 
   return (

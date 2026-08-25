@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -225,13 +225,19 @@ export function CreatorName({ address }) {
 
 // Dedicated presentation sub-component to isolate ERC-721 naming hooks safely. NFT minimums are
 // plain counts, so unlike token balances they need no decimals scaling.
-function NftTag({ tokenAddress, chainId, minBalance }) {
-  const { data: nftName } = useReadContract({
+//
+// `resolvedName` short-circuits the read: cidex resolves every gating collection's name once at
+// index time, and a directory card that reads it per chip is doing the same lookup twenty times
+// over for names the page was already handed.
+function NftTag({ tokenAddress, chainId, minBalance, resolvedName = undefined }) {
+  const { data: liveName } = useReadContract({
     address: tokenAddress,
     chainId,
     abi: [{ name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }],
     functionName: 'name',
+    query: { enabled: resolvedName === undefined },
   })
+  const nftName = resolvedName === undefined ? liveName : resolvedName
 
   return (
     <span
@@ -278,12 +284,16 @@ export function metadataFromRow(row) {
 }
 
 /**
- * @param {object|null} initialMetadata — the directory hands over the row it already has, so the
- *   card paints at once instead of waiting on communities() (RPC) and then the metadata CID
- *   (IPFS gateway) in series. Chain + IPFS still resolve afterwards and replace it when they
- *   succeed, so a just-edited community catches up without a reload.
+ * @param {object|null} row — the community's indexed row, carrying everything the card renders:
+ *   the metadata document cidex already resolved, the join gating (requirements, price, payout,
+ *   governor, key version) and the viewer's own membership standing. Given one, the card paints
+ *   from it and reads nothing onchain — a directory of twenty used to open with several hundred
+ *   un-batched eth_calls, and every card sat on a skeleton until its own communities() answered.
+ * @param {boolean} hideHeader — the standalone detail page, which renders its own header. It is
+ *   also what puts the card in live mode: one card on screen can afford authoritative reads, and
+ *   that is the surface where gating decisions actually get made.
  */
-export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null, initialMetadata = null }) {
+export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null, row = null }) {
   const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
   // Shared across every card on the page by SWR — one request, not one per card
@@ -298,7 +308,32 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const router = useRouter()
   const CONTRACT_ADDRESS = CONTRACTS[`chain${chainId}`]?.community
 
-  const [metadata, setMetadata] = useState(initialMetadata)
+  // Live mode: read the contract for everything instead of trusting the indexed row. On the
+  // detail page that is one card's worth of reads and buys authoritative gating; in the grid it
+  // would be that same set multiplied by the page size, which is the whole problem. A card with
+  // no row to fall back on has no choice either way.
+  //
+  // A grid card the viewer actually acts on joins them for the rest of its life. It has to: the
+  // indexed row is a block or two behind the transaction that just landed, and every refetch this
+  // card performs after a confirmation is a no-op while its reads are disabled — so a Join would
+  // sit there saying "Join". One card the viewer is interacting with can afford the reads.
+  const [hasInteracted, setHasInteracted] = useState(false)
+  const liveReads = hideHeader || !row || hasInteracted
+
+  // Metadata has two sources and a clear precedence: the gateway copy this card resolved for
+  // itself, if it has one, otherwise the copy cidex already resolved and put on the row. Derived
+  // rather than held in state, so the detail page — which mounts this card before its own fetch
+  // lands — picks the row up the moment it arrives, with no effect to synchronize the two.
+  //
+  // null means the gateway hasn't been asked yet; { value: null } means it was asked and came
+  // back with nothing, which is what separates "still loading" from "there is nothing to show".
+  const [gatewayMetadata, setGatewayMetadata] = useState(null)
+  const rowMetadataKey = row ? `${row.network_id}:${row.contract_address}:${row.id}:${row.updated_at ?? ''}` : null
+  const rowMetadata = useMemo(() => (row ? metadataFromRow(row) : null), [rowMetadataKey])
+  const metadata =
+    gatewayMetadata?.value ??
+    rowMetadata ??
+    (gatewayMetadata ? { name: `Space #${id}`, summary: 'Invalid metadata payload structure' } : null)
 
   const [isEditing, setIsEditing] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
@@ -323,6 +358,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // until submit) plus their ALL/ANY combinator, mirroring the create modal's editor
   const [editRequirements, setEditRequirements] = useState([])
   const [editRequirementMode, setEditRequirementMode] = useState(0)
+  // What the contract held when the editor opened. Submit diffs against this to decide whether
+  // setRequirements is worth a transaction — it has to be the same snapshot the form was seeded
+  // from, not whatever the card happens to be rendering (which, in the grid, is the indexed row).
+  const editSeedRef = useRef({ requirements: [], mode: 0 })
 
   // Payment Requirement Input States (blank paymentTokenAddress means the native coin)
   const [paymentTokenAddress, setPaymentTokenAddress] = useState('')
@@ -377,15 +416,18 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'communities',
     args: [id],
+    query: { enabled: liveReads },
   })
 
-  // Safe-to-use-before-loaded derived values so hooks below can reference them unconditionally
-  const creator = data ? data[1] : null
-  const admission = data ? Number(data[2]) : null
-  const cType = data ? Number(data[3]) : null
+  // Safe-to-use-before-loaded derived values so hooks below can reference them unconditionally.
+  // Chain first where it was read, indexed row otherwise — the two carry the same fields, and
+  // writing it this way means the detail page keeps its live answer without a second code path.
+  const creator = data ? data[1] : (row?.creator_address ?? null)
+  const admission = data ? Number(data[2]) : row ? Number(row.membership_type) : null
+  const cType = data ? Number(data[3]) : row?.community_type === null || row?.community_type === undefined ? null : Number(row.community_type)
   // Indices track the Community struct's field order (id, creator, admission, cType, isActive,
   // metadata) — isActive sits before metadata so it packs into the creator slot onchain.
-  const isActive = data ? Boolean(data[4]) : true
+  const isActive = data ? Boolean(data[4]) : row ? Boolean(row.is_active) : true
   const isOwner = Boolean(activeAccountAddress && creator && activeAccountAddress.toLowerCase() === creator.toLowerCase())
 
   // The community's composable requirement list + its ALL/ANY combinator (empty = no gating)
@@ -395,8 +437,22 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'getRequirements',
     args: [id],
+    query: { enabled: liveReads },
   })
-  const requirementsList = requirementsData ?? []
+  // Indexed rows arrive in the contract's own order with snake_case columns; normalized here to
+  // the tuple shape the chips and the editor already expect, so neither has to know the source.
+  const requirementsList =
+    requirementsData ??
+    (row?.requirements ?? []).map((requirement) => ({
+      rType: Number(requirement.r_type),
+      asset: requirement.asset,
+      minBalance: BigInt(requirement.min_balance ?? 0),
+      // Resolved by cidex at index time — present only on the indexed shape, and what lets a
+      // chip read "min 100 USDC" without the card touching the token contract
+      assetName: requirement.asset_name,
+      assetSymbol: requirement.asset_symbol,
+      assetDecimals: requirement.asset_decimals === null ? undefined : Number(requirement.asset_decimals),
+    }))
 
   const { data: requirementModeData } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -404,8 +460,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'requirementMode',
     args: [id],
-    query: { enabled: requirementsList.length > 1 },
+    query: { enabled: liveReads && requirementsList.length > 1 },
   })
+  const requirementMode = requirementModeData === undefined ? Number(row?.requirement_mode ?? 0) : Number(requirementModeData)
 
   const { data: paymentRequirementData, refetch: refetchPaymentRequirement } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -413,14 +470,16 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'paymentRequirements',
     args: [id],
+    query: { enabled: liveReads },
   })
 
   // Unpacked next to its read (rather than further down with the rest of the render values) so
-  // the metadata hook below stays above this component's loading return.
-  const savedPaymentToken = paymentRequirementData ? paymentRequirementData[0] : null
-  const savedPaymentPrice = paymentRequirementData ? paymentRequirementData[1]?.toString() : null
-  const savedPaymentIsLsp7 = Boolean(paymentRequirementData?.[2])
-  const hasValidPaymentRequirement = Boolean(paymentRequirementData) && savedPaymentPrice !== '0'
+  // the metadata hook below stays above this component's loading return. Only the two values the
+  // card displays: the LSP7 flag decides which approval call a paid join makes, so it is read
+  // live at the moment of paying rather than taken from here.
+  const savedPaymentToken = paymentRequirementData ? paymentRequirementData[0] : (row?.payment_token ?? null)
+  const savedPaymentPrice = paymentRequirementData ? paymentRequirementData[1]?.toString() : (row?.payment_price ?? null)
+  const hasValidPaymentRequirement = Boolean(savedPaymentPrice) && savedPaymentPrice !== '0'
   const isPaymentNative = isNativeAsset(savedPaymentToken)
 
   // Where the fee goes: the community's payout destination (zero = creator). join() pushes
@@ -432,28 +491,42 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'payoutDestination',
     args: [id],
+    query: { enabled: liveReads },
   })
   const payoutDestination =
     payoutDestinationData && payoutDestinationData !== ZERO_ADDRESS ? payoutDestinationData : null
 
   // The join price is stored in the smallest unit of whichever asset it's priced in — it only
-  // becomes a number anyone can read once scaled by that asset's decimals
+  // becomes a number anyone can read once scaled by that asset's decimals. cidex resolves the
+  // symbol and decimals at index time, so a seeded card skips the token reads entirely.
   const nativeCurrency = getNativeCurrency(chainId)
-  const paymentMeta = useTokenMeta(savedPaymentToken, chainId)
+  const indexedPaymentMeta = row
+    ? {
+        decimals: isPaymentNative ? nativeCurrency.decimals : row.payment_decimals === null ? undefined : Number(row.payment_decimals),
+        symbol: isPaymentNative ? nativeCurrency.symbol : (row.payment_symbol ?? ''),
+      }
+    : null
+  const livePaymentMeta = useTokenMeta(liveReads ? savedPaymentToken : null, chainId)
+  const paymentMeta = liveReads ? livePaymentMeta : indexedPaymentMeta
   const paymentPriceLabel = formatTokenDisplay(savedPaymentPrice, paymentMeta.decimals)
   const paymentPriceWithSymbol = paymentPriceLabel === null ? '…' : `${paymentPriceLabel} ${paymentMeta.symbol}`.trim()
 
-  // Current viewer's membership status (isMember, isPending, isModerator, isBanned, canPost)
+  // Current viewer's membership status (isMember, isPending, isModerator, isBanned, canPost).
+  // cidex writes this row straight from registry() on every membership event, so the indexed
+  // copy is the same answer a block later — enough to decide which button a card offers, while
+  // the contract still decides whether the resulting transaction goes through.
   const { data: myStatusData, refetch: refetchMyStatus } = useReadContract({
     address: CONTRACT_ADDRESS,
     chainId,
     abi: HupCommunityABI,
     functionName: 'registry',
     args: [id, activeAccountAddress],
-    query: { enabled: !!activeAccountAddress },
+    query: { enabled: liveReads && !!activeAccountAddress },
   })
-  const isModerator = isOwner || Boolean(myStatusData?.[2])
-  const isMember = Boolean(myStatusData?.[0])
+  const viewer = row?.viewer ?? null
+  const isModerator = isOwner || Boolean(myStatusData ? myStatusData[2] : viewer?.is_moderator)
+  const isMember = Boolean(myStatusData ? myStatusData[0] : viewer?.is_member)
+  const isBanned = Boolean(myStatusData ? myStatusData[3] : viewer?.is_banned)
 
   // Live composite eligibility check (bans, moderator override, canPost flag, NFT/token balance,
   // follow status). Gates both the self-service "Request Access" button and the "Write Post"
@@ -465,18 +538,52 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'canPost',
     args: [activeAccountAddress, id],
-    query: { enabled: !!activeAccountAddress },
+    query: { enabled: liveReads && !!activeAccountAddress },
   })
 
+  // DAO mode: the community's optional governance executor (creator-level powers onchain).
+  // Reverts on pre-governor deployments — wagmi surfaces that as undefined, i.e. "no governor".
+  const { data: governorData, refetch: refetchGovernor } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    chainId,
+    abi: HupCommunityABI,
+    functionName: 'governors',
+    args: [id],
+    query: { enabled: liveReads },
+  })
+  const governor = governorData
+    ? governorData !== ZERO_ADDRESS
+      ? governorData
+      : null
+    : (row?.governor_address ?? null)
+
+  // canPost() reproduced from the indexed row for the grid, following the contract's own order
+  // exactly. Everything it checks is indexed except the trailing isEligible() balance re-check,
+  // which no index can answer — a member holding a gating asset is presumed to still hold it,
+  // and the composer's own transaction (plus cidex's canPost() check before it tags the post)
+  // is what settles it. undefined means "not known yet", which leaves the button enabled.
+  const canPostFromRow = (() => {
+    if (!viewer) return undefined
+    if (!isActive || isBanned) return false
+    if (isOwner || isModerator || (governor && activeAccountAddress && governor.toLowerCase() === activeAccountAddress.toLowerCase())) return true
+    if (cType === 1) return false
+    if (!viewer.is_member || !viewer.can_post) return false
+    return true
+  })()
+  const canPost = liveReads ? myCanPostLive : activeAccountAddress ? canPostFromRow : undefined
+
   // Live composite eligibility (requirement list + optional module) — lets the Self-serve
-  // Join button disable itself proactively instead of submitting a join() that will revert
+  // Join button disable itself proactively instead of submitting a join() that will revert.
+  // The one gating read the grid keeps: it turns on current token/NFT balances, which nothing
+  // indexed can stand in for, and the condition narrows it to wallets actually looking at a
+  // self-serve community they haven't joined.
   const { data: amIEligible } = useReadContract({
     address: CONTRACT_ADDRESS,
     chainId,
     abi: HupCommunityABI,
     functionName: 'isEligible',
     args: [activeAccountAddress, id],
-    query: { enabled: !!activeAccountAddress && admission === ADMISSION.SelfServeIfEligible },
+    query: { enabled: !!activeAccountAddress && admission === ADMISSION.SelfServeIfEligible && !isMember && !isOwner },
   })
 
   const { mutate: joinCommunity, data: joinHash, isPending: isJoinPending, error: joinError } = useWriteContract()
@@ -489,9 +596,17 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'keyVersion',
     args: [id],
+    query: { enabled: liveReads },
   })
-  const keyVersion = keyVersionData ? Number(keyVersionData) : 0
-  const isEncryptionInitialized = keyVersion > 0
+  const keyVersion = keyVersionData === undefined ? Number(row?.key_version ?? 0) : Number(keyVersionData)
+  // is_encrypted has been indexed since long before key_version, and cidex backfills the version
+  // on its own schedule — so a row can legitimately know a community is encrypted without yet
+  // knowing which version it is on. The 🔒 chip only needs the former.
+  const isEncryptionInitialized = keyVersion > 0 || (keyVersionData === undefined && Boolean(row?.is_encrypted))
+  // ...but the key mailbox read below needs the exact version, and a guess would ask for the
+  // wrong envelope — which the effect further down would read as "this member has no key" and
+  // file a grant request nobody needs. It only runs where the version is known for certain.
+  const hasAuthoritativeKeyVersion = keyVersionData !== undefined || Number(row?.key_version ?? 0) > 0
 
   // History policy: when true, rotations publish backward key-chain links so members holding
   // only the current key (including future joiners) can decrypt pre-rotation posts.
@@ -501,28 +616,22 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     abi: HupCommunityABI,
     functionName: 'historyVisibleToNewMembers',
     args: [id],
+    query: { enabled: liveReads },
   })
-  const historyVisible = Boolean(historyVisibleData)
+  const historyVisible = historyVisibleData === undefined ? Boolean(row?.history_visible) : Boolean(historyVisibleData)
 
-  // DAO mode: the community's optional governance executor (creator-level powers onchain).
-  // Reverts on pre-governor deployments — wagmi surfaces that as undefined, i.e. "no governor".
-  const { data: governorData, refetch: refetchGovernor } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    chainId,
-    abi: HupCommunityABI,
-    functionName: 'governors',
-    args: [id],
-  })
-  const governor = governorData && governorData !== '0x0000000000000000000000000000000000000000' ? governorData : null
-
-  // The viewer's own wrapped copy of the current content key
+  // The viewer's own wrapped copy of the current content key. This one has no indexed stand-in
+  // and never will: the envelope is a secret wrapped to the member's public key, and the whole
+  // point is that no server holds it. Narrowed to members of encrypted communities instead —
+  // where it fires it is doing real work (deciding whether to file a key-grant request), and
+  // outside that it never had an answer worth reading.
   const { data: myWrappedKeyData, refetch: refetchMyWrappedKey } = useReadContract({
     address: CONTRACT_ADDRESS,
     chainId,
     abi: HupCommunityABI,
     functionName: 'wrappedKeys',
     args: [id, activeAccountAddress, BigInt(keyVersion || 0)],
-    query: { enabled: isEncryptionInitialized && !!activeAccountAddress },
+    query: { enabled: isEncryptionInitialized && hasAuthoritativeKeyVersion && !!activeAccountAddress && isMember },
   })
 
   // Contract modification hook for updating space metadata
@@ -622,15 +731,18 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   }, [isInviteConfirmed])
 
   // The viewer's own outstanding invite (if any) + their accept/decline response. Reverts on
-  // pre-invite deployments — wagmi surfaces that as undefined, i.e. "no invite".
-  const { data: myInviteData, refetch: refetchMyInvite } = useReadContract({
+  // pre-invite deployments — wagmi surfaces that as undefined, i.e. "no invite". cidex indexes
+  // the same flag from MemberInvited/InviteRevoked (and clears it on accept, which emits
+  // neither), so a seeded card shows the banner without a read of its own.
+  const { data: myInviteDataLive, refetch: refetchMyInvite } = useReadContract({
     address: CONTRACT_ADDRESS,
     chainId,
     abi: HupCommunityABI,
     functionName: 'invites',
     args: [id, activeAccountAddress],
-    query: { enabled: !!activeAccountAddress },
+    query: { enabled: liveReads && !!activeAccountAddress },
   })
+  const hasInvite = liveReads ? Boolean(myInviteDataLive) : Boolean(activeAccountAddress && viewer?.is_invited)
 
   const { mutate: respondInvite, data: inviteRespHash, isPending: isInviteRespPending, error: inviteRespError } = useWriteContract()
   const { isSuccess: isInviteRespConfirmed } = useWaitForTransactionReceipt({ hash: inviteRespHash })
@@ -738,11 +850,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   const isRequestApproval = admission === ADMISSION.RequestApproval
 
+  // The moderator queue itself. In the grid the viewer's own standing already arrives on the row
+  // (community_members.is_pending, which is what this endpoint reads too), so fetching the whole
+  // queue per card would be one request per community for information the page already has.
   useEffect(() => {
-    if (isRequestApproval) {
+    if (isRequestApproval && liveReads) {
       refetchPendingRequests()
     }
-  }, [isRequestApproval, chainId, id])
+  }, [isRequestApproval, liveReads, chainId, id])
 
   // Lazy key delivery, member side: a member with no envelope for the current key version (e.g.
   // they were offline during a rotation) files a 'grant' request so moderators can batch-deliver.
@@ -776,9 +891,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   }, [isEncryptionInitialized, isMember, activeAccountAddress, myWrappedKeyData, keyVersion, chainId, id])
 
   const myPendingRequest = pendingRequests.find((r) => r.wallet_address?.toLowerCase() === activeAccountAddress?.toLowerCase())
-  // Onchain isPending is authoritative; the offchain record only exists to make the request
-  // discoverable to moderators. Either one pending is enough to offer the requester a cancel.
-  const hasPendingRequest = Boolean(myStatusData?.[1]) || Boolean(myPendingRequest)
+  // Onchain isPending is authoritative; the indexed copy is the same flag cidex re-read from
+  // registry(), and the queue endpoint reads it too. Any of them pending is enough to offer the
+  // requester a cancel.
+  const hasPendingRequest = Boolean(myStatusData ? myStatusData[1] : viewer?.is_pending) || Boolean(myPendingRequest)
 
   // Pay to Join is also self-service, but pays first: native coin goes
   // straight into join()'s value; a token price needs an authorization step the contract can pull
@@ -786,12 +902,29 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // approve(spender, amount) otherwise. These are not the same call: LSP7 has no transferFrom, so
   // using the wrong one here would leave join() unable to actually collect payment.
   const handlePayToJoin = async () => {
-    if (!activeAccountAddress || !paymentRequirementData) return
-    const [token, price, isLsp7] = paymentRequirementData
-    const isNative = !token || token === '0x0000000000000000000000000000000000000000'
+    if (!activeAccountAddress || !chainId) return
 
     setIsPayingToJoin(true)
+    setHasInteracted(true)
     try {
+      // The price is read from the contract here, never from the indexed row the card renders.
+      // It decides how much this wallet approves, how much value the transaction carries, and
+      // the _maxPrice ceiling below — an indexed copy one block behind could put all three on a
+      // stale number, and being off by a block is not something to be off by when spending money.
+      const livePayment = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: HupCommunityABI,
+        functionName: 'paymentRequirements',
+        args: [id],
+      })
+      const [token, price, isLsp7] = livePayment
+      const isNative = !token || token === ZERO_ADDRESS
+      if (!price || price === 0n) {
+        alert("This community's join price isn't set — the creator needs to set one before anyone can pay to join.")
+        setIsPayingToJoin(false)
+        return
+      }
+
       // The stored flag picks both this approval and the transfer join() pulls with. If it
       // disagrees with what the token itself reports, the wrong selector is about to be sent to
       // a contract that has no such function — the wallet's gas estimate reverts before anything
@@ -875,6 +1008,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // post with a community. Without joining first, a post would publish untagged.
   const handleJoin = () => {
     if (!activeAccountAddress || !chainId) return
+    setHasInteracted(true)
     joinCommunity({
       address: CONTRACT_ADDRESS,
       chainId,
@@ -893,6 +1027,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // isPending was never set reverts with NoPendingRequest.
   const handleRequestAccess = () => {
     if (!activeAccountAddress || !chainId) return
+    setHasInteracted(true)
 
     joinCommunity({
       address: CONTRACT_ADDRESS,
@@ -923,6 +1058,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // built from, so there is no second record left to drift out of step with it.
   const handleCancelRequest = () => {
     if (!activeAccountAddress || !chainId) return
+    setHasInteracted(true)
 
     cancelRequestWrite({
       address: CONTRACT_ADDRESS,
@@ -1422,9 +1558,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   }, [hideHeader, communityPosts.length])
 
   // Community metadata is stored on-chain as an IPFS CID only (matching how posts store just a
-  // CID), not raw JSON — resolve it client-side since this reads communities() live from chain
-  // rather than through cidex's already-resolved DB copy. Declared before the early-return below
-  // so this hook always runs unconditionally like the others.
+  // CID), not raw JSON. Only the cards that read communities() themselves need to resolve it —
+  // cidex already fetched the same document and stores it on the row, so re-fetching it per card
+  // was a gateway round trip for a copy the page had in hand. Declared before the early-return
+  // below so this hook always runs unconditionally like the others.
   useEffect(() => {
     if (!data) return
     let cancelled = false
@@ -1437,9 +1574,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         if (result && result.result !== false) resolved = result
       }
       if (cancelled) return
-      // The gateway answer is the freshest copy, so it always wins; when it fails, a card seeded
-      // from the directory keeps what it has rather than degrading to the placeholder.
-      setMetadata((current) => resolved ?? current ?? { name: `Space #${id}`, summary: 'Invalid metadata payload structure' })
+      // The gateway answer is the freshest copy, so it always wins. A failed re-resolve keeps the
+      // last one that worked; with nothing at all, the derivation above falls through to the
+      // indexed row, and only then to the placeholder.
+      setGatewayMetadata((current) => ({ value: resolved ?? current?.value ?? null }))
     }
     resolve()
 
@@ -1448,7 +1586,11 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     }
   }, [data, id])
 
-  if (isLoading || !data || !metadata) {
+  // A seeded card is never in a loading state, on either surface: it has the row, and the row has
+  // everything it renders. The detail page still reads the chain, but it does so behind an
+  // already-painted card — every derived value above prefers the live answer once it lands.
+  // Only a card given neither a row nor a chain answer has nothing to show yet.
+  if (!metadata || (!data && !row)) {
     return (
       <div className={clsx(styles.card, styles.cardSkeleton)} aria-busy="true" aria-label={`Loading space #${id}`}>
         <div className={styles.cardSkeleton__cover} />
@@ -1472,36 +1614,71 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const admissionLabel = ADMISSION_OPTIONS[admission]?.tag || ADMISSION_OPTIONS[admission]?.label || '—'
   const typeLabels = ['Discussion', 'Broadcast']
 
-  // Every amount in the editor is a whole-unit string, so seeding means scaling the raw onchain
-  // integers back by their asset's decimals. The reads are near-always cache hits (the card's own
-  // tags resolved the same assets); when one genuinely fails the editor stays shut rather than
-  // opening with a number that would be written back wrong.
+  // The editor seeds from the contract, never from the indexed row. Everything this form touches
+  // is written straight back onchain, and setRequirements replaces the whole array — seeding from
+  // an index that is one block behind would let a save silently revert a change someone else just
+  // made. The reads are cheap here because they happen once, on opening the dialog, rather than
+  // once per card on a directory page.
+  //
+  // Every amount in the editor is a whole-unit string too, so seeding also means scaling the raw
+  // onchain integers back by their asset's decimals. When any of it fails the editor stays shut
+  // rather than opening with values that would be written back wrong.
   const handleStartEditing = async () => {
+    setHasInteracted(true)
     let seededRequirements
     let seededPaymentPrice
+    let seededMode
+    let seededPaymentToken
+    let seededPaymentIsLsp7
+    let seededPayoutDestination
     try {
+      const readGating = (functionName) =>
+        publicClient.readContract({ address: CONTRACT_ADDRESS, abi: HupCommunityABI, functionName, args: [id] })
+
+      const [liveRequirements, liveMode, livePayment, livePayout] = await Promise.all([
+        readGating('getRequirements'),
+        readGating('requirementMode'),
+        readGating('paymentRequirements'),
+        // Reverts on pre-payout deployments, which simply means fees go to the creator
+        readGating('payoutDestination').catch(() => null),
+      ])
+
       seededRequirements = await Promise.all(
-        requirementsList.map(async (row) => {
-          const rType = Number(row.rType)
-          const raw = row.minBalance ?? 0n
+        (liveRequirements ?? []).map(async (requirement) => {
+          const rType = Number(requirement.rType)
+          const raw = requirement.minBalance ?? 0n
           return {
             // NativeBalance opens as a blank-asset "Token or coin balance" row — the form has one
             // choice for both, and toOnchainRequirement maps it back on save
             rType: toUiRequirementType(rType),
-            asset: row.asset === ZERO_ADDRESS ? '' : row.asset,
+            asset: requirement.asset === ZERO_ADDRESS ? '' : requirement.asset,
             minBalance:
               rType === REQUIREMENT_TYPE.NativeBalance || rType === REQUIREMENT_TYPE.TokenBalance
-                ? toAmountInput(raw, await fetchTokenDecimals(publicClient, chainId, row.asset))
+                ? toAmountInput(raw, await fetchTokenDecimals(publicClient, chainId, requirement.asset))
                 : raw.toString(),
           }
         })
       )
-      seededPaymentPrice = hasValidPaymentRequirement
-        ? toAmountInput(savedPaymentPrice, await fetchTokenDecimals(publicClient, chainId, savedPaymentToken))
-        : ''
+      seededMode = Number(liveMode ?? 0)
+      editSeedRef.current = {
+        requirements: (liveRequirements ?? []).map((requirement) => [
+          Number(requirement.rType),
+          String(requirement.asset).toLowerCase(),
+          requirement.minBalance?.toString(),
+        ]),
+        mode: seededMode,
+      }
+
+      const liveToken = livePayment?.[0] ?? null
+      const livePrice = livePayment?.[1]?.toString() ?? null
+      seededPaymentToken = isNativeAsset(liveToken) ? '' : liveToken
+      seededPaymentIsLsp7 = Boolean(livePayment?.[2])
+      seededPaymentPrice =
+        livePrice && livePrice !== '0' ? toAmountInput(livePrice, await fetchTokenDecimals(publicClient, chainId, liveToken)) : ''
+      seededPayoutDestination = livePayout && livePayout !== ZERO_ADDRESS ? livePayout : null
     } catch (err) {
-      console.error('Failed to read the decimals of this community’s gating assets:', err)
-      alert('Could not load this community’s token settings right now. Please try again in a moment.')
+      console.error('Failed to read this community’s current settings from the contract:', err)
+      alert('Could not load this community’s settings right now. Please try again in a moment.')
       return
     }
 
@@ -1521,12 +1698,14 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     setEditAdmission(admission)
     setEditCommunityType(cType)
     setEditRequirements(seededRequirements)
-    setEditRequirementMode(Number(requirementModeData ?? 0))
-    setPaymentTokenAddress(isPaymentNative ? '' : savedPaymentToken)
+    setEditRequirementMode(seededMode)
+    setPaymentTokenAddress(seededPaymentToken)
     setPaymentPrice(seededPaymentPrice)
-    setPaymentIsLsp7(savedPaymentIsLsp7)
+    setPaymentIsLsp7(seededPaymentIsLsp7)
     setEditPayoutDestination(
-      payoutDestination ? { input: payoutDestination, address: payoutDestination, profile: null } : EMPTY_RECIPIENT
+      seededPayoutDestination
+        ? { input: seededPayoutDestination, address: seededPayoutDestination, profile: null }
+        : EMPTY_RECIPIENT
     )
     setIsEditing(true)
     setIsPosting(false)
@@ -1628,11 +1807,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
     // Replace the whole requirement list (creator-only setter) whenever the editor differs
     // from what's onchain — one tx swaps the entire configuration atomically
-    const onchainKey = JSON.stringify(
-      requirementsList.map((r) => [Number(r.rType), r.asset.toLowerCase(), r.minBalance?.toString()])
-    )
+    const onchainKey = JSON.stringify(editSeedRef.current.requirements)
     const editedKey = JSON.stringify(editedTuples.map((r) => [r.rType, r.asset.toLowerCase(), r.minBalance.toString()]))
-    const modeChanged = editRequirements.length > 1 && Number(requirementModeData ?? 0) !== editRequirementMode
+    const modeChanged = editRequirements.length > 1 && editSeedRef.current.mode !== editRequirementMode
     if (onchainKey !== editedKey || modeChanged) {
       updateRequirementsWrite({
         address: CONTRACT_ADDRESS,
@@ -1764,6 +1941,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // branches on self-leave: a departing member can't rotate the key (moderator-only), so their
   // browser files a pending-rotation request for moderators instead of attempting the doomed tx.
   const handleLeave = () => {
+    setHasInteracted(true)
     setBanningAddress(activeAccountAddress)
     banMember({
       address: CONTRACT_ADDRESS,
@@ -1946,6 +2124,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   }
 
   const handleToggleStatus = () => {
+    setHasInteracted(true)
     setStatusContract({
       address: CONTRACT_ADDRESS,
       chainId,
@@ -1963,13 +2142,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       <button
         type="button"
         className={styles.card__postTriggerBtn}
-        disabled={!isActive || (cType === 1 && !isModerator) || myCanPostLive === false}
+        disabled={!isActive || (cType === 1 && !isModerator) || canPost === false}
         title={
           !isActive
             ? 'This space is archived — reactivate it to post'
             : cType === 1 && !isModerator
               ? 'This is a Broadcast channel — only the creator/moderators can post'
-              : myCanPostLive === false
+              : canPost === false
                 ? 'Join this space to post'
                 : undefined
         }
@@ -2042,6 +2221,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           aria-label="Members & moderation"
           title="Members & moderation"
           onClick={() => {
+            setHasInteracted(true)
             refetchMembers()
             setIsManagingMembers(true)
             setIsEditing(false)
@@ -2073,13 +2253,23 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     <>
       {requirementsList.length > 1 && (
         <span className={styles.card__tag} title="How the requirements below combine">
-          {Number(requirementModeData ?? 0) === 1 ? 'ANY of' : 'ALL of'}
+          {requirementMode === 1 ? 'ANY of' : 'ALL of'}
         </span>
       )}
       {requirementsList.map((req, index) => {
         const rType = Number(req.rType)
         if (rType === REQUIREMENT_TYPE.NftBalance)
-          return <NftTag key={index} tokenAddress={req.asset} chainId={chainId} minBalance={req.minBalance?.toString()} />
+          return (
+            <NftTag
+              key={index}
+              tokenAddress={req.asset}
+              chainId={chainId}
+              minBalance={req.minBalance?.toString()}
+              // Only the indexed shape carries these; a live-read requirement leaves them
+              // undefined and the chip resolves the asset itself, exactly as before
+              resolvedName={req.assetName}
+            />
+          )
         if (rType === REQUIREMENT_TYPE.TokenBalance)
           return (
             <TokenRequirementTag
@@ -2088,6 +2278,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               chainId={chainId}
               minBalance={req.minBalance}
               className={styles.card__tag}
+              resolvedMeta={req.assetDecimals === undefined ? null : { symbol: req.assetSymbol, decimals: req.assetDecimals }}
             />
           )
         if (rType === REQUIREMENT_TYPE.NativeBalance)
@@ -2288,7 +2479,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
           {/* Two-step invite, invitee side: a moderator invited this wallet, but membership is a
               public onchain signal — it only happens if the viewer accepts here themselves */}
-          {Boolean(myInviteData) && !isMember && (
+          {hasInvite && !isMember && (
             <div className={clsx(styles.card__gatingRequirementSection, 'alert alert--info')} style={{ marginTop: '1rem' }}>
               <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>You're invited to this community</h5>
               <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem' }}>
@@ -2300,7 +2491,8 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   className={styles.card__submit}
                   style={{ width: 'auto', padding: '0.5rem 1.1rem' }}
                   disabled={isInviteRespPending}
-                  onClick={() =>
+                  onClick={() => {
+                    setHasInteracted(true)
                     respondInvite({
                       address: CONTRACT_ADDRESS,
                       chainId,
@@ -2308,7 +2500,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                       functionName: 'acceptInvite',
                       args: [id],
                     })
-                  }
+                  }}
                 >
                   {isInviteRespPending ? 'Confirm Wallet...' : 'Accept & Join'}
                 </button>
@@ -2316,7 +2508,8 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   type="button"
                   className={styles.card__cancelBtn}
                   disabled={isInviteRespPending}
-                  onClick={() =>
+                  onClick={() => {
+                    setHasInteracted(true)
                     respondInvite({
                       address: CONTRACT_ADDRESS,
                       chainId,
@@ -2324,7 +2517,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                       functionName: 'declineInvite',
                       args: [id],
                     })
-                  }
+                  }}
                 >
                   Decline
                 </button>
@@ -3372,7 +3565,7 @@ export default function CommunitiesPage() {
                     id={Number(row.id)}
                     networkId={Number(row.network_id)}
                     memberCount={Number(row.member_count ?? 0)}
-                    initialMetadata={metadataFromRow(row)}
+                    row={row}
                   />
                 ))
               )}

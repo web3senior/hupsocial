@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAccount } from 'wagmi'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeftIcon, CalendarBlankIcon, UserIcon, UsersIcon } from '@phosphor-icons/react'
@@ -22,20 +23,26 @@ const typeLabels = ['Discussion', 'Broadcast']
 
 export default function CommunityDetails({ networkId, communityId, initialName }) {
   const params = useParams()
+  const { address: activeAccountAddress } = useAccount()
   const { categories } = useCommunityCategories()
   const resolvedNetworkId = networkId || params.networkId
   const resolvedCommunityId = communityId || params.communityId
 
   const [community, setCommunity] = useState(null)
 
+  // viewer_address brings back this wallet's own membership standing on the row, which is what
+  // lets the card below paint its action buttons before the contract answers
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/v1/networks/communities/${resolvedCommunityId}?network_id=${resolvedNetworkId}`)
+    const query = new URLSearchParams({ network_id: resolvedNetworkId })
+    if (activeAccountAddress) query.set('viewer_address', activeAccountAddress)
+
+    fetch(`/api/v1/networks/communities/${resolvedCommunityId}?${query.toString()}`)
       .then((r) => r.json())
       .then((body) => { if (!cancelled && body?.data) setCommunity(body.data) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [resolvedNetworkId, resolvedCommunityId])
+  }, [resolvedNetworkId, resolvedCommunityId, activeAccountAddress])
 
   const name = community?.name || initialName || `Community #${resolvedCommunityId}`
 
@@ -143,7 +150,7 @@ export default function CommunityDetails({ networkId, communityId, initialName }
           </div>
         )}
 
-        <CommunityCard id={Number(resolvedCommunityId)} networkId={Number(resolvedNetworkId)} hideHeader />
+        <CommunityCard id={Number(resolvedCommunityId)} networkId={Number(resolvedNetworkId)} hideHeader row={community} />
       </div>
     </div>
   )

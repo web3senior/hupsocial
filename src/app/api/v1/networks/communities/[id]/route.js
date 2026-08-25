@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { attachCommunityExtras } from '@/lib/communityRows'
 import { currentCommunityContract } from '@/lib/communityJoin'
 
 export const runtime = 'nodejs'
@@ -18,6 +19,7 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url)
     const networkId = searchParams.get('network_id')
     const contractAddress = searchParams.get('contract_address')
+    const viewerAddress = searchParams.get('viewer_address')
 
     if (!networkId) {
       return NextResponse.json({ error: 'network_id is required' }, { status: 400 })
@@ -50,6 +52,10 @@ export async function GET(request, { params }) {
     if (rows.length === 0) {
       return NextResponse.json({ success: false, error: 'Community not found' }, { status: 404 })
     }
+
+    // Same shape the directory returns, so the detail page can seed its CommunityCard from this
+    // row instead of letting the card resolve the whole gating surface onchain again
+    await attachCommunityExtras(rows, viewerAddress)
 
     return NextResponse.json({ success: true, data: rows[0] })
   } catch (error) {

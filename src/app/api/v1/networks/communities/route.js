@@ -4,10 +4,15 @@
  * CommunityCreated/CommunityUpdated events. On-chain HupCommunity.communities(id) stays the
  * source of truth for gating and gets read directly wherever that matters; this route exists so
  * the directory doesn't need to iterate every community id client-side just to support search.
+ *
+ * It also carries everything the cards render — join gating, requirement chips, and the viewer's
+ * own membership standing — so a page of twenty communities costs three queries here instead of
+ * several hundred eth_calls spread across every deployed chain in the browser.
  */
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { attachCommunityExtras } from '@/lib/communityRows'
 import { DEFAULT_COMMUNITY_CATEGORY, isCategorySlugShaped } from '@/config/communityCategories'
 
 export const runtime = 'nodejs'
@@ -91,7 +96,9 @@ export async function GET(request) {
       whereParams.push(category)
     }
     if (creatorAddress) {
-      whereClause += ` AND c.creator_address = ?`
+      // LOWER() on both sides: cidex writes checksummed addresses into an ascii_bin column, so a
+      // lowercased address compared directly against it matches nothing
+      whereClause += ` AND LOWER(c.creator_address) = ?`
       whereParams.push(creatorAddress.toLowerCase())
     } else {
       // The public directory hides archived communities; a creator looking up their own
@@ -110,21 +117,37 @@ export async function GET(request) {
     // rest of the directory out — viewer_address only affects ordering, unlike creator_address.
     // Ids are only monotonic within one contract, so the cross-network mode sorts by indexed
     // creation time instead.
-    const baseOrder = contractPairs.length > 0 ? `c.created_at DESC, c.id DESC` : `c.id DESC`
-    const orderClause = viewerAddress ? `ORDER BY (c.creator_address = ?) DESC, ${baseOrder}` : `ORDER BY ${baseOrder}`
+    const orderBy = (alias) => {
+      const baseOrder = contractPairs.length > 0 ? `${alias}.created_at DESC, ${alias}.id DESC` : `${alias}.id DESC`
+      return viewerAddress ? `ORDER BY (LOWER(${alias}.creator_address) = ?) DESC, ${baseOrder}` : `ORDER BY ${baseOrder}`
+    }
     const orderParams = viewerAddress ? [viewerAddress.toLowerCase()] : []
 
+    // The member count is counted over the page, not the whole filtered set: MariaDB evaluates a
+    // select-list subquery for every row the WHERE matches, before LIMIT ever applies, so leaving
+    // it in the outer select made the directory pay for a COUNT per community on the chain rather
+    // than per community on screen. Ordering is repeated outside the derived table — a derived
+    // table's row order isn't something the optimizer promises to carry through.
     const [rows] = await pool.execute(
       `SELECT
-        c.*,
-        (SELECT COUNT(*) FROM community_members m WHERE m.network_id = c.network_id AND m.contract_address = c.contract_address AND m.community_id = c.id AND m.is_member = 1 AND m.is_banned = 0) as member_count
-      FROM communities c${whereClause}
-      ${orderClause} LIMIT ? OFFSET ?`,
-      [...whereParams, ...orderParams, limit + 1, offset],
+        page.*,
+        (SELECT COUNT(*) FROM community_members m
+          WHERE m.network_id = page.network_id AND m.contract_address = page.contract_address
+            AND m.community_id = page.id AND m.is_member = 1 AND m.is_banned = 0) as member_count
+      FROM (
+        SELECT c.* FROM communities c${whereClause}
+        ${orderBy('c')} LIMIT ? OFFSET ?
+      ) AS page
+      ${orderBy('page')}`,
+      [...whereParams, ...orderParams, limit + 1, offset, ...orderParams],
     )
 
     const hasMore = rows.length > limit
     const communitiesToSend = hasMore ? rows.slice(0, limit) : rows
+
+    // Requirement chips and the viewer's own membership standing — the last two things a card
+    // used to resolve onchain for itself, one round trip per card
+    await attachCommunityExtras(communitiesToSend, viewerAddress)
 
     return NextResponse.json({
       success: true,
