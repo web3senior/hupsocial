@@ -103,7 +103,24 @@ export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
   return `/api/ipfs/file?${params.toString()}`
 }
 
+/* What the LUKSO indexer hands back as a profile image `src` — and so what
+   fulfillUniversalProfiles writes to users.profileImage. Every UP row carries this shape; the
+   `ipfs://` twin lives on the indexer's `url` field, which we don't store. Matching it is how a
+   stored reference gets back to a bare CID. */
 const UP_CLOUD_IMAGE_PREFIX = 'https://api.universalprofile.cloud/image/'
+
+/**
+ * Pulls the bare IPFS CID out of the reference shapes we store — an `ipfs://` URI, or a LUKSO
+ * `/image/` CDN URL, whose `?method=…&data=…` verification params are no part of the CID.
+ * @param {string} src - The stored image reference.
+ * @returns {string|null} The CID (with any subpath), or null when the shape carries none.
+ */
+export const extractIPFSCid = (src) => {
+  if (!src || typeof src !== 'string') return null
+  if (isIPFSHash(src)) return src.replace(/^ipfs:\/\//, '') || null
+  if (src.startsWith(UP_CLOUD_IMAGE_PREFIX)) return src.slice(UP_CLOUD_IMAGE_PREFIX.length).split('?')[0] || null
+  return null
+}
 
 /**
  * Checks if a given string matches your custom protocol.
@@ -199,16 +216,33 @@ export const resolveStorageImageUrl = (src, options = {}) => {
     return params.length ? `${base}&${params.join('&')}` : base
   }
 
-  /* LUKSO's UP-cloud image CDN ignores ?width= — it serves the full original either way,
-     so a 26px avatar can pull megabytes (animated GIF profile pictures are the worst case)
-     and often hasn't decoded by the time the surface is on screen. The path after /image/
-     is the IPFS CID, optionally with a subpath, and NEXT_PUBLIC_IPFS_GATEWAY_URL is that
-     same host — so hand it to the sharp proxy, which does honour a width. */
-  if (src.startsWith(UP_CLOUD_IMAGE_PREFIX) && options.width) {
-    const cid = src.slice(UP_CLOUD_IMAGE_PREFIX.length).split('?')[0]
+  /* LUKSO's UP-cloud image CDN won't resize: ?width= comes back 404, and the bare path serves
+     the full original — so a 26px avatar can pull megabytes (animated GIF profile pictures are
+     the worst case) and often hasn't decoded by the time the surface is on screen. The path
+     after /image/ is the IPFS CID, and NEXT_PUBLIC_IPFS_GATEWAY_URL is that same host's /ipfs/
+     route — so hand the CID to the sharp proxy, which does honour a width. */
+  if (options.width) {
+    const cid = extractIPFSCid(src)
     if (cid) return resolveIPFSImageUrl(cid, options)
   }
 
   /* Everything else (custom protocol, http, asset paths) resolves as before */
+  return resolveStorageUrl(src)
+}
+
+/**
+ * Resolves an image reference straight to the configured IPFS gateway, bypassing the sharp
+ * proxy. This is the fallback for when the proxy's raced gateways don't hold a CID that the
+ * gateway itself does — prefer resolveStorageImageUrl, which resizes; this returns the original
+ * at full size. Built from the CID rather than reusing a stored CDN URL: the LUKSO `/image/`
+ * route serves a re-encoded file about twice the size once its `?method=…&data=…` params are
+ * missing, and the gateway host is ours to configure.
+ * @param {string} src - The raw input string (IPFS CID, `ipfs://` URI, UP-cloud URL, or HTTP URL).
+ * @returns {string|null} A direct gateway URL, or the plainly-resolved URL for non-IPFS shapes.
+ */
+export const resolveStorageGatewayUrl = (src) => {
+  const cid = extractIPFSCid(src)
+  if (cid) return `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${cid}`
+
   return resolveStorageUrl(src)
 }

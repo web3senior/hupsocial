@@ -9,7 +9,7 @@ import { CONTRACTS, appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { formatVotes, pollOptions, pollStatus, toRelative } from '@/lib/polls'
 import { shortTxError, handleBrokenAvatar, FALLBACK_AVATAR_SRC } from '@/lib/utils'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { resolveStorageImageUrl, resolveStorageGatewayUrl } from '@/lib/storageHelper'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import PollCard from '@/components/PollCard'
@@ -29,28 +29,29 @@ const shortWallet = (wallet) => (wallet ? `${wallet.slice(0, 6)}…${wallet.slic
  * every UP avatar on the default.
  *
  * Resolving through the sharp proxy keeps a 64px slot from pulling a full-size original, but the
- * proxy's raced gateways don't hold every CID and LUKSO's CDN serves some that they miss. So a
- * proxy miss retries the address's own URL before giving up on the default.
+ * proxy's raced gateways don't hold every CID that the configured gateway does. So a proxy miss
+ * retries the gateway directly — full size, but a real picture beats the default — before giving
+ * up on the default.
  * @param {Object} props
  * @param {string|null} props.src Raw profile image reference from the API.
  * @param {number} props.size Rendered width, in px, handed to the resize proxy.
  * @param {string} props.className Avatar class from the consumer's module.
  */
 function PollAvatar({ src, size, className }) {
-  const origin = typeof src === 'string' && src.startsWith('http') ? src : null
   const proxied = resolveStorageImageUrl(src, { width: size })
+  const gateway = resolveStorageGatewayUrl(src)
 
   const retryThenFallback = (event) => {
     const img = event.currentTarget
-    if (origin && !img.dataset.retriedOrigin && img.src !== origin) {
-      img.dataset.retriedOrigin = 'true'
-      img.src = origin
+    if (gateway && !img.dataset.retriedGateway && img.src !== gateway) {
+      img.dataset.retriedGateway = 'true'
+      img.src = gateway
       return
     }
     handleBrokenAvatar(event)
   }
 
-  return <img src={proxied || origin || FALLBACK_AVATAR_SRC} alt="" onError={retryThenFallback} className={className} />
+  return <img src={proxied || gateway || FALLBACK_AVATAR_SRC} alt="" onError={retryThenFallback} className={className} />
 }
 
 // A plain link rather than history.back(): a shared poll URL is usually the first page of the
