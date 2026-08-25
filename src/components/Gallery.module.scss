@@ -51,9 +51,19 @@
   /* A <video> paints nothing of its own until its poster has arrived, and nothing at all when
      it has none — so without a surface behind it the box showed the card background, white in
      light mode. The muted token reads as "a video goes here" from the first frame of the page. */
-  &[data-video] {
+  &[data-video]:not([data-fullscreen]) {
     overflow: hidden;
     background-color: var(--surface-muted);
+  }
+
+  /* In the lightbox this is nothing but a wrapper around the media: the slide is already the
+     surface. Sized like an inline card it filled the whole slide, so the muted token painted a
+     white panel behind the video — and its overflow clipped the 90vh player on short viewports. */
+  &[data-fullscreen] {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
   }
 
   /* Only while a still is expected and still travelling; a video with no still to wait for is
@@ -353,6 +363,12 @@
   max-height: 90vh;
   object-fit: contain;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Its own backdrop: the native controls carry a fullscreen button of their own, and there the
+   video element is the whole screen — anything the picture does not cover is this colour. */
+.fullscreenVideo {
+  background-color: #000;
 }
 
 .fullscreenImage {

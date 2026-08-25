@@ -399,6 +399,7 @@ export default function MediaGallery({ data = [] }) {
       <div
         className={styles.mediaContainer}
         data-video={isVideo ? '' : undefined}
+        data-fullscreen={isFullscreen ? '' : undefined}
         data-loading={isAwaitingStill ? '' : undefined}
       >
         {isVideo ? (
