@@ -16,6 +16,7 @@ import tradeAbi from '@/abis/HupTrade.json'
 import offersAbi from '@/abis/HupOffers.json'
 import tipperAbi from '@/abis/HupTipper.json'
 import communityAbi from '@/abis/HupCommunity.json'
+import pollsAbi from '@/abis/HupPolls.json'
 import dropsAbi from '@/abis/HupDrops.json'
 import { dropStandardLabel, dropStandardsFor } from '@/lib/drops'
 import { TIP_TOKENS } from '@/lib/tokens'
@@ -125,9 +126,31 @@ const SECTIONS = [
   { id: 'tipper', label: 'Tipper', icon: '💸', contractKey: 'tipper' },
   { id: 'drops', label: 'Drops', icon: '🎨', contractKey: 'drops' },
   { id: 'community', label: 'Community', icon: '👥', contractKey: 'community' },
+  { id: 'polls', label: 'Polls', icon: '📊', contractKey: 'polls' },
 ]
 
 const DEFAULT_SECTION = SECTIONS[0].id
+
+// Contracts that read an LSP26 follower registry the admin wires in after deployment. One
+// panel serves them all: the registry is never a constructor argument, so every fresh
+// deployment starts unset, and until it is set every FollowsCreator requirement on that
+// contract fails closed — `consequence` is what that looks like to users.
+const FOLLOWER_SYSTEM_TARGETS = {
+  community: {
+    key: 'community',
+    label: 'HupCommunity',
+    abi: communityAbi,
+    consequence: 'silently rejecting joins and blocking posts in follower-gated communities',
+  },
+  polls: {
+    key: 'polls',
+    label: 'HupPolls',
+    abi: pollsAbi,
+    consequence: 'refusing every ballot on a follower-only poll (the composer hides that gate until this is set)',
+  },
+}
+
+const followerSystemKey = (target, chain) => `${target.key}:${chain.id}`
 
 // A chain belongs in a tab only when it actually has that contract deployed — an empty string
 // in CONTRACTS means "not on this chain", and a card for it is a form that can only revert.
@@ -192,7 +215,8 @@ export default function Page() {
   const [erc677Checks, setErc677Checks] = useState({})
   const [erc677TxStates, setErc677TxStates] = useState({})
   const [contractBalances, setContractBalances] = useState({})
-  const [communityFollowerSystems, setCommunityFollowerSystems] = useState({})
+  // Keyed by followerSystemKey(target, chain) — one panel serves every FOLLOWER_SYSTEM_TARGETS entry
+  const [followerSystems, setFollowerSystems] = useState({})
   const [followerSystemInputs, setFollowerSystemInputs] = useState({})
   const [followerSystemTxStates, setFollowerSystemTxStates] = useState({})
   const [dropsConfigs, setDropsConfigs] = useState({})
@@ -1172,78 +1196,227 @@ export default function Page() {
     }
   }
 
-  // Read the LSP26 follower registry a chain's HupCommunity is currently wired to. It is not a
+  // Read the LSP26 follower registry a chain's contract is currently wired to. It is never a
   // constructor arg, so every fresh deployment starts at address(0).
-  const loadCommunityFollowerSystem = async (chain, communityAddress) => {
-    setCommunityFollowerSystems((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+  const loadFollowerSystem = async (chain, target) => {
+    const stateKey = followerSystemKey(target, chain)
+    setFollowerSystems((prev) => ({ ...prev, [stateKey]: { loading: true } }))
 
     try {
       const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
       const followerSystem = await client.readContract({
-        address: communityAddress,
-        abi: communityAbi,
+        address: CONTRACTS[`chain${chain.id}`][target.key],
+        abi: target.abi,
         functionName: 'followerSystem',
       })
 
-      setCommunityFollowerSystems((prev) => ({ ...prev, [chain.id]: { loading: false, followerSystem } }))
+      setFollowerSystems((prev) => ({ ...prev, [stateKey]: { loading: false, followerSystem } }))
     } catch (err) {
-      console.error(`Community follower system read error for chain ${chain.id}:`, err)
-      setCommunityFollowerSystems((prev) => ({
+      console.error(`${target.label} follower system read error for chain ${chain.id}:`, err)
+      setFollowerSystems((prev) => ({
         ...prev,
-        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read follower system' },
+        [stateKey]: { loading: false, error: err.shortMessage || err.message || 'Failed to read follower system' },
       }))
     }
   }
 
-  // Load the live wiring per chain, and seed each input with that chain's configured registry so
-  // the ordinary case (point a fresh deployment at the known LSP26 address) is one click
+  // Load the live wiring per chain and contract, and seed each input with that chain's
+  // configured registry so the ordinary case (point a fresh deployment at the known LSP26
+  // address) is one click
   useEffect(() => {
     if (!isAdmin) return
 
     const seeds = {}
     config.chains.forEach((chain) => {
       const deployment = CONTRACTS[`chain${chain.id}`]
-      if (!deployment?.community) return
+      Object.values(FOLLOWER_SYSTEM_TARGETS).forEach((target) => {
+        if (!deployment?.[target.key]) return
 
-      loadCommunityFollowerSystem(chain, deployment.community)
-      if (deployment.followerSystem) seeds[chain.id] = deployment.followerSystem
+        loadFollowerSystem(chain, target)
+        if (deployment.followerSystem) seeds[followerSystemKey(target, chain)] = deployment.followerSystem
+      })
     })
 
     setFollowerSystemInputs((prev) => ({ ...seeds, ...prev }))
   }, [isAdmin])
 
-  // Wire the follower registry into a chain's HupCommunity (admin wallet signs). Until this is
-  // set, every FollowsCreator requirement fails closed — follower-gated communities silently
-  // reject joins and block posting with nothing in the UI explaining why.
-  const handleSetFollowerSystem = async (chain, communityAddress) => {
-    const registry = followerSystemInputs[chain.id]?.trim()
+  // Wire the follower registry into a chain's contract (admin wallet signs). Until this is set,
+  // every FollowsCreator requirement on it fails closed — see FOLLOWER_SYSTEM_TARGETS for what
+  // that looks like — with nothing in the UI explaining why.
+  const handleSetFollowerSystem = async (chain, target) => {
+    const stateKey = followerSystemKey(target, chain)
+    const registry = followerSystemInputs[stateKey]?.trim()
     if (!isAddress(registry)) {
-      setFollowerSystemTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid registry address' } }))
+      setFollowerSystemTxStates((prev) => ({ ...prev, [stateKey]: { error: 'Enter a valid registry address' } }))
       return
     }
 
-    setFollowerSystemTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+    setFollowerSystemTxStates((prev) => ({ ...prev, [stateKey]: { loading: true, error: null } }))
 
     try {
       const txHash = await writeContractAsync({
-        address: communityAddress,
-        abi: communityAbi,
+        address: CONTRACTS[`chain${chain.id}`][target.key],
+        abi: target.abi,
         functionName: 'setFollowerSystem',
         args: [registry],
         chainId: chain.id,
       })
 
-      setFollowerSystemTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+      setFollowerSystemTxStates((prev) => ({ ...prev, [stateKey]: { loading: false, success: true, hash: txHash } }))
 
-      setTimeout(() => loadCommunityFollowerSystem(chain, communityAddress), 3000)
+      setTimeout(() => loadFollowerSystem(chain, target), 3000)
     } catch (err) {
-      console.error(`Follower system update error on chain ${chain.id}:`, err)
+      console.error(`${target.label} follower system update error on chain ${chain.id}:`, err)
       setFollowerSystemTxStates((prev) => ({
         ...prev,
-        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+        [stateKey]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
     }
   }
+
+  // The follower-registry panel, one card per chain running `target` — shared by every
+  // FOLLOWER_SYSTEM_TARGETS entry so wiring HupPolls looks exactly like wiring HupCommunity
+  const renderFollowerSystemSection = (target) => (
+    <section className={styles['admin-contracts__section']}>
+      <header className={styles['admin-contracts__header']}>
+        <h2 className={styles['admin-contracts__title']}>{target.label} Follower System</h2>
+        <p className={styles['admin-contracts__subtitle']}>
+          Wire the LSP26 follower registry into {target.label}. It is not a constructor argument, so a fresh deployment starts unset — and
+          while it is unset every FollowsCreator requirement fails closed, {target.consequence}.
+        </p>
+      </header>
+
+      <div className={styles['admin-contracts__grid']}>
+        {visibleChains(target.key).map((chain) => {
+          const deployment = CONTRACTS[`chain${chain.id}`]
+          const contractAddress = deployment[target.key]
+          const stateKey = followerSystemKey(target, chain)
+          const registryDraft = followerSystemInputs[stateKey] ?? ''
+          const state = followerSystems[stateKey]
+          const tx = followerSystemTxStates[stateKey]
+          const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+          const onChain = state?.followerSystem
+          const isUnset = onChain && onChain.toLowerCase() === zeroAddress
+          const matchesConfig = onChain && deployment.followerSystem && onChain.toLowerCase() === deployment.followerSystem.toLowerCase()
+
+          return (
+            <div
+              key={stateKey}
+              className={styles['admin-contracts__card']}
+              style={{
+                '--network-color-primary': chain.primaryColor || '#f97316',
+                '--network-color-text': chain.textColor || '#0d0d0d',
+              }}
+            >
+              <div className={styles['admin-contracts__card-header']}>
+                <div className={styles['admin-contracts__network-info']}>
+                  <div className={styles['admin-contracts__card-icon']}>
+                    <img src={chain.iconUrl} alt="" />
+                  </div>
+                  <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                </div>
+                <span className={styles['admin-contracts__badge']}>{target.label.toUpperCase()}</span>
+              </div>
+
+              <div className={styles['admin-contracts__details']}>
+                <div className={styles['admin-contracts__detail-row']}>
+                  <span className={styles['admin-contracts__detail-label']}>{target.label} Address</span>
+                  <span className={styles['admin-contracts__detail-value']}>
+                    {explorerUrl ? (
+                      <a href={`${explorerUrl}/address/${contractAddress}`} target="_blank" rel="noopener noreferrer">
+                        <code>{contractAddress}</code> ↗
+                      </a>
+                    ) : (
+                      <code>{contractAddress}</code>
+                    )}
+                  </span>
+                </div>
+
+                <div className={styles['admin-contracts__detail-row']}>
+                  <span className={styles['admin-contracts__detail-label']}>On-Chain Follower System</span>
+                  <div className={styles['admin-contracts__detail-value']}>
+                    {(!state || state.loading) && <span>Loading…</span>}
+                    {state?.error && (
+                      <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                        {state.error}
+                      </div>
+                    )}
+                    {isUnset && (
+                      <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                        ⚠️ Unset (address zero) — FollowsCreator gating fails closed on this chain
+                      </div>
+                    )}
+                    {onChain && !isUnset && matchesConfig && (
+                      <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
+                        ✓ Wired to the configured registry <code>{onChain}</code>
+                      </div>
+                    )}
+                    {onChain && !isUnset && !matchesConfig && (
+                      <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                        ⚠️ Set to <code>{onChain}</code>, which is not this chain&apos;s configured registry
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {tx && (
+                  <div className={styles['admin-contracts__detail-row']}>
+                    <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                    <div className={styles['admin-contracts__detail-value']}>
+                      {tx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                      {tx.error && <span style={{ color: '#ef4444' }}>❌ {tx.error}</span>}
+                      {tx.success && <span style={{ color: '#10b981' }}>🚀 Follower system updated.</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <form
+                className={styles['admin-contracts__edit-form']}
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleSetFollowerSystem(chain, target)
+                }}
+              >
+                <div className={styles['admin-contracts__input-group']}>
+                  <label className={styles['admin-contracts__detail-label']}>Follower Registry Address</label>
+                  <input
+                    type="text"
+                    className={styles['admin-contracts__input']}
+                    value={registryDraft}
+                    onChange={(e) => setFollowerSystemInputs((prev) => ({ ...prev, [stateKey]: e.target.value }))}
+                    placeholder="0x..."
+                  />
+                </div>
+
+                <div className={styles['admin-contracts__actions']}>
+                  <button
+                    type="submit"
+                    disabled={!registryDraft.trim() || tx?.loading}
+                    className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                  >
+                    {tx?.loading ? 'Writing...' : 'Set Follower System'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => loadFollowerSystem(chain, target)}
+                    disabled={state?.loading}
+                    className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                  >
+                    {state?.loading ? 'Reading...' : 'Refresh'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )
+        })}
+      </div>
+      {visibleChains(target.key).length === 0 && (
+        <p className={styles['admin-contracts__empty']}>No {target.label} deployments match this filter.</p>
+      )}
+    </section>
+  )
 
   // Read a chain's HupDrops wiring: the deployer satellite per standard the chain actually
   // uses (LSP7/LSP8 on LUKSO, ERC721/1155 elsewhere), the follower registry the Followers
@@ -3780,147 +3953,9 @@ export default function Page() {
             </section>
           )}
 
-          {activeSection === 'community' && (
-            <section className={styles['admin-contracts__section']}>
-              <header className={styles['admin-contracts__header']}>
-                <h2 className={styles['admin-contracts__title']}>HupCommunity Follower System</h2>
-                <p className={styles['admin-contracts__subtitle']}>
-                  Wire the LSP26 follower registry into HupCommunity. It is not a constructor argument, so a fresh deployment starts unset —
-                  and while it is unset every FollowsCreator requirement fails closed, silently rejecting joins and blocking posts in
-                  follower-gated communities.
-                </p>
-              </header>
+          {activeSection === 'community' && renderFollowerSystemSection(FOLLOWER_SYSTEM_TARGETS.community)}
 
-              <div className={styles['admin-contracts__grid']}>
-                {visibleChains('community').map((chain) => {
-                  const deployment = CONTRACTS[`chain${chain.id}`]
-                  const registryDraft = followerSystemInputs[chain.id] ?? ''
-                  const state = communityFollowerSystems[chain.id]
-                  const tx = followerSystemTxStates[chain.id]
-                  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
-                  const onChain = state?.followerSystem
-                  const isUnset = onChain && onChain.toLowerCase() === zeroAddress
-                  const matchesConfig =
-                    onChain && deployment.followerSystem && onChain.toLowerCase() === deployment.followerSystem.toLowerCase()
-
-                  return (
-                    <div
-                      key={`community-${chain.id}`}
-                      className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
-                    >
-                      <div className={styles['admin-contracts__card-header']}>
-                        <div className={styles['admin-contracts__network-info']}>
-                          <div className={styles['admin-contracts__card-icon']}>
-                            <img src={chain.iconUrl} alt="" />
-                          </div>
-                          <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
-                        </div>
-                        <span className={styles['admin-contracts__badge']}>HUPCOMMUNITY</span>
-                      </div>
-
-                      <div className={styles['admin-contracts__details']}>
-                        <div className={styles['admin-contracts__detail-row']}>
-                          <span className={styles['admin-contracts__detail-label']}>Community Address</span>
-                          <span className={styles['admin-contracts__detail-value']}>
-                            {explorerUrl ? (
-                              <a href={`${explorerUrl}/address/${deployment.community}`} target="_blank" rel="noopener noreferrer">
-                                <code>{deployment.community}</code> ↗
-                              </a>
-                            ) : (
-                              <code>{deployment.community}</code>
-                            )}
-                          </span>
-                        </div>
-
-                        <div className={styles['admin-contracts__detail-row']}>
-                          <span className={styles['admin-contracts__detail-label']}>On-Chain Follower System</span>
-                          <div className={styles['admin-contracts__detail-value']}>
-                            {(!state || state.loading) && <span>Loading…</span>}
-                            {state?.error && (
-                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
-                                {state.error}
-                              </div>
-                            )}
-                            {isUnset && (
-                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
-                                ⚠️ Unset (address zero) — FollowsCreator gating fails closed on this chain
-                              </div>
-                            )}
-                            {onChain && !isUnset && matchesConfig && (
-                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
-                                ✓ Wired to the configured registry <code>{onChain}</code>
-                              </div>
-                            )}
-                            {onChain && !isUnset && !matchesConfig && (
-                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
-                                ⚠️ Set to <code>{onChain}</code>, which is not this chain&apos;s configured registry
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {tx && (
-                          <div className={styles['admin-contracts__detail-row']}>
-                            <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
-                            <div className={styles['admin-contracts__detail-value']}>
-                              {tx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
-                              {tx.error && <span style={{ color: '#ef4444' }}>❌ {tx.error}</span>}
-                              {tx.success && <span style={{ color: '#10b981' }}>🚀 Follower system updated.</span>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <form
-                        className={styles['admin-contracts__edit-form']}
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          handleSetFollowerSystem(chain, deployment.community)
-                        }}
-                      >
-                        <div className={styles['admin-contracts__input-group']}>
-                          <label className={styles['admin-contracts__detail-label']}>Follower Registry Address</label>
-                          <input
-                            type="text"
-                            className={styles['admin-contracts__input']}
-                            value={registryDraft}
-                            onChange={(e) => setFollowerSystemInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
-                            placeholder="0x..."
-                          />
-                        </div>
-
-                        <div className={styles['admin-contracts__actions']}>
-                          <button
-                            type="submit"
-                            disabled={!registryDraft.trim() || tx?.loading}
-                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
-                          >
-                            {tx?.loading ? 'Writing...' : 'Set Follower System'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => loadCommunityFollowerSystem(chain, deployment.community)}
-                            disabled={state?.loading}
-                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
-                          >
-                            {state?.loading ? 'Reading...' : 'Refresh'}
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  )
-                })}
-              </div>
-              {visibleChains('community').length === 0 && (
-                <p className={styles['admin-contracts__empty']}>No HupCommunity deployments match this filter.</p>
-              )}
-            </section>
-          )}
+          {activeSection === 'polls' && renderFollowerSystemSection(FOLLOWER_SYSTEM_TARGETS.polls)}
         </div>
       </div>
     </>

@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { parseEventLogs, zeroAddress } from 'viem'
-import { useConnection, usePublicClient, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
@@ -112,6 +112,22 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
   const pollsAddress = CONTRACTS[`chain${chainId}`]?.polls
   const isWrongChain = Boolean(walletChain && chainId && walletChain.id !== chainId)
   const publicClient = usePublicClient({ chainId })
+
+  // The followers gate reads an LSP26 registry the admin wires into the polls contract after
+  // deployment; until then it fails closed onchain, and a poll opened against it is one nobody
+  // can answer. Asked of the contract rather than the config: the config says which registry
+  // a chain should use, only the contract knows whether it has been told yet. Offered while the
+  // read is still in flight so a slow RPC hides nothing — the effect below corrects a pick the
+  // answer then rules out.
+  const { data: followerSystem } = useReadContract({
+    abi: pollsAbi,
+    address: pollsAddress,
+    functionName: 'followerSystem',
+    chainId,
+    query: { enabled: Boolean(pollsAddress && chainId) },
+  })
+  const followersGateAvailable = followerSystem === undefined || String(followerSystem).toLowerCase() !== zeroAddress
+  const gates = followersGateAvailable ? GATES : GATES.filter((entry) => entry.key !== 'followers')
 
   const [question, setQuestion] = useState('')
   const [options, setOptions] = useState(emptyOptions)
@@ -247,6 +263,15 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
   useEffect(() => {
     if (fixedChainId) setChainId(fixedChainId)
   }, [fixedChainId])
+
+  // A restored draft or a network switch can leave the followers gate picked on a chain whose
+  // polls contract has no registry yet — fall back to Anyone rather than open a dead poll
+  useEffect(() => {
+    if (gate === 'followers' && !followersGateAvailable) {
+      setGate('anyone')
+      toast("Follower-only polls aren't available on this network yet", 'info')
+    }
+  }, [gate, followersGateAvailable])
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed, data: receipt } = useWaitForTransactionReceipt({ hash })
@@ -528,7 +553,7 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
           <fieldset className={styles.pollDialog__list}>
             <legend>Who can vote</legend>
             <select value={gate} onChange={(e) => setGate(e.target.value)} disabled={isBusy} aria-label="Who can vote">
-              {GATES.map((entry) => (
+              {gates.map((entry) => (
                 <option key={entry.key} value={entry.key}>
                   {entry.label}
                 </option>
@@ -579,7 +604,7 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
               </>
             )}
 
-            {gate === 'followers' && <small>Read from the LSP26 follower registry. On a network without one, nobody passes.</small>}
+            {gate === 'followers' && <small>Checked against the LSP26 follower registry onchain at the moment each ballot lands.</small>}
 
             {gate === 'allowlist' && (
               <>
