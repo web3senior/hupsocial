@@ -17,6 +17,7 @@
 
 import { NextResponse } from 'next/server'
 import sharp from 'sharp'
+import { webpAnimationOptions } from '@/lib/webpAnimation'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
 import { isInlineDataUri } from '@/lib/nftMetadata'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
@@ -102,12 +103,7 @@ async function encodeToWebp(buffer, { width, quality, stillOnly }) {
   return pipeline
     .webp({
       quality,
-      ...(isAnimated
-        ? {
-            loop: metadata.loop ?? 0,
-            ...(metadata.delay ? { delay: metadata.delay } : {}),
-          }
-        : {}),
+      ...(isAnimated ? webpAnimationOptions(metadata) : {}),
     })
     .toBuffer()
 }

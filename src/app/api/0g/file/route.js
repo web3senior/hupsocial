@@ -2,6 +2,7 @@ import { Indexer, MemData } from '@0gfoundation/0g-ts-sdk'
 import { ethers } from 'ethers'
 import { NextResponse } from 'next/server'
 import sharp from 'sharp'
+import { webpAnimationOptions } from '@/lib/webpAnimation'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -125,12 +126,7 @@ export async function GET(req) {
         : await pipeline
             .webp({
               quality,
-              ...(isAnimated
-                ? {
-                    loop: metadata.loop ?? 0,
-                    ...(metadata.delay ? { delay: metadata.delay } : {}),
-                  }
-                : {}),
+              ...(isAnimated ? webpAnimationOptions(metadata) : {}),
             })
             .toBuffer()
 

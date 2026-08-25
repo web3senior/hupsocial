@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
 import sharp from 'sharp'
+import { webpAnimationOptions } from '@/lib/webpAnimation'
 import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
 import { FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
 import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
@@ -414,12 +415,7 @@ async function resolveMedia({ cacheKey, cid, width, quality, format, stillOnly }
         : await pipeline
             .webp({
               quality,
-              ...(isAnimated
-                ? {
-                    loop: metadata.loop ?? 0,
-                    ...(metadata.delay ? { delay: metadata.delay } : {}),
-                  }
-                : {}),
+              ...(isAnimated ? webpAnimationOptions(metadata) : {}),
             })
             .toBuffer()
 
