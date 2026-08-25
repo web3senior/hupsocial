@@ -63,6 +63,7 @@ export const CONTRACTS = {
     events: '',
     predict: '0xc77372d05ccc2d30938aa58686671625769f88bd',
     apps: '',
+    polls: '',
     // HupDrops: `drops` is the engine; deployer satellites are registered inside it per standard
     // (1 = ERC721, 2 = ERC1155, 3 = LSP7, 4 = LSP8) and never read by the app.
     drops: '',
@@ -103,6 +104,12 @@ export const CONTRACTS = {
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
     predict: '0xD76dcBB664a002247269c1fBB161B0440674C570',
     apps: '0xe30350Cf486210C299Aef91De61799Daed1Df6C5',
+    // Deployed 2026-08-25 (block 8241147, tx 0xd448977676d0c10f90ebde46cbc65693f990c8a73df7ace2c64d0d700b47c6b3)
+    // — the first HupPolls on a mainnet, the fixed 1.0.0 build. Trusts the HupChatForwarder
+    // above (`forwarder`), not `hupForwarder`; the relay helper tries both. setFollowerSystem
+    // (LSP26 below) is still the admin's click on /admin/contracts → Polls; FollowsCreator
+    // fails closed and the composer hides the followers gate until then.
+    polls: '0x7A5134435E029b5bBFF0d4EB5aEbCf0255D76D88',
     drops: '',
     // No Uniswap on LUKSO, and launches are one-phase Uniswap pools — so no launches or swaps here.
     launch: '',
@@ -130,6 +137,7 @@ export const CONTRACTS = {
     events: '',
     predict: '',
     apps: '',
+    polls: '',
     // Satellites: LSP7 0xb489…3F06, LSP8 0x761B…62b1.
     drops: '0x073F3E3FF95b7EA8cb0Afb22389774E694782DaC',
     launch: '',
@@ -153,6 +161,7 @@ export const CONTRACTS = {
     events: '0x39CB4342C425Cdc8576fa593988E5a4980db9853',
     predict: '0xf9df0275821dbcCBd7Fe461c4224F1ccAC46ae20',
     apps: '',
+    polls: '',
     drops: '',
     launch: '',
     univ3Router: '0xfE31F71C1b106EAc32F1A19239c9a9A72ddfb900',
@@ -178,6 +187,7 @@ export const CONTRACTS = {
     events: '0x10feacEEDDB387112f9a484EfB2df9FB197934E4',
     predict: '0xb0F3D16De2B029Bb18d44C35AB811E23C4FC1B87',
     apps: '',
+    polls: '',
     drops: '',
     launch: '',
     univ3Router: '0x5615CDAb10dc425a742d643d949a7F474C01abc4',
@@ -206,6 +216,7 @@ export const CONTRACTS = {
     events: '0x6dB2352e9921F46F005449FcA36938e7cb5A29f5',
     predict: '0x70DBfbb6E64f2e246A83d3Ae0262CC9588c31472',
     apps: '',
+    polls: '',
     drops: '',
     launch: '',
     univ3Router: '0x2626664c2603336E57B271c5C0b26F421741e481',
@@ -230,6 +241,7 @@ export const CONTRACTS = {
     events: '0xD479950963A8F87d9Cd44Ad3983C96A5A4b3c14d',
     predict: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     apps: '',
+    polls: '',
     drops: '',
     launch: '',
     univ3Router: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
@@ -255,6 +267,7 @@ export const CONTRACTS = {
     events: '0x735A8352036B953F8AC0Ae421DaEf8f2978EcC91',
     predict: '0x08c4631B621959468770c3C9831E867aF9014780',
     apps: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
+    polls: '',
     drops: '',
     launch: '',
     // V4 only — no official Uniswap v3 or Sushi deployment here. Two quoters exist; both are
@@ -297,6 +310,7 @@ export const CONTRACTS = {
     events: '0x88C0963857049368470E2851aFf5EDFc2D32346C',
     predict: '0x81369e32F31DDAb46F9BF3269e523A440822C748',
     apps: '',
+    polls: '',
     drops: '',
     launch: '',
     univ3Router: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
