@@ -23,7 +23,6 @@ import {
   UsersIcon,
 } from '@phosphor-icons/react'
 import { SECTIONS, sectionLanding, sectionPaths } from '@/config/sections'
-import { POLLS_ENABLED } from '@/config/features'
 
 // Static navigation schema with icons.
 // Keeps components out of localStorage to prevent serialization crashes.
@@ -44,7 +43,7 @@ export const NAV_ITEMS_SCHEMA = [
   // Sits with the social rows rather than the market ones: a poll costs nothing and asks for
   // an opinion. A checklist, not a bar chart — Insights owns ChartBar here, and the sideways
   // variant just reads as a chart someone knocked over.
-  ...(POLLS_ENABLED ? [{ id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon }] : []),
+  { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
   { id: 'bazaar', name: 'Bazaar', path: sectionLanding(SECTIONS.bazaar), icon: StorefrontIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
   { id: 'trade', name: 'Trade', path: sectionLanding(SECTIONS.trade), icon: ArrowsDownUpIcon, activePaths: sectionPaths(SECTIONS.trade) },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },

@@ -22,7 +22,6 @@ import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { hupInstruction, readHupConfig } from '@/lib/solana/hup'
 import { sendHupAction } from '@/lib/solana/relay'
 import SolanaConnectButton from '@/components/ui/SolanaConnectButton'
-import { POLLS_ENABLED } from '@/config/features'
 import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
@@ -567,9 +566,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const launchAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.launch)
   // NFT drops too — only offered where the HupDrops engine is deployed
   const dropsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.drops)
-  // Polls the same: the ballot has to settle on the chain the post lands on. Behind the
-  // feature flag as well, so the button stays out of the toolbar while the feature is dark.
-  const pollsAvailable = POLLS_ENABLED && Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.polls)
+  // Polls the same: the ballot has to settle on the chain the post lands on
+  const pollsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.polls)
   // The composer already holds an image and text, so the create dialog opens with two of its four
   // required fields filled — the author only types a name and a ticker
   const launchPrefillImage = mediaItems.find((item) => item.type === 'image' && item.cid)?.cid ?? ''

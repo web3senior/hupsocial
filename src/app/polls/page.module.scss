@@ -17,27 +17,4 @@
       padding: 1rem;
     }
   }
-
-  &__soon {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    min-height: 40svh;
-    text-align: center;
-
-    h1 {
-      margin: 0;
-      font-size: var(--font-size-20, 1.25rem);
-    }
-
-    p {
-      margin: 0;
-      max-width: 34ch;
-      color: var(--text-muted, #888);
-      font-size: var(--font-size-14, 0.875rem);
-      line-height: 1.5;
-    }
-  }
 }

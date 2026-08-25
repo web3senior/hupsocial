@@ -9,7 +9,6 @@ import { zeroAddress } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSignTypedData, useWriteContract } from 'wagmi'
 import { getPublicClient, waitForTransactionReceipt } from 'wagmi/actions'
 import { CONTRACTS, config } from '@/config/wagmi'
-import { POLLS_ENABLED } from '@/config/features'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { formatShare, formatVotes, hasTallies, isPollOpen, parseJsonArray, pollOptions, pollRequirements, pollStatus, requirementChips } from '@/lib/polls'
@@ -79,8 +78,7 @@ export default function PollCard({ pollRef }) {
     query: { enabled: Boolean(gated && address && pollsAddress && pollId) },
   })
 
-  // Nothing renders while polls are dark, including a post that already carries one
-  if (!POLLS_ENABLED || !poll) return null
+  if (!poll) return null
 
   // A moderator's `hidden` flag is a display decision, never a change to the tally — the
   // contract keeps accepting and counting votes. Say so plainly rather than rendering

@@ -6,7 +6,6 @@ import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { useHomeTabsStore } from '@/stores/useHomeTabsStore'
 import { allAppChains } from '@/lib/chains'
-import { POLLS_ENABLED } from '@/config/features'
 import styles from './AddTabMenu.module.scss'
 
 /**
@@ -48,7 +47,7 @@ export default function AddTabMenu() {
               {!hasTab('trending') && <MenuItem icon={FlameIcon} label="Trending" onClick={() => handleSelect(close, 'trending')} />}
               {!hasTab('status') && <MenuItem icon={BroadcastIcon} label="Status" onClick={() => handleSelect(close, 'status')} />}
               {!hasTab('nft') && <MenuItem icon={StorefrontIcon} label="NFTs" onClick={() => handleSelect(close, 'nft')} />}
-              {POLLS_ENABLED && !hasTab('polls') && <MenuItem icon={ListChecksIcon} label="Polls" onClick={() => handleSelect(close, 'polls')} />}
+              {!hasTab('polls') && <MenuItem icon={ListChecksIcon} label="Polls" onClick={() => handleSelect(close, 'polls')} />}
               <MenuItem label="Networks" onClick={() => setView('networks')} trailing={<CaretRightIcon size={16} />} />
             </>
           )}
