@@ -3,6 +3,21 @@
   flex-direction: column;
   gap: 1rem;
 
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    align-self: flex-start;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-13, 0.8125rem);
+    text-decoration: none;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--text, inherit);
+    }
+  }
+
   &__header {
     display: flex;
     align-items: center;

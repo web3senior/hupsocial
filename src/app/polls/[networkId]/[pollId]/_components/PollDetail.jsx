@@ -13,12 +13,21 @@ import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import PollCard from '@/components/PollCard'
-import { ListChecksIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, ListChecksIcon } from '@phosphor-icons/react'
 import styles from './PollDetail.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
 
 const shortWallet = (wallet) => (wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '')
+
+// A plain link rather than history.back(): a shared poll URL is usually the first page of the
+// visit, and "back" from there would leave the site
+const BackToPolls = () => (
+  <Link href="/polls" className={styles.detail__back}>
+    <CaretLeftIcon size={14} weight="bold" aria-hidden="true" />
+    Back to polls
+  </Link>
+)
 
 /**
  * Poll Detail
@@ -47,9 +56,12 @@ export default function PollDetail({ networkId, pollId }) {
 
   if (detail && !poll) {
     return (
-      <div className={styles.detail__empty}>
-        <ListChecksIcon size={32} />
-        <p>This poll doesn&apos;t exist on this network.</p>
+      <div className={styles.detail}>
+        <BackToPolls />
+        <div className={styles.detail__empty}>
+          <ListChecksIcon size={32} />
+          <p>This poll doesn&apos;t exist on this network.</p>
+        </div>
       </div>
     )
   }
@@ -98,6 +110,8 @@ export default function PollDetail({ networkId, pollId }) {
 
   return (
     <div className={styles.detail}>
+      <BackToPolls />
+
       <header className={styles.detail__header}>
         <Link href={`/${poll.wallet_address}`} className={styles.detail__creator}>
           <img
