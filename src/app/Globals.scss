@@ -67,6 +67,9 @@
   --beta-badge-color: var(--gray-400);
   --new-badge-background: var(--purple-500);
   --new-badge-color: var(--white);
+  // Orange twin of NEW for a second fresh feature (Polls) so two rows don't wear the same purple
+  --new-orange-badge-background: var(--orange-500);
+  --new-orange-badge-color: var(--white);
 
   --footer-link-color: var(--white);
   --color-icon-muted: #4b5563;
@@ -123,6 +126,8 @@
   // brand colour keeps NEW recognisable across theme switches
   --new-badge-background: var(--purple-500);
   --new-badge-color: var(--white);
+  --new-orange-badge-background: var(--orange-500);
+  --new-orange-badge-color: var(--white);
 
   --footer-link-color: #a1a1aa;
   --color-icon-muted: #52525b;
@@ -164,6 +169,8 @@
   --beta-badge-color: var(--white);
   --new-badge-background: var(--lime-400);
   --new-badge-color: var(--lime-900);
+  --new-orange-badge-background: var(--orange-400);
+  --new-orange-badge-color: var(--orange-900);
 
   --footer-link-color: #6ee77d;
   --color-icon-muted: #4ade80;

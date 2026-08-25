@@ -33,6 +33,7 @@ const NAV_COMPONENTS = {
 const NAV_BADGES = {
   beta: { label: 'BETA', background: 'var(--beta-badge-background)', color: 'var(--beta-badge-color)' },
   new: { label: 'NEW', background: 'var(--new-badge-background)', color: 'var(--new-badge-color)' },
+  'new-orange': { label: 'NEW', background: 'var(--new-orange-badge-background)', color: 'var(--new-orange-badge-color)' },
 }
 
 const themeOptions = [
