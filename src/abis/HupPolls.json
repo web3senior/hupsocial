@@ -63,6 +63,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidAllowlistRoot",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidAsset",
     "type": "error"
   },

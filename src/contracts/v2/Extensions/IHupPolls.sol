@@ -85,8 +85,10 @@ interface IHupPolls {
     event VoteCast(uint256 indexed pollId, address indexed voter, uint8 optionIndex, uint32 optionVotes, uint32 totalVotes);
 
     /// @notice Emitted whenever a poll's electorate is defined — at creation when the list is
-    ///         non-empty, and again on any pre-vote correction. Kept off PollCreated so the
-    ///         common ungated poll pays neither the log nor the indexer a requirement column.
+    ///         non-empty, and on every pre-vote correction, including one that clears the list
+    ///         (an empty `requirements` here means "anyone may vote again"). Kept off
+    ///         PollCreated so the common ungated poll pays neither the log nor the indexer a
+    ///         requirement column.
     event PollRequirementsSet(uint256 indexed pollId, RequirementMode mode, bytes32 allowlistRoot, AssetRequirement[] requirements);
 
     /// @notice Emitted when the creator ends voting before the poll's window is up.
@@ -129,6 +131,7 @@ interface IHupPolls {
     error SessionExpired();
     error TooManyRequirements();
     error InvalidAsset();
+    error InvalidAllowlistRoot();
     error NotEligible();
 
     // --- MUTATIVE LOGIC ---
@@ -142,7 +145,9 @@ interface IHupPolls {
      * @param _closesAt Unix UTC time voting closes.
      * @param _requirements Who may vote; an empty list means anyone with a wallet.
      * @param _mode Whether every requirement must pass or any one suffices.
-     * @param _allowlistRoot Merkle root over eligible voters, for an Allowlisted entry; 0 if unused.
+     * @param _allowlistRoot Merkle root over eligible voters. Non-zero exactly when the list
+     *        carries an Allowlisted entry — an entry without a root is a poll nobody can vote
+     *        on, and a root without an entry is a gate the contract never checks.
      * @return pollId The id assigned to the new poll.
      */
     function createPoll(
@@ -168,12 +173,13 @@ interface IHupPolls {
     /**
      * @notice Replaces a poll's electorate. Creator only, and only before the first ballot —
      *         an electorate that could move after votes land would let a creator retroactively
-     *         invalidate people who already voted.
+     *         invalidate people who already voted. Always emits PollRequirementsSet, so an
+     *         empty list with a zero root is how a creator reopens a poll to anyone.
      * @param _owner Primary wallet of the creator (address(0) or the caller for a direct call).
      * @param _pollId The poll to re-gate.
-     * @param _requirements Replacement requirement list.
+     * @param _requirements Replacement requirement list; empty means anyone with a wallet.
      * @param _mode Replacement combination mode.
-     * @param _allowlistRoot Replacement Merkle root; 0 to clear.
+     * @param _allowlistRoot Replacement Merkle root; paired with an Allowlisted entry as in createPoll.
      */
     function setPollRequirements(
         address _owner,

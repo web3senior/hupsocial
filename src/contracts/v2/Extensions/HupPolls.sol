@@ -162,7 +162,12 @@ contract HupPolls is IHupPolls, Pausable, AccessControl, ERC2771Context {
         // rest of the extensions (and from their verification input).
         pollId = _openPoll(_resolveActor(_owner), _metadata, _optionCount, _resolveWindow(_opensAt, _closesAt), _closesAt);
 
-        _writeRequirements(pollId, _requirements, _mode, _allowlistRoot);
+        // An ungated poll — the overwhelming majority — writes nothing and emits nothing for
+        // the feature. Anything else goes through the shared validator, including a lone root
+        // with no list, which it rejects rather than storing as a gate that is never checked.
+        if (_requirements.length != 0 || _allowlistRoot != bytes32(0)) {
+            _writeRequirements(pollId, _requirements, _mode, _allowlistRoot);
+        }
     }
 
     function vote(address _owner, uint256 _pollId, uint8 _optionIndex, bytes32[] calldata _proof) external override whenNotPaused {
@@ -239,6 +244,8 @@ contract HupPolls is IHupPolls, Pausable, AccessControl, ERC2771Context {
         if (poll.totalVotes != 0) revert PollHasVotes();
         if (_resolveActor(_owner) != poll.creator) revert NotCreator();
 
+        // Unconditional, unlike createPoll: an empty list here is a clearing, and the helper
+        // announces it so an indexer drops the gate it recorded instead of showing it forever
         delete _requirementsOf[_pollId];
         _writeRequirements(_pollId, _requirements, _mode, _allowlistRoot);
     }
@@ -384,9 +391,14 @@ contract HupPolls is IHupPolls, Pausable, AccessControl, ERC2771Context {
     }
 
     /**
-     * @dev Validates and stores a poll's requirement list, then announces it. Shared by
-     *      createPoll and setPollRequirements so both can only ever write a list `vote` can
-     *      evaluate. An empty list writes nothing and emits nothing.
+     * @dev Validates and stores a poll's requirement list, then announces it — always, even
+     *      when the list is empty. From setPollRequirements an empty list is a clearing, and
+     *      an indexer that never hears about it keeps showing a gate the chain no longer
+     *      enforces; createPoll skips the call for an ungated poll instead, so the common
+     *      case still pays nothing. Shared by both so they can only ever write a list `vote`
+     *      can evaluate: a Merkle root and an Allowlisted entry must come together, since an
+     *      entry without a root is a poll nobody can ever vote on, and a root without an
+     *      entry is a gate the creator believes exists and the contract never checks.
      */
     function _writeRequirements(
         uint256 _pollId,
@@ -395,8 +407,8 @@ contract HupPolls is IHupPolls, Pausable, AccessControl, ERC2771Context {
         bytes32 _allowlistRoot
     ) private {
         if (_requirements.length > MAX_POLL_REQUIREMENTS) revert TooManyRequirements();
-        if (_requirements.length == 0 && _allowlistRoot == bytes32(0)) return;
 
+        bool hasAllowlist;
         for (uint256 i = 0; i < _requirements.length; i++) {
             AssetRequirement calldata r = _requirements[i];
             if (r.rType == RequirementType.TokenBalance || r.rType == RequirementType.NftBalance) {
@@ -408,8 +420,10 @@ contract HupPolls is IHupPolls, Pausable, AccessControl, ERC2771Context {
                 if (!ok) revert InvalidAsset();
             }
             if (r.rType == RequirementType.CommunityMember && r.asset == address(0)) revert InvalidAddress();
+            if (r.rType == RequirementType.Allowlisted) hasAllowlist = true;
             _requirementsOf[_pollId].push(r);
         }
+        if (hasAllowlist != (_allowlistRoot != bytes32(0))) revert InvalidAllowlistRoot();
 
         _polls[_pollId].requirementMode = _mode;
         allowlistRoot[_pollId] = _allowlistRoot;
