@@ -9,7 +9,7 @@ import { Like } from '@/components/ui/Like'
 import Bookmark from '@/components/ui/Bookmark'
 import Share from '@/components/ui/Share'
 import Counter from '@/components/ui/Counter'
-import { resolveStorageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
+import { resolveStorageStreamUrls, resolveStorageImageUrl } from '@/lib/storageHelper'
 import styles from './ShortsPlayer.module.scss'
 
 /**
@@ -28,7 +28,8 @@ export default function ShortsPlayer({ post, video, caption, isActive, isMuted, 
      and a boolean can't tell those apart. */
   const [status, setStatus] = useState('idle')
 
-  const src = resolveStorageUrl(video.cid)
+  /* Range-capable gateway first, the rest as fallbacks — see resolveIPFSStreamUrls */
+  const sources = resolveStorageStreamUrls(video.cid)
   const poster = video.poster ? resolveStorageImageUrl(video.poster, { width: 640 }) : undefined
   const commentCount = Number(post.total_comments) || 0
 
@@ -63,7 +64,6 @@ export default function ShortsPlayer({ post, video, caption, isActive, isMuted, 
       <div className={styles.shortsPlayer__frame}>
         <video
           ref={videoRef}
-          src={src}
           poster={poster}
           className={styles.shortsPlayer__video}
           loop
@@ -75,7 +75,11 @@ export default function ShortsPlayer({ post, video, caption, isActive, isMuted, 
           onClick={togglePlayback}
           onPlay={() => setStatus('playing')}
           onPause={() => setStatus('paused')}
-        />
+        >
+          {sources.map((source) => (
+            <source key={source} src={source} />
+          ))}
+        </video>
 
         {/* Author and caption sit on whatever the video happens to be showing, which can be a
             white sky. The scrim darkens only the strip they occupy so they stay readable

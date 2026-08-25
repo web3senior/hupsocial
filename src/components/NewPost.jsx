@@ -202,7 +202,7 @@ const withUploadResults = (content, results) => {
           ...element.data,
           items: element.data.items.map((item) => {
             const result = byId.get(item.uploadId)
-            return result ? { ...item, cid: result.cid, poster: result.poster } : item
+            return result ? { ...item, cid: result.cid, poster: result.poster, preview: result.preview } : item
           }),
         },
       }
@@ -921,13 +921,20 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         const cid = await uploadToIPFS(upload, { signal: controller.signal, onProgress: reportProgress })
 
         /* A still, pinned separately, so feed cards render a thumbnail without pulling the video
-           through a gateway. Best-effort: a container the browser can't decode posts without one. */
+           through a gateway, plus the inline preview that paints before the still arrives. Best-effort
+           from the original; when the browser could not decode that (an iPhone HEVC .mov on Chrome)
+           the H.264 rendition it just produced can be decoded, so try again on that one. */
         let poster
-        const posterFile = posterCapture ? await posterCapture : null
-        if (posterFile) poster = await uploadToIPFS(posterFile, { signal: controller.signal }).catch(() => undefined)
+        let preview
+        let captured = posterCapture ? await posterCapture : null
+        if (!captured && upload !== file) captured = await captureVideoPoster(upload)
+        if (captured) {
+          preview = captured.preview
+          poster = await uploadToIPFS(captured.file, { signal: controller.signal }).catch(() => undefined)
+        }
 
-        updateMediaItem(uploadId, ({ status, progress, error, ...item }) => ({ ...item, cid, poster }))
-        return { uploadId, cid, poster }
+        updateMediaItem(uploadId, ({ status, progress, error, ...item }) => ({ ...item, cid, poster, preview }))
+        return { uploadId, cid, poster, preview }
       } catch (error) {
         if (error?.name === 'AbortError') return null
         console.error('Trouble uploading file:', error)

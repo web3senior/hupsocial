@@ -50,6 +50,33 @@ export const resolveIPFSUrl = (ipfsUrl) => {
   return `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${hash}`
 }
 
+/* Video and audio stream straight from a gateway, and the browser drives that with HTTP range
+   requests: the first frame needs only the head of the file, a loop or a seek needs a slice from
+   the middle. The configured gateway advertises `Accept-Ranges: bytes` and then answers every
+   range with the whole file (a 64 KB probe of a 3.6 MB clip downloaded all 3.6 MB), so playback
+   waited on the full download and every loop fetched it again. Filebase — where uploads pin —
+   honours ranges, so it streams first; the configured gateways follow as <source> fallbacks. */
+const STREAM_GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_STREAM_GATEWAY_URL || 'https://ipfs.filebase.io/ipfs/'
+
+/**
+ * Resolves an IPFS video/audio CID to gateway URLs in the order a player should try them.
+ * @param {string} ipfsUrl - The IPFS URL containing the hash.
+ * @returns {string[]} Gateway URLs, range-capable first; empty when the input is not IPFS.
+ */
+export const resolveIPFSStreamUrls = (ipfsUrl) => {
+  if (!ipfsUrl || !isIPFSHash(ipfsUrl)) return []
+
+  const hash = ipfsUrl.replace(/^ipfs:\/\//, '')
+  const gateways = [STREAM_GATEWAY_URL, process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL, process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_FALLBACK]
+    .filter(Boolean)
+    /* The fallback var has shipped as http:// — every gateway speaks https, and a mixed scheme
+       would only list the same host twice */
+    .map((gateway) => gateway.replace(/^http:\/\//, 'https://'))
+    .map((gateway) => (gateway.endsWith('/') ? gateway : `${gateway}/`))
+
+  return [...new Set(gateways)].map((gateway) => `${gateway}${hash}`)
+}
+
 /**
  * Resolves an IPFS image to the server-side compression proxy (sharp → WebP).
  * Only use for images — video/audio should resolve via resolveIPFSUrl to keep
@@ -127,6 +154,18 @@ export const resolveStorageUrl = (src) => {
 
   /* Fallback: If it's already a regular web URL (http://, https://) or absolute asset path, return it as-is */
   return src
+}
+
+/**
+ * Universal resolver for STREAMED assets (video/audio) — the same routing as resolveStorageUrl,
+ * except IPFS content comes back as an ordered list of gateways for a player's <source> chain.
+ * @param {string} src - The raw input string (IPFS CID, 0G Hash, Custom URI, or HTTP URL).
+ * @returns {string[]} URLs to try in order; empty when the input can't be resolved.
+ */
+export const resolveStorageStreamUrls = (src) => {
+  if (isIPFSHash(src)) return resolveIPFSStreamUrls(src)
+  const url = resolveStorageUrl(src)
+  return url ? [url] : []
 }
 
 /**

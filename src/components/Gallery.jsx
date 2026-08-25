@@ -6,7 +6,7 @@ import { ArrowLeftIcon, ArrowRightIcon, CornersOutIcon, PauseIcon, PlayIcon, Spe
 import styles from './Gallery.module.scss'
 import useMediaZoom from '@/hooks/useMediaZoom'
 import { lockPageScroll, unlockPageScroll } from '@/lib/scrollLock'
-import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
+import { resolveIPFSUrl, resolveIPFSImageUrl, resolveStorageStreamUrls } from '@/lib/storageHelper'
 import { DEFAULT_SOUND_PREFS, loadSoundPrefs, saveSoundPrefs } from '@/lib/soundPrefs'
 import { useAutoplayPreference } from '@/hooks/useAutoplayPreference'
 
@@ -34,6 +34,11 @@ export default function MediaGallery({ data = [] }) {
   /* Keyed by index and fed by the elements' own play/pause events, so the play button reflects
      what each video is actually doing rather than what we last asked it to do. */
   const [playingVideos, setPlayingVideos] = useState({})
+  /* Which inline players have rendered real frames — the still stays over the box until then.
+     Keyed by index like playingVideos, and never unset: a paused player shows its own frame. */
+  const [startedVideos, setStartedVideos] = useState({})
+  /* Which stills have arrived (or failed), so the loading sweep stops with the download */
+  const [loadedStills, setLoadedStills] = useState({})
   const [isMuted, setIsMuted] = useState(true)
   const volumeRef = useRef(DEFAULT_SOUND_PREFS.volume)
   const [revealedItems, setRevealedItems] = useState({})
@@ -324,6 +329,24 @@ export default function MediaGallery({ data = [] }) {
     return resolveIPFSImageUrl(item.poster, { width: 640 })
   }
 
+  /* Gateway URLs for a video in the order the browser should try them — the range-capable one
+     first (see resolveIPFSStreamUrls), the rest as fallbacks should it fail to load */
+  const resolveVideoSources = (item) => {
+    if (item?.storage === '0G') return [resolveUrl(item)].filter(Boolean)
+    const cid = item?.cid || ''
+    if (!cid) return []
+    if (cid.startsWith('http')) return [cid]
+    return resolveStorageStreamUrls(cid.startsWith('ipfs://') ? cid : `ipfs://${cid}`)
+  }
+
+  /* The inline preview is a data URL the composer put in the post (see lib/videoPoster). Post
+     content is authored by anyone, so only accept an embedded image — never a remote URL that
+     would make every reader's browser call out to a host of the author's choosing. */
+  const resolvePreview = (item) =>
+    typeof item?.preview === 'string' && item.preview.startsWith('data:image/') && item.preview.length <= 8192
+      ? item.preview
+      : undefined
+
   const toggleGif = (index, item, e) => {
     e.stopPropagation()
     if (playingGifs[index]) {
@@ -360,9 +383,24 @@ export default function MediaGallery({ data = [] }) {
     /* The lightbox has native controls; an inline card has none, so without this a reader
        whose autoplay is off would be looking at a still frame with no way to start it. */
     const showPlayButton = isVideo && !isFullscreen && !isBlurred && !playingVideos[i]
+    const posterUrl = isVideo ? resolvePosterUrl(item) : undefined
+    const preview = isVideo ? resolvePreview(item) : undefined
+    /* The still is an <img> of our own over the inline player, not just the `poster` attribute.
+       A <video> paints nothing until its poster has downloaded — a separate request through the
+       gateway proxy — so the card was a blank box for that long (white, in light mode), and Safari
+       drops the poster the moment loading starts. Our image is fetched at high priority, sits on
+       the blurred inline preview while it travels, and stays until real frames render. */
+    const showStill = isVideo && !isFullscreen && !startedVideos[i]
+    const isAwaitingStill = showStill && Boolean(posterUrl) && !preview && !loadedStills[i]
+    const blur = isBlurred ? 'blur(40px)' : 'none'
+    const markStillLoaded = () => setLoadedStills((previous) => (previous[i] ? previous : { ...previous, [i]: true }))
 
     return (
-      <div className={styles.mediaContainer}>
+      <div
+        className={styles.mediaContainer}
+        data-video={isVideo ? '' : undefined}
+        data-loading={isAwaitingStill ? '' : undefined}
+      >
         {isVideo ? (
           <video
             ref={(el) => {
@@ -370,8 +408,7 @@ export default function MediaGallery({ data = [] }) {
               else videoRefs.current[i] = el
               applyStoredVolume(el)
             }}
-            src={url}
-            poster={resolvePosterUrl(item)}
+            poster={posterUrl}
             /* In-feed players are started by the visibility observer, so there is nothing to
                gain from buffering ahead of that — the poster is what the card shows until then.
                The lightbox starts its visible slide explicitly, which loads on demand. */
@@ -384,10 +421,18 @@ export default function MediaGallery({ data = [] }) {
                shares the index but not the state, so it must not overwrite it. */
             onPlay={isFullscreen ? undefined : () => setPlayingVideos((previous) => ({ ...previous, [i]: true }))}
             onPause={isFullscreen ? undefined : () => setPlayingVideos((previous) => ({ ...previous, [i]: false }))}
+            /* `playing`, not `play`: the first fires once frames are actually being rendered,
+               which is the moment the still can go without a blank in between */
+            onPlaying={isFullscreen ? undefined : () => setStartedVideos((previous) => (previous[i] ? previous : { ...previous, [i]: true }))}
             playsInline
             className={isFullscreen ? styles.fullscreenVideo : styles.videoPlayer}
-            style={{ filter: isBlurred ? 'blur(40px)' : 'none' }}
-          />
+            style={{ filter: blur }}
+          >
+            {/* The browser moves on to the next <source> when one fails to load */}
+            {resolveVideoSources(item).map((source) => (
+              <source key={source} src={source} />
+            ))}
+          </video>
         ) : (
           <img
             ref={isZoomTarget ? zoom.targetRef : undefined}
@@ -397,6 +442,24 @@ export default function MediaGallery({ data = [] }) {
             style={{ filter: isBlurred ? 'blur(40px)' : 'none', ...(isZoomTarget ? zoom.style : null) }}
             draggable={false}
           />
+        )}
+        {showStill && (
+          <div className={styles.videoStill} aria-hidden="true" style={{ filter: blur }}>
+            {preview && <img className={styles.videoStill__preview} src={preview} alt="" draggable={false} />}
+            {posterUrl && (
+              <img
+                className={styles.videoStill__poster}
+                src={posterUrl}
+                alt=""
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                draggable={false}
+                onLoad={markStillLoaded}
+                onError={markStillLoaded}
+              />
+            )}
+          </div>
         )}
         {showPlayButton && (
           <button
@@ -435,6 +498,9 @@ export default function MediaGallery({ data = [] }) {
                 <div
                   className={styles.mediaItem}
                   style={!isCarousel && getAspectRatio(item) ? { '--media-ratio': getAspectRatio(item) } : undefined}
+                  /* Lets the stylesheet size a video's box from the ratio alone, so it is the
+                     same size before and after the still arrives */
+                  data-ratio={!isCarousel && getAspectRatio(item) ? '' : undefined}
                   /* An image maximises on tap. A video plays or pauses instead — the control bar's
                      maximise button is the way into the lightbox for it. */
                   onClick={(e) => (item.type === 'video' ? toggleInlinePlayback(i, e) : openLightbox(i, e))}

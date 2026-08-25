@@ -18,6 +18,28 @@
   }
 }
 
+/* The sweep the rest of the app's loading surfaces use, over the muted surface token */
+@keyframes gallery-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@mixin loading-sweep {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(90deg, transparent 0%, var(--shimmer-glint) 50%, transparent 100%);
+  animation: gallery-sweep 2s infinite;
+  pointer-events: none;
+
+  /* The muted base still reads as "loading" once the sweep is gone */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 .mediaContainer {
   position: relative;
   width: 100%;
@@ -25,6 +47,65 @@
   display: flex;
   align-items: center;
   justify-content: center;
+
+  /* A <video> paints nothing of its own until its poster has arrived, and nothing at all when
+     it has none — so without a surface behind it the box showed the card background, white in
+     light mode. The muted token reads as "a video goes here" from the first frame of the page. */
+  &[data-video] {
+    overflow: hidden;
+    background-color: var(--surface-muted);
+  }
+
+  /* Only while a still is expected and still travelling; a video with no still to wait for is
+     simply paused, not loading */
+  &[data-loading]::after {
+    @include loading-sweep;
+  }
+}
+
+/* A 0G asset whose bytes have not resolved to a URL yet */
+.loadingPlaceholder {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 200px;
+  background-color: var(--surface-muted);
+
+  &::after {
+    @include loading-sweep;
+  }
+}
+
+/* The still over an inline player until it has rendered real frames: the inline preview the
+   composer embedded in the post, blurred, underneath the full still as it arrives. Sits below
+   the spoiler overlay (2), play button (4) and controls (5), and lets taps through to the card. */
+.videoStill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+
+  &__preview,
+  &__poster {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__preview {
+    object-fit: cover;
+    /* Scaled up so the blur's soft edge falls outside the clipped box */
+    filter: blur(12px);
+    transform: scale(1.15);
+  }
+
+  /* Fitted the way the player underneath fits, so the picture does not jump on hand-over */
+  &__poster {
+    object-fit: contain;
+  }
 }
 
 .controls {
@@ -152,6 +233,10 @@
     video {
       aspect-ratio: 3/4;
     }
+    /* The player crops to the 3:4 tile, so its still must crop the same way */
+    .videoStill__poster {
+      object-fit: cover;
+    }
   }
 }
 .embla__container {
@@ -194,6 +279,14 @@
        visible with no crop or letterbox; max-height bounds very tall assets. */
     aspect-ratio: var(--media-ratio, auto);
     object-fit: contain;
+  }
+
+  /* A video's box used to take its width from whatever the element had to hand — the 300px
+     default until the poster arrived, the poster's own width after — so the card resized under
+     the reader. With the ratio known the box is fully determined by the height cap and the
+     width cap, and it is that size from the first paint on. */
+  &[data-ratio] .videoPlayer {
+    width: calc(550px * var(--media-ratio));
   }
 }
 
