@@ -38,7 +38,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
 
-    const scope = ['open', 'upcoming', 'closed', 'mine'].includes(searchParams.get('scope')) ? searchParams.get('scope') : 'open'
+    const scope = ['open', 'upcoming', 'closed', 'mine', 'created'].includes(searchParams.get('scope')) ? searchParams.get('scope') : 'open'
     const sort = ['recent', 'votes', 'closing'].includes(searchParams.get('sort')) ? searchParams.get('sort') : null
     const networkId = parseInt(searchParams.get('networkId')) || null
     const participant = (searchParams.get('participant') || '').toLowerCase() || null
@@ -72,6 +72,14 @@ export async function GET(request) {
       scopeFilter = `AND (p.creator = ?
         OR EXISTS (SELECT 1 FROM poll_votes v WHERE v.network_id = p.network_id AND v.poll_id = p.poll_id AND v.voter = ?))`
       scopeArgs = [participant, participant]
+    } else if (scope === 'created') {
+      // Narrower than `mine`: only polls the wallet opened, any status. The composer's
+      // attach chooser lists these — a poll you merely voted on is not yours to attach.
+      if (!participant) {
+        return NextResponse.json({ success: false, error: 'participant is required for scope=created' }, { status: 400 })
+      }
+      scopeFilter = 'AND p.creator = ?'
+      scopeArgs = [participant]
     }
 
     // "closing" is the natural order for a live poll list and the default for the open scope:

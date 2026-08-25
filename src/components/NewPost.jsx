@@ -36,6 +36,7 @@ import AttachLaunchModal from '@/components/AttachLaunchModal'
 import AttachDropModal from '@/components/AttachDropModal'
 import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
 import CreatePollDialog from '@/components/CreatePollDialog'
+import AttachPollDialog from '@/components/AttachPollDialog'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
@@ -407,6 +408,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     actionType === 'edit' ? (getContentPayload(existingPost)?.poll ?? null) : (loadAttachmentDraft()?.poll ?? null)
   )
   const createPollRef = useRef(null)
+  // The Poll button opens a chooser first — new poll, or one already asked — which then
+  // hands off to createPollRef for the new-poll path
+  const attachPollRef = useRef(null)
   // Every in-flight attachment upload, keyed by uploadId: the File so a failed tile can retry,
   // the AbortController so Remove cancels the transfer, the promise so submit can await it
   const uploadsRef = useRef(new Map())
@@ -1747,8 +1751,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => createPollRef.current?.open()}
-                  aria-label="Attach a poll"
+                  onClick={() => attachPollRef.current?.open()}
+                  aria-label="Add a poll"
                   disabled={isBusy || Boolean(poll)}
                 >
                   <ListChecksIcon size={20} />
@@ -2057,6 +2061,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
       <AttachMiniAppDialog ref={attachMiniAppRef} onAttached={(reference) => setMiniApp(reference)} />
 
+      <AttachPollDialog
+        ref={attachPollRef}
+        chainId={targetChainId}
+        onAttach={(reference) => reference && setPoll(reference)}
+        onCreateNew={() => createPollRef.current?.open()}
+      />
       <CreatePollDialog ref={createPollRef} fixedChainId={targetChainId} onCreated={(reference) => reference && setPoll(reference)} />
     </NativeDialog>
   )
