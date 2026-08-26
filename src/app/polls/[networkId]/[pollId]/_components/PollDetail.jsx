@@ -12,6 +12,7 @@ import { shortTxError } from '@/lib/utils'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import Avatar from '@/components/ui/Avatar'
+import Profile from '@/components/Profile'
 import PollCard from '@/components/PollCard'
 import PollTimer from '@/components/PollTimer'
 import { CaretLeftIcon, ListChecksIcon } from '@phosphor-icons/react'
@@ -170,10 +171,9 @@ export default function PollDetail({ networkId, pollId }) {
         <ul>
           {recentVotes.map((vote) => (
             <li key={`${vote.wallet_address}-${vote.voted_at}`}>
-              <Link href={`/${vote.wallet_address}`} className={styles.detail__voter}>
-                <Avatar src={vote.profile_image} size={48} className={styles.detail__avatar} />
-                <span>{vote.display_name || shortWallet(vote.wallet_address)}</span>
-              </Link>
+              {/* The same Profile every other wallet list renders — avatar, chain badge, hover
+                  card and all — so a voter reads the way they do under a post or a listing */}
+              <Profile variant="fullWithoutTime" creator={vote.wallet_address} networkId={chainId} className={styles.detail__voter} />
               {/* Absent until the viewer has voted or the poll has closed — the API withholds
                   the column rather than the client hiding it */}
               {vote.option_index !== undefined && (
