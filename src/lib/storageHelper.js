@@ -277,19 +277,26 @@ export const AVATAR_PIXEL_DENSITY = 2
  * stays supersampled, and none is ever upscaled into softness. */
 const AVATAR_WIDTHS = [48, 96, 192, 384]
 
-/* Where animation starts paying for itself.
- *
- * Under this a profile picture is a circle no wider than a favicon: motion in it cannot be read,
- * while the encode is very much felt. The 60-frame GIF avatar in our own users table is 13.6MB
- * at source, 775KB re-encoded animated, and 1.1KB as a still — and the animated encode is the
- * one that runs the proxy past its fetch budget and 502s, which is what left GIF profile
- * pictures showing the default PFP. Small slots take the first frame; the profile header and the
- * hovercard, big enough to actually watch, animate. */
-const AVATAR_ANIMATE_FROM = 192
-
 /* The size a route with no slot to go on should ask for — the top rung, so a consumer that
    renders the URL as-is still gets a picture that holds up in the biggest box the app has. */
 export const AVATAR_MAX_SIZE = AVATAR_WIDTHS[AVATAR_WIDTHS.length - 1] / AVATAR_PIXEL_DENSITY
+
+/* Why every rung animates, including the small ones.
+ *
+ * The rungs under 192 used to take a first frame, on the reasoning that a 26px circle cannot
+ * show motion while the per-frame encode is what ran the proxy past its budget and 502'd. Half
+ * of that is true and the half that mattered is not: `still=1` does not skip a single byte of
+ * the gateway fetch — resolveMedia downloads the whole source before sharp is handed it — so
+ * the wait that produced the 502 was identical either way. It was four concurrent downloads of
+ * one 13.6MB original, and the ladder above is what fixed it.
+ *
+ * What the downgrade actually cost was measured against the 61-frame GIF avatar in our own
+ * users table: 55ms to encode at the 48 rung, 63ms at 96, once per CID and immutable on the CDN
+ * afterwards. What it bought was a frozen picture in every slot 48 CSS px and under — the feed,
+ * the nav, the hovercard, the follow lists — which is to say very nearly all of them.
+ *
+ * A caller that genuinely needs one frame says so; see the notification digest, whose reason is
+ * the mail client rather than the encoder. */
 
 /**
  * Resolves a profile picture at the ladder rung covering the slot it is laid out in — the one
@@ -297,13 +304,15 @@ export const AVATAR_MAX_SIZE = AVATAR_WIDTHS[AVATAR_WIDTHS.length - 1] / AVATAR_
  * surfaces is the entire point; see AVATAR_WIDTHS.
  * @param {string} src - Stored reference, in any shape resolveStorageImageUrl accepts.
  * @param {number} size - Laid-out width in CSS px. Pass AVATAR_MAX_SIZE when there is no slot.
+ * @param {{ still?: boolean }} [options] - `still` freezes an animated source to its first frame,
+ * for surfaces that cannot play one at all. Animation is the default everywhere else.
  * @returns {string|null} The proxy URL, or null when the reference carries no picture.
  */
-export const resolveAvatarImageUrl = (src, size) => {
+export const resolveAvatarImageUrl = (src, size, { still = false } = {}) => {
   const target = size * AVATAR_PIXEL_DENSITY
   const width = AVATAR_WIDTHS.find((rung) => rung >= target) ?? AVATAR_WIDTHS[AVATAR_WIDTHS.length - 1]
 
-  return resolveStorageImageUrl(src, { width, still: width < AVATAR_ANIMATE_FROM })
+  return resolveStorageImageUrl(src, { width, still })
 }
 
 /**

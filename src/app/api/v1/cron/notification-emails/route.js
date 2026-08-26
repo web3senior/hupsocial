@@ -35,9 +35,13 @@ const MAX_LISTED = 10
 
 /* The slot the digest template draws an actor at. Sized rather than given a width so it lands on
    the same ladder rung the app itself uses — the picture is usually already encoded and cached by
-   the time a digest goes out, and mail clients get a still frame rather than an animation many of
-   them refuse to play anyway. */
+   the time a digest goes out. */
 const DIGEST_AVATAR_SIZE = 32
+
+/* The one surface that asks for a frozen frame, and not to save an encode: an animation is
+   wasted on the mail clients that refuse to play one, and worse than wasted on the ones that
+   show its last frame instead of its first. */
+const DIGEST_AVATAR_OPTIONS = { still: true }
 
 // Quoted reply text is a preview, not the post — long enough to carry a real
 // sentence, short enough that ten of them stay one scroll.
@@ -266,7 +270,7 @@ export async function GET(request) {
           line: digestLine(row),
           snippet: ref ? snippets.get(postKey(ref.postId, ref.networkId, ref.contractAddress)) || null : null,
           action_url: row.action_url,
-          avatar: resolveAvatarImageUrl(row.actor_profile_image, DIGEST_AVATAR_SIZE),
+          avatar: resolveAvatarImageUrl(row.actor_profile_image, DIGEST_AVATAR_SIZE, DIGEST_AVATAR_OPTIONS),
         }
       })
       try {
