@@ -16,12 +16,15 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 
 export const runtime = 'nodejs'
 
 const FACE_COUNT = 3
-const AVATAR_WIDTH = 96
+
+/* The slot these are laid out in, not a width — the ladder picks the rung, so this URL is
+   character-for-character the one <Avatar size={26}> asks for and the two share a cached object */
+const FACE_SIZE = 26
 const CACHE_TTL_MS = 60_000
 
 /* A row only counts as a member once it carries a profile — see the file header for why */
@@ -51,8 +54,7 @@ export async function GET() {
     const users = faceRows
       .map((row) => ({
         address: String(row.wallet_address),
-        /* still: these are 26px circles — no reason to re-encode an animated GIF frame by frame */
-        avatar: resolveStorageImageUrl(row.profile_image, { width: AVATAR_WIDTH, still: true }),
+        avatar: resolveAvatarImageUrl(row.profile_image, FACE_SIZE),
       }))
       .filter((user) => user.avatar)
 

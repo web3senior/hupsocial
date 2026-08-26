@@ -21,7 +21,7 @@ import { getAddress } from 'viem'
 import { normalize } from 'viem/ens'
 import pool from '@/lib/db'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
@@ -30,7 +30,8 @@ const DEFAULT_LIMIT = 8
 const MAX_LIMIT = 20
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 const MIN_QUERY_LENGTH = 2
-const AVATAR_WIDTH = 96
+/* The slot a result row lays its picture out in; the ladder turns it into a shared rung */
+const RESULT_AVATAR_SIZE = 36
 
 // ENS lives on Ethereum mainnet and nowhere else — a `.eth` name means the same wallet whichever
 // chain the transfer ends up on, so resolution is chain-independent from the caller's point of view
@@ -63,7 +64,7 @@ const checksum = (value) => {
   }
 }
 
-const avatarUrl = (src) => resolveStorageImageUrl(src, { width: AVATAR_WIDTH })
+const avatarUrl = (src) => resolveAvatarImageUrl(src, RESULT_AVATAR_SIZE)
 
 // A UP name is whatever its owner wrote in its metadata, so it is never proof of identity — the
 // picker always shows the address next to it, which is why every entry carries one.

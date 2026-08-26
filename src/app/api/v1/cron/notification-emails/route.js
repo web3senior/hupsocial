@@ -25,13 +25,19 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { getMediaItems, getText } from '@/lib/content'
 import { sendNotificationDigest } from '@/lib/mailer'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 
 // Serverless-budget caps: recipients per run, rows fetched per run, and lines
 // actually listed in one digest (the rest is folded into "+N more").
 const MAX_RECIPIENTS = 50
 const MAX_ROWS = 500
 const MAX_LISTED = 10
+
+/* The slot the digest template draws an actor at. Sized rather than given a width so it lands on
+   the same ladder rung the app itself uses — the picture is usually already encoded and cached by
+   the time a digest goes out, and mail clients get a still frame rather than an animation many of
+   them refuse to play anyway. */
+const DIGEST_AVATAR_SIZE = 32
 
 // Quoted reply text is a preview, not the post — long enough to carry a real
 // sentence, short enough that ten of them stay one scroll.
@@ -260,7 +266,7 @@ export async function GET(request) {
           line: digestLine(row),
           snippet: ref ? snippets.get(postKey(ref.postId, ref.networkId, ref.contractAddress)) || null : null,
           action_url: row.action_url,
-          avatar: resolveStorageImageUrl(row.actor_profile_image, { width: 64 }),
+          avatar: resolveAvatarImageUrl(row.actor_profile_image, DIGEST_AVATAR_SIZE),
         }
       })
       try {

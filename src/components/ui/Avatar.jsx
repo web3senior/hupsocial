@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { resolveStorageImageUrl, resolveStorageGatewayUrl } from '@/lib/storageHelper'
+import { resolveAvatarImageUrl, resolveStorageGatewayUrl } from '@/lib/storageHelper'
 import { FALLBACK_AVATAR_SRC } from '@/lib/utils'
 
 /* How long a retry may hang before the default PFP takes the slot.
@@ -16,16 +16,12 @@ import { FALLBACK_AVATAR_SRC } from '@/lib/utils'
  * and actively loading by the time this clock is armed. */
 const RETRY_DEADLINE_MS = 8000
 
-/* What a layout pixel costs in real ones.
+/* What fills the circle until the picture does.
  *
- * `size` is the box the picture is laid out in; the screen paints that box with `devicePixelRatio`
- * times as many pixels, so an encode at `size` is upscaled into it and arrives soft — invisible at
- * 20px, unmissable on the profile header. The multiplier is a constant and not `devicePixelRatio`
- * because this component renders on the server too: reading a browser-only value there either
- * guesses wrong in the HTML or hydrates to a second URL and pulls every avatar twice. 2 is what
- * the screens we run on report, and the proxy resizes `withoutEnlargement`, so asking past the
- * original's own width costs nothing. */
-const PIXEL_DENSITY = 2
+ * An `<img>` with nothing decoded yet paints nothing, so every avatar on a cold surface was a
+ * hole in the layout for as long as the fetch took. The token is the one the skeletons already
+ * use, and it is dropped the moment the picture loads so a transparent PNG is not tinted by it. */
+const PLACEHOLDER_STYLE = { backgroundColor: 'var(--shimmer-bg)' }
 
 /**
  * Avatar
@@ -35,23 +31,23 @@ const PIXEL_DENSITY = 2
  *
  * `profile_image` arrives in whatever shape the row carries: `ipfs://` from our own DB, a full
  * api.universalprofile.cloud URL from the LUKSO indexer, an http avatar, or nothing. All of it
- * resolves through the sharp proxy at the rendered width times the display's pixel density, which
- * matters twice over. A 36px slot stops pulling a full-size original — UP pictures run to
- * megabytes — and, because the proxy always answers, a picture that cannot be fetched produces a
- * real HTTP error instead of an open socket, so the fallback below actually runs.
+ * resolves through the sharp proxy at the ladder rung covering this slot, which matters twice
+ * over. A 36px slot stops pulling a full-size original — UP pictures run to megabytes — and,
+ * because the proxy always answers, a picture that cannot be fetched produces a real HTTP error
+ * instead of an open socket, so the fallback below actually runs.
  *
  * Three stages, each tried only when the one before it failed: the proxy, then the configured
  * gateway direct (full size, but a real picture beats the default), then the bundled default.
  * @param {Object} props
  * @param {string|null} props.src Raw profile image reference.
- * @param {number} [props.size] Laid-out width in px; the encode is requested at PIXEL_DENSITY× it.
+ * @param {number} [props.size] Laid-out width in px; resolveAvatarImageUrl picks the rung.
  * @param {string} [props.alt] Alt text; empty for decorative avatars beside a visible name.
  * @param {string} [props.className] Avatar class from the consumer's module.
  * @param {'lazy'|'eager'} [props.loading] Native loading hint.
  * @param {string} [props.title] Native tooltip.
  */
 const Avatar = ({ src, size = 36, alt = '', className, loading = 'lazy', title }) => {
-  const proxied = resolveStorageImageUrl(src, { width: size * PIXEL_DENSITY })
+  const proxied = resolveAvatarImageUrl(src, size)
   const gateway = resolveStorageGatewayUrl(src)
 
   /* Deduplicated because a reference that is neither IPFS nor a UP-cloud URL resolves to
@@ -85,7 +81,10 @@ const Avatar = ({ src, size = 36, alt = '', className, loading = 'lazy', title }
       width={size}
       height={size}
       loading={loading}
+      /* Off the main thread, so a page of avatars decoding at once cannot stall the feed */
+      decoding="async"
       className={className}
+      style={settled ? undefined : PLACEHOLDER_STYLE}
       /* SCSS hook for the surfaces that draw the default differently from a real picture */
       data-fallback={current === FALLBACK_AVATAR_SRC ? 'true' : undefined}
       onLoad={() => setAttempt({ src, stage, settled: true })}

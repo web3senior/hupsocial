@@ -253,6 +253,59 @@ export const resolveStorageImageUrl = (src, options = {}) => {
   return resolveStorageUrl(src)
 }
 
+/* What a layout pixel costs in real ones.
+ *
+ * A slot is laid out at `size`; the screen paints it with `devicePixelRatio` times as many
+ * pixels, so an encode at `size` is upscaled into the box and arrives soft — invisible at 20px,
+ * unmissable on the profile header. A constant rather than `devicePixelRatio` because avatars
+ * render on the server too: reading a browser-only value there either guesses wrong in the HTML
+ * or hydrates to a second URL and pulls every picture twice. 2 is what the screens we run on
+ * report, and the proxy resizes `withoutEnlargement`, so asking past the original's own width
+ * costs nothing. */
+export const AVATAR_PIXEL_DENSITY = 2
+
+/* The only widths a profile picture is ever encoded at.
+ *
+ * The proxy keys its cache — and the CDN its object — on the exact width, and the app lays
+ * avatars out at ten different sizes (20, 24, 26, 30, 32, 36, 38, 44, 48, 64). Every one was its
+ * own gateway download, its own sharp encode and its own cold CDN object, so a picture was never
+ * warm however many people had already seen it: the feed missed on 72, the hovercard missed on
+ * 88, the header missed on 128. Rounding up onto three rungs collapses all ten. The first
+ * visitor to any surface pays; everyone after gets an edge hit against an `immutable` object.
+ *
+ * Rounding UP rather than to the nearest is what leaves this without a downside — every slot
+ * stays supersampled, and none is ever upscaled into softness. */
+const AVATAR_WIDTHS = [48, 96, 192, 384]
+
+/* Where animation starts paying for itself.
+ *
+ * Under this a profile picture is a circle no wider than a favicon: motion in it cannot be read,
+ * while the encode is very much felt. The 60-frame GIF avatar in our own users table is 13.6MB
+ * at source, 775KB re-encoded animated, and 1.1KB as a still — and the animated encode is the
+ * one that runs the proxy past its fetch budget and 502s, which is what left GIF profile
+ * pictures showing the default PFP. Small slots take the first frame; the profile header and the
+ * hovercard, big enough to actually watch, animate. */
+const AVATAR_ANIMATE_FROM = 192
+
+/* The size a route with no slot to go on should ask for — the top rung, so a consumer that
+   renders the URL as-is still gets a picture that holds up in the biggest box the app has. */
+export const AVATAR_MAX_SIZE = AVATAR_WIDTHS[AVATAR_WIDTHS.length - 1] / AVATAR_PIXEL_DENSITY
+
+/**
+ * Resolves a profile picture at the ladder rung covering the slot it is laid out in — the one
+ * way an avatar URL is built, on the server and in the browser alike. Sharing rungs across
+ * surfaces is the entire point; see AVATAR_WIDTHS.
+ * @param {string} src - Stored reference, in any shape resolveStorageImageUrl accepts.
+ * @param {number} size - Laid-out width in CSS px. Pass AVATAR_MAX_SIZE when there is no slot.
+ * @returns {string|null} The proxy URL, or null when the reference carries no picture.
+ */
+export const resolveAvatarImageUrl = (src, size) => {
+  const target = size * AVATAR_PIXEL_DENSITY
+  const width = AVATAR_WIDTHS.find((rung) => rung >= target) ?? AVATAR_WIDTHS[AVATAR_WIDTHS.length - 1]
+
+  return resolveStorageImageUrl(src, { width, still: width < AVATAR_ANIMATE_FROM })
+}
+
 /**
  * Resolves an image reference straight to the configured IPFS gateway, bypassing the sharp
  * proxy. This is the fallback for when the proxy's raced gateways don't hold a CID that the

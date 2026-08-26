@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { AVATAR_MAX_SIZE, resolveAvatarImageUrl } from '@/lib/storageHelper'
 import { queryUniversalProfile } from '@/lib/lukso'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
@@ -81,7 +81,7 @@ export async function GET(request, { params }) {
       /* Fallback to profileImages array elements if they exist as per incoming payload */
       profile.profileImage =
         profile.profileImages && profile.profileImages.length > 0
-          ? resolveStorageImageUrl(profile.profileImages[0].src, { width: 512 })
+          ? resolveAvatarImageUrl(profile.profileImages[0].src, AVATAR_MAX_SIZE)
           : null
 
       profile.wallet_address = normalizeAddress(address) // Ensure wallet address is included in the response for consistency
@@ -114,7 +114,7 @@ export async function GET(request, { params }) {
     delete dbProfile.email_notifications
 
     /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
-    dbProfile.profileImage = resolveStorageImageUrl(dbProfile.profileImage, { width: 512 })
+    dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
 
     /* The raw pointer columns say nothing a client can render, and a stale one must never be
        mistaken for a badge — only the verified resolution above is exposed. */
