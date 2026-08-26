@@ -81,4 +81,22 @@ const CashtagCard = ({ token, onRemove, wide = false }) => {
   )
 }
 
+/**
+ * The card's own placeholder, kept in this file and on this stylesheet so the two cannot drift:
+ * a skeleton whose shape is a guess is worse than none, because the row visibly resizes the
+ * moment the quote lands. Same block, same frame, same chart slice — only the contents are bars.
+ */
+export const CashtagCardSkeleton = ({ wide = false }) => (
+  <article className={clsx(styles.cashtagCard, styles['cashtagCard--skeleton'], wide && styles['cashtagCard--wide'])} aria-hidden="true">
+    <span className={clsx('shimmer', styles.cashtagCard__skeletonIcon)} />
+
+    <div className={styles.cashtagCard__identity}>
+      <span className={clsx('shimmer', styles.cashtagCard__skeletonName)} />
+      <span className={clsx('shimmer', styles.cashtagCard__skeletonMeta)} />
+    </div>
+
+    <span className={clsx('shimmer', styles.cashtagCard__chartWrap, styles.cashtagCard__skeletonChart)} />
+  </article>
+)
+
 export default CashtagCard

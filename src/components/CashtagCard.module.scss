@@ -150,3 +150,54 @@
     max-inline-size: 52%;
   }
 }
+
+// The loading placeholder is the same block, not a lookalike: it inherits the card's frame,
+// padding and — through __chartWrap — the exact slice the trend will land in, including the
+// lone-card rule above. Its parts are sized from the real row's own metrics (a 32px disc, a
+// 40px plot), so a card fills in where its skeleton stood rather than resizing the post.
+.cashtagCard--skeleton {
+  .cashtagCard__identity {
+    // Bars need air between them that two lines of type do not
+    gap: 6px;
+  }
+}
+
+.cashtagCard__skeletonIcon {
+  flex: 0 0 auto;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 50%;
+}
+
+.cashtagCard__skeletonName,
+.cashtagCard__skeletonMeta {
+  block-size: 12px;
+  border-radius: 6px;
+}
+
+// Proportioned like the lines they stand in for: the name is one word, the meta row carries
+// symbol, price and the move
+.cashtagCard__skeletonName {
+  inline-size: 55%;
+}
+
+.cashtagCard__skeletonMeta {
+  inline-size: 78%;
+}
+
+.cashtagCard__skeletonChart {
+  block-size: 40px;
+  border-radius: 10px;
+  // Echoes the plot about to replace it — the sparkline's own area gradient, same token, a
+  // fraction of the strength. Faint on purpose: the card has not measured a direction yet,
+  // and a confident green here would announce one.
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--chart-up) 20%, transparent) 0%, transparent 100%);
+
+  // The dark themes carry a brighter green (#22c55e against #16a34a) over a far darker ground,
+  // where the same 20% stops reading as a hint and starts reading as a chart that has already
+  // loaded. Half the tint puts it back at the same distance from its surface.
+  :global([data-theme='dark']) &,
+  :global([data-theme='terminal']) & {
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--chart-up) 11%, transparent) 0%, transparent 100%);
+  }
+}

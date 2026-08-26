@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { useCashtags } from '@/hooks/useCashtags'
-import CashtagCard from './CashtagCard'
+import CashtagCard, { CashtagCardSkeleton } from './CashtagCard'
 import styles from './CashtagStrip.module.scss'
 
 // Below this the strip is at an end, and the wheel belongs to the page again
@@ -24,7 +24,7 @@ const EDGE_SLOP_PX = 2
  * hover. Touch needs neither and gets neither.
  */
 const CashtagStrip = ({ text, cashtags }) => {
-  const { tokens } = useCashtags(text, cashtags)
+  const { tokens, symbols, isLoading } = useCashtags(text, cashtags)
   const trackRef = useRef(null)
   const [edges, setEdges] = useState({ start: true, end: true })
 
@@ -85,9 +85,25 @@ const CashtagStrip = ({ text, cashtags }) => {
     el.scrollBy({ left: step ?? direction * el.clientWidth, behavior: 'smooth' })
   }
 
-  // Renders nothing until there is something real to show — a skeleton here would make every
-  // post in the feed jump as prices land
-  if (tokens.length === 0) return null
+  // Nothing quoted and nothing coming: the post named no token the app can vouch for, or the
+  // API vouched for none of the ones it did
+  if (tokens.length === 0 && !isLoading) return null
+
+  // Placeholders while the first quotes are in flight. What makes these safe is that the
+  // symbols are known synchronously — they are read straight out of the post's own text — so
+  // the strip reserves exactly the cards it is about to draw, at exactly their height, and the
+  // row fills in where it stood instead of shoving the feed down as prices land.
+  if (tokens.length === 0) {
+    return (
+      <div className={styles.cashtagStrip} aria-hidden="true">
+        <div className={styles.cashtagStrip__track}>
+          {symbols.map((symbol) => (
+            <CashtagCardSkeleton key={symbol} wide={symbols.length === 1} />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
