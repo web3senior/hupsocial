@@ -346,6 +346,34 @@
       background: var(--surface-muted, rgba(128, 128, 128, 0.12));
     }
 
+    /* A GFM table is the one block that can overrun the measure, and the global table stylesheet
+       centres every cell and fixes the layout — neither of which suits prose. Matched to the
+       reader so the preview is a preview. */
+    :global(table) {
+      display: block;
+      overflow-x: auto;
+      width: 100%;
+      margin: 0 0 1em;
+      table-layout: auto;
+      border-collapse: collapse;
+      font-size: 0.95em;
+    }
+
+    :global(th),
+    :global(td) {
+      padding: 0.5em 0.75em;
+      border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+      text-align: start;
+    }
+
+    :global(th) {
+      background: var(--surface-muted, rgba(128, 128, 128, 0.1));
+      font-weight: 600;
+      font-size: inherit;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+
     /* Same reason as the reader: Global.scss strips list markers app-wide */
     :global(ul) {
       margin: 0 0 1em;

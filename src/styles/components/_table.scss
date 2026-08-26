@@ -1,5 +1,9 @@
+/* Colours here are theme tokens, not literals. This file used to hardcode #ccc borders, #fff
+   rows and a gray-200 header, which meant every table in the app rendered as a white block with
+   near-white text on it in dark mode — legible only in the light theme it was written against.
+   Layout is untouched; only the colours moved onto tokens. */
 table {
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   border-collapse: collapse;
   margin: 0;
   padding: 0;
@@ -13,12 +17,14 @@ table caption {
 }
 
 table tr {
-  background-color: #fff;
-  border: 1px solid var(--gray-300);
+  /* Transparent rather than a surface colour: the table then sits on whatever background it was
+     placed on, which is correct in every theme without needing a value per theme. */
+  background-color: transparent;
+  border: 1px solid var(--border);
   padding: 0.35em;
 
   &:hover {
-    background-color: var(--gray-50);
+    background-color: var(--surface-muted);
   }
 }
 
@@ -35,7 +41,7 @@ table th {
 }
 
 table thead th {
-  background-color: var(--gray-200);
+  background-color: var(--surface-muted);
 }
 
 @media screen and (max-width: 600px) {
@@ -64,7 +70,7 @@ table thead th {
   }
 
   table td {
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border);
     display: block;
     font-size: 0.8em;
   }

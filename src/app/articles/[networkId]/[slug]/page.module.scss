@@ -169,6 +169,9 @@
       overflow-x: auto;
       width: 100%;
       margin: 0 0 1.5em;
+      /* The global table stylesheet fixes the layout, which forces equal columns regardless of
+         content — fine for a data grid, wrong for a table inside prose. */
+      table-layout: auto;
       border-collapse: collapse;
       font-size: 0.95em;
     }
@@ -180,9 +183,14 @@
       text-align: start;
     }
 
+    /* The global sheet renders every th small, uppercase and letter-spaced. That reads as a data
+       grid; a table in an article is a sentence in rows. */
     :global(th) {
       background: var(--surface-muted, rgba(128, 128, 128, 0.1));
       font-weight: 600;
+      font-size: inherit;
+      letter-spacing: normal;
+      text-transform: none;
     }
   }
 

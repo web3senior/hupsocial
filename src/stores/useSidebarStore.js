@@ -48,7 +48,9 @@ export const NAV_ITEMS_SCHEMA = [
   // With the social rows for the same reason polls are: an article is something someone wrote,
   // not something they listed for sale. The directory is public and the only reading surface
   // for long-form, so it earns a row rather than living behind the More menu.
-  { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon },
+  // Badged because nobody is looking for a reading surface that did not exist last week; drop
+  // the `badge` key once it has settled in, the way the note above the Chat row says.
+  { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon, badge: 'new' },
   { id: 'bazaar', name: 'Bazaar', path: sectionLanding(SECTIONS.bazaar), icon: StorefrontIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
   { id: 'trade', name: 'Trade', path: sectionLanding(SECTIONS.trade), icon: ArrowsDownUpIcon, activePaths: sectionPaths(SECTIONS.trade) },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },

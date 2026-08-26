@@ -1,11 +1,12 @@
 /* A reading list, not a card grid: one article per row, title-first, so the page scans like a
    table of contents. Covers are a thumbnail on the side rather than a hero — at index scale the
    art is an aid to recognition, not the reason to stop. */
+/* No padding of its own — the page container supplies it, the same way every other directory
+   sits inside its card. */
 .directory {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem 1rem 3rem;
 }
 
 .directory__header {
@@ -35,7 +36,10 @@
   gap: 0.35rem;
   padding: 0.45rem 0.9rem;
   border-radius: 999px;
-  background: var(--primary, #2a78d6);
+  /* Takes the connected chain's colour, which wagmi writes onto the root element when the chain
+     changes. It is runtime-only — undefined until a wallet connects — so the fallback is not
+     optional here: bare, this button would be invisible to every signed-out visitor. */
+  background: var(--network-color-primary, var(--primary, #2a78d6));
   color: var(--white, #fff);
   font-size: var(--font-size-12, 0.75rem);
   font-weight: 600;
