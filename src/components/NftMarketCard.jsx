@@ -7,7 +7,8 @@ import { CubeIcon, DiamondIcon, TagIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
 import { formatStake } from '@/hooks/useStakeToken'
 import { useProfile } from '@/hooks/useProfile'
-import { handleBrokenImage, handleBrokenAvatar } from '@/lib/utils'
+import { handleBrokenImage } from '@/lib/utils'
+import Avatar from '@/components/ui/Avatar'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import NftQuickBuy from '@/components/NftQuickBuy'
 import { appChains } from '@/config/contracts'
@@ -135,13 +136,7 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
           <div className={styles.nftCard__footer}>
             <span className={styles.nftCard__seller}>
               {profile?.profileImage ? (
-                <img
-                  className={styles.nftCard__sellerAvatar}
-                  src={profile.profileImage}
-                  alt=""
-                  loading="lazy"
-                  onError={handleBrokenAvatar}
-                />
+                <Avatar className={styles.nftCard__sellerAvatar} src={profile.profileImage} size={30} />
               ) : (
                 <span className={clsx(styles.nftCard__sellerAvatar, styles['nftCard__sellerAvatar--fallback'])} aria-hidden="true">
                   {sellerName.slice(0, 1).toUpperCase()}

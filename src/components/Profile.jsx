@@ -14,8 +14,8 @@ import { addressTag, sameAddress, shortAddress } from '@/lib/address'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
-import { handleBrokenAvatar } from '@/lib/utils'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
+import Avatar from './ui/Avatar'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
 import clsx from 'clsx'
@@ -86,14 +86,11 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             onClick={(e) => e.stopPropagation()}
             aria-label={`Open profile card for ${profile.name}`}
           >
-            <Image
+            <Avatar
               className={clsx(styles.imageWrapper__avatar, 'rounded-full')}
               alt={profile.name}
               src={profile.profileImage}
-              width={36}
-              height={36}
-              unoptimized
-              onError={handleBrokenAvatar}
+              size={36}
             />
             <Identicon
               name={profile.name}
@@ -240,7 +237,7 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
   return (
     <div className={clsx(styles.hoverCard, 'flex flex-column align-items-start gap-050')} onClick={(e) => e.stopPropagation()}>
       <button type="button" className={styles.hoverCard__avatar} onClick={() => creator && router.push(`/${creator}`)}>
-        <Image alt={profile.name} src={profile.profileImage} width={48} height={48} unoptimized onError={handleBrokenAvatar} />
+        <Avatar alt={profile.name} src={profile.profileImage} size={48} />
       </button>
 
       <div className={styles.nameRow}>

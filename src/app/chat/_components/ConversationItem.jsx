@@ -1,5 +1,5 @@
 import { useProfile } from '@/hooks/useProfile'
-import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from '@/components/ui/Avatar'
 import clsx from 'clsx'
 import styles from './Chat.module.scss'
 import { useLastMessage } from '@/hooks/useLastMessage'
@@ -39,11 +39,11 @@ export const ConversationItem = ({ chat, isActive, onSelect, onDelete, isDeletin
     >
       <div className={styles['conversation-item__content']}>
         <div className={styles['conversation-item__user']}>
-          <img
+          <Avatar
             src={profile?.profileImage}
+            size={44}
             alt={displayName}
             className={styles['conversation-item__avatar']}
-            onError={handleBrokenAvatar}
           />
           <div className={styles['conversation-item__info']}>
             <div className="flex justify-between align-items-center">

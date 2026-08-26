@@ -20,7 +20,7 @@ import { usePostStore } from '@/stores/usePostStore'
 import BatchLikeTrigger from './BatchLikeTrigger'
 import NativePopover from './ui/NativePopover'
 import NavBadge from './ui/NavBadge'
-import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from './ui/Avatar'
 import { GitHub } from './Icons'
 import styles from './Aside.module.scss'
 
@@ -95,14 +95,10 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
     <>
       <div className={styles.iconWrapper} data-icon={item.name}>
         {item.avatarSrc ? (
-          <Image
+          <Avatar
             className={clsx(styles.navAvatar, isActive && styles.navAvatarActive)}
             src={item.avatarSrc}
-            alt=""
-            width={20}
-            height={20}
-            unoptimized
-            onError={handleBrokenAvatar}
+            size={20}
           />
         ) : (
           <Icon size={20} weight={isActive ? 'fill' : 'regular'} />

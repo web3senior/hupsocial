@@ -125,7 +125,15 @@ export async function POST(request) {
 const PRIMARY_HEADERS_TIMEOUT_MS = 8000
 /* Fallbacks get less patience: by the time one is asked, the caller has already waited once */
 const FALLBACK_HEADERS_TIMEOUT_MS = 5000
-const BODY_TIMEOUT_MS = 15000
+/* The body phase is timed on PROGRESS, not on total elapsed time, because a flat ceiling
+   cannot tell the two body failures apart. A big file arriving slowly and a file that stops
+   arriving both hit 15s; only one of them says anything about the CID. Partially-pinned
+   content is the case that matters: a UP profile picture whose first UnixFS leaf survives and
+   whose other eight blocks are gone streams ~232KB of its declared 1.98MB from every gateway
+   and then goes silent forever. So the clock restarts on every chunk — a slow transfer keeps
+   buying time as long as bytes keep coming, and a stall is caught in a fraction of the old
+   ceiling and reported for what it is. */
+const BODY_STALL_TIMEOUT_MS = 6000
 /* Ceiling for the whole chain — the primary's patience, one round of fallbacks, and however
    long a slow body is allowed to take — so the encode still fits inside maxDuration after it.
    An unpinned CID costs the first two: 13s, once, then the negative caches take over. */
@@ -207,8 +215,64 @@ function respond(entry) {
 }
 
 /**
+ * Drains a response body under a stall clock rather than a total one. The timer is rearmed on
+ * every chunk, so a transfer keeps its budget for as long as it is making progress and loses it
+ * the moment it stops — which is the difference between a big file on a slow link and content
+ * whose remaining blocks nobody has.
+ * @param {Response} upstream The gateway response, already known to be ok.
+ * @param {Object} budget
+ * @param {number} budget.deadline Absolute time (ms epoch) the whole chain must be done by.
+ * @param {() => void} budget.abort Aborts the underlying request.
+ * @returns {Promise<Buffer>} The complete body.
+ * @throws {Error} `stalled: true` and the byte count so far when the stream goes quiet.
+ */
+async function drainBody(upstream, { deadline, abort }) {
+  const reader = upstream.body.getReader()
+  const chunks = []
+  let received = 0
+  let stalled = false
+
+  const arm = () => {
+    const wait = Math.min(BODY_STALL_TIMEOUT_MS, deadline - Date.now())
+    return setTimeout(() => {
+      /* Only a full quiet window is evidence about the content. When the clamp above cut the
+         wait short, what expired was the chain's total budget mid-transfer, and that says
+         nothing about the CID — the bytes were still coming. */
+      stalled = wait >= BODY_STALL_TIMEOUT_MS
+      abort()
+    }, Math.max(1, wait))
+  }
+
+  let timer = arm()
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      clearTimeout(timer)
+      chunks.push(value)
+      received += value.length
+      timer = arm()
+    }
+  } catch (error) {
+    if (!stalled) throw error
+
+    const timeout = new Error(`stalled after ${received} bytes`)
+    timeout.name = 'TimeoutError'
+    timeout.stalled = true
+    throw timeout
+  } finally {
+    clearTimeout(timer)
+  }
+
+  return Buffer.concat(chunks)
+}
+
+/**
  * Fetches one gateway under the two-phase budget. Rejects with an error carrying `phase`
- * ('headers' | 'body'), so the caller can tell "never found it" from "found it, lost it".
+ * ('headers' | 'body'), so the caller can tell "never found it" from "found it, lost it",
+ * plus `stalled` on the body failure that means the content stopped arriving mid-stream.
  * @param {string} url Full gateway URL for the CID.
  * @param {Object} budget
  * @param {number} budget.headersMs How long to wait for the gateway to answer at all.
@@ -223,7 +287,7 @@ async function fetchGateway(url, { headersMs, deadline, signal }) {
   const cancel = () => controller.abort()
   signal?.addEventListener('abort', cancel, { once: true })
   let phase = 'headers'
-  let timer = arm(headersMs)
+  const timer = arm(headersMs)
 
   try {
     const upstream = await fetch(url, { signal: controller.signal })
@@ -246,15 +310,15 @@ async function fetchGateway(url, { headersMs, deadline, signal }) {
 
     clearTimeout(timer)
     phase = 'body'
-    timer = arm(BODY_TIMEOUT_MS)
 
-    return { url, contentType, buffer: Buffer.from(await upstream.arrayBuffer()) }
+    return { url, contentType, buffer: await drainBody(upstream, { deadline, abort: cancel }) }
   } catch (error) {
     if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-      const cancelled = signal?.aborted === true
-      const timeout = new Error(cancelled ? 'cancelled' : `timed out waiting for ${phase}`)
+      const cancelled = signal?.aborted === true && !error.stalled
+      const timeout = new Error(cancelled ? 'cancelled' : error.stalled ? error.message : `timed out waiting for ${phase}`)
       timeout.name = cancelled ? 'CancelledError' : 'TimeoutError'
       timeout.phase = phase
+      timeout.stalled = error.stalled === true
       throw timeout
     }
     error.phase ??= phase
@@ -315,10 +379,16 @@ async function fetchFromGateways(cid) {
   const failure = new Error(attempts.map(({ host, error }) => `${host} ${error.message}`).join('; ') || 'no IPFS gateway configured')
   failure.name = attempts.some(({ error }) => error.name === 'TimeoutError') ? 'TimeoutError' : 'GatewayError'
   failure.gateway = true
-  /* Reached every gateway, and each one either hung or refused before sending a byte. A
-     connection error is not evidence about the CID, only about our side of the network. */
+  /* Reached every gateway, and not one of them could produce the content: each either hung or
+     refused before sending a byte, or started sending and went quiet with the file unfinished.
+     Both are facts about the content — nobody holds all of its blocks — where a connection
+     error, or a transfer that simply ran out of the chain's budget while still moving, is only
+     a fact about our side of the network. */
   failure.unresolvable =
-    attempts.length > 0 && attempts.every(({ error }) => error.phase === 'headers' && (error.name === 'TimeoutError' || error.status))
+    attempts.length > 0 &&
+    attempts.every(
+      ({ error }) => error.stalled === true || (error.phase === 'headers' && (error.name === 'TimeoutError' || error.status)),
+    )
   throw failure
 }
 
@@ -326,10 +396,13 @@ async function fetchFromGateways(cid) {
  * Writes a failed resolve into every cache it belongs in and shapes the entry to serve.
  *
  * Three classes, believed for different lengths:
- * - Unresolvable: no gateway ever started sending the content. That says something about the
- *   CID (unpinned, mistyped), so it goes to the durable store too, and is held for the full TTL.
- * - Transient: a gateway had the content but couldn't deliver it in time, or was reachable only
- *   to error. That says something about this minute, so it is held briefly, in-process only.
+ * - Unresolvable: no gateway could produce the content — none ever started sending it, or the
+ *   ones that did went quiet with the file unfinished. That says something about the CID
+ *   (unpinned, partially pinned, mistyped), so it goes to the durable store too, and is held
+ *   for the full TTL.
+ * - Transient: a gateway had the content and was still delivering it when the budget ran out,
+ *   or was reachable only to error. That says something about this minute, so it is held
+ *   briefly, in-process only.
  * - Ours: sharp or heic-convert rejected the bytes. A deploy fixes this class and a deploy
  *   restarts the process, so in-process for the full TTL is exactly right.
  * @param {Object} params

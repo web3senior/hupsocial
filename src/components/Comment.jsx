@@ -27,7 +27,7 @@ import {
 import { renderMarkdown } from '@/lib/markdown'
 import { getIPFS } from '@/lib/ipfs'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
-import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from './ui/Avatar'
 import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
 import { DotsThreeIcon } from '@phosphor-icons/react'
@@ -580,11 +580,11 @@ const ConnectedProfile = ({ addr }) => {
         router.push(`/u/${addr}`)
       }}
     >
-      <img
+      <Avatar
         alt={profile.name || `Default PFP`}
-        src={`${profile.profileImage}`}
+        src={profile.profileImage}
+        size={36}
         className={`rounded`}
-        onError={handleBrokenAvatar}
       />
 
       <figcaption className={`flex flex-column`}>

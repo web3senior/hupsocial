@@ -109,16 +109,31 @@ export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
    stored reference gets back to a bare CID. */
 const UP_CLOUD_IMAGE_PREFIX = 'https://api.universalprofile.cloud/image/'
 
+/* Our own proxy endpoint — which is a shape we RECEIVE as well as one we emit. The profile API
+   resolves `profileImage` through resolveStorageImageUrl before serving it, so what reaches a
+   component is usually already a proxy URL at that route's chosen width rather than the stored
+   reference. Reading the CID back out of one is what lets a 26px slot re-resolve at 26px
+   instead of inheriting a 512, and what keeps a direct-gateway retry possible at all. */
+const PROXY_IMAGE_PATH = '/api/ipfs/file'
+
 /**
- * Pulls the bare IPFS CID out of the reference shapes we store — an `ipfs://` URI, or a LUKSO
- * `/image/` CDN URL, whose `?method=…&data=…` verification params are no part of the CID.
- * @param {string} src - The stored image reference.
+ * Pulls the bare IPFS CID out of every reference shape that reaches us — an `ipfs://` URI, a
+ * LUKSO `/image/` CDN URL whose `?method=…&data=…` verification params are no part of the CID,
+ * or one of our own already-resolved proxy URLs.
+ * @param {string} src - The stored or already-resolved image reference.
  * @returns {string|null} The CID (with any subpath), or null when the shape carries none.
  */
 export const extractIPFSCid = (src) => {
   if (!src || typeof src !== 'string') return null
   if (isIPFSHash(src)) return src.replace(/^ipfs:\/\//, '') || null
   if (src.startsWith(UP_CLOUD_IMAGE_PREFIX)) return src.slice(UP_CLOUD_IMAGE_PREFIX.length).split('?')[0] || null
+
+  /* Matched by path rather than by full URL so it reads both the relative form the resolver
+     emits and the absolute one a serialized payload may carry. URLSearchParams also undoes the
+     encoding, which matters for the CIDs that carry a `/0-profile…` subpath. */
+  const proxyAt = src.indexOf(`${PROXY_IMAGE_PATH}?`)
+  if (proxyAt !== -1) return new URLSearchParams(src.slice(proxyAt + PROXY_IMAGE_PATH.length + 1)).get('cid') || null
+
   return null
 }
 
@@ -216,11 +231,19 @@ export const resolveStorageImageUrl = (src, options = {}) => {
     return params.length ? `${base}&${params.join('&')}` : base
   }
 
-  /* LUKSO's UP-cloud image CDN won't resize: ?width= comes back 404, and the bare path serves
-     the full original — so a 26px avatar can pull megabytes (animated GIF profile pictures are
-     the worst case) and often hasn't decoded by the time the surface is on screen. The path
-     after /image/ is the IPFS CID, and NEXT_PUBLIC_IPFS_GATEWAY_URL is that same host's /ipfs/
-     route — so hand the CID to the sharp proxy, which does honour a width. */
+  /* Two shapes land here carrying a CID that is not an `ipfs://` URI, and both need the width
+     applied rather than ignored:
+
+     LUKSO's UP-cloud image CDN won't resize — ?width= comes back 404 and the bare path serves
+     the full original, so a 26px avatar can pull megabytes (animated GIF profile pictures are
+     the worst case) and often hasn't decoded by the time the surface is on screen.
+
+     Our own proxy URLs arrive already resolved at whichever width the producing route picked —
+     512 from the profile API — which is just as wrong for a 26px slot, and silently so, since
+     the URL looks correct.
+
+     Either way the answer is the same: recover the CID and re-resolve it through the sharp
+     proxy at the width the caller actually needs. */
   if (options.width) {
     const cid = extractIPFSCid(src)
     if (cid) return resolveIPFSImageUrl(cid, options)

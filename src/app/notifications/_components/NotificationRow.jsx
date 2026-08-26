@@ -11,7 +11,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { getPostById } from '@/lib/api'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
-import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from '@/components/ui/Avatar'
 import { amountOf, hrefOf, previewPostIdOf, quotedSubjectOf } from './notificationModel'
 import styles from './NotificationRow.module.scss'
 
@@ -186,7 +186,7 @@ function ActorAvatar({ address }) {
 
   return (
     <Link href={`/${address}`} className={styles.row__avatar} onClick={(event) => event.stopPropagation()} title={profile.fullName || profile.name}>
-      <Image src={profile.profileImage} alt={profile.name} width={32} height={32} unoptimized onError={handleBrokenAvatar} />
+      <Avatar src={profile.profileImage} alt={profile.name} size={32} />
     </Link>
   )
 }

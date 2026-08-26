@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile } from '@/hooks/useProfile'
-import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from '@/components/ui/Avatar'
 import { WalletOptions } from '@/components/ConnectWallet'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
@@ -61,7 +61,11 @@ function Connected({ addr }) {
     <>
       <header className={styles.card__header}>
         <span className={styles.connected__avatar}>
-          {isLoading || !profile ? <span className={`shimmer rounded`} style={{ width: `64px`, height: `64px` }} /> : <img src={profile.profileImage} alt="" className={`rounded`} onError={handleBrokenAvatar} />}
+          {isLoading || !profile ? (
+            <span className={`shimmer rounded`} style={{ width: `64px`, height: `64px` }} />
+          ) : (
+            <Avatar src={profile.profileImage} size={64} className={`rounded`} />
+          )}
           <span className={styles.connected__check} aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor">
               <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />

@@ -32,6 +32,7 @@ import AssetsTab from '@/components/tabs/AssetsTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from '@/components/ui/Avatar'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
@@ -1002,7 +1003,7 @@ const Status = ({ addr, profile, selfView }) => {
           <main className={`flex flex-column align-items-center gap-1 `}>
             <div className={`${styles.statusPopover__pfp} rounded relative`}>
               <figure className={`rounded`}>
-                <img src={`${profile.profileImage}`} alt="" onError={handleBrokenAvatar} />
+                <Avatar src={profile.profileImage} size={64} />
               </figure>
 
               <div
@@ -1349,6 +1350,9 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 <div className={styles.profileModal__avatarWrap}>
                   <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
                     <figure className={styles.profileModal__avatar}>
+                      {/* Stays a bare img rather than an Avatar: showPFP writes the picked
+                          file's data URL straight onto this node, and a controlled component
+                          would put the saved picture back on its next render */}
                       <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" onError={handleBrokenAvatar} />
                       <div className={styles.profileModal__avatarOverlay}>
                         <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">

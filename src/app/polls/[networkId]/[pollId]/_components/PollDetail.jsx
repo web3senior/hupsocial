@@ -8,10 +8,10 @@ import { useConnection, usePublicClient, useWriteContract } from 'wagmi'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { formatVotes, pollOptions, pollStatus, toRelative } from '@/lib/polls'
-import { shortTxError, handleBrokenAvatar, FALLBACK_AVATAR_SRC } from '@/lib/utils'
-import { resolveStorageImageUrl, resolveStorageGatewayUrl } from '@/lib/storageHelper'
+import { shortTxError } from '@/lib/utils'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
+import Avatar from '@/components/ui/Avatar'
 import PollCard from '@/components/PollCard'
 import PollTimer from '@/components/PollTimer'
 import { CaretLeftIcon, ListChecksIcon } from '@phosphor-icons/react'
@@ -20,39 +20,6 @@ import styles from './PollDetail.module.scss'
 const fetcher = (url) => fetch(url).then((res) => res.json())
 
 const shortWallet = (wallet) => (wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '')
-
-/**
- * Poll Avatar
- * `profile_image` arrives in whatever shape the row carries — `ipfs://` from our own DB, a full
- * api.universalprofile.cloud URL from the LUKSO indexer — so the universal resolver does the
- * routing rather than the IPFS one, which would send that whole CDN URL as the CID and leave
- * every UP avatar on the default.
- *
- * Resolving through the sharp proxy keeps a 64px slot from pulling a full-size original, but the
- * proxy's raced gateways don't hold every CID that the configured gateway does. So a proxy miss
- * retries the gateway directly — full size, but a real picture beats the default — before giving
- * up on the default.
- * @param {Object} props
- * @param {string|null} props.src Raw profile image reference from the API.
- * @param {number} props.size Rendered width, in px, handed to the resize proxy.
- * @param {string} props.className Avatar class from the consumer's module.
- */
-function PollAvatar({ src, size, className }) {
-  const proxied = resolveStorageImageUrl(src, { width: size })
-  const gateway = resolveStorageGatewayUrl(src)
-
-  const retryThenFallback = (event) => {
-    const img = event.currentTarget
-    if (gateway && !img.dataset.retriedGateway && img.src !== gateway) {
-      img.dataset.retriedGateway = 'true'
-      img.src = gateway
-      return
-    }
-    handleBrokenAvatar(event)
-  }
-
-  return <img src={proxied || gateway || FALLBACK_AVATAR_SRC} alt="" onError={retryThenFallback} className={className} />
-}
 
 // A plain link rather than history.back(): a shared poll URL is usually the first page of the
 // visit, and "back" from there would leave the site
@@ -157,7 +124,7 @@ export default function PollDetail({ networkId, pollId }) {
 
       <header className={styles.detail__header}>
         <Link href={`/${poll.wallet_address}`} className={styles.detail__creator}>
-          <PollAvatar src={poll.profile_image} size={64} className={styles.detail__avatar} />
+          <Avatar src={poll.profile_image} size={64} className={styles.detail__avatar} />
           <span>
             <strong>{poll.display_name || shortWallet(poll.wallet_address)}</strong>
             <small>asked {toRelative(poll.opened_at)}</small>
@@ -204,7 +171,7 @@ export default function PollDetail({ networkId, pollId }) {
           {recentVotes.map((vote) => (
             <li key={`${vote.wallet_address}-${vote.voted_at}`}>
               <Link href={`/${vote.wallet_address}`} className={styles.detail__voter}>
-                <PollAvatar src={vote.profile_image} size={48} className={styles.detail__avatar} />
+                <Avatar src={vote.profile_image} size={48} className={styles.detail__avatar} />
                 <span>{vote.display_name || shortWallet(vote.wallet_address)}</span>
               </Link>
               {/* Absent until the viewer has voted or the poll has closed — the API withholds

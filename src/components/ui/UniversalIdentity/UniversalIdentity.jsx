@@ -1,7 +1,7 @@
 import React from 'react'
 import clsx from 'clsx'
 import { Identicon } from './Identicon'
-import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from '../Avatar'
 import styles from './UniversalIdentity.module.scss'
 
 export const UniversalIdentity = ({
@@ -20,11 +20,11 @@ export const UniversalIdentity = ({
           
           {/* FRONT SIDE: The standard uploaded profile image */}
           <div className={clsx(styles['user-identity__face'], styles['user-identity__face--front'])}>
-            <img 
-              src={resolvedAvatar} 
-              className={styles['user-identity__avatar']} 
+            <Avatar
+              src={resolvedAvatar}
+              size={80} // Matches full diameter of wrapper container
+              className={styles['user-identity__avatar']}
               alt={`${displayName}'s avatar`}
-              onError={handleBrokenAvatar}
             />
           </div>
 

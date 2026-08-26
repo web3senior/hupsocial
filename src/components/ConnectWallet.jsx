@@ -9,7 +9,7 @@ import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connect
 import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
-import { handleBrokenAvatar } from '@/lib/utils'
+import Avatar from '@/components/ui/Avatar'
 import DialogSheet from '@/components/ui/DialogSheet'
 import NativePopover from '@/components/ui/NativePopover'
 import NetworkSelect from '@/components/ui/NetworkSelect'
@@ -72,14 +72,7 @@ function CommunityProof() {
     <div className={`${styles.proof} flex align-items-center`}>
       <div className={`${styles.proof__avatars} flex`}>
         {proof.users.map((user) => (
-          <img
-            key={user.address}
-            src={user.avatar}
-            alt=""
-            width="26"
-            height="26"
-            onError={handleBrokenAvatar}
-          />
+          <Avatar key={user.address} src={user.avatar} size={26} />
         ))}
       </div>
       <p className={styles.proof__text}>
@@ -389,7 +382,7 @@ export function Profile({ addr }) {
   return (
     <Link href={`/${addr}`}>
       <figure className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`} title={profile.name}>
-        <img alt={profile.name || `PFP`} src={profile.profileImage} className={`rounded`} onError={handleBrokenAvatar} />
+        <Avatar alt={profile.name || `PFP`} src={profile.profileImage} size={38} className={`rounded`} />
       </figure>
     </Link>
   )
