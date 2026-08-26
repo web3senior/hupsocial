@@ -5,6 +5,8 @@ import { PinataSDK } from 'pinata'
 import sharp from 'sharp'
 import { webpAnimationOptions } from '@/lib/webpAnimation'
 import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
+import { addToFilebase } from '@/lib/filebase'
+import { gatewayList } from '@/lib/ipfsGateways'
 import { FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
 import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
 
@@ -41,22 +43,12 @@ export const revalidate = 0
 export const maxDuration = 60
 
 async function uploadToFilebase(file) {
-  const form = new FormData()
-  form.append('file', file, file.name)
-
-  const res = await fetch('https://rpc.filebase.io/api/v0/add', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.FILEBASE_IPFS_RPC_TOKEN}`,
-    },
-    body: form,
+  /* Rebuilt per attempt: a File/Blob is consumed by the request that sends it */
+  return addToFilebase(() => {
+    const form = new FormData()
+    form.append('file', file, file.name)
+    return form
   })
-
-  if (!res.ok) throw new Error(`Filebase RPC ${res.status}: ${await res.text()}`)
-
-  const { Hash } = await res.json()
-  console.log('[filebase] uploaded, CID:', Hash)
-  return Hash
 }
 
 async function uploadToPinata(file) {
@@ -141,26 +133,8 @@ const TOTAL_FETCH_BUDGET_MS = 24000
 /* Less than this left and it is not worth opening a socket */
 const MIN_ATTEMPT_MS = 1500
 
-/* Where the bytes come from. The configured gateway goes first; when it fails, the CID is
-   retried on public gateways that resolve the whole network, so a bad minute at one host no
-   longer decides whether a post has a picture. Filebase before ipfs.io because that is where
-   uploads pin — its gateway has the blocks before anyone else has ever fetched them. */
-const BUILT_IN_FALLBACK_GATEWAYS = ['https://ipfs.filebase.io/ipfs/', 'https://ipfs.io/ipfs/']
-
-/**
- * The gateways to try, in order, deduplicated.
- * @returns {string[]} Base URLs ending in a slash, ready for the CID to be appended.
- */
-function gatewayList() {
-  const configured = [process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL, process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_FALLBACK]
-  const normalized = [...configured, ...BUILT_IN_FALLBACK_GATEWAYS]
-    .filter(Boolean)
-    /* The fallback var has shipped as http:// — every gateway speaks https, and a mixed
-       scheme would only put the same host in the list twice */
-    .map((gateway) => gateway.replace(/^http:\/\//, 'https://'))
-    .map((gateway) => (gateway.endsWith('/') ? gateway : `${gateway}/`))
-  return [...new Set(normalized)]
-}
+/* The gateway chain moved to lib/ipfsGateways so the article body reader walks the same hosts
+   in the same order — two copies would drift the moment one of them gained a fallback. */
 
 /* The bytes are a pure function of cid + params, so they can sit in the shared cache
    forever. Without s-maxage only browsers cached it, and every social crawler that scraped

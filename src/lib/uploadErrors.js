@@ -87,13 +87,29 @@ export function shortUploadError(error, fallback = 'Upload failed', maxLength = 
   return `${message.slice(0, maxLength - 1).replace(/\s+\S*$/, '')}…`
 }
 
+/* A Pinata account that is over its plan, or whose key is rejected, will refuse every upload
+   until someone changes the billing or the token. Reporting that beside a transient Filebase
+   blip reads as two equal causes, when only one of them is about this upload at all. */
+const PINATA_UNAVAILABLE = /plan limit|surpass|quota|exceeded|payment|unauthorized|forbidden|invalid api key|401|403/i
+
 /**
  * Both pinning providers refused an upload: name each with its reason, kept short enough for one
- * toast line. The primary's reason comes first since that is the one worth fixing.
+ * toast line. Filebase leads because it is the primary and the one worth fixing — and when the
+ * Pinata fallback was never going to work, it is named as unavailable rather than as a second
+ * failure, so the reader is not sent chasing the wrong one.
  * @param {unknown} filebaseError
  * @param {unknown} pinataError
  * @returns {string}
  */
 export function bothProvidersFailed(filebaseError, pinataError) {
-  return `Filebase: ${shortUploadError(filebaseError, 'failed', 70)} · Pinata: ${shortUploadError(pinataError, 'failed', 70)}`
+  const attempts = filebaseError?.attempts
+  const tried = attempts > 1 ? ` after ${attempts} tries` : ''
+  const filebase = `Filebase${tried}: ${shortUploadError(filebaseError, 'failed', 70)}`
+
+  const pinataReason = shortUploadError(pinataError, 'failed', 70)
+  const pinata = PINATA_UNAVAILABLE.test(pinataReason)
+    ? 'Pinata fallback unavailable (account limits)'
+    : `Pinata: ${pinataReason}`
+
+  return `${filebase} · ${pinata}`
 }

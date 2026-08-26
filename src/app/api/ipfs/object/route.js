@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
+import { addToFilebase } from '@/lib/filebase'
 import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
 
 const pinata = new PinataSDK({
@@ -10,28 +11,21 @@ const pinata = new PinataSDK({
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+/* This route now retries Filebase before falling back to Pinata, and an article body is the
+   largest thing it pins. Left on the platform default (10–15s without Fluid Compute) the last
+   retry would be killed mid-flight — the failure the retry exists to prevent. Same figure the
+   media route uses. */
+export const maxDuration = 60
 
 async function uploadToFilebase(json) {
-  const form = new FormData()
-  form.append(
-    'file',
-    new Blob([JSON.stringify(json)], { type: 'application/json' }),
-    'metadata.json'
-  )
+  const body = JSON.stringify(json)
 
-  const res = await fetch('https://rpc.filebase.io/api/v0/add', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.FILEBASE_IPFS_RPC_TOKEN}`,
-    },
-    body: form,
+  /* Rebuilt per attempt: the Blob inside is consumed by the request that sends it */
+  return addToFilebase(() => {
+    const form = new FormData()
+    form.append('file', new Blob([body], { type: 'application/json' }), 'metadata.json')
+    return form
   })
-
-  if (!res.ok) throw new Error(`Filebase RPC ${res.status}: ${await res.text()}`)
-
-  const { Hash } = await res.json()
-  console.log('[filebase] uploaded, CID:', Hash)
-  return Hash
 }
 
 async function uploadToPinata(json) {
