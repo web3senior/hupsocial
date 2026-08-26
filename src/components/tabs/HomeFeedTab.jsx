@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
@@ -10,7 +10,9 @@ import { getPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
+import PendingPost from '@/components/PendingPost'
 import { usePostStore } from '@/stores/usePostStore'
+import { usePendingPostStore } from '@/stores/usePendingPostStore'
 import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 import PageTitle from '@/components/PageTitle'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
@@ -62,6 +64,7 @@ export default function HomeFeedTab({
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
   const authoredPostNonce = usePostStore((state) => state.authoredPostNonce)
+  const pendingPosts = usePendingPostStore((state) => state.pending)
 
   const mounted = useClientMounted()
   const { address: evmAddress } = useConnection()
@@ -439,6 +442,23 @@ export default function HomeFeedTab({
     else await pollNewPosts()
   }, [handleManualRefresh, pollNewPosts])
 
+  // The viewer's own posts still in flight, drawn above the list as ghost cards. A ghost stops
+  // being drawn the moment the row it resolved to is actually in this feed — that is the handover,
+  // and doing it per feed means a tab that has not refreshed yet keeps its ghost instead of
+  // blanking because some other tab got there first.
+  const ghostPosts = useMemo(() => {
+    if (pendingPosts.length === 0) return []
+    // Only feeds a plain new post belongs in: the bazaar and NFT tabs list posts by what they
+    // carry, which nothing can know before the post is indexed.
+    if (feedMode !== 'foryou' && feedMode !== 'network') return []
+
+    const listedKeys = new Set((posts?.list ?? []).map(postKey))
+    return pendingPosts.filter((entry) => {
+      if (feedMode === 'network' && Number(entry.networkId) !== Number(networkId)) return false
+      return !(entry.resolvedKey && listedKeys.has(entry.resolvedKey))
+    })
+  }, [pendingPosts, posts.list, feedMode, networkId])
+
   const lastAuthoredNonceRef = useRef(authoredPostNonce)
   useEffect(() => {
     if (authoredPostNonce === lastAuthoredNonceRef.current) return
@@ -482,6 +502,13 @@ export default function HomeFeedTab({
                 </svg>
               </div>
             )}
+
+            {ghostPosts.map((entry) => (
+              <section key={entry.id} className={styles.post}>
+                <PendingPost entry={entry} />
+                {posts?.list?.length > 0 && <hr />}
+              </section>
+            ))}
 
             {postsLoaded === 0 && (loadError ? <FeedError onRetry={handleRetry} /> : <PostSkeletonGrid count={14} />)}
 

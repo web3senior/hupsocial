@@ -1,0 +1,105 @@
+// The ghost row: the author's post drawn where it will land, while the chain and the indexer
+// catch up. Padding matches .post so the swap to the real card moves nothing.
+.pending-post {
+  // The action bar borrows Post.module.scss, and its ripple reads this from the card it sits in
+  --post-button-bg: var(--surface-muted);
+
+  position: relative;
+  overflow: hidden;
+  padding: 20px 20px 0 20px;
+  // A preview of a row, not a row — no clicks, no text selection, no focus stops
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.55;
+  animation: pending-post-breathe 2.6s ease-in-out infinite alternate;
+
+  @media (max-width: 640px) {
+    padding: 10px;
+  }
+
+  // The same glint the feed skeletons sweep, so a post in flight reads as loading at a glance
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(90deg, transparent 0%, var(--shimmer-glint) 50%, transparent 100%);
+    animation: pending-post-sweep 2.2s infinite;
+    pointer-events: none;
+  }
+
+  // Faded and muted still reads as "not landed yet" with every animation gone
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+
+    &::after {
+      content: none;
+    }
+  }
+
+  // Confirmed onchain — only the indexer is left, so the card settles instead of breathing
+  &[data-status='indexed'] {
+    animation: none;
+    opacity: 0.72;
+  }
+
+  // Lines up with .post__main's own indent in the feed, so the swap to the real card shifts
+  // nothing sideways either
+  &__body {
+    padding-left: 3rem;
+  }
+
+  // The action bar's own indent, which .post gives it through its data-content='false' rule
+  &__footer {
+    padding-left: 2.5rem;
+  }
+
+  &__text {
+    font-family: var(--font-sans);
+    font-size: var(--system-16-font-size);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    // Long drafts must not push the rest of the feed down while they are still in flight
+    max-height: 180px;
+    overflow: hidden;
+
+    p {
+      margin: 0;
+
+      &:empty {
+        display: none;
+      }
+    }
+  }
+
+  &__media {
+    overflow: hidden;
+    border-radius: var(--global-border-radius);
+    margin-top: 0.5rem;
+  }
+
+  // Stands in for a quote, poll, listing or market card until the real one can be resolved by id
+  &__attachment {
+    height: 96px;
+    margin-top: 0.5rem;
+    // Same corner as the cards it stands in for — the global .rounded is a pill
+    border-radius: var(--global-border-radius);
+  }
+}
+
+@keyframes pending-post-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pending-post-breathe {
+  0% {
+    opacity: 0.42;
+  }
+
+  100% {
+    opacity: 0.72;
+  }
+}

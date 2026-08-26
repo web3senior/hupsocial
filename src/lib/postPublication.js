@@ -15,6 +15,7 @@ import { toast } from '@/components/NextToast'
 import { usePostStore } from '@/stores/usePostStore'
 import { useComposerStore } from '@/stores/useComposerStore'
 import { useCommentsCacheStore } from '@/stores/useCommentsCacheStore'
+import { usePendingPostStore } from '@/stores/usePendingPostStore'
 
 // cidex only sees the post once the transaction is mined AND its next scan runs, so the wait is
 // a block time plus a poll interval — a couple of seconds on a fast chain, longer on a slow one.
@@ -25,6 +26,10 @@ const POLL_TIMEOUT_MS = 120_000
 // Long enough for a slow chain to mine, short enough that a transaction nobody will ever see
 // mined stops holding a toast open. Running out is not a verdict — see settleTransaction.
 const RECEIPT_TIMEOUT_MS = 120_000
+// How long a handed-over ghost card is kept after the indexer answered. The feed drops it the
+// moment the real row is in its list, so this only sweeps up entries belonging to feeds nobody
+// had open at the time.
+const GHOST_HANDOVER_MS = 30_000
 
 const COPY = {
   post: {
@@ -153,6 +158,31 @@ export function trackPostPublication({
     return
   }
 
+  // A whole post also gets a ghost card at the top of the feed for as long as it is in flight,
+  // so the author watches it sit where it will land instead of watching a toast spin. A reply
+  // belongs to a thread they are already reading and an edit rewrites a card already on screen,
+  // so neither has anywhere to put one. The payload is the plaintext the composer kept for its
+  // own recovery, and its media was pinned before the transaction was sent — the ghost shows the
+  // real post, not a placeholder.
+  const ghost =
+    kind === 'post' && recovery?.state?.content
+      ? {
+          id: `${networkId}:${metadata}`,
+          networkId: Number(networkId),
+          author,
+          content: recovery.state.content,
+          createdAt: Math.floor(Date.now() / 1000),
+          status: 'publishing',
+          resolvedKey: null,
+        }
+      : null
+
+  const ghostStore = usePendingPostStore.getState()
+  if (ghost) ghostStore.addPendingPost(ghost)
+  const dropGhost = () => {
+    if (ghost) ghostStore.removePendingPost(ghost.id)
+  }
+
   const pollForIndexing = () => {
     const startedAt = Date.now()
 
@@ -167,6 +197,13 @@ export function trackPostPublication({
 
       if (found) {
         handle.update(copy.done, 'success')
+        // Handed over rather than dropped: the feed keeps drawing the ghost until the row it
+        // names is actually in the list, so the refresh below swaps one for the other with
+        // nothing blank in between.
+        if (ghost) {
+          ghostStore.updatePendingPost(ghost.id, { status: 'indexed', resolvedKey: `${networkId}:${found.id}` })
+          window.setTimeout(dropGhost, GHOST_HANDOVER_MS)
+        }
         // A reply belongs to a post page's comment list, not the home feed — so it refreshes the
         // thread it landed in instead of pulling page 1 of a feed the author isn't looking at.
         // is_comment is the parent the indexer actually recorded, which beats the composer's own
@@ -179,6 +216,9 @@ export function trackPostPublication({
 
       if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
         handle.update(copy.slow, 'info')
+        // The indexer is behind, not busy: the post surfaces on its own with the next refresh,
+        // and a ghost that outlives the wait is a card that never resolves.
+        dropGhost()
         return
       }
 
@@ -195,6 +235,8 @@ export function trackPostPublication({
 
     if (settled === 'reverted') {
       handle.update(copy.failed, 'error')
+      // Nothing landed, so nothing may keep sitting at the top of the feed
+      dropGhost()
       // The composer comes back holding everything that was written: the content was pinned
       // before the transaction was ever sent, so a second attempt costs only the signature
       useComposerStore.getState().restoreComposer(recovery)
