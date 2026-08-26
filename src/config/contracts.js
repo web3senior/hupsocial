@@ -33,6 +33,10 @@ export const robinhood = defineChain({
 // browsers, whose wallets bring their own RPC, looked fine. Mutating the shared chain object
 // keeps every importer pinned. Only http[0] is read server-side.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
+/* Do not reorder these two to put the official node first: server reads take http[0], and 42's
+   official node 403s them. The browser needs the opposite order and gets it from an explicit
+   fallback() in config/wagmi rather than from this array — a bare http() would read http[0] here
+   and put every page on thirdweb's keyless tier, which rate-limits with -32005. */
 lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.com', 'https://rpc.mainnet.lukso.network'] } }
 
 // Single source of truth for the wagmi config's `chains` tuple and for server-side RPC lookups

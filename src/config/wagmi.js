@@ -1,4 +1,4 @@
-import { createConfig, http, webSocket } from 'wagmi'
+import { createConfig, fallback, http, webSocket } from 'wagmi'
 import {
   arbitrum,
   arbitrumSepolia,
@@ -144,8 +144,19 @@ export const config = createConfig({
     // every browser read on chain 1 fails CORS — the profile Assets tab showed no Ethereum row
     // at all until this was pinned to an endpoint that allows cross-origin calls.
     [mainnet.id]: http('https://ethereum-rpc.publicnode.com'),
-    [lukso.id]: http(),
-    [luksoTestnet.id]: http(),
+    /* LUKSO is the one chain whose browser and server callers need DIFFERENT endpoints, and a bare
+       http() cannot express that: it reads chain.rpcUrls.default.http[0], the same slot the server
+       reads. That slot has to stay thirdweb, because the official node answers server-side callers
+       with a 403 HTML page (see the RPC pins in config/contracts).
+       In a browser the ordering is exactly backwards — thirdweb's keyless tier answers a busy page
+       with -32005 "Request exceeds defined limit", and its error responses carry no CORS headers,
+       so the failure surfaces as an unexplained "Failed to fetch" instead. The official node has
+       no such cap from a browser and passes preflight. Hence an explicit list here: official
+       first, thirdweb kept only as a fallback for the case where the official node is down. */
+    [lukso.id]: fallback([http('https://rpc.mainnet.lukso.network'), http('https://42.rpc.thirdweb.com')]),
+    /* The testnet's default is already the official node, which browsers can reach; wrapped only
+       so a blip retries instead of failing the read outright. */
+    [luksoTestnet.id]: fallback([http('https://rpc.testnet.lukso.network')]),
     [bsc.id]: http(),
     // The official Robinhood endpoint (rpc.mainnet.chain.robinhood.com) sends a malformed
     // Access-Control-Allow-Origin ('*,*') that browsers reject — every client-side read on
