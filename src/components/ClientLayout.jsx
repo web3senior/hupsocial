@@ -11,6 +11,7 @@ import Footer from './Footer'
 import InstallAppDialog from './InstallAppDialog'
 import EmailLoginDialog from './EmailLoginDialog'
 import EmbeddedTxConfirm from './EmbeddedTxConfirm'
+import ComposerRecovery from './ComposerRecovery'
 import OfflineBanner from './ui/OfflineBanner'
 import { Providers } from '@/app/providers'
 import styles from './ClientLayout.module.scss'
@@ -52,6 +53,9 @@ export default function ClientLayout({ children }) {
         {/* Email embedded wallet surfaces: the login flow and its extension-popup stand-in */}
         <EmailLoginDialog />
         <EmbeddedTxConfirm />
+        {/* Composers close on the transaction, not the receipt — this is where one comes back
+            if the chain rejects it after the author has already returned to the feed */}
+        <ComposerRecovery />
       </WagmiContext>
 
       {isBooting && <SplashScreen />}

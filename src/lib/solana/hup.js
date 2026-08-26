@@ -199,9 +199,11 @@ export const confirmSolanaSignature = async (networkId, signature, { timeoutMs =
       console.warn('Solana status poll failed, retrying:', error.message)
     }
 
-    if (status?.err) throw new Error(`Transaction failed onchain: ${JSON.stringify(status.err)}`)
+    // Both exits throw, so the code is what lets a caller tell "the cluster refused this" from
+    // "the cluster never answered" — only the first is evidence the transaction failed
+    if (status?.err) throw Object.assign(new Error(`Transaction failed onchain: ${JSON.stringify(status.err)}`), { code: 'TX_REVERTED' })
     if (status && (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized')) return status
-    if (Date.now() > deadline) throw new Error('Timed out waiting for the Solana transaction to confirm')
+    if (Date.now() > deadline) throw Object.assign(new Error('Timed out waiting for the Solana transaction to confirm'), { code: 'TX_TIMEOUT' })
 
     await sleep(intervalMs)
   }

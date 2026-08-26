@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useSignTypedData, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi'
 import { isSessionActive } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { formatWait } from '@/config/gasless'
@@ -10,7 +10,7 @@ import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } fro
 import { ArrowClockwiseIcon, ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, ListChecksIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
-import { trackPostPublication } from '@/lib/postPublishToast'
+import { trackPostPublication } from '@/lib/postPublication'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useActiveChain } from '@/hooks/useActiveChain'
 import useVisualViewport from '@/hooks/useVisualViewport'
@@ -130,7 +130,22 @@ const loadDraftContent = () => {
   }
 }
 
-const getInitialPostContent = (text, url, actionType, existingPost) => {
+// A published payload carries its attachment references alongside the content (see the tail of
+// handleCreatePost), and each of those is restored into its own state. Leaving them on the
+// content object would have getSerializablePostContent spread a second copy into the next one.
+const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'tokenLaunch', 'nftDrop', 'miniApp', 'poll']
+
+const stripAttachments = (content) => {
+  const bare = { ...content }
+  for (const key of ATTACHMENT_KEYS) delete bare[key]
+  return bare
+}
+
+const getInitialPostContent = (text, url, actionType, existingPost, restoredContent) => {
+  // A submission the chain rejected comes back exactly as it was sent — ahead of the draft,
+  // which the composer already cleared when it closed on the transaction
+  if (restoredContent?.elements) return stripAttachments(restoredContent)
+
   if (actionType === 'edit' && existingPost) {
     const content = getContentPayload(existingPost)
     const existingText = getContentElement(content, 'text')?.data?.text || ''
@@ -352,15 +367,19 @@ const restoreCaretState = (editor, caret) => {
 
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed }) {
+export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed, restoreState = null }) {
   const mounted = useClientMounted()
   // The composer mounts open and unmounts closed, so this tracks exactly the sheet's lifetime:
   // the mobile fullscreen sheet sizes itself off these vars to survive the software keyboard
   useVisualViewport()
 
+  // What a rejected submission left behind (components/ComposerRecovery): the payload that was
+  // pinned, which already carries every attachment reference, plus the settings it was sent with
+  const restoredContent = restoreState?.content ?? null
+
   const initialPostContent = useMemo(
-    () => getInitialPostContent(text, url, actionType, existingPost),
-    [text, url, actionType, existingPost]
+    () => getInitialPostContent(text, url, actionType, existingPost, restoredContent),
+    [text, url, actionType, existingPost, restoredContent]
   )
 
   const isComment = actionType === 'comment'
@@ -374,38 +393,42 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     : ''
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
-  const [allowComments, setAllowComments] = useState(true)
+  const [allowComments, setAllowComments] = useState(() => restoreState?.allowComments ?? true)
   // Edits re-upload the whole content JSON, so the existing attachment must be carried
   // into state or saving the edit would silently drop the listing from the post
   const [nftListing, setNftListing] = useState(() =>
-    actionType === 'edit' ? getContentPayload(existingPost)?.nftListing ?? null : null
+    restoredContent?.nftListing ?? (actionType === 'edit' ? getContentPayload(existingPost)?.nftListing ?? null : null)
   )
   const [showSellNftModal, setShowSellNftModal] = useState(false)
   // Prediction markets travel like NFT listings: a content-JSON reference to an onchain id
   const [predictMarket, setPredictMarket] = useState(() =>
-    actionType === 'edit' ? getContentPayload(existingPost)?.predictMarket ?? null : null
+    restoredContent?.predictMarket ?? (actionType === 'edit' ? getContentPayload(existingPost)?.predictMarket ?? null : null)
   )
   const [showAttachMarket, setShowAttachMarket] = useState(false)
   // Token launches too — a { launchId, token, chainId } reference the LaunchCard resolves live,
   // so the curve's price and state are never frozen into the stored post
   const [tokenLaunch, setTokenLaunch] = useState(() =>
-    actionType === 'edit' ? getContentPayload(existingPost)?.tokenLaunch ?? null : null
+    restoredContent?.tokenLaunch ?? (actionType === 'edit' ? getContentPayload(existingPost)?.tokenLaunch ?? null : null)
   )
   const [showAttachLaunch, setShowAttachLaunch] = useState(false)
   // NFT drops as well — a thin reference plus static art; DropCard resolves supply, phases,
   // and progress live from the HupDrops engine so the card never shows stale mint state
-  const [nftDrop, setNftDrop] = useState(() => (actionType === 'edit' ? getContentPayload(existingPost)?.nftDrop ?? null : null))
+  const [nftDrop, setNftDrop] = useState(
+    () => restoredContent?.nftDrop ?? (actionType === 'edit' ? getContentPayload(existingPost)?.nftDrop ?? null : null)
+  )
   const [showAttachDrop, setShowAttachDrop] = useState(false)
   // Mini apps travel the same way: a thin { appId, chainId } reference, never the frame URL, so
   // a moderator revoking an app takes effect in every post that embedded it
-  const [miniApp, setMiniApp] = useState(() => (actionType === 'edit' ? getContentPayload(existingPost)?.miniApp ?? null : null))
+  const [miniApp, setMiniApp] = useState(
+    () => restoredContent?.miniApp ?? (actionType === 'edit' ? getContentPayload(existingPost)?.miniApp ?? null : null)
+  )
   const attachMiniAppRef = useRef(null)
   // Polls travel like every other attachment: a { pollId, chainId } reference the PollCard
   // resolves live, so the tally in a post is the tally onchain rather than a frozen snapshot.
   // A fresh composer restores an attachment left over from a refresh — the poll it names is
   // already onchain and paid for.
   const [poll, setPoll] = useState(() =>
-    actionType === 'edit' ? (getContentPayload(existingPost)?.poll ?? null) : (loadAttachmentDraft()?.poll ?? null)
+    restoredContent?.poll ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.poll ?? null) : (loadAttachmentDraft()?.poll ?? null))
   )
   const createPollRef = useRef(null)
   // The Poll button opens a chooser first — new poll, or one already asked — which then
@@ -444,8 +467,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const { chainId: activeChainId } = useActiveChain()
   // The Solana wallet sits beside the EVM one; a submission bound for a Solana cluster signs with it
   const solanaWallet = useSolanaWallet()
-  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
+  // Only the signature is awaited in here. What the chain does with the transaction afterwards is
+  // watched by lib/postPublication, which outlives this component — see finishSubmission.
+  const { isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
 
   // Which community this submission belongs to, if any: an explicit community composer target
   // (posting from a community page), the replied-to post's community, or the quoted post's
@@ -517,7 +541,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // keeps writing, the toolbar stays live, and Post waits for the last transfer itself
   const hasPendingUploads = mediaItems.some(isTransferring)
   const hasFailedUploads = mediaItems.some((item) => item.status === 'failed')
-  const isBusy = isSigning || isConfirming || isSubmitting
+  const isBusy = isSigning || isSubmitting
   const hasPostBody =
     postText.trim().length > 0 ||
     mediaItems.length > 0 ||
@@ -1186,37 +1210,52 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     if (moderationWarning) moderationDialogRef.current?.open()
   }, [moderationWarning])
 
-  // Shared by the wallet path (receipt confirmed) and the relayed path (relayer accepted the
-  // transaction) — both end the composer the same way
-  const finishSubmission = useCallback(() => {
-    if (actionType === 'post') {
-      localStorage.removeItem(getDraftStorageKey())
-      localStorage.removeItem(getAttachmentDraftKey())
-    }
+  /**
+   * Ends the composer the moment the submission is out of the author's hands — the wallet
+   * returned a hash, the relayer took the request, or the cluster took the transaction. Waiting
+   * for the chain to confirm kept people staring at a spinner for something they had already
+   * done, so the wait now happens behind them, in the feed.
+   *
+   * @param {{txHash?: string, signature?: string}} [receipt] Whichever handle this path produced.
+   */
+  const finishSubmission = useCallback(
+    ({ txHash = null, signature = null } = {}) => {
+      // Same slot, same rule as the persist effects below: a recovered composer neither writes
+      // the draft nor clears it, because by now it may belong to a different post
+      if (actionType === 'post' && !restoreState) {
+        localStorage.removeItem(getDraftStorageKey())
+        localStorage.removeItem(getAttachmentDraftKey())
+      }
 
-    // Handed to a module-scope tracker, not awaited here: the composer unmounts on the next line,
-    // so the loading toast and its poll have to live outside it. Clearing the ref also makes a
-    // second call (a re-fired isConfirmed effect) a no-op instead of a duplicate toast.
-    const pending = pendingPublishRef.current
-    pendingPublishRef.current = null
-    if (pending) trackPostPublication(pending)
+      // Handed to a module-scope tracker, not awaited here: the composer unmounts on the next
+      // line, so the receipt watch, the loading toast and the indexer poll all have to live
+      // outside it. Clearing the ref also makes a second call a no-op rather than a second toast.
+      const pending = pendingPublishRef.current
+      pendingPublishRef.current = null
+      // onConfirmed travels with it instead of firing here: its callers bump a comment count or
+      // reload a community feed, and neither should happen for a post that never landed.
+      if (pending) trackPostPublication({ ...pending, txHash, signature, onIndexed: onConfirmed })
 
-    onConfirmed?.()
-    handleClose()
-  }, [actionType, handleClose, onConfirmed])
+      handleClose()
+    },
+    [actionType, handleClose, onConfirmed, restoreState]
+  )
 
   /**
-   * Relays `create` through our forwarder so the author pays no gas. Returns false when the
-   * relay is unavailable for this wallet or network, leaving the caller to send the
-   * transaction the usual way. Only `create` is sponsored — edits keep paying their own gas.
+   * Relays `create` through our forwarder so the author pays no gas. Returns the relayed
+   * transaction hash, or null when the relay is unavailable for this wallet or network, leaving
+   * the caller to send the transaction the usual way. Only `create` is sponsored — edits keep
+   * paying their own gas.
    */
   const tryGaslessCreate = async (args) => {
-    if (!isGaslessEnabled(targetChainId) || !targetChain || !targetPublicClient) return false
+    if (!isGaslessEnabled(targetChainId) || !targetChain || !targetPublicClient) return null
 
     try {
       const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
 
-      await relayHupAction({
+      // The hash is what lets the tracker tell a relayed post that reverted from one the indexer
+      // is merely slow to see — without it, a failed relay could only ever time out
+      return await relayHupAction({
         chain: targetChain,
         publicClient: targetPublicClient,
         owner: address,
@@ -1225,8 +1264,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         signTypedDataAsync,
         useSessionKey: session.active,
       })
-
-      return true
     } catch (err) {
       // A cooldown is an answer, not a failure — falling through would charge the author for
       // a post they were just told to retry in a moment
@@ -1235,16 +1272,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // A relayer hiccup is never fatal — the wallet path still works, so this only
       // decides who pays for the post
       console.warn('Gasless post unavailable:', err.message)
-      return false
+      return null
     }
   }
 
   /**
    * The Solana counterpart of the four write branches below: one instruction, sponsored by the
    * relay where it serves the cluster (posts, comments, quotes), otherwise signed and paid by
-   * the Solana wallet. Edits are never sponsored, as on EVM. Resolves once the transaction is
-   * confirmed, so the caller can treat it like a receipt.
+   * the Solana wallet. Edits are never sponsored, as on EVM. Resolves as soon as the cluster has
+   * taken the transaction — confirmation is the tracker's job, exactly as on EVM.
    * @param {string} metadata The pinned metadata CID.
+   * @returns {Promise<string>} The base58 signature.
    */
   const submitSolana = async (metadata) => {
     const signer = solanaWallet.getSigner()
@@ -1254,13 +1292,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     const actor = signer.account.address
 
     if (actionType === 'edit') {
-      await sendHupAction({
+      const { signature } = await sendHupAction({
         networkId,
         signer,
         sponsor: false,
+        confirm: false,
         instructions: [hupInstruction.update({ networkId, actor, id: existingPost.id, metadata, allowComments })],
       })
-      return
+      return signature
     }
 
     // Comments carry their parent; quotes are plain posts whose target rides in the content JSON
@@ -1276,7 +1315,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     })
 
     // A cooldown is an answer, not a failure — the author was just told to wait
-    await sendHupAction({ networkId, signer, instructions: [instruction], onCooldown: 'throw' })
+    const { signature } = await sendHupAction({ networkId, signer, instructions: [instruction], onCooldown: 'throw', confirm: false })
+    return signature
   }
 
   const handleCreatePost = async (event) => {
@@ -1412,20 +1452,31 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         metadata,
         kind: actionType === 'edit' ? 'edit' : isComment ? 'reply' : 'post',
         parentId: isComment ? replyTarget?.id : null,
+        // Everything needed to put this composer back if the chain rejects the transaction after
+        // the author has already moved on. The content is the plaintext payload, never the sealed
+        // one — a community post has to come back editable, not as ciphertext.
+        recovery: {
+          props: { actionType, existingPost, replyTarget, quoteTarget, communityTarget, onConfirmed },
+          state: { content: serializableContent, allowComments },
+        },
       }
 
       if (isSolanaTarget) {
-        await submitSolana(metadata)
-        finishSubmission()
+        const signature = await submitSolana(metadata)
+        finishSubmission({ signature })
         return
       }
+
+      // The wallet handing back a hash is where the composer's job ends. Whether that transaction
+      // succeeds is settled by lib/postPublication, long after this dialog has gone.
+      const submitOnchain = (request) => writeContract(request, { onSuccess: (txHash) => finishSubmission({ txHash }) })
 
       if (actionType === 'edit') {
         // Edits must go back to the chain the post already lives on — the wallet's active chain
         // can be an entirely different network
         const postContractAddress = CONTRACTS[`chain${existingPost?.network_id}`]?.hup
         if (!postContractAddress) throw new Error('Contract configuration missing for network')
-        writeContract({
+        submitOnchain({
           abi,
           address: postContractAddress,
           functionName: 'update',
@@ -1437,11 +1488,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         const targetContractAddress = CONTRACTS[`chain${replyTarget?.network_id}`]?.hup
         if (!targetContractAddress) throw new Error('Contract configuration missing for network')
         const createArgs = [address, ContentType.Comment, metadata, replyTarget.id, allowComments]
-        if (await tryGaslessCreate(createArgs)) {
-          finishSubmission()
+        const relayedHash = await tryGaslessCreate(createArgs)
+        if (relayedHash) {
+          finishSubmission({ txHash: relayedHash })
           return
         }
-        writeContract({
+        submitOnchain({
           abi,
           address: targetContractAddress,
           functionName: 'create',
@@ -1453,11 +1505,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         const targetContractAddress = CONTRACTS[`chain${quoteTarget?.network_id}`]?.hup
         if (!targetContractAddress) throw new Error('Contract configuration missing for network')
         const createArgs = [address, ContentType.Post, metadata, 0, allowComments]
-        if (await tryGaslessCreate(createArgs)) {
-          finishSubmission()
+        const relayedHash = await tryGaslessCreate(createArgs)
+        if (relayedHash) {
+          finishSubmission({ txHash: relayedHash })
           return
         }
-        writeContract({
+        submitOnchain({
           abi,
           address: targetContractAddress,
           functionName: 'create',
@@ -1472,11 +1525,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           : CONTRACTS[`chain${targetChainId}`]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
         if (!postContractAddress) throw new Error('Contract configuration missing for network')
         const createArgs = [address, ContentType.Post, metadata, 0, allowComments]
-        if (await tryGaslessCreate(createArgs)) {
-          finishSubmission()
+        const relayedHash = await tryGaslessCreate(createArgs)
+        if (relayedHash) {
+          finishSubmission({ txHash: relayedHash })
           return
         }
-        writeContract({
+        submitOnchain({
           abi,
           address: postContractAddress,
           functionName: 'create',
@@ -1510,31 +1564,31 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     ingestFiles(Array.from(seedFiles), null)
   }, [seedFiles]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A recovered composer never touches the draft keys. It is the second composer on screen
+  // whenever the author started writing again while the transaction was in flight, and there is
+  // only one draft slot — the post being written now owns it, not the one that already failed.
+  const persistsDraft = mounted && actionType === 'post' && !restoreState
+
   // Persist the draft so an accidental refresh doesn't lose it — restored via loadDraftContent()
   useEffect(() => {
-    if (!mounted || actionType !== 'post') return
+    if (!persistsDraft) return
     try {
       localStorage.setItem(getDraftStorageKey(), JSON.stringify(getSerializablePostContent(postContent)))
     } catch (error) {
       console.error('Failed to save post draft:', error)
     }
-  }, [mounted, actionType, postContent])
+  }, [persistsDraft, postContent])
 
   // Same idea for the attached poll, kept in its own key (see getAttachmentDraftKey)
   useEffect(() => {
-    if (!mounted || actionType !== 'post') return
+    if (!persistsDraft) return
     try {
       if (poll) localStorage.setItem(getAttachmentDraftKey(), JSON.stringify({ poll }))
       else localStorage.removeItem(getAttachmentDraftKey())
     } catch (error) {
       console.error('Failed to save post attachments:', error)
     }
-  }, [mounted, actionType, poll])
-
-  useEffect(() => {
-    if (!isConfirmed) return
-    finishSubmission()
-  }, [isConfirmed, finishSubmission])
+  }, [persistsDraft, poll])
 
   useEffect(() => {
     const uploads = uploadsRef.current
@@ -1967,10 +2021,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           </div>
 
           <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain || hasFailedUploads}>
+            {/* No confirming state: the composer closes as soon as the transaction is sent, so
+                the only wait left in here is the author's own signature */}
             {isSubmitting && hasPendingUploads
               ? 'Uploading...'
-              : isConfirming
-                ? actionType === 'edit' ? 'Updating...' : isComment ? 'Replying...' : 'Posting...'
               : isSigning
                 ? 'Signing...'
                 : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : 'Post'}

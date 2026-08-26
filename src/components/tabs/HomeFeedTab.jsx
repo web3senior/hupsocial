@@ -431,7 +431,7 @@ export default function HomeFeedTab({
     handleManualRefresh()
   }, [feedRefreshNonce, handleManualRefresh])
 
-  // The viewer's own post just finished indexing (lib/postPublishToast.js). Merge it straight in
+  // The viewer's own post just finished indexing (lib/postPublication.js). Merge it straight in
   // while they are still parked at the top — that is the whole point of the wait — but if they
   // have scrolled away in the meantime, queue it behind the pill instead of snatching the page.
   const handleAuthoredPost = useCallback(async () => {
