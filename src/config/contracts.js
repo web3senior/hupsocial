@@ -208,6 +208,13 @@ export const CONTRACTS = {
     forwarder: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
+    // Deployed 2026-08-26 (block 50482657, tx 0xc8a723f70e70cb0b436d9581d89ec6227c40ba6f1739d1b0ff16197e27f5d5c9)
+    // — the second HupCommunity on a mainnet, the same direct-push payout-destination build
+    // as LUKSO. Trusts the `forwarder` above, confirmed onchain with isTrustedForwarder.
+    // cidex row 128.
+    // setFollowerSystem(LSP26 below) is still the admin's click; FollowsCreator fails closed
+    // until then.
+    community: '0x77986dE55d0C746351F3A0797b745306c5Fc072C',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '0x01F725975b17dB66DBF26ebAa02bc74F8a433A18',
