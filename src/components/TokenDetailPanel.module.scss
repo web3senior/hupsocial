@@ -269,6 +269,20 @@ $rarity: (
     border-collapse: collapse;
     table-layout: auto;
 
+    // The global sheet paints every row a literal #fff and frames it in --gray-300, which reads
+    // as a white slab on a dark surface. Both have to be unset here, hover included — that one
+    // is --gray-50, so it would flash light on a theme where nothing else is.
+    tr {
+      border: 0;
+      background-color: transparent;
+    }
+
+    // Nothing in this table is clickable per row, so the hover the sheet assumes has no meaning
+    // to convey
+    tbody tr:hover {
+      background-color: transparent;
+    }
+
     th {
       padding: 0 0.75rem 0.5rem 0;
       font-size: 0.72rem;
@@ -277,7 +291,8 @@ $rarity: (
       text-align: left;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      background: none;
+      // Undoes the sheet's --gray-200 header band
+      background-color: transparent;
       white-space: nowrap;
     }
 
