@@ -1,0 +1,150 @@
+.token {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &__back {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    align-self: flex-start;
+  }
+
+  // Media-forward split: artwork left, the token's whole record right. Collapses to a single
+  // column on narrow screens with the artwork on top, which is the order a reader wants on a
+  // phone — see the picture, then decide.
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 1.5rem;
+    align-items: start;
+
+    @media (max-width: 900px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  // The record below is long — offers, traits, a timeline — and a page about a picture where
+  // the picture scrolls away is a catalogue entry. Sticky only where there is height to spare:
+  // on a short viewport the artwork would otherwise pin over the sections a reader is reading.
+  &__media {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+
+    @media (min-width: 901px) and (min-height: 700px) {
+      position: sticky;
+      // Clears the fixed header, the same offset the app's other sticky rails use
+      top: 5rem;
+    }
+  }
+
+  // Holds whichever representation is on show — artwork or 3D model — so swapping between them
+  // keeps the same square footprint and the toggle can anchor to a corner of it. The frame and
+  // the ground sit here rather than on the image: a detail view contains the artwork instead of
+  // cropping it, and a portrait token would otherwise letterbox onto the page's own background.
+  &__stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-width: 0;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--surface-muted, var(--surface));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      // Contain, not cover: a detail view is where the whole artwork is meant to be seen,
+      // matching the dialog the collection grid opens over the same token
+      object-fit: contain;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is line-art, so
+      // hold it at icon scale rather than stretching it to the frame
+      &[data-broken] {
+        padding: 30%;
+      }
+    }
+  }
+
+  // Sits over the bottom-right of the artwork rather than under it: it is an alternate view of
+  // the same thing, not a separate action
+  &__stageToggle {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+  }
+
+  &__mediaFallback {
+    display: grid;
+    place-items: center;
+    color: var(--gray-400);
+  }
+
+  &__mediaActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  &__action {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover {
+      background: color-mix(in srgb, var(--text) 11%, transparent);
+    }
+  }
+
+  &__record {
+    min-width: 0;
+  }
+
+  &__missing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 4rem 1rem;
+    text-align: center;
+    color: var(--gray-400);
+  }
+}

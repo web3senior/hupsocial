@@ -20,8 +20,13 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { fetchUsdPrices, priceKeyFor } from '@/lib/prices'
 
 export const runtime = 'nodejs'
+
+// store_tokens has no row for the native coin; both the price helper and the client key it
+// by the zero address
+const NATIVE_TOKEN = '0x0000000000000000000000000000000000000000'
 
 // IHupTrade.ListingStatus / IHupOffers.OfferStatus, as cidex writes them
 const LISTING_STATUS_ACTIVE = 1
@@ -211,10 +216,40 @@ export async function GET(request, { params }) {
     // component, which already resolves names, avatars and the Universal Profile fallback on the
     // client — the same way the listing page credits a seller and the offer list an offerer.
 
+    // A dollar figure beside every price, because "1.2 LYX" answers a different question than
+    // "$3.10" and a reader deciding whether to buy is asking the second one. Sent as a rate per
+    // whole token rather than as a converted amount per row: the same rate serves the ask, the
+    // top offer and every line of the timeline, and the client already holds the decimals it
+    // needs to apply it.
+    //
+    // Cosmetic throughout. Testnets have no DefiLlama slug and unlisted ERC20s no price, so a
+    // missing key is the normal case, not an error — those rows simply render without a dollar
+    // figure rather than with a wrong one.
+    const usd = {}
+    try {
+      // `listings` already contains the active ask, so the three tables cover every currency
+      // any row on this page is quoted in
+      const tokens = new Set(
+        [...listings, ...trades, ...offers].map((row) => (row.payment_token || NATIVE_TOKEN).toLowerCase()),
+      )
+      const keys = new Map([...tokens].map((token) => [token, priceKeyFor(chainId, token)]))
+      const prices = await fetchUsdPrices([...keys.values()])
+
+      for (const [token, key] of keys) {
+        const price = key ? prices.get(key) : null
+        if (price) usd[token] = price
+      }
+    } catch {
+      // Prices are decoration — the panel is fully usable in token terms without them
+    }
+
     return NextResponse.json(
       {
         success: true,
         data: {
+          // Rate per whole token, keyed by payment token (the zero address for the native coin).
+          // Absent keys mean "no price known", which the client renders as no dollar figure.
+          usd,
           // Shaped like a row of GET /api/v1/nfts so TradeCard and NftQuickBuy can take it
           // without the panel reshaping a listing per surface
           listing: active

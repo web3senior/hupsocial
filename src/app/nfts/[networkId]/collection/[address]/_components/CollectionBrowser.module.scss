@@ -38,6 +38,8 @@
 
   // The tile's own surface is the button — artwork and caption both, so the whole card is the
   // hit area rather than only the words inside it
+  // A link to the token's page since the grid stopped opening a dialog — the button resets stay
+  // because they cost nothing, and text-decoration is the one an anchor adds back
   &__open {
     display: flex;
     flex-direction: column;
@@ -46,6 +48,7 @@
     font: inherit;
     color: inherit;
     text-align: left;
+    text-decoration: none;
     background: none;
     border: 0;
     cursor: pointer;

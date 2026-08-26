@@ -184,6 +184,35 @@
     }
   }
 
+  // The dollar figure beside the bid. Secondary to the token amount on purpose: the offer is
+  // denominated in the token, and this is the translation, not the price.
+  &__usdCell {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__floorCell {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  // Above the floor is the ordinary case for an ask and the notable one for a bid, so the two
+  // directions are coloured rather than left to the sign alone
+  &__delta {
+    font-weight: 600;
+    color: var(--chart-up, #16a34a);
+
+    &--under {
+      color: var(--chart-down, #e11d48);
+    }
+  }
+
+  // Nothing to say in this cell — a dash, not an empty box a reader has to interpret
+  &__blank {
+    color: var(--text-muted);
+  }
+
   &__expires {
     color: var(--text-muted);
     white-space: nowrap;

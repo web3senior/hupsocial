@@ -1,0 +1,117 @@
+// One collapsible block of a detail stack. Chrome only — the section owns its frame, its
+// summary row and the caret; everything inside the body is the consumer's.
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+
+  // The marker is drawn by the caret below, in the corner a reader expects it. Both selectors
+  // are needed: WebKit still ships the pseudo-element, everyone else honours `list-style`.
+  &__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &:hover {
+      background: color-mix(in srgb, var(--text) 4%, transparent);
+    }
+
+    // The summary is the focus target, so the ring has to sit inside the rounded frame rather
+    // than being clipped by the overflow above
+    &:focus-visible {
+      outline: 2px solid var(--network-color-primary, currentColor);
+      outline-offset: -2px;
+    }
+  }
+
+  &__title {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--gray-400);
+  }
+
+  // The reason a closed section is worth opening — how much is behind it
+  &__count {
+    padding: 0.05rem 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+
+  &__aside {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--gray-400);
+    white-space: nowrap;
+  }
+
+  &__caret {
+    flex-shrink: 0;
+    color: var(--gray-400);
+    transition: transform 0.18s ease;
+  }
+
+  &[open] &__caret {
+    transform: rotate(180deg);
+  }
+
+  &__body {
+    padding: 0 1rem 1rem;
+    // Long tables and charts scroll inside the section rather than widening the column
+    min-width: 0;
+  }
+
+  // Only the open state animates: a closed section that transitioned would delay find-in-page
+  // scrolling to a match inside it
+  &[open] &__body {
+    animation: sectionReveal 0.18s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &__caret {
+      transition: none;
+    }
+
+    &[open] &__body {
+      animation: none;
+    }
+  }
+}
+
+@keyframes sectionReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

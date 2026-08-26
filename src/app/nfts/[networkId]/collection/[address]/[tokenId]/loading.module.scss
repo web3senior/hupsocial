@@ -1,0 +1,75 @@
+/* Route-level fallback skeleton for the token detail page.
+   Mirrors .page/.page__container from page.module.scss (and TokenPage's media/record split)
+   so the swap to the real page doesn't cause a layout jump. */
+.loading {
+  min-height: 85svh;
+
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: clip;
+    padding: 1.25rem;
+
+    @media (max-width: 600px) {
+      border: none;
+      border-radius: 0;
+      padding: 1rem;
+    }
+  }
+
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 2.4rem;
+
+    @media (max-width: 900px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  &__media {
+    aspect-ratio: 1;
+    border-radius: 16px;
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
+  }
+
+  &__line {
+    height: 20px;
+    border-radius: 999px;
+
+    &--collection {
+      max-width: 180px;
+    }
+
+    &--title {
+      height: 36px;
+      max-width: 420px;
+    }
+
+    &--stats {
+      max-width: 320px;
+    }
+  }
+
+  /* The price card, then the first two collapsed sections — the shape the real page settles into */
+  &__card {
+    height: 150px;
+    border-radius: 16px;
+  }
+
+  &__section {
+    height: 48px;
+    border-radius: 14px;
+  }
+}

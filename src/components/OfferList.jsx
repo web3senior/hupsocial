@@ -10,6 +10,10 @@ import clsx from 'clsx'
 // graphs (the listing page), and importing the wagmi config there constructs connectors
 // during that pass
 import { appChains, CONTRACTS } from '@/config/contracts'
+import { formatUsdAmount, rateFor } from '@/lib/usdAmount'
+// Same rule the collection table measures an ask by, so a bid and an ask on one collection are
+// never described against its floor two different ways
+import { PERCENT_FORMAT, readFloorDelta } from '@/lib/nftFloorDelta'
 import offersAbi from '@/abis/HupOffers.json'
 import { toast } from '@/components/NextToast'
 import Profile from './Profile'
@@ -136,8 +140,11 @@ const toBytes32TokenId = (raw) => {
  *        knows it (a live listing's seller). Omit it and the list reads the owner from the
  *        chain instead — either way it unlocks the accept flow.
  * @param {('stack'|'table')} [props.variant] Layout to render. Defaults to 'stack'.
+ * @param {Object} [props.floor] From useCollectionFloor — {floor, symbol, decimals}. Only the
+ *        table uses it, to say how far each bid sits from the collection's floor. Omit it and
+ *        that column simply doesn't render, which is what the compact stack wants.
  */
-const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAddress, variant = 'stack' }) => {
+const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAddress, variant = 'stack', floor = null }) => {
   const tokenId = toBytes32TokenId(tokenIdProp)
   // The offer row a pending accept/cancel belongs to, so only that row's button spins
   const [pendingOfferId, setPendingOfferId] = useState(null)
@@ -216,6 +223,9 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
     : null
   const { data: offersData, mutate: mutateOffers } = useSWR(offersKey, fetcher)
   const offers = offersData?.data ?? []
+  // Dollars per whole payment token, from the same response — the table prices each bid with
+  // the rate for its own currency, since a token can be bid on in two
+  const usdRates = offersData?.usd ?? null
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
@@ -303,10 +313,12 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
     })
   }
 
+  // Native offers have no store_tokens row — the chain's own currency symbol fills in
+  const symbolOf = (offer) => offer.payment_symbol ?? (offer.payment_token === zeroAddress ? nativeSymbol : '')
+
   const formatPrice = (offer) => {
     const value = amountFormat.format(Number(formatUnits(BigInt(offer.price), offer.payment_decimals ?? 18)))
-    // Native offers have no store_tokens row — the chain's own currency symbol fills in
-    const symbol = offer.payment_symbol ?? (offer.payment_token === zeroAddress ? nativeSymbol : '')
+    const symbol = symbolOf(offer)
     return symbol ? `${value} ${symbol}` : value
   }
 
@@ -365,8 +377,18 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
               <thead>
                 <tr>
                   <th scope="col">Price</th>
-                  <th scope="col">From</th>
+                  <th scope="col" className={styles.offerList__usdCell}>
+                    USD Price
+                  </th>
+                  {/* Only where a floor exists to measure against — a header over a column of
+                      dashes is worse than no column */}
+                  {floor?.floor && (
+                    <th scope="col" className={styles.offerList__floorCell}>
+                      Floor Difference
+                    </th>
+                  )}
                   <th scope="col">Expires in</th>
+                  <th scope="col">From</th>
                   <th scope="col" className={styles.offerList__actionsCell}>
                     Actions
                   </th>
@@ -378,11 +400,48 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
                   // data-label feeds the global _table.scss mobile pattern: under 600px rows
                   // stack into cards and each cell's label renders from this attribute
                   const action = renderAction(offer)
+                  const usd = formatUsdAmount(offer.price, offer.payment_decimals ?? 18, rateFor(usdRates, offer.payment_token))
+                  // A bid quoted in a currency the floor doesn't speak can't be measured
+                  // against it, so that row prints a dash rather than a made-up percentage
+                  const { delta, atFloor } = readFloorDelta({ price: offer.price, symbol: symbolOf(offer), floor })
+
                   return (
                     <tr key={offer.offer_id}>
                       <td data-label="Price" className={styles.offerList__price}>
                         {formatPrice(offer)}
                       </td>
+
+                      <td data-label="USD Price" className={styles.offerList__usdCell}>
+                        {usd ?? <span className={styles.offerList__blank}>—</span>}
+                      </td>
+
+                      {floor?.floor && (
+                        <td data-label="Floor Difference" className={styles.offerList__floorCell}>
+                          {delta === null ? (
+                            <span className={styles.offerList__blank}>—</span>
+                          ) : atFloor ? (
+                            <span className={styles.offerList__blank}>At floor</span>
+                          ) : (
+                            <span
+                              className={clsx(styles.offerList__delta, delta < 0 && styles['offerList__delta--under'])}
+                              title={`${delta < 0 ? 'Below' : 'Above'} the ${amountFormat.format(
+                                Number(formatUnits(BigInt(floor.floor), floor.decimals ?? 18)),
+                              )} ${floor.symbol} floor`}
+                            >
+                              {PERCENT_FORMAT.format(delta)}
+                            </span>
+                          )}
+                        </td>
+                      )}
+
+                      <td
+                        data-label="Expires in"
+                        className={styles.offerList__expires}
+                        title={new Date(offer.expires_at * 1000).toLocaleString()}
+                      >
+                        {formatTimeLeft(offer.expires_at)}
+                      </td>
+
                       <td data-label="From">
                         <div className={styles.offerList__from}>
                           {/* Same identity treatment every other surface gives a wallet — avatar,
@@ -395,13 +454,7 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
                           )}
                         </div>
                       </td>
-                      <td
-                        data-label="Expires in"
-                        className={styles.offerList__expires}
-                        title={new Date(offer.expires_at * 1000).toLocaleString()}
-                      >
-                        {formatTimeLeft(offer.expires_at)}
-                      </td>
+
                       <td
                         data-label="Actions"
                         className={clsx(styles.offerList__actionsCell, !action && styles['offerList__actionsCell--none'])}

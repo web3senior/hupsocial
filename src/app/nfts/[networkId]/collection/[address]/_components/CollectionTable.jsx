@@ -6,6 +6,9 @@ import { CubeIcon, DiamondIcon } from '@phosphor-icons/react'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { formatStake } from '@/hooks/useStakeToken'
 import { displayTokenId } from '@/lib/walletNfts'
+// Shared with the token page's offer book, so an ask and a bid on the same collection are
+// measured against its floor by one rule
+import { PERCENT_FORMAT, readFloorDelta } from '@/lib/nftFloorDelta'
 import { handleBrokenImage } from '@/lib/utils'
 import NftQuickBuy from '@/components/NftQuickBuy'
 import styles from './CollectionTable.module.scss'
@@ -33,38 +36,6 @@ function elapsed(unixSeconds) {
   if (absolute < 86400) return ELAPSED_FORMAT.format(Math.trunc(delta / 3600), 'hour')
   if (absolute < 2592000) return ELAPSED_FORMAT.format(Math.trunc(delta / 86400), 'day')
   return ELAPSED_FORMAT.format(Math.trunc(delta / 2592000), 'month')
-}
-
-// signDisplay carries the direction, so the cell never needs the words "above"/"below"
-const PERCENT_FORMAT = new Intl.NumberFormat(undefined, {
-  style: 'percent',
-  maximumFractionDigits: 1,
-  signDisplay: 'exceptZero',
-})
-
-// Inside this band an ask is the floor for every purpose a reader has — printing "+0.2%"
-// would be precision nobody asked for
-const AT_FLOOR_BAND = 0.005
-
-/**
- * How far an ask sits from the collection floor, as a fraction.
- * Base units throughout, so this holds for any price a chain can express — Number only
- * enters after the ratio has been taken in BigInt.
- * @param {string|number} price Ask, in base units.
- * @param {string|number} floor Collection floor, in base units.
- * @returns {number|null} Fraction above (positive) or below (negative) the floor.
- */
-function floorDelta(price, floor) {
-  try {
-    const ask = BigInt(price)
-    const base = BigInt(floor)
-    if (base === 0n) return null
-
-    // Four decimals of ratio, taken before the divide, so small deltas survive
-    return Number(((ask - base) * 10000n) / base) / 10000
-  } catch {
-    return null
-  }
 }
 
 /**
@@ -102,7 +73,7 @@ function blankRankTitle(rarity) {
  * One token's row. Artwork and name resolve through the same metadata read-through the
  * tiles use, so browsing the table warms the cache exactly like browsing the grid does.
  */
-function TableRow({ row, chainId, collection, collectionName, rarity, floor, topOffers, onOpen, onOffer }) {
+function TableRow({ row, chainId, collection, collectionName, rarity, floor, topOffers, onOffer }) {
   const meta = useNftMetadata({
     chainId,
     collection,
@@ -128,9 +99,7 @@ function TableRow({ row, chainId, collection, collectionName, rarity, floor, top
 
   // A percentage against a floor quoted in another currency would be a made-up number, so
   // the comparison only runs when both sides speak the same token
-  const comparable = Boolean(row.price && floor?.floor && (!floor.symbol || !row.symbol || floor.symbol === row.symbol))
-  const delta = comparable ? floorDelta(row.price, floor.floor) : null
-  const atFloor = delta !== null && Math.abs(delta) < AT_FLOOR_BAND
+  const { delta, atFloor } = readFloorDelta({ price: row.price, symbol: row.symbol, floor })
 
   const identity = (
     <>
@@ -157,17 +126,12 @@ function TableRow({ row, chainId, collection, collectionName, rarity, floor, top
         <span className={styles.table__item}>
           {/* The same door the grid's tiles open, so a reader who switched layouts doesn't get
               a different destination for the same click */}
-          {onOpen ? (
-            <button
-              type="button"
-              className={styles.table__itemLink}
-              onClick={() => onOpen({ tokenId: row.tokenId, isLsp8: Boolean(Number(row.isLsp8)) })}
-            >
-              {identity}
-            </button>
-          ) : (
-            identity
-          )}
+          <Link
+            href={`/nfts/${chainId}/collection/${collection.toLowerCase()}/${encodeURIComponent(row.tokenId)}`}
+            className={styles.table__itemLink}
+          >
+            {identity}
+          </Link>
 
           {row.isSold && <span className={styles.table__sold}>Sold</span>}
           {meta.model && (
@@ -307,7 +271,6 @@ function TableRow({ row, chainId, collection, collectionName, rarity, floor, top
  * @param {Object} [props.topOffers] From useCollectionTopOffers: {offerByToken}.
  * @param {boolean} [props.isLoading] Renders shimmer rows instead of content.
  * @param {number} [props.skeletonRows=12] How many shimmer rows to hold the space with.
- * @param {Function} [props.onOpen] Opens the token detail modal — every row's item cell.
  * @param {Function} [props.onOffer] Opens the offer dialog for an unlisted token.
  */
 export default function CollectionTable({
@@ -320,7 +283,6 @@ export default function CollectionTable({
   topOffers,
   isLoading = false,
   skeletonRows = 12,
-  onOpen,
   onOffer,
 }) {
   return (
@@ -377,7 +339,6 @@ export default function CollectionTable({
                   rarity={rarity}
                   floor={floor}
                   topOffers={topOffers}
-                  onOpen={onOpen}
                   onOffer={onOffer}
                 />
               ))}

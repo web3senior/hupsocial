@@ -39,17 +39,52 @@ $rarity: (
     color: var(--gray-400);
   }
 
+  // Above the token's name, as its own line: a drop names its tokens, and "#4812" alone tells a
+  // reader who arrived on a shared link nothing at all
   &__collection {
+    display: block;
     overflow: hidden;
-    max-width: 16rem;
+    max-width: 100%;
+    font-size: 0.9rem;
     font-weight: 600;
-    color: var(--text);
+    color: var(--network-color-primary, var(--text));
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
 
     &:hover {
       text-decoration: underline;
+    }
+  }
+
+  // The facts the app can stand behind, where a marketplace with accounts would put view and
+  // favourite counters. Wraps rather than scrolls — it sits above the fold on a phone.
+  &__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    margin: 0.15rem 0 0;
+  }
+
+  &__stat {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+
+    dt {
+      font-size: 0.72rem;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    dd {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
     }
   }
 
@@ -65,11 +100,9 @@ $rarity: (
     cursor: help;
   }
 
-  // Pushed to the end of the line on anything wide enough to hold it, exactly where a reader
-  // looking for "is this mine?" scans first
+  // Leads the identity line now that the collection has moved above the title — "is this mine?"
+  // is the first thing a reader asks of a token they've opened
   &__owner {
-    margin-left: auto;
-
     strong,
     a {
       color: var(--text);
@@ -96,6 +129,63 @@ $rarity: (
     font-size: 1.35rem;
     font-weight: 700;
     line-height: 1.2;
+  }
+
+  // The headline figure when there is no live ask — the best standing bid, which is what a
+  // reader is deciding against
+  &__headline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__headlineLabel {
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__headlinePrice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0;
+
+    strong {
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+  }
+
+  // The two comparisons a reader makes against the ask, under the card that states it
+  &__askMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--gray-400);
+  }
+
+  // Secondary to the token amount on purpose: the price is denominated in the token, and the
+  // dollar figure is the translation
+  &__usd {
+    color: var(--gray-400);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__delta {
+    font-weight: 600;
+    color: var(--chart-up, #16a34a);
+    font-variant-numeric: tabular-nums;
+
+    &--under {
+      color: var(--chart-down, #e11d48);
+    }
   }
 
   &__actions {
@@ -154,61 +244,91 @@ $rarity: (
     }
   }
 
-  &__tabs {
-    display: flex;
-    gap: 0.25rem;
-    // A narrow dialog can't hold five tabs; scrolling them beats wrapping them onto two rows
-    overflow-x: auto;
-    border-bottom: 1px solid var(--border);
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  &__tab {
-    position: relative;
-    flex-shrink: 0;
-    padding: 0.6rem 0.85rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--gray-400);
-    background: none;
-    border: 0;
-    cursor: pointer;
-    transition: color 0.15s ease;
-
-    &:hover {
-      color: var(--text);
-    }
-
-    &--active {
-      color: var(--text);
-
-      &::after {
-        content: '';
-        position: absolute;
-        right: 0.5rem;
-        bottom: -1px;
-        left: 0.5rem;
-        height: 2px;
-        background: var(--network-color-primary, var(--text));
-        border-radius: 2px 2px 0 0;
-      }
-    }
-  }
-
-  &__panel {
+  // The record itself: a stack of DetailSections, each owning its own frame
+  &__sections {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.6rem;
     min-width: 0;
+  }
 
-    // The panel takes focus when a tab is opened by keyboard; the ring belongs on the tab that
-    // was pressed, not on the region it revealed
-    &:focus {
-      outline: none;
+  // Wide rows scroll inside their section rather than widening the column, which on the token
+  // page would push the artwork off-screen
+  &__scroller {
+    overflow-x: auto;
+    min-width: 0;
+  }
+
+  // The global _table.scss element sheet reaches every bare <table>; this undoes its frame and
+  // grey header band, exactly as the offer table does, so the two read as one surface
+  &__table {
+    width: 100%;
+    margin: 0;
+    font-size: 0.82rem;
+    border: 0;
+    border-collapse: collapse;
+    table-layout: auto;
+
+    th {
+      padding: 0 0.75rem 0.5rem 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--gray-400);
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: none;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.5rem 0.75rem 0.5rem 0;
+      border: 0;
+      border-top: 1px solid var(--border);
+      vertical-align: middle;
+    }
+  }
+
+  &__cellPrice {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__cellMuted {
+    color: var(--gray-400);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  // Under 600px the global _table.scss linearizes every table: thead is clipped away, rows stack
+  // as cards, and each cell renders its data-label bold to the left. Adopt that idiom — the row
+  // borders above would otherwise draw a line between every field of one stacked card.
+  @media screen and (max-width: 600px) {
+    &__table td {
+      border-top: 0;
+      padding-right: 0;
+      text-align: right;
+    }
+
+    &__table tr + tr td:first-child {
+      border-top: 1px solid var(--border);
+    }
+  }
+
+  // Attribution above a description, the way a marketplace credits a work
+  &__by {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+
+    small {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
   }
 

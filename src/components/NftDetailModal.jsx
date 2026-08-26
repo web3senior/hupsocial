@@ -13,8 +13,8 @@ import styles from './NftDetailModal.module.scss'
 /**
  * NftDetailModal
  * One token's full record in the top layer — the artwork on the left, TokenDetailPanel's identity,
- * action card and tabs on the right. For the tokens that have no page of their own: a listed NFT
- * gets /nfts/[chain]/[listingId], an unlisted one would otherwise be a picture with nowhere to go.
+ * action card and sections on the right. A quick look at a token without leaving the page you are on —
+ * the token's own page at /nfts/[chain]/collection/[address]/[tokenId] is where its action card links.
  *
  * The dialog owns the frame and the artwork only. Everything a reader can learn or do about the
  * token — list, transfer, offer, traits, offers, activity, price history — belongs to the panel,
@@ -78,7 +78,7 @@ export default function NftDetailModal({ chainId, collection, tokenId, isLsp8, c
           )}
 
           {/* Only for formats that actually paint — an fbx or usdz gets the download link in the
-              panel's Details tab instead of a button opening an empty canvas */}
+              panel's Details section instead of a button opening an empty canvas */}
           {model?.isRenderable && (
             <button type="button" className={styles.nftDetail__stageToggle} onClick={() => setShowModel((visible) => !visible)}>
               {showModel ? <ImageIcon size={14} weight="bold" /> : <CubeIcon size={14} weight="bold" />}
@@ -95,7 +95,8 @@ export default function NftDetailModal({ chainId, collection, tokenId, isLsp8, c
           collectionName={collectionName}
           showCollectionLink={showCollectionLink}
           // The one surface with no URL of its own — a reader who wants to send this to somebody
-          // needs the listing page, so the action card offers it
+          // needs the token's own page, so the action card offers it
+          tokenHref={`/nfts/${chainId}/collection/${String(collection).toLowerCase()}/${encodeURIComponent(tokenId)}`}
           showListingLink
         />
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/contracts'
 import { getNftListings } from '@/lib/api'
@@ -8,7 +9,6 @@ import useCollectionTokens from '@/hooks/useCollectionTokens'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { displayTokenId } from '@/lib/walletNfts'
 import { formatStake } from '@/hooks/useStakeToken'
-import NftDetailModal from '@/components/NftDetailModal'
 import OfferModal from '@/components/OfferModal'
 import CollectionTable from './CollectionTable'
 import styles from './CollectionBrowser.module.scss'
@@ -20,7 +20,7 @@ const count = new Intl.NumberFormat()
 // carry their own listing from the API's join, so the cap only ever costs chain-mode badges.
 const LISTING_OVERLAY_LIMIT = 60
 
-function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listing, nativeCurrency, onOpen, onOffer }) {
+function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listing, nativeCurrency, onOffer }) {
   const meta = useNftMetadata({ chainId, collection, tokenId, isLsp8, imageWidth: 320, still: true })
   const label = displayTokenId(tokenId)
   const name = meta.name || (collectionName ? `${collectionName} #${label}` : `#${label}`)
@@ -52,19 +52,19 @@ function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listi
     </>
   )
 
-  // Every tile is a door to the same place — the token's detail modal, which carries the price,
-  // the buy, the traits and the link through to the listing page when there is one. Listed and
-  // unlisted tokens used to behave differently here, which made the unlisted half a dead end.
+  // Every tile is a door to the same place — the token's own page, which carries the price, the
+  // buy, the traits and the link through to the listing page when there is one. A link rather
+  // than a dialog: a reader who finds an NFT worth showing someone needs a URL for it, and the
+  // page is prefetched on hover, so it opens no slower than the overlay it replaced.
   return (
     <span className={styles.browser__item}>
-      <button
-        type="button"
+      <Link
+        href={`/nfts/${chainId}/collection/${collection.toLowerCase()}/${encodeURIComponent(tokenId)}`}
         className={styles.browser__open}
-        onClick={() => onOpen({ tokenId, isLsp8: Boolean(Number(isLsp8)) })}
         aria-label={listing ? `${name}, listed for ${formatStake(listing.price, decimals)} ${symbol}` : `Details for ${name}`}
       >
         {body}
-      </button>
+      </Link>
 
       {/* Unlisted tokens can still be bid on — offers are escrow-backed and non-custodial, so
           they don't need the owner to have listed anything */}
@@ -91,9 +91,9 @@ function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listi
  * means browsing here *fills* the cache: each rendered token becomes a row, so the fallback
  * view and the trait filter both grow as a side effect of people looking.
  *
- * Tokens with a live listing badge their price. Every tile — listed or not — opens the same
- * detail modal, which is where the price, the buy, the traits and the rest of the token's record
- * live.
+ * Tokens with a live listing badge their price. Every tile — listed or not — links to the same
+ * place, the token's own page, which is where the price, the buy, the traits and the rest of its
+ * record live.
  * @param {Object} props
  * @param {number} props.chainId Chain the collection lives on.
  * @param {string} props.collection Collection contract address, lowercased.
@@ -133,12 +133,8 @@ export default function CollectionBrowser({
   // its price. Cache-backed rows already carry their listing from the API's own join.
   const [listingByToken, setListingByToken] = useState(null)
 
-  // One shared detail dialog for the whole grid and table — a tile can't own it, since the
-  // modal has to outlive the tile being scrolled past
-  const [detail, setDetail] = useState(null)
-
-  // One shared offer dialog too; unlisted tiles open it directly on their token, which spares
-  // the reader a trip through the detail modal to bid on something nobody has listed
+  // One shared offer dialog; unlisted tiles open it directly on their token, which spares the
+  // reader a trip through the token's page to bid on something nobody has listed
   const [offerTarget, setOfferTarget] = useState(null)
   const offersEnabled = Boolean(CONTRACTS[`chain${chainId}`]?.offers)
 
@@ -223,7 +219,6 @@ export default function CollectionBrowser({
           floor={floor}
           topOffers={topOffers}
           isLoading={isLoading || !mode}
-          onOpen={setDetail}
           onOffer={offersEnabled ? setOfferTarget : null}
         />
       ) : isLoading || !mode ? (
@@ -251,24 +246,10 @@ export default function CollectionBrowser({
               isLsp8={token.is_lsp8}
               listing={token.listing || listingByToken?.get(String(token.token_id)) || null}
               nativeCurrency={chainInfo?.nativeCurrency}
-              onOpen={setDetail}
               onOffer={offersEnabled ? setOfferTarget : null}
             />
           ))}
         </div>
-      )}
-
-      {detail && (
-        <NftDetailModal
-          chainId={chainId}
-          collection={collection}
-          tokenId={detail.tokenId}
-          isLsp8={detail.isLsp8}
-          collectionName={collectionName}
-          // Already on the collection's page — the link would lead back to here
-          showCollectionLink={false}
-          onClose={() => setDetail(null)}
-        />
       )}
 
       {offerTarget && (

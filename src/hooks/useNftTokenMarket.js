@@ -56,6 +56,10 @@ export default function useNftTokenMarket({ chainId, collection, tokenId, chainI
       topOffer: withCurrency(payload?.topOffer),
       activity: (payload?.activity || []).map(withCurrency),
       sales: (payload?.sales || []).map(withCurrency),
+      // Dollars per whole payment token, keyed by token address — applied per row through
+      // lib/usdAmount rather than converted here, since one rate serves every row in that
+      // currency. Empty on testnets and for unpriced ERC20s, which render in token terms only.
+      usd: payload?.usd || null,
     }
   }, [data, chainInfo])
 

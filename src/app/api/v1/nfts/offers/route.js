@@ -19,8 +19,12 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
+import { fetchUsdPrices, priceKeyFor } from '@/lib/prices'
 
 export const runtime = 'nodejs'
+
+// store_tokens has no row for the native coin; the price helper keys it by the zero address
+const NATIVE_TOKEN = '0x0000000000000000000000000000000000000000'
 
 const OFFER_STATUS_ACTIVE = 1
 const OFFER_STATUS_FILLED = 2
@@ -116,7 +120,26 @@ export async function GET(request) {
     }))
     await fulfillUniversalProfiles(data, pool)
 
-    return NextResponse.json({ success: true, data })
+    // A dollar rate per whole payment token, so an offer book can print what a bid is worth
+    // next to what it is denominated in. A rate rather than a converted amount per row: the
+    // client already holds each row's decimals, and one rate serves every row quoted in that
+    // currency. Cosmetic — testnets and unpriced ERC20s simply have no key here, and those
+    // rows render in token terms alone.
+    const usd = {}
+    try {
+      const tokens = new Set(data.map((row) => (row.payment_token || NATIVE_TOKEN).toLowerCase()))
+      const keys = new Map([...tokens].map((token) => [token, priceKeyFor(Number(networkId), token)]))
+      const prices = await fetchUsdPrices([...keys.values()])
+
+      for (const [token, key] of keys) {
+        const price = key ? prices.get(key) : null
+        if (price) usd[token] = price
+      }
+    } catch {
+      // Prices are decoration — every offer surface works without them
+    }
+
+    return NextResponse.json({ success: true, data, usd })
   } catch (error) {
     console.error('[GET_NFT_OFFERS_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
