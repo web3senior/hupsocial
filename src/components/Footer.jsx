@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import { HouseIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
+import { HouseIcon, PlayCircleIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { toast } from '@/components/NextToast'
@@ -98,7 +98,7 @@ export default function Footer() {
 
     return [
       { name: 'Home', path: '/', icon: HouseIcon },
-      { name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
+      { name: 'Shorts', path: '/shorts', icon: PlayCircleIcon },
       {
         name: 'New',
         // Same gate as the sidebar: no wallet, no composer
