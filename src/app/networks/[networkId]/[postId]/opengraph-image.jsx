@@ -17,6 +17,13 @@
  * It also gives the posts that carry no media a card of their own. Two thirds of the feed is
  * text or an NFT listing, and every one of those shared the site logo — which made a shared
  * post look exactly like a shared home page.
+ *
+ * Every picture on the card is fetched through our own /api/ipfs/file proxy rather than from
+ * the reference the row carries. A LUKSO profile picture is stored as an
+ * api.universalprofile.cloud/image/… URL, and that host stalls for 10-30s on a cold CID — so
+ * the card sat on the avatar for its whole timeout and a fresh share cost 7.5s, past what X's
+ * crawler waits. The proxy races gateways, and its objects sit on the CDN `immutable` at the
+ * widths the app already asks for, so the first render after a post is usually a CDN hit.
  */
 
 import { ImageResponse } from 'next/og'
@@ -25,7 +32,7 @@ import pool from '@/lib/db'
 import { getPostById } from '@/lib/api'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
 import { truncate, summarizePostContent } from '@/lib/postSummary'
-import { resolveStorageUrl } from '@/lib/storageHelper'
+import { extractIPFSCid, resolveAvatarImageUrl, resolveIPFSImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 
 export const runtime = 'nodejs'
 
@@ -44,12 +51,26 @@ export const alt = 'A post on Hup'
    full gateway fetch plus a satori render again. */
 const CACHE_CONTROL = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
 
-/* A gateway that never answers must not hold the card open, but the bar has to clear what the
-   healthy gateway actually costs: api.universalprofile.cloud answers a cold CID in 3.3-3.6s,
-   so a 4s budget dropped artwork at random. The avatar and the artwork are fetched in parallel,
-   so this is the wait for both, and only the first crawler pays it — s-maxage serves the rest
-   from the CDN. */
-const FETCH_TIMEOUT_MS = 6000
+/* A source that never answers must not hold the card open, but the bar has to clear what a
+   cold proxy miss actually costs — the raced gateways answer a CID nobody has warmed in 3-4s,
+   so a shorter budget dropped artwork at random. The avatar and the artwork are fetched in
+   parallel, so the card waits for the slower of the two, and only the first crawler pays it —
+   s-maxage serves the rest from the CDN. */
+const ARTWORK_TIMEOUT_MS = 6000
+
+/* The avatar is decoration; the artwork and the words are the card. A text post has nothing
+   else to wait on, so an avatar that misses the CDN must not cost the crawler the whole artwork
+   budget — the header falls back to an initial and the card still ships inside X's patience. */
+const AVATAR_TIMEOUT_MS = 2500
+
+/* The avatar is laid out at 88px; resolveAvatarImageUrl turns that into the same proxy rung the
+   profile header asks for, which is what makes it a CDN hit rather than a gateway fetch */
+const AVATAR_SLOT_PX = 88
+
+/* Video posters and NFT artwork are fetched at the widths Gallery.jsx and TradeCard.jsx already
+   request, for the same reason: a width nobody else asks for is a cold object every time */
+const POSTER_WIDTH = 640
+const NFT_IMAGE_WIDTH = 512
 
 /* Artwork past this is a broken or hostile source, not something worth decoding into a card */
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024
@@ -183,21 +204,40 @@ const fontSizeFor = (length) => {
 }
 
 /**
- * Turns any storage reference into something fetch can reach from the server.
- * @param {string} uri - ipfs:// URI, 0G hash, custom:// URI, data: URI or absolute URL.
- * @param {string} baseUrl - Origin used to absolutize the app-relative storage proxies.
+ * Makes a resolved reference reachable from the server: the storage helpers emit app-relative
+ * proxy paths, and fetch needs an origin in front of them.
+ * @param {string|null} resolved - Output of one of the storageHelper resolvers.
+ * @param {string} baseUrl - Origin of this deployment.
  * @returns {string|null}
  */
-const resolveFetchableUrl = (uri, baseUrl) => {
+const toFetchable = (resolved, baseUrl) => {
+  if (!resolved) return null
+  return resolved.startsWith('/') ? `${baseUrl}${resolved}` : resolved
+}
+
+/**
+ * Resolves a piece of artwork to a fetchable URL, through the proxy wherever it carries a CID.
+ *
+ * resolveStorageImageUrl only re-routes a UP-cloud or already-proxied URL when a width is
+ * given; extracting the CID first means every shape that carries one goes through the proxy,
+ * width or not. The plain (no-width) object is the one the feed itself requests for post
+ * images, so it is the one most likely to be sitting on the CDN.
+ *
+ * @param {string} uri - ipfs:// URI, bare CID, UP-cloud URL, 0G hash, data: URI or absolute URL.
+ * @param {string} baseUrl - Origin used to absolutize the app-relative storage proxies.
+ * @param {{ width?: number, still?: boolean }} [options] - Proxy resize hints.
+ * @returns {string|null}
+ */
+const resolveArtworkUrl = (uri, baseUrl, options = {}) => {
   if (!uri || typeof uri !== 'string') return null
-  if (uri.startsWith('data:') || uri.startsWith('http://') || uri.startsWith('https://')) return uri
+  if (uri.startsWith('data:')) return uri
 
   /* Some rows carry a bare CID where the schema expects an ipfs:// URI */
   const normalized = /^(Qm|baf)/.test(uri) ? `ipfs://${uri}` : uri
 
-  const resolved = resolveStorageUrl(normalized)
-  if (!resolved) return null
-  return resolved.startsWith('/') ? `${baseUrl}${resolved}` : resolved
+  const cid = extractIPFSCid(normalized)
+  const resolved = cid ? resolveIPFSImageUrl(cid, options) : resolveStorageImageUrl(normalized, options)
+  return toFetchable(resolved, baseUrl)
 }
 
 /**
@@ -209,13 +249,14 @@ const resolveFetchableUrl = (uri, baseUrl) => {
  *
  * @param {string} url
  * @param {number} boxSize - Longest edge to fit within, in pixels.
+ * @param {number} timeoutMs - How long this picture is worth waiting for.
  * @returns {Promise<string|null>}
  */
-const toPngDataUri = async (url, boxSize) => {
+const toPngDataUri = async (url, boxSize, timeoutMs) => {
   if (!url) return null
 
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
     if (!response.ok) return null
 
     const arrayBuffer = await response.arrayBuffer()
@@ -252,10 +293,10 @@ const resolvePostArtwork = async (post, baseUrl) => {
   const items = post?.content?.elements?.find((element) => element?.type === 'media')?.data?.items || []
 
   const image = items.find((item) => item?.type === 'image' && item?.cid)
-  if (image) return resolveFetchableUrl(image.cid, baseUrl)
+  if (image) return resolveArtworkUrl(image.cid, baseUrl)
 
   const video = items.find((item) => item?.type === 'video' && item?.poster)
-  if (video) return resolveFetchableUrl(video.poster, baseUrl)
+  if (video) return resolveArtworkUrl(video.poster, baseUrl, { width: POSTER_WIDTH })
 
   /* An NFT listing keeps its artwork in token metadata rather than on the post, so it takes
      a listing row plus a metadata lookup. Both are read in-process — two HTTP hops back into
@@ -281,7 +322,7 @@ const resolvePostArtwork = async (post, baseUrl) => {
         allowStale: true,
       })
 
-      return resolveFetchableUrl(result?.metadata?.image, baseUrl)
+      return resolveArtworkUrl(result?.metadata?.image, baseUrl, { width: NFT_IMAGE_WIDTH, still: true })
     } catch (error) {
       console.warn('[post-og] NFT artwork lookup failed:', error.message)
       return null
@@ -352,8 +393,8 @@ export default async function Image({ params }) {
 
     const bodyText = post.content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
     const [avatar, artwork] = await Promise.all([
-      toPngDataUri(resolveFetchableUrl(post.profile_image, baseUrl), 176),
-      resolvePostArtwork(post, baseUrl).then((url) => toPngDataUri(url, 760)),
+      toPngDataUri(toFetchable(resolveAvatarImageUrl(post.profile_image, AVATAR_SLOT_PX), baseUrl), AVATAR_SLOT_PX * 2, AVATAR_TIMEOUT_MS),
+      resolvePostArtwork(post, baseUrl).then((url) => toPngDataUri(url, 760, ARTWORK_TIMEOUT_MS)),
     ])
 
     /* A post with artwork gets less room for words, so it is cut shorter */
