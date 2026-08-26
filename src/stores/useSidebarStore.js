@@ -37,13 +37,13 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'search', name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
   { id: 'notifications', name: 'Notifications', path: '/notifications', icon: BellIcon, hasBadge: true },
   { id: 'divider-primary', type: 'divider' },
-  // `badge` keys into NAV_BADGES in Aside.jsx; drop 'new' once the feature has settled in.
-  { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon, badge: 'new' },
+  // `badge` keys into NAV_BADGES in Aside.jsx; drop it once the feature has settled in.
+  { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   // Sits with the social rows rather than the market ones: a poll costs nothing and asks for
   // an opinion. A checklist, not a bar chart — Insights owns ChartBar here, and the sideways
   // variant just reads as a chart someone knocked over.
-  { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon, badge: 'new-orange' },
+  { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
   { id: 'bazaar', name: 'Bazaar', path: sectionLanding(SECTIONS.bazaar), icon: StorefrontIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
   { id: 'trade', name: 'Trade', path: sectionLanding(SECTIONS.trade), icon: ArrowsDownUpIcon, activePaths: sectionPaths(SECTIONS.trade) },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
