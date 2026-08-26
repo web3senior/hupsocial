@@ -11,7 +11,6 @@ import { formatVotes, pollOptions, pollStatus, toRelative } from '@/lib/polls'
 import { shortTxError } from '@/lib/utils'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
-import Avatar from '@/components/ui/Avatar'
 import Profile from '@/components/Profile'
 import PollCard from '@/components/PollCard'
 import PollTimer from '@/components/PollTimer'
@@ -19,8 +18,6 @@ import { CaretLeftIcon, ListChecksIcon } from '@phosphor-icons/react'
 import styles from './PollDetail.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
-
-const shortWallet = (wallet) => (wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '')
 
 // A plain link rather than history.back(): a shared poll URL is usually the first page of the
 // visit, and "back" from there would leave the site
@@ -124,13 +121,12 @@ export default function PollDetail({ networkId, pollId }) {
       <BackToPolls />
 
       <header className={styles.detail__header}>
-        <Link href={`/${poll.wallet_address}`} className={styles.detail__creator}>
-          <Avatar src={poll.profile_image} size={64} className={styles.detail__avatar} />
-          <span>
-            <strong>{poll.display_name || shortWallet(poll.wallet_address)}</strong>
-            <small>asked {toRelative(poll.opened_at)}</small>
-          </span>
-        </Link>
+        {/* The creator reads exactly like the voters below — one Profile component for every
+            wallet on the page, avatar hover card and chain badge included */}
+        <div className={styles.detail__creator}>
+          <Profile variant="fullWithoutTime" creator={poll.wallet_address} networkId={chainId} />
+          <small className={styles.detail__asked}>asked {toRelative(poll.opened_at)}</small>
+        </div>
 
         <span className={clsx(styles.detail__badge, styles[`detail__badge--${status.key}`])}>{status.label}</span>
       </header>
