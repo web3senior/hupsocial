@@ -1,0 +1,237 @@
+/* A reading page, not a feed row. The measure is the container's, the type is larger than
+   anywhere else in the app, and nothing competes with the prose for attention. */
+.page {
+  width: 100%;
+}
+
+.article {
+  padding: 1.5rem 1rem 4rem;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: clamp(1rem, 2.5vw, 1.25rem);
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text-muted, #6b7280);
+  }
+
+  &__byline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: var(--font-size-12, 0.75rem);
+    color: var(--text-muted, #6b7280);
+    white-space: nowrap;
+  }
+
+  &__cover {
+    margin: 0 0 2rem;
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: var(--global-border-radius, 12px);
+    }
+  }
+
+  /* The body is injected HTML, so its children are styled by element rather than by class.
+     `:global` is required — CSS modules would otherwise hash tag selectors out of existence. */
+  &__body {
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    /* Long words, URLs and CJK runs must not push the page into a horizontal scroll */
+    overflow-wrap: break-word;
+
+    :global(h1),
+    :global(h2),
+    :global(h3),
+    :global(h4) {
+      margin: 2em 0 0.6em;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+    }
+
+    :global(h1) {
+      font-size: 1.75em;
+    }
+    :global(h2) {
+      font-size: 1.4em;
+    }
+    :global(h3) {
+      font-size: 1.2em;
+    }
+
+    :global(p) {
+      margin: 0 0 1.25em;
+    }
+
+    :global(a) {
+      color: var(--primary, #2a78d6);
+      text-decoration: underline;
+      text-underline-offset: 0.15em;
+    }
+
+    /* Global.scss resets list-style-type to none app-wide, which is right for nav and feed lists
+       and wrong for prose — a list in an article has to look like one. */
+    :global(ul) {
+      margin: 0 0 1.25em;
+      padding-inline-start: 1.5em;
+      list-style-type: disc;
+    }
+
+    :global(ol) {
+      margin: 0 0 1.25em;
+      padding-inline-start: 1.5em;
+      list-style-type: decimal;
+    }
+
+    :global(ul ul) {
+      list-style-type: circle;
+    }
+
+    :global(li) {
+      margin-bottom: 0.4em;
+    }
+
+    :global(img) {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 1.5em auto;
+      border-radius: var(--global-border-radius, 12px);
+    }
+
+    :global(blockquote) {
+      margin: 1.5em 0;
+      padding-inline-start: 1.1em;
+      border-inline-start: 3px solid var(--border, rgba(128, 128, 128, 0.4));
+      color: var(--text-muted, #6b7280);
+      font-style: italic;
+    }
+
+    :global(hr) {
+      margin: 2.5em 0;
+      border: 0;
+      border-top: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+    }
+
+    :global(code) {
+      padding: 0.15em 0.35em;
+      border-radius: 4px;
+      background: var(--surface-muted, rgba(128, 128, 128, 0.14));
+      font-size: 0.9em;
+    }
+
+    :global(pre) {
+      /* Code sets its own width; it scrolls inside its block rather than widening the page */
+      overflow-x: auto;
+      margin: 0 0 1.5em;
+      padding: 1rem;
+      border-radius: var(--global-border-radius, 12px);
+      background: var(--surface-muted, rgba(128, 128, 128, 0.12));
+      line-height: 1.55;
+
+      :global(code) {
+        padding: 0;
+        background: transparent;
+      }
+    }
+
+    /* Tables come from GFM markdown and are the other thing that can overrun the measure */
+    :global(table) {
+      display: block;
+      overflow-x: auto;
+      width: 100%;
+      margin: 0 0 1.5em;
+      border-collapse: collapse;
+      font-size: 0.95em;
+    }
+
+    :global(th),
+    :global(td) {
+      padding: 0.5em 0.75em;
+      border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+      text-align: start;
+    }
+
+    :global(th) {
+      background: var(--surface-muted, rgba(128, 128, 128, 0.1));
+      font-weight: 600;
+    }
+  }
+
+  &__unavailable {
+    margin: 2rem 0;
+    padding: 1rem;
+    border: 1px dashed var(--border, rgba(128, 128, 128, 0.35));
+    border-radius: var(--global-border-radius, 12px);
+    color: var(--text-muted, #6b7280);
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.6;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 2rem 0 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: var(--surface-muted, rgba(128, 128, 128, 0.12));
+      font-size: var(--font-size-12, 0.75rem);
+      color: var(--text-muted, #6b7280);
+    }
+  }
+
+  &__footer {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  }
+
+  &__discuss {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 1.1rem;
+    border-radius: 999px;
+    background: var(--surface-muted, rgba(128, 128, 128, 0.12));
+    color: var(--text, inherit);
+    font-size: var(--font-size-12, 0.75rem);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      background: var(--surface-muted, rgba(128, 128, 128, 0.2));
+    }
+  }
+}

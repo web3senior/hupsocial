@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, ListChecksIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, ListChecksIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -133,7 +133,7 @@ const loadDraftContent = () => {
 // A published payload carries its attachment references alongside the content (see the tail of
 // handleCreatePost), and each of those is restored into its own state. Leaving them on the
 // content object would have getSerializablePostContent spread a second copy into the next one.
-const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'tokenLaunch', 'nftDrop', 'miniApp', 'poll']
+const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'tokenLaunch', 'nftDrop', 'miniApp', 'poll', 'article']
 
 const stripAttachments = (content) => {
   const bare = { ...content }
@@ -367,7 +367,7 @@ const restoreCaretState = (editor, caret) => {
 
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed, restoreState = null }) {
+export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed, restoreState = null, article: articleSeed = null }) {
   const mounted = useClientMounted()
   // The composer mounts open and unmounts closed, so this tracks exactly the sheet's lifetime:
   // the mobile fullscreen sheet sizes itself off these vars to survive the software keyboard
@@ -417,6 +417,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     () => restoredContent?.nftDrop ?? (actionType === 'edit' ? getContentPayload(existingPost)?.nftDrop ?? null : null)
   )
   const [showAttachDrop, setShowAttachDrop] = useState(false)
+  // Articles are the one attachment the composer never creates: the editor at /compose/article
+  // pins the body to IPFS and hands the finished reference in as a prop, the same way a poll
+  // arrives already onchain. What rides in the payload is only the card — title, cover, excerpt,
+  // word count and the bodyCid — so a long read costs the feed the same bytes as a short post.
+  const [article, setArticle] = useState(
+    () => restoredContent?.article ?? (actionType === 'edit' ? getContentPayload(existingPost)?.article ?? null : articleSeed)
+  )
   // Mini apps travel the same way: a thin { appId, chainId } reference, never the frame URL, so
   // a moderator revoking an app takes effect in every post that embedded it
   const [miniApp, setMiniApp] = useState(
@@ -550,7 +557,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     Boolean(tokenLaunch) ||
     Boolean(nftDrop) ||
     Boolean(miniApp) ||
-    Boolean(poll)
+    Boolean(poll) ||
+    Boolean(article)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
   // Every submission is pinned to one chain: an edit updates the post where it already lives,
@@ -1396,6 +1404,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // that later loses its embeddable grant stops rendering without touching stored posts
       if (miniApp) serializableContent.miniApp = miniApp
 
+      // Articles the same way — the body is already pinned under its own CID by the editor, and
+      // only the card travels here. ArticleCard renders from these fields alone; the reader page
+      // is the only thing that ever fetches the body.
+      if (article) serializableContent.article = article
+
       // Polls as well — the poll already exists onchain (opened in CreatePollDialog); PollCard
       // resolves the tally live, so a post never carries a count that has since moved
       if (poll) serializableContent.poll = poll
@@ -1869,6 +1882,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 <ImageIcon size={16} />
                 <span>NFT drop attached (drop #{nftDrop.dropId})</span>
                 <button type="button" onClick={() => setNftDrop(null)} aria-label="Detach NFT drop" disabled={isBusy}>
+                  <XIcon size={14} />
+                </button>
+              </div>
+            )}
+
+            {article && (
+              <div className={styles.nftAttachment}>
+                <ArticleIcon size={16} />
+                <span>Article attached — {article.title}</span>
+                <button type="button" onClick={() => setArticle(null)} aria-label="Detach article" disabled={isBusy}>
                   <XIcon size={14} />
                 </button>
               </div>

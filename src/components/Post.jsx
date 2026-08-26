@@ -48,6 +48,7 @@ import EmbedPostDialog from './EmbedPostDialog'
 import TipModal from './TipModal'
 import BuyButton from './BuyButton'
 import TradeCard from './TradeCard'
+import ArticleCard from './ArticleCard'
 import DropCard from './DropCard'
 import PredictCard from './PredictCard'
 import PollCard from './PollCard'
@@ -351,6 +352,12 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
                       : displayItem?.wallet_address
                   }
                 />
+              )}
+
+              {/* Long-form: the card renders entirely from the post payload, and only the
+                  reader page ever fetches the body under article.bodyCid */}
+              {displayItem?.content?.article && (
+                <ArticleCard article={displayItem.content.article} networkId={displayItem.network_id} postId={displayItem.id} />
               )}
 
               {displayItem?.content?.predictMarket && <PredictCard marketRef={displayItem.content.predictMarket} />}
@@ -1025,6 +1032,11 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
         // Quoting a listing is a referral channel like reposting: buys made from this
         // quote credit the quote's author with the listing's referral share
         <TradeCard listing={quotedPost.content.nftListing} referral={quotedBy} />
+      )}
+      {/* Compact: a quoted article is already two levels deep, and its cover plus excerpt would
+          make the quote taller than the post doing the quoting */}
+      {quotedPost?.content?.article && (
+        <ArticleCard article={quotedPost.content.article} networkId={networkId} postId={quotedPost.id} compact />
       )}
       {quotedPost?.content?.predictMarket && <PredictCard marketRef={quotedPost.content.predictMarket} />}
       {/* A quoted poll is votable in place, like the original — the card resolves the same

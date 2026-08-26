@@ -54,11 +54,26 @@ export const handleBrokenAvatar = (event) => {
   img.src = FALLBACK_AVATAR_SRC
 }
 
-export const slugify = (str) => {
-  str = str.replace(/^\s+|\s+$/g, '') // trim leading/trailing white space
-  str = str.toLowerCase() // convert string to lowercase
-  str = str
-    .replace(/\s+/g, '-') // replace spaces with hyphens
-    .replace(/-+/g, '-') // remove consecutive hyphens
-  return str
-}
+/**
+ * A URL slug that survives non-Latin input.
+ *
+ * Letters and numbers are kept in their own script rather than transliterated — an ASCII-folded
+ * Persian or Chinese title is an unreadable slug, and percent-encoded UTF-8 paths are handled
+ * everywhere. Two characters are preserved on purpose: combining marks (Indic matras, Arabic
+ * harakat), which are part of the letter they sit on, and ZWNJ (U+200C), which joins letters
+ * inside Persian words — dropping it changes what the word says, so it is not punctuation.
+ *
+ * @param {string} str
+ * @returns {string} A slug, or '' when nothing sluggable was left.
+ */
+export const slugify = (str) =>
+  String(str || '')
+    /* Compose first, so an accented character is a single code point rather than a letter plus a
+       combining mark — otherwise the mark can survive the filter on its own. */
+    .normalize('NFC')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-') // whitespace becomes hyphens
+    .replace(/[^\p{L}\p{N}\p{M}\u200C\-]+/gu, '') // drop punctuation, keep marks and ZWNJ
+    .replace(/-+/g, '-') // collapse consecutive hyphens
+    .replace(/^-|-$/g, '') // no leading or trailing hyphen
