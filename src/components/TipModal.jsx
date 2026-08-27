@@ -1,18 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useReadContract, useWriteContract } from 'wagmi'
+import { waitForTransactionReceipt } from 'wagmi/actions'
 import { encodeAbiParameters, erc20Abi, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
-import { useSWRConfig } from 'swr'
 import clsx from 'clsx'
-import { CONTRACTS } from '@/config/wagmi'
+import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { trackTip } from '@/lib/tipTracking'
+import { shortTxError } from '@/lib/utils'
 import tipperAbi from '@/abis/HupTipper.json'
 import { toast } from '@/components/NextToast'
-import { getPostStatsKey } from '@/hooks/usePostStats'
 import NativeDialog from './ui/NativeDialog'
 import Profile from './Profile'
 import styles from './TipModal.module.scss'
@@ -20,11 +21,12 @@ import styles from './TipModal.module.scss'
 const TIP_PRESETS = [1, 2, 5, 10]
 
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+// The amount the way the button and the toast both say it — "5 LYX", "0.25 G$"
+const amountNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
 
-// cidex polls its chains every second, so the Tipped event is indexed within a few seconds
-// of the receipt. Long enough that the refetch reads the new row, short enough that the
-// dollar badge updates while the tipper is still looking at the post.
-const TIP_INDEX_DELAY_MS = 10000
+// An approval only unlocks the send button, so the modal stays open while it mines — but not
+// past this, or a transaction nobody will ever see mined keeps the button locked forever
+const APPROVAL_TIMEOUT_MS = 120_000
 
 // Popularity line for a search result — the signal that separates the real token from
 // same-name copycats (LUKSO returns holder counts, GeckoTerminal pool liquidity)
@@ -112,30 +114,12 @@ const TipModal = ({ item, setShowTipModal }) => {
   const [tokenSearchResults, setTokenSearchResults] = useState([])
   // Flipped on synchronously at the top of every send handler so the button locks on the
   // click itself — the session check is two RPC round trips, and wagmi only reports isPending
-  // once mutate() runs after them. Cleared when the wallet settles (hash or rejection); from
-  // there isPending/isConfirming cover the rest.
+  // once the write actually starts. Held until the handler settles: for a tip that is the
+  // hash (the modal closes on it), for an approval it is the receipt (the modal stays open).
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { address } = useConnection()
-  const { mutate: mutateStats } = useSWRConfig()
   const dialogRef = useRef(null)
-  const lastActionRef = useRef(null)
   const creator = item.wallet_address
-
-  // Optimistic counter bump — the indexer lands the Tipped event a few seconds after the
-  // receipt, so revalidating immediately would race it and snap the counter back
-  const bumpTipCount = () => {
-    const statsKey = getPostStatsKey(item, address)
-
-    mutateStats(
-      statsKey,
-      (current) => ({ ...(current || item), total_tips: Number((current || item)?.total_tips || 0) + 1 }),
-      { revalidate: false },
-    )
-
-    // The badge shows dollars, and only the API can price them — so once the indexer has had
-    // time to land the event, pull the row again to move the earned figure
-    setTimeout(() => mutateStats(statsKey), TIP_INDEX_DELAY_MS)
-  }
 
   // Tips settle on the post's own chain, not whichever chain is currently active
   const chainId = Number(item.network_id)
@@ -272,62 +256,54 @@ const TipModal = ({ item, setShowTipModal }) => {
   // ERC677 funds and credits the tip in one transaction, so it never needs an allowance
   const needsApproval = isTokenTip && !isErc677 && allowance !== undefined && amountUnits !== null && allowance < amountUnits
 
-  const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = isPending || isConfirming || isSubmitting
+  const { isPending, writeContractAsync } = useWriteContract()
+  const isBusy = isPending || isSubmitting
+
+  const amountLabel = `${amountNumber.format(parsedAmount)} ${symbol}`
 
   // Mount = open / unmount = close, matching the NewPost dialog contract
   useEffect(() => {
     dialogRef.current?.open()
   }, [])
 
-  useEffect(() => {
-    if (!submitError) return
-    toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
-  }, [submitError])
+  // The transaction is sent: the modal's job is done. Everything after — the receipt, the
+  // toast that reports it, the counter — is handed to trackTip, which outlives this component,
+  // so the user goes back to the feed instead of watching a button say "Confirming" for a block.
+  const handOff = (hash) => {
+    trackTip({ post: item, viewer: address, hash, amountLabel })
+    dialogRef.current?.close()
+  }
 
-  useEffect(() => {
-    if (!isConfirmed) return
-    if (lastActionRef.current === 'approve') {
-      toast('Token approved — you can send your tip now', 'success')
-      refetchAllowance()
-    } else {
-      toast('Tip sent', 'success')
-      bumpTipCount()
-      dialogRef.current?.close()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConfirmed])
-
-  const handleApprove = (e) => {
+  // An approval can't close the modal — the tip it unlocks is still to be sent from here — so
+  // it holds the button while it mines, but the wait is reported by a toast the user can
+  // ignore rather than a frozen label. The onchain allowance is re-read whatever happened.
+  const handleApprove = async (e) => {
     e.stopPropagation()
     if (amountUnits === null || !tokenAddress) return
 
-    lastActionRef.current = 'approve'
     setIsSubmitting(true)
-    const settle = { onSettled: () => setIsSubmitting(false) }
-    if (isLsp7) {
-      writeContract(
-        {
-          abi: lsp7Abi,
-          address: tokenAddress,
-          functionName: 'authorizeOperator',
-          args: [tipperAddress, amountUnits, '0x'],
-          chainId,
-        },
-        settle
+    let handle = null
+    const report = (message, type) => {
+      if (!handle?.update(message, type)) toast(message, type)
+    }
+
+    try {
+      const hash = await writeContractAsync(
+        isLsp7
+          ? { abi: lsp7Abi, address: tokenAddress, functionName: 'authorizeOperator', args: [tipperAddress, amountUnits, '0x'], chainId }
+          : { abi: erc20Abi, address: tokenAddress, functionName: 'approve', args: [tipperAddress, amountUnits], chainId }
       )
-    } else {
-      writeContract(
-        {
-          abi: erc20Abi,
-          address: tokenAddress,
-          functionName: 'approve',
-          args: [tipperAddress, amountUnits],
-          chainId,
-        },
-        settle
-      )
+
+      handle = toast(`Approving ${symbol}…`, 'loading')
+      const receipt = await waitForTransactionReceipt(config, { chainId, hash, timeout: APPROVAL_TIMEOUT_MS })
+      if (receipt.status !== 'success') throw new Error(`${symbol} approval was rejected onchain`)
+
+      report(`${symbol} approved — send your tip`, 'success')
+    } catch (err) {
+      report(shortTxError(err, 'Approval failed'), 'error')
+    } finally {
+      refetchAllowance()
+      setIsSubmitting(false)
     }
   }
 
@@ -336,67 +312,58 @@ const TipModal = ({ item, setShowTipModal }) => {
     if (amountUnits === null || !tipperAddress || (isTokenTip && !tokenAddress)) return
 
     setIsSubmitting(true)
-    const settle = { onSettled: () => setIsSubmitting(false) }
-
-    // ERC677: one transaction, no approve. The tipper is credited from onTokenTransfer, which
-    // reads the post id out of the payload. Burner sessions can't apply here — the tokens have
-    // to leave the wallet that actually holds them — so this path always uses wagmi.
-    if (isErc677) {
-      lastActionRef.current = 'tip'
-      writeContract(
-        {
+    try {
+      // ERC677: one transaction, no approve. The tipper is credited from onTokenTransfer, which
+      // reads the post id out of the payload. Burner sessions can't apply here — the tokens have
+      // to leave the wallet that actually holds them — so this path always uses wagmi.
+      if (isErc677) {
+        const hash = await writeContractAsync({
           abi: erc677Abi,
           address: tokenAddress,
           functionName: 'transferAndCall',
           args: [tipperAddress, amountUnits, encodeErc677TipData(BigInt(item.id))],
           chainId,
-        },
-        settle
-      )
-      return
-    }
+        })
+        handOff(hash)
+        return
+      }
 
-    // The recipient is resolved onchain by HupTipper from the post's creator — the client
-    // only commits the post id, amount, and token
-    const args = [address, BigInt(item.id), amountUnits, tokenAddress ?? zeroAddress, isLsp7, '0x']
+      // The recipient is resolved onchain by HupTipper from the post's creator — the client
+      // only commits the post id, amount, and token
+      const args = [address, BigInt(item.id), amountUnits, tokenAddress ?? zeroAddress, isLsp7, '0x']
 
-    // Route through the burner session key if one's active — same convenience BuyButton gets,
-    // skipping the wallet popup. Approve/authorizeOperator stays wagmi-only regardless.
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+      // Route through the burner session key if one's active — same convenience BuyButton gets,
+      // skipping the wallet popup. Approve/authorizeOperator stays wagmi-only regardless.
+      const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
-    if (session.active) {
-      try {
-        await writeWithBurnerSession({
+      if (session.active) {
+        // Back at the hash, not the receipt — the tracker does the waiting, not the modal
+        const tx = await writeWithBurnerSession({
           chain: chainInfo,
           contractAddress: tipperAddress,
           abi: tipperAbi,
           functionName: 'tip',
           args: isTokenTip ? args : [...args, { value: amountUnits }],
+          waitForReceipt: false,
         })
-
-        toast('Tip sent', 'success')
-        bumpTipCount()
-        dialogRef.current?.close()
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsSubmitting(false)
+        handOff(tx.hash)
+        return
       }
-      return
-    }
 
-    lastActionRef.current = 'tip'
-    writeContract(
-      {
+      const hash = await writeContractAsync({
         abi: tipperAbi,
         address: tipperAddress,
         functionName: 'tip',
         args,
         chainId,
         ...(isTokenTip ? {} : { value: amountUnits }),
-      },
-      settle
-    )
+      })
+      handOff(hash)
+    } catch (err) {
+      toast(shortTxError(err, 'Tip failed'), 'error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -513,7 +480,7 @@ const TipModal = ({ item, setShowTipModal }) => {
         {!tipperAddress && <p className={styles.tipModal__hint}>Tipping isn&apos;t available on this network yet</p>}
         {needsApproval ? (
           <button type="button" className={styles.tipModal__send} onClick={handleApprove} disabled={isBusy || amountUnits === null || isSelf}>
-            {isBusy ? 'Confirming...' : `Approve ${new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(parsedAmount)} ${symbol}`}
+            {isBusy ? 'Approving…' : `Approve ${amountLabel}`}
           </button>
         ) : (
           <button
@@ -522,11 +489,7 @@ const TipModal = ({ item, setShowTipModal }) => {
             onClick={handleTip}
             disabled={isBusy || amountUnits === null || isSelf || !tipperAddress}
           >
-            {isBusy
-              ? 'Confirming...'
-              : isValidAmount
-              ? `Send ${new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(parsedAmount)} ${symbol}`
-              : `Send`}
+            {isBusy ? 'Sending…' : isValidAmount ? `Send ${amountLabel}` : `Send`}
           </button>
         )}
       </footer>

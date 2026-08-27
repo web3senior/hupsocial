@@ -215,8 +215,12 @@ export const sendRawWithBurnerSession = async ({ chain, to, data }) => {
 /**
  * Writes a transaction with the burner session key. A locked vault opens the unlock dialog
  * first; a cancelled unlock bubbles up as code 4001 for the caller to fall back on.
+ *
+ * Resolves once the transaction is mined by default. Callers that close their UI the moment
+ * the node accepts the transaction and track the receipt themselves (optimistic flows like
+ * TipModal) pass `waitForReceipt: false` to get the response back at the hash instead.
  */
-export const writeWithBurnerSession = async ({ chain, contractAddress, abi, functionName, args, password = null }) => {
+export const writeWithBurnerSession = async ({ chain, contractAddress, abi, functionName, args, password = null, waitForReceipt = true }) => {
   // Retrieve signer (decrypts key asynchronously if needed)
   const burnerSigner = await getBurnerSigner(chain, password)
 
@@ -227,7 +231,7 @@ export const writeWithBurnerSession = async ({ chain, contractAddress, abi, func
   const contract = new ethers.Contract(contractAddress, abi, burnerSigner)
   const tx = await contract[functionName](...args)
 
-  await tx.wait()
+  if (waitForReceipt) await tx.wait()
   return tx
 }
 
