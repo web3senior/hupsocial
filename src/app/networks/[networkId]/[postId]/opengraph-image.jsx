@@ -26,10 +26,16 @@
  * widths the app already asks for, so the first render after a post is usually a CDN hit.
  */
 
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import makeBlockie from 'ethereum-blockies-base64'
 import { ImageResponse } from 'next/og'
 import sharp from 'sharp'
 import pool from '@/lib/db'
+import { isEvmAddress, normalizeAddress, shortAddress } from '@/lib/address'
 import { getPostById } from '@/lib/api'
+import { getChainIconSvg } from '@/lib/chains'
+import { queryUniversalProfile } from '@/lib/lukso'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
 import { truncate, summarizePostContent } from '@/lib/postSummary'
 import { extractIPFSCid, resolveAvatarImageUrl, resolveIPFSImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
@@ -75,13 +81,44 @@ const NFT_IMAGE_WIDTH = 512
 /* Artwork past this is a broken or hostile source, not something worth decoding into a card */
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024
 
+/* Whether the author is a Universal Profile is decided the way the feed decides it — the LUKSO
+   indexer either knows the address or it does not — but on a much tighter clock than the profile
+   API's 4s. This is one badge on a card a crawler is already waiting on, so a slow indexer has to
+   cost the badge rather than the render. */
+const UP_LOOKUP_TIMEOUT_MS = 1500
+
+/* The identity row is the feed's own, blown up. Everything beside the avatar is sized off this
+   ratio rather than eyeballed, so the badges keep the proportions Profile.module.scss gives them
+   against its 36px avatar. */
+const IDENTITY_SCALE = AVATAR_SLOT_PX / 36
+
+/* 14px in the feed, for both the chain logo and the UP mark */
+const BADGE_PX = Math.round(14 * IDENTITY_SCALE)
+
+/* The blockie over the avatar's bottom-right corner: 12px, ringed, and overhanging by 4px */
+const FINGERPRINT_PX = Math.round(12 * IDENTITY_SCALE)
+const FINGERPRINT_RING_PX = Math.round(2 * IDENTITY_SCALE)
+const FINGERPRINT_OVERHANG_PX = Math.round(4 * IDENTITY_SCALE)
+
 const COLORS = {
   background: '#191B1A',
   border: '#2E322F',
   text: '#F2F5F3',
   muted: '#7E847F',
   accent: '#A4A9A5',
+  /* --fingerprint-border resolves to --surface-muted in both dark themes */
+  fingerprint: '#2A2A2A',
 }
+
+/* The UP mark the feed shows beside a Universal Profile's name. Read once at module scope rather
+   than per request — it is 14KB that never changes, and inlining a local asset this way is what
+   Next's own opengraph-image guidance prescribes. A failed read costs the badge, never the card. */
+const UP_LOGO_SRC = await readFile(join(process.cwd(), 'public', 'up.png'), 'base64')
+  .then((data) => `data:image/png;base64,${data}`)
+  .catch((error) => {
+    console.warn('[post-og] UP mark unavailable:', error.message)
+    return null
+  })
 
 const styles = {
   container: {
@@ -98,12 +135,27 @@ const styles = {
     alignItems: 'center',
     gap: '24px',
   },
+  /* Positioned so the fingerprint can hang off its corner the way it does in the feed */
+  avatarSlot: {
+    position: 'relative',
+    display: 'flex',
+    flexShrink: 0,
+  },
   avatar: {
     width: '88px',
     height: '88px',
     borderRadius: '50%',
     border: `3px solid ${COLORS.border}`,
     objectFit: 'cover',
+  },
+  fingerprint: {
+    position: 'absolute',
+    bottom: `-${FINGERPRINT_RING_PX / 2}px`,
+    right: `-${FINGERPRINT_OVERHANG_PX}px`,
+    width: `${FINGERPRINT_PX}px`,
+    height: `${FINGERPRINT_PX}px`,
+    borderRadius: `${Math.round(4 * IDENTITY_SCALE)}px`,
+    border: `${FINGERPRINT_RING_PX}px solid ${COLORS.fingerprint}`,
   },
   avatarFallback: {
     width: '88px',
@@ -122,10 +174,19 @@ const styles = {
     flexDirection: 'column',
     justifyContent: 'center',
   },
+  nameRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: `${Math.round(4 * IDENTITY_SCALE)}px`,
+  },
   displayName: {
     fontSize: '42px',
     color: COLORS.text,
     lineHeight: 1.1,
+  },
+  badge: {
+    width: `${BADGE_PX}px`,
+    height: `${BADGE_PX}px`,
   },
   handle: {
     fontSize: '26px',
@@ -190,8 +251,6 @@ const styles = {
 }
 
 const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
-
-const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
 
 const capitalize = (text) => (text ? text[0].toUpperCase() + text.slice(1) : text)
 
@@ -278,6 +337,57 @@ const toPngDataUri = async (url, boxSize, timeoutMs) => {
     /* A card without artwork still reads; one that never arrives does not */
     return null
   }
+}
+
+/**
+ * Rasterizes a chain logo into a PNG data URI at the size it will be laid out.
+ *
+ * The logos are inline SVG, and handing satori one is not the same bet as handing it a photo:
+ * several carry gradients and referenced clipPaths, which is the support gap the Hup mark below
+ * had to be flattened around. sharp draws the markup properly, and rendering at 4x the slot
+ * before the resize is what keeps a 32px viewBox from arriving soft. Alpha is kept — the badge
+ * is a shape on the card, not a picture in a frame.
+ *
+ * @param {string|null} svg - Raw SVG markup from config/chainIcons.
+ * @param {number} sizePx - Longest edge, in the card's own pixels.
+ * @returns {Promise<string|null>}
+ */
+const svgToPngDataUri = async (svg, sizePx) => {
+  if (!svg) return null
+
+  try {
+    const png = await sharp(Buffer.from(svg), { density: 72 * 4 })
+      .resize({ width: sizePx, height: sizePx, fit: 'inside' })
+      .png()
+      .toBuffer()
+
+    return `data:image/png;base64,${png.toString('base64')}`
+  } catch (error) {
+    console.warn('[post-og] chain logo render failed:', error.message)
+    return null
+  }
+}
+
+/**
+ * The author's Universal Profile, or null when the LUKSO indexer does not know the address.
+ *
+ * Read in-process rather than through our own profile API: that endpoint would re-resolve the
+ * avatar, the badge and the origin the card has no use for, over an HTTP hop back into
+ * ourselves. Only EVM addresses are asked about — a Solana author is not a UP, and base58 must
+ * not be lowercased on the way to the indexer.
+ *
+ * @param {string} address
+ * @returns {Promise<Object|null>}
+ */
+const resolveUniversalProfile = async (address) => {
+  if (!isEvmAddress(address)) return null
+
+  const result = await queryUniversalProfile(address, { timeoutMs: UP_LOOKUP_TIMEOUT_MS })
+  const profile = result?.data?.Profile?.[0]
+
+  /* The same bar the profile API sets before it calls a row a universal_profile: an indexed
+     address with no name is a contract the indexer happens to have seen, not a profile. */
+  return profile?.name || profile?.fullName ? profile : null
 }
 
 /**
@@ -392,10 +502,18 @@ export default async function Image({ params }) {
     }
 
     const bodyText = post.content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
-    const [avatar, artwork] = await Promise.all([
+    const [avatar, artwork, universalProfile, chainLogo] = await Promise.all([
       toPngDataUri(toFetchable(resolveAvatarImageUrl(post.profile_image, AVATAR_SLOT_PX), baseUrl), AVATAR_SLOT_PX * 2, AVATAR_TIMEOUT_MS),
       resolvePostArtwork(post, baseUrl).then((url) => toPngDataUri(url, 760, ARTWORK_TIMEOUT_MS)),
+      /* Both of these sit inside the artwork's own wait, so the identity row costs the card
+         nothing it was not already spending */
+      resolveUniversalProfile(post.wallet_address),
+      svgToPngDataUri(getChainIconSvg(post.network_id), BADGE_PX),
     ])
+
+    /* The blockie is derived, not fetched — the same fingerprint the feed draws over the avatar,
+       from the same normalized address */
+    const fingerprint = post.wallet_address ? makeBlockie(normalizeAddress(post.wallet_address)) : null
 
     /* A post with artwork gets less room for words, so it is cut shorter */
     const text = truncate(bodyText, artwork ? 180 : 300)
@@ -417,9 +535,16 @@ export default async function Image({ params }) {
     const buffer = await render((withText) => (
       <div style={styles.container}>
         <div style={styles.header}>
-          {avatar ? <img src={avatar} alt="" style={styles.avatar} /> : <div style={styles.avatarFallback}>{(name[0] || 'H').toUpperCase()}</div>}
+          <div style={styles.avatarSlot}>
+            {avatar ? <img src={avatar} alt="" style={styles.avatar} /> : <div style={styles.avatarFallback}>{(name[0] || 'H').toUpperCase()}</div>}
+            {fingerprint ? <img src={fingerprint} alt="" style={styles.fingerprint} /> : null}
+          </div>
           <div style={styles.identity}>
-            <span style={styles.displayName}>{name}</span>
+            <div style={styles.nameRow}>
+              <span style={styles.displayName}>{name}</span>
+              {chainLogo ? <img src={chainLogo} alt="" style={styles.badge} /> : null}
+              {universalProfile && UP_LOGO_SRC ? <img src={UP_LOGO_SRC} alt="" style={styles.badge} /> : null}
+            </div>
             <span style={styles.handle}>{shortAddress(post.wallet_address)}</span>
           </div>
           {post.network_name ? <div style={styles.chip}>{post.network_name}</div> : null}
