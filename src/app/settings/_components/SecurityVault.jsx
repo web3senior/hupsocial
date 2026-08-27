@@ -1,8 +1,10 @@
 'use client'
 
-// The ONE place in the app that asks for the security PIN. Every PIN-protected feature
-// (private communities, in-app wallet session keys, future features) derives its keys from the
-// master secret unlocked here — other pages never prompt for the PIN, they link to this tab.
+// The home of the security PIN. Every PIN-protected feature (private communities, in-app wallet
+// session keys, future features) derives its keys from the master secret unlocked here — pages
+// never ask for the PIN themselves, they link to this tab. The only other surfaces that may ask
+// are Hup's own unlock dialogs (VaultUnlockDialog, MiniAppVaultUnlockDialog), for an action
+// already underway that a locked vault would otherwise dead-end.
 
 import { useEffect, useState } from 'react'
 import { useConnection, useSignMessage, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'

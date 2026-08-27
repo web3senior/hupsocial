@@ -20,7 +20,7 @@ import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { hupInstruction } from '@/lib/solana/hup'
 import { sendHupAction } from '@/lib/solana/relay'
 import { getNetworkDisplayName } from '@/lib/chains'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { ensureVaultUnlocked, isBurnerUnlocked, isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { MAX_BATCH_LIKE_COUNT, chunk, describeDropped, preflightQueue } from '@/lib/batchLike'
 import { getWalletBatchMap, useSidebarStore } from '@/stores/useSidebarStore'
@@ -201,6 +201,23 @@ export const useBatchLike = () => {
           publicClient: targetPublicClient ?? publicClient,
         })
 
+        // The vault gates BOTH session paths — sponsored relay signing and the local burner
+        // write — so it is opened once here rather than mid-loop. Opening it later would mean
+        // the relay had already failed silently and the whole basket had dropped to the wallet.
+        // An already-unlocked vault costs nothing: the key decrypts from the cached master with
+        // no prompt at all.
+        let sessionUsable = session.active
+        if (sessionUsable && !isBurnerUnlocked()) {
+          try {
+            await ensureVaultUnlocked({ reason: queue.length === 1 ? 'This like' : `These ${queue.length} likes` })
+          } catch (err) {
+            // Cancelling the unlock is not a failed batch — the wallet path still works, and a
+            // heart that stops working reads as broken
+            if (err.code !== 4001) console.warn('Session key unavailable:', err.message)
+            sessionUsable = false
+          }
+        }
+
         const batches = chunk(queue, MAX_BATCH_LIKE_COUNT)
 
         // The pre-check only skips a relay round trip that the local cooldown mirror already
@@ -224,7 +241,7 @@ export const useBatchLike = () => {
                 functionName: 'batchLike',
                 args: [address, batch],
                 signTypedDataAsync,
-                useSessionKey: session.active,
+                useSessionKey: sessionUsable,
               })
 
               sent = true
@@ -243,7 +260,7 @@ export const useBatchLike = () => {
           }
 
           if (!sent) {
-            if (session.active) {
+            if (sessionUsable) {
               // Burner key authorization route needs no wallet confirmation
               await writeWithBurnerSession({
                 chain: chainDefinition,
@@ -275,7 +292,7 @@ export const useBatchLike = () => {
         toast(
           relayedCount === batches.length
             ? `${likedLabel} — gas covered by Hup!`
-            : session.active
+            : sessionUsable
               ? `${likedLabel} via active session key!`
               : likedLabel,
           'success',

@@ -1,7 +1,8 @@
 import { ethers } from 'ethers'
 import { getUserSessions } from './communication'
 import { decryptData, encryptData, isPrivateKeyEncrypted } from './cryptoHelper'
-import { deriveChildKeyBytes, CHILD_KEY_LABELS } from './securityVault'
+import { clearMasterSecret, deriveChildKeyBytes, getCachedMasterHex, CHILD_KEY_LABELS } from './securityVault'
+import { requestVaultUnlock } from './vaultUnlockBus'
 
 const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
 
@@ -14,10 +15,61 @@ export const sessionStorageUnlockedKey = `${prefix}unlocked_burner_key`
 const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl || chain?.rpc || process.env.NEXT_PUBLIC_LUKSO_RPC_URL
 
 /**
- * Retrieves the burner signer. Asynchronously decrypts the key if locked.
+ * True when this tab can already sign with the session key — either the plaintext is cached for
+ * the tab or the stored key predates at-rest encryption. Reads only; never opens a prompt.
+ */
+export const isBurnerUnlocked = () => {
+  if (typeof window === 'undefined') return false
+  if (sessionStorage.getItem(sessionStorageUnlockedKey)) return true
+
+  const storedKey = localStorage.getItem(localStorageBurnerKey)
+  return Boolean(storedKey) && !isPrivateKeyEncrypted(storedKey)
+}
+
+/**
+ * Makes the session key signable in this tab, asking for the vault PIN only when it has to.
+ *
+ * The stored blob is encrypted with the vault MASTER, never with a string the user types, so
+ * the unlock is always master-first: a vault already opened in Settings decrypts the key here
+ * with no prompt at all. Only a locked vault reaches the dialog.
+ *
+ * @param {{ reason?: string }} [context] - short line naming what is waiting on the unlock
+ * @throws {Error} code 'NO_SESSION_KEY' when this device holds no burner key.
+ * @throws {Error} code 'VAULT_LOCKED' when the vault is locked and no unlock surface is mounted.
+ * @throws {Error} code 4001 when the user cancels the unlock.
+ */
+export const ensureVaultUnlocked = async (context = {}) => {
+  if (isBurnerUnlocked()) return
+
+  if (!localStorage.getItem(localStorageBurnerKey) || !localStorage.getItem(localStorageBurnerAddress)) {
+    const err = new Error('No session key found on this device')
+    err.code = 'NO_SESSION_KEY'
+    throw err
+  }
+
+  const cachedMaster = getCachedMasterHex()
+  if (cachedMaster) {
+    try {
+      await unlockBurnerWithMaster(cachedMaster)
+      return
+    } catch (err) {
+      if (err.code !== 'WRONG_PIN') throw err
+      // The cached master cannot open this key, and unlockMaster hands a cached master straight
+      // back without ever looking at the PIN — leaving it in place would make the dialog a
+      // no-op that re-fails on every attempt.
+      clearMasterSecret()
+    }
+  }
+
+  await requestVaultUnlock(context)
+}
+
+/**
+ * Retrieves the burner signer, unlocking the vault first when the key is still encrypted.
  *
  * @param {object} chain - The chain object containing RPC configurations.
- * @param {string|null} password - Optional password to decrypt the key if locked.
+ * @param {string|null} password - Legacy escape hatch: a secret to decrypt the key with
+ *   directly, for keys still at rest under the old per-feature password scheme.
  */
 export const getBurnerSigner = async (chain, password = null) => {
   const storedAddress = localStorage.getItem(localStorageBurnerAddress)
@@ -32,16 +84,17 @@ export const getBurnerSigner = async (chain, password = null) => {
     // 2. Fallback to legacy unencrypted key
     if (!isPrivateKeyEncrypted(storedKey)) {
       privateKey = storedKey
-    } else {
-      // 3. Encrypted key requires password to decrypt
-      if (!password) {
-        // throw new Error('PASSWORD_REQUIRED')
-        password = prompt(`Please enter your password`)
-      }
+    } else if (password) {
+      // 3. A caller-supplied secret wins, for keys stored under the old scheme
       privateKey = await decryptData(storedKey, password)
 
       // Cache decrypted key in sessionStorage for this tab session
       sessionStorage.setItem(sessionStorageUnlockedKey, privateKey)
+    } else {
+      // 4. Otherwise the vault owns this key — unlock it (silently when already open)
+      await ensureVaultUnlocked()
+      privateKey = sessionStorage.getItem(sessionStorageUnlockedKey)
+      if (!privateKey) throw new Error('Session key is still locked')
     }
   }
 
@@ -160,8 +213,8 @@ export const sendRawWithBurnerSession = async ({ chain, to, data }) => {
 }
 
 /**
- * Writes a transaction with the burner session key.
- * Bubbles up 'PASSWORD_REQUIRED' if the key needs to be unlocked.
+ * Writes a transaction with the burner session key. A locked vault opens the unlock dialog
+ * first; a cancelled unlock bubbles up as code 4001 for the caller to fall back on.
  */
 export const writeWithBurnerSession = async ({ chain, contractAddress, abi, functionName, args, password = null }) => {
   // Retrieve signer (decrypts key asynchronously if needed)

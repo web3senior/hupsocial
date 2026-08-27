@@ -1,0 +1,120 @@
+/* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+.vaultUnlock {
+  padding: var(--native-popover-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    width: min(400px, calc(100vw - 6px - 2em - 2px - 2 * var(--native-popover-padding, 1rem)));
+    cursor: default;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: var(--font-size-16, 1rem);
+      margin: 0;
+    }
+  }
+
+  &__close {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__reason {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    strong {
+      color: var(--color);
+    }
+  }
+
+  &__pin {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    letter-spacing: 0.2em;
+
+    &:focus {
+      outline: 2px solid var(--primary, #0d6efd);
+      outline-offset: -1px;
+    }
+  }
+
+  &__error {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--danger-600, #dc2626);
+  }
+
+  &__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 0.6rem;
+  }
+
+  &__cancel,
+  &__unlock {
+    border-radius: var(--global-border-radius);
+    padding: 0.6rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__cancel {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+
+    &:hover:not(:disabled) {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__unlock {
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+  }
+}
