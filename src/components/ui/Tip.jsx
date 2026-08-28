@@ -11,13 +11,10 @@ import Tooltip from './Tooltip'
 import styles from './Tip.module.scss'
 
 const compactUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 })
-const plainUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
-// Sub-cent tips are the norm on a young network — significant digits keep $0.004 readable
-// instead of rounding a real tip down to "$0.00" or hiding it behind a "<$0.01".
-const tinyUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', maximumSignificantDigits: 2 })
+const plainUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-/** Earned dollars for the badge: compact past 1k, significant digits under a cent. */
-const formatEarned = (usd) => (usd >= 1000 ? compactUsd : usd >= 0.01 ? plainUsd : tinyUsd).format(usd)
+/** Earned dollars for the badge: always two decimals, compact past 1k. */
+const formatEarned = (usd) => (usd >= 1000 ? compactUsd : plainUsd).format(usd)
 
 const compactCount = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 const compactToken = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 })
