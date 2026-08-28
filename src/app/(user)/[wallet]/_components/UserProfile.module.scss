@@ -439,28 +439,6 @@
   }
 }
 
-.links {
-  a {
-    padding: 0.7rem 1rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 1rem;
-
-    &:not(:first-child) {
-      margin-top: 1rem;
-    }
-
-    &:hover {
-      background-color: var(--gray-50);
-    }
-
-    code {
-      font-size: 10px;
-      //opacity: 0.4;
-      color: var(--black-400);
-    }
-  }
-}
-
 // Profile
 .profile {
 }

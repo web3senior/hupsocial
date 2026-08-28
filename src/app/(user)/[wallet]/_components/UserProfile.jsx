@@ -26,7 +26,6 @@ import ProfileInsights from '@/components/ProfileInsights'
 import UPlogo from '@/../public/up.png'
 import { uploadFileToIPFS } from '@/lib/ipfs'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
-import LinksTab from '@/components/tabs/LinksTab'
 import AssetsTab from '@/components/tabs/AssetsTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
@@ -37,6 +36,7 @@ import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
+import ProfileLinks from './ProfileLinks'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
 import { CakeIcon, MapPinIcon } from '@phosphor-icons/react'
 import styles from './UserProfile.module.scss'
@@ -162,7 +162,6 @@ export default function UserProfile() {
     { id: 'posts', label: 'Posts', count: postsFeed.total },
     { id: 'assets', label: 'Assets' },
     { id: 'reposts', label: 'Reposts', count: repostsFeed.total },
-    { id: 'links', label: 'Links' },
   ]
   const TabContentMap = {
     events: <></>,
@@ -272,11 +271,6 @@ export default function UserProfile() {
             </div>
           )}
 
-          {activeTab === 'links' && (
-            <div className={`${styles.tabContent} ${styles.links} relative`}>
-              <LinksTab />
-            </div>
-          )}
         </div>
       </div>
     </>
@@ -649,6 +643,9 @@ const Profile = ({ addr }) => {
             )}
 
             <p className={`${styles.profile__description} mt-20`}>{profile.description || 'This user has not set up a bio yet.'}</p>
+
+            {/* Where the links used to sit behind a tab: one line under the bio, the rest in a modal */}
+            <ProfileLinks links={profile.links} />
 
             <div className={`${styles.profile__tags} flex flex-row align-items-center flex-wrap gap-050`}>
               <TagsElement rawTags={profile.tags} />

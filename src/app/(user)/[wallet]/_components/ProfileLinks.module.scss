@@ -1,0 +1,146 @@
+// The inline row sits in the same small-fact stack as the birthday and origin chips,
+// so it matches their size — only the colour marks it as somewhere you can go.
+.profileLinks {
+  &__row {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    font-size: var(--system-12-font-size);
+    color: var(--cashtag-color);
+    cursor: pointer;
+
+    svg {
+      flex-shrink: 0;
+    }
+
+    &:hover .profileLinks__primary {
+      text-decoration: underline;
+    }
+  }
+
+  // A long URL truncates rather than pushing the "and N more" out of the header
+  &__primary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  &__more {
+    flex-shrink: 0;
+    color: var(--text-muted, var(--gray-500));
+  }
+}
+
+/* Chrome for the NativeDialog root — the primitive only supplies centering, backdrop and animation */
+.dialog {
+  // Never set display unconditionally on a <dialog>: author styles override the UA's
+  // `dialog:not([open]) { display: none }`, leaving the closed dialog in the page flow
+  // as an invisible click-blocking box.
+  &[open] {
+    display: flex;
+  }
+  flex-direction: column;
+  width: min(420px, calc(100vw - 2rem));
+  max-height: 82svh;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background-color: var(--surface);
+  color: var(--text, inherit);
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 0.5rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__close {
+    all: unset;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--surface-muted, var(--hover));
+    }
+  }
+
+  // Centred on the dialog, not on what is left beside the close button — the title
+  // holds the middle by taking the width and offsetting the button it sits next to.
+  &__title {
+    flex: 1;
+    margin: 0;
+    margin-right: 28px; // the close button's box, so the title centres on the dialog
+    text-align: center;
+    font-size: var(--font-size-16, 1rem);
+    font-weight: var(--font-weight-semibold, 600);
+  }
+
+  &__list {
+    flex: 1;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    li + li {
+      border-top: 1px solid var(--border);
+    }
+  }
+
+  &__link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--surface-muted, var(--hover));
+    }
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--surface-muted, var(--hover));
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0; // lets the two lines below truncate instead of stretching the row
+
+    strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: var(--font-weight-semibold, 600);
+    }
+
+    small {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-muted, var(--gray-500));
+    }
+  }
+}
