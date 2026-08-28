@@ -20,6 +20,7 @@ import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, 
 import storeAbi from '@/abis/HupBazaar.json'
 import { STORE_ADDRESSES, USDC, X402_NETWORKS } from '@/lib/tokens'
 import { decryptContent, isConfigured } from '@/lib/storeCrypto'
+import { fetchIPFS } from '@/lib/ipfsGateways'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -186,9 +187,12 @@ export async function GET(request) {
     // A sell-out (auto-deactivation) needs no handling here: grantPurchase emits ItemBought,
     // and the cidex indexer derives remaining stock/active state into store_listings from it.
 
-    const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
-    const ipfsRes = await fetch(`${gatewayUrl}${listing.metadata.replace('ipfs://', '')}`)
-    if (!ipfsRes.ok) {
+    /* The payment has already settled, so every gateway gets a turn before this can fail */
+    let ipfsRes
+    try {
+      ipfsRes = await fetchIPFS(listing.metadata.replace('ipfs://', ''))
+    } catch (gatewayError) {
+      console.error('Paid content fetch failed on every gateway:', gatewayError.message)
       return NextResponse.json({ error: 'Payment settled but content fetch failed — contact support', settlement: settleHash }, { status: 502 })
     }
 

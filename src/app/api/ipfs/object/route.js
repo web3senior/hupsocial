@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { PinataSDK } from 'pinata'
 import { addToFilebase } from '@/lib/filebase'
 import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
+import { gatewayUrl } from '@/lib/ipfsGateways'
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,
@@ -58,7 +59,7 @@ export async function POST(request) {
     }
 
     const cid = `ipfs://${rawCID}`
-    const url = `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${rawCID}`
+    const url = gatewayUrl(rawCID)
     console.log('Upload complete. CID:', cid)
     return NextResponse.json({ url, cid }, { status: 200 })
   } catch (e) {

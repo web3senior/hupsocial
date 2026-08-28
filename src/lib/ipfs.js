@@ -1,3 +1,4 @@
+import { fetchIPFS } from '@/lib/ipfsGateways'
 import { shortUploadError } from '@/lib/uploadErrors'
 
 // The reason a response was not OK, in the short form every caller's toast shows verbatim. Our
@@ -231,50 +232,28 @@ export async function hashIpfsContent(uri) {
   }
 }
 
+/* One gateway's bad minute used to be the whole answer here: a single fetch, and a 504 or a
+   hang meant the caller saw `{ result: false }` for content the next host holds. Walking the
+   shared list instead costs nothing when the first one answers — which, with Filebase leading,
+   is the host our own uploads pinned to. */
+const JSON_FETCH_TIMEOUT_MS = 8000
+
 /**
- * Fetches and parses JSON content from a specified IPFS gateway URL using the CID.
+ * Fetches and parses JSON content from IPFS, trying each configured gateway in order.
+ * @param {string} CID - Bare CID or path, already stripped of its `ipfs://` prefix.
+ * @returns {Promise<object>} The parsed JSON, or `{ result: false }` when no gateway could serve it.
  */
 export const getIPFS = async (CID) => {
-  // 1. Basic input validation
   if (!CID) {
     console.error('getIPFS Error: No CID provided.')
     return { result: false }
   }
 
-  // Ensure the gateway URL is configured
-  const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
-  if (!gatewayUrl) {
-    console.error('getIPFS Error: NEXT_PUBLIC_IPFS_GATEWAY_URL environment variable is not set.')
-    return { result: false }
-  }
-
-  // Construct the full URL for the IPFS content
-  const url = `${gatewayUrl}${CID}`
-
   try {
-    // console.log(`Fetching from IPFS: ${url}`);
-
-    const requestOptions = {
-      method: 'GET',
-      // 'follow' is the default behavior for 'redirect', but explicitly stating it is fine.
-      redirect: 'follow',
-    }
-
-    const response = await fetch(url, requestOptions)
-
-    // 2. Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
-    if (!response.ok) {
-      console.error(`IPFS Fetch Error: Failed to fetch CID ${CID}. Status: ${response.status} ${response.statusText}`)
-      return { result: false }
-    }
-
-    // 3. Parse the response body as JSON
-    const data = await response.json()
-
-    return data
+    const response = await fetchIPFS(CID, { timeoutMs: JSON_FETCH_TIMEOUT_MS })
+    return await response.json()
   } catch (e) {
-    // 4. Handle network or JSON parsing errors
-    console.error(`IPFS Fetch Exception for CID ${CID}:`, e)
+    console.error(`IPFS Error for CID ${CID}:`, e.message)
     return { result: false }
   }
 }

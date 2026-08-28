@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { keccak256 } from 'viem'
+import { fetchIPFS } from '@/lib/ipfsGateways'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -32,22 +33,15 @@ export async function GET(req) {
     return NextResponse.json({ error: 'Invalid CID' }, { status: 400 })
   }
 
-  const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
-  if (!gatewayUrl) {
-    return NextResponse.json({ error: 'IPFS gateway is not configured' }, { status: 500 })
-  }
-
   let lastError = 'Gateway did not answer'
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(RETRY_DELAY_MS)
 
     try {
-      const upstream = await fetch(`${gatewayUrl}${cid}`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
-      if (!upstream.ok) {
-        lastError = `IPFS gateway error: ${upstream.status}`
-        continue
-      }
+      // Every gateway in the list gets a turn per attempt: the bytes are content-addressed, so
+      // whichever host answers first hashes to the same digest a verifier will compute
+      const upstream = await fetchIPFS(cid, { timeoutMs: FETCH_TIMEOUT_MS })
 
       const bytes = new Uint8Array(await upstream.arrayBuffer())
       // A zero-byte answer is a gateway hiccup, not content worth hashing

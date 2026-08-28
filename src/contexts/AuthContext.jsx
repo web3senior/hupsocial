@@ -3,6 +3,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 // import ABI from './../abi/pollpal.json'
 // import LSP0ERC725Account from '@lukso/lsp0-contracts/compatibility-abis/LSP0ERC725Account-v0.12.0.json'
+import { gatewayUrl } from '@/lib/ipfsGateways'
 import { toast } from '../components/NextToast'
 import { Spinner as Loading } from './../components/Loading'
 import Web3 from 'web3'
@@ -24,7 +25,9 @@ export const getIPFS = async (CID) => {
     method: 'GET',
     redirect: 'follow',
   }
-  const response = await fetch(`${process.env.NEXT_PUBLIC_IPFS_GATEWAY}${CID}`, requestOptions)
+  /* Was NEXT_PUBLIC_IPFS_GATEWAY, a var that has never existed in any env file — every call
+     here fetched `undefined<CID>` against our own origin. */
+  const response = await fetch(gatewayUrl(CID), requestOptions)
   if (!response.ok) return { result: false } //throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }

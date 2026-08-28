@@ -9,6 +9,7 @@
 // smart-contract accounts like LUKSO Universal Profiles), falling back to plain EOA recovery.
 
 import { NextResponse } from 'next/server'
+import { fetchIPFS } from '@/lib/ipfsGateways'
 import { createPublicClient, http, hashMessage, recoverMessageAddress, isAddress, isAddressEqual, getAddress } from 'viem'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia } from 'wagmi/chains'
 import storeAbi from '@/abis/HupBazaar.json'
@@ -126,10 +127,13 @@ export async function POST(request) {
       return NextResponse.json({ error: 'CID does not match this listing' }, { status: 400 })
     }
 
-    const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
-    const rawCid = cid.replace('ipfs://', '')
-    const ipfsRes = await fetch(`${gatewayUrl}${rawCid}`)
-    if (!ipfsRes.ok) {
+    /* Walks every gateway: a buyer who has paid should not be told "no" because the one host we
+       asked was having a bad minute with content the next one holds */
+    let ipfsRes
+    try {
+      ipfsRes = await fetchIPFS(cid.replace('ipfs://', ''))
+    } catch (gatewayError) {
+      console.error('Gated content fetch failed on every gateway:', gatewayError.message)
       return NextResponse.json({ error: 'Failed to fetch content from IPFS' }, { status: 502 })
     }
 

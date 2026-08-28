@@ -5,6 +5,7 @@ import useEmblaCarousel from 'embla-carousel-react'
 import { ArrowLeftIcon, ArrowRightIcon, CornersOutIcon, PauseIcon, PlayIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
 import useMediaZoom from '@/hooks/useMediaZoom'
+import { primaryGateway } from '@/lib/ipfsGateways'
 import { lockPageScroll, unlockPageScroll } from '@/lib/scrollLock'
 import { resolveIPFSUrl, resolveIPFSImageUrl, resolveStorageStreamUrls } from '@/lib/storageHelper'
 import { DEFAULT_SOUND_PREFS, loadSoundPrefs, saveSoundPrefs } from '@/lib/soundPrefs'
@@ -54,7 +55,7 @@ export default function MediaGallery({ data = [] }) {
   // The lightbox renders a second <video> per slide; these are kept apart from the inline
   // players so handing playback from one to the other is explicit rather than accidental.
   const lightboxVideoRefs = useRef([])
-  const GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL
+  const GATEWAY_URL = primaryGateway()
 
   const visualData = data.filter((item) => item.type !== 'audio')
   const audioData = data.filter((item) => item.type === 'audio')

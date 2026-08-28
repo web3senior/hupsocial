@@ -1,6 +1,7 @@
 /**
  * Utility helper to handle decentralized and custom asset routing.
  */
+import { gatewayList, gatewayUrl, primaryGateway } from '@/lib/ipfsGateways'
 
 /**
  * Checks if a given string is a 0G Storage root hash or protocol.
@@ -46,8 +47,8 @@ export const resolveIPFSUrl = (ipfsUrl) => {
   /* Strip the protocol prefix to isolate the hash */
   const hash = ipfsUrl.replace(/^ipfs:\/\//, '')
 
-  /* Point directly to the configured IPFS Gateway */
-  return `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${hash}`
+  /* Point directly to the leading IPFS gateway */
+  return gatewayUrl(hash)
 }
 
 /* Video and audio stream straight from a gateway, and the browser drives that with HTTP range
@@ -55,8 +56,9 @@ export const resolveIPFSUrl = (ipfsUrl) => {
    the middle. The configured gateway advertises `Accept-Ranges: bytes` and then answers every
    range with the whole file (a 64 KB probe of a 3.6 MB clip downloaded all 3.6 MB), so playback
    waited on the full download and every loop fetched it again. Filebase — where uploads pin —
-   honours ranges, so it streams first; the configured gateways follow as <source> fallbacks. */
-const STREAM_GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_STREAM_GATEWAY_URL || 'https://ipfs.filebase.io/ipfs/'
+   honours ranges, and it now leads every gateway list, so the primary streams first; the
+   configured gateways follow as <source> fallbacks. */
+const STREAM_GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_STREAM_GATEWAY_URL || primaryGateway()
 
 /**
  * Resolves an IPFS video/audio CID to gateway URLs in the order a player should try them.
@@ -67,10 +69,9 @@ export const resolveIPFSStreamUrls = (ipfsUrl) => {
   if (!ipfsUrl || !isIPFSHash(ipfsUrl)) return []
 
   const hash = ipfsUrl.replace(/^ipfs:\/\//, '')
-  const gateways = [STREAM_GATEWAY_URL, process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL, process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_FALLBACK]
+  const gateways = [STREAM_GATEWAY_URL, ...gatewayList()]
     .filter(Boolean)
-    /* The fallback var has shipped as http:// — every gateway speaks https, and a mixed scheme
-       would only list the same host twice */
+    /* The stream override is raw env — gatewayList() has already normalized the rest */
     .map((gateway) => gateway.replace(/^http:\/\//, 'https://'))
     .map((gateway) => (gateway.endsWith('/') ? gateway : `${gateway}/`))
 
@@ -327,7 +328,7 @@ export const resolveAvatarImageUrl = (src, size, { still = false } = {}) => {
  */
 export const resolveStorageGatewayUrl = (src) => {
   const cid = extractIPFSCid(src)
-  if (cid) return `${process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL}${cid}`
+  if (cid) return gatewayUrl(cid)
 
   return resolveStorageUrl(src)
 }
