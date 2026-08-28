@@ -138,8 +138,10 @@ export default function ArticleEditor() {
   const canPublish = Boolean(title.trim()) && Boolean(markdown.trim()) && !isOverSize && !isUploadingCover && !isPreparing
 
   /**
-   * Wrap or prefix the current selection with markdown syntax. Operating on the textarea's own
-   * selection (rather than appending) is what makes the toolbar usable mid-paragraph.
+   * Toggle markdown syntax around the current selection. Operating on the textarea's own
+   * selection (rather than appending) is what makes the toolbar usable mid-paragraph, and
+   * pressing the same button twice has to strip the syntax again — otherwise bold, unbold,
+   * bold leaves `****` stacked around the words.
    * @param {string} before Inserted at the start of the selection.
    * @param {string} [after] Inserted at the end; omit for line-prefix syntax like `> ` or `- `.
    * @param {string} [placeholder] Used when nothing is selected, and left selected afterwards.
@@ -150,17 +152,69 @@ export default function ArticleEditor() {
       if (!el) return
 
       const { selectionStart, selectionEnd, value } = el
-      const selected = value.slice(selectionStart, selectionEnd) || placeholder
-      const next = `${value.slice(0, selectionStart)}${before}${selected}${after}${value.slice(selectionEnd)}`
-
-      patch({ markdown: next })
 
       /* Restore the caret after React has committed the new value, otherwise the browser puts
          it at the end and the next keystroke lands in the wrong place. */
-      requestAnimationFrame(() => {
-        el.focus()
-        el.setSelectionRange(selectionStart + before.length, selectionStart + before.length + selected.length)
-      })
+      const commit = (next, start, end) => {
+        patch({ markdown: next })
+        requestAnimationFrame(() => {
+          el.focus()
+          el.setSelectionRange(start, end)
+        })
+      }
+
+      // Line-prefix syntax belongs at the head of the caret's line, not wherever the caret sits
+      if (!after) {
+        const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
+        if (value.startsWith(before, lineStart)) {
+          const next = value.slice(0, lineStart) + value.slice(lineStart + before.length)
+          const shift = before.length
+          commit(next, Math.max(lineStart, selectionStart - shift), Math.max(lineStart, selectionEnd - shift))
+          return
+        }
+        if (selectionStart === selectionEnd && value.slice(lineStart, selectionStart).trim() === '') {
+          const next = `${value.slice(0, lineStart)}${before}${placeholder}${value.slice(lineStart)}`
+          commit(next, lineStart + before.length, lineStart + before.length + placeholder.length)
+          return
+        }
+        const next = `${value.slice(0, lineStart)}${before}${value.slice(lineStart)}`
+        commit(next, selectionStart + before.length, selectionEnd + before.length)
+        return
+      }
+
+      const selected = value.slice(selectionStart, selectionEnd)
+
+      // The markers were selected along with the text, so unwrap from the inside. Every complete
+      // pair within the selection goes, or unbolding a paragraph holding two bold spans would
+      // strip the outermost markers and strand the inner ones mid-sentence.
+      if (selected.length >= before.length + after.length && selected.startsWith(before) && selected.endsWith(after)) {
+        let inner = ''
+        let index = 0
+        while (index < selected.length) {
+          const close = selected.startsWith(before, index) ? selected.indexOf(after, index + before.length) : -1
+          if (close === -1) {
+            inner += selected[index]
+            index += 1
+            continue
+          }
+          inner += selected.slice(index + before.length, close)
+          index = close + after.length
+        }
+        commit(value.slice(0, selectionStart) + inner + value.slice(selectionEnd), selectionStart, selectionStart + inner.length)
+        return
+      }
+
+      // Only the words are selected — the state this function itself leaves behind after wrapping
+      const outerStart = selectionStart - before.length
+      if (outerStart >= 0 && value.startsWith(before, outerStart) && value.startsWith(after, selectionEnd)) {
+        const next = value.slice(0, outerStart) + selected + value.slice(selectionEnd + after.length)
+        commit(next, outerStart, outerStart + selected.length)
+        return
+      }
+
+      const body = selected || placeholder
+      const next = `${value.slice(0, selectionStart)}${before}${body}${after}${value.slice(selectionEnd)}`
+      commit(next, selectionStart + before.length, selectionStart + before.length + body.length)
     },
     [patch]
   )
