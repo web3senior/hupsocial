@@ -51,6 +51,24 @@ const prettyUrl = (url) =>
     .replace(/^www\./i, '')
     .replace(/\/$/, '')
 
+const hostOf = (url) => {
+  try {
+    return new URL(toHref(url), 'https://hup.social').hostname.replace(/^www\./i, '')
+  } catch (error) {
+    return prettyUrl(url).split(/[/?#]/)[0]
+  }
+}
+
+// The one-line summary shares its row with "and N more", so it can't hold an arbitrary
+// URL. A short path still reads well and is worth keeping — `x.com/TheCitadelRPG` says
+// more than `x.com` does — but past this width a slug only ever truncates to an
+// unreadable stub, so the domain alone serves better. The full address is in the tooltip.
+const INLINE_URL_MAX = 32
+const compactUrl = (url) => {
+  const pretty = prettyUrl(url)
+  return pretty.length <= INLINE_URL_MAX ? pretty : hostOf(url)
+}
+
 export default function ProfileLinks({ links: rawLinks }) {
   const links = useMemo(() => parseLinks(rawLinks), [rawLinks])
   const dialogRef = useRef(null)
@@ -62,19 +80,20 @@ export default function ProfileLinks({ links: rawLinks }) {
   return (
     <>
       {rest.length === 0 ? (
-        <a className={styles.profileLinks__row} href={toHref(first.url)} target="_blank" rel="noopener noreferrer">
+        <a className={styles.profileLinks__row} href={toHref(first.url)} target="_blank" rel="noopener noreferrer" title={first.url}>
           <LinkSimpleIcon size={14} weight="bold" />
-          <span className={styles.profileLinks__primary}>{prettyUrl(first.url)}</span>
+          <span className={styles.profileLinks__primary}>{compactUrl(first.url)}</span>
         </a>
       ) : (
         <button
           type="button"
           className={styles.profileLinks__row}
           aria-haspopup="dialog"
+          title={first.url}
           onClick={() => dialogRef.current?.open()}
         >
           <LinkSimpleIcon size={14} weight="bold" />
-          <span className={styles.profileLinks__primary}>{prettyUrl(first.url)}</span>
+          <span className={styles.profileLinks__primary}>{compactUrl(first.url)}</span>
           <span className={styles.profileLinks__more}>and {rest.length} more</span>
         </button>
       )}
@@ -89,20 +108,28 @@ export default function ProfileLinks({ links: rawLinks }) {
           </header>
 
           <ul className={styles.dialog__list}>
-            {links.map((link, index) => (
-              <li key={`${link.url}-${index}`}>
-                <a className={styles.dialog__link} href={toHref(link.url)} target="_blank" rel="noopener noreferrer">
-                  <span className={styles.dialog__icon}>
-                    <LinkSimpleIcon size={18} weight="bold" />
-                  </span>
-                  <span className={styles.dialog__text}>
-                    <strong>{link.label || prettyUrl(link.url)}</strong>
-                    {/* The name is only worth a second line when it is not just the URL again */}
-                    {link.label && link.label !== prettyUrl(link.url) && <small>{prettyUrl(link.url)}</small>}
-                  </span>
-                </a>
-              </li>
-            ))}
+            {links.map((link, index) => {
+              // Named links lead with the name, unnamed ones with the compact address, so the
+              // bold line is always something short and recognisable. The full address is the
+              // second line — it wraps rather than clipping, since the tail of a URL is often
+              // the only thing telling two of them apart.
+              const primary = link.label || compactUrl(link.url)
+              const secondary = prettyUrl(link.url)
+
+              return (
+                <li key={`${link.url}-${index}`}>
+                  <a className={styles.dialog__link} href={toHref(link.url)} target="_blank" rel="noopener noreferrer" title={link.url}>
+                    <span className={styles.dialog__icon}>
+                      <LinkSimpleIcon size={18} weight="bold" />
+                    </span>
+                    <span className={styles.dialog__text}>
+                      <strong>{primary}</strong>
+                      {secondary !== primary && <small>{secondary}</small>}
+                    </span>
+                  </a>
+                </li>
+              )
+            })}
           </ul>
         </NativeDialog>
       )}

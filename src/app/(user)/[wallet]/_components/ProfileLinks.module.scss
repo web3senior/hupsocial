@@ -136,10 +136,15 @@
       font-weight: var(--font-weight-semibold, 600);
     }
 
+    // A long address wraps over two lines instead of clipping to an unreadable stub —
+    // and breaks mid-token if it has to, so one unbroken slug can't widen the dialog.
     small {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      line-height: 1.35;
       color: var(--text-muted, var(--gray-500));
     }
   }
