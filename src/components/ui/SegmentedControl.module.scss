@@ -1,0 +1,108 @@
+// A single track holding the options, with one background that travels between them. The active
+// option is told apart by ink alone — no fill weight, no shadow — so the only thing that moves
+// when you press is the surface underneath.
+//
+// The track carries no padding of its own: the segments fill it edge to edge, so the control sits
+// on a toolbar row without reading as the heaviest thing on it.
+.segmented {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: var(--segmented-height);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--surface-muted);
+  // Safety net only: the segments size to their labels, so this scrolls solely on a row narrow
+  // enough that they stop fitting — clipping a choice out of sight would hide it entirely. The
+  // slider is positioned against this box, so it scrolls with the segments rather than off them.
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  &[data-size='sm'] {
+    --segmented-height: 28px;
+    --segmented-gutter: 0.6875rem;
+    --segmented-font: var(--font-size-13, 0.8125rem);
+  }
+
+  &[data-size='md'] {
+    --segmented-height: 34px;
+    --segmented-gutter: 0.9rem;
+    --segmented-font: 0.82rem;
+  }
+
+  // Rides on transform rather than left, so the browser can hand the move to the compositor and
+  // the travel stays smooth next to a grid that is re-laying itself out. Width is animated too,
+  // which cannot be composited — but it is one element and the alternative is segments cut to the
+  // longest label in the row.
+  &__slider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--segmented-w, 0);
+    border-radius: 999px;
+    background-color: var(--surface);
+    transform: translateX(var(--segmented-x, 0));
+    // Eased in and out over a beat long enough to read as travel — a fast-out curve arrives
+    // before the eye has followed it, which is the same as not animating at all
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  &__option {
+    position: relative; // Above the slider, which is painted first
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    height: 100%;
+    padding: 0 var(--segmented-gutter);
+    border: 0;
+    background-color: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--segmented-font);
+    // Held at one weight in both states: a label that thickens when picked would resize the
+    // segment under the slider that just arrived on it
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.24s ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    // The outline sits inside the track, which clips anything drawn past its edge
+    &:focus-visible {
+      outline: 2px solid var(--text-muted);
+      outline-offset: -3px;
+      border-radius: 999px;
+    }
+
+    // Solid ink rather than an accent: --accent-primary resolves only once a wallet connects,
+    // which would leave the pressed segment unreadable when it isn't
+    &--active {
+      color: var(--text);
+    }
+  }
+
+  // Icon-only segments are squares, so the track reads as a switch rather than a row of words
+  &--iconOnly &__option {
+    width: var(--segmented-height);
+    padding: 0;
+  }
+
+  // A slider that jumps is the same information without the motion sickness
+  @media (prefers-reduced-motion: reduce) {
+    &__slider {
+      transition: none;
+    }
+  }
+}

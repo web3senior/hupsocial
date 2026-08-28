@@ -18,62 +18,16 @@
     z-index: 3;
   }
 
-  &__tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
+  // Both controls are SegmentedControls; the header only says how they sit on the row. The
+  // filters take the slack and scroll inside themselves on a narrow phone, so the view switch
+  // and the refresh button keep their place instead of being pushed off the end.
+  &__filters {
     min-width: 0;
   }
 
-  &__tab {
-    padding: 0.3125rem 0.6875rem;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.15s var(--transition-soft), color 0.15s var(--transition-soft);
-
-    &:hover {
-      background: color-mix(in srgb, var(--foreground) 6%, transparent);
-      color: var(--foreground);
-    }
-
-    &--active {
-      background: color-mix(in srgb, var(--foreground) 10%, transparent);
-      color: var(--foreground);
-    }
-  }
-
   &__views {
-    display: flex;
-    gap: 0.125rem;
+    flex: 0 0 auto;
     margin-left: auto;
-    padding: 0.125rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface-muted);
-  }
-
-  &__view {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.75rem;
-    height: 1.5rem;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-
-    &--active {
-      background: var(--surface);
-      color: var(--foreground);
-    }
   }
 
   &__refresh {

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import clsx from 'clsx'
 import { XIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
@@ -14,10 +13,12 @@ import useCollectionRarity from '@/hooks/useCollectionRarity'
 import useCollectionTopOffers from '@/hooks/useCollectionTopOffers'
 import useCollectionTraits from '@/hooks/useCollectionTraits'
 import useGridLayout from '@/hooks/useGridLayout'
+import useStoredChoice from '@/hooks/useStoredChoice'
 import { toast } from '@/components/NextToast'
 import PageTitle from '@/components/PageTitle'
 import NftMarketCard from '@/components/NftMarketCard'
 import LayoutToggle from '@/components/ui/LayoutToggle'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 import CollectionBrowser from './CollectionBrowser'
 import CollectionHeader from './CollectionHeader'
 import CollectionTable from './CollectionTable'
@@ -38,6 +39,8 @@ const STATUS_TABS = [
   { value: 'collection', label: 'Whole collection' },
 ]
 
+const STATUS_VALUES = STATUS_TABS.map((tab) => tab.value)
+
 /**
  * Collection View
  * The collection page: its onchain identity up top (CollectionHeader) and this app's
@@ -55,9 +58,9 @@ export default function CollectionView({ networkId, address }) {
   const info = useCollectionInfo({ chainId, collection })
   const stats = useCollectionStats({ chainId, collection, chainInfo })
 
-  const [status, setStatus] = useState('active')
-  // Density is the reader's habit rather than the collection's, so the choice is remembered
-  // across collections and shared by both grids — switching tabs never reshapes the page
+  // Both of these are the reader's habit rather than the collection's, so they are remembered
+  // across collections. Density is shared by both grids, so switching tabs never reshapes the page
+  const [status, setStatus] = useStoredChoice('nft-collection-status', STATUS_VALUES, 'active')
   const [layout, setLayout] = useGridLayout('nft-collection-layout')
   // Bumped after a sweep, to remount the browse grid. Its token list is a plain fetch, not an
   // SWR key, so a sweep that dropped rows for tokens that don't exist would otherwise keep
@@ -217,19 +220,9 @@ export default function CollectionView({ networkId, address }) {
           {/* What is being shown, then how it is shown — one row of identically cut pills,
               with the density switch last because it reshapes rather than re-queries */}
           <div className={styles.collection__filters}>
-            <div className={styles.collection__tabs} role="group" aria-label="Listing status">
-              {STATUS_TABS.map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  className={clsx(styles.collection__tab, status === tab.value && styles['collection__tab--active'])}
-                  aria-pressed={status === tab.value}
-                  onClick={() => setStatus(tab.value)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {/* Tabs rather than a pressed group: each one swaps the grid below for a different
+                set of NFTs, which is the panel a tablist exists to describe */}
+            <SegmentedControl options={STATUS_TABS} value={status} onChange={setStatus} label="Listing status" as="tabs" />
 
             {/* Drives whichever grid is showing — the listings or the whole collection */}
             <LayoutToggle value={layout} onChange={setLayout} label="Grid layout" />

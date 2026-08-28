@@ -3,6 +3,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { ArrowClockwiseIcon, ArrowUpIcon, CubeIcon, ListDashesIcon, PulseIcon, SpinnerIcon } from '@phosphor-icons/react'
+import useStoredChoice from '@/hooks/useStoredChoice'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 import ActivityBlock, { BlockGap } from './ActivityBlock'
 import ActivityTape from './ActivityTape'
 import { TABS, groupIntoBlocks, skippedBlocksBetween } from './activityModel'
@@ -17,9 +19,15 @@ const REFRESH_MS = 45_000
 const PILL_SCROLL_THRESHOLD = 220
 
 const VIEWS = [
-  { id: 'blocks', label: 'Blocks', icon: CubeIcon },
-  { id: 'tape', label: 'Tape', icon: ListDashesIcon },
+  { value: 'blocks', label: 'Blocks', icon: CubeIcon },
+  { value: 'tape', label: 'Tape', icon: ListDashesIcon },
 ]
+
+// The filters carry an empty-state message and a kind list the segmented control has no use for,
+// so it gets the two fields it reads and nothing else
+const TAB_OPTIONS = TABS.map((tab) => ({ value: tab.id, label: tab.label }))
+const TAB_IDS = TABS.map((tab) => tab.id)
+const VIEW_IDS = VIEWS.map((view) => view.value)
 
 const tabById = (id) => TABS.find((tab) => tab.id === id) || TABS[0]
 
@@ -32,8 +40,10 @@ const mergeRows = (kept, added) => {
 }
 
 export default function ActivityStream() {
-  const [tab, setTab] = useState(TABS[0].id)
-  const [view, setView] = useState(VIEWS[0].id)
+  // Which slice you watch and how you read it are both habits, so a reload lands back where you
+  // left off rather than on 'All' in Blocks every time
+  const [tab, setTab] = useStoredChoice('activity-filter', TAB_IDS, TABS[0].id)
+  const [view, setView] = useStoredChoice('activity-view', VIEW_IDS, VIEWS[0].value)
   const [rows, setRows] = useState([])
   const [nextCursor, setNextCursor] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -158,39 +168,11 @@ export default function ActivityStream() {
   return (
     <section className={styles.stream}>
       <header className={styles.stream__header}>
-        <div className={styles.stream__tabs} role="tablist" aria-label="Activity filters">
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={item.id === tab}
-              className={clsx(styles.stream__tab, item.id === tab && styles['stream__tab--active'])}
-              onClick={() => setTab(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {/* Tabs, because each filter swaps the feed below for a different set of rows */}
+        <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} label="Activity filters" as="tabs" size="sm" className={styles.stream__filters} />
 
-        <div className={styles.stream__views} role="group" aria-label="Layout">
-          {VIEWS.map((item) => {
-            const Icon = item.icon
-            return (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={item.id === view}
-                aria-label={item.label}
-                title={item.label}
-                className={clsx(styles.stream__view, item.id === view && styles['stream__view--active'])}
-                onClick={() => setView(item.id)}
-              >
-                <Icon size={15} weight={item.id === view ? 'fill' : 'regular'} />
-              </button>
-            )
-          })}
-        </div>
+        {/* A group rather than tabs: both views are the same rows, read differently */}
+        <SegmentedControl options={VIEWS} value={view} onChange={setView} label="Layout" size="sm" iconOnly className={styles.stream__views} />
 
         <button
           type="button"

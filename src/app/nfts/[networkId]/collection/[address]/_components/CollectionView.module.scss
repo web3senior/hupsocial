@@ -19,42 +19,14 @@
     flex-wrap: wrap;
   }
 
-  // The status tabs and the density switch, one group: same pill, same gap, and the
-  // switch last because it changes the shape of the answer rather than the question
+  // The status tabs and the density switch, one group: same track, same gap, and the
+  // switch last because it changes the shape of the answer rather than the question.
+  // Both are SegmentedControls, so nothing here styles them beyond how they sit.
   &__filters {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
-  }
-
-  &__tabs {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  &__tab {
-    height: 34px;
-    padding: 0 0.9rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background-color: var(--surface-muted);
-    color: var(--text);
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-
-    &:hover {
-      border-color: var(--text-muted);
-    }
-
-    &--active {
-      border-color: var(--network-color-primary, var(--color-primary));
-      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 12%, transparent);
-      color: var(--network-color-primary, var(--color-primary));
-    }
   }
 
   &__tools {
