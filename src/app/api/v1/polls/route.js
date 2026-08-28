@@ -12,6 +12,10 @@ import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
 
+/* How many faces a card's voter strip holds. Only the addresses travel — the client renders
+   each one through Profile, which owns identity everywhere in the app. */
+const FACE_COUNT = 3
+
 const POLL_COLUMNS = `
   p.network_id,
   p.poll_id,
@@ -122,6 +126,45 @@ export async function GET(request) {
       for (const poll of polls) {
         const key = `${poll.network_id}-${poll.poll_id}`
         poll.viewer_option = key in ballotByKey ? ballotByKey[key] : null
+      }
+    }
+
+    // The last few to answer, for the card's face strip. Who voted is public on the detail
+    // route already — it is the *choice* that is gated below, and nothing here carries one.
+    //
+    // One UNION ALL of per-poll point lookups, each riding idx_poll, rather than a ROW_NUMBER()
+    // over a tuple-IN derived table: the same shape the posts feed settled on, because that
+    // plan is one this XAMPP MariaDB 10.4 build crashes on.
+    for (const poll of polls) poll.recent_voters = []
+
+    const voted = polls.filter((poll) => Number(poll.total_votes) > 0)
+    if (voted.length > 0) {
+      const faceArgs = []
+      const faceQuery = voted
+        .map((poll) => {
+          faceArgs.push(poll.network_id, poll.poll_id)
+          return `(SELECT network_id, poll_id, voter, block_number, log_index
+                     FROM poll_votes
+                    WHERE network_id = ? AND poll_id = ?
+                    ORDER BY block_number DESC, log_index DESC
+                    LIMIT ${FACE_COUNT})`
+        })
+        .join(' UNION ALL ')
+
+      const [faces] = await pool.execute(faceQuery, faceArgs)
+
+      // UNION ALL makes no promise about the order rows come back in, so the newest-first
+      // ordering each branch asked for is re-applied here rather than assumed.
+      const facesByKey = {}
+      for (const face of faces) {
+        const key = `${face.network_id}-${face.poll_id}`
+        ;(facesByKey[key] ||= []).push(face)
+      }
+      for (const poll of polls) {
+        const bucket = facesByKey[`${poll.network_id}-${poll.poll_id}`] ?? []
+        poll.recent_voters = bucket
+          .sort((a, b) => Number(b.block_number) - Number(a.block_number) || Number(b.log_index) - Number(a.log_index))
+          .map((face) => String(face.voter))
       }
     }
 

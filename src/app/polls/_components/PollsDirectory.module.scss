@@ -260,6 +260,65 @@
     font-weight: 600;
   }
 
+  /* Who has already answered: overlapping faces, then the count — the same social proof the
+     connect popup puts under its title */
+  &__voters {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__faces {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Nested for the specificity to beat Profile's own rule, and raised over the stretched title
+     link — a face carries a hover card and a link of its own, and neither is reachable under it */
+  .directory__face {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+
+    &:not(:first-child) {
+      margin-left: -8px;
+    }
+
+    /* The face lifts clear of its neighbours while it is being read */
+    &:hover {
+      z-index: 2;
+    }
+
+    img {
+      /* A card-colored ring separates the overlapping faces from each other */
+      border: 2px solid var(--background);
+      background-color: var(--surface-muted);
+
+      /* Profile paints the identicon fingerprint over the picture. At this size it lands on
+         top of the neighbour it overlaps and reads as noise, and the hover card behind each
+         face carries the same fingerprint at a size worth checking. */
+      + img {
+        display: none;
+      }
+    }
+  }
+
+  &__votersText {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    /* The count is the figure being sold, so it carries the card's own text color rather than
+       the muted tone around it */
+    strong {
+      color: var(--foreground);
+      font-weight: 600;
+    }
+  }
+
   &__foot {
     display: flex;
     align-items: center;

@@ -25,14 +25,22 @@ const fetcher = (url) => fetch(url).then((res) => res.json())
 const SkeletonCard = () => (
   <li className={styles.directory__item} aria-hidden="true">
     <div className={clsx(styles.directory__card, styles.directory__skeleton)}>
-      {/* Same shape a loaded card holds — a 36px creator avatar, the question, its window bar
-          and the meta line — so the first page lands without the list jumping */}
+      {/* Same shape a loaded card holds — a 36px creator avatar, the question, its window bar,
+          the voter faces and the meta line — so the first page lands without the list jumping */}
       <div className={styles.directory__skeletonTop}>
         <div className="shimmer rounded-full" style={{ width: '36px', height: '36px' }} />
         <div className="shimmer rounded" style={{ width: '7rem', height: '14px' }} />
       </div>
       <div className="shimmer rounded" style={{ width: '80%', height: '16px' }} />
       <div className="shimmer rounded" style={{ width: '100%', height: '4px' }} />
+      <div className={styles.directory__voters}>
+        <div className={styles.directory__faces}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className={clsx('shimmer rounded-full', styles.directory__face)} style={{ width: '26px', height: '26px' }} />
+          ))}
+        </div>
+        <div className="shimmer rounded" style={{ width: '4rem', height: '12px' }} />
+      </div>
       <div className="shimmer rounded" style={{ width: '55%', height: '12px' }} />
     </div>
   </li>
@@ -110,6 +118,9 @@ export default function PollsDirectory() {
     const chips = requirementChips(poll, appChains.find((chain) => chain.id === Number(poll.network_id))?.nativeCurrency?.symbol)
     const href = `/polls/${poll.network_id}/${poll.poll_id}`
     const votes = Number(poll.total_votes) || 0
+    // The last few wallets to answer. Who voted is not the same fact as what they voted for —
+    // the choice stays behind the same gate the tallies do, and never reaches this list.
+    const voters = Array.isArray(poll.recent_voters) ? poll.recent_voters : []
 
     return (
       <li key={`${poll.network_id}-${poll.poll_id}`} className={styles.directory__item}>
@@ -183,9 +194,37 @@ export default function PollsDirectory() {
             />
           )}
 
+          {/* Who is already in, the way the connect popup shows who is already here: the last
+              faces to arrive, then the count. Each face is a Profile — hover card, chain badge
+              and all — so a voter reads as the same person they are under a post. */}
+          {votes > 0 && (
+            <div className={styles.directory__voters}>
+              {voters.length > 0 && (
+                <div className={styles.directory__faces}>
+                  {voters.map((voter) => (
+                    <Profile
+                      key={voter}
+                      variant="imageOnly"
+                      size={26}
+                      creator={voter}
+                      networkId={poll.network_id}
+                      className={styles.directory__face}
+                    />
+                  ))}
+                </div>
+              )}
+              <span className={styles.directory__votersText}>
+                <strong>{formatVotes(votes)}</strong> {votes === 1 ? 'person' : 'people'} voted
+              </span>
+            </div>
+          )}
+
           <div className={styles.directory__foot}>
             <span className={styles.directory__meta}>
-              Asked {toRelative(poll.opened_at)} · {formatVotes(votes)} {votes === 1 ? 'vote' : 'votes'} · {options.length} options
+              {/* The count lives in the strip above once there is one, so the meta line carries
+                  it only in the state the strip cannot show */}
+              Asked {toRelative(poll.opened_at)}
+              {votes === 0 && ' · No votes yet'} · {options.length} options
             </span>
 
             <CopyButton

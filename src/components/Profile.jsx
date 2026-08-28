@@ -23,13 +23,18 @@ import clsx from 'clsx'
 import UPlogo from '@/../public/up.png'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', className }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 36, className }) {
   const router = useRouter()
   const { profile, isLoading } = useProfile(creator)
   const [popoverOpened, setPopoverOpened] = useState(false)
 
   // Derived check for layout variations sharing the full metadata sub-row
   const isFullLike = variant === 'full' || variant === 'fullWithoutTime'
+
+  // The picture's laid-out size, handed to the stylesheet so the shimmer that stands in for it
+  // reserves the same box and the fingerprint keeps its proportion. Only `imageOnly` surfaces
+  // have reason to move it — a face strip is smaller than a byline.
+  const avatarBox = { '--profile-avatar-size': `${size}px` }
 
   // Extract network configuration based on current chain identifier
   const chainInfo = useMemo(() => {
@@ -60,8 +65,8 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   // Render placeholder skeletal visual states during active metadata fetches
   if (isLoading || !profile) {
     return (
-      <div className={clsx(styles.profileShimmer, 'flex align-items-center gap-050', className)}>
-        <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 36, height: 36, flexShrink: 0 }} />
+      <div className={clsx(styles.profileShimmer, 'flex align-items-center gap-050', className)} style={avatarBox}>
+        <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: size, height: size, flexShrink: 0 }} />
         {variant !== 'imageOnly' && (
           <div className="flex flex-column gap-025">
             <div className="flex flex-row gap-025">
@@ -78,7 +83,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   }
 
   return (
-    <div className={clsx(styles.profile, 'flex align-items-center', className)}>
+    <div className={clsx(styles.profile, 'flex align-items-center', className)} style={avatarBox}>
       <NativePopover
         trigger={
           <button
@@ -91,13 +96,13 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               className={clsx(styles.imageWrapper__avatar, 'rounded-full')}
               alt={profile.name}
               src={profile.profileImage}
-              size={36}
+              size={size}
             />
             <Identicon
               name={profile.name}
               profileImage={profile.profileImage}
               address={creator}
-              size={18}
+              size={Math.round(size / 2)}
               className={clsx(styles.imageWrapper__fingerprint)}
             />
           </button>
