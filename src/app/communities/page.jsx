@@ -44,6 +44,8 @@ import { getIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { buildLinks, displayLinks, emptySocials, parseLinks } from '@/lib/socialLinks'
+import { asClause, describeWalletError } from '@/lib/walletErrors'
+import { toast } from '@/components/NextToast'
 import BrandingLinksFields from './_components/BrandingLinksFields'
 import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
@@ -293,6 +295,20 @@ export function metadataFromRow(row) {
  *   also what puts the card in live mode: one card on screen can afford authoritative reads, and
  *   that is the surface where gating decisions actually get made.
  */
+// Failures stay on screen longer than the toast's 5s default: they carry a reason worth reading,
+// and nothing else is left to explain what happened once they go.
+const ERROR_TOAST_MS = 12000
+
+const REQUEST_ALREADY_HANDLED =
+  'that wallet is no longer pending — they withdrew the request, or another moderator handled it first. The queue refreshes on its own.'
+
+// HupCommunity reverts worth translating. Matched against the whole error, so both the decoded
+// name and the bare selector a node sometimes returns instead resolve to the same sentence.
+const KNOWN_REVERTS = {
+  NoPendingRequest: REQUEST_ALREADY_HANDLED,
+  '0xcc2c06e8': REQUEST_ALREADY_HANDLED,
+}
+
 export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null, row = null }) {
   const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
@@ -788,6 +804,85 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
 
   const banHandledRef = useRef(null)
   const rotateHandledRef = useRef(null)
+
+  // --- Transaction feedback ---
+
+  // Every write on this card reports itself in a toast rather than a line under its own button.
+  // The card is tall and the wallet answers seconds later, so an inline line was routinely
+  // scrolled out of view — and inside the Modify dialog it vanished the moment the dialog closed,
+  // which is exactly when a slow confirmation lands.
+  const feedbackToastRef = useRef(null)
+  const showFeedback = (message, type, options) => {
+    // update() returns false once the user has closed the toast — start a fresh one then, so a
+    // verdict is never silently swallowed
+    if (!feedbackToastRef.current?.update(message, type, options)) feedbackToastRef.current = toast(message, type, options)
+  }
+
+  // Each write's failure, labelled with the action it belongs to — wagmi holds one error object
+  // per hook until that hook is used again, so identity is what tells a new failure from a
+  // re-render of an old one.
+  const writeFailures = [
+    ['Couldn’t join', joinError],
+    ['Couldn’t pay to join', payToJoinError],
+    ['Couldn’t withdraw the request', cancelRequestError],
+    ['Couldn’t answer the invite', inviteRespError],
+    ['Couldn’t save the details', updateError],
+    ['Couldn’t save the requirements', requirementsError],
+    ['Couldn’t save the join price', paymentReqError],
+    ['Couldn’t save the fee destination', payoutDestinationError],
+    ['Couldn’t change the community’s status', statusError],
+    ['Couldn’t approve the request', approveError],
+    ['Couldn’t ban the member', banError],
+    ['Couldn’t unban the member', unbanError],
+    ['Couldn’t send the invite', inviteError],
+    ['Couldn’t update the moderator', governorError],
+    ['Couldn’t update the whitelist', whitelistError],
+  ]
+  const reportedFailureRef = useRef(null)
+  useEffect(() => {
+    const failure = writeFailures.find(([, error]) => error)
+    if (!failure) return
+    const [label, error] = failure
+    if (reportedFailureRef.current === error) return
+    reportedFailureRef.current = error
+    console.error(`${label}:`, error)
+    showFeedback(`${label} — ${asClause(describeWalletError(error, { known: KNOWN_REVERTS }))}`, 'error', { duration: ERROR_TOAST_MS })
+  }, [
+    joinError,
+    payToJoinError,
+    cancelRequestError,
+    inviteRespError,
+    updateError,
+    requirementsError,
+    paymentReqError,
+    payoutDestinationError,
+    statusError,
+    approveError,
+    banError,
+    unbanError,
+    inviteError,
+    governorError,
+    whitelistError,
+  ])
+
+  // Saving the Modify form is one morphing toast (saving → saved), the same shape the create
+  // modal uses. A save can span three transactions, so "saved" waits for whichever of them the
+  // submission actually started.
+  const isSavingConfig = isUpdateConfirming || isRequirementsConfirming || isPaymentReqConfirming
+  useEffect(() => {
+    if (isSavingConfig) showFeedback('Saving your changes…', 'loading')
+  }, [isSavingConfig])
+
+  const isConfigSaved =
+    isUpdateConfirmed &&
+    (!requirementsHash || isRequirementsConfirmed) &&
+    (editAdmission !== ADMISSION.PayToJoin || !paymentReqHash || isPaymentReqConfirmed)
+  useEffect(() => {
+    if (!isConfigSaved) return
+    showFeedback('Changes saved.', 'success')
+    // Released so the next save opens its own toast instead of morphing this one
+    feedbackToastRef.current = null
+  }, [isConfigSaved])
 
   // Refresh the requirement list on successful block confirmation
   useEffect(() => {
@@ -2457,20 +2552,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             </>
           )}
 
-          {joinError && <div className={styles.card__error}>Error: {joinError.shortMessage || joinError.message}</div>}
-
-          {cancelRequestError && (
-            <div className={styles.card__error}>Error: {cancelRequestError.shortMessage || cancelRequestError.message}</div>
-          )}
-
-          {statusError && <div className={styles.card__error}>Error: {statusError.shortMessage || statusError.message}</div>}
-
-          {banError && banningAddress === activeAccountAddress && (
-            <div className={styles.card__error}>Error: {banError.shortMessage || banError.message}</div>
-          )}
-
-          {payToJoinError && <div className={styles.card__error}>Error: {payToJoinError.shortMessage || payToJoinError.message}</div>}
-
           {/* Member of an encrypted community without a working key mailbox (locked vault or
               unregistered identity): tell THEM directly — moderators can't deliver a key to a
               wallet with no registered public key, and shouldn't have to chase members 1:1.
@@ -2522,9 +2603,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   Decline
                 </button>
               </div>
-              {inviteRespError && (
-                <div className={styles.card__error}>Error: {inviteRespError?.shortMessage || inviteRespError?.message}</div>
-              )}
             </div>
           )}
 
@@ -2626,7 +2704,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 ✓ Invite sent — they become a member once they accept it from this community's card.
               </p>
             )}
-            {inviteError && <div className={styles.card__error}>Error: {inviteError?.shortMessage || inviteError?.message}</div>}
             {members.length === 0 ? (
               <p className={styles.feed__empty}>No members found yet.</p>
             ) : (
@@ -2716,9 +2793,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                     {isGovernorPending ? 'Confirm Wallet...' : isGovernorConfirming ? 'Setting...' : 'Set Governor'}
                   </button>
                 </form>
-              )}
-              {governorError && (
-                <div className={styles.card__error}>Error: {governorError?.shortMessage || governorError?.message}</div>
               )}
             </div>
           )}
@@ -2856,7 +2930,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   </div>
                 ))
               )}
-              {whitelistError && <div className={styles.card__error}>Error: {whitelistError?.shortMessage || whitelistError?.message}</div>}
             </div>
           )}
 
@@ -2894,19 +2967,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             </div>
           )}
 
-          {(approveError || banError || unbanError) && (
-            <div className={styles.card__error}>
-              Error:{' '}
-              {`${approveError?.shortMessage || ''}${approveError?.message || ''}`.match(/NoPendingRequest|0xcc2c06e8/)
-                ? 'That wallet is no longer pending — they withdrew the request, or another moderator handled it first. The queue refreshes on its own.'
-                : approveError?.shortMessage ||
-                  approveError?.message ||
-                  banError?.shortMessage ||
-                  banError?.message ||
-                  unbanError?.shortMessage ||
-                  unbanError?.message}
-            </div>
-          )}
         </div>
       </CardDialog>
 
@@ -3156,11 +3216,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   placeholder="Name, ENS, or 0x… wallet / contract address"
                   hint="Contracts work too: a Safe, DAO treasury, or splitter contract can share fees between wallets under rules you control. Make sure it can receive the payment asset — joins fail while it can't."
                 />
-                {payoutDestinationError && (
-                  <div className={styles.card__error}>
-                    Error: {payoutDestinationError?.shortMessage || payoutDestinationError?.message}
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -3258,45 +3313,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 : 'Reactivate community'}
           </button>
 
-          {(updateHash || requirementsHash || paymentReqHash) && (
-            <div className={styles.card__monitor}>
-              {updateHash && (
-                <p className={styles.card__tx}>
-                  Details saved: <span>{updateHash}</span>
-                </p>
-              )}
-              {requirementsHash && (
-                <p className={styles.card__tx}>
-                  Requirements saved: <span>{requirementsHash}</span>
-                </p>
-              )}
-              {paymentReqHash && (
-                <p className={styles.card__tx}>
-                  Join price saved: <span>{paymentReqHash}</span>
-                </p>
-              )}
-              {(isUpdateConfirming || isRequirementsConfirming || isPaymentReqConfirming) && (
-                <p className={styles.card__status}>Saving your changes…</p>
-              )}
-              {isUpdateConfirmed &&
-                (!requirementsHash || isRequirementsConfirmed) &&
-                (editAdmission !== ADMISSION.PayToJoin || !paymentReqHash || isPaymentReqConfirmed) && (
-                  <p className={clsx(styles.card__status, styles['card__status--success'])}>Changes saved!</p>
-                )}
-            </div>
-          )}
-
-          {(updateError || requirementsError || paymentReqError) && (
-            <div className={styles.card__error}>
-              Error:{' '}
-              {updateError?.shortMessage ||
-                updateError?.message ||
-                requirementsError?.shortMessage ||
-                requirementsError?.message ||
-                paymentReqError?.shortMessage ||
-                paymentReqError?.message}
-            </div>
-          )}
+          {/* Progress, the saved confirmation, and any failure all live in the toast now —
+              see the transaction feedback effects above. A toast outlives this dialog, so a
+              confirmation that lands after it closes is still seen. */}
         </form>
       </CardDialog>
 
@@ -3382,10 +3401,12 @@ export default function CommunitiesPage() {
   // flight, and a slow older response must not overwrite the newest query's results
   const directoryFetchSeqRef = useRef(0)
 
-  const fetchDirectory = async (page = 1, append = false) => {
-    if (isAllNetworks ? communityChains.length === 0 : !directoryNetworkId || !directoryContractAddress) return
+  // `quiet` skips the loading state: a poll that repeats every few seconds would otherwise
+  // flash the directory's skeleton over content that is already on screen.
+  const fetchDirectory = async (page = 1, append = false, { quiet = false } = {}) => {
+    if (isAllNetworks ? communityChains.length === 0 : !directoryNetworkId || !directoryContractAddress) return null
     const fetchSeq = ++directoryFetchSeqRef.current
-    setIsDirectoryLoading(true)
+    if (!quiet) setIsDirectoryLoading(true)
     try {
       const params = new URLSearchParams({ page, limit: 20 })
       if (isAllNetworks) {
@@ -3412,12 +3433,32 @@ export default function CommunitiesPage() {
       setTotalCommunities(Number(json.meta?.total ?? 0))
       setDirectoryPage(page)
       setDirectoryError('')
+      // Handed back so a caller waiting on a specific community can tell whether this page
+      // already contains it — see waitForCommunityToIndex
+      return json.data
     } catch (err) {
-      if (fetchSeq !== directoryFetchSeqRef.current) return
+      if (fetchSeq !== directoryFetchSeqRef.current) return null
       console.error('Failed to load community directory from cidex:', err)
       setDirectoryError(err.message || 'Failed to load communities')
+      return null
     } finally {
-      if (fetchSeq === directoryFetchSeqRef.current) setIsDirectoryLoading(false)
+      if (!quiet && fetchSeq === directoryFetchSeqRef.current) setIsDirectoryLoading(false)
+    }
+  }
+
+  // cidex reads the CommunityCreated event a few seconds behind the receipt, so the single
+  // refetch fired the moment a create confirms reliably misses the new row — which is why the
+  // directory used to need a manual page reload. Retry on a widening backoff until the row
+  // shows up, then stop; if indexing is further behind than this, the next natural refresh
+  // picks it up.
+  const INDEXING_BACKOFF_MS = [0, 1500, 3000, 5000, 8000, 12000]
+  const waitForCommunityToIndex = async (communityId) => {
+    for (const delay of INDEXING_BACKOFF_MS) {
+      if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
+      const rows = await fetchDirectory(1, false, { quiet: delay > 0 })
+      // A create with no id decoded (or a fetch that lost its race) just takes the first refresh
+      if (communityId == null || !rows) return
+      if (rows.some((row) => String(row.id) === String(communityId))) return
     }
   }
 
@@ -3590,11 +3631,12 @@ export default function CommunitiesPage() {
             ref={createModalRef}
             vault={vault}
             vaultPrompt={<VaultUnlockPrompt vault={vault} />}
-            onCreated={() => {
-              // Best-effort directory refresh — subject to cidex's indexing lag, same as the
-              // global post feed, so the new entry may take a few seconds to show
-              fetchDirectory(1, false)
+            onCreated={(newCommunityId) => {
+              // Close first, then keep refreshing in the background until cidex has the row —
+              // the modal is done either way, and the directory fills itself in without the
+              // user reaching for reload
               createModalRef.current?.close()
+              waitForCommunityToIndex(newCommunityId)
             }}
           />
         </div>

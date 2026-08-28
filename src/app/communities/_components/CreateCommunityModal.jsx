@@ -17,6 +17,8 @@ import { getActiveChain } from '@/lib/communication'
 import { uploadObjectToIPFS } from '@/lib/ipfs'
 import { generateContentKey, wrapContentKey } from '@/lib/communityVault'
 import { buildLinks, emptySocials } from '@/lib/socialLinks'
+import { asClause, describeWalletError } from '@/lib/walletErrors'
+import { CONTRACTS, appChains } from '@/config/contracts'
 import BrandingLinksFields from './BrandingLinksFields'
 import ImagePicker from './ImagePicker'
 import { AssetUnitLabel, TokenUnitHint } from './TokenAmount'
@@ -45,6 +47,23 @@ import styles from '../page.module.scss'
 // A half-filled form survives a full page refresh too: every field mirrors into this
 // localStorage draft, restored on mount and dropped once a community is actually created.
 const DRAFT_STORAGE_KEY = 'hup_community_create_draft'
+
+// createCommunity's own reverts, spelled out. A custom error reaches the client as a bare name
+// (viem's shortMessage for one is the name, or worse the raw selector), so this map is the only
+// place their meaning can live.
+const KNOWN_CREATE_REVERTS = {
+  CreationCooldownActive: 'You created a community recently — there’s a 1-hour wait between communities. Try again in a few minutes.',
+  MaxCommunitiesReached: 'You’ve reached the maximum number of communities one account can create.',
+  InsufficientFee: 'The fee didn’t match the current creation fee. Refresh the page and try again.',
+}
+
+// The networks HupCommunity is actually deployed on, read from the same map getActiveChain
+// resolves against — so a new deployment needs no edit here. Without this, creating from a
+// chain that has no entry sends a write to an undefined address, and the wallet answers with a
+// generic RPC error that names nothing.
+const COMMUNITY_CHAIN_NAMES = new Intl.ListFormat('en', { type: 'disjunction' }).format(
+  appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.community).map((chain) => chain.name)
+)
 
 const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, vaultPrompt, onClose, onCreated }, ref) {
   const [activeChain, activeChainContracts] = getActiveChain()
@@ -88,7 +107,6 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   // address (Safe, DAO, splitter) is fine — it withdraws from the ledger under its own rules.
   const [payoutDestination, setPayoutDestination] = useState(EMPTY_RECIPIENT)
   const [isConfiguring, setIsConfiguring] = useState(false)
-  const [configError, setConfigError] = useState('')
 
   // Draft restore runs in an effect, not the state initializers — effects never run during
   // SSR, so the server-rendered markup and the first client render always agree.
@@ -252,11 +270,15 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const stepTo = (key, status) => setTxSteps((steps) => steps.map((step) => (step.key === key ? { ...step, status } : step)))
 
   const txToastRef = useRef(null)
-  const showTxToast = (message, type) => {
+  const showTxToast = (message, type, options) => {
     // update() returns false once the user has closed the toast — start a fresh one then,
     // so the final success/failure state is never silently swallowed
-    if (!txToastRef.current?.update(message, type)) txToastRef.current = toast(message, type)
+    if (!txToastRef.current?.update(message, type, options)) txToastRef.current = toast(message, type, options)
   }
+
+  // Failures get longer on screen than the 5s default: they carry a reason worth reading, and
+  // unlike the success line there's nothing else left to tell the user what went wrong.
+  const showErrorToast = (message) => showTxToast(message, 'error', { duration: 12000 })
 
   useEffect(() => {
     if (isConfirming) showTxToast('Creating your community…', 'loading')
@@ -266,12 +288,13 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     if (isConfiguring) showTxToast('Community created — one more confirmation in your wallet to save its requirements…', 'loading')
   }, [isConfiguring])
 
-  // Submission failures keep their inline error display — just drop the spinner
+  // A failed create reports itself in the toast, never in a line under the form: the toast
+  // outlives the modal, so a rejection that lands after the user has closed it is still seen.
+  // Dissolving the checklist brings the form back so the fix can be made and retried.
   useEffect(() => {
-    if (createError) {
-      txToastRef.current?.dismiss()
-      txToastRef.current = null
-    }
+    if (!createError) return
+    setTxSteps([])
+    showErrorToast(describeWalletError(createError, { known: KNOWN_CREATE_REVERTS }))
   }, [createError])
 
   const isCreatingEncrypted = encrypted
@@ -315,7 +338,6 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       let activeStep = null
       if (hasFollowUps) {
         setIsConfiguring(true)
-        setConfigError('')
         try {
           if (requirements.length > 0) {
             activeStep = 'requirements'
@@ -379,13 +401,13 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
         } catch (err) {
           if (activeStep) stepTo(activeStep, 'error')
           console.error('Community created, but configuring its gating requirements failed:', err)
-          setConfigError(
-            'Community created, but its gating setup was not completed — finish it from the Modify form.',
-          )
           setIsConfiguring(false)
-          txToastRef.current?.dismiss()
-          txToastRef.current = null
-          return // keep the modal open so the error is seen; user closes manually
+          const reason = describeWalletError(err, { known: KNOWN_CREATE_REVERTS, rejection: 'You declined the follow-up signature.' })
+          showErrorToast(`Your community was created, but its setup didn’t finish — ${asClause(reason)} Finish it from the Modify form.`)
+          // The checklist stays up with the failed step marked, so it's clear which part of the
+          // setup is missing. Re-submitting the form would create a second community, so the
+          // modal is closed by hand rather than reset for a retry.
+          return
         }
         setIsConfiguring(false)
       }
@@ -396,31 +418,22 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       txToastRef.current = null
 
       resetForm()
-      onCreated?.()
+      // The id goes with it so the directory can wait for exactly this community to be indexed
+      // rather than refetching once and hoping cidex was already there
+      onCreated?.(newCommunityId)
     }
     run()
   }, [isConfirmed, receipt, hash])
 
-  // A rejected or failed create dissolves the checklist so the form (and its error line)
-  // comes back instead of a stuck step list
-  useEffect(() => {
-    if (createError) setTxSteps([])
-  }, [createError])
-
-  // Known createCommunity reverts, translated to something a user can act on — the raw
-  // shortMessage for a custom error is just the error name (or worse, hex)
-  const friendlyCreateError = (() => {
-    if (!createError) return null
-    const raw = `${createError.shortMessage || ''} ${createError.message || ''}`
-    if (raw.includes('CreationCooldownActive'))
-      return 'You created a community recently — there’s a 1-hour wait between communities. Try again in a few minutes.'
-    if (raw.includes('MaxCommunitiesReached')) return 'You’ve reached the maximum number of communities one account can create.'
-    if (raw.includes('InsufficientFee')) return 'The fee didn’t match the current creation fee. Refresh the page and try again.'
-    return createError.shortMessage || createError.message
-  })()
-
   const handleCreate = async (e) => {
     e.preventDefault()
+
+    // No deployment on this chain means the write below would target an undefined address, and
+    // the wallet's answer to that is an unnamed RPC error — so say it plainly instead.
+    if (!CONTRACT_ADDRESS) {
+      showErrorToast(`Communities aren’t live on ${activeChain?.name || 'this network'} yet. Switch to ${COMMUNITY_CHAIN_NAMES} to create one.`)
+      return
+    }
 
     if (isCreatingEncrypted && !vault.identity) {
       vault.setShowPinPrompt(true)
@@ -431,7 +444,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     // signed, the community already exists and the failure could only surface as a
     // half-configured follow-up.
     if (needsPayment && payoutDestination.input.trim() && !payoutDestination.address) {
-      alert('Fee destination: pick a wallet from the suggestions or paste a full address — or clear the field to keep fees yourself.')
+      showErrorToast('Fee destination: pick a wallet from the suggestions or paste a full address — or clear the field to keep fees yourself.')
       return
     }
 
@@ -461,7 +474,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       metadataCid = await uploadObjectToIPFS(metadataObj)
     } catch (err) {
       console.error('Failed to upload community metadata to IPFS:', err)
-      alert('Failed to upload community metadata. Please try again.')
+      showErrorToast('Couldn’t upload the community’s details to IPFS. Nothing was signed — check your connection and try again.')
       return
     }
 
@@ -853,10 +866,6 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
               : 'Create Community'}
           </button>
         </form>
-
-        {friendlyCreateError && <div className={styles.manager__error}>Error: {friendlyCreateError}</div>}
-
-        {configError && <div className={styles.manager__error}>{configError}</div>}
       </div>
     </NativeDialog>
   )
