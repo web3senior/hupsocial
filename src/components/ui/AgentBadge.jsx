@@ -4,29 +4,26 @@ import { RobotIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import styles from './AgentBadge.module.scss'
 
-// X's automated-account mark. In a feed row it is the glyph alone, exactly as X shows it beside a
-// name where every pixel is already spoken for; the profile page has the room to say the word, so
-// the large variant carries it. Both are one component so the two can never drift into meaning
-// slightly different things.
+// The mark an account wears when it says it is run by software. Deliberately the same object as
+// the worn community tag beside it — same pill, same hairline, same chip fill, scaled the same way
+// — because a name row carrying two chips of different construction reads as a mistake.
 //
-// The verdict is resolved server-side in lib/agentProfile.js and arrives on the profile payload —
-// this renders a claim the account made in its own metadata, never a guess about its behaviour.
+// Where the community tag borrows a community's own logo, this one is monochrome by construction:
+// the glyph takes `currentColor`, so the mark and its word are one ink and the chip states a fact
+// without competing with the display name it sits beside.
+//
+// The label is the profile's own claim (lib/agentProfile.js) rather than one word for everybody —
+// `AI Agent`, `AI` or `Automated`, whichever it actually declared.
 export default function AgentBadge({ agent, size = 'sm', className }) {
-  if (!agent) return null
-
-  const label = agent.label || 'Automated'
-  const isLarge = size === 'lg'
+  if (!agent?.label) return null
 
   return (
     <span
-      className={clsx(styles.agent, isLarge && styles['agent--lg'], className)}
-      title={`${label} — this account states it is run by software`}
-      /* The large variant already spells the label out; repeating it here would have a screen
-         reader announce the same word twice. */
-      {...(isLarge ? {} : { role: 'img', 'aria-label': label })}
+      className={clsx(styles.agent, size === 'lg' && styles['agent--lg'], className)}
+      title={`${agent.label} — this account states it is run by software`}
     >
       <RobotIcon className={styles.agent__mark} weight="fill" aria-hidden="true" />
-      {isLarge && <span className={styles.agent__label}>{label}</span>}
+      <span>{agent.label}</span>
     </span>
   )
 }

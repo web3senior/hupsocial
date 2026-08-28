@@ -19,20 +19,28 @@
  * disagree about who is automated.
  */
 
-// The tags that ARE a declaration, normalized. Deliberately narrow: a bare `ai` is not one — it is
-// worn by builders describing what they work on, and matching it would pin the robot on a human
-// founder whose only crime is a tag list that mentions the field.
-const AGENT_TAGS = new Set([
-  'agent',
-  'aiagent',
-  'automated',
-  'automatedaccount',
-  'autonomous',
-  'autonomousagent',
-  'bot',
-  'botaccount',
-  'chatbot',
+// The tags that ARE a declaration, normalized, each mapped to the word the chip wears. The chip
+// repeats the claim back rather than flattening every tag into one label: a wallet that tagged
+// itself `ai` is saying something smaller than one that tagged itself `ai-agent`, and a chip
+// reading "AI" beside a builder's name is their own word, where "Automated" would be our verdict
+// on them.
+const AGENT_TAGS = new Map([
+  ['agent', 'AI Agent'],
+  ['aiagent', 'AI Agent'],
+  ['autonomousagent', 'AI Agent'],
+  ['ai', 'AI'],
+  ['automated', 'Automated'],
+  ['automatedaccount', 'Automated'],
+  ['autonomous', 'Automated'],
+  ['bot', 'Automated'],
+  ['botaccount', 'Automated'],
+  ['chatbot', 'Automated'],
 ])
+
+// Most specific first. Tag lists overlap — the profile that started this carries `Agent`,
+// `ai-agent` AND `AI` — so the chip has to settle on one, and the most particular claim is the one
+// worth showing.
+const LABEL_PRECEDENCE = ['AI Agent', 'Automated', 'AI']
 
 // The description only speaks when it says so outright. Loose readings ("AI-powered", "powered by
 // Claude") describe tools a human uses as often as they describe the account itself.
@@ -46,14 +54,17 @@ const normalizeTag = (tag) =>
     .replace(/[^a-z0-9]/g, '')
 
 /**
- * True when one tag is a declaration. The plural is checked as a second lookup rather than by
+ * The label one tag declares, or null. The plural is checked as a second lookup rather than by
  * stripping a trailing `s` upfront — that would maul `autonomous` into a word matching nothing.
  */
-const isAgentTag = (tag) => {
+const labelForTag = (tag) => {
   const normalized = normalizeTag(tag)
-  if (!normalized) return false
+  if (!normalized) return null
 
-  return AGENT_TAGS.has(normalized) || (normalized.endsWith('s') && AGENT_TAGS.has(normalized.slice(0, -1)))
+  if (AGENT_TAGS.has(normalized)) return AGENT_TAGS.get(normalized)
+  if (normalized.endsWith('s')) return AGENT_TAGS.get(normalized.slice(0, -1)) ?? null
+
+  return null
 }
 
 /**
@@ -75,17 +86,20 @@ const parseTags = (tags) => {
 }
 
 /**
- * The automated mark a profile has claimed for itself, or null.
+ * The mark a profile has claimed for itself, or null.
  *
  * @param {Object|null} profile - a profile payload from either branch of the profile route.
- * @returns {{ label: string, source: 'tag'|'description' }|null} `source` records how the claim was
- *   made, so a moderation view can tell a tagged account from one that only says it in prose.
+ * @returns {{ label: 'AI Agent'|'AI'|'Automated', source: 'tag'|'description' }|null} `source`
+ *   records how the claim was made, so a moderation view can tell a tagged account from one that
+ *   only says it in prose.
  */
 export function resolveAgentProfile(profile) {
   if (!profile) return null
 
-  if (parseTags(profile.tags).some(isAgentTag)) {
-    return { label: 'Automated', source: 'tag' }
+  const claimed = new Set(parseTags(profile.tags).map(labelForTag).filter(Boolean))
+  const label = LABEL_PRECEDENCE.find((candidate) => claimed.has(candidate))
+  if (label) {
+    return { label, source: 'tag' }
   }
 
   if (typeof profile.description === 'string' && DECLARED_IN_DESCRIPTION.test(profile.description)) {
