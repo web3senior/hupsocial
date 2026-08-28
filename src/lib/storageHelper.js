@@ -4,30 +4,6 @@
 import { gatewayList, gatewayUrl, primaryGateway } from '@/lib/ipfsGateways'
 
 /**
- * Checks if a given string is a 0G Storage root hash or protocol.
- * @param {string} src - The asset path or hash string.
- * @returns {boolean}
- */
-export const is0GHash = (src) => {
-  return typeof src === 'string' && (src.startsWith('0x') || src.startsWith('0g://'))
-}
-
-/**
- * Resolves a 0G root hash to a direct backend streaming proxy endpoint.
- * @param {string} hash - The 0G root hash or protocol URI.
- * @returns {string|null} The API proxy endpoint URL, or null if invalid.
- */
-export const resolve0GUrl = (hash) => {
-  if (!hash || !is0GHash(hash)) return null
-
-  /* Strip protocol if it was passed as 0g:// instead of raw hex */
-  const cleanHash = hash.replace(/^0g:\/\//, '')
-
-  /* Point directly to the API endpoint to leverage native browser streaming and caching */
-  return `/api/0g/file?hash=${cleanHash}`
-}
-
-/**
  * Checks if a given string is an IPFS protocol URI.
  * @param {string} src - The asset path or hash string.
  * @returns {boolean}
@@ -164,7 +140,7 @@ export const resolveCustomUrl = (customUrl) => {
 
 /**
  * Universal resolver that automatically detects the asset storage type and resolves it.
- * @param {string} src - The raw input string (IPFS CID, 0G Hash, Custom URI, or HTTP URL).
+ * @param {string} src - The raw input string (IPFS CID, Custom URI, or HTTP URL).
  * @returns {string|null} The fully resolved target URL string.
  */
 export const resolveStorageUrl = (src) => {
@@ -173,11 +149,6 @@ export const resolveStorageUrl = (src) => {
   /* Route IPFS Protocol */
   if (isIPFSHash(src)) {
     return resolveIPFSUrl(src)
-  }
-
-  /* Route 0G Storage Protocol */
-  if (is0GHash(src)) {
-    return resolve0GUrl(src)
   }
 
   /* Route Custom Protocol */
@@ -192,7 +163,7 @@ export const resolveStorageUrl = (src) => {
 /**
  * Universal resolver for STREAMED assets (video/audio) — the same routing as resolveStorageUrl,
  * except IPFS content comes back as an ordered list of gateways for a player's <source> chain.
- * @param {string} src - The raw input string (IPFS CID, 0G Hash, Custom URI, or HTTP URL).
+ * @param {string} src - The raw input string (IPFS CID, Custom URI, or HTTP URL).
  * @returns {string[]} URLs to try in order; empty when the input can't be resolved.
  */
 export const resolveStorageStreamUrls = (src) => {
@@ -206,7 +177,7 @@ export const resolveStorageStreamUrls = (src) => {
  * server-side sharp compression proxies (WebP output, optional resize).
  * Only use for images; video/audio must resolve via resolveStorageUrl to keep
  * native gateway streaming.
- * @param {string} src - The raw input string (IPFS CID, 0G Hash, Custom URI, or HTTP URL).
+ * @param {string} src - The raw input string (IPFS CID, Custom URI, or HTTP URL).
  * @param {{ width?: number, quality?: number, still?: boolean, format?: 'webp'|'jpeg' }} [options] - Optional
  * resize width, quality (1-100), still (first-frame-only, skips animated encoding — for thumbnails), and
  * format ('jpeg' for social crawlers that mishandle WebP; defaults to WebP).
@@ -218,18 +189,6 @@ export const resolveStorageImageUrl = (src, options = {}) => {
   /* Route IPFS images through the compression proxy */
   if (isIPFSHash(src)) {
     return resolveIPFSImageUrl(src, options)
-  }
-
-  /* 0G images already stream through /api/0g/file — append resize/quality params */
-  if (is0GHash(src)) {
-    const base = resolve0GUrl(src)
-    if (!base) return null
-    const params = []
-    if (options.width) params.push(`w=${options.width}`)
-    if (options.quality) params.push(`q=${options.quality}`)
-    if (options.still) params.push('still=1')
-    if (options.format === 'jpeg') params.push('fmt=jpeg')
-    return params.length ? `${base}&${params.join('&')}` : base
   }
 
   /* Two shapes land here carrying a CID that is not an `ipfs://` URI, and both need the width

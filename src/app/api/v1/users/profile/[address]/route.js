@@ -113,7 +113,7 @@ export async function GET(request, { params }) {
     delete dbProfile.email_verified_at
     delete dbProfile.email_notifications
 
-    /* Resolve profile image from any protocol (IPFS, 0G, etc.) */
+    /* Resolve profile image from any protocol (IPFS, UP cloud, http, etc.) */
     dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
 
     /* The raw pointer columns say nothing a client can render, and a stale one must never be
@@ -181,9 +181,9 @@ export async function PUT(request, { params }) {
       queryValues.push(birthday.trim() === '' ? null : birthday)
     }
 
-    // FIXED: Better string validation for the 0G root hash.
-    // If it's an empty file object from the form submit, typeof won't be a string.
-    // We also make sure it's not an empty string string.
+    // The form sends the already-pinned reference as a string; an untouched file input sends an
+    // empty File object instead, which must never overwrite the stored picture. Both the type
+    // check and the emptiness check are load-bearing.
     if (typeof profileImage === 'string' && profileImage.trim() !== '') {
       updateFields.push('`profileImage` = ?')
       queryValues.push(profileImage)

@@ -41,7 +41,7 @@ function trimOrigin(origin) {
 }
 
 /**
- * Media CIDs resolve to relative proxy paths (`/api/ipfs/file`, `/api/0g/file`). An embed is
+ * Media CIDs resolve to relative proxy paths (`/api/ipfs/file`). An embed is
  * always read from another origin, so every asset URL has to carry one.
  */
 function absolutize(url, origin) {

@@ -11,7 +11,7 @@
  * Rasterizing is also what keeps it safe. Contract-authored SVG is attacker-controlled markup;
  * it is decoded into pixels here and never echoed back as markup, so there is no script to run.
  *
- * Tokens whose artwork lives in real storage redirect to the existing IPFS/0G proxies rather
+ * Tokens whose artwork lives in real storage redirect to the existing IPFS proxy rather
  * than being re-encoded here twice.
  */
 

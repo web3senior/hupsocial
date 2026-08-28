@@ -15,7 +15,7 @@ import { txExplorerUrl } from './explorer'
 const ENCRYPTED_PLACEHOLDER = '🔒 Encrypted community content — only members can view'
 
 /**
- * Media CIDs resolve to relative proxy paths (`/api/ipfs/file`, `/api/0g/file`). Markdown is
+ * Media CIDs resolve to relative proxy paths (`/api/ipfs/file`). Markdown is
  * always read outside the app — a clipboard paste, an assistant fetching the document — so
  * every asset link has to carry an origin to stay reachable.
  */

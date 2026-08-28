@@ -195,7 +195,6 @@ function ActorAvatar({ address }) {
 function firstImageUrl(items) {
   const item = items?.find((candidate) => candidate?.type !== 'video' && candidate?.type !== 'audio')
   if (!item?.cid) return null
-  if (item.storage === '0G') return `/api/0g/file?hash=${item.cid}`
   if (item.cid.startsWith('http')) return item.cid
 
   return resolveIPFSImageUrl(item.cid, { width: 192 })

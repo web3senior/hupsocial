@@ -88,10 +88,10 @@ const isDeadPrefix = (prefix) => {
  * token, those are statements about its host. Either way the caller sees what it would have
  * seen after waiting: a rejection or null.
  *
- * @param {string} uri ipfs://, https://, 0g:// or a data: URI.
+ * @param {string} uri ipfs://, https:// or a data: URI.
  * @param {{ baseUrl?: string, timeoutMs?: number }} [options] `baseUrl` makes the
- * resolver's relative output (the 0G proxy path) absolute — required on the server, where
- * fetch has no document origin to resolve against. `timeoutMs` overrides the default bound.
+ * resolver's relative output (the app's own proxy paths) absolute — required on the server,
+ * where fetch has no document origin to resolve against. `timeoutMs` overrides the default bound.
  */
 export const fetchMetadataJson = async (uri, options = {}) => {
   if (!uri) return null

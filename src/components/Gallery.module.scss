@@ -73,19 +73,6 @@
   }
 }
 
-/* A 0G asset whose bytes have not resolved to a URL yet */
-.loadingPlaceholder {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  min-height: 200px;
-  background-color: var(--surface-muted);
-
-  &::after {
-    @include loading-sweep;
-  }
-}
-
 /* The still over an inline player until it has rendered real frames: the inline preview the
    composer embedded in the post, blurred, underneath the full still as it arrives. Sits below
    the spoiler overlay (2), play button (4) and controls (5), and lets taps through to the card. */

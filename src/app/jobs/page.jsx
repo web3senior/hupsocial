@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import useSWRInfinite from 'swr/infinite'
 import { ArrowDownIcon, ChatCircleIcon, EyeIcon, FlameIcon, HeartIcon, MedalIcon, RepeatIcon, TrophyIcon, UsersIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
-import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
 

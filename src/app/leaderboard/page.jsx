@@ -16,7 +16,6 @@ import {
   UsersIcon,
 } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
-import { is0GHash, resolve0GUrl } from '@/lib/storageHelper'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
 import { useProfile } from '@/hooks/useProfile'

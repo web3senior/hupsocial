@@ -43,7 +43,6 @@ export default function MediaGallery({ data = [] }) {
   const [isMuted, setIsMuted] = useState(true)
   const volumeRef = useRef(DEFAULT_SOUND_PREFS.volume)
   const [revealedItems, setRevealedItems] = useState({})
-  const [resolvedUrls, setResolvedUrls] = useState({})
   // GIFs open paused on their first frame; these track which ones the reader started
   const [playingGifs, setPlayingGifs] = useState({})
   const [loadingGifs, setLoadingGifs] = useState({})
@@ -237,7 +236,7 @@ export default function MediaGallery({ data = [] }) {
       if (video) observer.observe(video)
     })
     return () => observer.disconnect()
-  }, [data, resolvedUrls, autoplay])
+  }, [data, autoplay])
 
   const handleReveal = (index, e) => {
     e.stopPropagation()
@@ -307,7 +306,6 @@ export default function MediaGallery({ data = [] }) {
      rendition of an animated GIF, and a lighter download than the animated one */
   const resolveUrl = (item, still = false) => {
     const imageOptions = still ? { still: true } : {}
-    if (item?.storage === '0G') return `/api/0g/file?hash=${item.cid}${still ? '&still=1' : ''}`
     if (item?.storage === 'IPFS') {
       /* Images go through the sharp compression proxy; video/audio keep native gateway streaming */
       if (item.type === 'video' || item.type === 'audio') return resolveIPFSUrl(item.cid)
@@ -325,7 +323,6 @@ export default function MediaGallery({ data = [] }) {
      fall back to the browser's default behaviour of showing the first decoded frame. */
   const resolvePosterUrl = (item) => {
     if (item?.type !== 'video' || !item?.poster) return undefined
-    if (item.storage === '0G') return `/api/0g/file?hash=${item.poster}`
     if (item.poster.startsWith('http')) return item.poster
     return resolveIPFSImageUrl(item.poster, { width: 640 })
   }
@@ -333,7 +330,6 @@ export default function MediaGallery({ data = [] }) {
   /* Gateway URLs for a video in the order the browser should try them — the range-capable one
      first (see resolveIPFSStreamUrls), the rest as fallbacks should it fail to load */
   const resolveVideoSources = (item) => {
-    if (item?.storage === '0G') return [resolveUrl(item)].filter(Boolean)
     const cid = item?.cid || ''
     if (!cid) return []
     if (cid.startsWith('http')) return [cid]
@@ -376,10 +372,6 @@ export default function MediaGallery({ data = [] }) {
     const isBlurred = item.spoiler && !revealedItems[i] && !isFullscreen
     // Only the image on the visible lightbox slide carries the zoom transform
     const isZoomTarget = isFullscreen && !isVideo && i === selectedIndex
-
-    if (item?.storage === '0G' && !url) {
-      return <div className={styles.loadingPlaceholder} />
-    }
 
     /* The lightbox has native controls; an inline card has none, so without this a reader
        whose autoplay is off would be looking at a still frame with no way to start it. */

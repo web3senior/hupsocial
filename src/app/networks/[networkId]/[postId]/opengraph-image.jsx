@@ -282,7 +282,7 @@ const toFetchable = (resolved, baseUrl) => {
  * width or not. The plain (no-width) object is the one the feed itself requests for post
  * images, so it is the one most likely to be sitting on the CDN.
  *
- * @param {string} uri - ipfs:// URI, bare CID, UP-cloud URL, 0G hash, data: URI or absolute URL.
+ * @param {string} uri - ipfs:// URI, bare CID, UP-cloud URL, data: URI or absolute URL.
  * @param {string} baseUrl - Origin used to absolutize the app-relative storage proxies.
  * @param {{ width?: number, still?: boolean }} [options] - Proxy resize hints.
  * @returns {string|null}

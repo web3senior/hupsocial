@@ -24,7 +24,6 @@ import moment from 'moment'
 import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
 import ProfileInsights from '@/components/ProfileInsights'
 import UPlogo from '@/../public/up.png'
-import { is0GHash, isIPFSHash, resolve0GUrl, resolveIPFSUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS } from '@/lib/ipfs'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import LinksTab from '@/components/tabs/LinksTab'
@@ -420,7 +419,6 @@ const Profile = ({ addr }) => {
   const [selfView, setSelfView] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [isItUp, setIsItUp] = useState(false)
-  const [resolved0gUrl, setResolved0gUrl] = useState(null)
   const [viewCount, setViewCount] = useState(null)
   const [birthdayBurstKey, setBirthdayBurstKey] = useState(0) // bumped to replay the confetti burst on tap
   const followListDialogRef = useRef(null)
@@ -1172,7 +1170,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
 
           profileImageHash = rootHash
         } catch (uploadErr) {
-          console.error('0G Storage Error:', uploadErr)
+          console.error('Profile image upload error:', uploadErr)
           setError(uploadErr.message || 'Failed to upload image to decentralized storage.')
           setIsPending(false)
           return
