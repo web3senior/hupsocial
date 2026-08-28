@@ -28,6 +28,24 @@ import pool from '@/lib/db'
 export const DURABLE_FAILURE_TTL_MS = 30 * 60 * 1000
 
 /**
+ * The same, for a row that only ever meant "nobody found it in time".
+ *
+ * The recorded `status` carries which of the two it was, written by the proxy's recordFailure:
+ * 502 for gateways that answered about the content (a refusal, or a transfer that stalled with
+ * the file unfinished), 504 for gateways that never got that far. Half an hour is the right
+ * hold for the first and much too long for the second — provider discovery fails on content
+ * that is merely slow to locate, and two Universal Profile pictures spent their half hour as
+ * the default avatar while serving perfectly well again minutes in.
+ *
+ * Rows written before this distinction existed are all 504s, so they age out on the short
+ * clock: the failure they recorded is the one most likely to have stopped being true.
+ */
+export const DURABLE_DISCOVERY_TTL_MS = 5 * 60 * 1000
+
+/** The status recordFailure writes when no gateway ever found the content. */
+const UNDISCOVERED_STATUS = 504
+
+/**
  * Primary-key ceiling. utf8mb4 spends four bytes a character, so 255 is the longest a
  * varchar key stays inside InnoDB's index limit. A longer key is dropped rather than
  * truncated: two transforms of one CID would truncate to the same string, and the second
@@ -36,7 +54,7 @@ export const DURABLE_FAILURE_TTL_MS = 30 * 60 * 1000
 const MAX_KEY_LENGTH = 255
 
 /**
- * Whether this key is known to be unresolvable.
+ * Whether this key is known to be unresolvable, on the clock its class earns.
  * @param {string} cacheKey The proxy's cache key — cid plus every transform param.
  * @returns {Promise<{status: number, message: string}|null>} The failure to replay, or null
  * if the key is unknown, its record has expired, or the database could not be reached.
@@ -45,12 +63,22 @@ export async function readDurableFailure(cacheKey) {
   if (!cacheKey || cacheKey.length > MAX_KEY_LENGTH) return null
 
   try {
+    /* The age is compared server-side, in one expression, deliberately. Reading `failed_at`
+       back and subtracting it here would measure it against this process's clock and this
+       connection's timezone — a Vercel function in UTC against a database that is not would
+       expire every row early or none of them. */
     const [rows] = await pool.execute(
       `SELECT status, message
          FROM media_failures
-        WHERE cache_key = ? AND failed_at > NOW() - INTERVAL ? SECOND
+        WHERE cache_key = ?
+          AND failed_at > NOW() - INTERVAL (CASE WHEN status = ? THEN ? ELSE ? END) SECOND
         LIMIT 1`,
-      [cacheKey, Math.floor(DURABLE_FAILURE_TTL_MS / 1000)],
+      [
+        cacheKey,
+        UNDISCOVERED_STATUS,
+        Math.floor(DURABLE_DISCOVERY_TTL_MS / 1000),
+        Math.floor(DURABLE_FAILURE_TTL_MS / 1000),
+      ],
     )
 
     const row = rows[0]

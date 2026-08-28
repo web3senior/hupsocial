@@ -60,6 +60,22 @@ export const FAILURE_TTL_MS = 10 * 60 * 1000
  */
 export const TRANSIENT_FAILURE_TTL_MS = 60 * 1000
 
+/**
+ * How long "no gateway could find it in time" is believed — the middle class, and the one
+ * that was being mistaken for the first.
+ *
+ * Filebase names the phase in its own error: `no providers found for the CID (phase: provider
+ * discovery)`. That is not the same statement as "this content does not exist" — a provider
+ * that is slow, asleep or briefly unreachable produces it exactly like one that is gone
+ * forever, and the difference only shows up on the next attempt. Two Universal Profile
+ * pictures made the point: every gateway gave up on them, and both were serving again a few
+ * minutes later, having been held as unresolvable in the meantime.
+ *
+ * So it is remembered — a cold instance should not re-pay the whole fetch budget for a CID
+ * the last one just failed on — but only for as long as the fact is likely to still be true.
+ */
+export const DISCOVERY_FAILURE_TTL_MS = 3 * 60 * 1000
+
 // Pinned to globalThis so `next dev`'s module reloading doesn't drop the cache — and with it
 // the memory of which CIDs are dead — on every edit. Same reasoning as the db pool.
 const globalForMedia = globalThis

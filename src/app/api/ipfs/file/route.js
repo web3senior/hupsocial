@@ -6,8 +6,8 @@ import sharp from 'sharp'
 import { webpAnimationOptions } from '@/lib/webpAnimation'
 import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
 import { addToFilebase } from '@/lib/filebase'
-import { gatewayList } from '@/lib/ipfsGateways'
-import { FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
+import { gatewayList, gatewayUrl } from '@/lib/ipfsGateways'
+import { DISCOVERY_FAILURE_TTL_MS, FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
 import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
 
 const pinata = new PinataSDK({
@@ -307,10 +307,15 @@ async function fetchGateway(url, { headersMs, deadline, signal }) {
   }
 }
 
+/* What a gateway says when it has looked rather than merely failed to look. 400 belongs with
+   them: a CID it cannot even parse will not become parseable later. */
+const DEFINITIVE_STATUSES = new Set([400, 404, 410, 451])
+
 /**
  * Asks the primary gateway, then races the fallbacks. When every gateway fails, the rejection
- * carries `gateway: true`, and `unresolvable: true` if none of them ever started sending the
- * content — the one outcome that says something about the CID rather than about the network.
+ * carries `gateway: true` plus the verdict: `unresolvable` when every host answered about the
+ * content itself, `undiscovered` when they merely never found it in time. Neither flag is set
+ * for the network's own bad minute — see the comment on the classification below.
  * @param {string} cid Content address to resolve.
  * @returns {Promise<{url: string, contentType: string, buffer: Buffer|null}>} See fetchGateway.
  */
@@ -357,32 +362,48 @@ async function fetchFromGateways(cid) {
   const failure = new Error(attempts.map(({ host, error }) => `${host} ${error.message}`).join('; ') || 'no IPFS gateway configured')
   failure.name = attempts.some(({ error }) => error.name === 'TimeoutError') ? 'TimeoutError' : 'GatewayError'
   failure.gateway = true
-  /* Reached every gateway, and not one of them could produce the content: each either hung or
-     refused before sending a byte, or started sending and went quiet with the file unfinished.
-     Both are facts about the content — nobody holds all of its blocks — where a connection
-     error, or a transfer that simply ran out of the chain's budget while still moving, is only
-     a fact about our side of the network. */
-  failure.unresolvable =
-    attempts.length > 0 &&
-    attempts.every(
-      ({ error }) => error.stalled === true || (error.phase === 'headers' && (error.name === 'TimeoutError' || error.status)),
-    )
+
+  /* Nothing arrived from anywhere — but that covers two different facts, and treating them as
+     one is what kept working profile pictures dark for half an hour.
+
+     A gateway that answers 404/410/451 has looked and is telling us about the CONTENT, and a
+     transfer that started and went quiet says the same thing in the other direction: somebody
+     holds the first block and nobody holds the rest. Those are durable facts.
+
+     A gateway that times out, 5xx's or rate-limits never got that far. Filebase spells it out —
+     `no providers found for the CID (phase: provider discovery)` — and a provider that is merely
+     slow or briefly unreachable is indistinguishable, in that one answer, from one that is gone.
+     It is a fact about the minute, and the next attempt is what separates them. */
+  const definitive = ({ error }) => error.stalled === true || (error.phase === 'headers' && DEFINITIVE_STATUSES.has(error.status))
+  const answered = ({ error }) => error.phase === 'headers' && (error.name === 'TimeoutError' || Boolean(error.status))
+
+  failure.unresolvable = attempts.length > 0 && attempts.every(definitive)
+  /* Mixed evidence lands here rather than above: one host's 404 does not make the other two
+     hosts' timeouts an answer about the content. */
+  failure.undiscovered = !failure.unresolvable && attempts.length > 0 && attempts.every((attempt) => definitive(attempt) || answered(attempt))
   throw failure
 }
 
 /**
  * Writes a failed resolve into every cache it belongs in and shapes the entry to serve.
  *
- * Three classes, believed for different lengths:
- * - Unresolvable: no gateway could produce the content — none ever started sending it, or the
- *   ones that did went quiet with the file unfinished. That says something about the CID
+ * Four classes, believed for different lengths:
+ * - Unresolvable: every gateway answered about the content — refused it outright, or started
+ *   sending and went quiet with the file unfinished. That says something about the CID
  *   (unpinned, partially pinned, mistyped), so it goes to the durable store too, and is held
  *   for the full TTL.
+ * - Undiscovered: no gateway found it in time. Likely the same CID as above, and just as
+ *   likely a provider having a bad few minutes, so it is remembered — a cold instance should
+ *   not re-pay the fetch budget the last one just spent — but only briefly.
  * - Transient: a gateway had the content and was still delivering it when the budget ran out,
  *   or was reachable only to error. That says something about this minute, so it is held
  *   briefly, in-process only.
  * - Ours: sharp or heic-convert rejected the bytes. A deploy fixes this class and a deploy
  *   restarts the process, so in-process for the full TTL is exactly right.
+ *
+ * The status doubles as the class, because the durable store reads it back and must hold the
+ * two gateway classes for different lengths: 502 for a gateway that answered, 504 for one that
+ * never found it. Keep the two in step with lib/mediaFailureStore.js.
  * @param {Object} params
  * @param {string} params.cacheKey Identity of the entry.
  * @param {string} params.cid Content address, kept alongside for triage.
@@ -392,20 +413,22 @@ async function fetchFromGateways(cid) {
  */
 async function recordFailure({ cacheKey, cid, error }) {
   const gateway = error.gateway === true
-  const timedOut = error.name === 'TimeoutError'
-  const status = timedOut ? 504 : gateway ? 502 : 500
+  const unresolvable = error.unresolvable === true
+  const undiscovered = error.undiscovered === true
+  const status = !gateway ? 500 : unresolvable ? 502 : 504
   const message = gateway ? `IPFS gateway: ${error.message}` : error.message || 'Internal Server Error'
-  const ttlMs = gateway && !error.unresolvable ? TRANSIENT_FAILURE_TTL_MS : FAILURE_TTL_MS
+  const ttlMs = !gateway || unresolvable ? FAILURE_TTL_MS : undiscovered ? DISCOVERY_FAILURE_TTL_MS : TRANSIENT_FAILURE_TTL_MS
 
   if (!gateway) console.error('IPFS_API_ROUTE_ERROR:', error)
-  else console.warn(error.unresolvable ? 'IPFS_UNRESOLVABLE:' : 'IPFS_GATEWAY_TRANSIENT:', cid, '—', error.message)
+  else console.warn(unresolvable ? 'IPFS_UNRESOLVABLE:' : undiscovered ? 'IPFS_UNDISCOVERED:' : 'IPFS_GATEWAY_TRANSIENT:', cid, '—', error.message)
 
   writeMediaFailure(cacheKey, status, message, ttlMs)
 
-  /* Only the class that will still be true on the next cold start goes in the database: the
-     in-process record dies with this process, and on a serverless deployment that is often
-     one request. A slow transfer is not that class — the next instance should try again. */
-  if (error.unresolvable) await recordDurableFailure({ cacheKey, cid, status, message })
+  /* Only the classes that will still be true on the next cold start go in the database: the
+     in-process record dies with this process, and on a serverless deployment that is often one
+     request. A slow transfer is not that class — the next instance should try again. An
+     undiscovered CID is, but only for the few minutes the store holds its 504s. */
+  if (unresolvable || undiscovered) await recordDurableFailure({ cacheKey, cid, status, message })
 
   return { kind: 'error', status, message, ttlMs }
 }
