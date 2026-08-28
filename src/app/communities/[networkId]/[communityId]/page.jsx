@@ -1,18 +1,24 @@
 import { cache } from 'react'
-import { getCommunityById } from '@/lib/api'
+import { fetchCommunityRow } from '@/lib/communityRows'
 import CommunityDetails from './_components/CommunityDetails'
 import styles from './page.module.scss'
 
-// Deduplicate the fetch so generateMetadata and Page share one request per render
-const fetchCommunity = cache((networkId, communityId) => getCommunityById(networkId, communityId))
+// Straight to the indexed row, not out through this app's own /api/v1 route. A server component
+// self-fetching its own API is a full request/response back through the server for a query it can
+// run itself — and NEXT_PUBLIC_BASE_URL carries a trailing slash, so the URL it built ended up as
+// `//api/v1/...`, which Next answers with a 308 and turns one hop into two.
+//
+// Deduplicated so generateMetadata and Page share one query per render. No viewer address: this
+// render is shared by everyone who opens the community, so membership standing is the client's
+// to ask for.
+const fetchCommunity = cache((networkId, communityId) => fetchCommunityRow({ networkId, communityId }))
 
 export async function generateMetadata({ params }, parent) {
   const parentMetadata = await parent
   const { networkId, communityId } = await params
 
   try {
-    const res = await fetchCommunity(networkId, communityId)
-    const community = res?.data
+    const community = await fetchCommunity(networkId, communityId)
 
     const description = community?.summary || community?.description || parentMetadata.description || 'View this community on Hup.'
 
@@ -36,11 +42,14 @@ export async function generateMetadata({ params }, parent) {
 
 export default async function Page({ params }) {
   const { networkId, communityId } = await params
-  const res = await fetchCommunity(networkId, communityId).catch(() => null)
+  const community = await fetchCommunity(networkId, communityId).catch(() => null)
 
+  // The whole indexed row travels down with the RSC payload, not just its name. It is the exact
+  // row the client used to re-request for itself after hydration — one round trip behind a
+  // shimmer, for data the server already had in hand.
   return (
     <div className={styles.page}>
-      <CommunityDetails networkId={networkId} communityId={communityId} initialName={res?.data?.name} />
+      <CommunityDetails networkId={networkId} communityId={communityId} initialCommunity={community} />
     </div>
   )
 }

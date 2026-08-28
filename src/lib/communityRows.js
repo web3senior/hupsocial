@@ -15,6 +15,7 @@
  */
 
 import pool from '@/lib/db'
+import { currentCommunityContract } from '@/lib/communityJoin'
 
 /**
  * Community rows are keyed by (network_id, contract_address, id) — a chain can have hosted
@@ -115,4 +116,66 @@ async function attachViewerMembership(rows, viewerAddress) {
 export async function attachCommunityExtras(rows, viewerAddress = null) {
   await Promise.all([attachRequirements(rows), attachViewerMembership(rows, viewerAddress)])
   return rows
+}
+
+/**
+ * One community's fully-populated row, straight from the indexed tables.
+ *
+ * Lives here rather than inside the route handler so the detail page — a server component, on the
+ * same machine as this database — can render from it without going out over HTTP to its own API
+ * for data it is one query away from.
+ *
+ * @param {object} options
+ * @param {number|string} options.networkId Chain id the community lives on.
+ * @param {number|string} options.communityId Its onchain id, unique only within a deployment.
+ * @param {string|null} [options.contractAddress] A specific HupCommunity deployment to look in.
+ * @param {string|null} [options.viewerAddress] Wallet whose membership standing to attach.
+ * @returns {Promise<object|null>} The row, or null when this chain has no such community indexed.
+ */
+export async function fetchCommunityRow({ networkId, communityId, contractAddress = null, viewerAddress = null }) {
+  if (!networkId || communityId === undefined || communityId === null) return null
+
+  let query = `
+    SELECT
+      c.*,
+      (SELECT COUNT(*) FROM community_members m WHERE m.network_id = c.network_id AND m.contract_address = c.contract_address AND m.community_id = c.id AND m.is_member = 1 AND m.is_banned = 0) as member_count
+    FROM communities c
+    WHERE c.network_id = ? AND c.id = ?
+  `
+  const queryParams = [networkId, communityId]
+
+  // (network_id, id) is NOT unique — `communities` is keyed by (network_id, contract_address,
+  // id), so every HupCommunity deployment a chain has hosted contributes its own row per id,
+  // and an unpinned LIMIT 1 answered with whichever the optimizer reached first (the detail
+  // page showed a retired deployment's community #1 in place of the current one). An explicit
+  // contract_address still wins, for looking a specific deployment up on purpose.
+  const pinnedContract = contractAddress?.toLowerCase() || currentCommunityContract(networkId)
+  if (pinnedContract) {
+    query += ` AND c.contract_address = ?`
+    queryParams.push(pinnedContract)
+  }
+
+  query += ` LIMIT 1`
+
+  const [rows] = await pool.execute(query, queryParams)
+  if (rows.length === 0) return null
+
+  await attachCommunityExtras(rows, viewerAddress)
+  return toClientRow(rows[0])
+}
+
+/**
+ * DATETIME columns come back from mysql2 as JS Date objects. Serving this row as JSON stringified
+ * them on the way out; handing it straight to a server component does not — React serializes a
+ * Date as a Date, and the client then holds a different shape depending on which path the row
+ * took. Everything downstream is written for the JSON one (toRelativeTime reads a Date as epoch
+ * *seconds*, which dated this community 56,000 years into the future), so the rows are levelled
+ * here, at the single point both paths pass through.
+ */
+function toClientRow(row) {
+  const normalized = {}
+  for (const [key, value] of Object.entries(row)) {
+    normalized[key] = value instanceof Date ? value.toISOString() : value
+  }
+  return normalized
 }

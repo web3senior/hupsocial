@@ -328,10 +328,15 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const CONTRACT_ADDRESS = CONTRACTS[`chain${chainId}`]?.community
 
-  // Live mode: read the contract for everything instead of trusting the indexed row. On the
-  // detail page that is one card's worth of reads and buys authoritative gating; in the grid it
-  // would be that same set multiplied by the page size, which is the whole problem. A card with
-  // no row to fall back on has no choice either way.
+  // Live mode: ask the contract as well as the indexed row. On the detail page that is one card's
+  // worth of reads and buys authoritative gating; in the grid it would be that same set multiplied
+  // by the page size, which is the whole problem. A card with no row to fall back on has no choice
+  // either way.
+  //
+  // It decides which reads *run*, never what the card renders while they are running: every value
+  // below prefers the live answer once it lands and shows the row's until then. Live mode used to
+  // mean the row was ignored outright, which is why the detail page opened on a skeleton and then
+  // an ellipsis where the join price goes — a dozen round trips to display data it was holding.
   //
   // A grid card the viewer actually acts on joins them for the rest of its life. It has to: the
   // indexed row is a block or two behind the transaction that just landed, and every refetch this
@@ -528,8 +533,11 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     args: [id],
     query: { enabled: liveReads },
   })
+  // cidex indexes the same address off PayoutDestinationSet, so the row answers this while the
+  // read is still in flight — the live value takes over the moment it lands.
+  const savedPayoutDestination = payoutDestinationData ?? row?.payout_destination ?? null
   const payoutDestination =
-    payoutDestinationData && payoutDestinationData !== ZERO_ADDRESS ? payoutDestinationData : null
+    savedPayoutDestination && savedPayoutDestination !== ZERO_ADDRESS ? savedPayoutDestination : null
 
   // The join price is stored in the smallest unit of whichever asset it's priced in — it only
   // becomes a number anyone can read once scaled by that asset's decimals. cidex resolves the
@@ -542,7 +550,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       }
     : null
   const livePaymentMeta = useTokenMeta(liveReads ? savedPaymentToken : null, chainId)
-  const paymentMeta = liveReads ? livePaymentMeta : indexedPaymentMeta
+  // In the grid the live read never runs — and useTokenMeta answers a disabled read with the
+  // *native* currency, so it must not be consulted there at all. Where it does run, decimals stays
+  // undefined until it lands, and a price with unknown decimals renders as '…' — so the indexed
+  // pair carries the label until then rather than instead of it. The detail page used to show that
+  // ellipsis for the whole length of a decimals() and a symbol().
+  const paymentMeta =
+    liveReads && livePaymentMeta.decimals !== undefined ? livePaymentMeta : (indexedPaymentMeta ?? livePaymentMeta)
   const paymentPriceLabel = formatTokenDisplay(savedPaymentPrice, paymentMeta.decimals)
   const paymentPriceWithSymbol = paymentPriceLabel === null ? '…' : `${paymentPriceLabel} ${paymentMeta.symbol}`.trim()
 
@@ -605,7 +619,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     if (!viewer.is_member || !viewer.can_post) return false
     return true
   })()
-  const canPost = liveReads ? myCanPostLive : activeAccountAddress ? canPostFromRow : undefined
+  // Live answer wins wherever it has arrived; the row's reconstruction stands in until then. Both
+  // surfaces read it the same way now — the detail page waited on canPost() before it could decide
+  // whether to offer the composer, which is a round trip it already had the answer to.
+  const canPost = myCanPostLive ?? (activeAccountAddress ? canPostFromRow : undefined)
 
   // Live composite eligibility (requirement list + optional module) — lets the Self-serve
   // Join button disable itself proactively instead of submitting a join() that will revert.
@@ -777,7 +794,11 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     args: [id, activeAccountAddress],
     query: { enabled: liveReads && !!activeAccountAddress },
   })
-  const hasInvite = liveReads ? Boolean(myInviteDataLive) : Boolean(activeAccountAddress && viewer?.is_invited)
+  // undefined covers both "not read yet" and "this deployment predates invites and reverted" —
+  // the indexed flag is the right answer in the first case and absent in the second, so the same
+  // fallback serves both.
+  const hasInvite =
+    myInviteDataLive !== undefined ? Boolean(myInviteDataLive) : Boolean(activeAccountAddress && viewer?.is_invited)
 
   const { mutate: respondInvite, data: inviteRespHash, isPending: isInviteRespPending, error: inviteRespError } = useWriteContract()
   const { isSuccess: isInviteRespConfirmed } = useWaitForTransactionReceipt({ hash: inviteRespHash })

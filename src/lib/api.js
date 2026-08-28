@@ -523,17 +523,9 @@ export const getPostById = async (networkId, postId, viewerAddress = null) => {
   const data = await response.json()
   return data
 }
-export const getCommunityById = async (networkId, communityId) => {
-  // Determine the base URL based on the environment
-  const isServer = typeof window === 'undefined'
-  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000' : ''
-
-  const url = `${baseUrl}/api/v1/networks/communities/${communityId}?network_id=${networkId}`
-
-  const response = await fetch(url, { next: { revalidate: 30 } })
-  if (!response.ok) throw new Error('Community fetch failed')
-  return response.json()
-}
+// getCommunityById lived here and self-fetched /api/v1/networks/communities/[id] over HTTP. The
+// only caller was the community detail page, which runs on the server next to the database and now
+// calls fetchCommunityRow() in lib/communityRows directly instead.
 
 export const recordProfileView = async (address, walletAddress = null) => {
   try {

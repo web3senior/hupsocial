@@ -156,6 +156,11 @@ export const toRelativeTime = (input) => {
   } else if (typeof input === 'string') {
     const isoStr = input.replace(' ', 'T')
     timestampInSeconds = Math.floor(new Date(isoStr).getTime() / 1000)
+  } else if (input instanceof Date) {
+    // A Date reaching the numeric branch below coerces to milliseconds and is then read as
+    // seconds — silently, and roughly 56,000 years off. Server components hand these over intact
+    // (React serializes a Date as a Date), so it is a shape the client genuinely sees.
+    timestampInSeconds = Math.floor(input.getTime() / 1000)
   } else {
     timestampInSeconds = Math.trunc(input)
   }

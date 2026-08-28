@@ -21,30 +21,50 @@ import styles from './CommunityDetails.module.scss'
 const admissionLabels = ADMISSION_OPTIONS.map((option) => option.tag)
 const typeLabels = ['Discussion', 'Broadcast']
 
-export default function CommunityDetails({ networkId, communityId, initialName }) {
+export default function CommunityDetails({ networkId, communityId, initialCommunity = null }) {
   const params = useParams()
   const { address: activeAccountAddress } = useAccount()
   const { categories } = useCommunityCategories()
   const resolvedNetworkId = networkId || params.networkId
   const resolvedCommunityId = communityId || params.communityId
 
-  const [community, setCommunity] = useState(null)
+  // The same indexed row, re-fetched with viewer_address so it carries the connected wallet's own
+  // membership standing — which is what lets the card below paint its action buttons before the
+  // contract answers. Held separately from the server's copy rather than overwriting it: this one
+  // only exists once there is a wallet to ask about, and until then the page renders the seeded
+  // row instead of a shimmer.
+  const [viewerCommunity, setViewerCommunity] = useState(null)
 
-  // viewer_address brings back this wallet's own membership standing on the row, which is what
-  // lets the card below paint its action buttons before the contract answers
+  // Two communities in a row share this component instance — the App Router re-renders the same
+  // segment with new params instead of remounting — so a fetched row is only adopted while it
+  // still belongs to the community on screen. Otherwise the second one would open showing the
+  // first one's membership.
+  const communityKey = `${resolvedNetworkId}:${resolvedCommunityId}`
+  const community =
+    viewerCommunity && `${viewerCommunity.network_id}:${viewerCommunity.id}` === communityKey ? viewerCommunity : initialCommunity
+
+  // Presence, not identity: the seeded row is a fresh object on every server render, and depending
+  // on it directly would re-run this fetch on any router refresh.
+  const hasSeed = Boolean(initialCommunity)
+
   useEffect(() => {
+    // Nothing left to ask for: the row is already here and there is no wallet to enrich it with.
+    // The fetch still runs when the server had no row to hand over (its query found nothing, or
+    // threw), which is the only path back to a populated page from there.
+    if (!activeAccountAddress && hasSeed) return
+
     let cancelled = false
     const query = new URLSearchParams({ network_id: resolvedNetworkId })
     if (activeAccountAddress) query.set('viewer_address', activeAccountAddress)
 
     fetch(`/api/v1/networks/communities/${resolvedCommunityId}?${query.toString()}`)
       .then((r) => r.json())
-      .then((body) => { if (!cancelled && body?.data) setCommunity(body.data) })
+      .then((body) => { if (!cancelled && body?.data) setViewerCommunity(body.data) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [resolvedNetworkId, resolvedCommunityId, activeAccountAddress])
+  }, [resolvedNetworkId, resolvedCommunityId, activeAccountAddress, hasSeed])
 
-  const name = community?.name || initialName || `Community #${resolvedCommunityId}`
+  const name = community?.name || `Community #${resolvedCommunityId}`
 
   // cidex keeps the community's whole IPFS metadata JSON in the indexed row, so the optional
   // website/socials come along with the columns it also splits out — no extra fetch, and a
