@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -46,6 +46,8 @@ import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { buildLinks, displayLinks, emptySocials, parseLinks } from '@/lib/socialLinks'
 import { asClause, describeWalletError } from '@/lib/walletErrors'
 import { toast } from '@/components/NextToast'
+import { usePostStore } from '@/stores/usePostStore'
+import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 import BrandingLinksFields from './_components/BrandingLinksFields'
 import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
@@ -322,6 +324,8 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const publicClient = usePublicClient({ chainId })
   const vault = useCommunityVault()
   const router = useRouter()
+  // Hands the clicked row to the post detail page so it paints instantly, exactly as HomeFeedTab does
+  const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const CONTRACT_ADDRESS = CONTRACTS[`chain${chainId}`]?.community
 
   // Live mode: read the contract for everything instead of trusting the indexed row. On the
@@ -354,7 +358,21 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const [isEditing, setIsEditing] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
   const [isManagingMembers, setIsManagingMembers] = useState(false)
-  const [communityPosts, setCommunityPosts] = useState([])
+  // --- Community feed cache (mirrors HomeFeedTab) ---
+
+  // The community feed restores through the same in-memory store the home feed uses, keyed per
+  // community. Opening a post unmounts this page; coming back re-reads the snapshot instead of
+  // refetching page 1 behind a shimmer and dropping the reader at the top of the feed.
+  const feedCacheKey = `community-${chainId}-${id}`
+  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
+  // Safe to read in an initializer: the store is in-memory, so it's always empty during SSR
+  // hydration and hits only ever happen on client-side remounts. Only the detail view keeps a
+  // feed at all, so the directory's cards never read or write one.
+  const [initialFeedCache] = useState(() =>
+    hideHeader ? useFeedCacheStore.getState().readFeedCache(feedCacheKey, address ?? null) : null
+  )
+
+  const [communityPosts, setCommunityPosts] = useState(initialFeedCache?.list ?? [])
   const [isFeedLoading, setIsFeedLoading] = useState(false)
 
   // Update states for inline modifications
@@ -391,9 +409,10 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // New post content inputs
   // Bumped by the NewPost community composer once its tx confirms, so the feed reloads
   const [feedRefreshKey, setFeedRefreshKey] = useState(0)
-  // Infinite-scroll paging for the community feed (detail page only)
-  const [feedPage, setFeedPage] = useState(1)
-  const [hasMoreFeed, setHasMoreFeed] = useState(false)
+  // Infinite-scroll paging for the community feed (detail page only) — seeded from the cache so
+  // a restored feed keeps paginating from where it left off instead of re-appending page 2
+  const [feedPage, setFeedPage] = useState(initialFeedCache?.page ?? 1)
+  const [hasMoreFeed, setHasMoreFeed] = useState(initialFeedCache?.hasMore ?? false)
   const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false)
 
   // Member management state
@@ -1583,13 +1602,97 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     return decryptedPosts
   }
 
+  // Live scroll position and feed height: reading them in the unmount cleanup is too late, since
+  // Next may already have reset scroll for the incoming route by then.
+  const lastFeedScrollYRef = useRef(0)
+  const feedListRef = useRef(null)
+  const lastFeedHeightRef = useRef(initialFeedCache?.feedHeight ?? 0)
+  // Consumed once the restored posts have rendered.
+  const pendingFeedScrollRef = useRef(initialFeedCache ? (initialFeedCache.scrollY ?? 0) : null)
+  // Height held on the list while restoring: media hasn't loaded on the first frames, so without
+  // it the document is too short for the scroll target and the browser clamps the jump.
+  const [reservedFeedHeight, setReservedFeedHeight] = useState(initialFeedCache?.feedHeight ?? null)
+  const feedSnapshotRef = useRef(null)
+
+  // Snapshot the cacheable state every render, for the save-on-exit cleanup below.
+  useEffect(() => {
+    if (!hideHeader) return
+    feedSnapshotRef.current = { list: communityPosts, page: feedPage, hasMore: hasMoreFeed, address: address ?? null }
+    lastFeedHeightRef.current = feedListRef.current?.offsetHeight || lastFeedHeightRef.current
+  })
+
+  useEffect(() => {
+    if (!hideHeader) return
+    const handleScroll = () => {
+      lastFeedScrollYRef.current = document.documentElement.scrollTop
+      // Media loads change the height without a re-render, so re-measure here too.
+      lastFeedHeightRef.current = feedListRef.current?.offsetHeight || lastFeedHeightRef.current
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [hideHeader])
+
+  // Save on the way out — opening a post is what unmounts this page.
+  useEffect(() => {
+    if (!hideHeader) return
+    return () => {
+      const snapshot = feedSnapshotRef.current
+      if (!snapshot || snapshot.list.length === 0) return
+      saveFeedCache(feedCacheKey, { ...snapshot, scrollY: lastFeedScrollYRef.current, feedHeight: lastFeedHeightRef.current || null })
+    }
+  }, [hideHeader, feedCacheKey, saveFeedCache])
+
+  // Restore the cached position once the hydrated posts have rendered. Reaching the target once
+  // isn't enough to stop: Next's layout router scrolls the new segment to top AFTER this effect,
+  // and media loads can still clamp the position — so keep re-asserting until the target survives
+  // two consecutive frames. rAF callbacks run before the pending paint, so a reset that lands
+  // pre-paint is corrected pre-paint and never shows.
+  useLayoutEffect(() => {
+    const target = pendingFeedScrollRef.current
+    if (target === null || communityPosts.length === 0) return
+
+    const deadline = performance.now() + 1500
+    let frame = 0
+    let stableFrames = 0
+    const apply = () => {
+      if (Math.abs(window.scrollY - target) < 2) {
+        stableFrames += 1
+      } else {
+        stableFrames = 0
+        // 'instant' overrides the app's global scroll-behavior: smooth — a plain scrollTo animates
+        // the restore, which IS the visible top-to-position crawl.
+        window.scrollTo({ top: target, behavior: 'instant' })
+      }
+      if (stableFrames >= 2 || performance.now() > deadline) {
+        pendingFeedScrollRef.current = null
+        setReservedFeedHeight(null)
+        return
+      }
+      frame = requestAnimationFrame(apply)
+    }
+    apply()
+
+    return () => cancelAnimationFrame(frame)
+  }, [communityPosts])
+
+  // Everything the loaded feed depends on, in one string. Unlocking the vault is in there because
+  // decryption changes what the same rows render as, and feedRefreshKey because the composer bumps
+  // it to force a reload.
+  const feedParams = `${address ?? null}|${chainId}|${id}|${feedRefreshKey}|${vault.identity ? 1 : 0}`
+  // Seeded on a cache hit so the mount fetch is skipped entirely; set when data is applied (not
+  // when the fetch starts) so it stays correct under StrictMode's double-run.
+  const appliedFeedParamsRef = useRef(initialFeedCache ? feedParams : null)
+
   // Initial load / refresh (page 1) — infinite scrolling appends further pages below
   useEffect(() => {
+    const params = feedParams
     const fetchCommunityFeed = async () => {
       // The grid/directory view doesn't show a per-card feed (see hideHeader-gated render below) —
       // skip the fetch entirely there so browsing the directory doesn't fire one feed request per
       // visible card
       if (!chainId || !hideHeader) return
+      // Already applied — hydrated from the session cache, so no page-1 refetch behind a shimmer
+      if (appliedFeedParamsRef.current === params) return
       setIsFeedLoading(true)
       try {
         const response = await getPosts(1, FEED_PAGE_SIZE, chainId, null, address, id)
@@ -1599,6 +1702,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
         setCommunityPosts(decrypted)
         setFeedPage(1)
         setHasMoreFeed(Boolean(response?.meta?.hasMore))
+        appliedFeedParamsRef.current = params
       } catch (err) {
         console.error('Failed to load community feed from cidex:', err)
       } finally {
@@ -1607,7 +1711,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     }
 
     fetchCommunityFeed()
-  }, [id, chainId, address, feedRefreshKey, vault.identity, hideHeader])
+    // feedParams folds together every value this fetch reads
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedParams, hideHeader])
 
   // Loads the next page and appends — same shape as the home feed's scroll pagination
   const loadMoreFeed = async () => {
@@ -2615,16 +2721,30 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
               ) : communityPosts.length === 0 ? (
                 <div className={styles.feed__empty}>No posts published in this space yet.</div>
               ) : (
-                <div className={styles.feed__list}>
+                // minHeight holds the document tall enough for a restore to land in one jump while
+                // the media in the restored posts is still loading; it's released once the scroll
+                // position sticks.
+                <div
+                  className={styles.feed__list}
+                  ref={feedListRef}
+                  style={reservedFeedHeight ? { minHeight: `${reservedFeedHeight}px` } : undefined}
+                >
                   {communityPosts.map((post, i) => (
                     // Same open-on-click affordance as the home/trending feeds: the row
                     // navigates to the post's thread view (text selection doesn't trigger it)
                     <div
                       key={post.id}
-                      className="animate fade pointer"
+                      // A restored feed must repaint identically in place — no entrance replay
+                      className={clsx('pointer', !initialFeedCache && ['animate', 'fade'])}
                       onPointerDown={rememberCardPointerDown}
+                      onMouseEnter={() => router.prefetch(`/networks/${post.network_id ?? chainId}/${post.id}`)}
+                      onTouchStart={() => router.prefetch(`/networks/${post.network_id ?? chainId}/${post.id}`)}
                       onClick={(e) => {
                         if (isTextSelectionDrag(e)) return
+                        // Hand the row to the post store first, exactly as the home feed does: the
+                        // detail page paints that copy immediately instead of shimmering while its
+                        // own fetch runs
+                        setCurrentPost(post)
                         router.push(`/networks/${post.network_id ?? chainId}/${post.id}`)
                       }}
                     >

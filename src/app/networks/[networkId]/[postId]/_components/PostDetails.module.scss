@@ -14,6 +14,24 @@
   min-height: 85svh;
   color: var(--page-text);
 
+  // Page chrome above the post card, matching the back control on the drop/poll/listing pages
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    // The same tokens the poll/listing back links use — the --page-* set is declared on `.page`,
+    // which this component never actually puts on an element
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-13, 0.8125rem);
+    text-decoration: none;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--text, inherit);
+    }
+  }
+
   &__container {
     position: relative;
     top: 0;

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnection } from 'wagmi'
+import Link from 'next/link'
+import { CaretLeftIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -78,8 +80,23 @@ export default function PostDetails({ networkId, postId }) {
     if (mounted) recordPostView(resolvedNetworkId, resolvedPostId, address)
   }, [resolvedPostId, resolvedNetworkId, address, mounted])
 
+  // A plain link rather than history.back(): a shared post URL is usually the first page of the
+  // visit, and "back" from there would leave the site. It goes to wherever the post lives — its
+  // community, or the home feed — and both of those restore the scroll position the reader left
+  // from, so the destination behaves like a back button without depending on there being history.
+  const backHref = post?.community_id ? `/communities/${post.network_id ?? resolvedNetworkId}/${post.community_id}` : '/'
+  const backLabel = post?.community_id ? 'Back to community' : 'Back to feed'
+
   return (
     <div className={`${styles.post}`}>
+      {/* Outside the card so it reads as page chrome rather than part of the post itself */}
+      <div className="__container" data-width={`small`}>
+        <Link href={backHref} className={styles.page__back}>
+          <CaretLeftIcon size={14} weight="bold" aria-hidden="true" />
+          {backLabel}
+        </Link>
+      </div>
+
       <div className={`__container ${styles.page__container}`} data-width={`small`}>
         {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
 
