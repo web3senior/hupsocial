@@ -4,7 +4,12 @@
    peered) endpoint in front of. The configured gateways follow, then the public resolvers, so a
    bad minute at one host no longer decides whether content loads. */
 const FILEBASE_GATEWAY = 'https://ipfs.filebase.io/ipfs/'
-const BUILT_IN_FALLBACK_GATEWAYS = [FILEBASE_GATEWAY, 'https://ipfs.io/ipfs/']
+/* Pinata rides along because it is where content we did NOT upload actually lives. A DHT
+   provider lookup on the NFT market's collection icons names bitswap.pinata.cloud for most of
+   the ones still reachable: creators pinned their own artwork to their own Pinata accounts, and
+   until now no gateway in this list was the host holding it — we were asking Filebase to go
+   find blocks over bitswap instead of asking the node that has them. */
+const BUILT_IN_FALLBACK_GATEWAYS = [FILEBASE_GATEWAY, 'https://gateway.pinata.cloud/ipfs/', 'https://ipfs.io/ipfs/']
 
 /**
  * Puts a configured gateway into the one shape the callers append a CID to.

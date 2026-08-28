@@ -42,8 +42,25 @@ export const DURABLE_FAILURE_TTL_MS = 30 * 60 * 1000
  */
 export const DURABLE_DISCOVERY_TTL_MS = 5 * 60 * 1000
 
+/**
+ * The same again, for a row that means the content itself is gone.
+ *
+ * The two TTLs above are both hedges against a gateway having had a bad minute. This one is not
+ * a hedge: the proxy asks the DHT who advertises the CID, and a row is written with this status
+ * only when the answer is nobody. There is no host whose luck could change, so the retry the
+ * short clocks exist to allow would be spent relearning the same fact — for four of the NFT
+ * market's collection icons, every few minutes, forever.
+ *
+ * Half a day, not permanent, because a creator can re-pin their artwork and the routing layer
+ * can be wrong in the quiet direction.
+ */
+export const DURABLE_DEAD_TTL_MS = 12 * 60 * 60 * 1000
+
 /** The status recordFailure writes when no gateway ever found the content. */
 const UNDISCOVERED_STATUS = 504
+
+/** The status recordFailure writes when the DHT knows of no provider at all. */
+const DEAD_STATUS = 410
 
 /**
  * Primary-key ceiling. utf8mb4 spends four bytes a character, so 255 is the longest a
@@ -71,12 +88,14 @@ export async function readDurableFailure(cacheKey) {
       `SELECT status, message
          FROM media_failures
         WHERE cache_key = ?
-          AND failed_at > NOW() - INTERVAL (CASE WHEN status = ? THEN ? ELSE ? END) SECOND
+          AND failed_at > NOW() - INTERVAL (CASE status WHEN ? THEN ? WHEN ? THEN ? ELSE ? END) SECOND
         LIMIT 1`,
       [
         cacheKey,
         UNDISCOVERED_STATUS,
         Math.floor(DURABLE_DISCOVERY_TTL_MS / 1000),
+        DEAD_STATUS,
+        Math.floor(DURABLE_DEAD_TTL_MS / 1000),
         Math.floor(DURABLE_FAILURE_TTL_MS / 1000),
       ],
     )

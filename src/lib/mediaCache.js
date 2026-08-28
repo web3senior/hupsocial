@@ -76,6 +76,23 @@ export const TRANSIENT_FAILURE_TTL_MS = 60 * 1000
  */
 export const DISCOVERY_FAILURE_TTL_MS = 3 * 60 * 1000
 
+/**
+ * How long "the network has no provider for this" is believed — the class the three above were
+ * all guessing at.
+ *
+ * The others are inferred from how gateways behaved, which is why they are held for minutes: a
+ * gateway that failed to find something is reporting its own luck, and luck changes. This one
+ * is a different kind of statement. The DHT was asked who advertises the CID and answered with
+ * nobody, so there is no host to have a better minute later — the last pin lapsed and the bytes
+ * went with it. Four of the NFT market's eleven collection icons are in exactly this state.
+ *
+ * Hours rather than forever, because a creator can re-pin, and because a provider record can be
+ * missing from the routing layer for reasons of its own. A day of showing the placeholder for
+ * something that came back is a fair price for never again spending the fetch budget on content
+ * that is gone.
+ */
+export const DEAD_FAILURE_TTL_MS = 12 * 60 * 60 * 1000
+
 // Pinned to globalThis so `next dev`'s module reloading doesn't drop the cache — and with it
 // the memory of which CIDs are dead — on every edit. Same reasoning as the db pool.
 const globalForMedia = globalThis
