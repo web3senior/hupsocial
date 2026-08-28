@@ -73,8 +73,11 @@ const countFormatter = new Intl.NumberFormat()
 const chartDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 const chartPrice = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 3 })
 
+// Each label names what the wallet printed beneath it did, not what happened to the token: a trade
+// row credits the buyer, so it reads "Bought" rather than "Sale", which a reader takes as the
+// profile having sold.
 const ACTIVITY_META = {
-  sale: { label: 'Sale', Icon: ReceiptIcon },
+  sale: { label: 'Bought', Icon: ReceiptIcon },
   listed: { label: 'Listed', Icon: TagIcon },
   cancelled: { label: 'Listing cancelled', Icon: ProhibitIcon },
   offer: { label: 'Offer', Icon: HandCoinsIcon },

@@ -36,6 +36,8 @@ const DEFAULT_META = { icon: PulseIcon, tone: 'neutral' }
 // from: a purchase is a shopping bag rather than a storefront, a filled offer is a handshake rather
 // than a checkmark. Where the app already has a glyph for the destination (Predict, Swap), the row
 // reuses it so a verb reads the same in the feed and in the sidebar.
+//   label    — the verb the tape prints beside the actor, so it always describes what that wallet
+//              did: a trade is "Bought", never "Sale", which reads as the actor having sold.
 //   tone     — drives the icon colour, the amount pill and the hover tint (see the SCSS module).
 //   previews — the row fetches and shows the post this line points at.
 export const KIND_META = {
@@ -45,7 +47,7 @@ export const KIND_META = {
   like: { icon: HeartIcon, tone: 'like', weight: 'fill', previews: true, label: 'Like' },
   follow: { icon: UserPlusIcon, tone: 'follow', weight: 'fill', label: 'Follow' },
   tip: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', previews: true, label: 'Tip' },
-  nft_sale: { icon: ShoppingBagOpenIcon, tone: 'money', weight: 'fill', label: 'NFT sale' },
+  nft_sale: { icon: ShoppingBagOpenIcon, tone: 'money', weight: 'fill', label: 'Bought' },
   offer_made: { icon: TagIcon, tone: 'offer', weight: 'fill', label: 'Offer' },
   offer_filled: { icon: HandshakeIcon, tone: 'offer', weight: 'fill', label: 'Offer filled' },
   bet: { icon: ChartLineUpIcon, tone: 'market', weight: 'bold', label: 'Bet' },
