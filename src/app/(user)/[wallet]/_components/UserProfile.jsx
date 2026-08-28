@@ -963,23 +963,29 @@ const Status = ({ addr, profile, selfView }) => {
   }, [submitError, receiptError])
 
   const handleToggle = useCallback((e) => setPanelOpened(e.newState === 'open'), [])
+
+  const hasStatus = Boolean(status && status.content !== '')
+
+  // Nothing to read and nothing to write: the editor behind this bubble always sets the
+  // viewer own status, so on another profile an empty pill is a dead end. Status also only
+  // lives on the EVM contracts, so a Solana profile never has one to show.
+  if (!isEvmAddress(addr) || (!hasStatus && !selfView)) return null
+
+  const expiresAt = hasStatus ? web3.utils.toNumber(status.expirationTimestamp) : 0
+  const statusTitle = hasStatus
+    ? `Updated ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}${
+        expiresAt > 0 ? ` - clears ${moment.unix(expiresAt).utc().fromNow()}` : ' - no expiry'
+      }`
+    : 'Share a short status'
+
   return (
     <NativePopover
       placement="center"
       className={styles.statusPopover}
       onToggle={handleToggle}
       trigger={
-        <button className={`${styles.status} animate pointer`}>
-          {status && (
-            <p
-              title={`Updated at ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()} - Expiration ${moment
-                .unix(web3.utils.toNumber(status.expirationTimestamp))
-                .utc()
-                .fromNow()}`}
-            >
-              {status.content !== '' ? <>{status.content}</> : <> Status...</>}
-            </p>
-          )}
+        <button className={clsx(styles.status, !hasStatus && styles['status--empty'], 'animate pointer')} title={statusTitle}>
+          <p>{hasStatus ? status.content : 'Share a status'}</p>
         </button>
       }
     >
