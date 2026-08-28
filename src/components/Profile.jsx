@@ -15,6 +15,7 @@ import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
+import AgentBadge from './ui/AgentBadge'
 import Avatar from './ui/Avatar'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
@@ -123,6 +124,9 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               {displayName}
             </Link>
             <CommunityBadge badge={profile.badge} />
+            {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two
+                say where a post came from, this one says what published it. */}
+            <AgentBadge agent={profile.agent} />
             {/* <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} /> */}
             {chainInfo && (
               <div className={styles.badge} title={chainInfo.name}>
@@ -245,6 +249,7 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
           {profile.fullName || profile.name}
         </Link>
         <CommunityBadge badge={profile.badge} />
+        <AgentBadge agent={profile.agent} />
         <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} />
       </div>
 

@@ -1,0 +1,44 @@
+// The automated-account mark. Two variants of one shape: a bare glyph in the name row, and the
+// same glyph wearing its word on the profile page.
+//
+// Everything inside is sized in em so the large variant only has to set a font-size — the padding,
+// the gap and the mark itself all follow it without a second number being restated. This is the
+// same trick .communityTag uses in Profile.module.scss, and it is why the two pills sit level
+// beside each other at either scale.
+.agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  flex-shrink: 0;
+  line-height: 1.3;
+  // Muted by design: the mark is a fact about the account, not a badge of standing. It must not
+  // out-shout the display name it sits next to, the way a verification check is meant to.
+  color: var(--text-muted, var(--gray-400));
+}
+
+.agent__mark {
+  // Matches the chain and Universal Profile glyphs already in the name row (.badge, 14px), so the
+  // row reads as one line of marks rather than as icons at three sizes.
+  width: 14px;
+  height: 14px;
+}
+
+// The profile page gets the outline pill the worn community tag wears, so a name followed by both
+// reads as one family of marks and not as a badge plus a loose icon.
+.agent--lg {
+  padding: 0.2em 0.4em;
+  border: 1px solid var(--border);
+  background-color: var(--tag);
+  border-radius: 5px;
+  font-size: var(--system-10-font-size);
+  font-weight: 600;
+
+  .agent__mark {
+    width: 1.2em;
+    height: 1.2em;
+  }
+}
+
+.agent__label {
+  white-space: nowrap;
+}

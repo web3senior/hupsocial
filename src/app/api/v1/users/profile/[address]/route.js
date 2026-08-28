@@ -4,6 +4,7 @@ import pool from '@/lib/db'
 import { AVATAR_MAX_SIZE, resolveAvatarImageUrl } from '@/lib/storageHelper'
 import { queryUniversalProfile } from '@/lib/lukso'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
+import { resolveAgentProfile } from '@/lib/agentProfile'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 
 /**
@@ -92,6 +93,9 @@ export async function GET(request, { params }) {
       // Same for the community badge: a UP describes a person, not their Hup memberships.
       profile.badge = badge
       profile.origin = origin
+      /* Read from the profile's OWN tags and description, so the mark travels with the metadata
+         rather than with anything Hup remembers about the account — see lib/agentProfile.js. */
+      profile.agent = resolveAgentProfile(profile)
 
       return NextResponse.json({
         source: 'universal_profile',
@@ -127,6 +131,10 @@ export async function GET(request, { params }) {
        form is exposed, exactly as the badge is. */
     delete dbProfile.origin_code
     dbProfile.origin = origin
+
+    /* Same mark, same rule, off the cached copy of the same two fields — the resolver takes the
+       JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
+    dbProfile.agent = resolveAgentProfile(dbProfile)
 
     return NextResponse.json({
       source: 'database',

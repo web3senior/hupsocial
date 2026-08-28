@@ -31,6 +31,7 @@ import AssetsTab from '@/components/tabs/AssetsTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenAvatar } from '@/lib/utils'
+import AgentBadge from '@/components/ui/AgentBadge'
 import Avatar from '@/components/ui/Avatar'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
@@ -597,6 +598,11 @@ const Profile = ({ addr }) => {
                   never look like two things — only its scale changes, so it holds its own beside a
                   display name. Verified server-side on each read — see lib/badge.js. */}
               <CommunityBadge badge={profile.badge} size="lg" />
+
+              {/* Where the feed shows the glyph alone, the profile page has room for the word — the
+                  one place a visitor is deciding whether to follow the account is the one place it
+                  should not have to be inferred from an icon. */}
+              <AgentBadge agent={profile.agent} size="lg" />
               {/* <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} /> */}
 
               {profile.source === `universal_profile` && (
