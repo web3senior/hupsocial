@@ -11,6 +11,12 @@
   --poll-win-track: rgba(22, 163, 74, 0.25);
   --poll-win-tint: rgba(22, 163, 74, 0.08);
   --poll-win-text: #15803d;
+  /* The two lifecycle hues, named here so the window bar can be handed one as a colour rather
+     than a class. Literal rather than --primary: that token resolves to the app's blue, which
+     would put a running poll's bar in a different colour from the "Open" badge beside it
+     everywhere else on the page. */
+  --poll-open: #ec4899;
+  --poll-upcoming: #2a78d6;
 
   display: flex;
   flex-direction: column;
@@ -106,13 +112,8 @@
         color: var(--poll-win-text);
       }
 
-      .pollCard__bar {
-        background: var(--poll-win-track);
-      }
-
-      .pollCard__barFill {
-        background: var(--poll-win-fill);
-      }
+      /* The bar's own colours are handed to ui/ProgressBar as values, so a winning row does
+         not need to reach into another module's class names to repaint it */
     }
 
     &:disabled {
@@ -149,25 +150,15 @@
     color: var(--text-muted, #888);
   }
 
-  &__bar {
-    display: block;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--surface-muted, rgba(0, 0, 0, 0.06));
-    overflow: hidden;
-  }
-
-  &__barFill {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--text-muted, #a1a1aa);
-    transition: width 0.3s ease;
-  }
-
   &__optionVotes {
     font-size: var(--font-size-12);
     color: var(--text-muted, #888);
+  }
+
+  /* Slimmer than a result bar and pinned above the footer: it measures the clock, not the
+     vote, and must never be mistaken for a tally */
+  &__window {
+    gap: 0.25rem;
   }
 
   &__footer {

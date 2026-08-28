@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
@@ -13,11 +13,16 @@ import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
 import PollCard from '@/components/PollCard'
-import PollTimer from '@/components/PollTimer'
+import CopyButton from '@/components/ui/CopyButton'
 import { CaretLeftIcon, ListChecksIcon } from '@phosphor-icons/react'
 import styles from './PollDetail.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
+
+// The ballot card above already ticks the countdown, so the facts row carries the thing a
+// countdown can't say: the wall-clock moment voting ends, in the reader's own zone
+const dateTimeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const formatWhen = (unixSeconds) => (Number(unixSeconds) > 0 ? dateTimeFormat.format(new Date(Number(unixSeconds) * 1000)) : '—')
 
 // A plain link rather than history.back(): a shared poll URL is usually the first page of the
 // visit, and "back" from there would leave the site
@@ -55,12 +60,25 @@ export default function PollDetail({ networkId, pollId }) {
 
   // The status badge and the close-early control are derived from the clock at render time,
   // so a window that ends on screen needs a re-render as well as fresh data — the refetch
-  // alone would not re-render if nothing in the payload changed
+  // alone would not re-render if nothing in the payload changed. One alarm at the edge rather
+  // than a per-second tick: the countdown itself lives on the ballot card, and this page only
+  // has to notice the single moment it runs out.
   const [, setPhaseTick] = useState(0)
-  const refreshPhase = () => {
-    setPhaseTick((tick) => tick + 1)
-    mutate()
-  }
+  const closesAt = Number(poll?.closed_at) > 0 ? Number(poll.closed_at) : Number(poll?.closes_at) || 0
+
+  useEffect(() => {
+    const msUntilClose = closesAt * 1000 - Date.now()
+    // Nothing to schedule for a poll already settled, and a window further out than a day will
+    // have been refetched long before a timer that long could fire
+    if (msUntilClose <= 0 || msUntilClose > 86400 * 1000) return
+
+    const timer = setTimeout(() => {
+      setPhaseTick((tick) => tick + 1)
+      mutate()
+    }, msUntilClose + 1000)
+
+    return () => clearTimeout(timer)
+  }, [closesAt, mutate])
 
   if (detail && !poll) {
     return (
@@ -128,7 +146,19 @@ export default function PollDetail({ networkId, pollId }) {
           <small className={styles.detail__asked}>asked {toRelative(poll.opened_at)}</small>
         </div>
 
-        <span className={clsx(styles.detail__badge, styles[`detail__badge--${status.key}`])}>{status.label}</span>
+        <div className={styles.detail__headerActions}>
+          <span className={clsx(styles.detail__badge, styles[`detail__badge--${status.key}`])}>{status.label}</span>
+          {/* A poll is something people are sent, so the link to it belongs beside the status
+              rather than three menus deep */}
+          <CopyButton
+            value={`/polls/${chainId}/${pollId}`}
+            label="Copy link"
+            title="Copy poll link"
+            copiedTitle="Copied"
+            variant="chip"
+            size={13}
+          />
+        </div>
       </header>
 
       {/* The card is the ballot — the page never renders a second voting path */}
@@ -154,9 +184,9 @@ export default function PollDetail({ networkId, pollId }) {
           <dd>{chain?.name || `#${chainId}`}</dd>
         </div>
         <div>
-          <dt>Voting</dt>
-          <dd>
-            <PollTimer opensAt={poll.opens_at} closesAt={Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at} onPhaseChange={refreshPhase} />
+          <dt>{status.key === 'closed' ? 'Closed' : status.key === 'upcoming' ? 'Opens' : 'Closes'}</dt>
+          <dd className={styles.detail__when}>
+            {formatWhen(status.key === 'upcoming' ? poll.opens_at : Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at)}
           </dd>
         </div>
       </dl>

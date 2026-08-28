@@ -38,6 +38,15 @@
     color: var(--text-muted, #888);
   }
 
+  // Status and the copy control travel together, so they wrap as a pair when the creator's
+  // name runs long rather than the badge dropping alone
+  &__headerActions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
   &__badge {
     flex-shrink: 0;
     font-size: var(--font-size-10, 0.65rem);
@@ -109,6 +118,13 @@
       margin: 0;
       font-size: var(--font-size-14, 0.875rem);
       font-weight: 600;
+
+      // A date and time is longer than the counts beside it, so it drops a step and wraps
+      // inside its own cell rather than widening every column of the grid
+      &.detail__when {
+        font-size: var(--font-size-12);
+        line-height: 1.35;
+      }
     }
   }
 

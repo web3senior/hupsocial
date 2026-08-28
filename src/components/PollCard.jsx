@@ -17,6 +17,7 @@ import { shortTxError } from '@/lib/utils'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import PollTimer from '@/components/PollTimer'
+import ProgressBar from '@/components/ui/ProgressBar'
 import styles from './PollCard.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
@@ -250,9 +251,18 @@ export default function PollCard({ pollRef }) {
 
                 {showResults && (
                   <>
-                    <span className={styles.pollCard__bar} aria-hidden>
-                      <span className={styles.pollCard__barFill} style={{ width: `${option.share}%` }} />
-                    </span>
+                    {/* Decorative on purpose: the button's own label already reads the option
+                        and its share, and a progressbar role inside it would say it twice */}
+                    <ProgressBar
+                      percent={option.share}
+                      gradient={false}
+                      decorative
+                      // The winner owns the only colour on a settled card. Before that, the
+                      // viewer's own pick is the one bar in the accent, so they can find their
+                      // ballot without hunting for the tick beside the label.
+                      color={isWinner ? 'var(--poll-win-fill)' : isChosen ? 'var(--primary, #ec4899)' : 'var(--text-muted, #a1a1aa)'}
+                      trackColor={isWinner ? 'var(--poll-win-track)' : 'var(--surface-muted, rgba(0, 0, 0, 0.06))'}
+                    />
                     <span className={styles.pollCard__optionVotes}>
                       {formatVotes(option.votes)} {option.votes === 1 ? 'vote' : 'votes'}
                     </span>
@@ -264,34 +274,48 @@ export default function PollCard({ pollRef }) {
         })}
       </ul>
 
+      {/* The window as a bar as well as a number: the countdown says how long is left, the
+          fill says how much of the poll is already spent — which is the part that tells a
+          reader whether it is worth coming back to. An upcoming poll fills toward the moment
+          it opens instead. */}
+      {status.key !== 'closed' && (
+        <ProgressBar
+          className={styles.pollCard__window}
+          startsAt={status.key === 'upcoming' ? poll.opened_at : poll.opens_at}
+          endsAt={status.key === 'upcoming' ? poll.opens_at : poll.closes_at}
+          height={4}
+          color={status.key === 'upcoming' ? 'var(--poll-upcoming)' : 'var(--poll-open)'}
+          animated={status.key === 'open'}
+          label={isCounting ? <span className={styles.pollCard__meta}>Counting your vote…</span> : undefined}
+          hint={
+            <span className={styles.pollCard__meta}>
+              <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} onPhaseChange={refreshPhase} />
+            </span>
+          }
+          // The bar's own clock is the last thing still running when a poll ends with nobody
+          // touching the page — it hands the card back its re-render
+          onComplete={refreshPhase}
+          ariaLabel="Voting window"
+        />
+      )}
+
       <footer className={styles.pollCard__footer}>
-        {showResults ? (
-          <Link href={`/polls/${chainId}/${pollId}`} className={styles.pollCard__total}>
-            {formatVotes(poll.total_votes)} total {Number(poll.total_votes) === 1 ? 'vote' : 'votes'}
-          </Link>
-        ) : (
+        {/* The running total never reveals the split, so it shows before a ballot as well as
+            after — a poll with 300 votes on it is worth voting in, and that was invisible */}
+        <Link href={`/polls/${chainId}/${pollId}`} className={styles.pollCard__total}>
+          {formatVotes(poll.total_votes)} {showResults ? 'total ' : ''}
+          {Number(poll.total_votes) === 1 ? 'vote' : 'votes'}
+        </Link>
+
+        {status.key === 'closed' && (
           <span className={styles.pollCard__meta}>
-            {isCounting ? (
-              'Counting your vote…'
-            ) : (
-              <PollTimer
-                opensAt={poll.opens_at}
-                closesAt={Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at}
-                onPhaseChange={refreshPhase}
-              />
-            )}
+            <PollTimer opensAt={poll.opens_at} closesAt={Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at} onPhaseChange={refreshPhase} />
           </span>
         )}
 
         {/* Only while it still matters: after a poll closes, why someone couldn't vote is
             no longer actionable and the footer belongs to the result */}
         {isBlocked && isOpen && <span className={styles.pollCard__blocked}>You don’t meet the requirements</span>}
-
-        {showResults && status.key !== 'closed' && (
-          <span className={styles.pollCard__meta}>
-            <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} onPhaseChange={refreshPhase} />
-          </span>
-        )}
       </footer>
     </section>
   )

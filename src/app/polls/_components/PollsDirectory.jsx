@@ -7,16 +7,36 @@ import clsx from 'clsx'
 import { useConnection } from 'wagmi'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import CreatePollDialog from '@/components/CreatePollDialog'
-import { formatVotes, pollOptions, pollStatus, requirementChips, toRelative } from '@/lib/polls'
+import { formatShare, formatVotes, pollOptions, pollStatus, requirementChips, toRelative } from '@/lib/polls'
 import PollTimer from '@/components/PollTimer'
-import { ListChecksIcon, MagnifyingGlassIcon, PlusIcon } from '@phosphor-icons/react'
+import Profile from '@/components/Profile'
+import CopyButton from '@/components/ui/CopyButton'
+import ProgressBar from '@/components/ui/ProgressBar'
+import SegmentedControl from '@/components/ui/SegmentedControl'
+import { CheckCircleIcon, ListChecksIcon, MagnifyingGlassIcon, PlusIcon } from '@phosphor-icons/react'
 import styles from './PollsDirectory.module.scss'
 
 const PAGE_SIZE = 25
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
 
-const shortWallet = (wallet) => (wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '')
+// Enough rows to fill the fold, so the first page arriving reflows the list rather than
+// replacing an empty page with a full one
+const SkeletonCard = () => (
+  <li className={styles.directory__item} aria-hidden="true">
+    <div className={clsx(styles.directory__card, styles.directory__skeleton)}>
+      {/* Same shape a loaded card holds — a 36px creator avatar, the question, its window bar
+          and the meta line — so the first page lands without the list jumping */}
+      <div className={styles.directory__skeletonTop}>
+        <div className="shimmer rounded-full" style={{ width: '36px', height: '36px' }} />
+        <div className="shimmer rounded" style={{ width: '7rem', height: '14px' }} />
+      </div>
+      <div className="shimmer rounded" style={{ width: '80%', height: '16px' }} />
+      <div className="shimmer rounded" style={{ width: '100%', height: '4px' }} />
+      <div className="shimmer rounded" style={{ width: '55%', height: '12px' }} />
+    </div>
+  </li>
+)
 
 /**
  * Polls Directory
@@ -67,10 +87,10 @@ export default function PollsDirectory() {
   const hasMore = Boolean(pages?.[pages.length - 1]?.nextPage)
 
   const scopes = [
-    { key: 'open', label: 'Open' },
-    { key: 'upcoming', label: 'Upcoming' },
-    { key: 'closed', label: 'Closed' },
-    ...(address ? [{ key: 'mine', label: 'Mine' }] : []),
+    { value: 'open', label: 'Open' },
+    { value: 'upcoming', label: 'Upcoming' },
+    { value: 'closed', label: 'Closed' },
+    ...(address ? [{ value: 'mine', label: 'Mine' }] : []),
   ]
 
   const emptyCopy = {
@@ -88,100 +108,113 @@ export default function PollsDirectory() {
     const leader = status.key === 'closed' ? options.find((option) => option.isLeader) : null
     const hasVoted = poll.viewer_option !== null && poll.viewer_option !== undefined
     const chips = requirementChips(poll, appChains.find((chain) => chain.id === Number(poll.network_id))?.nativeCurrency?.symbol)
+    const href = `/polls/${poll.network_id}/${poll.poll_id}`
+    const votes = Number(poll.total_votes) || 0
 
     return (
-      <Link key={`${poll.network_id}-${poll.poll_id}`} href={`/polls/${poll.network_id}/${poll.poll_id}`} className={styles.directory__card}>
-        <div className={styles.directory__cardTop}>
-          <span className={clsx(styles.directory__badge, styles[`directory__badge--${status.key}`])}>{status.label}</span>
-          {hasVoted && <span className={styles.directory__voted}>You voted</span>}
-          <span className={styles.directory__network}>{chainName(poll.network_id)}</span>
-        </div>
+      <li key={`${poll.network_id}-${poll.poll_id}`} className={styles.directory__item}>
+        {/* An article with one stretched link rather than a card-shaped anchor: the copy
+            button is a button, and a button nested inside a link is neither valid nor
+            reliably operable by keyboard */}
+        <article className={styles.directory__card}>
+          <div className={styles.directory__cardTop}>
+            {/* The one way a wallet is rendered anywhere in the app — avatar, name, chain badge
+                and hover card included, so a poll's creator reads exactly like the same person
+                under a post. Raised above the stretched link so their name stays clickable. */}
+            <Profile variant="fullWithoutTime" creator={poll.wallet_address} networkId={poll.network_id} className={styles.directory__creator} />
 
-        <h3 className={styles.directory__title}>{poll.question || `Poll #${poll.poll_id}`}</h3>
-
-        {/* Same chips the in-post card shows — who is shut out belongs next to the question
-            wherever it is read, not only where it can be voted on */}
-        {chips.length > 0 && (
-          <div className={styles.directory__chips}>
-            {chips.map((chip, index) => (
-              <span key={index} className={clsx(styles.directory__chip, styles[`directory__chip--${chip.tone}`])}>
-                {chip.label}
-              </span>
-            ))}
+            <div className={styles.directory__cardTopRight}>
+              {hasVoted && (
+                <span className={styles.directory__voted}>
+                  <CheckCircleIcon size={12} weight="fill" aria-hidden="true" />
+                  You voted
+                </span>
+              )}
+              <span className={clsx(styles.directory__badge, styles[`directory__badge--${status.key}`])}>{status.label}</span>
+              <span className={styles.directory__network}>{chainName(poll.network_id)}</span>
+            </div>
           </div>
-        )}
 
-        <p className={styles.directory__meta}>
-          <span>{poll.display_name || shortWallet(poll.wallet_address)}</span>
-          <span>{toRelative(poll.opened_at)}</span>
-          {status.key !== 'closed' && (
-            <span>
-              <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} />
-            </span>
+          <h3 className={styles.directory__title}>
+            <Link href={href} className={styles.directory__titleLink}>
+              {poll.question || `Poll #${poll.poll_id}`}
+            </Link>
+          </h3>
+
+          {/* Same chips the in-post card shows — who is shut out belongs next to the question
+              wherever it is read, not only where it can be voted on */}
+          {chips.length > 0 && (
+            <div className={styles.directory__chips}>
+              {chips.map((chip, index) => (
+                <span key={index} className={clsx(styles.directory__chip, styles[`directory__chip--${chip.tone}`])}>
+                  {chip.label}
+                </span>
+              ))}
+            </div>
           )}
-        </p>
 
-        <p className={styles.directory__stats}>
-          <span>
-            {formatVotes(poll.total_votes)} {Number(poll.total_votes) === 1 ? 'vote' : 'votes'}
-          </span>
-          <span>{options.length} options</span>
-          {leader && <span className={styles.directory__winner}>Leading: {leader.label}</span>}
-        </p>
-      </Link>
+          {/* How much of the window is already spent, which is the thing a countdown alone
+              never says: "ends in 2h" reads urgent on a poll that ran for a month and on one
+              that opened this morning */}
+          {status.key !== 'closed' && (
+            <ProgressBar
+              className={styles.directory__window}
+              startsAt={status.key === 'upcoming' ? poll.opened_at : poll.opens_at}
+              endsAt={status.key === 'upcoming' ? poll.opens_at : poll.closes_at}
+              height={4}
+              color={status.key === 'upcoming' ? 'var(--poll-upcoming)' : 'var(--poll-open)'}
+              animated={status.key === 'open'}
+              hint={<PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} />}
+              ariaLabel="Voting window"
+            />
+          )}
+
+          {/* A settled poll has a result, so the row shows it rather than a clock that stopped */}
+          {leader && (
+            <ProgressBar
+              className={styles.directory__window}
+              percent={leader.share}
+              height={4}
+              color="var(--poll-win)"
+              gradient={false}
+              label={<span className={styles.directory__winner}>Leading: {leader.label}</span>}
+              hint={<span className={styles.directory__winner}>{formatShare(leader.share)}</span>}
+              ariaLabel={`Leading option: ${leader.label}, ${formatShare(leader.share)}`}
+            />
+          )}
+
+          <div className={styles.directory__foot}>
+            <span className={styles.directory__meta}>
+              Asked {toRelative(poll.opened_at)} · {formatVotes(votes)} {votes === 1 ? 'vote' : 'votes'} · {options.length} options
+            </span>
+
+            <CopyButton
+              className={styles.directory__copy}
+              value={href}
+              title="Copy poll link"
+              copiedTitle="Link copied"
+              toastMessage="Poll link copied"
+              size={13}
+            />
+          </div>
+        </article>
+      </li>
     )
   }
 
   return (
     <div className={styles.directory}>
       <div className={styles.directory__toolbar}>
-        <div className={styles.directory__toggle} role="tablist" aria-label="Poll scope">
-          {scopes.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              role="tab"
-              aria-selected={scope === option.key}
-              className={clsx(styles.directory__toggleButton, scope === option.key ? styles['directory__toggleButton--active'] : null)}
-              onClick={() => setScope(option.key)}
-              // data-label feeds the hidden bold ::after that reserves the active width,
-              // so toggling bold never shifts the row
-              data-label={option.label}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className={styles.directory__toolbarRow}>
+          <SegmentedControl options={scopes} value={scope} onChange={setScope} label="Poll scope" as="tabs" size="sm" />
+
+          <button type="button" className={styles.directory__createButton} onClick={() => dialogRef.current?.open()}>
+            <PlusIcon size={14} weight="bold" />
+            New poll
+          </button>
         </div>
 
-        {pollChains.length > 1 && (
-          <select
-            className={styles.directory__networkFilter}
-            value={networkId}
-            onChange={(e) => setNetworkId(e.target.value)}
-            aria-label="Filter by network"
-          >
-            <option value="">All networks</option>
-            {pollChains.map((chain) => (
-              <option key={chain.id} value={chain.id}>
-                {chain.name}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <select className={styles.directory__networkFilter} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort polls">
-          <option value="">Default</option>
-          <option value="closing">Closing soonest</option>
-          <option value="votes">Most votes</option>
-          <option value="recent">Newest</option>
-        </select>
-
-        <button type="button" className={styles.directory__createButton} onClick={() => dialogRef.current?.open()}>
-          <PlusIcon size={14} />
-          New poll
-        </button>
-
-        <div className={styles.directory__searchRow}>
+        <div className={styles.directory__toolbarRow}>
           <div className={styles.directory__search}>
             <MagnifyingGlassIcon size={14} />
             <input
@@ -194,19 +227,54 @@ export default function PollsDirectory() {
               spellCheck={false}
             />
           </div>
+
+          {pollChains.length > 1 && (
+            <select
+              className={styles.directory__select}
+              value={networkId}
+              onChange={(e) => setNetworkId(e.target.value)}
+              aria-label="Filter by network"
+            >
+              <option value="">All networks</option>
+              {pollChains.map((chain) => (
+                <option key={chain.id} value={chain.id}>
+                  {chain.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <select className={styles.directory__select} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort polls">
+            <option value="">Default</option>
+            <option value="closing">Closing soonest</option>
+            <option value="votes">Most votes</option>
+            <option value="recent">Newest</option>
+          </select>
         </div>
       </div>
 
-      {isLoading && <p className={styles.directory__empty}>Loading polls...</p>}
+      {isLoading && (
+        <ul className={styles.directory__list}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <SkeletonCard key={index} />
+          ))}
+        </ul>
+      )}
 
       {!isLoading && polls.length === 0 && (
         <div className={styles.directory__empty}>
           <ListChecksIcon size={32} />
           <p>{search ? `No polls match “${search}”.` : emptyCopy[scope]}</p>
+          {!search && scope !== 'closed' && (
+            <button type="button" className={styles.directory__createButton} onClick={() => dialogRef.current?.open()}>
+              <PlusIcon size={14} weight="bold" />
+              Ask something
+            </button>
+          )}
         </div>
       )}
 
-      {polls.map((poll) => renderCard(poll))}
+      {polls.length > 0 && <ul className={styles.directory__list}>{polls.map((poll) => renderCard(poll))}</ul>}
 
       {hasMore && (
         <button type="button" className={styles.directory__loadMore} onClick={() => setSize(size + 1)} disabled={isValidating}>

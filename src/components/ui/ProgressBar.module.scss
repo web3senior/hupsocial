@@ -1,0 +1,117 @@
+// Every dimension and colour is a custom property with a token default, so a caller overrides
+// exactly the one it cares about — a chain's own hue on a drop tile, a win green on a settled
+// poll — and inherits the rest.
+.progress {
+  --progress-height: 6px;
+  --progress-radius: 999px;
+  // Defaults to the connected chain's hue, which is only set once a wallet connects — hence the
+  // token fallback behind it, so an unconnected page still paints a visible bar
+  --progress-color: var(--network-color-primary, var(--color-primary, #ec4899));
+  --progress-track: color-mix(in srgb, var(--text-muted, #888) 18%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  min-width: 0;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // Tabular figures so a ticking countdown or a climbing percentage does not shuffle the row
+  // sideways on every tick
+  &__hint {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__track {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: var(--progress-height);
+    border-radius: var(--progress-radius);
+    background-color: var(--progress-track);
+    overflow: hidden;
+  }
+
+  &__fill {
+    position: relative;
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    overflow: hidden;
+    background-color: var(--progress-color);
+    // A value that lands while the bar is on screen slides instead of snapping
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  // Dim at the start, full strength at the leading edge — the bar reads as filling toward
+  // something rather than as a flat block of colour
+  &__fill--gradient {
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--progress-color) 45%, transparent), var(--progress-color));
+  }
+
+  // Only for something still moving: a sheen on a finished bar says the story is still running
+  &__fill--animated::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: progressSheen 2.4s ease-in-out infinite;
+  }
+
+  // Unknown progress — a shuttle crossing the track, never a fill that implies a fraction
+  &__fill--indeterminate {
+    width: 35%;
+    animation: progressShuttle 1.4s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &__fill {
+      transition: none;
+
+      &::after {
+        animation: none;
+      }
+    }
+
+    // The shuttle is the only thing saying "working", so it slows rather than stops
+    &__fill--indeterminate {
+      animation-duration: 3s;
+    }
+  }
+}
+
+@keyframes progressSheen {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes progressShuttle {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(310%);
+  }
+}

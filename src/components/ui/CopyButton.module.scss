@@ -1,0 +1,64 @@
+.copy {
+  position: relative; // Above a stretched card link, which is painted over everything else
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    color: var(--text, inherit);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--text-muted, #888);
+    outline-offset: 2px;
+  }
+
+  // Bare icon on a card or a header — nothing to draw until it is hovered
+  &--ghost {
+    border: 0;
+    border-radius: 0.4rem;
+    background-color: transparent;
+    padding: 0.25rem;
+
+    &:hover {
+      background-color: var(--surface-muted, rgba(0, 0, 0, 0.04));
+    }
+  }
+
+  // A pill that reads as a control on its own, for a toolbar or a page header
+  &--chip {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--background);
+    padding: 0.3rem 0.7rem;
+
+    &:hover {
+      background-color: var(--surface-muted, rgba(0, 0, 0, 0.04));
+    }
+  }
+
+  // The confirmation is a colour as well as a glyph, so the change registers peripherally
+  &--copied {
+    color: var(--status-success, #15803d);
+
+    &:hover {
+      color: var(--status-success, #15803d);
+    }
+
+    &.copy--chip {
+      border-color: color-mix(in srgb, var(--status-success, #15803d) 40%, transparent);
+    }
+  }
+}

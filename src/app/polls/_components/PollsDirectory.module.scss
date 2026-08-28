@@ -1,70 +1,45 @@
 .directory {
+  /* The three lifecycle hues the badges, the window bar and the result bar all read from, so a
+     status is one colour wherever it appears on the page */
+  --poll-open: #ec4899;
+  --poll-upcoming: #2a78d6;
+  --poll-win: #15803d;
+
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
 
+  /* Two rows: what is being looked at, then how it is narrowed. They were one wrapping row, so
+     the search field's position moved every time the scope list gained or lost "Mine". */
   &__toolbar {
     display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  &__toolbarRow {
+    display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 0.5rem;
     flex-wrap: wrap;
-  }
-
-  &__toggle {
-    display: flex;
-    gap: 0.25rem;
-    background: var(--surface-muted, rgba(0, 0, 0, 0.04));
-    border-radius: 999px;
-    padding: 0.2rem;
-  }
-
-  &__toggleButton {
-    all: unset;
-    cursor: pointer;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0.3rem 0.75rem;
-    border-radius: 999px;
-    font-size: var(--font-size-12);
-
-    /* Invisible bold twin reserves the active-state width, so toggling
-       font-weight never shifts the row */
-    &::after {
-      content: attr(data-label);
-      font-weight: 600;
-      height: 0;
-      overflow: hidden;
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    &--active {
-      background: var(--surface);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
-      font-weight: 600;
-    }
-  }
-
-  /* Full-width basis claims a whole row of the wrapping toolbar for the search field */
-  &__searchRow {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1 1 100%;
   }
 
   &__search {
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    flex: 1;
+    flex: 1 1 12rem;
+    min-width: 0;
     border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 0.3rem 0.7rem;
+    padding: 0.35rem 0.75rem;
     background: var(--background);
     color: var(--text-muted, #888);
+    transition: border-color 0.15s ease;
+
+    &:focus-within {
+      border-color: var(--poll-open);
+    }
 
     input {
       all: unset;
@@ -79,13 +54,14 @@
     }
   }
 
-  &__networkFilter {
+  &__select {
     border: 1px solid var(--border);
-    border-radius: var(--global-border-radius);
+    border-radius: 999px;
     background-color: var(--background);
     color: inherit;
-    padding: 0.35rem 2rem 0.35rem 0.5rem;
+    padding: 0.35rem 1.75rem 0.35rem 0.75rem;
     font-size: var(--font-size-12);
+    cursor: pointer;
   }
 
   &__createButton {
@@ -94,34 +70,68 @@
     align-items: center;
     gap: 0.3rem;
     border: none;
-    background-color: var(--network-color-primary, #0d6efd);
+    background-color: var(--network-color-primary, var(--poll-open));
     color: #fff;
     border-radius: 999px;
     padding: 0.4rem 0.85rem;
     font-size: var(--font-size-12);
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
+    transition: opacity 0.15s ease;
 
     &:hover {
       opacity: 0.9;
     }
   }
 
-  &__card {
+  &__list {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.6rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__item {
+    display: block;
+  }
+
+  &__card {
+    position: relative; /* Anchors the stretched title link over the whole card */
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
     border: 1px solid var(--border);
     border-radius: var(--global-border-radius);
     padding: 0.85rem 1rem;
     background: var(--background);
     color: inherit;
-    text-decoration: none;
-    transition: border-color 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
 
     &:hover {
-      border-color: var(--primary, #0d6efd);
+      border-color: color-mix(in srgb, var(--poll-open) 45%, var(--border));
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
     }
+
+    /* Whatever is focused inside the card, the card says so — otherwise tabbing to the title
+       of a borderless row lands somewhere invisible */
+    &:focus-within {
+      border-color: var(--poll-open);
+    }
+  }
+
+  &__skeleton {
+    gap: 0.6rem;
+    pointer-events: none;
+  }
+
+  &__skeletonTop {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   &__cardTop {
@@ -129,6 +139,25 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  // Profile sizes itself to its contents; in a card row it takes the slack instead, so the
+  // status cluster sits flush right. Nested for the specificity to beat its own rule, and
+  // raised over the stretched title link so the name, avatar and hover card stay reachable.
+  .directory__creator {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  &__cardTopRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
   }
 
   &__badge {
@@ -140,13 +169,13 @@
     padding: 0.15rem 0.55rem;
 
     &--open {
-      background: rgba(236, 72, 153, 0.14);
-      color: #ec4899;
+      background: color-mix(in srgb, var(--poll-open) 14%, transparent);
+      color: var(--poll-open);
     }
 
     &--upcoming {
-      background: rgba(42, 120, 214, 0.14);
-      color: #2a78d6;
+      background: color-mix(in srgb, var(--poll-upcoming) 14%, transparent);
+      color: var(--poll-upcoming);
     }
 
     &--closed {
@@ -156,10 +185,12 @@
   }
 
   &__voted {
-    margin-right: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: var(--font-size-10, 0.65rem);
     font-weight: 600;
-    color: #15803d;
+    color: var(--status-success, #15803d);
   }
 
   &__network {
@@ -195,29 +226,65 @@
   &__title {
     margin: 0;
     font-size: var(--font-size-16, 1rem);
-    line-height: 1.3;
+    line-height: 1.35;
   }
 
-  &__meta,
-  &__stats {
+  /* The whole card is the target, but only the question is the link — so the accessible name
+     is the question rather than every word on the row */
+  &__titleLink {
+    color: inherit;
+    text-decoration: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--poll-open);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  }
+
+  /* Both the running window and the settled result use it, and both sit tight under whatever
+     they describe */
+  &__window {
+    gap: 0.25rem;
+  }
+
+  &__winner {
+    color: var(--poll-win);
+    font-weight: 600;
+  }
+
+  &__foot {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
-    margin: 0;
     font-size: var(--font-size-12);
     color: var(--text-muted, #888);
   }
 
-  &__winner {
-    color: #15803d;
+  &__meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__copy {
+    margin-left: auto;
   }
 
   &__empty {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     padding: 2.5rem 1rem;
     color: var(--text-muted, #888);
     font-size: var(--font-size-14, 0.875rem);
@@ -225,6 +292,11 @@
 
     p {
       margin: 0;
+    }
+
+    /* The auto margin that pins it right on a toolbar would shove it off-centre here */
+    .directory__createButton {
+      margin-left: 0;
     }
   }
 
