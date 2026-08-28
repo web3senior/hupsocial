@@ -13,8 +13,13 @@ import { FALLBACK_AVATAR_SRC } from '@/lib/utils'
  * headers, sends the part of the body it has, and then stalls forever — the `<img>` fires
  * neither `load` nor `error`, so the slot stays empty until the socket dies minutes later.
  * Reaching a retry also means the proxy stage already errored, so the picture is on screen
- * and actively loading by the time this clock is armed. */
-const RETRY_DEADLINE_MS = 8000
+ * and actively loading by the time this clock is armed.
+ *
+ * A retry is also the one stage that pulls the original at full size, and an animated GIF
+ * profile picture is the heaviest original the app has. At the old figure those were being
+ * timed out mid-download and replaced with the default PFP — a real picture that was on its
+ * way, thrown away. */
+const RETRY_DEADLINE_MS = 12000
 
 /* What fills the circle until the picture does.
  *

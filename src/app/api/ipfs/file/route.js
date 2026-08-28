@@ -128,8 +128,12 @@ const FALLBACK_HEADERS_TIMEOUT_MS = 5000
 const BODY_STALL_TIMEOUT_MS = 6000
 /* Ceiling for the whole chain — the primary's patience, one round of fallbacks, and however
    long a slow body is allowed to take — so the encode still fits inside maxDuration after it.
-   An unpinned CID costs the first two: 13s, once, then the negative caches take over. */
-const TOTAL_FETCH_BUDGET_MS = 24000
+   An unpinned CID costs the first two: 13s, once, then the negative caches take over.
+   What the rest of it buys is headroom for the biggest sources we serve: an animated GIF
+   profile picture runs to double digits of megabytes, and cutting its transfer short cached a
+   transient failure for a picture that was arriving perfectly well. Still less than half of
+   maxDuration, which leaves the per-frame encode more time than it has ever needed. */
+const TOTAL_FETCH_BUDGET_MS = 32000
 /* Less than this left and it is not worth opening a socket */
 const MIN_ATTEMPT_MS = 1500
 

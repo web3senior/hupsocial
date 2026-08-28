@@ -29,7 +29,7 @@
  */
 
 /** Total encoded bytes held. Thumbnails run 0.5–30KB, so this is thousands of them. */
-const MAX_BYTES = 64 * 1024 * 1024
+const MAX_BYTES = 96 * 1024 * 1024
 
 /** Entry ceiling, so a stampede of misses can't grow the map without bound on tiny bodies. */
 const MAX_ENTRIES = 4000
@@ -37,8 +37,14 @@ const MAX_ENTRIES = 4000
 /**
  * One body big enough to evict most of the cache is not worth caching — a 4096px original
  * would flush a page of thumbnails to serve one request that the CDN header already covers.
+ *
+ * Animated profile pictures are what sets the figure. A long GIF avatar re-encodes to an
+ * animated WebP of several megabytes at the top rung, and a body over this ceiling is served
+ * but never held — so every cold instance re-ran the gateway fetch and the per-frame encode
+ * for a picture the whole feed shows. Raised to cover them, with the total budget raised
+ * alongside it so one such avatar still cannot be more than a sixth of the cache.
  */
-const MAX_ENTRY_BYTES = 8 * 1024 * 1024
+const MAX_ENTRY_BYTES = 16 * 1024 * 1024
 
 /**
  * How long a failure is believed. Long enough that a page of dead CIDs costs its timeout
