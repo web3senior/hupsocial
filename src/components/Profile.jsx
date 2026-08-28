@@ -134,7 +134,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               </div>
             )}
             {profile.source === `universal_profile` && (
-              <div className={styles.badge} onClick={handleUniversalProfile}>
+              <div className={clsx(styles.badge, styles['badge--link'])} title={`View Universal Profile`} onClick={handleUniversalProfile}>
                 <Image alt={`Universal Profile`} src={UPlogo} width={14} height={14} />
               </div>
             )}

@@ -83,6 +83,18 @@
     width: inherit;
     height: inherit;
   }
+
+  // Only some glyphs in the name row act on a click: the chain mark is a label, the Universal
+  // Profile mark opens the profile on universaleverything.io. The modifier keeps the affordance
+  // with the one that acts, so a plain label never claims to be a button.
+  &--link {
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
 }
 
 // The worn community tag. Borrows the outline-pill shape the hover card's address button already
