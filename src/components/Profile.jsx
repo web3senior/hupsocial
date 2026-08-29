@@ -23,7 +23,7 @@ import clsx from 'clsx'
 import UPlogo from '@/../public/up.png'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 36, className }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, className }) {
   const router = useRouter()
   const { profile, isLoading } = useProfile(creator)
   const [popoverOpened, setPopoverOpened] = useState(false)
@@ -34,6 +34,10 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   // The picture's laid-out size, handed to the stylesheet so the shimmer that stands in for it
   // reserves the same box and the fingerprint keeps its proportion. Only `imageOnly` surfaces
   // have reason to move it — a face strip is smaller than a byline.
+  //
+  // 32px is the byline default, the size Instagram sets a post header's picture at. It costs no
+  // less to fetch than a larger slot would — every size from 24 up to 48 rounds to the same 96px
+  // rung of the avatar ladder — so this is a layout call, not a bandwidth one.
   const avatarBox = { '--profile-avatar-size': `${size}px` }
 
   // Extract network configuration based on current chain identifier

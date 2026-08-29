@@ -1,5 +1,5 @@
 .profileShimmer {
-  height: var(--profile-avatar-size, 36px);
+  height: var(--profile-avatar-size, 32px);
 
   &__item {
   background-color: var(--shimmer-bg);
@@ -29,12 +29,12 @@
   will-change: transform;
   cursor: pointer;
 
-  // The picture fills whatever box the consumer asked for; 36px is the byline default every
+  // The picture fills whatever box the consumer asked for; 32px is the byline default every
   // surface but a face strip uses.
   &__avatar {
     display: block;
-    width: var(--profile-avatar-size, 36px);
-    height: var(--profile-avatar-size, 36px);
+    width: var(--profile-avatar-size, 32px);
+    height: var(--profile-avatar-size, 32px);
     object-fit: cover;
   }
 
