@@ -5,6 +5,7 @@ import { useConnection } from 'wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
 import { useSolanaWalletStore } from '@/stores/useSolanaWalletStore'
 import { getPostById } from '@/lib/api'
+import { applyPendingTips } from '@/lib/pendingTips'
 
 /**
  * Builds the shared SWR cache key for a post's live stats, so components outside the
@@ -37,10 +38,13 @@ export function usePostStats(post) {
       const res = await getPostById(post.network_id, post.id, address)
       const freshPost = Array.isArray(res?.data) ? res.data[0] : res?.data
 
-      return freshPost || post
+      // A tip this tab sent is final onchain the moment the modal closes, but the API only
+      // knows what the indexer has written — until the row lands, the count the tipper
+      // already saw move wins over the one that predates it.
+      return applyPendingTips(cacheKey, freshPost || post)
     } catch (error) {
       console.error('Failed to sync post stats via API:', error)
-      return post
+      return applyPendingTips(cacheKey, post)
     }
   }
 
