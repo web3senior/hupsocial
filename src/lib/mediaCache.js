@@ -7,7 +7,7 @@
  * of thumbnails re-fetches every one of them from the gateway and re-runs sharp on every
  * cold load, for every visitor.
  *
- * Three things live here, and the third is the one that actually hurts without it:
+ * Four things live here, and the third is the one that actually hurts without it:
  *
  * 1. A bounded LRU of encoded bodies, so a repeat request is a memory read.
  * 2. In-flight coalescing, so twenty cards pointing at the same CID open one socket, not
@@ -17,6 +17,8 @@
  *    open ~6 connections per origin, so a handful of dead CIDs on one page starve every
  *    other image behind them. Remembering the failure turns that from "8 seconds, every
  *    render, forever" into "8 seconds once".
+ * 4. A short-lived cache of ORIGINALS, so the four widths one avatar is asked at share the
+ *    single download between them rather than paying for it four times over.
  *
  * In memory rather than on disk: Vercel's filesystem is read-only outside /tmp, and the
  * success path already ships an immutable `s-maxage` for the shared CDN cache. This is the
@@ -45,6 +47,24 @@ const MAX_ENTRIES = 4000
  * alongside it so one such avatar still cannot be more than a sixth of the cache.
  */
 const MAX_ENTRY_BYTES = 16 * 1024 * 1024
+
+/**
+ * The same ceiling for an ORIGINAL — the bytes exactly as the gateway served them, held so the
+ * ladder rungs can share one download. Higher than the encoded ceiling because an original is
+ * the expensive thing here and an encode is not: the GIF avatar in our own users table is
+ * 13.6MB and takes 9.9s to pull, and re-encoding it at another width costs 188ms.
+ */
+const MAX_SOURCE_BYTES = 32 * 1024 * 1024
+
+/**
+ * How long an original is kept after the fetch that paid for it.
+ *
+ * Nothing about a CID's bytes goes stale, so this is not a correctness window — it is how long
+ * the other rungs have to arrive. A profile picture is asked for at 48, 96, 192 and 384 within
+ * one page load, and once all four are encoded the original is so much dead weight: several
+ * megabytes of GIF holding a share of the budget that thumbnails could be using.
+ */
+const SOURCE_TTL_MS = 5 * 60 * 1000
 
 /**
  * How long a failure is believed. Long enough that a page of dead CIDs costs its timeout
@@ -151,6 +171,50 @@ export function writeMediaBody(key, body, contentType) {
   if (body.length > MAX_ENTRY_BYTES) return
   store.set(key, { kind: 'body', body, contentType, bytes: body.length })
   setHeldBytes(heldBytes + body.length)
+  evict()
+}
+
+/**
+ * The key an original is held under. Namespaced away from the encode keys, which start with the
+ * CID, so the two can never be read for each other.
+ * @param {string} cid Content address the bytes were fetched for.
+ * @returns {string} The cache key — also the right key to coalesce the fetch on.
+ */
+export function mediaSourceKey(cid) {
+  return `source|${cid}`
+}
+
+/**
+ * Reads the original bytes of a CID, if the fetch that paid for them was recent enough.
+ * @param {string} cid Content address.
+ * @returns {{url: string, contentType: string, buffer: Buffer}|null} The gateway's answer, or
+ * null on a miss.
+ */
+export function readMediaSource(cid) {
+  const entry = readMedia(mediaSourceKey(cid))
+  return entry?.kind === 'source' ? entry : null
+}
+
+/**
+ * Stores the original bytes of a CID so the other widths don't re-download them.
+ *
+ * The proxy caches per encode key — cid, width, quality, still, format — which is right for
+ * what it serves and wrong for what it fetches: the same original was pulled again for every
+ * rung of the avatar ladder. On a 13.6MB GIF profile picture that is four 9.9s downloads for
+ * one picture, and only the first rung anyone looked at ever made it inside a response.
+ * @param {string} cid Content address the bytes were fetched for.
+ * @param {{url: string, contentType: string, buffer: Buffer}} source The gateway's answer.
+ */
+export function writeMediaSource(cid, { url, contentType, buffer }) {
+  if (buffer.length > MAX_SOURCE_BYTES) return
+
+  const key = mediaSourceKey(cid)
+  /* Replacing an entry, not adding one, if the same original is written twice — and at
+     megabytes apiece an unsubtracted original would have the budget evicting thumbnails to make
+     room for bytes it is no longer holding */
+  setHeldBytes(heldBytes - (store.get(key)?.bytes || 0))
+  store.set(key, { kind: 'source', url, contentType, buffer, bytes: buffer.length, expiresAt: Date.now() + SOURCE_TTL_MS })
+  setHeldBytes(heldBytes + buffer.length)
   evict()
 }
 

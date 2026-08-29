@@ -7,7 +7,7 @@ import { webpAnimationOptions } from '@/lib/webpAnimation'
 import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
 import { addToFilebase } from '@/lib/filebase'
 import { gatewayList, gatewayUrl } from '@/lib/ipfsGateways'
-import { DEAD_FAILURE_TTL_MS, DISCOVERY_FAILURE_TTL_MS, FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, readMedia, writeMediaBody, writeMediaFailure, writeMediaRedirect } from '@/lib/mediaCache'
+import { DEAD_FAILURE_TTL_MS, DISCOVERY_FAILURE_TTL_MS, FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, mediaSourceKey, readMedia, readMediaSource, writeMediaBody, writeMediaFailure, writeMediaRedirect, writeMediaSource } from '@/lib/mediaCache'
 import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
 
 const pinata = new PinataSDK({
@@ -505,6 +505,36 @@ async function recordFailure({ cacheKey, cid, error, providers = null }) {
 }
 
 /**
+ * The original bytes for a CID, fetched once however many widths ask for them.
+ *
+ * The encode cache is keyed by cid + width + quality + still + format, which is exactly right
+ * for what this route SERVES and quite wrong for what it FETCHES. One profile picture is asked
+ * for at four rungs of the avatar ladder within a single page load, and every one of them was
+ * opening its own transfer for the same file — so the download, which is the only expensive
+ * part, was paid once per rung. On the 13.6MB animated GIF in our own users table that is 9.9s each time, against a
+ * 188ms encode: the first rung anyone looked at was slow and every other rung was slow again for
+ * no reason at all.
+ *
+ * Coalesced as well as cached, so rungs that arrive together — which is what a page load
+ * actually does — join the transfer already running instead of starting another.
+ * @param {string} cid Content address to resolve.
+ * @returns {Promise<{url: string, contentType: string, buffer: Buffer|null}>} The gateway's
+ * answer; `buffer` is null for content streamed straight from the gateway.
+ */
+async function fetchSource(cid) {
+  const cached = readMediaSource(cid)
+  if (cached) return cached
+
+  return coalesceMedia(mediaSourceKey(cid), async () => {
+    const source = await fetchFromGateways(cid)
+    /* Only bytes are worth keeping — a passthrough carries none, and its redirect is already
+       remembered under the encode key */
+    if (source.buffer) writeMediaSource(cid, source)
+    return source
+  })
+}
+
+/**
  * The cache-miss path: fetch from the gateway, transcode, optimize, and record the outcome
  * — success or failure — so the next caller for this key repeats none of it.
  * @param {Object} params
@@ -522,7 +552,7 @@ async function resolveMedia({ cacheKey, cid, width, quality, format, stillOnly }
   const providers = hasProviders(cid)
 
   try {
-    const { url, buffer: fetched } = await fetchFromGateways(cid)
+    const { url, buffer: fetched } = await fetchSource(cid)
 
     /* Only images go through sharp — video/audio stream straight from whichever gateway had it */
     if (!fetched) {
@@ -608,6 +638,45 @@ function stillResolving() {
   )
 }
 
+/**
+ * The same moment, answered for something that renders pictures: the gateway itself.
+ *
+ * A 504 tells an <img> the picture failed, and it has no way to know that the failure means
+ * "wait ten seconds". Every avatar heavy enough to miss the response deadline was therefore
+ * unreachable BY CONSTRUCTION — the element errored, the fallback ladder in ui/Avatar spent
+ * itself, and the visitor got the default face for a picture that was arriving perfectly well.
+ * Animated GIF profile pictures are all in that class: the one in our users table is 13.6MB and
+ * takes 9.9s to arrive from the gateway that holds it, which no response deadline worth having
+ * would wait for — so not one of them had ever appeared.
+ *
+ * So the caller is sent to the original instead. It is the unoptimized file, which is the
+ * trade — but it renders, it animates, and it is the same host the client-side fallback would
+ * have reached for anyway. Nobody remembers the redirect, so the next view of that picture
+ * picks up the resized encode this handoff left running behind it.
+ *
+ * Only for callers that render images — see rendersImages below. A crawler or an OG renderer
+ * gets the 504 it can act on rather than a 13.6MB GIF it would have to decode.
+ * @param {string} cid Content address still being resolved.
+ * @returns {Response} A 302 to the gateway, cached by nobody.
+ */
+function handOffToGateway(cid) {
+  return new NextResponse(null, {
+    status: 302,
+    headers: { Location: gatewayUrl(cid), 'Cache-Control': 'no-store' },
+  })
+}
+
+/**
+ * Whether the caller is something that paints pictures — an `<img>`, which advertises the image
+ * types it can take — as opposed to a crawler, an OG renderer or our own `fetch`, none of which
+ * name an image type and all of which want an answer rather than a redirect to an original.
+ * @param {Request} req The incoming request.
+ * @returns {boolean} True when the caller named image types it accepts.
+ */
+function rendersImages(req) {
+  return (req.headers.get('accept') ?? '').includes('image/')
+}
+
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const cid = searchParams.get('cid')
@@ -650,10 +719,11 @@ export async function GET(req) {
   const entry = await withDeadline(resolving, RESPONSE_DEADLINE_MS)
   if (entry) return respond(entry)
 
-  /* The deadline won, so the visitor gets a placeholder now and the real answer on their next
-     look. `after` hands the unfinished resolve to the platform's waitUntil so a serverless
-     instance is not torn down mid-fetch; where no waitUntil exists it throws, and that is fine
-     — a long-lived server keeps the promise running on its own, which is all this needs. */
+  /* The deadline won, so the caller is sent to the gateway for this view and gets the resized
+     encode on the next one. `after` hands the unfinished resolve to the platform's waitUntil so
+     a serverless instance is not torn down mid-fetch; where no waitUntil exists it throws, and
+     that is fine — a long-lived server keeps the promise running on its own, which is all this
+     needs. Either way the resolve is what fills the cache the handoff is redirecting past. */
   console.warn('IPFS_SLOW_RESOLVE handed off past the response deadline:', cid)
   try {
     after(resolving)
@@ -661,5 +731,5 @@ export async function GET(req) {
     /* No waitUntil in this environment — the resolve continues in-process regardless */
   }
 
-  return stillResolving()
+  return rendersImages(req) ? handOffToGateway(cid) : stillResolving()
 }
