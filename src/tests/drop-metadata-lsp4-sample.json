@@ -1,0 +1,52 @@
+{
+  "LSP4Metadata": {
+    "name": "Alpha Node Passes",
+    "description": "A thousand passes for the crew that broke the testnet first. One per wallet in the allowlist phase, open to everyone after.",
+    "links": [
+      { "title": "Website", "url": "https://example.com/alpha-node" },
+      { "title": "X", "url": "https://x.com/example" }
+    ],
+    "icon": [
+      [
+        {
+          "width": 0,
+          "height": 0,
+          "url": "ipfs://bafybei...drop-icon",
+          "verification": {
+            "method": "keccak256(bytes)",
+            "data": "0x8b1a9953c4611296a827abf8c47804d7f5b0a53a9a1f2d1a7c6b0e3f4d5a6b7c"
+          }
+        }
+      ]
+    ],
+    "images": [
+      [
+        {
+          "width": 0,
+          "height": 0,
+          "url": "ipfs://bafybei...drop-artwork",
+          "verification": {
+            "method": "keccak256(bytes)",
+            "data": "0x3f2d1a7c6b0e3f4d5a6b7c8b1a9953c4611296a827abf8c47804d7f5b0a53a9a"
+          }
+        }
+      ]
+    ],
+    "backgroundImage": [
+      [
+        {
+          "width": 0,
+          "height": 0,
+          "url": "ipfs://bafybei...drop-banner",
+          "verification": {
+            "method": "keccak256(bytes)",
+            "data": "0xc4611296a827abf8c47804d7f5b0a53a9a1f2d1a7c6b0e3f4d5a6b7c8b1a9953"
+          }
+        }
+      ]
+    ],
+    "assets": [],
+    "attributes": []
+  },
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
+}

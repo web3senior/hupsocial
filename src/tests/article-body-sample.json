@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "kind": "article-body",
+  "markdown": "# How the drops engine settles a mint\n\nThe engine never holds a token. It holds the *right* to make one, and hands that right to the collection at the moment a mint clears.\n\n## Phases\n\nA drop opens in whichever phase its start time reaches first...\n",
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
+}

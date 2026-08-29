@@ -3,7 +3,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { ImageIcon, PlusIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
-import { uploadFileToIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadFileToIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { parseJsonArray } from '@/lib/predict'
 import NativeDialog from '@/components/ui/NativeDialog'
@@ -107,13 +107,13 @@ const EditMarketDialog = forwardRef(function EditMarketDialog({ market, marketId
     setIsUploading(true)
     let cid
     try {
-      cid = await uploadObjectToIPFS({
+      cid = await uploadObjectToIPFS(withAuthor({
         title: title.trim(),
         description: description.trim(),
         outcomes: labels.map((label) => ({ label })),
         image,
         ...(category ? { category } : {}),
-      })
+      }, viewer))
     } catch (err) {
       toast(err.message || 'Failed to upload market details', 'error')
       setIsUploading(false)

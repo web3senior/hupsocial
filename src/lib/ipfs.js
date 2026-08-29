@@ -185,16 +185,49 @@ export async function uploadFileToIPFS(file, transfer = {}) {
   }
 }
 
+/* Metadata JSON is tiny, so a slow answer means the pinning service is struggling, not that
+   the payload is large. Generous enough to ride out a retry, short enough that a wedged
+   provider surfaces as an error the caller can report. */
+const OBJECT_UPLOAD_TIMEOUT_MS = 30000
+
+/**
+ * Stamps the publishing wallet onto a metadata payload just before it is pinned.
+ *
+ * A CID is content-addressed: it says what the document is and nothing about who wrote it. The
+ * transaction that carries it is not a reliable answer either — a gasless post arrives from the
+ * relayer, a Universal Profile calls through its own ERC725X `execute()`, and a burner session
+ * key signs for its owner. Carrying the author inside the document keeps the two together no
+ * matter which of those paths the CID travelled, and survives being read straight off a gateway.
+ *
+ * Two things deliberately opt out, and both are encrypted: chat, and posts to an encrypted
+ * community. Neither is stamped at all — not on the envelope, and not inside the ciphertext
+ * either. Encryption keeps a secret only as long as its key does, and a key outlives the moment
+ * it was used: it gets rotated to someone who joins later, and it can leak. An author sealed
+ * inside is a record that only has to be decrypted once to name everyone; an author never
+ * written down cannot be recovered at all. Anything Hup publishes openly is stamped.
+ *
+ * See the payload map in src/tests/README.md for which documents carry the key.
+ *
+ * @param {Object} payload The metadata about to be pinned.
+ * @param {string} [author] Connected wallet — a checksummed EVM address, or base58 for Solana.
+ * @returns {Object} `payload` with `author` appended, or `payload` untouched when unconnected.
+ */
+export const withAuthor = (payload, author) => (typeof author === 'string' && author ? { ...payload, author } : payload)
+
 /**
  * Uploads a plain JSON object through the server-side /api/ipfs/object route and returns the
  * CID string — used for post/community metadata payloads (small, so no presign needed).
+ * Rejects rather than hanging if the service does not answer within `timeoutMs`.
  */
-export async function uploadObjectToIPFS(contentObj) {
+export async function uploadObjectToIPFS(contentObj, { timeoutMs = OBJECT_UPLOAD_TIMEOUT_MS } = {}) {
   try {
     const res = await fetch('/api/ipfs/object', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(contentObj),
+      // Unlike the digest above this one is required — but it still needs a deadline, or a
+      // wedged pinning service leaves the caller's submit button spinning with no way back
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) throw new Error(await readFailure(res, 'Upload failed'))
     const { cid } = await res.json()
@@ -206,20 +239,59 @@ export async function uploadObjectToIPFS(contentObj) {
 }
 
 /**
+ * Pins a set of files as one IPFS DIRECTORY and returns its root CID — what a numbered
+ * collection's reveal needs, since tokenURI resolves as baseURI + tokenId + suffix and only a
+ * directory root can serve `<cid>/7.json`. File names are flattened to their basename server
+ * side, so a folder picked with webkitdirectory lands flat under the root.
+ *
+ * Goes through the server route rather than a presign: the presigned paths pin objects
+ * individually and produce no directory root. That caps a folder at the platform's request
+ * body limit, which is ample for a JSON manifest and not for thousands of images — for those,
+ * pin externally and paste the CID.
+ *
+ * @param {File[]|FileList} files
+ * @returns {Promise<string>} The directory CID (bare, no `ipfs://` prefix).
+ */
+export async function uploadFolderToIPFS(files) {
+  try {
+    const form = new FormData()
+    for (const file of Array.from(files)) form.append('files', file, file.webkitRelativePath || file.name)
+
+    const res = await fetch('/api/ipfs/folder', { method: 'POST', body: form })
+    if (!res.ok) throw new Error(await readFailure(res, 'Folder upload failed'))
+
+    const { cid } = await res.json()
+    if (!cid) throw new Error('CID not found')
+    return cid
+  } catch (error) {
+    throw new Error(shortUploadError(error), { cause: error })
+  }
+}
+
+/* Hashing asks a gateway for bytes that were pinned seconds ago, which is the slowest thing a
+   gateway ever does — freshly pinned content often is not servable yet, and the request can sit
+   until the far end gives up. The digest is optional by design (its absence degrades to the
+   unverified VerifiableURI form), so it gets a deadline rather than the caller's patience.
+   Without one, a drop with an icon, a banner and artwork made four unbounded round trips and
+   the composer sat on "Creating…" forever. */
+const HASH_TIMEOUT_MS = 12000
+
+/**
  * keccak256 of the bytes a gateway serves for a CID, via /api/ipfs/hash — the digest LSP2/LSP4
- * verification data carries. Returns null when the gateway can't be read: callers publishing
- * metadata fall back to the unverified form rather than blocking on a gateway hiccup.
+ * verification data carries. Returns null when the gateway can't be read OR does not answer
+ * within `timeoutMs`: callers publishing metadata fall back to the unverified form rather than
+ * blocking on a gateway hiccup.
  * @param {string} uri An `ipfs://` URI or a bare CID.
  * @returns {Promise<string|null>} 0x-prefixed 32-byte digest, or null.
  */
-export async function hashIpfsContent(uri) {
+export async function hashIpfsContent(uri, { timeoutMs = HASH_TIMEOUT_MS } = {}) {
   if (!uri) return null
 
   const cid = String(uri).replace(/^ipfs:\/\//, '').trim()
   if (!cid) return null
 
   try {
-    const res = await fetch(`/api/ipfs/hash?cid=${encodeURIComponent(cid)}`)
+    const res = await fetch(`/api/ipfs/hash?cid=${encodeURIComponent(cid)}`, { signal: AbortSignal.timeout(timeoutMs) })
     if (!res.ok) {
       console.warn(`[ipfs] could not hash ${cid}: ${res.status}`)
       return null

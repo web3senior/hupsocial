@@ -8,7 +8,7 @@ import { useConnection, usePublicClient, useReadContract, useWaitForTransactionR
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { uploadFileToIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadFileToIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { TOTAL_SUPPLY, estimateOpeningBuy, formatNative, formatTokenAmount } from '@/lib/launch'
 import launchAbi from '@/abis/HupLaunch.json'
@@ -214,12 +214,12 @@ const CreateLaunchDialog = forwardRef(function CreateLaunchDialog(
     setIsUploading(true)
     let cid
     try {
-      cid = await uploadObjectToIPFS({
+      cid = await uploadObjectToIPFS(withAuthor({
         name: name.trim(),
         symbol,
         description: description.trim(),
         image,
-      })
+      }, address))
     } catch (err) {
       toast(err.message || 'Failed to upload token details', 'error')
       setIsUploading(false)

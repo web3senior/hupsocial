@@ -1,0 +1,15 @@
+{
+  "name": "Alpha Node Passes",
+  "symbol": "ANP",
+  "description": "A thousand passes for the crew that broke the testnet first. One per wallet in the allowlist phase, open to everyone after.",
+  "image": "ipfs://bafybei...drop-artwork",
+  "banner_image": "ipfs://bafybei...drop-banner",
+  "icon": "ipfs://bafybei...drop-icon",
+  "external_link": "https://example.com/alpha-node",
+  "links": [
+    { "title": "Website", "url": "https://example.com/alpha-node" },
+    { "title": "X", "url": "https://x.com/example" },
+    { "title": "Docs", "url": "https://example.com/alpha-node/docs" }
+  ],
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
+}

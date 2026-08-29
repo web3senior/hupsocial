@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import {
   ArticleIcon,
@@ -32,7 +33,7 @@ import {
   makeArticleRef,
   readingTimeLabel,
 } from '@/lib/article'
-import { uploadFileToIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadFileToIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { renderArticleMarkdown } from '@/lib/markdown'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { handleBrokenImage } from '@/lib/utils'
@@ -79,6 +80,9 @@ const loadDraft = () => {
  */
 export default function ArticleEditor() {
   const router = useRouter()
+  /* The body is pinned here, under its own CID, before the composer ever opens — so it carries
+     its own author stamp rather than inheriting the one on the post that will link to it. */
+  const { address } = useConnection()
 
   /* The draft is one state object rather than five pieces of state for a specific reason: it is
      restored from localStorage after mount (reading storage during the first render would make
@@ -288,7 +292,7 @@ export default function ArticleEditor() {
       /* The body is pinned before the composer opens, so by the time a transaction is signed the
          CID it references already resolves. Re-publishing identical markdown yields the identical
          CID, so a retry after a rejected transaction costs nothing and pins nothing new. */
-      const bodyCid = await uploadObjectToIPFS(makeArticleBody(markdown))
+      const bodyCid = await uploadObjectToIPFS(withAuthor(makeArticleBody(markdown), address))
       setPendingArticle(makeArticleRef({ title: trimmedTitle, subtitle: subtitle.trim(), cover, tags, bodyCid, markdown }))
     } catch (error) {
       toast(error.message || 'Could not pin the article body', 'error')

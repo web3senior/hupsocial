@@ -1,0 +1,62 @@
+{
+  "version": "1",
+  "elements": [
+    {
+      "type": "text",
+      "data": { "text": "Everything a post can carry, in one payload." }
+    },
+    {
+      "type": "media",
+      "data": { "items": [] }
+    }
+  ],
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0",
+
+  "quoteOf": "1042",
+  "communityId": 5,
+
+  "nftListing": {
+    "listingId": "17",
+    "chainId": 42,
+    "collection": "0xB7Af0000000000000000000000000000000F41A0",
+    "tokenId": "0x0000000000000000000000000000000000000000000000000000000000000007",
+    "isLsp8": true,
+    "token": "0x0000000000000000000000000000000000000000",
+    "isTokenLsp7": false,
+    "price": "2500000000000000000",
+    "referralBps": 250
+  },
+
+  "predictMarket": { "marketId": "3", "chainId": 8453 },
+
+  "tokenLaunch": {
+    "launchId": "12",
+    "token": "0x7798000000000000000000000000000000000072",
+    "chainId": 8453
+  },
+
+  "nftDrop": {
+    "dropId": "4",
+    "chainId": 4201,
+    "collection": "0x073F00000000000000000000000000000082DaC0",
+    "standardId": 3,
+    "name": "Alpha Node Passes",
+    "symbol": "ANP",
+    "image": "ipfs://bafybei...drop-cover"
+  },
+
+  "miniApp": { "appId": "4", "chainId": 10143 },
+
+  "poll": { "pollId": "9", "chainId": 42 },
+
+  "article": {
+    "version": "1",
+    "title": "How the drops engine settles a mint",
+    "subtitle": "Phases, allowlists, and the two transactions in between.",
+    "cover": "ipfs://bafybei...article-cover",
+    "tags": ["drops", "lukso", "engineering"],
+    "bodyCid": "bafybei...article-body",
+    "excerpt": "The engine never holds a token. It holds the right to make one...",
+    "wordCount": 1420
+  }
+}

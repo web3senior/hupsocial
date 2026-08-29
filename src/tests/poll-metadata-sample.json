@@ -1,0 +1,15 @@
+{
+  "question": "Which chain should Hup Communities ship to next?",
+  "options": [
+    { "label": "Optimism" },
+    { "label": "Arbitrum" },
+    { "label": "Celo" },
+    { "label": "Somewhere else — say so in a reply" }
+  ],
+  "requirementLabels": ["Holds at least 1 Alpha Node Pass"],
+  "allowlist": [
+    "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0",
+    "0x7798000000000000000000000000000000000072"
+  ],
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
+}

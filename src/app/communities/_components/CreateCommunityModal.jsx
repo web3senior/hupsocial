@@ -14,7 +14,7 @@ import DialogHeader from '@/components/ui/DialogHeader'
 import { toast } from '@/components/NextToast'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getActiveChain } from '@/lib/communication'
-import { uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { generateContentKey, wrapContentKey } from '@/lib/communityVault'
 import { buildLinks, emptySocials } from '@/lib/socialLinks'
 import { asClause, describeWalletError } from '@/lib/walletErrors'
@@ -452,7 +452,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     // serializes exactly as it did before this section existed
     const links = buildLinks(socials, extraLinks)
 
-    const metadataObj = {
+    const metadataObj = withAuthor({
       name,
       // Omitted when blank, like `links` — a community without a tag publishes no tag key at
       // all, and cidex reads its absence as "grants no badge".
@@ -465,7 +465,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       'logo url': logoUrl,
       'cover url': coverUrl,
       ...(links.length > 0 ? { links } : {}),
-    }
+    }, accountAddress)
 
     // Community metadata is stored on-chain as an IPFS CID only (MAX_METADATA_LENGTH enforces
     // this — a raw JSON blob would exceed it), matching how posts already store just a CID.

@@ -1,0 +1,10 @@
+{
+  "name": "Hup Miner",
+  "description": "A daily onchain mini game. One dig per day, signed by your session key so it never opens a wallet popup.",
+  "url": "https://example.com/hupminer",
+  "icon": "ipfs://bafybei...app-icon",
+  "repo": "https://github.com/example/hupminer",
+  "aspectRatio": "3:4",
+  "tags": ["game", "daily", "session-key"],
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
+}

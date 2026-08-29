@@ -7,7 +7,7 @@ import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWai
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { MAX_POLL_OPTIONS, MIN_POLL_OPTIONS, POLL_DURATIONS, REQUIREMENT_MODE, REQUIREMENT_TYPE } from '@/lib/polls'
 import { allowlistRootFor } from '@/lib/pollAllowlist'
 import pollsAbi from '@/abis/HupPolls.json'
@@ -359,7 +359,7 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
     setIsUploading(true)
     let cid
     try {
-      cid = await uploadObjectToIPFS({
+      cid = await uploadObjectToIPFS(withAuthor({
         question: trimmedQuestion,
         options: labels.map((label) => ({ label })),
         // Display copy for the requirement chips, and — for an allowlist — the address set
@@ -367,7 +367,7 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
         // is already onchain, so publishing the members reveals nothing new.
         ...(gateConfig.labels.length > 0 ? { requirementLabels: gateConfig.labels } : {}),
         ...(gateConfig.allowlist.length > 0 ? { allowlist: gateConfig.allowlist } : {}),
-      })
+      }, address))
     } catch (err) {
       toast(err.message || 'Failed to upload the poll', 'error')
       setIsUploading(false)

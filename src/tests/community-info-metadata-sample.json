@@ -1,7 +1,14 @@
 {
   "name": "Alpha Node",
+  "tag": "alpha",
+  "category": "technology",
   "summary": "A space for early builders and testers.",
   "description": "Alpha Node is where we coordinate testnet feedback, share bug reports, and preview upcoming features before they ship. Be respectful, stay on topic, and have fun.",
   "logo url": "ipfs://bafybei...alpha-node-logo",
-  "cover url": "ipfs://bafybei...alpha-node-cover"
+  "cover url": "ipfs://bafybei...alpha-node-cover",
+  "links": [
+    { "title": "Website", "url": "https://example.com/alpha-node" },
+    { "title": "X", "url": "https://x.com/example" }
+  ],
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
 }

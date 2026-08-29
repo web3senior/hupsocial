@@ -40,7 +40,7 @@ import { getActiveChain } from '@/lib/communication'
 import { useProfile } from '@/hooks/useProfile'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { getPosts } from '@/lib/api'
-import { getIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
+import { getIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { buildLinks, displayLinks, emptySocials, parseLinks } from '@/lib/socialLinks'
@@ -1994,7 +1994,9 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     // rather than writing an empty array
     const updatedLinks = buildLinks(editSocials, editExtraLinks)
 
-    const updatedMetadataObj = {
+    // The stamp on an edit names whoever saved this revision, not the original creator — the
+    // creator is already onchain, and a document says who wrote the words it actually carries.
+    const updatedMetadataObj = withAuthor({
       name: editName,
       // Dropped from the JSON when cleared rather than written empty: cidex reads a missing tag
       // as "this community grants no badge", and clearing it takes the pill off every member.
@@ -2005,7 +2007,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       'logo url': editLogoUrl,
       'cover url': editCoverUrl,
       ...(updatedLinks.length > 0 ? { links: updatedLinks } : {}),
-    }
+    }, address)
 
     // Community metadata is stored on-chain as an IPFS CID only (MAX_METADATA_LENGTH enforces
     // this — a raw JSON blob would exceed it), matching how posts already store just a CID.

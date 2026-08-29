@@ -1,0 +1,8 @@
+{
+  "title": "Will HupDrops reach 1,000 mints before October?",
+  "description": "Resolves YES if the indexer records 1,000 or more mints across every deployed HupDrops engine before 2026-10-01 00:00 UTC. Reposts and refunded mints do not count.",
+  "outcomes": [{ "label": "Yes" }, { "label": "No" }],
+  "image": "ipfs://bafybei...market-cover",
+  "category": "onchain",
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
+}

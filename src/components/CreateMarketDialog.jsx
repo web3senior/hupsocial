@@ -8,7 +8,7 @@ import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { uploadFileToIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadFileToIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import predictAbi from '@/abis/HupPredict.json'
 import { toast } from '@/components/NextToast'
@@ -254,13 +254,13 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
     setIsUploading(true)
     let cid
     try {
-      cid = await uploadObjectToIPFS({
+      cid = await uploadObjectToIPFS(withAuthor({
         title: title.trim(),
         description: description.trim(),
         outcomes: labels.map((label) => ({ label })),
         image,
         ...(category ? { category } : {}),
-      })
+      }, address))
     } catch (err) {
       toast(err.message || 'Failed to upload market details', 'error')
       setIsUploading(false)

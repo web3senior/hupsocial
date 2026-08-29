@@ -27,6 +27,7 @@
             "mimeType": "image/png",
             "width": 1280,
             "height": 800,
+            "aiGenerated": true,
             "spoiler": false
           },
           {
@@ -38,6 +39,8 @@
             "width": 1920,
             "height": 1080,
             "duration": 45.0,
+            "poster": "Qm9012...poster-cid-3",
+            "preview": "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
             "spoiler": false
           },
           {
@@ -52,5 +55,6 @@
         ]
       }
     }
-  ]
+  ],
+  "author": "0xe1190Ae4b1d0dEa5F8B0eF1cB0Dd4A9F0b0eC4d0"
 }

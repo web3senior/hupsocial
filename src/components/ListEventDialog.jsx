@@ -6,7 +6,7 @@ import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWai
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { wallTimeToUnix } from '@/lib/dateHelper'
 import eventsAbi from '@/abis/HupEvents.json'
 import { toast } from '@/components/NextToast'
@@ -132,7 +132,7 @@ const ListEventDialog = forwardRef(function ListEventDialog({ onListed }, ref) {
     setIsUploading(true)
     let cid
     try {
-      cid = await uploadObjectToIPFS({
+      cid = await uploadObjectToIPFS(withAuthor({
         title: title.trim(),
         description: description.trim(),
         organizerName: organizerName.trim(),
@@ -141,7 +141,7 @@ const ListEventDialog = forwardRef(function ListEventDialog({ onListed }, ref) {
         timezone,
         url: trimmedUrl,
         image: imageUrl.trim(),
-      })
+      }, address))
     } catch (err) {
       toast(err.message || 'Failed to upload event details', 'error')
       setIsUploading(false)

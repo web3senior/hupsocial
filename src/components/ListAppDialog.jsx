@@ -6,7 +6,7 @@ import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWai
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { getStoredBurner, isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { uploadObjectToIPFS } from '@/lib/ipfs'
+import { uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import appsAbi from '@/abis/HupApps.json'
 import { toast } from '@/components/NextToast'
 import { InfoIcon, StarIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
@@ -148,7 +148,7 @@ const ListAppDialog = forwardRef(function ListAppDialog({ categories = [], app =
     setIsUploading(true)
     let cid
     try {
-      cid = await uploadObjectToIPFS({
+      cid = await uploadObjectToIPFS(withAuthor({
         name: name.trim(),
         description: description.trim(),
         url: trimmedUrl,
@@ -159,7 +159,7 @@ const ListAppDialog = forwardRef(function ListAppDialog({ categories = [], app =
           .split(',')
           .map((tag) => tag.trim())
           .filter(Boolean),
-      })
+      }, address))
     } catch (err) {
       toast(err.message || 'Failed to upload app details', 'error')
       setIsUploading(false)
