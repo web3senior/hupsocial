@@ -1,25 +1,85 @@
-/* Custom scrollbar styling for Firefox */
-* {
-  scrollbar-width: unset;
-  scrollbar-color: var(--thumbBG) var(--scrollbarBG);
+/* App-wide scrollbar. Colors come from the per-theme --scrollbarBG / --thumbBG /
+   --thumbBG-hover tokens in Globals.scss. */
+
+/* Firefox only, and deliberately gated. Chromium 121+ treats scrollbar-color/scrollbar-width
+   as the authority: declare either one and the browser draws its own standard scrollbar and
+   ignores every ::-webkit-scrollbar-* rule below — width, gutter and :hover with them. This
+   rule used to apply to `*`, which is why no hover colour ever reached the page in Chrome.
+   Firefox gets the resting pair only; it has no hover hook for scrollbars. */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: var(--thumbBG) var(--scrollbarBG);
+  }
 }
 
-/* Base scrollbar container for WebKit/Blink browsers */
+/* WebKit/Blink. 14px channel with a 3px gutter each side leaves an 8px thumb.
+   Changing this width also changes the gutter `scrollbar-gutter: stable` reserves
+   on <html>, so the fixed header and the page stay aligned with it. */
 ::-webkit-scrollbar {
-  width: 12px; /* Balanced width for modern UI; original 118px was massive */
-  background-color: var(--thumbBG);
+  width: 14px;
+  height: 14px;
+  background-color: var(--scrollbarBG);
 }
 
-/* Track configuration */
 ::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 100vh;
+  background-color: var(--scrollbarBG);
 }
 
-/* Draggable thumb configuration */
+/* The gutter is a transparent border rather than padding: only padding-box is
+   painted, so the thumb floats inside the track instead of filling it. */
 ::-webkit-scrollbar-thumb {
   background-color: var(--thumbBG);
   background-clip: padding-box;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   border-radius: 100vh;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--thumbBG-hover);
+}
+
+/* Dragging keeps the hover brightness — losing it mid-drag reads as a dropped grab */
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--thumbBG-hover);
+}
+
+/* End buttons. Styling the bar at all puts Chromium on its custom path, where a button has
+   no default arrow and zero height — so the pair has to be drawn here or the ends come out
+   blank. The arrow itself is a background image rather than a mask: -webkit-mask-image is
+   ignored on scrollbar parts and paints the button as a solid block. Only the vertical pair
+   is drawn; horizontal bars keep a plain channel. */
+::-webkit-scrollbar-button:vertical:decrement,
+::-webkit-scrollbar-button:vertical:increment {
+  height: 14px;
+  background-color: var(--scrollbarBG);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 10px;
+}
+
+::-webkit-scrollbar-button:vertical:decrement {
+  background-image: var(--scrollbar-arrow-up);
+}
+
+::-webkit-scrollbar-button:vertical:increment {
+  background-image: var(--scrollbar-arrow-down);
+}
+
+/* The other half of each pair — what a double-button scrollbar would show — stays collapsed,
+   or each end grows a second arrow pointing the wrong way. */
+::-webkit-scrollbar-button:vertical:start:increment,
+::-webkit-scrollbar-button:vertical:end:decrement {
+  display: none;
+}
+
+/* Hover lifts the button's ground instead of swapping in a second arrow SVG, so the feedback
+   comes from the theme's own thumb colour and costs no extra token. */
+::-webkit-scrollbar-button:vertical:hover {
+  background-color: color-mix(in srgb, var(--thumbBG) 28%, var(--scrollbarBG));
+}
+
+/* Where a vertical and a horizontal bar meet, so the square isn't left white */
+::-webkit-scrollbar-corner {
+  background-color: var(--scrollbarBG);
 }

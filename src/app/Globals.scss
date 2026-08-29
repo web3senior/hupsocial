@@ -58,8 +58,15 @@
   // trend hue is a caret in the header, and both carry a shape and a label besides.
   --chart-sale: #d97706;
 
-  --scrollbarBG: transparent;
-  --thumbBG: var(--gray-200);
+  // Scrollbar: the track is painted so the bar reads as a channel, the thumb one step
+  // darker than it, and hover one step darker again.
+  --scrollbarBG: #f1f1f2;
+  --thumbBG: var(--gray-300);
+  --thumbBG-hover: var(--gray-400);
+  // The end-button arrows are background images, so their fill can't be a var — each theme
+  // carries its own pair, coloured to sit a step darker than that theme's resting thumb.
+  --scrollbar-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 3L9 7H1z' fill='%239ca3af'/%3E%3C/svg%3E");
+  --scrollbar-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L9 3H1z' fill='%239ca3af'/%3E%3C/svg%3E");
   --network-color-primary-light: color-mix(in srgb, var(--network-color-primary) 35%, transparent);
 
   --fingerprint-border: var(--white, #fff);
@@ -116,8 +123,13 @@
   // ΔE 9.4 against the teal. Teal and the line hue both pass here unchanged.
   --trend-down: #de535e;
 
-  --scrollbarBG: transparent;
-  --thumbBG: #2a2a2a;
+  // Scrollbar: the track sits just above the page ground so the channel stays visible, and
+  // the thumb is light against it — the old #2a2a2a thumb was invisible on this background.
+  --scrollbarBG: #262626;
+  --thumbBG: #a3a3a3;
+  --thumbBG-hover: #d4d4d4;
+  --scrollbar-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 3L9 7H1z' fill='%23a3a3a3'/%3E%3C/svg%3E");
+  --scrollbar-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L9 3H1z' fill='%23a3a3a3'/%3E%3C/svg%3E");
 
   --fingerprint-border: var(--surface-muted);
   --beta-badge-background: var(--black-400);
@@ -161,8 +173,11 @@
   // Blue is off-palette here — a saturated green still reads apart from the body text.
   --cashtag-color: #4ade80;
 
-  --scrollbarBG: transparent;
-  --thumbBG: var(--black);
+  --scrollbarBG: #0d2117;
+  --thumbBG: #2f6b45;
+  --thumbBG-hover: #4ade80;
+  --scrollbar-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 3L9 7H1z' fill='%232f6b45'/%3E%3C/svg%3E");
+  --scrollbar-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L9 3H1z' fill='%232f6b45'/%3E%3C/svg%3E");
 
   --fingerprint-border: var(--surface-muted);
   --beta-badge-background: var(--green-400);
