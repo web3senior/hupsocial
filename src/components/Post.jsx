@@ -432,7 +432,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             </div>
             <div className="flex align-items-center gap-025">
               {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
-              {actionsSet.has('share') && <Share item={displayItem || item} />}
+              {/* captureRef: the card copies itself, exactly as it is on screen */}
+              {actionsSet.has('share') && <Share item={displayItem || item} captureRef={sectionRef} />}
             </div>
           </div>
         </footer>
@@ -1133,6 +1134,9 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
         )}
         id={`post${postId}`}
         dir="auto"
+        // Marks the clamp for anything that has to undo it — a copy of this post as a picture
+        // shows all of the words, because a picture has nothing to expand (lib/postCaptureSheet.js)
+        data-collapsed={isCollapsible && !isExpanded ? 'true' : undefined}
         onClick={(e) => {
           // Links inside dangerouslySetInnerHTML have no React handler; keep their clicks from opening post details
           if (e.target.closest('a')) e.stopPropagation()
@@ -1146,6 +1150,7 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
         <button
           type="button"
           className={styles.post__showMore}
+          data-show-more
           onClick={(e) => {
             e.stopPropagation()
             setIsExpanded((prev) => !prev)

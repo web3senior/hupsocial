@@ -18,7 +18,8 @@ export const Counter = ({ value, children }) => {
   const [initialValue] = useState(value)
 
   return (
-    <div className={styles.counterWrapper}>
+    // data-counter: the hook "Show metrics" hides in a copied picture of a post
+    <div className={styles.counterWrapper} data-counter>
       <span key={value} className={clsx(styles.counterNumber, value !== initialValue && styles.counterNumberEnter)}>
         {children ?? value}
       </span>
