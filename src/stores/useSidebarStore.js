@@ -11,7 +11,7 @@ import {
   CalendarBlankIcon,
   ChartBarIcon,
   ChatCircleIcon,
-  CoinsIcon,
+  CurrencyDollarIcon,
   HouseIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
@@ -63,7 +63,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'activity', name: 'Activity', path: '/activity', icon: PulseIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
   // Your own sales, so it sits with the rest of your account rather than in the market block
-  { id: 'revenue', name: 'Revenue', path: '/revenue', icon: CoinsIcon },
+  { id: 'revenue', name: 'Money', path: '/revenue', icon: CurrencyDollarIcon },
 ]
 
 // Baskets migrated from the pre-wallet era live under this key until the

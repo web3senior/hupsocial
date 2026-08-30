@@ -99,7 +99,7 @@ export default function RevenueHero({ totals, supporterCount, paymentsCount }) {
   const usdTotal = pricedTotals.reduce((sum, total) => sum + total.usd_value, 0)
 
   return (
-    <section className={styles.hero} aria-label="Revenue summary">
+    <section className={styles.hero} aria-label="Money summary">
       <div className={styles.hero__headline}>
         <span className={styles.hero__eyebrow}>Total earned</span>
         {pricedTotals.length > 0 && <span className={styles.hero__usd}>{usdFormatter.format(usdTotal)}</span>}

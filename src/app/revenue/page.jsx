@@ -5,7 +5,7 @@ import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
-import { CoinsIcon, StorefrontIcon, WalletIcon, ImageIcon, HandCoinsIcon } from '@phosphor-icons/react'
+import { CurrencyDollarIcon, StorefrontIcon, WalletIcon, ImageIcon, HandCoinsIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import { ContentSpinner } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -89,19 +89,19 @@ export default function RevenuePage() {
 
   return (
     <>
-      <PageTitle name="Revenue" />
+      <PageTitle name="Money" />
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="small">
           {!mounted ? null : !isConnected ? (
             <div className={styles.emptyState}>
               <WalletIcon size={48} />
               <h3>Connect your wallet</h3>
-              <p>Connect your wallet to see your revenue.</p>
+              <p>Connect your wallet to see your money.</p>
             </div>
           ) : error ? (
             <div className={styles.emptyState}>
-              <CoinsIcon size={48} />
-              <h3>Couldn&apos;t load Revenue</h3>
+              <CurrencyDollarIcon size={48} />
+              <h3>Couldn&apos;t load Money</h3>
               <p>{error.message}</p>
             </div>
           ) : !overview ? (
@@ -111,7 +111,7 @@ export default function RevenuePage() {
           ) : totalPayments === 0 ? (
             <div className={styles.emptyState}>
               <StorefrontIcon size={48} />
-              <h3>No revenue yet</h3>
+              <h3>No money yet</h3>
               <p>
                 Sales, NFT trades, and tips all land here.{' '}
                 <Link href="/bazaar">Browse the Bazaar</Link> to see what selling looks like.
@@ -126,7 +126,7 @@ export default function RevenuePage() {
               />
 
               <div className={styles.page__toolbar}>
-                <div className={styles.page__tabs} role="tablist" aria-label="Revenue source">
+                <div className={styles.page__tabs} role="tablist" aria-label="Money source">
                   {TABS.map(({ key, label }) => (
                     <button
                       key={key}
