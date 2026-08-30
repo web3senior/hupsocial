@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -261,6 +261,22 @@ export default function Aside() {
     }
   }
 
+  // The scrollbar thumb is transparent at rest and only painted while the list is hovered or
+  // scrolling (SCSS). Scroll fires per frame, so the class is toggled on the element directly
+  // instead of through state — re-rendering the whole nav 60 times a second buys nothing.
+  const navListRef = useRef(null)
+  const scrollIdleTimer = useRef(null)
+
+  const handleNavListScroll = () => {
+    const list = navListRef.current
+    if (!list) return
+    list.classList.add(styles.navListScrolling)
+    clearTimeout(scrollIdleTimer.current)
+    scrollIdleTimer.current = setTimeout(() => list.classList.remove(styles.navListScrolling), 600)
+  }
+
+  useEffect(() => () => clearTimeout(scrollIdleTimer.current), [])
+
   const requestFeedRefresh = usePostStore((state) => state.requestFeedRefresh)
 
   // Home link double-duty: scrolled down -> back to top, already at top -> pull fresh posts
@@ -321,7 +337,7 @@ export default function Aside() {
           </button>
         </header>
 
-        <ul className={styles.navList}>
+        <ul className={styles.navList} ref={navListRef} onScroll={handleNavListScroll}>
           {navLinks.map((item, index) => (
             <li key={item.id ?? `${item.type}-${index}`}>
               <NavLink
@@ -505,7 +521,7 @@ export default function Aside() {
             }}
             aria-label="Create new post"
           >
-            <PlusIcon />
+            <PlusIcon/>
           </button>
         </div>
       )}

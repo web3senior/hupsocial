@@ -72,6 +72,18 @@
   .navList {
     overflow-y: auto;
     overflow-x: hidden; // Keep nowrap rows and tooltip pseudo-elements from flashing a horizontal scrollbar mid-transition
+
+    // The standard properties opt this list out of the global 14px ::-webkit-scrollbar chrome
+    // (Chromium 121+ ignores those rules once scrollbar-width/color are declared): a thin bar
+    // that stays invisible until the menu is hovered or actively scrolled, so the gutter
+    // never jumps. The scrolling class comes from the onScroll handler in Aside.jsx.
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+
+    &:hover,
+    &.navListScrolling {
+      scrollbar-color: var(--thumbBG) transparent;
+    }
   }
 
   .link {
