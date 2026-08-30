@@ -46,6 +46,8 @@ const toLength = (value) => (typeof value === 'number' ? `${value}px` : value)
  * @param {boolean} [props.gradient=true] Dim at the start, full strength at the leading edge.
  * @param {boolean} [props.animated=false] Sweeps a sheen across the fill — for something still
  *   moving. A finished bar should never carry it: motion says the story is still running.
+ * @param {boolean} [props.sparkle=false] Lights drifting off the fill's leading edge — the mint
+ *   bar treatment. Same rule as `animated`: only for a story still running.
  * @param {boolean} [props.indeterminate=false] Unknown progress; a shuttle rides the track.
  * @param {import('react').ReactNode} [props.label] Leading caption above the track.
  * @param {import('react').ReactNode} [props.hint] Trailing caption above the track — a
@@ -72,6 +74,7 @@ export default function ProgressBar({
   radius = 999,
   gradient = true,
   animated = false,
+  sparkle = false,
   indeterminate = false,
   label,
   hint,
@@ -161,6 +164,17 @@ export default function ProgressBar({
           style={indeterminate ? undefined : { width: `${fill}%` }}
         />
       </span>
+
+      {/* The emitter is a zero-height layer over the track, as wide as the fill, so the lights
+          rise from wherever the leading edge is — and can float past the track's clipped box,
+          which is why they can't live inside it */}
+      {sparkle && !indeterminate && fill > 0 && (
+        <span className={styles.progress__sparkles} style={{ width: `${fill}%` }} aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      )}
     </span>
   )
 }

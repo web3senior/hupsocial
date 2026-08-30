@@ -9,6 +9,8 @@
   --progress-color: var(--network-color-primary, var(--color-primary, #ec4899));
   --progress-track: color-mix(in srgb, var(--text-muted, #888) 18%, transparent);
 
+  // The anchor for the sparkle emitter, which rides over the track from outside it
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -80,6 +82,51 @@
     animation: progressShuttle 1.4s ease-in-out infinite;
   }
 
+  // Lights drifting off the fill's leading edge. The layer spans the fill's width over the
+  // track (the track clips, so the particles can't live inside it), and each dot is born at
+  // its right end — white-hot core, glow in the bar's own colour — then drifts a few pixels
+  // out and fades. Absolutely positioned, so the flex column's gap never counts it.
+  &__sparkles {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: var(--progress-height);
+    pointer-events: none;
+    // The emitter follows the leading edge at the same pace the fill slides
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+    span {
+      position: absolute;
+      top: 50%;
+      right: -1px;
+      width: 3px;
+      height: 3px;
+      border-radius: 999px;
+      background-color: color-mix(in srgb, #fff 70%, var(--progress-color));
+      box-shadow: 0 0 5px 1px color-mix(in srgb, var(--progress-color) 85%, transparent);
+      opacity: 0;
+      animation: progressSpark 1.8s ease-out infinite;
+
+      &:nth-child(2) {
+        width: 2px;
+        height: 2px;
+        --spark-x: 9px;
+        --spark-y: 5px;
+        animation-duration: 2.4s;
+        animation-delay: 0.7s;
+      }
+
+      &:nth-child(3) {
+        width: 2px;
+        height: 2px;
+        --spark-x: 12px;
+        --spark-y: -3px;
+        animation-duration: 2.1s;
+        animation-delay: 1.3s;
+      }
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     &__fill {
       transition: none;
@@ -93,6 +140,11 @@
     &__fill--indeterminate {
       animation-duration: 3s;
     }
+
+    // Pure decoration — nothing is lost by dropping it entirely
+    &__sparkles {
+      display: none;
+    }
   }
 }
 
@@ -103,6 +155,22 @@
 
   to {
     transform: translateX(100%);
+  }
+}
+
+@keyframes progressSpark {
+  0% {
+    opacity: 0;
+    transform: translate(0, -50%) scale(0.6);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--spark-x, 7px), calc(-50% + var(--spark-y, -5px))) scale(1);
   }
 }
 
