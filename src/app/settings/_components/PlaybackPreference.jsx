@@ -1,7 +1,7 @@
 'use client'
 
 import { PlayCircleIcon } from '@phosphor-icons/react'
-import clsx from 'clsx'
+import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import { setAutoplayPreference, useAutoplayPreference } from '@/hooks/useAutoplayPreference'
 import styles from './PlaybackPreference.module.scss'
 
@@ -29,26 +29,24 @@ export default function PlaybackPreference() {
       </header>
 
       <div className={styles.playback__panel}>
-        <label className={styles.playback__row}>
-          <span className={styles.playback__copy}>
+        <div className={styles.playback__row}>
+          {/* The switch is its own <label>, so the copy drives it through htmlFor rather than
+              wrapping it — a label inside a label is invalid and double-fires the toggle */}
+          <label className={styles.playback__copy} htmlFor="autoplay-videos">
             <span className={styles.playback__label}>Autoplay videos</span>
             <span className={styles.playback__hint}>
               {autoplay
                 ? 'Videos start as soon as they scroll into view.'
                 : 'Videos wait on their thumbnail until you press play.'}
             </span>
-          </span>
+          </label>
 
-          <input
-            type="checkbox"
-            className={styles.playback__input}
+          <ToggleSwitch
+            id="autoplay-videos"
             checked={autoplay}
             onChange={(event) => setAutoplayPreference(event.target.checked)}
           />
-          <span className={clsx(styles.playback__switch, autoplay && styles.playback__switchOn)} aria-hidden="true">
-            <span className={styles.playback__knob} />
-          </span>
-        </label>
+        </div>
       </div>
     </div>
   )

@@ -370,37 +370,9 @@
     }
   }
 
+  // The switch itself is the shared ToggleSwitch; this only seats it against the first line of copy
   &__switch {
-    flex-shrink: 0;
-    position: relative;
-    width: 42px;
-    height: 24px;
     margin-top: 0.15rem;
-    border: none;
-    border-radius: 999px;
-    background: var(--border);
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-
-    &::after {
-      content: '';
-      position: absolute;
-      inset-block-start: 3px;
-      inset-inline-start: 3px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #fff;
-      transition: transform 0.15s ease;
-    }
-
-    &--on {
-      background: var(--primary, #ec4899);
-
-      &::after {
-        transform: translateX(18px);
-      }
-    }
   }
 
   &__preview {

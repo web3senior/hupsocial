@@ -51,13 +51,13 @@
   justify-content: space-between;
   gap: calc(var(--spacing) * 4);
   padding: calc(var(--spacing) * 4);
-  cursor: pointer;
 }
 
 .playback__copy {
   display: flex;
   flex-direction: column;
   gap: calc(var(--spacing) * 1);
+  cursor: pointer;
 }
 
 .playback__label {
@@ -69,52 +69,4 @@
   font-size: var(--system-13-font-size);
   color: var(--text-muted);
   line-height: var(--line-height-base);
-}
-
-/* The real checkbox stays in the layout but invisible, so the control keeps native keyboard
-   focus and screen-reader semantics while the drawn switch beside it does the presenting. */
-.playback__input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.playback__switch {
-  position: relative;
-  flex-shrink: 0;
-  width: 46px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  transition: background-color 0.18s ease, border-color 0.18s ease;
-}
-
-.playback__switchOn {
-  background: var(--text);
-  border-color: var(--text);
-}
-
-.playback__knob {
-  position: absolute;
-  top: 50%;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  transform: translateY(-50%);
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  transition: transform 0.18s ease;
-}
-
-.playback__switchOn .playback__knob {
-  transform: translate(18px, -50%);
-}
-
-.playback__input:focus-visible + .playback__switch {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
 }

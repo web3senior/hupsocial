@@ -15,6 +15,7 @@ import launchAbi from '@/abis/HupLaunch.json'
 import { toast } from '@/components/NextToast'
 import { CheckCircleIcon, ImageIcon, LightningIcon, RocketLaunchIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
+import ToggleSwitch from './ui/ToggleSwitch'
 import styles from './CreateLaunchDialog.module.scss'
 
 const MAX_NAME_LENGTH = 32
@@ -379,13 +380,11 @@ const CreateLaunchDialog = forwardRef(function CreateLaunchDialog(
                 shows on the card either way.
               </small>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={takeCreatorFee}
+            <ToggleSwitch
+              checked={takeCreatorFee}
+              onChange={(event) => setTakeCreatorFee(event.target.checked)}
               aria-label="Take a creator fee on each buy"
-              className={clsx(styles.launchDialog__switch, takeCreatorFee && styles['launchDialog__switch--on'])}
-              onClick={() => setTakeCreatorFee((on) => !on)}
+              className={styles.launchDialog__switch}
               disabled={isBusy}
             />
           </div>
@@ -395,13 +394,11 @@ const CreateLaunchDialog = forwardRef(function CreateLaunchDialog(
               <strong>Buy pre-launch</strong>
               <small>Bundle a ${symbol || 'TOKEN'} buy into the launch transaction, so nobody can front-run you.</small>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={bundleBuy}
+            <ToggleSwitch
+              checked={bundleBuy}
+              onChange={(event) => setBundleBuy(event.target.checked)}
               aria-label="Bundle a buy with the launch"
-              className={clsx(styles.launchDialog__switch, bundleBuy && styles['launchDialog__switch--on'])}
-              onClick={() => setBundleBuy((on) => !on)}
+              className={styles.launchDialog__switch}
               disabled={isBusy}
             />
           </div>

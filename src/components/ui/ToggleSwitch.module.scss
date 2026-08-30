@@ -1,8 +1,16 @@
 // ■■■ Configuration & Variables ■■■
-$width: 40px;
-$height: 18px;
-$padding: 2px;
-$circle-diameter: $height - ($padding * 2);
+@use "sass:math";
+
+// The knob is taller than the track and rides over it, so the layout box is the knob's full
+// extent — nothing overflows a row, and centring the switch centres the visible shape.
+$track-width: 48px;
+$track-height: 20px;
+$knob-size: 28px;
+$knob-radius: 8px;
+$knob-border: 2px;
+$knob-overhang: math.div($knob-size - $track-height, 2);
+$travel: $track-width - $knob-size;
+$glyph-size: 14px;
 
 // The palette lives with the switch, not with a consumer. It used to be declared in the
 // Settings wallet panel's module — the only place that rendered one — so any other screen
@@ -10,26 +18,39 @@ $circle-diameter: $height - ($padding * 2);
 // Explicitly listed selectors keep the CSS module pure.
 :global(:root),
 :global([data-theme='light']) {
-  --toggle-inactive: #e5e5ea;
-  --toggle-active: #4cd964;
+  --toggle-inactive: #e6eaee;
+  --toggle-active: #4cd000;
+  --toggle-knob: #ffffff;
+  --toggle-knob-border: #dfe4e9;
+  --toggle-glyph: #9aa3ad;
+  --toggle-knob-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 4px 10px rgba(15, 23, 42, 0.1);
 }
 
 :global([data-theme='dark']) {
   --toggle-inactive: #2a2d34;
-  --toggle-active: #30d158;
+  --toggle-active: #56dd0c;
+  --toggle-knob: #3a3d45;
+  --toggle-knob-border: #4a4e57;
+  --toggle-glyph: #a1a5ae;
+  --toggle-knob-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
 :global([data-theme='terminal']) {
   --toggle-inactive: #12301c;
   --toggle-active: #a3ffad;
+  --toggle-knob: #0d1c12;
+  --toggle-knob-border: #1f7a3a;
+  --toggle-glyph: #6ee77d;
+  --toggle-knob-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 10px rgba(0, 0, 0, 0.4);
 }
 
 .toggle {
   position: relative;
   display: inline-block;
   flex-shrink: 0;
-  width: $width;
-  height: $height;
+  width: $track-width;
+  height: $knob-size;
+  cursor: pointer;
 
   &__input {
     position: absolute;
@@ -37,49 +58,90 @@ $circle-diameter: $height - ($padding * 2);
     height: 0;
     opacity: 0;
 
-    &:focus-visible + .toggle__slider {
-      box-shadow: 0 0 0 3px var(--shimmer-glint);
+    &:focus-visible ~ .toggle__knob {
+      outline: 2px solid var(--toggle-active);
+      outline-offset: 2px;
     }
 
     // The checkbox is controlled, so :checked is the single source of truth for the
     // painted state — no modifier class to drift out of sync with it
-    &:checked + .toggle__slider {
+    &:checked ~ .toggle__track {
       background-color: var(--toggle-active);
+    }
 
-      &::before {
-        transform: translateX($width - $circle-diameter - ($padding * 2));
+    &:checked ~ .toggle__knob {
+      transform: translateX($travel);
+      border-color: var(--toggle-active);
+      color: var(--toggle-active);
+
+      .toggle__glyph--off {
+        opacity: 0;
+        transform: scale(0.6) rotate(-90deg);
+      }
+
+      .toggle__glyph--on {
+        opacity: 1;
+        transform: none;
       }
     }
   }
 
-  &__slider {
+  &__track {
     position: absolute;
-    inset: 0;
+    inset-block: $knob-overhang;
+    inset-inline: 0;
     border-radius: 999px;
     background-color: var(--toggle-inactive);
-    cursor: pointer;
     transition: background-color 0.3s ease;
+  }
 
-    &::before {
-      content: '';
-      position: absolute;
-      top: $padding;
-      left: $padding;
-      width: $circle-diameter;
-      height: $circle-diameter;
-      border-radius: 50%;
-      background-color: var(--surface);
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-      transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-      will-change: transform;
+  &__knob {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: $knob-size;
+    height: $knob-size;
+    border: $knob-border solid var(--toggle-knob-border);
+    border-radius: $knob-radius;
+    background-color: var(--toggle-knob);
+    color: var(--toggle-glyph);
+    box-shadow: var(--toggle-knob-shadow);
+    transition:
+      transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+      border-color 0.3s ease,
+      color 0.3s ease;
+    will-change: transform;
+  }
+
+  // Both glyphs are stacked in the knob and cross-fade, so the tick grows in as the cross spins out
+  &__glyph {
+    position: absolute;
+    width: $glyph-size;
+    height: $glyph-size;
+    transition:
+      opacity 0.2s ease,
+      transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+
+    &--on {
+      opacity: 0;
+      transform: scale(0.6);
     }
   }
 
   &--disabled {
     opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
 
-    .toggle__slider {
-      cursor: not-allowed;
-    }
+@media (prefers-reduced-motion: reduce) {
+  .toggle__track,
+  .toggle__knob,
+  .toggle__glyph {
+    transition: none;
   }
 }
