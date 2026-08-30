@@ -49,6 +49,9 @@ export default function PollDetail({ networkId, pollId }) {
   const publicClient = usePublicClient({ chainId })
   const { writeContractAsync } = useWriteContract()
   const [isClosing, setIsClosing] = useState(false)
+  const [extraVotes, setExtraVotes] = useState([])
+  const [extraHasMore, setExtraHasMore] = useState(null)
+  const [isLoadingVotes, setIsLoadingVotes] = useState(false)
 
   const { data: detail, mutate } = useSWR(
     `/api/v1/polls/${pollId}?networkId=${chainId}${address ? `&voter=${address.toLowerCase()}` : ''}`,
@@ -57,6 +60,17 @@ export default function PollDetail({ networkId, pollId }) {
 
   const poll = detail?.data?.poll
   const recentVotes = detail?.data?.recentVotes ?? []
+
+  // The first page rides SWR and stays fresh; pages the viewer asked for with "Show more"
+  // are appended from state. A wallet votes at most once per poll, so it dedupes the seam
+  // between a revalidated first page and older appended ones.
+  const seenVoters = new Set()
+  const votes = [...recentVotes, ...extraVotes].filter((vote) => {
+    if (seenVoters.has(vote.wallet_address)) return false
+    seenVoters.add(vote.wallet_address)
+    return true
+  })
+  const hasMoreVotes = extraHasMore ?? Boolean(detail?.data?.hasMoreVotes)
 
   // The status badge and the close-early control are derived from the clock at render time,
   // so a window that ends on screen needs a re-render as well as fresh data — the refetch
@@ -79,6 +93,15 @@ export default function PollDetail({ networkId, pollId }) {
 
     return () => clearTimeout(timer)
   }, [closesAt, mutate])
+
+  // Appended pages predate a gate flip — the viewer votes, or the window closes — so their
+  // rows lack the choice column a revalidated first page now carries. Drop them; "Show more"
+  // refetches under the open gate with choices attached.
+  const resultsVisible = Boolean(detail?.data?.ballot) || (closesAt > 0 && closesAt * 1000 <= Date.now())
+  useEffect(() => {
+    setExtraVotes([])
+    setExtraHasMore(null)
+  }, [resultsVisible])
 
   if (detail && !poll) {
     return (
@@ -131,6 +154,25 @@ export default function PollDetail({ networkId, pollId }) {
       toast(shortTxError(err, 'Could not close the poll'), 'error')
     } finally {
       setIsClosing(false)
+    }
+  }
+
+  const loadMoreVotes = async () => {
+    setIsLoadingVotes(true)
+    try {
+      // Offset by what is on screen, not by pages fetched: a revalidated first page may have
+      // shifted the list, and the dedupe above absorbs any overlap this causes
+      const res = await fetch(
+        `/api/v1/polls/${pollId}?networkId=${chainId}${address ? `&voter=${address.toLowerCase()}` : ''}&votesOffset=${votes.length}`,
+      )
+      const page = await res.json()
+      if (!Array.isArray(page?.data?.recentVotes)) throw new Error('Bad response')
+      setExtraVotes((prev) => [...prev, ...page.data.recentVotes])
+      setExtraHasMore(Boolean(page.data.hasMoreVotes))
+    } catch {
+      toast('Could not load more voters', 'error')
+    } finally {
+      setIsLoadingVotes(false)
     }
   }
 
@@ -193,9 +235,9 @@ export default function PollDetail({ networkId, pollId }) {
 
       <section className={styles.detail__voters}>
         <h2>Who voted</h2>
-        {recentVotes.length === 0 && <p className={styles.detail__empty}>No votes yet.</p>}
+        {votes.length === 0 && <p className={styles.detail__empty}>No votes yet.</p>}
         <ul>
-          {recentVotes.map((vote) => (
+          {votes.map((vote) => (
             /* One card per voter: who on top, what beneath. An option label is user-authored
                prose, and a card gives it a full line to wrap on instead of a sliver of a row */
             <li key={`${vote.wallet_address}-${vote.voted_at}`}>
@@ -215,6 +257,12 @@ export default function PollDetail({ networkId, pollId }) {
             </li>
           ))}
         </ul>
+
+        {hasMoreVotes && (
+          <button type="button" className={styles.detail__more} onClick={loadMoreVotes} disabled={isLoadingVotes}>
+            {isLoadingVotes ? 'Loading...' : 'Show more voters'}
+          </button>
+        )}
 
         <p className={styles.detail__note}>
           {canSeeResults

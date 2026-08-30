@@ -18,6 +18,7 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url)
     const networkId = parseInt(searchParams.get('networkId')) || null
     const voter = (searchParams.get('voter') || '').toLowerCase() || null
+    const votesOffset = Math.max(0, parseInt(searchParams.get('votesOffset'), 10) || 0)
 
     if (!networkId || !/^\d+$/.test(String(pollId))) {
       return NextResponse.json({ success: false, error: 'networkId and a numeric poll id are required' }, { status: 400 })
@@ -45,16 +46,21 @@ export async function GET(request, { params }) {
     await fulfillUniversalProfiles([poll], pool)
 
     // Who voted, and — once the viewer has earned the results below — what they picked.
-    const [recentVotes] = await pool.execute(
+    // One page per request (`votesOffset` walks the list); one extra row is fetched only to
+    // learn whether another page exists, then dropped before it can leak.
+    const VOTES_PAGE = 30
+    const [pagedVotes] = await pool.execute(
       `SELECT v.voter AS wallet_address, v.option_index, v.voted_at, v.tx_hash,
               u.name AS display_name, u.profileImage AS profile_image
        FROM poll_votes v
        LEFT JOIN users u ON u.wallet_address = v.voter
        WHERE v.network_id = ? AND v.poll_id = ?
        ORDER BY v.block_number DESC, v.log_index DESC
-       LIMIT 30`,
+       LIMIT ${VOTES_PAGE + 1} OFFSET ${votesOffset}`,
       [networkId, pollId],
     )
+    const hasMoreVotes = pagedVotes.length > VOTES_PAGE
+    const recentVotes = pagedVotes.slice(0, VOTES_PAGE)
     await fulfillUniversalProfiles(recentVotes, pool)
 
     // The viewer's own ballot, when a wallet was supplied. One row at most — the contract
@@ -94,7 +100,7 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      data: { poll, recentVotes, ballot },
+      data: { poll, recentVotes, ballot, hasMoreVotes },
     })
   } catch (error) {
     console.error('[GET_POLL_DETAIL_ERROR]:', error.message)

@@ -204,6 +204,28 @@
     overflow-wrap: anywhere;
   }
 
+  // Centered under the voter grid — the conventional seat for a load-more control
+  &__more {
+    all: unset;
+    cursor: pointer;
+    align-self: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+      color: var(--text, inherit);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+  }
+
   &__note {
     margin: 0.25rem 0 0;
     font-size: var(--font-size-12);
