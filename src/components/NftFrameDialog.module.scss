@@ -1,0 +1,500 @@
+// Frame mode — a picture frame on a lit wall, built out of the box model.
+//
+// The moulding is the element's own border: four semi-transparent side tints over one shared
+// finish (base colour + sheen), so the corners mitre at 45° the way a real frame's do, and a top
+// light lands lighter on the upper rail than the lower one. Grain runs along each rail through a
+// masked pseudo-element. The mat is padding with a bevel-cut window, and the wall is one flat
+// colour with a spotlight, a vignette and a little tooth — a flat colour reads as a screen.
+//
+// One deliberate look rather than a theme-following one: a gallery wall is the same wall in
+// light mode and dark.
+
+// Tiling grey noise with its alpha scaled by `$slope`. A pair of anisotropic frequencies
+// ('0.012 0.55') stretches it into grain along one axis; a single value gives even tooth.
+@function grain($frequency, $slope) {
+  @return url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='#{$frequency}' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='#{$slope}'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+$grain-wood-x: grain('0.012 0.55', 0.26);
+$grain-wood-y: grain('0.55 0.012', 0.26);
+$grain-paint: grain(0.9, 0.09);
+$grain-metal: grain(0.9, 0.05);
+$grain-wall: grain(0.85, 0.5);
+
+// `$sides` is top right bottom left — the tints the border paints over the finish
+@mixin finish($base, $sheen, $sides, $grain-x: $grain-paint, $grain-y: $grain-paint) {
+  --frame-base: #{$base};
+  --frame-sheen: #{$sheen};
+  --frame-sides: #{$sides};
+  --frame-grain-x: #{$grain-x};
+  --frame-grain-y: #{$grain-y};
+}
+
+@mixin wall($wall, $glow, $shade, $placard, $placard-text) {
+  --wall: #{$wall};
+  --wall-glow: #{$glow};
+  --wall-shade: #{$shade};
+  --placard: #{$placard};
+  --placard-text: #{$placard-text};
+}
+
+.frameMode {
+  width: 100vw;
+  height: 100vh;
+  // iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  color: #fff;
+  background: #151517;
+
+  // Only style the open state's display — a bare `display: flex` would override the UA's
+  // `display: none` on the closed dialog and flash it before showModal() runs
+  &[open] {
+    display: flex;
+  }
+
+  // --- Finishes ---------------------------------------------------------------------------
+  // Set on the wall (which the piece inherits) and on each swatch (which previews itself)
+
+  [data-frame='black'] {
+    @include finish(
+      #161616,
+      linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.25)),
+      rgba(255, 255, 255, 0.14) rgba(0, 0, 0, 0.22) rgba(0, 0, 0, 0.45) rgba(255, 255, 255, 0.04)
+    );
+  }
+
+  [data-frame='walnut'] {
+    @include finish(
+      #4a2c1a,
+      linear-gradient(135deg, rgba(255, 214, 170, 0.18), rgba(255, 255, 255, 0) 40%, rgba(0, 0, 0, 0.28)),
+      rgba(255, 225, 190, 0.16) rgba(0, 0, 0, 0.18) rgba(0, 0, 0, 0.42) rgba(255, 255, 255, 0.04),
+      $grain-wood-x,
+      $grain-wood-y
+    );
+  }
+
+  [data-frame='oak'] {
+    @include finish(
+      #c59a63,
+      linear-gradient(135deg, rgba(255, 240, 215, 0.35), rgba(255, 255, 255, 0) 45%, rgba(90, 50, 20, 0.22)),
+      rgba(255, 248, 235, 0.3) rgba(60, 30, 10, 0.12) rgba(60, 30, 10, 0.3) rgba(255, 255, 255, 0.06),
+      $grain-wood-x,
+      $grain-wood-y
+    );
+  }
+
+  [data-frame='gold'] {
+    @include finish(
+      #b8922f,
+      linear-gradient(135deg, #f7e3a1 0%, #c9a24a 22%, #fff3c4 40%, #a97f22 58%, #f1d786 78%, #8f6a1a 100%),
+      rgba(255, 255, 255, 0.28) rgba(0, 0, 0, 0.14) rgba(0, 0, 0, 0.36) rgba(255, 255, 255, 0.08),
+      $grain-metal,
+      $grain-metal
+    );
+  }
+
+  [data-frame='white'] {
+    @include finish(
+      #f3f1ec,
+      linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.05)),
+      rgba(255, 255, 255, 0.6) rgba(0, 0, 0, 0.07) rgba(0, 0, 0, 0.15) rgba(0, 0, 0, 0.02)
+    );
+  }
+
+  [data-wall='white'] {
+    @include wall(#e9e5de, rgba(255, 253, 247, 0.95), rgba(40, 32, 24, 0.3), #fbfaf7, #1e1b17);
+  }
+
+  [data-wall='greige'] {
+    @include wall(#b4aa9c, rgba(255, 248, 236, 0.6), rgba(30, 24, 18, 0.4), #f6f3ec, #1e1b17);
+  }
+
+  [data-wall='charcoal'] {
+    @include wall(#232426, rgba(255, 247, 228, 0.18), rgba(0, 0, 0, 0.55), #efece5, #1a1916);
+  }
+
+  // --- The wall ---------------------------------------------------------------------------
+
+  &__wall {
+    --frame-width: clamp(12px, 2.4vmin, 40px);
+    --mat-width: clamp(16px, 4.2vmin, 76px);
+    --mat-color: #f5f2ea;
+
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    // The bottom reserve keeps the centred piece clear of the control bar
+    padding: 1.5rem 1.5rem 5.5rem;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 95% 75% at 50% -8%, var(--wall-glow), transparent 62%),
+      var(--wall);
+
+    &:not([data-mat]) {
+      --mat-width: 0px;
+    }
+
+    // Tooth, then vignette — both under the piece and the chrome
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    &::before {
+      background: $grain-wall;
+      opacity: 0.07;
+      mix-blend-mode: multiply;
+    }
+
+    &::after {
+      background: radial-gradient(ellipse 80% 80% at 50% 42%, transparent 48%, var(--wall-shade) 100%);
+    }
+
+    // The chrome leaves the wall once the pointer has rested; the first touch brings it back
+    &[data-idle] {
+      cursor: none;
+
+      .frameMode__close,
+      .frameMode__controls {
+        opacity: 0;
+        pointer-events: none;
+      }
+    }
+  }
+
+  // --- The piece --------------------------------------------------------------------------
+
+  &__piece {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(0.9rem, 2.6vmin, 1.6rem);
+    max-width: 100%;
+    margin: 0;
+  }
+
+  &__moulding {
+    // Everything the frame adds around the picture on each axis — what the image's viewport
+    // budget has to give up
+    --chrome: calc(2 * (var(--frame-width) + var(--mat-width)));
+
+    position: relative;
+    border: var(--frame-width) solid;
+    border-color: var(--frame-sides);
+    background: var(--frame-sheen), var(--frame-base);
+    background-origin: border-box;
+    background-clip: border-box;
+    // The moulding's outer edge — where it stops being wall
+    outline: 1px solid rgba(0, 0, 0, 0.28);
+    // Light from above: a tight contact shadow, then the soft one a frame throws down a wall
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.35),
+      0 10px 22px -6px rgba(0, 0, 0, 0.42),
+      0 34px 60px -22px rgba(0, 0, 0, 0.55);
+
+    // Grain along each rail: one pseudo-element runs it across the top and bottom, the other
+    // down the sides, each masked to its own rails so nothing paints over the picture
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      inset: calc(-1 * var(--frame-width));
+      pointer-events: none;
+    }
+
+    &::before {
+      background: var(--frame-grain-x);
+      mask:
+        linear-gradient(#000 0 0) top / 100% var(--frame-width) no-repeat,
+        linear-gradient(#000 0 0) bottom / 100% var(--frame-width) no-repeat;
+    }
+
+    &::after {
+      background: var(--frame-grain-y);
+      mask:
+        linear-gradient(#000 0 0) left 0 top var(--frame-width) / var(--frame-width) calc(100% - 2 * var(--frame-width)) no-repeat,
+        linear-gradient(#000 0 0) right 0 top var(--frame-width) / var(--frame-width) calc(100% - 2 * var(--frame-width)) no-repeat;
+    }
+  }
+
+  &__mat {
+    padding: var(--mat-width);
+    line-height: 0;
+    background: var(--mat-color);
+    // The moulding's lip casts down onto the mat; with the mat off the glass covers this and
+    // carries the same shadow itself
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.16),
+      inset 0 3px 8px rgba(0, 0, 0, 0.22);
+  }
+
+  &__glass {
+    position: relative;
+    line-height: 0;
+    // The ground behind a transparent artwork: the mat's own colour when there is one, a
+    // near-black when the picture sits straight in the rabbet
+    background: #101011;
+
+    [data-mat] & {
+      background: var(--mat-color);
+      // The bevel cut around the mat's window — the white core of the board, then the shadow
+      // it throws onto the picture
+      box-shadow:
+        0 0 0 1px #fff,
+        0 0 0 2px rgba(0, 0, 0, 0.09),
+        0 1px 4px 1px rgba(0, 0, 0, 0.16);
+    }
+
+    // Glass: a diagonal catch of the room's light, kept faint so a bright artwork barely shows it
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(108deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.035) 30%, rgba(255, 255, 255, 0) 48%);
+    }
+
+    // No mat: the moulding's lip casts straight onto the picture instead
+    .frameMode__wall:not([data-mat]) &::after {
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+        inset 0 3px 10px rgba(0, 0, 0, 0.35);
+    }
+
+    img {
+      display: block;
+      width: auto;
+      height: auto;
+      // The frame hugs the picture, so the picture is what the viewport budgets: the width
+      // less the frame and a margin, the height less the frame, the placard and the controls
+      max-width: calc(100vw - var(--chrome) - 3rem);
+      // 14rem: the wall's own padding, the gap to the placard, the placard, the control bar and
+      // its bottom margin, plus a little air above the frame
+      max-height: calc(100dvh - var(--chrome) - 14rem);
+      user-select: none;
+      -webkit-user-drag: none;
+
+      // Stamped by handleBrokenImage once the source 404s — line-art, so hold it at a fixed
+      // square rather than letting the frame collapse around a 300×150 default
+      &[data-broken] {
+        width: 40vmin;
+        height: 40vmin;
+        padding: 12%;
+        object-fit: contain;
+        background: #1d1d1f;
+      }
+    }
+  }
+
+  // Hangs while the metadata is still resolving, so the frame has a picture-shaped hole
+  // rather than nothing between its rails
+  &__blank {
+    display: block;
+    width: min(58vmin, calc(100vw - 8rem));
+    aspect-ratio: 1;
+    background: linear-gradient(135deg, #1a1a1c, #2a2a2e);
+  }
+
+  // --- The placard ------------------------------------------------------------------------
+
+  &__placard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 12rem;
+    max-width: min(28rem, 80vw);
+    padding: 0.6rem 1.1rem;
+    text-align: center;
+    color: var(--placard-text);
+    background: var(--placard);
+    border-radius: 2px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 2px 6px -2px rgba(0, 0, 0, 0.35),
+      0 8px 18px -10px rgba(0, 0, 0, 0.4);
+  }
+
+  &__placardTitle {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(0.85rem, 1.8vmin, 1.05rem);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    overflow-wrap: anywhere;
+  }
+
+  &__placardMeta {
+    font-size: clamp(0.62rem, 1.3vmin, 0.72rem);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.7;
+    overflow-wrap: anywhere;
+  }
+
+  // --- Chrome -----------------------------------------------------------------------------
+  // Dark glass whatever the wall — it has to read on gallery white and on charcoal alike
+
+  &__close,
+  &__controls {
+    position: absolute;
+    z-index: 2;
+    color: #fff;
+    background: rgba(20, 20, 22, 0.76);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(10px);
+    transition: opacity 0.35s ease;
+  }
+
+  &__close {
+    top: max(0.9rem, env(safe-area-inset-top));
+    right: 0.9rem;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(20, 20, 22, 0.92);
+    }
+  }
+
+  &__controls {
+    left: 50%;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem 0.9rem;
+    max-width: calc(100% - 2rem);
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    transform: translateX(-50%);
+  }
+
+  &__group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  &__groupLabel {
+    margin-right: 0.15rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+
+  &__swatch {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    cursor: pointer;
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+
+    &[data-frame] {
+      background: var(--frame-sheen), var(--frame-base);
+    }
+
+    &[data-wall] {
+      background: radial-gradient(circle at 35% 30%, var(--wall-glow), transparent 60%), var(--wall);
+    }
+
+    &:hover {
+      transform: scale(1.08);
+    }
+
+    &--active {
+      box-shadow:
+        0 0 0 2px rgb(20, 20, 22),
+        0 0 0 3.5px #fff;
+    }
+  }
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 30px;
+    padding: 0 0.8rem;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    &--on,
+    &--on:hover {
+      color: #111;
+      background: #fff;
+      border-color: #fff;
+    }
+  }
+
+  &__divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  // Phones: the bar wraps to two or three rows, where a pill radius reads as a blob and the
+  // divider strands itself on a row of its own; the piece takes the extra clearance and a
+  // tighter side margin, since the width is what caps the picture there
+  @media (width <= 560px) {
+    &__wall {
+      padding: 1.25rem 1rem 8rem;
+    }
+
+    &__controls {
+      border-radius: 18px;
+    }
+
+    &__divider {
+      display: none;
+    }
+
+    &__glass img {
+      max-width: calc(100vw - var(--chrome) - 2rem);
+    }
+  }
+
+  &__swatch,
+  &__toggle,
+  &__close {
+    &:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+  }
+}

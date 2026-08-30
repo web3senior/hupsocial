@@ -10,6 +10,7 @@ import useNftMetadata from '@/hooks/useNftMetadata'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
 import PageTitle from '@/components/PageTitle'
 import TokenDetailPanel from '@/components/TokenDetailPanel'
+import NftFrameDialog from '@/components/NftFrameDialog'
 import Share from '@/components/ui/Share'
 import HupMark from '@/components/ui/HupMark'
 import ModelViewer from '@/components/ui/ModelViewer'
@@ -17,6 +18,7 @@ import {
   ArrowSquareOutIcon,
   CaretLeftIcon,
   CubeIcon,
+  FrameCornersIcon,
   ImageIcon,
   ShareNetworkIcon,
   WarningIcon,
@@ -51,6 +53,10 @@ export default function TokenPage({ networkId, collection, tokenId }) {
   // Collections that ship a 3D asset still lead with their artwork: the mesh is megabytes and
   // the renderer another few hundred KB, so both wait until someone asks for them.
   const [showModel, setShowModel] = useState(false)
+
+  // Frame mode — the artwork hung in a picture frame on a gallery wall, for a second screen or a
+  // TV. Mount = open / unmount = close, the dialog's own contract.
+  const [framed, setFramed] = useState(false)
 
   const chainId = Number(networkId)
 
@@ -160,6 +166,19 @@ export default function TokenPage({ networkId, collection, tokenId }) {
               </a>
             )}
 
+            {/* Hangs the artwork on a wall in the top layer — the image, never the 3D model,
+                because a frame is for a picture. Nothing to hang until the metadata resolves. */}
+            <button
+              type="button"
+              className={styles.token__action}
+              onClick={() => setFramed(true)}
+              disabled={!metadata.image}
+              title="Hang the artwork in a frame on a wall — for a second screen or a TV"
+            >
+              <FrameCornersIcon size={16} />
+              Frame mode
+            </button>
+
             <Link href={collectionPath} className={styles.token__action}>
               <ImageIcon size={16} />
               Collection
@@ -199,6 +218,20 @@ export default function TokenPage({ networkId, collection, tokenId }) {
           />
         </div>
       </div>
+
+      {framed && (
+        <NftFrameDialog
+          chainId={chainId}
+          collection={collection}
+          tokenId={tokenId}
+          isLsp8={isLsp8}
+          collectionName={collectionLabel}
+          // The 1024 copy this page already painted hangs at once; the dialog swaps in its own
+          // sharper rung once that has loaded
+          poster={metadata.image}
+          onClose={() => setFramed(false)}
+        />
+      )}
     </div>
   )
 }

@@ -132,6 +132,16 @@
     &:hover {
       background: color-mix(in srgb, var(--text) 11%, transparent);
     }
+
+    // Frame mode with nothing to hang yet — the metadata is still resolving
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+
+      &:hover {
+        background: color-mix(in srgb, var(--text) 6%, transparent);
+      }
+    }
   }
 
   &__record {
