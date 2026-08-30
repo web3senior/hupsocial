@@ -650,6 +650,24 @@ $rarity: (
     }
   }
 
+  // The rows a reader takes away with them — address and id — carry a copy button beside
+  // the value. Flex so the button never rides the ellipsis; the link keeps the truncation.
+  &__detailCopy {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+
+    a {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    // A long bytes32 id truncates; the copy affordance is the one part that must not
+    button {
+      flex-shrink: 0;
+    }
+  }
+
   &__refreshRow {
     display: flex;
     flex-wrap: wrap;

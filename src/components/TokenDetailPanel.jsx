@@ -43,6 +43,7 @@ import OfferList from '@/components/OfferList'
 import OfferModal from '@/components/OfferModal'
 import SellNftModal from '@/components/SellNftModal'
 import SendNftModal from '@/components/SendNftModal'
+import CopyButton from '@/components/ui/CopyButton'
 import DetailSection from '@/components/ui/DetailSection'
 import { toast } from '@/components/NextToast'
 import styles from './TokenDetailPanel.module.scss'
@@ -809,7 +810,9 @@ export default function TokenDetailPanel({
             </div>
             <div>
               <dt>Collection address</dt>
-              <dd>
+              {/* The copy takes the full address, not the shortened print — the short form is
+                  for reading, the clipboard is for pasting somewhere that checks all 40 chars */}
+              <dd className={styles.token__detailCopy} title={collection}>
                 {collectionUrl ? (
                   <a href={collectionUrl} target="_blank" rel="noopener noreferrer">
                     {shortAddress(collection)}
@@ -818,11 +821,14 @@ export default function TokenDetailPanel({
                 ) : (
                   shortAddress(collection)
                 )}
+                <CopyButton value={collection} title="Copy collection address" size={13} />
               </dd>
             </div>
             <div>
               <dt>Token id</dt>
-              <dd title={String(tokenId)}>
+              {/* Raw id on the clipboard — bytes32 for LSP8, decimal for ERC721 — the form a
+                  contract call or explorer search actually takes */}
+              <dd className={styles.token__detailCopy} title={String(tokenId)}>
                 {tokenUrl ? (
                   <a href={tokenUrl} target="_blank" rel="noopener noreferrer">
                     {label}
@@ -831,6 +837,7 @@ export default function TokenDetailPanel({
                 ) : (
                   label
                 )}
+                <CopyButton value={String(tokenId)} title="Copy token id" size={13} />
               </dd>
             </div>
             <div>
