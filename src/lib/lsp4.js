@@ -3,7 +3,8 @@
 // metadata caches on the server. Isomorphic: only global fetch/atob, which both runtimes have.
 
 import { hexToString } from 'viem'
-import { resolveStorageUrl } from '@/lib/storageHelper'
+import { isIPFSHash, resolveStorageUrl } from '@/lib/storageHelper'
+import { raceIPFS } from '@/lib/ipfsGateways'
 
 // LSP4 metadata lives in ERC725Y storage — keccak256 data keys per the LSP4 spec
 export const LSP4_TOKEN_NAME_KEY = '0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b6ecceaf653468af1'
@@ -80,6 +81,11 @@ const isDeadPrefix = (prefix) => {
   return false
 }
 
+// What a gateway says when it has looked for the document and is answering about the
+// document, not about itself. Everything else — a timeout, a refused connection, 429, 5xx —
+// is a statement about the host, and the host is what the dead-prefix rule remembers.
+const DEFINITIVE_STATUSES = new Set([400, 404, 410, 451])
+
 /**
  * Fetches and parses a metadata JSON document from any storage URI.
  *
@@ -87,6 +93,13 @@ const isDeadPrefix = (prefix) => {
  * answered 429/5xx is skipped outright for a few minutes — a 404 is an answer about one
  * token, those are statements about its host. Either way the caller sees what it would have
  * seen after waiting: a rejection or null.
+ *
+ * An `ipfs://` document is asked of every configured gateway at once and the first to answer
+ * wins. One host alone is the wrong bet there: the primary is where our own uploads pin, and a
+ * collection's document is almost never one of those — it answered 504 within a second for
+ * every LUKSO collection's CID while the gateway that held it was never asked, and the
+ * collection cache filled with whatever the indexer remembered instead. The race keeps the
+ * same bound: no gateway waits past the clock, and the losers are cancelled.
  *
  * @param {string} uri ipfs://, https:// or a data: URI.
  * @param {{ baseUrl?: string, timeoutMs?: number }} [options] `baseUrl` makes the
@@ -112,19 +125,37 @@ export const fetchMetadataJson = async (uri, options = {}) => {
       return JSON.parse(payload)
     }
   }
-  const resolved = resolveStorageUrl(uri)
-  if (!resolved) return null
-  const target = resolved.startsWith('/') && options.baseUrl ? new URL(resolved, options.baseUrl).toString() : resolved
 
   // Keyed on the onchain URI rather than the gateway URL it resolves to, so the prefix is the
   // collection's own (`ipfs://<cid>`, `https://api.collection.xyz/token`) and never the
   // gateway's.
   const prefix = sharedPrefixOf(uri)
   if (prefix && isDeadPrefix(prefix)) return null
+  const timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS
+
+  if (isIPFSHash(uri)) {
+    let response
+    try {
+      response = await raceIPFS(uri.replace(/^ipfs:\/\//, ''), { timeoutMs })
+    } catch (error) {
+      // Only a round in which every gateway looked and answered about the document is an
+      // answer about the document; a host that never answered, or asked us to back off,
+      // condemns its directory the way a single-host timeout always did.
+      const statuses = error.statuses || []
+      const answered = !error.timedOut && statuses.length === error.attempted && statuses.every((status) => DEFINITIVE_STATUSES.has(status))
+      if (prefix && !answered) deadPrefixes.set(prefix, Date.now() + DEAD_PREFIX_TTL_MS)
+      return null
+    }
+    return response.json()
+  }
+
+  const resolved = resolveStorageUrl(uri)
+  if (!resolved) return null
+  const target = resolved.startsWith('/') && options.baseUrl ? new URL(resolved, options.baseUrl).toString() : resolved
 
   let response
   try {
-    response = await fetch(target, { signal: AbortSignal.timeout(options.timeoutMs ?? FETCH_TIMEOUT_MS) })
+    response = await fetch(target, { signal: AbortSignal.timeout(timeoutMs) })
   } catch (error) {
     // Timed out, or the host refused the connection: the tokens next to this one are not
     // going to fare any better.

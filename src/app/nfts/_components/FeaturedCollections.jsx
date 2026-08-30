@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
 import { StarIcon } from '@phosphor-icons/react'
 import { getNftCollectionRanking } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { isSameStoredImage, resolveStorageImageUrl } from '@/lib/storageHelper'
 import HupMark from '@/components/ui/HupMark'
 import styles from './FeaturedCollections.module.scss'
 
@@ -47,6 +47,15 @@ const quote = (value, symbol, decimals, chain) => {
   return { amount: formatted, symbol: symbol || (isNative ? chain?.nativeCurrency?.symbol : '') || '' }
 }
 
+// A ranking row's identity, as the slides and the dots are keyed
+const keyOf = (row) => `${row.network_id}-${row.collection}`
+
+// A banner that is the icon's own file is no banner: a square logo stretched 2.6:1 is worse
+// than the icon blurred behind the name, which is what a slide does without one. The
+// resolvers no longer cache such a banner, but rows written before they learned that live
+// out their TTL, and chillwhales fronted the market that way for a day.
+const bannerOf = (row) => (row.banner_uri && !isSameStoredImage(row.banner_uri, row.icon_uri) ? row.banner_uri : null)
+
 /**
  * Which of the ranking rows front the banner. Only a named collection qualifies, and among
  * those the ones with artwork go first — a banner, then at least an icon to blur behind the
@@ -58,7 +67,7 @@ const quote = (value, symbol, decimals, chain) => {
  * @returns {Array<Object>} At most SLIDE_COUNT rows.
  */
 const pickSlides = (rows) => {
-  const tier = (row) => (row.banner_uri ? 0 : row.icon_uri ? 1 : 2)
+  const tier = (row) => (bannerOf(row) ? 0 : row.icon_uri ? 1 : 2)
   return rows
     .filter((row) => row.name)
     .map((row, rank) => ({ row, rank }))
@@ -108,6 +117,39 @@ const buildStats = (row, chain) => {
 }
 
 /**
+ * One artwork layer's source, and what to do when it fails. Artwork reaches the browser
+ * through the image proxy, which resizes it — but the proxy can only serve what an IPFS
+ * gateway still holds, and a banner the LUKSO indexer remembered may survive only on the
+ * indexer's own CDN: First Beings' and HALO's last IPFS provider was Infura's node, which is
+ * gone, and Winged Legends' has none at all. So a proxy miss retries the stored URL itself
+ * when that is a plain https address, and only then is the layer given up.
+ * @param {string|null} stored The URI as cached — ipfs://, https://, or null for none.
+ * @param {string|null} proxied The proxy URL resolved for it.
+ * @returns {{ src: string|null, onError: Function }} `src` is null once nothing is left to try.
+ */
+const useArtwork = (stored, proxied) => {
+  const candidates = useMemo(() => {
+    const list = []
+    if (proxied) list.push(proxied)
+    if (stored && /^https?:\/\//i.test(stored) && stored !== proxied) list.push(stored)
+    return list
+  }, [stored, proxied])
+  const [attempt, setAttempt] = useState(0)
+
+  // Two layers can show the same file — the icon blurred behind the name and sharp in the
+  // corner — so one failure arrives twice; only the source that actually failed advances
+  const onError = useCallback(
+    (event) => {
+      const failed = event.currentTarget.getAttribute('src')
+      setAttempt((current) => (candidates[current] === failed ? current + 1 : current))
+    },
+    [candidates],
+  )
+
+  return { src: candidates[attempt] || null, onError }
+}
+
+/**
  * One featured collection: its banner artwork edge to edge, the name and chain over the lower
  * band, the four figures in a frosted panel, and the collection's own mark in the corner. The
  * whole slide is the link to the collection page.
@@ -116,27 +158,33 @@ const buildStats = (row, chain) => {
  * @param {number} props.index Position in the carousel.
  * @param {number} props.count How many slides there are.
  * @param {boolean} props.isActive Whether this is the slide on screen.
+ * @param {Function} props.onArtworkLost Called with the row's key once no artwork layer is left.
  */
-function Slide({ row, index, count, isActive }) {
+function Slide({ row, index, count, isActive, onArtworkLost }) {
   const networkId = Number(row.network_id)
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)
   const address = String(row.collection).toLowerCase()
+  const bannerUri = bannerOf(row)
 
   // 1600 wide is what the collection page asks for, so the artwork a click lands on is the
   // very file the browser already holds
-  const banner = resolveStorageImageUrl(row.banner_uri, { width: 1600 })
-  const icon = resolveStorageImageUrl(row.icon_uri, { width: 128, still: true })
+  const banner = useArtwork(bannerUri, resolveStorageImageUrl(bannerUri, { width: 1600 }))
+  const icon = useArtwork(row.icon_uri, resolveStorageImageUrl(row.icon_uri, { width: 128, still: true }))
   const stats = buildStats(row, chain)
 
-  // An image that fails — the gateway behind the proxy timed out, the file went unpinned —
-  // steps aside rather than swapping in a placeholder: at banner scale the line-art mark
-  // would be the whole slide. The fallback is the next layer down, the blurred icon, and
-  // after that the tinted plate.
-  const [bannerFailed, setBannerFailed] = useState(false)
-  const [iconFailed, setIconFailed] = useState(false)
-  const showBanner = Boolean(banner) && !bannerFailed
-  const showIcon = Boolean(icon) && !iconFailed
+  // An image that fails — every gateway behind the proxy came up empty, and the CDN copy
+  // after it — steps aside rather than swapping in a placeholder: at banner scale the
+  // line-art mark would be the whole slide. The fallback is the next layer down, the blurred
+  // icon. When that goes too the slide has nothing left to show and tells the deck so: a
+  // collection that arrived with artwork and lost all of it would otherwise sit in the top
+  // tier as a tinted plate, ahead of collections whose artwork loads.
+  const showBanner = Boolean(banner.src)
+  const showIcon = Boolean(icon.src)
+  const lost = !showBanner && !showIcon && Boolean(bannerUri || row.icon_uri)
+  useEffect(() => {
+    if (lost) onArtworkLost(keyOf(row))
+  }, [lost, onArtworkLost, row])
 
   return (
     <Link
@@ -154,16 +202,16 @@ function Slide({ row, index, count, isActive }) {
         {showBanner ? (
           <img
             className={styles.featured__banner}
-            src={banner}
+            src={banner.src}
             alt=""
             decoding="async"
             fetchPriority={index === 0 ? 'high' : 'low'}
-            onError={() => setBannerFailed(true)}
+            onError={banner.onError}
           />
         ) : showIcon ? (
           // No banner onchain: the icon, blown up and blurred, so the slide still wears the
           // collection's own colours instead of a grey plate
-          <img className={styles.featured__blur} src={icon} alt="" decoding="async" onError={() => setIconFailed(true)} />
+          <img className={styles.featured__blur} src={icon.src} alt="" decoding="async" onError={icon.onError} />
         ) : (
           <HupMark size={64} />
         )}
@@ -177,7 +225,7 @@ function Slide({ row, index, count, isActive }) {
         Featured
       </span>
 
-      {showIcon && <img className={styles.featured__logo} src={icon} alt="" decoding="async" onError={() => setIconFailed(true)} />}
+      {showIcon && <img className={styles.featured__logo} src={icon.src} alt="" decoding="async" onError={icon.onError} />}
 
       <div className={styles.featured__body}>
         <div className={styles.featured__titleRow}>
@@ -227,6 +275,7 @@ function Slide({ row, index, count, isActive }) {
  */
 export default function FeaturedCollections({ networkId }) {
   const [slides, setSlides] = useState([])
+  const [lostKeys, setLostKeys] = useState(() => new Set())
   const [isLoading, setIsLoading] = useState(true)
   const [active, setActive] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
@@ -234,6 +283,12 @@ export default function FeaturedCollections({ networkId }) {
   const [isHidden, setIsHidden] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(false)
   const trackRef = useRef(null)
+
+  // The deck as it stands: a slide whose artwork failed in every layer leaves it (see Slide)
+  const visible = useMemo(() => slides.filter((row) => !lostKeys.has(keyOf(row))), [slides, lostKeys])
+  const handleArtworkLost = useCallback((key) => {
+    setLostKeys((current) => (current.has(key) ? current : new Set(current).add(key)))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -246,6 +301,7 @@ export default function FeaturedCollections({ networkId }) {
         const res = await getNftCollectionRanking({ limit: FETCH_LIMIT, networkId: networkId || undefined, sort: 'volumeTotal' })
         if (cancelled) return
         setSlides(pickSlides(res.data || []))
+        setLostKeys(new Set())
         // A new set starts from its first slide. The track itself remounts fresh — the
         // skeleton stood in for it while this loaded — so only the index has to follow.
         setActive(0)
@@ -282,17 +338,37 @@ export default function FeaturedCollections({ networkId }) {
   const goTo = useCallback(
     (index) => {
       const track = trackRef.current
-      const count = slides.length
+      const count = visible.length
       if (!track || count === 0) return
       const next = ((index % count) + count) % count
       track.scrollTo({ left: next * track.clientWidth, behavior: reduceMotion ? 'instant' : 'smooth' })
     },
-    [slides.length, reduceMotion],
+    [visible.length, reduceMotion],
   )
+
+  // The slide on screen stays on screen when one before it leaves the deck: the track keeps
+  // its pixel offset, which would otherwise now be showing a different collection. Reacts to
+  // the deck changing shape only — following `active` itself is the scroll handler's job.
+  const activeKeyRef = useRef(null)
+  useEffect(() => {
+    const track = trackRef.current
+    const key = activeKeyRef.current
+    if (!track || !key) return
+    const index = visible.findIndex((row) => keyOf(row) === key)
+    if (index !== -1 && index !== active) {
+      track.scrollTo({ left: index * track.clientWidth, behavior: 'instant' })
+      setActive(index)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
+
+  useEffect(() => {
+    activeKeyRef.current = visible[active] ? keyOf(visible[active]) : null
+  }, [visible, active])
 
   // Keyed on `active` so a dot press restarts the clock — the slide someone chose gets its
   // full dwell, not whatever was left of the previous one's
-  const isPaused = isHovered || isFocused || isHidden || reduceMotion || slides.length < 2
+  const isPaused = isHovered || isFocused || isHidden || reduceMotion || visible.length < 2
 
   useEffect(() => {
     if (isPaused) return
@@ -309,7 +385,7 @@ export default function FeaturedCollections({ networkId }) {
 
   // Nothing named on the selected chain — the rail and the grid below already say what is
   // there, and a banner with no artwork would only push them down the page
-  if (!isLoading && slides.length === 0) return null
+  if (!isLoading && visible.length === 0) return null
 
   if (isLoading) {
     return (
@@ -334,16 +410,16 @@ export default function FeaturedCollections({ networkId }) {
       onBlur={() => setIsFocused(false)}
     >
       <div ref={trackRef} className={styles.featured__track} onScroll={handleScroll}>
-        {slides.map((row, index) => (
-          <Slide key={`${row.network_id}-${row.collection}`} row={row} index={index} count={slides.length} isActive={index === active} />
+        {visible.map((row, index) => (
+          <Slide key={keyOf(row)} row={row} index={index} count={visible.length} isActive={index === active} onArtworkLost={handleArtworkLost} />
         ))}
       </div>
 
-      {slides.length > 1 && (
+      {visible.length > 1 && (
         <div className={styles.featured__dots}>
-          {slides.map((row, index) => (
+          {visible.map((row, index) => (
             <button
-              key={`${row.network_id}-${row.collection}`}
+              key={keyOf(row)}
               type="button"
               className={clsx(styles.featured__dot, index === active && styles['featured__dot--active'])}
               aria-label={`Show ${row.name}`}

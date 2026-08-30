@@ -8,6 +8,7 @@
 
 import { hexToString } from 'viem'
 import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, erc725yGetDataAbi, decodeVerifiableUri, fetchMetadataJson } from '@/lib/lsp4'
+import { isSameStoredImage } from '@/lib/storageHelper'
 
 // keccak256 data keys per the LSP4 spec, like the ones in lib/lsp4
 const LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756'
@@ -145,6 +146,14 @@ export const resolveCollectionMetadata = async ({ publicClient, collection, isLs
   // backgroundImage. backgroundImage itself is one conceptual image however it's nested.
   const firstImageVariants = Array.isArray(lsp4?.images?.[0]) ? lsp4.images[0] : lsp4?.images
 
+  // A banner is a second artwork. When a candidate turns out to be the icon's own file — a
+  // collection whose only picture is its logo, or whose `images` merely repeats `icon` — there
+  // is no banner: the header and the featured slide each have a better answer for that (a
+  // tinted plate, the icon blurred behind the name) than a square logo stretched across a
+  // 3:1 slot, which is what chillwhales fronted the market with.
+  const icon = pickWidestImage(lsp4?.icon)
+  const banner = [pickWidestImage(lsp4?.backgroundImage), pickWidestImage(firstImageVariants)].find((candidate) => candidate && !isSameStoredImage(candidate, icon)) || null
+
   // 'lsp4' = the offchain document answered; 'contract' = the collection simply has no
   // LSP4Metadata pointer set, so the onchain reads are all there will ever be; null = a
   // pointer exists but the document didn't come back — transient, cached briefly and retried.
@@ -156,8 +165,8 @@ export const resolveCollectionMetadata = async ({ publicClient, collection, isLs
     name,
     symbol,
     description: typeof lsp4?.description === 'string' && lsp4.description.trim() ? lsp4.description.trim() : null,
-    banner: pickWidestImage(lsp4?.backgroundImage) || pickWidestImage(firstImageVariants),
-    icon: pickWidestImage(lsp4?.icon),
+    banner,
+    icon,
     creators,
     links: sanitizeLinks(lsp4?.links),
     totalSupply: totalSupply === null ? null : totalSupply.toString(),

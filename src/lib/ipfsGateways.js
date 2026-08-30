@@ -88,3 +88,69 @@ export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}
 
   throw lastError ?? new Error('no IPFS gateway is configured')
 }
+
+/**
+ * Fetches a CID from every gateway at once and takes the first OK response. For small
+ * documents — a collection's metadata JSON — where the wait is the whole cost and no single
+ * host is worth waiting on: the primary holds our own pins, and a collection's document is
+ * almost never one of those, so it answers 504 within a second while the host that does hold
+ * it is never asked. Losers are aborted so their sockets are freed; the winner's is not.
+ *
+ * Per-attempt controllers rather than AbortSignal.any, which older Safari lacks — this runs in
+ * the browser too, behind the token-icon and NFT hooks.
+ * @param {string} cid Bare CID or path, already stripped of its `ipfs://` prefix.
+ * @param {{timeoutMs?: number, init?: RequestInit}} [options] Per-gateway timeout, fetch
+ * options (`init.signal` is replaced by the race's own).
+ * @returns {Promise<Response>} The first OK response.
+ * @throws {Error & {attempted: number, statuses: number[], timedOut: boolean}} When every
+ * gateway failed: how many were asked, every HTTP status that came back (a host that never
+ * answered contributes none) and whether any of them ran out the clock.
+ */
+export async function raceIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {} } = {}) {
+  const attempts = gatewayList().map((gateway) => ({
+    url: `${gateway}${cid}`,
+    host: gateway.replace(/^https?:\/\//, '').split('/')[0],
+    controller: new AbortController(),
+    expired: false,
+  }))
+  const statuses = []
+
+  const run = async (attempt) => {
+    const timer = setTimeout(() => {
+      attempt.expired = true
+      attempt.controller.abort()
+    }, timeoutMs)
+    try {
+      const response = await fetch(attempt.url, { redirect: 'follow', ...init, signal: attempt.controller.signal })
+      if (response.ok) return { response, attempt }
+      statuses.push(response.status)
+      throw Object.assign(new Error(`IPFS gateway error: ${response.status}`), { status: response.status })
+    } catch (error) {
+      /* A loser cancelled because another host delivered says nothing about the CID */
+      if (attempt.controller.signal.aborted && !attempt.expired) throw error
+      console.warn(`IPFS_GATEWAY_FAILED ${attempt.host} ${attempt.expired ? 'timed out' : error.message}:`, cid)
+      throw error
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  let winner = null
+  try {
+    winner = await Promise.any(attempts.map(run))
+  } catch {
+    /* AggregateError — every attempt has already recorded itself above */
+  } finally {
+    for (const attempt of attempts) {
+      if (attempt !== winner?.attempt && !attempt.controller.signal.aborted) attempt.controller.abort()
+    }
+  }
+
+  if (winner) return winner.response
+
+  throw Object.assign(new Error(attempts.length ? 'no IPFS gateway could serve this content' : 'no IPFS gateway is configured'), {
+    attempted: attempts.length,
+    statuses,
+    timedOut: attempts.some((attempt) => attempt.expired),
+  })
+}

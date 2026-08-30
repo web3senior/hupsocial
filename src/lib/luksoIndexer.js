@@ -15,6 +15,8 @@
  * so cards render properly instead of falling back to a bare placeholder.
  */
 
+import { isSameStoredImage } from '@/lib/storageHelper'
+
 const LUKSO_MAINNET_ID = 42
 const ENDPOINT = 'https://envio.lukso-mainnet.universal.tech/v1/graphql'
 
@@ -133,8 +135,9 @@ export const fetchLuksoCollectionMetadata = async ({ collection }) => {
 
   const icon = pickUrl(asset.icons?.[0])
   // Same precedence the onchain resolver gives the document: a declared background image,
-  // else the first artwork
-  const banner = pickUrl(asset.backgroundImages?.[0]) || pickUrl(asset.images?.[0])
+  // else the first artwork — and, as there, never the icon's own file in a second role.
+  // chillwhales' row arrived with the logo as both, and the featured slide stretched it.
+  const banner = [pickUrl(asset.backgroundImages?.[0]), pickUrl(asset.images?.[0])].find((candidate) => candidate && !isSameStoredImage(candidate, icon)) || null
   const description = typeof asset.description === 'string' && asset.description.trim() ? asset.description.trim() : null
   const links = (asset.links || [])
     .filter((link) => link && typeof link.url === 'string' && /^https?:\/\//i.test(link.url.trim()))

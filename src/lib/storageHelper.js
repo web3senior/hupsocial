@@ -115,6 +115,24 @@ export const extractIPFSCid = (src) => {
 }
 
 /**
+ * Whether two stored image references name the same file. The CID is the identity wherever
+ * there is one — the same picture reaches us as `ipfs://…`, as the LUKSO CDN's `/image/<cid>?…`
+ * and as our own proxy URL, and two different files can never share a CID — and the reference
+ * itself is the identity where there is none (an Arweave or plain https URL). A side without
+ * any reference never matches.
+ * @param {string|null|undefined} a - One stored or resolved reference.
+ * @param {string|null|undefined} b - The other.
+ * @returns {boolean}
+ */
+export const isSameStoredImage = (a, b) => {
+  if (!a || !b || typeof a !== 'string' || typeof b !== 'string') return false
+  const cidA = extractIPFSCid(a)
+  const cidB = extractIPFSCid(b)
+  if (cidA || cidB) return Boolean(cidA) && cidA === cidB
+  return a.trim() === b.trim()
+}
+
+/**
  * Checks if a given string matches your custom protocol.
  * @param {string} src - The asset path or URI string.
  * @returns {boolean}
