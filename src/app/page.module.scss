@@ -12,6 +12,20 @@
   // this .page class on nested wrappers, so page-level padding stacks up.
   --app-header-clearance: calc(1.4rem + 38px);
 
+  // The feed shell keeps plain viewport centring (user call): the global container rule in
+  // styles/Global.scss walks stepped containers out from under the sidebar, but the feed
+  // column always cleared it at small width and its sticky tab strip has to keep sharing an
+  // axis with the feed — so every stepped container under this module's .page reverts to
+  // the old margin-auto centring. Note the reach: HomeFeedTab and its sibling tab
+  // components import THIS module and wrap themselves in .page, so the revert follows the
+  // feed shell onto every route that renders one (/, /bazaar, …) — the market and section
+  // pages, which don't, keep the sidebar-aware behaviour.
+  div[class*='__container'][data-width] {
+    max-width: var(--container-max);
+    margin-inline: auto;
+    transition: none;
+  }
+
   &__tab-bar {
     // Keeps the tab strip visible while the feed scrolls. Sticky lives on this
     // full-width wrapper: the strip's own __container parent is exactly the

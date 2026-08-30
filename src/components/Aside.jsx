@@ -241,6 +241,40 @@ export default function Aside() {
   const shouldShowMobileMenu = isMobileLayout && isMobileMenuOpen
   const closeSidebar = isMobileLayout ? closeMobileMenu : closeMenu
 
+  // How much of the viewport's left edge this sidebar actually owns, published as
+  // --aside-width on the root element so CSS can size against the real footprint instead of
+  // assuming the widest state (the NFT Market's card does — see MarketViews.module.scss,
+  // which used to pin a ghost 250px gap beside a compact sidebar and shove the page right).
+  // A ResizeObserver rather than deriving from isExpanded: the compact width is fit-content,
+  // so the browser's measurement is the only honest one, and the observer streams the 0.3s
+  // fold so a consumer can glide alongside it. Nothing here re-renders — the value goes
+  // straight to a custom property. On the mobile layout the element parks off-canvas at its
+  // full width, so what it owns is zero. Before mount the placeholder renders untracked and
+  // the property stays unset — consumers fall back to the expanded width, which is exactly
+  // what the placeholder shows.
+  const asideRef = useRef(null)
+
+  useEffect(() => {
+    const root = document.documentElement
+    const aside = asideRef.current
+    if (!aside) return undefined
+
+    if (isMobileLayout) {
+      root.style.setProperty('--aside-width', '0px')
+      return () => root.style.removeProperty('--aside-width')
+    }
+
+    const publish = () => root.style.setProperty('--aside-width', `${aside.getBoundingClientRect().width}px`)
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(aside)
+
+    return () => {
+      observer.disconnect()
+      root.style.removeProperty('--aside-width')
+    }
+  }, [isMobileLayout, mounted])
+
   const [tooltipReady, setTooltipReady] = useState(false)
 
   useEffect(() => {
@@ -298,6 +332,7 @@ export default function Aside() {
 
   return (
     <aside
+      ref={asideRef}
       className={clsx(
         styles.aside,
         !isMobileLayout && (isExpanded ? styles.expanded : styles.compact),

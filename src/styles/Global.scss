@@ -97,7 +97,28 @@ div[class*='__container'] {
   // Loop to generate data-width attribute selectors dynamically
   @each $name, $width in $container-widths {
     &[data-width='#{$name}'] {
+      --container-max: #{$width};
       max-width: $width;
+    }
+  }
+
+  // Sidebar-aware centring. The aside is fixed over the viewport's left edge and publishes
+  // its live width as --aside-width (components/Aside): 250px expanded, ~50px compact, 0
+  // once the layout goes mobile and it slides off-canvas — and unset on routes that render
+  // no sidebar, where the 0px fallback keeps plain viewport centring. A stepped container
+  // used to centre on the viewport alone, which below ~1550px slid its left columns under
+  // the expanded nav; now it centres exactly as before while centring clears the aside,
+  // gives up centring for a flush seat beside it when it would not, and shrinks before it
+  // ever overflows the right edge — which also makes the xlarge/xxlarge steps usable on a
+  // laptop instead of clipping. The transition follows the aside's own 0.3s fold, so the
+  // card glides alongside a collapsing menu rather than teleporting.
+  @media (min-width: 768px) {
+    &[data-width] {
+      --container-clearance: calc(var(--aside-width, 0px) + 1rem);
+      max-width: min(var(--container-max), calc(100% - var(--container-clearance) - 1rem));
+      margin-inline-start: max(var(--container-clearance), calc((100% - min(var(--container-max), 100%)) / 2));
+      margin-inline-end: auto;
+      transition: margin-inline-start 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
   }
 }
