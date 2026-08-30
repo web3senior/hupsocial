@@ -1,5 +1,4 @@
 import PageTitle from '@/components/PageTitle'
-import SectionTabs from '@/components/ui/SectionTabs'
 import DropsDirectory from './_components/DropsDirectory'
 import styles from './page.module.scss'
 
@@ -12,7 +11,6 @@ export default function DropsPage() {
   return (
     <>
       <PageTitle name="Drops" />
-      <SectionTabs section="bazaar" />
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="medium">
           <DropsDirectory />

@@ -84,6 +84,13 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)
 
+  // A tile whose collection name never resolved falls back to the NFT's own name, which
+  // usually carries the id already ("Universal Apes #315") — and the chip beside it would
+  // then print the same id twice. Compared with spaces and grouping stripped, so a chip's
+  // "#1,042" still matches a name's "#1042".
+  const title = metadata.collectionName || metadata.name || 'Unnamed'
+  const idInTitle = title.replace(/[\s,]/g, '').toLowerCase().includes(`#${String(listing.token_id).toLowerCase()}`)
+
   const formattedPrice = formatStake(listing.price, listing.decimals)
   const lastSalePrice = listing.last_sale_price ? formatStake(listing.last_sale_price, listing.last_sale_decimals) : null
   const sellerName = listing.display_name || (listing.wallet_address ? shortAddress(listing.wallet_address) : '')
@@ -125,9 +132,12 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
             {isMetaLoading ? (
               <span className={styles.nftCard__skeleton} />
             ) : (
-              <span className={styles.nftCard__title}>{metadata.collectionName || metadata.name || 'Unnamed'}</span>
+              <span className={styles.nftCard__title}>{title}</span>
             )}
-            <span className={styles.nftCard__tokenId}>
+            {/* Marked rather than removed when the title already says the id: compact hides
+                the title and the chip is then the tile's whole identity, so which one shows
+                is the stylesheet's call per layout */}
+            <span className={clsx(styles.nftCard__tokenId, idInTitle && styles['nftCard__tokenId--inTitle'])}>
               <DiamondIcon size={11} weight="fill" />#{formatTokenId(listing.token_id)}
             </span>
           </div>

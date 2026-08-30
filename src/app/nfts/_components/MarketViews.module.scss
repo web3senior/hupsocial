@@ -1,48 +1,120 @@
 @use '@/styles/components/responsive' as *;
 
-// How much of the viewport's left edge the fixed sidebar owns, plus the gutter a card should
-// keep off it. components/Aside is 250px expanded and narrower in every other state, so
-// clearing its widest is clearing all of them.
-$aside-clearance: 250px;
-$gutter: 1rem;
+// The card itself takes the shared data-width="large" step; the global container rule
+// (styles/Global.scss) clears the fixed sidebar with the live --aside-width, so this module
+// no longer sizes the shell at all. The grid gains a column at that width, the ranking its
+// eleven, and the table is built to scroll sideways under 975px on a small laptop.
 
-// The ranking's card, sized against the sidebar rather than by a shared data-width step.
-//
-// Every page card in the app is `margin: 0 auto` inside a <main> that spans the whole
-// viewport, while the sidebar is fixed over its left 250px — so a card stays clear only while
-// it is narrower than `100% - 2 × 250px`. data-width="large" is 1024px, which crosses that
-// line below about 1550px of viewport: on a 1440 laptop the ranking's left edge sat at 201px
-// and on a 1280 at 121px, putting the rank column, the view switch and the toolbar caption
-// underneath the nav.
-//
-// So: the shared 1024px wherever centring already clears the sidebar, and below that the card
-// stops centring and takes the column the sidebar leaves. The table inside is built to scroll
-// sideways under 975px, which is what pays for the last of it on a small laptop.
-//
-// Doubled class on purpose: Global.scss dresses anything with `__container` in its class list
-// — this element included, through the route's own shell class — and its `margin: 0 auto`
-// outweighs a single module class.
-.views__shell--wide.views__shell--wide {
-  --views-clearance: calc(#{$aside-clearance} + #{$gutter});
-  --views-width: min(1024px, calc(100% - var(--views-clearance) - #{$gutter}));
-
-  @include md-up {
-    max-width: var(--views-width);
-    // max() rather than `auto`, so the card centres exactly as it always did while there is
-    // room to, and only gives that up to the sidebar when centring would reach under it
-    margin-inline-start: max(var(--views-clearance), calc((100% - var(--views-width)) / 2));
-    margin-inline-end: auto;
-  }
-}
-
-// The switch between the two readings of the market. Same pill tabs the collection page uses
-// for its listing-status group, so the two levels of the marketplace share one control shape.
+// The toolbar under the banner: which reading, which chain, and the way through to Drops.
+// One row while it fits. Under the md breakpoint the chain strip takes a row of its own
+// beneath the switch and the Drops link, and scrolls sideways rather than wrapping — nine
+// logos folding onto a third line would push the grid down by a row of buttons to show a
+// chain that could have scrolled in.
 .views {
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  // The switch between the two readings of the market. Same pill tabs the collection page
+  // uses for its listing-status group, so the two levels of the marketplace share one
+  // control shape.
   &__switch {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    margin-bottom: 1rem;
+  }
+
+  &__chains {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    // Room for the active ring, which box-shadow paints outside the button
+    padding: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    @include md-down {
+      order: 1;
+      flex-basis: 100%;
+    }
+  }
+
+  &__chain {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+
+    img {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+    }
+
+    &:hover {
+      border-color: var(--text-muted);
+    }
+
+    &--all {
+      width: auto;
+      padding: 0 0.7rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    // A ring in the accent — the reference's thick outline — rather than a fill over the
+    // logo, so the mark keeps its own colours inside it. --network-color-primary is only
+    // set once a wallet connects, so the fallback is what most readers actually see.
+    &--active {
+      border-color: var(--network-color-primary, var(--color-primary));
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 12%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 35%, transparent);
+    }
+  }
+
+  // Solid where the tabs are outlined: it leaves the page, and must not read as a third
+  // reading of the market
+  &__drops {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    height: 34px;
+    margin-inline-start: auto;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    background-color: var(--text);
+    color: var(--surface);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+
+    &:hover {
+      opacity: 0.85;
+    }
   }
 
   &__tab {

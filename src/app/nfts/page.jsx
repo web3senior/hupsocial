@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react'
 import PageTitle from '@/components/PageTitle'
-import SectionTabs from '@/components/ui/SectionTabs'
 import MarketViews from './_components/MarketViews'
 import styles from './page.module.scss'
 
@@ -15,7 +14,6 @@ export default function Page() {
   return (
     <>
       <PageTitle name="NFT Market" />
-      <SectionTabs section="bazaar" />
       <div className={`${styles.page} animate fade`}>
         {/* The card shell is the sibling section pages' (drops, swap, launches), but its width
             belongs to whichever view is up — a league table needs room a feed-width column

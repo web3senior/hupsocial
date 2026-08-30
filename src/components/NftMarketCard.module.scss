@@ -294,6 +294,13 @@
   }
 }
 
+// The chip steps back when the title already carries the id ("Universal Apes #315" — the
+// component marks it) — but only outside compact: the small grid hides the title and
+// promotes the chip to the tile's whole name, so there it must always show.
+.nftCard:not(.nftCard--compact) .nftCard__tokenId--inTitle {
+  display: none;
+}
+
 // Density modifier. The tile keeps its markup and drops the facts that stop being legible
 // in a narrower column; the list layout is a table elsewhere, not a turned-around tile.
 

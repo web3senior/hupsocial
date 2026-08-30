@@ -186,7 +186,7 @@ export async function GET(request) {
              COALESCE(li.is_lsp8, tr.is_lsp8, 0) AS is_lsp8,
              COALESCE(li.active_count, 0) AS active_count,
              li.last_listed_at,
-             cc.name, cc.icon_uri,
+             cc.name, cc.icon_uri, cc.banner_uri,
              cc.total_supply,
              fl.payment_token AS floor_token,
              CAST(fl.floor_price AS CHAR) AS floor_price,

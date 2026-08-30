@@ -235,6 +235,10 @@ export const getNftCollections = async (limit = 12, networkId) => {
  * active listings. Ranked server-side, because a stat can only order the market if it was
  * computed across all of it (see the ranking route).
  *
+ * Each row also carries what nft_collection_cache holds for the collection — name, icon,
+ * banner, total supply — so the ranking table and the featured banner print identity from
+ * the same response rather than reading it per row.
+ *
  * Prices arrive as base-unit strings in each collection's dominant payment token, with the
  * symbol and decimals alongside — native-coin rows carry null for both and the caller fills
  * them from its chain config.

@@ -25,23 +25,6 @@
     font-size: var(--font-size-13, 0.82rem);
   }
 
-  &__select {
-    padding: 0.4rem 0.7rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background-color: var(--surface);
-    color: var(--text-muted);
-    font: inherit;
-    font-size: var(--font-size-13, 0.82rem);
-    font-weight: 600;
-    cursor: pointer;
-
-    &--active {
-      border-color: var(--text-muted);
-      color: var(--text);
-    }
-  }
-
   // Unlike the collection page's token table, this one scrolls sideways rather than dropping
   // columns to fit: the point of a league table is that every stat is there to be compared, so
   // the columns below are sized to land all eleven inside the widest card the app's layout

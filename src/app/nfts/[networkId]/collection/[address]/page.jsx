@@ -50,7 +50,7 @@ export default async function Page({ params }) {
           name once metadata loads, spacerless so the gap never doubles. */}
       <PageTitle name="NFT collection" />
       <div className={styles.page}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width={`xlarge`}>
           <CollectionView networkId={networkId} address={address} />
         </div>
       </div>

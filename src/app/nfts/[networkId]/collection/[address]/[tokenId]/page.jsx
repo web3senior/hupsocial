@@ -72,7 +72,7 @@ export default async function Page({ params }) {
           (its later effect wins), spacerless so the gap never doubles. */}
       <PageTitle name={`NFT #${raw}`} />
       <div className={styles.page}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width={`xlarge`}>
           <TokenPage networkId={networkId} collection={address} tokenId={raw} />
         </div>
       </div>

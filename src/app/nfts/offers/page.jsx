@@ -12,7 +12,7 @@ export default function Page() {
       {/* Same container every directory page uses — main is full-bleed and the sidebar is
           fixed over it, so content without this sits underneath the nav */}
       <div className={styles.page}>
-        <div className={`__container ${styles.page__container}`} data-width="small">
+        <div className={`__container ${styles.page__container}`} data-width={`xlarge`}>
           <MyOffers />
         </div>
       </div>

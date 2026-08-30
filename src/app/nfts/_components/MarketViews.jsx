@@ -2,10 +2,27 @@
 
 import { useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
-import { SquaresFourIcon, RankingIcon } from '@phosphor-icons/react'
+import { RocketLaunchIcon, SquaresFourIcon, RankingIcon } from '@phosphor-icons/react'
+import { appChains, CONTRACTS } from '@/config/contracts'
+import Tooltip from '@/components/ui/Tooltip'
+import FeaturedCollections from './FeaturedCollections'
 import styles from './MarketViews.module.scss'
+
+// Only chains with HupTrade deployed can have anything on this market, so only those earn a
+// button in the chain strip — the same list the grid validates the URL's networkId against
+const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)
+
+// Same derivation the market cards, rail and table use — wagmi's config stamps iconUrl onto
+// the shared chain objects as a side effect, so don't depend on that module having been
+// evaluated first
+const chainIconFor = (chain) => {
+  if (!chain) return null
+  if (chain.iconUrl) return chain.iconUrl
+  return chain.icon ? `data:image/svg+xml,${encodeURIComponent(chain.icon)}` : null
+}
 
 // Both views load on demand, not just the second one. Only one is ever mounted, and they are
 // nothing alike underneath: the grid drags in the market cards, the hero rail and the sell
@@ -35,13 +52,16 @@ const CHAIN_SCOPED_PARAMS = ['collection', 'token']
  * `view` lives in the URL alongside the grid's filters, so a link to the ranking is a link
  * to the ranking, and the browser's back button steps between the two readings.
  *
- * The chain filter is deliberately shared. It is the one filter that means the same thing on
- * both sides, and a reader who narrowed the grid to Base has already said which market they
- * are looking at.
+ * The chain filter is deliberately shared, and lives here rather than in either view. It is
+ * the one filter that means the same thing on both sides, and a reader who narrowed the
+ * grid to Base has already said which market they are looking at — so it sits in the
+ * toolbar between the featured banner and whichever reading is up, as a strip of chain
+ * logos, and both views read it from the URL.
  *
- * The page's card shell is rendered here rather than by the route, because its width is a
- * property of the view: the grid is a feed and reads best in the section pages' shared
- * 768px column, while eleven columns of figures need every pixel a laptop can give them.
+ * The page's card shell is rendered here rather than by the route so that toolbar — view
+ * switch, chain strip, the way through to Drops — sits inside the card above either
+ * reading. The card takes the large width for both: the grid gets a fourth column out of
+ * it, and eleven columns of figures need every pixel a laptop can give them.
  * @param {Object} props
  * @param {string} props.shellClassName The route's card-shell class — passed down so
  * page.module.scss stays the page's, and only the width travels.
@@ -83,31 +103,80 @@ export default function MarketViews({ shellClassName }) {
 
   const isRanking = view === 'collections'
 
+  // Pressing the chain that is already selected lets go of it — a pressed toggle that
+  // cannot be unpressed sends the reader hunting for the "All" button
+  const setNetwork = (value) => setParam('networkId', value === networkId ? '' : value, CHAIN_SCOPED_PARAMS)
+
   return (
-    // The ranking sizes itself rather than taking a shared data-width step — see
-    // views__shell--wide, which has to clear the fixed sidebar the steps know nothing about.
-    <div className={clsx('__container', shellClassName, isRanking && styles['views__shell--wide'])} data-width={isRanking ? undefined : 'medium'}>
-      <div className={styles.views__switch} role="group" aria-label="Market view">
-        {tabs.map(({ value, label, Icon, hint, isActive }) => (
-          <button
-            key={value}
-            type="button"
-            title={hint}
-            className={clsx(styles.views__tab, isActive && styles['views__tab--active'])}
-            aria-pressed={isActive}
-            onClick={() => setParam('view', value === 'items' ? '' : value)}
-          >
-            <Icon size={15} weight={isActive ? 'fill' : 'regular'} aria-hidden="true" />
-            {label}
-          </button>
-        ))}
+    // The shared large step — the global container rule (styles/Global.scss) clears the
+    // fixed sidebar with the live --aside-width, so the card needs no page-local sizing
+    <div className={clsx('__container', shellClassName)} data-width={`xlarge`}>
+      {/* Above the toolbar, so both readings open on the same showcase — it bleeds to the
+          card's edges and follows the shared chain filter */}
+      <FeaturedCollections networkId={networkId} />
+
+      <div className={styles.views__toolbar}>
+        <div className={styles.views__switch} role="group" aria-label="Market view">
+          {tabs.map(({ value, label, Icon, hint, isActive }) => (
+            <button
+              key={value}
+              type="button"
+              title={hint}
+              className={clsx(styles.views__tab, isActive && styles['views__tab--active'])}
+              aria-pressed={isActive}
+              onClick={() => setParam('view', value === 'items' ? '' : value)}
+            >
+              <Icon size={15} weight={isActive ? 'fill' : 'regular'} aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* The chain filter as a strip of logos: every network at a glance, the one in force
+            ringed. Logos rather than names because the reader recognises a mark faster than
+            a word, and the name is a hover away. */}
+        <div className={styles.views__chains} role="group" aria-label="Network">
+          <Tooltip content="Every network HupTrade runs on">
+            <button
+              type="button"
+              className={clsx(styles.views__chain, styles['views__chain--all'], !networkId && styles['views__chain--active'])}
+              aria-pressed={!networkId}
+              onClick={() => setNetwork('')}
+            >
+              All
+            </button>
+          </Tooltip>
+
+          {tradeChains.map((chain) => {
+            const value = String(chain.id)
+            const icon = chainIconFor(chain)
+            const isActive = networkId === value
+
+            return (
+              <Tooltip key={chain.id} content={chain.name}>
+                <button
+                  type="button"
+                  className={clsx(styles.views__chain, isActive && styles['views__chain--active'])}
+                  aria-pressed={isActive}
+                  aria-label={chain.name}
+                  onClick={() => setNetwork(value)}
+                >
+                  {icon ? <img src={icon} alt="" /> : chain.name.slice(0, 1)}
+                </button>
+              </Tooltip>
+            )
+          })}
+        </div>
+
+        {/* Drops used to be a tab of the section strip above the page; with the strip gone,
+            this is the way through to new mints from the market */}
+        <Link href="/drops" className={styles.views__drops}>
+          <RocketLaunchIcon size={15} weight="fill" aria-hidden="true" />
+          Drops
+        </Link>
       </div>
 
-      {isRanking ? (
-        <CollectionsTable networkId={networkId} onNetworkChange={(value) => setParam('networkId', value, CHAIN_SCOPED_PARAMS)} />
-      ) : (
-        <NftMarketGrid />
-      )}
+      {isRanking ? <CollectionsTable networkId={networkId} /> : <NftMarketGrid />}
     </div>
   )
 }

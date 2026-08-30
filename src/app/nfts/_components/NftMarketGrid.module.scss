@@ -171,6 +171,16 @@
     }
   }
 
+  /* Density variant, same contract as the collection page's grid: comfortable stays on the
+     base rule so the responsive column counts keep applying (an attribute selector for it
+     would outrank those media queries), and list never reaches this grid — MarketTable
+     renders instead. The attribute selector deliberately outranks the media queries below,
+     so compact holds its auto-fill at every width. */
+  &__grid[data-layout='compact'] {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+  }
+
   &__skeletonTile {
     aspect-ratio: 1;
     border-radius: 16px;
@@ -213,6 +223,14 @@
   @media (min-width: 640px) {
     &__grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* The xlarge card leaves three columns chunky — a fourth keeps the tiles at artwork
+     scale, the same 2/3/4 ladder the collection page climbs */
+  @media (min-width: 1024px) {
+    &__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 }

@@ -11,6 +11,7 @@ import { getNftListings, getNftPaymentTokens, getNftSellers } from '@/lib/api'
 import Avatar from '@/components/ui/Avatar'
 import { useProfile } from '@/hooks/useProfile'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
+import useGridLayout from '@/hooks/useGridLayout'
 import { appChains } from '@/config/contracts'
 import { CONTRACTS } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
@@ -18,7 +19,9 @@ import NativePopover from '@/components/ui/NativePopover'
 import Tooltip from '@/components/ui/Tooltip'
 import NftMarketCard from '@/components/NftMarketCard'
 import SellNftModal from '@/components/SellNftModal'
+import LayoutToggle from '@/components/ui/LayoutToggle'
 import MarketHero from './MarketHero'
+import MarketTable from './MarketTable'
 import styles from './NftMarketGrid.module.scss'
 
 const PAGE_SIZE = 24
@@ -227,8 +230,9 @@ function buildApiFilters(filters, priceDecimals, search) {
   return api
 }
 
-// Counts only what the popover still hides — network/status/referral/sort live in the
-// always-visible quick row, so badging them would flag filters the user can already see
+// Counts only what the popover still hides — status/referral/sort live in the always-visible
+// quick row and the network in the page's logo strip, so badging them would flag filters
+// the user can already see
 const hiddenFilterCount = (filters) =>
   [filters.collection, filters.standard, filters.token, filters.seller, filters.minPrice, filters.maxPrice].filter(Boolean).length
 
@@ -292,6 +296,12 @@ export default function NftMarketGrid() {
   // Filters live in the URL, not component state — coming back from a listing detail
   // remounts this grid, and the query string is the only thing that survives the trip
   const filters = useMemo(() => filtersFromParams(searchParams, NETWORK_OPTIONS), [searchParams])
+
+  // The same three-way density contract the collection page keeps, remembered per surface —
+  // comfortable and compact re-lay the tiles, list swaps them for MarketTable
+  const [layout, setLayout] = useGridLayout('nft-market-layout')
+  const isListLayout = layout === 'list'
+
   const filtersRef = useRef(filters)
   useEffect(() => {
     filtersRef.current = filters
@@ -627,17 +637,11 @@ export default function NftMarketGrid() {
 
       {/* The filters users reach for constantly sit in the open; the narrower ones
           (collection, standard, payment token, price) stay behind the funnel. The pills
-          scroll, the funnel does not — it must stay reachable at any width. */}
+          scroll, the funnel does not — it must stay reachable at any width. The chain is
+          not here at all: it is the page's filter, picked from the logo strip above both
+          views (MarketViews), and arrives through the URL like everything else. */}
       <div className={styles.market__toolbar}>
         <div className={styles.market__quickFilters}>
-          <QuickSelect
-            label="Network"
-            tooltip="Show only listings on one chain. Collections and payment tokens are chain-specific, so switching networks clears both."
-            value={filters.networkId}
-            defaultValue=""
-            options={NETWORK_OPTIONS}
-            onChange={(value) => setFilters((f) => ({ ...f, networkId: value, token: '', collection: '' }))}
-          />
           <QuickSelect
             label="Status"
             tooltip="Where a listing stands onchain. Active is what you can buy right now — widen it to see what already sold."
@@ -663,6 +667,10 @@ export default function NftMarketGrid() {
             onChange={(value) => setFilters((f) => ({ ...f, sort: value }))}
           />
         </div>
+
+        {/* How the listings render — the collection page's toggle, with List swapping the
+            tiles for the market table */}
+        <LayoutToggle value={layout} onChange={setLayout} label="Grid layout" />
 
         {/* Only while a collection is the view — a sweep of "everything on the market" is
             not something a button should be able to start */}
@@ -879,18 +887,29 @@ export default function NftMarketGrid() {
       </div>
 
       {isLoading ? (
-        <div className={styles.market__grid}>
-          {/* 12 divides by both column counts, so the skeleton never ends on an orphan row */}
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className={styles.market__skeletonTile} />
-          ))}
-        </div>
+        isListLayout ? (
+          <MarketTable listings={[]} isLoading />
+        ) : (
+          <div className={styles.market__grid} data-layout={layout}>
+            {/* 12 divides by every column count, so the skeleton never ends on an orphan row */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className={styles.market__skeletonTile} />
+            ))}
+          </div>
+        )
       ) : items.length === 0 ? (
         <p className={styles.market__empty}>{search ? `Nothing on the market matches "${search}".` : 'No listings match these filters.'}</p>
+      ) : isListLayout ? (
+        <MarketTable listings={items} onCollectionResolved={handleCollectionResolved} />
       ) : (
-        <div className={styles.market__grid}>
+        <div className={styles.market__grid} data-layout={layout}>
           {items.map((listing) => (
-            <NftMarketCard key={`${listing.network_id}-${listing.listing_id}`} listing={listing} onCollectionResolved={handleCollectionResolved} />
+            <NftMarketCard
+              key={`${listing.network_id}-${listing.listing_id}`}
+              listing={listing}
+              layout={layout}
+              onCollectionResolved={handleCollectionResolved}
+            />
           ))}
         </div>
       )}

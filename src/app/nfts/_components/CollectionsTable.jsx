@@ -250,11 +250,13 @@ function CollectionRow({ row, rank }) {
  *
  * Ordering is the server's — sorting a page of fifty in the browser would only ever reorder
  * the fifty the previous sort chose.
+ * The chain filter is not this table's to set — it is picked from the logo strip above both
+ * views (MarketViews) and arrives through the URL; the caption here only says which chain
+ * the ranking is of.
  * @param {Object} props
  * @param {string} props.networkId Chain filter, shared with the listings grid through the URL.
- * @param {Function} props.onNetworkChange Writes the chain filter back to the query string.
  */
-export default function CollectionsTable({ networkId = '', onNetworkChange }) {
+export default function CollectionsTable({ networkId = '' }) {
   const [sort, setSort] = useState('volume24h')
   const [rows, setRows] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -294,21 +296,6 @@ export default function CollectionsTable({ networkId = '', onNetworkChange }) {
           Ranked across {chainName === 'All networks' ? 'every network' : chainName} by what has actually traded through HupTrade. Tap a
           column to reorder.
         </p>
-
-        <Tooltip content="Rank collections on one chain. Prices are quoted per collection, so a single network is the only place a money column ranks like for like.">
-          <select
-            aria-label="Network"
-            className={clsx(styles.collections__select, networkId && styles['collections__select--active'])}
-            value={networkId}
-            onChange={(e) => onNetworkChange?.(e.target.value)}
-          >
-            {NETWORK_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Tooltip>
       </header>
 
       <div className={styles.collections__scroll}>
