@@ -1,0 +1,287 @@
+// The market's list layout — the same table pattern as the collection page's
+// CollectionTable, trimmed to the columns that mean something across collections. Like the
+// ranking table it scrolls sideways in its own box rather than dropping columns, which is
+// what pays for narrow screens; the cost is a header that can't be sticky (a scroll
+// container on the x axis is one on both).
+//
+// styles/components/_table.scss dresses every bare <table> in the app: a grey frame,
+// centred cells, and — under 600px — a reflow that stacks each row with its column name
+// printed in front of every value. That suits a document table; this is a data grid, so it
+// opts out through class selectors, no !important needed.
+.table {
+  width: 100%;
+  min-width: 780px; // Below this the columns stop being comparable and the wrapper scrolls
+  border: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--font-size-13, 0.82rem);
+
+  &__scroll {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--surface);
+  }
+
+  &__head {
+    // The global sheet clips thead out of the document below 600px; this table keeps its
+    // headers — a column of bare numbers with no heading is unreadable
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+
+    // Left as a block by the global reflow the header row would stop defining the columns,
+    // and a fixed layout with no first row falls back to equal shares
+    tr {
+      display: table-row;
+      border: 0;
+      background-color: transparent;
+    }
+  }
+
+  &__heading {
+    padding: 0.7rem 0.6rem;
+    box-shadow: inset 0 -1px 0 var(--border);
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+    font-weight: 600;
+    // The global sheet shouts headers in spaced-out caps; a column label reads faster as a word
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  // Visually hidden, still read aloud — the action column has no label worth printing
+  &__headingHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  &__row {
+    display: table-row;
+    border: 0;
+    background-color: transparent;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+
+    &:not(:last-child) .table__cell {
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    }
+  }
+
+  &__cell {
+    display: table-cell;
+    padding: 0.55rem 0.6rem;
+    overflow: hidden;
+    font-size: inherit;
+    text-align: left;
+    vertical-align: middle;
+
+    // The global reflow prints the column name in front of every value once rows stack;
+    // these rows never stack
+    &::before {
+      content: none;
+    }
+
+    &--numeric {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    // Column widths, read off the header row by the fixed layout — Item takes what is left
+    &--price {
+      width: 118px;
+    }
+
+    &--lastSale {
+      width: 118px;
+    }
+
+    &--seller {
+      width: 190px;
+    }
+
+    &--listed {
+      width: 88px;
+    }
+
+    &--action {
+      width: 112px;
+    }
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  &__itemLink {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+
+    &:hover .table__name {
+      text-decoration: underline;
+    }
+  }
+
+  &__thumb {
+    position: relative;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background-color: var(--surface-muted);
+
+    // The artwork only — the chain badge is also an <img> in here, and letting this rule
+    // reach it inflates the logo to fill the tile over the art. The rounding lives here
+    // rather than as overflow: hidden on the box, which would clip the badge riding the
+    // corner from outside.
+    img:not(.table__chain) {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      object-fit: cover;
+
+      // Stamped by handleBrokenImage once the source 404s
+      &[data-broken] {
+        object-fit: contain;
+        padding: 20%;
+      }
+    }
+  }
+
+  // Rides the thumb's corner exactly like the profile avatar's fingerprint mark
+  // (Profile.module.scss): same offsets, same ring, same radius. The ring colour doubles
+  // as the plaque behind the logo so a transparent mark never sinks into the artwork.
+  &__chain {
+    position: absolute;
+    right: -4px;
+    bottom: -1px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--fingerprint-border);
+    border-radius: 4px;
+    background-color: var(--fingerprint-border);
+  }
+
+  &__thumbFallback {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  &__name {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tokenId {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-11, 0.72rem);
+  }
+
+  // The collection, when the NFT's own name doesn't already carry it — first in the
+  // sub-line, with the id after
+  &__collection {
+    overflow: hidden;
+    margin-inline-end: 0.35rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__sold {
+    flex-shrink: 0;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text) 10%, transparent);
+    color: var(--text-muted);
+    font-size: var(--font-size-11, 0.72rem);
+    font-weight: 600;
+  }
+
+  &__model {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    flex-shrink: 0;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 12%, transparent);
+    color: var(--network-color-primary, var(--color-primary));
+    font-size: var(--font-size-11, 0.72rem);
+    font-weight: 600;
+  }
+
+  &__price {
+    font-weight: 600;
+
+    small {
+      margin-inline-start: 0.15em;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+  }
+
+  &__listed {
+    color: var(--text-muted);
+  }
+
+  &__blank {
+    color: var(--text-muted);
+  }
+
+  &__skeleton {
+    display: block;
+    height: 44px;
+    border-radius: 10px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: marketTablePulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes marketTablePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
