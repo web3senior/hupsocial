@@ -17,6 +17,7 @@ import useCollectionInfo from '@/hooks/useCollectionInfo'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import TokenDetailPanel from '@/components/TokenDetailPanel'
+import NftFrameDialog from '@/components/NftFrameDialog'
 import Share from '@/components/ui/Share'
 import HupMark from '@/components/ui/HupMark'
 import ModelViewer from '@/components/ui/ModelViewer'
@@ -27,6 +28,7 @@ import {
   CaretRightIcon,
   ChatCircleIcon,
   CubeIcon,
+  FrameCornersIcon,
   HandshakeIcon,
   ImageIcon,
   ReceiptIcon,
@@ -94,6 +96,10 @@ export default function ListingDetail({ networkId, listingId }) {
   // Collections that ship a 3D asset still lead with their artwork: the mesh is megabytes
   // and the renderer another few hundred KB, so both wait until someone asks for them.
   const [showModel, setShowModel] = useState(false)
+
+  // Frame mode — the artwork hung in a picture frame on a gallery wall, for a second screen or a
+  // TV. Mount = open / unmount = close, the dialog's own contract.
+  const [framed, setFramed] = useState(false)
 
   const chainId = Number(networkId)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
@@ -213,6 +219,19 @@ export default function ListingDetail({ networkId, listingId }) {
                 Listing transaction
               </a>
             )}
+
+            {/* Hangs the artwork on a wall in the top layer — the image, never the 3D model,
+                because a frame is for a picture. Nothing to hang until the metadata resolves. */}
+            <button
+              type="button"
+              className={styles.listing__action}
+              onClick={() => setFramed(true)}
+              disabled={!metadata.image}
+              title="Hang the artwork in a frame on a wall — for a second screen or a TV"
+            >
+              <FrameCornersIcon size={16} />
+              Frame mode
+            </button>
 
             {/* Same target menu a post's share action offers (copy link, X, Telegram, ...) */}
             <Share
@@ -385,6 +404,20 @@ export default function ListingDetail({ networkId, listingId }) {
             <CaretRightIcon size={16} />
           </Link>
         </aside>
+      )}
+
+      {framed && (
+        <NftFrameDialog
+          chainId={chainId}
+          collection={listing.collection}
+          tokenId={listing.token_id}
+          isLsp8={isLsp8}
+          collectionName={metadata.collectionName || collectionInfo.name || null}
+          // The 1024 copy this page already painted hangs at once; the dialog swaps in its own
+          // sharper rung once that has loaded
+          poster={metadata.image}
+          onClose={() => setFramed(false)}
+        />
       )}
     </div>
   )

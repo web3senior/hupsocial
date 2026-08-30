@@ -95,6 +95,32 @@
     background: var(--surface);
   }
 
+  // Bottom-left of the artwork, opposite the 3D toggle — same chrome, so the two read as one
+  // row of alternate views of the same thing
+  &__stageFrame {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 0;
+    border-radius: 999px;
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.78);
+    }
+  }
+
   &__stageToggle {
     position: absolute;
     right: 10px;
