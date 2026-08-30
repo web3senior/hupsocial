@@ -31,6 +31,15 @@
     flex-wrap: wrap;
     gap: 0.25rem 0.5rem;
     min-width: 0;
+
+    // Profile pins itself to max-content; beside the status cluster it must give instead,
+    // so a long name truncates rather than shoving the badge and copy control off the
+    // card. Nested for the specificity to beat Profile's own rule.
+    .detail__creatorProfile {
+      flex-shrink: 1;
+      width: auto;
+      min-width: 0;
+    }
   }
 
   &__asked {
@@ -142,9 +151,12 @@
       color: var(--text-muted, #888);
     }
 
+    // A grid of voter cards rather than rows: a row has no room for a long option label,
+    // a card hands it a full line of its own. auto-fill keeps it responsive with no media
+    // query — columns on a desktop, a single stack on a phone.
     ul {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
       gap: 0.6rem;
       list-style: none;
       margin: 0;
@@ -153,12 +165,24 @@
 
     li {
       display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.6rem 0.75rem;
+      background: var(--background);
+      font-size: var(--font-size-12);
+    }
+
+    // Who and when share the card's top line. Profile sizes itself to its contents; here it
+    // fills the slack instead so the time sits flush right and a long name truncates.
+    // Nested for the specificity to beat Profile's own rule.
+    .detail__voterTop {
+      display: flex;
       align-items: center;
       gap: 0.5rem;
-      font-size: var(--font-size-12);
 
-      // Profile sizes itself to its contents; in a row it fills the slack instead so the
-      // choice and time sit flush right. Nested for the specificity to beat its own rule.
       .detail__voter {
         flex: 1;
         width: auto;
@@ -168,8 +192,16 @@
   }
 
   &__voterChoice {
-    flex-shrink: 0;
+    // The ballot the card reports, as a chip under the name. User-authored prose wraps
+    // inside the card's width rather than truncating or shoving the layout.
+    align-self: flex-start;
+    max-width: 100%;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    background: var(--surface-muted, rgba(0, 0, 0, 0.04));
     font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
 
   &__note {

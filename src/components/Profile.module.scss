@@ -26,6 +26,9 @@
   all: unset;
   position: relative;
   display: block;
+  // The reset's `img { max-width: 100% }` lets the picture collapse with this flex item, so
+  // in a card row a long name was shrinking the avatar. The name is the half that gives.
+  flex-shrink: 0;
   will-change: transform;
   cursor: pointer;
 
@@ -56,11 +59,21 @@
   }
 }
 
+// The text half of the byline. Flexbox refuses to shrink it below the name's own width
+// without min-width: 0, and that refusal was pushed onto the avatar in any consumer that
+// hands Profile a fixed slot — the ellipsis on .name can only happen once this gives.
+.nameColumn {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .nameRow {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .name {
@@ -70,6 +83,12 @@
   font-family: var(--font-family-monospace);
   color: inherit;
   text-decoration: none;
+  // In a constrained row the name is the one thing on the line that may give — it
+  // truncates, and every glyph beside it holds its size
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   &:hover {
     text-decoration: underline;
@@ -79,6 +98,7 @@
 .badge {
   width: 14px;
   height: 14px;
+  flex-shrink: 0; // A chain glyph never pays for a long name beside it
 
   svg,
   img {
@@ -155,6 +175,8 @@
   line-height: 1;
   font-size: var(--system-13-font-size);
   color: var(--gray-400);
+  flex-shrink: 0; // The timestamp holds while the name truncates
+  white-space: nowrap;
 }
 
 .hoverCard {

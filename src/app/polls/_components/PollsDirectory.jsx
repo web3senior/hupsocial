@@ -25,10 +25,11 @@ const fetcher = (url) => fetch(url).then((res) => res.json())
 const SkeletonCard = () => (
   <li className={styles.directory__item} aria-hidden="true">
     <div className={clsx(styles.directory__card, styles.directory__skeleton)}>
-      {/* Same shape a loaded card holds — a 36px creator avatar, the question, its window bar,
-          the voter faces and the meta line — so the first page lands without the list jumping */}
+      {/* Same shape a loaded card holds — a 32px creator avatar (Profile's byline default), the
+          question, its window bar, the voter faces and the meta line — so the first page lands
+          without the list jumping */}
       <div className={styles.directory__skeletonTop}>
-        <div className="shimmer rounded-full" style={{ width: '36px', height: '36px' }} />
+        <div className="shimmer rounded-full" style={{ width: '32px', height: '32px' }} />
         <div className="shimmer rounded" style={{ width: '7rem', height: '14px' }} />
       </div>
       <div className="shimmer rounded" style={{ width: '80%', height: '16px' }} />

@@ -121,7 +121,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       </NativePopover>
 
       {variant !== 'imageOnly' && (
-        <div className="flex flex-column align-items-start justify-content-center gap-025">
+        <div className={clsx(styles.nameColumn, 'flex flex-column align-items-start justify-content-center gap-025')}>
           <div className={styles.nameRow}>
             <Link
               href={creator ? `/${creator}` : '#'}

@@ -142,7 +142,7 @@ export default function PollDetail({ networkId, pollId }) {
         {/* The creator reads exactly like the voters below — one Profile component for every
             wallet on the page, avatar hover card and chain badge included */}
         <div className={styles.detail__creator}>
-          <Profile variant="fullWithoutTime" creator={poll.wallet_address} networkId={chainId} />
+          <Profile variant="fullWithoutTime" creator={poll.wallet_address} networkId={chainId} className={styles.detail__creatorProfile} />
           <small className={styles.detail__asked}>asked {toRelative(poll.opened_at)}</small>
         </div>
 
@@ -196,10 +196,15 @@ export default function PollDetail({ networkId, pollId }) {
         {recentVotes.length === 0 && <p className={styles.detail__empty}>No votes yet.</p>}
         <ul>
           {recentVotes.map((vote) => (
+            /* One card per voter: who on top, what beneath. An option label is user-authored
+               prose, and a card gives it a full line to wrap on instead of a sliver of a row */
             <li key={`${vote.wallet_address}-${vote.voted_at}`}>
-              {/* The same Profile every other wallet list renders — avatar, chain badge, hover
-                  card and all — so a voter reads the way they do under a post or a listing */}
-              <Profile variant="fullWithoutTime" creator={vote.wallet_address} networkId={chainId} className={styles.detail__voter} />
+              <div className={styles.detail__voterTop}>
+                {/* The same Profile every other wallet list renders — avatar, chain badge, hover
+                    card and all — so a voter reads the way they do under a post or a listing */}
+                <Profile variant="fullWithoutTime" creator={vote.wallet_address} networkId={chainId} className={styles.detail__voter} />
+                <span className={styles.detail__voterTime}>{toRelative(vote.voted_at)}</span>
+              </div>
               {/* Absent until the viewer has voted or the poll has closed — the API withholds
                   the column rather than the client hiding it */}
               {vote.option_index !== undefined && (
@@ -207,7 +212,6 @@ export default function PollDetail({ networkId, pollId }) {
                   {options[Number(vote.option_index)]?.label || `Option #${Number(vote.option_index) + 1}`}
                 </span>
               )}
-              <span className={styles.detail__voterTime}>{toRelative(vote.voted_at)}</span>
             </li>
           ))}
         </ul>
