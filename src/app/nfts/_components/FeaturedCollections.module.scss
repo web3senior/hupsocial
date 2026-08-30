@@ -1,0 +1,317 @@
+// The featured-collections banner at the top of the NFT Market. Broken out of the card's
+// padding so the artwork meets the card's edges — the container clips its overflow and
+// rounds its corners, so the top corners come free. The offsets mirror that padding
+// (page.module.scss), the same coupling the collection page's own banner carries.
+.featured {
+  position: relative;
+  margin: -1.25rem -1.25rem 1.25rem;
+  isolation: isolate;
+
+  @media (max-width: 600px) {
+    margin: -1rem -1rem 1rem;
+  }
+
+  // One slide per viewport, snapped, with the scrollbar hidden: a swipe on touch and the
+  // dots underneath are the two ways through it, and a bar under a banner reads as a bug
+  &__track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  // The reference banner is about 3.5:1; the card is 768px wide in the Items view, where
+  // that ratio leaves 220px — too short for a name over a four-figure panel — so the slide
+  // sits a little squarer and holds a floor on small screens. The extra bottom padding
+  // reserves the strip the dots ride in, so they never land on the stat panel.
+  &__slide {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex: 0 0 100%;
+    flex-direction: column;
+    justify-content: flex-end;
+    aspect-ratio: 2.6 / 1;
+    min-height: 240px;
+    max-height: 360px;
+    padding: 1.25rem 1.25rem 2.4rem;
+    overflow: hidden;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    color: #fff;
+    text-decoration: none;
+    background-color: var(--surface-muted);
+
+    &:focus-visible {
+      outline: 3px solid #fff;
+      outline-offset: -3px;
+    }
+
+    @media (max-width: 600px) {
+      aspect-ratio: auto;
+      min-height: 280px;
+      padding: 1rem 1rem 2.4rem;
+    }
+  }
+
+  // The artwork, under everything else, with a scrim that darkens the lower band and the
+  // left edge where the text sits — white type has to read on any banner, a pale one
+  // included, and the scrim is what pays for that rather than a text shadow alone
+  &__art {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 12%, var(--surface-muted));
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgb(0 0 0 / 12%) 0%, rgb(0 0 0 / 0%) 30%, rgb(0 0 0 / 72%) 100%),
+        linear-gradient(90deg, rgb(0 0 0 / 40%) 0%, rgb(0 0 0 / 0%) 55%);
+      pointer-events: none;
+    }
+  }
+
+  &__banner {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.8s ease;
+  }
+
+  // A slow push-in on hover, the way a storefront banner says it is a link
+  &__slide:hover &__banner {
+    transform: scale(1.04);
+  }
+
+  // No banner onchain: the icon, blown up and blurred, so the slide still wears the
+  // collection's own colours instead of a grey plate
+  &__blur {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.4);
+    filter: blur(40px) saturate(1.4);
+  }
+
+  // The banner's own label, top left — the same dark chip the drops tiles wear over their
+  // artwork (DropsDirectory.module.scss), sitting at the logo's offsets on the other corner
+  &__flag {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.24rem 0.6rem;
+    border-radius: 4px;
+    background-color: rgb(20 22 28 / 62%);
+    backdrop-filter: blur(6px);
+    color: #f4f4f5;
+    font-size: var(--font-size-10, 0.625rem);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  // The collection's own mark, top right, where the reference keeps its logo
+  &__logo {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 56px;
+    height: 56px;
+    border: 1px solid rgb(255 255 255 / 30%);
+    border-radius: 14px;
+    object-fit: cover;
+    background-color: rgb(0 0 0 / 40%);
+    box-shadow: 0 8px 24px -8px rgb(0 0 0 / 60%);
+
+    @media (max-width: 600px) {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+    }
+  }
+
+  &__body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  &__titleRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  // Semibold, not black — over artwork the scrim already separates the type, and a heavier
+  // cut just shouts. line-height 1 hugs the glyphs, so the chain logo beside it centres on
+  // the letters themselves rather than on a line box padded with leading.
+  &__name {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    font-size: clamp(1.35rem, 3vw, 2rem);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__chain {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+  }
+
+  // Frosted panel, so the figures read on any artwork — the same panel the reference shows
+  &__stats {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.5rem;
+    align-self: flex-start;
+    max-width: 100%;
+    margin: 0;
+    padding: 0.65rem 1rem;
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 14px;
+    background-color: rgb(0 0 0 / 55%);
+    backdrop-filter: blur(14px);
+
+    @media (max-width: 600px) {
+      gap: 0.5rem 1.1rem;
+      padding: 0.55rem 0.85rem;
+    }
+  }
+
+  &__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+
+    dt {
+      color: rgb(255 255 255 / 70%);
+      font-size: var(--font-size-10, 10px);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    dd {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+
+      small {
+        margin-inline-start: 0.25em;
+        color: rgb(255 255 255 / 80%);
+        font-size: 0.78em;
+        font-weight: 600;
+      }
+    }
+
+    // A dash, dimmed — an unknown, not a figure
+    &--empty dd {
+      color: rgb(255 255 255 / 45%);
+      font-weight: 600;
+    }
+  }
+
+  // Bottom centre, in the strip the slide's padding reserves. The active dot stretches into a
+  // bar rather than only brightening, so position reads without relying on contrast alone
+  &__dots {
+    position: absolute;
+    right: 0;
+    bottom: 0.5rem;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    gap: 0.2rem;
+  }
+
+  // The dot is drawn by a pseudo-element inside a taller button, so the target is tappable
+  // without the dot itself growing
+  &__dot {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+
+    &::before {
+      content: '';
+      display: block;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background-color: rgb(255 255 255 / 45%);
+      transition: width 0.2s ease, background-color 0.2s ease;
+    }
+
+    &:hover::before {
+      background-color: rgb(255 255 255 / 75%);
+    }
+
+    &--active::before {
+      width: 18px;
+      background-color: #fff;
+    }
+
+    &:focus-visible {
+      border-radius: 999px;
+      outline: 2px solid #fff;
+      outline-offset: -2px;
+    }
+  }
+
+  &__skeleton {
+    aspect-ratio: 2.6 / 1;
+    min-height: 240px;
+    max-height: 360px;
+    background-color: color-mix(in srgb, var(--text) 6%, transparent);
+    animation: featuredPulse 1.4s ease-in-out infinite;
+
+    @media (max-width: 600px) {
+      aspect-ratio: auto;
+      min-height: 280px;
+    }
+  }
+}
+
+@keyframes featuredPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
