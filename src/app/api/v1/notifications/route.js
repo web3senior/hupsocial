@@ -32,6 +32,11 @@ const MONEY_TYPES = [
   'post_sent_tip',
   'nft_sold',
   'nft_purchased',
+  // An offer is money owed on an asset you hold — the tab a reader opens looking for one
+  'nft_offer_received',
+  'nft_offer_made',
+  'nft_offer_filled',
+  'nft_offer_accepted',
   'market_received_bet',
   'market_earned_fee',
   'market_resolved',

@@ -1,4 +1,5 @@
 import { txExplorerUrl } from '@/lib/explorer'
+import { offerHref } from '@/lib/nftLinks'
 import {
   ArrowsDownUpIcon,
   ChartLineUpIcon,
@@ -145,7 +146,12 @@ export function hrefOf(row) {
   if (kind === 'swap') return '/swap'
   if (row.entity_type === 'community' && networkId && entityId) return `/communities/${networkId}/${entityId}`
 
-  // Offers are collection- or token-wide bids; the app has no page for a single offer.
+  // An NFT offer lands on the asset's own page, anchored at the offer's row in its book;
+  // a fungible one is an OTC deal and lands on the P2P directory that fills it.
+  if (kind === 'offer_made' || kind === 'offer_filled') {
+    return offerHref(row.meta ? { network_id: networkId, ...row.meta } : null)
+  }
+
   return null
 }
 

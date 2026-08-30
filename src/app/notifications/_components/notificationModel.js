@@ -4,6 +4,7 @@ import {
   ChartLineUpIcon,
   ChatCircleIcon,
   HandCoinsIcon,
+  HandshakeIcon,
   HeartIcon,
   PencilSimpleIcon,
   PlusCircleIcon,
@@ -16,6 +17,7 @@ import {
   UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { formatUnits } from 'viem'
+import { offerHref } from '@/lib/nftLinks'
 
 // Tabs mirror the `filter` values the notifications API understands. "All" deliberately
 // leaves out your own activity (post indexed, you liked a post) — that lives under "You",
@@ -23,7 +25,7 @@ import { formatUnits } from 'viem'
 export const FILTERS = [
   { id: 'inbox', label: 'All', empty: 'Nothing from anyone yet.' },
   { id: 'mentions', label: 'Mentions', empty: 'No replies or quotes yet.' },
-  { id: 'money', label: 'Money', empty: 'No tips, sales or bets yet.' },
+  { id: 'money', label: 'Money', empty: 'No tips, sales, offers or bets yet.' },
   { id: 'you', label: 'You', empty: 'Your own activity will show up here.' },
 ]
 
@@ -47,6 +49,11 @@ export const ACTION_META = {
   user_received_follow: { icon: UserPlusIcon, tone: 'follow', weight: 'fill', group: 'action', verb: 'followed you' },
   post_received_tip: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'tipped your post', previewFrom: 'entity' },
   nft_sold: { icon: StorefrontIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'bought your NFT' },
+  // Offers carry no verb on purpose: the indexer's own sentence names the asset and the bid
+  // ("0x1234…5678 offered 5 MON for Burnt Pix #7"), and a verb would replace all of that with
+  // "made an offer" — which is exactly the row nobody could act on.
+  nft_offer_received: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none' },
+  nft_offer_filled: { icon: HandshakeIcon, tone: 'money', weight: 'fill', group: 'none' },
   market_received_bet: { icon: ChartLineUpIcon, tone: 'market', weight: 'fill', group: 'none', verb: 'placed a bet on your market' },
   market_resolved: { icon: ChartLineUpIcon, tone: 'market', weight: 'fill', group: 'none', verb: 'resolved a market you are in' },
   market_refunds_available: { icon: ArrowsCounterClockwiseIcon, tone: 'market', group: 'none' },
@@ -65,6 +72,8 @@ export const ACTION_META = {
   repost_created: { icon: RepeatIcon, tone: 'repost', weight: 'bold', group: 'none', previewFrom: 'entity' },
   post_sent_tip: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none', previewFrom: 'entity' },
   nft_purchased: { icon: StorefrontIcon, tone: 'money', weight: 'fill', group: 'none' },
+  nft_offer_made: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none' },
+  nft_offer_accepted: { icon: HandshakeIcon, tone: 'money', weight: 'fill', group: 'none' },
   market_earned_fee: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none' },
   community_created: { icon: UsersThreeIcon, tone: 'follow', weight: 'fill', group: 'none' },
   community_joined: { icon: UsersThreeIcon, tone: 'follow', weight: 'fill', group: 'none' },
@@ -146,6 +155,17 @@ export function hrefOf(group) {
   const postId = previewPostIdOf(group) || (group.entityType === 'post' ? group.entityId : null)
 
   if (networkId && postId) return `/networks/${networkId}/${postId}`
+
+  // Market rows are built here rather than trusted to action_url, because the rows that already
+  // exist were written without one — an offer said someone had bid on your NFT and left you to
+  // find it yourself. The payload names the asset, so the link is derivable either way.
+  if (group.entityType === 'nft_offer') {
+    const offerPath = offerHref(latest.data)
+    if (offerPath) return offerPath
+  }
+  // A sale points at the listing it settled, the same door the activity feed opens.
+  if (group.entityType === 'nft_listing' && networkId && group.entityId) return `/nfts/${networkId}/${group.entityId}`
+
   if (!latest.action_url) return null
 
   // Legacy rows still point at /posts/<id>?network_id=<n>

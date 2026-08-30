@@ -80,6 +80,12 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     background-color: var(--surface-muted);
+
+    // The offer a notification linked at — settles back to the resting surface so the mark
+    // says "here" without becoming a permanent state
+    &--highlight {
+      animation: offerList-arrive 2.5s ease-out;
+    }
   }
 
   &__offerWho {
@@ -127,6 +133,12 @@
 
     tbody tr:hover {
       background-color: var(--hover);
+    }
+
+    // Animated declarations outrank the hover rule above in the cascade, so the mark
+    // survives the pointer landing on the row it just scrolled to
+    tbody tr.offerList__row--highlight {
+      animation: offerList-arrive 2.5s ease-out;
     }
 
     th {
@@ -293,5 +305,17 @@
         color: var(--danger-500, #ef4444);
       }
     }
+  }
+}
+
+// Where a notification's #offer-<id> link lands: flares in the page's accent, then settles,
+// so the row reads as "the one you were told about" rather than a state it is in
+@keyframes offerList-arrive {
+  0%,
+  40% {
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 16%, transparent);
+  }
+  100% {
+    background-color: transparent;
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { formatUnits, numberToHex, zeroAddress } from 'viem'
@@ -11,6 +11,8 @@ import clsx from 'clsx'
 // during that pass
 import { appChains, CONTRACTS } from '@/config/contracts'
 import { formatUsdAmount, rateFor } from '@/lib/usdAmount'
+// The anchor a notification links at, so the row a reader was told about is the row they land on
+import { offerAnchorId } from '@/lib/nftLinks'
 // Same rule the collection table measures an ask by, so a bid and an ask on one collection are
 // never described against its floor two different ways
 import { PERCENT_FORMAT, readFloorDelta } from '@/lib/nftFloorDelta'
@@ -112,6 +114,20 @@ const formatTimeLeft = (expiresAt) => {
   return hourFormat.format(Math.max(Math.round(seconds / 3600), 1))
 }
 
+// The URL hash, readable during render without tripping hydration: the server pass and the
+// first client render agree on '', then React swaps in the real value — the same reconciliation
+// TokenPage does for the share URL's origin.
+const subscribeToHash = (callback) => {
+  window.addEventListener('hashchange', callback)
+  return () => window.removeEventListener('hashchange', callback)
+}
+const useLocationHash = () =>
+  useSyncExternalStore(
+    subscribeToHash,
+    () => window.location.hash,
+    () => '',
+  )
+
 // HupOffers keys tokens by bytes32 for both standards. Indexed rows already carry the hex
 // form; chain-enumerated ERC721 ids can arrive as plain decimals, so normalize once here.
 const toBytes32TokenId = (raw) => {
@@ -148,6 +164,10 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
   const tokenId = toBytes32TokenId(tokenIdProp)
   // The offer row a pending accept/cancel belongs to, so only that row's button spins
   const [pendingOfferId, setPendingOfferId] = useState(null)
+  // The offer a notification or digest email sent the reader here to look at (#offer-<id>).
+  // Derived from the hash rather than held in state, so no render ever has to set it.
+  const highlightedOfferId = useLocationHash().match(/^#offer-(\d+)$/)?.[1] ?? null
+  const hasScrolledToOffer = useRef(false)
   const { address } = useConnection()
   const lastActionRef = useRef(null)
 
@@ -226,6 +246,20 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
   // Dollars per whole payment token, from the same response — the table prices each bid with
   // the rate for its own currency, since a token can be bid on in two
   const usdRates = offersData?.usd ?? null
+
+  // Arriving from a notification: the row #offer-<id> names is fetched, not server-rendered, so
+  // the browser's own fragment scroll fired into a page that didn't have it yet. Once the offers
+  // land, finish the journey by hand. Once only: revalidations must not yank the reader back
+  // after they've scrolled away.
+  useEffect(() => {
+    if (hasScrolledToOffer.current || !highlightedOfferId) return
+
+    const rows = offersData?.data ?? []
+    if (!rows.some((offer) => String(offer.offer_id) === highlightedOfferId)) return
+
+    hasScrolledToOffer.current = true
+    document.getElementById(offerAnchorId(highlightedOfferId))?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [offersData, highlightedOfferId])
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
@@ -406,7 +440,11 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
                   const { delta, atFloor } = readFloorDelta({ price: offer.price, symbol: symbolOf(offer), floor })
 
                   return (
-                    <tr key={offer.offer_id}>
+                    <tr
+                      key={offer.offer_id}
+                      id={offerAnchorId(offer.offer_id)}
+                      className={clsx(String(offer.offer_id) === highlightedOfferId && styles['offerList__row--highlight'])}
+                    >
                       <td data-label="Price" className={styles.offerList__price}>
                         {formatPrice(offer)}
                       </td>
@@ -472,7 +510,11 @@ const OfferList = ({ chainId, collection, tokenId: tokenIdProp, isLsp8, ownerAdd
             {offers.map((offer) => {
               const isOwn = address && offer.offerer.toLowerCase() === address.toLowerCase()
               return (
-                <li key={offer.offer_id} className={styles.offerList__offer}>
+                <li
+                  key={offer.offer_id}
+                  id={offerAnchorId(offer.offer_id)}
+                  className={clsx(styles.offerList__offer, String(offer.offer_id) === highlightedOfferId && styles['offerList__offer--highlight'])}
+                >
                   <div className={styles.offerList__offerWho}>
                     <Profile variant="fullWithoutTime" creator={offer.offerer} networkId={chainId} />
                     <span className={styles.offerList__offerExpiry}>
