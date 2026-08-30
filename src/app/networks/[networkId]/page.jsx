@@ -1,142 +1,147 @@
 import Link from 'next/link'
-import { config, CONTRACTS } from '@/config/wagmi'
+import clsx from 'clsx'
+import { config } from '@/config/wagmi'
 import PageTitle from '@/components/PageTitle'
-import { slugify } from '@/lib/utils'
+import CopyButton from '@/components/ui/CopyButton'
+import { coreRows, featureRows, getDeployment, swapRows } from '../_components/contractCatalog'
 import styles from './page.module.scss'
 
 export default async function Page({ params }) {
-  const id = (await params).networkId
+  const { networkId } = await params
+  const chain = (config.chains || []).find((item) => item.id.toString() === networkId.toString())
 
   return (
     <>
-      <PageTitle name={`networks`} />
+      <PageTitle name={chain ? chain.name : `Networks`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width={`medium`}>
-          <NetworkDetails id={id} />
+        <div className={clsx('__container', styles.page__container)} data-width={`medium`}>
+          {chain ? <NetworkDetails chain={chain} /> : <NetworkNotFound />}
         </div>
       </div>
     </>
   )
 }
 
-const NetworkDetails = ({ id }) => {
+const NetworkNotFound = () => (
+  <div className={styles.empty}>
+    <p>This network is not part of Hup.</p>
+    <Link href={`/networks`}>&larr; Back to all networks</Link>
+  </div>
+)
+
+const NetworkDetails = ({ chain }) => {
+  const deployment = getDeployment(chain.id)
+  // Base explorer URL every address row links against
+  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+  const rpcUrl = chain.rpcUrls?.default?.http?.[0]
+
+  const groups = [
+    { title: `Core`, description: `The social engine and the plumbing every feature relies on`, rows: coreRows(deployment) },
+    { title: `Features`, description: `Extensions deployed on this network`, rows: featureRows(deployment) },
+    { title: `Swap venues`, description: `Third-party contracts the swap page routes through`, rows: swapRows(deployment) },
+  ].filter((group) => group.rows.length > 0)
+
   return (
-    <>
-      {config.chains &&
-        config.chains
-          .filter((filterItem) => filterItem.id.toString() === id.toString())
-          .map((item, i) => {
-            // Find specific contract set for this matching chain ID
-            const contractKey = `chain${item.id}`
-            const deployment = CONTRACTS[contractKey]
+    <div className={styles.network}>
+      <header className={styles.network__header} style={{ '--bg-color': chain.primaryColor }}>
+        <div className={styles.network__icon}>
+          <img src={chain.iconUrl} alt="" />
+        </div>
+        <h3 className={styles.network__name}>
+          {chain.name}
+          {chain.testnet && <span className={`lable lable-warning`}>TESTNET</span>}
+        </h3>
+        <span className={styles.network__meta}>
+          Chain {chain.id} · {chain.nativeCurrency?.symbol}
+        </span>
+      </header>
 
-            // Extract base block explorer URL for target formatting link setups
-            const explorerUrl = item.blockExplorers?.default?.url?.replace(/\/$/, '')
+      <section className={styles.network__section}>
+        <h4 className={styles['network__section-title']}>Network</h4>
+        <div className={styles.rows}>
+          <InfoRow label={`Chain ID`} value={chain.id} copyValue={`${chain.id}`} />
+          <InfoRow label={`Currency`} value={`${chain.nativeCurrency?.name} (${chain.nativeCurrency?.symbol})`} />
+          <InfoRow label={`RPC`} value={<code>{rpcUrl}</code>} copyValue={rpcUrl} />
+          <InfoRow
+            label={`Block explorer`}
+            value={
+              explorerUrl ? (
+                <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
+                  {explorerUrl} ↗
+                </a>
+              ) : (
+                `N/A`
+              )
+            }
+          />
+          {/* Mainnet chain objects also carry faucetUrl (pointing at their testnet's faucet), so gate on testnet */}
+          {chain.testnet && chain.faucetUrl && (
+            <InfoRow
+              label={`Faucet`}
+              value={
+                <a href={chain.faucetUrl} target="_blank" rel="noopener noreferrer">
+                  {chain.faucetUrl} ↗
+                </a>
+              }
+            />
+          )}
+          {deployment?.nativeIsErc20 && (
+            <InfoRow label={`Note`} value={`The native coin is itself an ERC20 — swaps approve it instead of sending value.`} />
+          )}
+        </div>
+      </section>
 
-            return (
-              <div key={i} className={`${styles.network}`} title={item.rpcUrls.default.http[0]}>
-                <div
-                  className={`${styles.network__body} d-f-c flex-row justify-content-between gap-025`}
-                  style={{ '--bg-color': `${item.primaryColor}` }}
-                >
-                  <div className={`flex flex-column align-items-center justify-content-start gap-050 flex-1`}>
-                    <div className={`${styles.network__icon}`}>
-                      <img src={item.iconUrl} alt="" />
-                    </div>
-                    <h3>{item.name}</h3>
+      {groups.map((group) => (
+        <section key={group.title} className={styles.network__section}>
+          <h4 className={styles['network__section-title']}>
+            {group.title}
+            <span className={styles['network__section-count']}>{group.rows.length}</span>
+          </h4>
+          <p className={styles['network__section-description']}>{group.description}</p>
+          <div className={styles.rows}>
+            {group.rows.map((row) => (
+              <AddressRow key={row.key} row={row} explorerUrl={explorerUrl} />
+            ))}
+          </div>
+        </section>
+      ))}
 
-                    <table className={`mt-10 mb-10`}>
-                      <thead>
-                        <tr>
-                          <th width="30%">Setting</th>
-                          <th>Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>Name</td>
-                          <td>
-                            {item.name}
-                            {item.testnet && <span className={`lable lable-warning ml-10`}>TESTNET</span>}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Chain Id</td>
-                          <td>{item.id}</td>
-                        </tr>
-                        <tr>
-                          <td>Currency Symbol</td>
-                          <td>{item.nativeCurrency?.symbol}</td>
-                        </tr>
-                        <tr>
-                          <td>RPC</td>
-                          <td>
-                            <code>{item.rpcUrls.default.http[0]}</code>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Block Explorer</td>
-                          <td>
-                            {explorerUrl ? (
-                              <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
-                                {explorerUrl} ↗
-                              </a>
-                            ) : (
-                              'N/A'
-                            )}
-                          </td>
-                        </tr>
+      {groups.length === 0 && <p className={styles.empty}>No Hup contracts are deployed on this network yet.</p>}
 
-                        {/* Dynamic contract links mapped straight to the active network explorer base URL */}
-                        {deployment && (
-                          <>
-                            <tr>
-                              <td>Forwarder Contract</td>
-                              <td>
-                                {explorerUrl ? (
-                                  <a href={`${explorerUrl}/address/${deployment.forwarder}`} target="_blank" rel="noopener noreferrer">
-                                    <code>{deployment.forwarder}</code> ↗
-                                  </a>
-                                ) : (
-                                  <code>{deployment.forwarder}</code>
-                                )}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td>Hub Contract</td>
-                              <td>
-                                {explorerUrl ? (
-                                  <a href={`${explorerUrl}/address/${deployment.hup}`} target="_blank" rel="noopener noreferrer">
-                                    <code>{deployment.hup}</code> ↗
-                                  </a>
-                                ) : (
-                                  <code>{deployment.hup}</code>
-                                )}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td>Status Contract</td>
-                              <td>
-                                {explorerUrl ? (
-                                  <a href={`${explorerUrl}/address/${deployment.status}`} target="_blank" rel="noopener noreferrer">
-                                    <code>{deployment.status}</code> ↗
-                                  </a>
-                                ) : (
-                                  <code>{deployment.status}</code>
-                                )}
-                              </td>
-                            </tr>
-                          </>
-                        )}
-                      </tbody>
-                    </table>
-
-                    <Link href={`/networks`}>&larr; Back to all networks</Link>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-    </>
+      <Link href={`/networks`} className={styles.network__back}>
+        &larr; Back to all networks
+      </Link>
+    </div>
   )
 }
+
+const InfoRow = ({ label, value, copyValue }) => (
+  <div className={styles.row}>
+    <div className={styles.row__info}>
+      <span className={styles.row__label}>{label}</span>
+    </div>
+    <div className={styles.row__value}>
+      {value}
+      {copyValue && <CopyButton value={copyValue} title={`Copy ${label.toLowerCase()}`} className={styles.row__copy} />}
+    </div>
+  </div>
+)
+
+const AddressRow = ({ row, explorerUrl }) => (
+  <div className={styles.row}>
+    <div className={styles.row__info}>
+      <span className={styles.row__label}>{row.label}</span>
+      {row.description && <span className={styles.row__description}>{row.description}</span>}
+    </div>
+    <div className={styles.row__value}>
+      {explorerUrl ? (
+        <a href={`${explorerUrl}/address/${row.address}`} target="_blank" rel="noopener noreferrer" title={`View on explorer`}>
+          <code>{row.address}</code> ↗
+        </a>
+      ) : (
+        <code>{row.address}</code>
+      )}
+      <CopyButton value={row.address} title={`Copy address`} className={styles.row__copy} />
+    </div>
+  </div>
+)
