@@ -292,6 +292,8 @@
   }
 
   &__skeleton {
+    // Explicit, or the max-height transfers through the aspect-ratio and caps the width at 936px
+    width: 100%;
     aspect-ratio: 2.6 / 1;
     min-height: 240px;
     max-height: 360px;
