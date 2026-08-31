@@ -187,7 +187,9 @@ export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null
     return row ? { metadata: rowToMetadata(row), cached: true } : null
   }
 
-  const resolvedIsLsp8 = typeof isLsp8 === 'boolean' ? isLsp8 : row ? Boolean(row.is_lsp8) : await detectIsLsp8(key, publicClient)
+  // A nameless row's flag is the prime suspect for why it is nameless — a wrong-standard read
+  // answers totalSupply but not name() — so only a named row's flag is reused.
+  const resolvedIsLsp8 = typeof isLsp8 === 'boolean' ? isLsp8 : row?.name ? Boolean(row.is_lsp8) : await detectIsLsp8(key, publicClient)
 
   let metadata
   try {
@@ -213,7 +215,10 @@ export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null
 
   // A resolution that lost the offchain document must never overwrite one that had it —
   // otherwise one bad minute from a gateway blanks a banner that was already working.
-  if (!metadata.source && row && isComplete(row)) {
+  // Likewise a nameless result never replaces a named row: names don't vanish onchain, so
+  // that is the signature of a wrong-standard read (ERC721-style calls against LSP8 answer
+  // totalSupply but not name()).
+  if (row && ((!metadata.source && isComplete(row)) || (!metadata.name && row.name))) {
     try {
       await touchRow(key)
     } catch (error) {
