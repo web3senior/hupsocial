@@ -10,6 +10,7 @@ import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { useActiveChain } from '@/hooks/useActiveChain'
 import { useDropCollection } from '@/hooks/useDropCollection'
+import { networkColorStyle } from '@/lib/networkColors'
 import { useProfile } from '@/hooks/useProfile'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { PHASE_STATUS, dropStandardLabel, phaseStatus } from '@/lib/drops'
@@ -118,7 +119,8 @@ function DropTile({ chainId, dropId, dropsAddress, liveOnly = false }) {
 
   return (
     <li>
-      <Link href={`/drops/${chainId}/${dropId}`} className={styles.directory__card} title={tooltip}>
+      {/* Colours come from the drop's chain, not the connected wallet's */}
+      <Link href={`/drops/${chainId}/${dropId}`} className={styles.directory__card} title={tooltip} style={networkColorStyle(chainInfo)}>
         <span className={styles.directory__media}>
           {imageUrl ? (
             <img src={imageUrl} alt="" loading="lazy" />

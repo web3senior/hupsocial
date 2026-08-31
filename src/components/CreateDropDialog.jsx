@@ -11,6 +11,7 @@ import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { hashIpfsContent, uploadFileToIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import {
+import { networkColorStyle } from '@/lib/networkColors'
   DROP_GATES,
   DROP_SOCIALS,
   allowlistRoot,
@@ -829,6 +830,7 @@ const CreateDropDialog = forwardRef(function CreateDropDialog(
                   {formatEther(creationFee)} {nativeSymbol}
                 </dd>
               </div>
+      style={networkColorStyle(chainInfo)}
             )}
           </dl>
 

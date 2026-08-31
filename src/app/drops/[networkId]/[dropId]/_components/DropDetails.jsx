@@ -10,6 +10,7 @@ import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { dropStandardLabel, isLuksoStandard } from '@/lib/drops'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { networkColorStyle } from '@/lib/networkColors'
 import { handleBrokenImage } from '@/lib/utils'
 import { useDropCollection } from '@/hooks/useDropCollection'
 import dropsAbi from '@/abis/HupDrops.json'
@@ -131,7 +132,8 @@ export default function DropDetails({ networkId, dropId }) {
   const createdAt = Number(drop.createdAt ?? 0)
 
   return (
-    <div className={`${styles.drop} animate fade`}>
+    // Colours come from the drop's chain, not the connected wallet's
+    <div className={`${styles.drop} animate fade`} style={networkColorStyle(chainInfo)}>
       {name && <PageTitle name={name} spacer={false} />}
 
       <button type="button" className={styles.drop__back} onClick={() => router.back()}>

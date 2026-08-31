@@ -8,6 +8,7 @@ import { getNftCollectionRanking } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
 import { isSameStoredImage, resolveStorageImageUrl } from '@/lib/storageHelper'
+import { networkColorStyle } from '@/lib/networkColors'
 import HupMark from '@/components/ui/HupMark'
 import styles from './FeaturedCollections.module.scss'
 
@@ -57,24 +58,12 @@ const keyOf = (row) => `${row.network_id}-${row.collection}`
 const bannerOf = (row) => (row.banner_uri && !isSameStoredImage(row.banner_uri, row.icon_uri) ? row.banner_uri : null)
 
 /**
- * Which of the ranking rows front the banner. Only a named collection qualifies, and among
- * those the ones with artwork go first — a banner, then at least an icon to blur behind the
- * name, then the rest — with the ranking's own order kept inside each tier. A hero exists to
- * show artwork: a slide of tinted plate with a logo on it is a last resort, not a headline,
- * and on a market where the most traded collection never published an image it would
- * otherwise be the first thing every reader sees.
+ * The top named collections, in server order; artwork never reorders the deck — an artless
+ * slide falls back inside itself.
  * @param {Array<Object>} rows Ranking rows, in the order the server ranked them.
  * @returns {Array<Object>} At most SLIDE_COUNT rows.
  */
-const pickSlides = (rows) => {
-  const tier = (row) => (bannerOf(row) ? 0 : row.icon_uri ? 1 : 2)
-  return rows
-    .filter((row) => row.name)
-    .map((row, rank) => ({ row, rank }))
-    .sort((a, b) => tier(a.row) - tier(b.row) || a.rank - b.rank)
-    .slice(0, SLIDE_COUNT)
-    .map(({ row }) => row)
-}
+const pickSlides = (rows) => rows.filter((row) => row.name).slice(0, SLIDE_COUNT)
 
 /**
  * The figures a buyer scans a collection by, as the banner prints them. Every one can be
@@ -193,6 +182,8 @@ function Slide({ row, index, count, isActive }) {
       // scroll the track to it mid-rotation, and the dots underneath are the way across
       aria-hidden={!isActive}
       tabIndex={isActive ? 0 : -1}
+      // The plate tints with the collection's chain, not the wallet's, which :root carries
+      style={networkColorStyle(chain)}
     >
       <div className={styles.featured__art}>
         {showBanner ? (

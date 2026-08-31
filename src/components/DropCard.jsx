@@ -13,6 +13,7 @@ import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { DROP_GATES, allowlistProof, formatPhaseTime, gateLabel, phaseStatus, PHASE_STATUS } from '@/lib/drops'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { handleBrokenImage } from '@/lib/utils'
+import { networkColorStyle } from '@/lib/networkColors'
 import dropsAbi from '@/abis/HupDrops.json'
 import { toast } from '@/components/NextToast'
 import styles from './DropCard.module.scss'
@@ -230,7 +231,8 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
             : null
 
   return (
-    <div className={clsx(styles.dropCard, { [styles['dropCard--compact']]: compact })} onClick={(e) => e.stopPropagation()}>
+    // Colours come from the drop's chain, not the connected wallet's
+    <div className={clsx(styles.dropCard, { [styles['dropCard--compact']]: compact })} style={networkColorStyle(chainInfo)} onClick={(e) => e.stopPropagation()}>
       {!compact && (
         <div className={styles.dropCard__top}>
           <div className={styles.dropCard__media}>
