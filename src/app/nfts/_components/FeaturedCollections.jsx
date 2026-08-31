@@ -158,9 +158,8 @@ const useArtwork = (stored, proxied) => {
  * @param {number} props.index Position in the carousel.
  * @param {number} props.count How many slides there are.
  * @param {boolean} props.isActive Whether this is the slide on screen.
- * @param {Function} props.onArtworkLost Called with the row's key once no artwork layer is left.
  */
-function Slide({ row, index, count, isActive, onArtworkLost }) {
+function Slide({ row, index, count, isActive }) {
   const networkId = Number(row.network_id)
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)
@@ -176,15 +175,12 @@ function Slide({ row, index, count, isActive, onArtworkLost }) {
   // An image that fails — every gateway behind the proxy came up empty, and the CDN copy
   // after it — steps aside rather than swapping in a placeholder: at banner scale the
   // line-art mark would be the whole slide. The fallback is the next layer down, the blurred
-  // icon. When that goes too the slide has nothing left to show and tells the deck so: a
-  // collection that arrived with artwork and lost all of it would otherwise sit in the top
-  // tier as a tinted plate, ahead of collections whose artwork loads.
+  // icon, and after that the tinted plate. The slide itself stays: it earned its place on
+  // volume, not on artwork, and failures don't arrive together — the proxy gives each gateway
+  // seconds, the browser queues the low-priority banners, the CDN retry hangs on a slow host —
+  // so a deck that shed slides as their images gave up emptied itself minutes into a page view.
   const showBanner = Boolean(banner.src)
   const showIcon = Boolean(icon.src)
-  const lost = !showBanner && !showIcon && Boolean(bannerUri || row.icon_uri)
-  useEffect(() => {
-    if (lost) onArtworkLost(keyOf(row))
-  }, [lost, onArtworkLost, row])
 
   return (
     <Link
@@ -275,7 +271,6 @@ function Slide({ row, index, count, isActive, onArtworkLost }) {
  */
 export default function FeaturedCollections({ networkId }) {
   const [slides, setSlides] = useState([])
-  const [lostKeys, setLostKeys] = useState(() => new Set())
   const [isLoading, setIsLoading] = useState(true)
   const [active, setActive] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
@@ -283,12 +278,6 @@ export default function FeaturedCollections({ networkId }) {
   const [isHidden, setIsHidden] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(false)
   const trackRef = useRef(null)
-
-  // The deck as it stands: a slide whose artwork failed in every layer leaves it (see Slide)
-  const visible = useMemo(() => slides.filter((row) => !lostKeys.has(keyOf(row))), [slides, lostKeys])
-  const handleArtworkLost = useCallback((key) => {
-    setLostKeys((current) => (current.has(key) ? current : new Set(current).add(key)))
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -301,7 +290,6 @@ export default function FeaturedCollections({ networkId }) {
         const res = await getNftCollectionRanking({ limit: FETCH_LIMIT, networkId: networkId || undefined, sort: 'volumeTotal' })
         if (cancelled) return
         setSlides(pickSlides(res.data || []))
-        setLostKeys(new Set())
         // A new set starts from its first slide. The track itself remounts fresh — the
         // skeleton stood in for it while this loaded — so only the index has to follow.
         setActive(0)
@@ -338,37 +326,17 @@ export default function FeaturedCollections({ networkId }) {
   const goTo = useCallback(
     (index) => {
       const track = trackRef.current
-      const count = visible.length
+      const count = slides.length
       if (!track || count === 0) return
       const next = ((index % count) + count) % count
       track.scrollTo({ left: next * track.clientWidth, behavior: reduceMotion ? 'instant' : 'smooth' })
     },
-    [visible.length, reduceMotion],
+    [slides.length, reduceMotion],
   )
-
-  // The slide on screen stays on screen when one before it leaves the deck: the track keeps
-  // its pixel offset, which would otherwise now be showing a different collection. Reacts to
-  // the deck changing shape only — following `active` itself is the scroll handler's job.
-  const activeKeyRef = useRef(null)
-  useEffect(() => {
-    const track = trackRef.current
-    const key = activeKeyRef.current
-    if (!track || !key) return
-    const index = visible.findIndex((row) => keyOf(row) === key)
-    if (index !== -1 && index !== active) {
-      track.scrollTo({ left: index * track.clientWidth, behavior: 'instant' })
-      setActive(index)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible])
-
-  useEffect(() => {
-    activeKeyRef.current = visible[active] ? keyOf(visible[active]) : null
-  }, [visible, active])
 
   // Keyed on `active` so a dot press restarts the clock — the slide someone chose gets its
   // full dwell, not whatever was left of the previous one's
-  const isPaused = isHovered || isFocused || isHidden || reduceMotion || visible.length < 2
+  const isPaused = isHovered || isFocused || isHidden || reduceMotion || slides.length < 2
 
   useEffect(() => {
     if (isPaused) return
@@ -385,7 +353,7 @@ export default function FeaturedCollections({ networkId }) {
 
   // Nothing named on the selected chain — the rail and the grid below already say what is
   // there, and a banner with no artwork would only push them down the page
-  if (!isLoading && visible.length === 0) return null
+  if (!isLoading && slides.length === 0) return null
 
   if (isLoading) {
     return (
@@ -410,14 +378,14 @@ export default function FeaturedCollections({ networkId }) {
       onBlur={() => setIsFocused(false)}
     >
       <div ref={trackRef} className={styles.featured__track} onScroll={handleScroll}>
-        {visible.map((row, index) => (
-          <Slide key={keyOf(row)} row={row} index={index} count={visible.length} isActive={index === active} onArtworkLost={handleArtworkLost} />
+        {slides.map((row, index) => (
+          <Slide key={keyOf(row)} row={row} index={index} count={slides.length} isActive={index === active} />
         ))}
       </div>
 
-      {visible.length > 1 && (
+      {slides.length > 1 && (
         <div className={styles.featured__dots}>
-          {visible.map((row, index) => (
+          {slides.map((row, index) => (
             <button
               key={keyOf(row)}
               type="button"
