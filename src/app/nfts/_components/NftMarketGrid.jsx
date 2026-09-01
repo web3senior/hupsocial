@@ -35,9 +35,12 @@ const STATUS_OPTIONS = [
 ]
 
 const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest' },
+  { value: 'newest', label: 'Recently listed' },
+  { value: 'oldest', label: 'Oldest listed' },
   { value: 'price_asc', label: 'Lowest price' },
   { value: 'price_desc', label: 'Highest price' },
+  { value: 'referral_desc', label: 'Highest referral reward' },
+  { value: 'recently_sold', label: 'Recently sold' },
 ]
 
 // Thresholds in basis points — the API takes 'any'/'none' or a minimum bps
@@ -660,11 +663,19 @@ export default function NftMarketGrid() {
           />
           <QuickSelect
             label="Sort"
-            tooltip="Order the grid — newest listings first, or by price. Price order only lines up across listings priced in the same token."
+            tooltip="Order the grid — by listing age, price, referral reward, or when it last sold. Price order only lines up across listings priced in the same token."
             value={filters.sort}
             defaultValue="newest"
             options={SORT_OPTIONS}
-            onChange={(value) => setFilters((f) => ({ ...f, sort: value }))}
+            // Sorting by sale time while Active hides every sold row would order nothing —
+            // widen to Active + sold; a deliberate Sold status is kept as-is
+            onChange={(value) =>
+              setFilters((f) => ({
+                ...f,
+                sort: value,
+                status: value === 'recently_sold' && f.status === 'active' ? 'active_sold' : f.status,
+              }))
+            }
           />
         </div>
 

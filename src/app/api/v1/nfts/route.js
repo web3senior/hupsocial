@@ -124,7 +124,7 @@ export async function GET(request) {
     const q = (searchParams.get('q') || '').trim().slice(0, MAX_SEARCH_LENGTH) // NFT name, collection name, seller name or address fragment
     const referral = searchParams.get('referral') // 'any' (>0) | 'none' (=0) | minimum bps, e.g. '500' for 5%+
     const traits = parseTraitFilters(searchParams.get('traits')) // JSON [{label, value}] — see above
-    const sort = searchParams.get('sort') || 'newest' // 'newest' | 'price_asc' | 'price_desc'
+    const sort = searchParams.get('sort') || 'newest' // an ORDER_BY key below
     const statusKey = searchParams.get('status') || 'active'
     // Defaults to what's still buyable; 'active_sold'/'all' widen to the sold rows too. An
     // unknown key (a hand-edited URL, or the retired 'cancelled') degrades to active.
@@ -230,12 +230,24 @@ export async function GET(request) {
         ` AND ${conditions.join(' AND ')})`
     }
 
-    const orderBy =
-      sort === 'price_asc'
-        ? 'CAST(l.price AS DECIMAL(65,0)) ASC'
-        : sort === 'price_desc'
-        ? 'CAST(l.price AS DECIMAL(65,0)) DESC'
-        : 'l.listed_at DESC'
+    const ORDER_BY = {
+      newest: 'l.listed_at DESC',
+      oldest: 'l.listed_at ASC',
+      price_asc: 'CAST(l.price AS DECIMAL(65,0)) ASC',
+      price_desc: 'CAST(l.price AS DECIMAL(65,0)) DESC',
+      referral_desc: 'l.referral_bps DESC, l.listed_at DESC',
+      recently_sold: 'tr.last_sold_at DESC, l.listed_at DESC',
+    }
+    const orderBy = ORDER_BY[sort] || ORDER_BY.newest
+
+    // Pre-aggregated join, not a select-list subquery — see attachLastSales for the MariaDB
+    // trap. NULL last_sold_at sorts after every sale under DESC, so never-sold rows trail.
+    const tradeJoin =
+      sort === 'recently_sold'
+        ? ` LEFT JOIN (SELECT network_id, listing_id, MAX(sold_at) AS last_sold_at
+               FROM nft_trades GROUP BY network_id, listing_id) tr
+               ON tr.network_id = l.network_id AND tr.listing_id = l.listing_id`
+        : ''
 
     const [rows] = await pool.execute(
       `SELECT
@@ -247,6 +259,7 @@ export async function GET(request) {
        FROM nft_listings l
        LEFT JOIN store_tokens st ON st.network_id = l.network_id AND st.token = l.payment_token
        LEFT JOIN users u ON u.wallet_address = l.seller
+       ${tradeJoin}
        ${whereClause}
        ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,

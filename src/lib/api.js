@@ -160,7 +160,7 @@ export const getPosts = async (page = 1, limit = 20, networkId = null, walletAdd
  * `[{"label":"Eyes","value":"Laser"}]`. Values sharing a label are ORed, labels are ANDed.
  * Matches against the cached token metadata, so tokens nobody has viewed yet are excluded —
  * getNftCollectionTraits reports that coverage alongside the options.
- * @param {'newest'|'price_asc'|'price_desc'} [filters.sort]
+ * @param {'newest'|'oldest'|'price_asc'|'price_desc'|'referral_desc'|'recently_sold'} [filters.sort]
  */
 export const getNftListings = async (page = 1, limit = 24, filters = {}) => {
   const params = new URLSearchParams({ page, limit })
