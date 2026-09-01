@@ -2,6 +2,8 @@
  * @file lib/collectionMetadataCache.js
  * @description Server-only read-through cache for collection-level display metadata, backed
  * by the nft_collection_cache table — the collection-shaped sibling of nftMetadataCache.
+ * Stale-while-revalidate: any existing row answers the request immediately; TTL expiry
+ * re-resolves from chain after the response, never inside it.
  *
  * On-demand read caching, not event scanning — it stays in the app rather than moving to
  * cidex, which owns log-derived tables. The DDL ships with the rest of the schema in
@@ -11,6 +13,7 @@
  * answers from RPC, just without the cache.
  */
 
+import { after } from 'next/server'
 import pool from '@/lib/db'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
 import { resolveCollectionMetadata } from '@/lib/collectionMetadata'
@@ -150,37 +153,32 @@ const detectIsLsp8 = async (key, publicClient) => {
   }
 }
 
-/**
- * Resolves a collection's metadata, preferring a fresh cached row over an RPC fan-out.
- * @param {Object} params
- * @param {number|string} params.chainId Chain the collection lives on.
- * @param {string} params.collection NFT contract address.
- * @param {boolean|null} [params.isLsp8] True/false when the caller knows the standard;
- * null/undefined to infer it (from the listings index, then an onchain probe).
- * @param {string} [params.baseUrl] Absolute origin, for resolving proxy-relative storage URLs.
- * @param {boolean} [params.forceRefresh=false] Ignore the cached row's freshness and
- * re-read from chain. The row is still loaded, because it is what protects a good banner
- * from being demoted if this read comes back empty.
- * @returns {Promise<{metadata: Object, cached: boolean}|null>} null when the chain is
- * unconfigured or the read failed outright. metadata always carries isLsp8.
- */
-export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null, baseUrl, forceRefresh = false }) => {
-  const key = normalizeKey({ chainId, collection })
+// One background re-resolve per collection at a time — concurrent stale hits all serve the
+// row; only the first schedules the chain read.
+const revalidating = new Set()
 
-  let row = null
-  try {
-    row = await readRow(key)
-  } catch (error) {
-    console.warn('[collection-metadata-cache] read failed, falling back to RPC:', error.message)
-  }
-
-  if (row && !forceRefresh) {
-    const age = Date.now() - new Date(row.fetched_at).getTime()
-    if (age < ttlFor(row)) {
-      return { metadata: rowToMetadata(row), cached: true }
+const scheduleRevalidate = (key, work) => {
+  const guard = `${key.networkId}:${key.collection}`
+  if (revalidating.has(guard)) return
+  revalidating.add(guard)
+  const task = async () => {
+    try {
+      await work()
+    } catch (error) {
+      console.warn('[collection-metadata-cache] background revalidate failed:', error.message)
+    } finally {
+      revalidating.delete(guard)
     }
   }
+  try {
+    after(task)
+  } catch {
+    // Outside a request scope (scripts, tests) there is no response to wait on
+    void task()
+  }
+}
 
+const resolveFromChain = async (key, { isLsp8, baseUrl, row }) => {
   const publicClient = getServerPublicClient(key.networkId)
   if (!publicClient) {
     // Unknown chain — a stale row still beats nothing.
@@ -234,6 +232,43 @@ export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null
   }
 
   return { metadata: { ...metadata, banner: storableUri(metadata.banner), icon: storableUri(metadata.icon), isLsp8: resolvedIsLsp8 }, cached: false }
+}
+
+/**
+ * Resolves a collection's metadata, DB row first: any cached row answers immediately, and a
+ * row past its TTL triggers a chain re-resolve after the response instead of blocking it.
+ * Only a collection with no row at all resolves inline.
+ * @param {Object} params
+ * @param {number|string} params.chainId Chain the collection lives on.
+ * @param {string} params.collection NFT contract address.
+ * @param {boolean|null} [params.isLsp8] True/false when the caller knows the standard;
+ * null/undefined to infer it (from the listings index, then an onchain probe).
+ * @param {string} [params.baseUrl] Absolute origin, for resolving proxy-relative storage URLs.
+ * @param {boolean} [params.forceRefresh=false] Re-read from chain synchronously, ignoring the
+ * cached row's freshness. The row is still loaded, because it is what protects a good banner
+ * from being demoted if this read comes back empty.
+ * @returns {Promise<{metadata: Object, cached: boolean}|null>} null when the chain is
+ * unconfigured or the read failed outright. metadata always carries isLsp8.
+ */
+export const getCollectionMetadata = async ({ chainId, collection, isLsp8 = null, baseUrl, forceRefresh = false }) => {
+  const key = normalizeKey({ chainId, collection })
+
+  let row = null
+  try {
+    row = await readRow(key)
+  } catch (error) {
+    console.warn('[collection-metadata-cache] read failed, falling back to RPC:', error.message)
+  }
+
+  if (row && !forceRefresh) {
+    const age = Date.now() - new Date(row.fetched_at).getTime()
+    if (age >= ttlFor(row)) {
+      scheduleRevalidate(key, () => resolveFromChain(key, { isLsp8, baseUrl, row }))
+    }
+    return { metadata: rowToMetadata(row), cached: true }
+  }
+
+  return resolveFromChain(key, { isLsp8, baseUrl, row })
 }
 
 /**
