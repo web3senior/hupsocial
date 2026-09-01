@@ -5,42 +5,34 @@ import { usePublicClient, useReadContract, useReadContracts } from 'wagmi'
 import { isAddress, toHex } from 'viem'
 import clsx from 'clsx'
 import { ArrowLeftIcon, CaretLeftIcon, CaretRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
-import useSWR from 'swr'
-import { decodeVerifiableURI } from '@/lib/drops'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { LSP4_METADATA_KEY, decodeVerifiableUri, fetchMetadataJson } from '@/lib/lsp4'
+import { resolveNftMetadata } from '@/lib/nftMetadata'
+import { loadNftMetadata } from '@/lib/nftMetadataBatch'
+import { mapWithConcurrency } from '@/lib/concurrency'
+import { resolveNftImageUrl } from '@/hooks/useNftMetadata'
 import { handleBrokenImage } from '@/lib/utils'
-import { getIPFS } from '@/lib/ipfs'
 import { toast } from '@/components/NextToast'
 import Lsp4MetadataEditor from './Lsp4MetadataEditor'
 import styles from './TokenMetadataEditor.module.scss'
 
-const LSP4_METADATA_KEY = '0x9afb95cacc9f95858ec44aa8c3b685511002e30ae54415823f406128b85b238e'
 const PAGE_SIZE = 60
 
-/* How many uncached tokens are worth resolving from chain in one go. Each costs a gateway fetch,
-   so a fully unindexed page of sixty is left as numbers rather than firing sixty requests. */
-const ONCHAIN_THUMB_LIMIT = 24
+/* Artwork is asked for one grid row at a time, two rows in flight: a whole page in one request
+   would paint nothing until its slowest token answered, and more rows at once would multiply the
+   RPC budget the batch route keeps per request. */
+const THUMB_CHUNK = 12
+const THUMB_CHUNKS_IN_FLIGHT = 2
+const THUMB_WIDTH = 192
 const countFormat = new Intl.NumberFormat('en')
 
 const TOKEN_ABI = [
   { name: 'getDataForTokenId', type: 'function', stateMutability: 'view', inputs: [{ type: 'bytes32' }, { type: 'bytes32' }], outputs: [{ type: 'bytes' }] },
   { name: 'tokenOwnerOf', type: 'function', stateMutability: 'view', inputs: [{ type: 'bytes32' }], outputs: [{ type: 'address' }] },
   { name: 'totalSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  { name: 'getData', type: 'function', stateMutability: 'view', inputs: [{ type: 'bytes32' }], outputs: [{ type: 'bytes' }] },
 ]
-
-const LSP8_BASE_URI_KEY = '0x1a7628600c3bac7101f53697f48df381ddc36b9015e7d7c9c5633d1252aa2843'
 
 /** LSP8 ids are numbers cast to bytes32, left-padded — the same convention the drops engine mints. */
 const tokenIdToBytes32 = (n) => toHex(BigInt(n), { size: 32 })
-
-/*
- * The gateway readers take a bare path — "Qm…/1", never "ipfs://Qm…/1" — because the gateway
- * base already ends in /ipfs/. Passing the scheme through produces
- * "https://host/ipfs/ipfs://Qm…", which 404s on every gateway in the list and looks exactly like
- * content that is not pinned.
- */
-const toIpfsPath = (uri) => String(uri ?? '').replace(/^ipfs:\/\//, '')
 
 /**
  * Token Metadata Editor
@@ -92,8 +84,7 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
     [total, page],
   )
 
-  // One batched call for the visible page — cheap enough to be worth showing, unlike resolving
-  // every token's artwork, which would be a hundred gateway fetches per page.
+  // One batched call for the visible page: which tokens already carry their own document.
   const { data: overrides } = useReadContracts({
     contracts: pageIds.map((id) => ({
       address: collection,
@@ -106,88 +97,75 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
   })
 
   /*
-   * Thumbnails for the visible page in one request. Deliberately from the indexer's cache rather
-   * than from chain: resolving each token's document and fetching its image would be sixty round
-   * trips to draw one screen. A token the indexer has not reached simply has no row, and its cell
-   * falls back to the number — the picker never waits on this.
+   * Artwork for the visible page, through the same read-through cache every NFT card uses. A
+   * token the indexer already holds costs a row lookup; one it has never seen is resolved from
+   * chain on the server — its own override first, then the collection's base URI plus its
+   * number — and stored, so the next visitor and the collection page both inherit the answer.
+   * The batch endpoint going away (the database with it) drops each token back to the same
+   * browser-side RPC read the cards fall back to.
    */
-  const { data: thumbs } = useSWR(
-    pageIds.length ? `/api/v1/nfts/collections/${chainId}/${collection}/thumbnails?ids=${pageIds.join(',')}` : null,
-    (url) => fetch(url).then((res) => res.json()),
-  )
-  const thumbById = useMemo(() => {
-    const map = new Map()
-    for (const row of thumbs?.data ?? []) map.set(String(row.token_id), row)
-    return map
-  }, [thumbs])
-
-  /*
-   * The cache is empty for a collection the indexer has not reached yet — which is every
-   * collection on the day it launches, and exactly when its creator is most likely to be in here
-   * editing it. So resolve the stragglers from chain: a token's own override if it has one,
-   * otherwise the collection's base URI plus its number, then fetch that document for its image.
-   *
-   * Capped, and only for the visible page. Sixty gateway fetches to draw one screen is the cost
-   * this whole component was built to avoid, so a page that is entirely unindexed stays as
-   * numbers rather than quietly becoming slow.
-   */
-  const [resolved, setResolved] = useState({})
-  const resolvedRef = useRef(new Set())
-
-  const { data: baseUriRaw } = useReadContract({
-    address: collection,
-    abi: TOKEN_ABI,
-    functionName: 'getData',
-    args: [LSP8_BASE_URI_KEY],
-    chainId,
-    query: { enabled: Boolean(collection) },
-  })
+  const [thumbs, setThumbs] = useState({})
+  const [pending, setPending] = useState(() => new Set())
+  const askedRef = useRef(new Set())
 
   useEffect(() => {
-    /*
-     * Wait for BOTH reads to settle. The base URI and the per-token overrides arrive
-     * independently, and starting before the base URI is known means every token resolves to
-     * nothing — while still being marked as attempted below, which is how a token could be
-     * skipped permanently by a race that resolves a few hundred milliseconds later.
-     */
-    if (!thumbs || baseUriRaw === undefined || overrides === undefined) return undefined
+    if (!collection || !pageIds.length) return undefined
 
-    const missing = pageIds.filter((id) => !thumbById.has(String(id)) && !resolvedRef.current.has(id))
-    if (!missing.length || missing.length > ONCHAIN_THUMB_LIMIT) return undefined
+    const asked = askedRef.current
+    const wanted = pageIds.filter((id) => !asked.has(id))
+    if (!wanted.length) return undefined
+    wanted.forEach((id) => asked.add(id))
+    setPending((prev) => new Set([...prev, ...wanted]))
 
     let cancelled = false
-    const base = baseUriRaw && baseUriRaw !== '0x' ? decodeVerifiableURI(baseUriRaw) : null
+    const done = new Set()
+    const chunks = []
+    for (let i = 0; i < wanted.length; i += THUMB_CHUNK) chunks.push(wanted.slice(i, i + THUMB_CHUNK))
 
-    const run = async () => {
-      await Promise.all(
-        missing.map(async (id) => {
-          // A per-token override wins, exactly as it does when a wallet resolves the token
-          const own = overrides?.[pageIds.indexOf(id)]?.result
-          const uri = own && own !== '0x' ? decodeVerifiableURI(own) : base ? `${base}${id}` : null
-
-          // Marked only once there is something to fetch, so a token is never written off for a
-          // document we never actually asked for
-          if (!uri) return
-          resolvedRef.current.add(id)
-
-          // getIPFS answers { result: false } rather than throwing, so a failure lands here as a
-          // document with no image — which is the same outcome as a document that has none.
-          const json = await getIPFS(toIpfsPath(uri)).catch(() => null)
-          const lsp4 = json?.LSP4Metadata ?? json
-          const image = lsp4?.images?.[0]?.[0]?.url ?? lsp4?.image ?? ''
-          if (!cancelled && image) {
-            setResolved((prev) => ({ ...prev, [id]: { name: lsp4?.name ?? '', image_uri: image } }))
-          }
-        }),
-      )
+    const resolveOne = async (id) => {
+      const tokenId = tokenIdToBytes32(id)
+      try {
+        return await loadNftMetadata({ chainId: Number(chainId), collection, tokenId, isLsp8: true })
+      } catch {
+        if (!publicClient) return null
+        const metadata = await resolveNftMetadata({ publicClient, collection, tokenId, isLsp8: true }).catch(() => null)
+        return metadata ? { ...metadata, imageIsProxied: false } : null
+      }
     }
-    run()
+
+    mapWithConcurrency(chunks, THUMB_CHUNKS_IN_FLIGHT, async (chunk) => {
+      if (cancelled) return
+      // Issued in one tick, so the coalescer folds the row into a single request
+      const results = await Promise.all(chunk.map(resolveOne))
+      if (cancelled) return
+      chunk.forEach((id) => done.add(id))
+      setThumbs((prev) => {
+        const next = { ...prev }
+        chunk.forEach((id, index) => {
+          next[id] = results[index]
+        })
+        return next
+      })
+      setPending((prev) => {
+        const next = new Set(prev)
+        chunk.forEach((id) => next.delete(id))
+        return next
+      })
+    })
 
     return () => {
       cancelled = true
+      // Whatever this run did not finish is asked again next time it is on screen, instead of
+      // staying a number for the rest of the session
+      const unfinished = wanted.filter((id) => !done.has(id))
+      unfinished.forEach((id) => asked.delete(id))
+      setPending((prev) => {
+        const next = new Set(prev)
+        unfinished.forEach((id) => next.delete(id))
+        return next
+      })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thumbs, pageIds, baseUriRaw, overrides])
+  }, [pageIds, collection, chainId, publicClient])
 
   const load = () => {
     const id = parseInt(tokenInput, 10)
@@ -226,8 +204,8 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
       let hasOverride = false
       if (stored && stored !== '0x') {
         hasOverride = true
-        const uri = decodeVerifiableURI(stored)
-        const json = uri ? await getIPFS(toIpfsPath(uri)).catch(() => null) : null
+        const uri = decodeVerifiableUri(stored)
+        const json = uri ? await fetchMetadataJson(uri).catch(() => null) : null
         const lsp4 = json?.LSP4Metadata ?? json
         if (lsp4) {
           current = {
@@ -287,22 +265,25 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
               // A token that already carries its own document is the one a creator is usually
               // looking for — either to change it again, or to avoid overwriting it by accident.
               const overridden = overrides?.[index]?.result && overrides[index].result !== '0x'
-              const thumb = thumbById.get(String(id)) ?? resolved[id]
+              const thumb = thumbs[id]
+              const image = resolveNftImageUrl(thumb, { width: THUMB_WIDTH, still: true })
+              const isPending = pending.has(id)
               return (
                 <button
                   key={id}
                   type="button"
-                  className={clsx(styles.token__cell, overridden && styles['token__cell--overridden'])}
+                  className={clsx(
+                    styles.token__cell,
+                    overridden && styles['token__cell--overridden'],
+                    isPending && !image && styles['token__cell--pending'],
+                  )}
                   disabled={busy || loading}
+                  aria-busy={isPending || undefined}
                   onClick={() => open(id)}
                   title={`${thumb?.name || `Token #${id}`}${overridden ? ' — has its own metadata' : ''}`}
                 >
                   <span className={styles.token__art}>
-                    {thumb?.image_uri ? (
-                      <img src={resolveStorageImageUrl(thumb.image_uri)} alt="" loading="lazy" onError={handleBrokenImage} />
-                    ) : (
-                      <em>#{id}</em>
-                    )}
+                    {image ? <img src={image} alt="" loading="lazy" onError={handleBrokenImage} /> : <em>#{id}</em>}
                   </span>
                   <span className={styles.token__cellLabel}>#{id}</span>
                 </button>

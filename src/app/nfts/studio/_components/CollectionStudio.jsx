@@ -197,6 +197,107 @@ export default function CollectionStudio() {
     }
   }
 
+  /*
+   * Which tabs have anything in them. LSP7 has a collection document and no individual tokens;
+   * an ERC collection has tokens behind a base URI and no owner-writable document of its own. A
+   * tab with nothing to do is left out rather than shown empty.
+   */
+  const ready = probe.status === 'ready'
+  const hasCollectionTab = ready && isLuksoKind(probe.kind) && Boolean(caps.canEditCollection)
+  const hasTokensTab = ready && Boolean(caps.canEditTokens)
+  const tabs = [hasCollectionTab && { id: 'collection', label: 'Collection' }, hasTokensTab && { id: 'tokens', label: 'Tokens' }].filter(Boolean)
+
+  // Remembered per collection, so pasting a new address opens on its first tab
+  const [tabChoice, setTabChoice] = useState(null)
+  // Same trap as currentDoc: both addresses are undefined before anything is pasted
+  const chosenTab = tabChoice && probe.address && tabChoice.address === probe.address ? tabChoice.tab : null
+  const activeTab = tabs.some((tab) => tab.id === chosenTab) ? chosenTab : (tabs[0]?.id ?? null)
+
+  const isLsp7 = probe.kind === COLLECTION_KIND.LSP7
+
+  // The raw pointer. For LSP8 and ERC it is the tokens' base; for LSP7 it is the collection
+  // document itself, which is why it changes tab with the kind.
+  const uriEditor = (
+    <>
+      <h2 className={styles.studio__section}>{isLsp7 ? 'Metadata URI' : 'Base URI'}</h2>
+      <label className={styles.studio__editor}>
+        <span>{isLsp7 ? 'Point the collection at a document you already host' : 'Every token, resolved as base + number'}</span>
+        <input
+          type="text"
+          value={baseUri}
+          spellCheck={false}
+          placeholder={isLsp7 ? 'ipfs://…' : 'ipfs://…/'}
+          onChange={(e) => setBaseUri(e.target.value)}
+        />
+        <small>
+          {isLsp7 ? (
+            <>
+              Written to <code>LSP4Metadata</code> as a VerifiableURI, replacing whatever the editor above saved.
+            </>
+          ) : (
+            <>
+              Token 1 will resolve to <code>{`${baseUri || 'ipfs://…/'}1`}</code>
+              {isLuksoKind(probe.kind)
+                ? ' — LSP8 appends the number and nothing else, so no file extension.'
+                : ' plus whatever suffix this contract appends.'}
+            </>
+          )}
+        </small>
+      </label>
+
+      <button type="button" className={styles.studio__save} onClick={handleSave} disabled={isPending || !baseUri.trim()}>
+        {isPending ? 'Saving…' : 'Save onchain'}
+      </button>
+    </>
+  )
+
+  const collectionPanel = hasCollectionTab && (
+    <>
+      {currentDoc ? (
+        <Lsp4MetadataEditor key={probe.address} current={currentDoc} name={probe.name} busy={isPending} onSave={saveLsp4} />
+      ) : (
+        <p className={styles.studio__note}>Reading the current metadata…</p>
+      )}
+      {isLsp7 && uriEditor}
+    </>
+  )
+
+  // Every token first, then one token: the bulk upload fills the base URI it sits above
+  const tokensPanel = hasTokensTab && (
+    <>
+      {probe.kind === COLLECTION_KIND.LSP8 && (
+        <>
+          <h2 className={styles.studio__section}>Per-token artwork</h2>
+          {/* The bulk uploader never knew it was talking to a Hup drop; it pins artwork and
+              metadata and hands back a CID, which is exactly what this page needs. */}
+          <DropArtworkUpload
+            standardId={4}
+            maxSupply={Number(probe.totalSupply ?? 0)}
+            collectionName={probe.name ?? ''}
+            disabled={isPending}
+            onPinned={({ cid }) => setBaseUri(`ipfs://${cid}/`)}
+          />
+        </>
+      )}
+
+      {uriEditor}
+
+      {probe.kind === COLLECTION_KIND.LSP8 && (
+        <>
+          <h2 className={styles.studio__section}>One token at a time</h2>
+          {/* Keyed per collection so its thumbnail and page state never carry over to the next */}
+          <TokenMetadataEditor
+            key={`${chainId}:${probe.address}`}
+            collection={probe.address}
+            chainId={chainId}
+            busy={isPending}
+            onSave={saveTokenMetadata}
+          />
+        </>
+      )}
+    </>
+  )
+
   return (
     <div className={styles.studio}>
       <header className={styles.studio__head}>
@@ -359,66 +460,40 @@ export default function CollectionStudio() {
             </p>
           )}
 
-          {caps.canEditTokens && (
+          {tabs.length > 0 && (
             <>
               <p className={styles.studio__note}>
                 <CheckCircleIcon size={14} weight="fill" /> Editable — writes go through{' '}
                 <code>{caps.method}</code>.
               </p>
 
-              {isLuksoKind(probe.kind) && (
-                <>
-                  <h2 className={styles.studio__section}>Collection metadata</h2>
-                  {currentDoc ? (
-                    <Lsp4MetadataEditor key={probe.address} current={currentDoc} name={probe.name} busy={isPending} onSave={saveLsp4} />
-                  ) : (
-                    <p className={styles.studio__note}>Reading the current metadata…</p>
-                  )}
-
-                  <h2 className={styles.studio__section}>Per-token artwork</h2>
-                </>
+              {tabs.length > 1 && (
+                <div className={styles.studio__tabs} role="tablist" aria-label="Studio sections">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      id={`studio-tab-${tab.id}`}
+                      aria-selected={activeTab === tab.id}
+                      aria-controls={`studio-panel-${tab.id}`}
+                      className={clsx(styles.studio__tab, activeTab === tab.id && styles['studio__tab--active'])}
+                      onClick={() => setTabChoice({ address: probe.address, tab: tab.id })}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
               )}
 
-              {/* The bulk uploader never knew it was talking to a Hup drop; it pins artwork and
-                  metadata and hands back a CID, which is exactly what this page needs. */}
-              {probe.kind === COLLECTION_KIND.LSP8 && (
-                <DropArtworkUpload
-                  standardId={4}
-                  maxSupply={Number(probe.totalSupply ?? 0)}
-                  collectionName={probe.name ?? ''}
-                  disabled={isPending}
-                  onPinned={({ cid }) => setBaseUri(`ipfs://${cid}/`)}
-                />
-              )}
-
-              {probe.kind === COLLECTION_KIND.LSP8 && (
-                <>
-                  <h2 className={styles.studio__section}>One token at a time</h2>
-                  <TokenMetadataEditor collection={probe.address} chainId={chainId} busy={isPending} onSave={saveTokenMetadata} />
-                </>
-              )}
-
-              <h2 className={styles.studio__section}>Base URI</h2>
-              <label className={styles.studio__editor}>
-                <span>Every token, resolved as base + number</span>
-                <input
-                  type="text"
-                  value={baseUri}
-                  spellCheck={false}
-                  placeholder="ipfs://…/"
-                  onChange={(e) => setBaseUri(e.target.value)}
-                />
-                <small>
-                  Token 1 will resolve to <code>{`${baseUri || 'ipfs://…/'}1`}</code>
-                  {isLuksoKind(probe.kind)
-                    ? ' — LSP8 appends the number and nothing else, so no file extension.'
-                    : ' plus whatever suffix this contract appends.'}
-                </small>
-              </label>
-
-              <button type="button" className={styles.studio__save} onClick={handleSave} disabled={isPending || !baseUri.trim()}>
-                {isPending ? 'Saving…' : 'Save onchain'}
-              </button>
+              <div
+                className={styles.studio__panel}
+                role={tabs.length > 1 ? 'tabpanel' : undefined}
+                id={`studio-panel-${activeTab}`}
+                aria-labelledby={tabs.length > 1 ? `studio-tab-${activeTab}` : undefined}
+              >
+                {activeTab === 'collection' ? collectionPanel : tokensPanel}
+              </div>
             </>
           )}
         </>
