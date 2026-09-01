@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { ArrowLeftIcon, ArrowRightIcon, CornersOutIcon, PauseIcon, PlayIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowLeftIcon, ArrowRightIcon, CornersOutIcon, PauseIcon, PlayIcon, SparkleIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
 import useMediaZoom from '@/hooks/useMediaZoom'
 import { primaryGateway } from '@/lib/ipfsGateways'
@@ -471,6 +471,15 @@ export default function MediaGallery({ data = [] }) {
           <div className={styles.spoilerOverlay} onClick={(e) => handleReveal(i, e)}>
             <span>Spoiler</span>
           </div>
+        )}
+        {/* Set at upload from the file's own Content Credentials (see lib/aiProvenance) — this
+            reports what the asset declared about itself, so it is never on a post that did not
+            arrive carrying it, and never absent from one that did */}
+        {item.aiGenerated && (
+          <span className={styles.aiBadge}>
+            <SparkleIcon size={12} weight="fill" />
+            Made with AI
+          </span>
         )}
       </div>
     )

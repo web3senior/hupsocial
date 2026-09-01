@@ -1,0 +1,196 @@
+.token {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr));
+    gap: 0.4rem;
+  }
+
+  &__cell {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    cursor: pointer;
+
+    &:disabled { opacity: 0.5; cursor: default; }
+
+    &:hover:not(:disabled) .token__art,
+    &:focus-visible .token__art {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  // The artwork if the indexer has it, the number if it does not — the cell is the same size
+  // either way, so a half-indexed collection does not draw a ragged grid.
+  &__art {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    transition: border-color 0.15s ease;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    em {
+      font-style: normal;
+      font-size: var(--font-size-12);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__cellLabel {
+    text-align: center;
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted, #888);
+  }
+
+  // Already carries its own document — the one a creator is usually hunting for
+  &__cell--overridden {
+    .token__art {
+      border-color: var(--network-color-primary, var(--color-primary));
+      border-width: 2px;
+    }
+
+    .token__cellLabel {
+      color: var(--text);
+      font-weight: 700;
+    }
+  }
+
+  &__pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    button {
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      cursor: pointer;
+      color: var(--text);
+
+      &:disabled { opacity: 0.4; cursor: default; }
+    }
+  }
+
+  &__lookup {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  &__field {
+    flex: 1 1 12rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0 0.75rem;
+    color: var(--text-muted, #888);
+
+    &:focus-within {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      background: none;
+      border: none;
+      outline: none;
+      padding: 0.6rem 0;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--text);
+    }
+  }
+
+  &__go {
+    flex-shrink: 0;
+    padding: 0 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: none;
+    cursor: pointer;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    color: var(--text);
+
+    &:hover:not(:disabled) {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 0.05rem;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__back {
+    all: unset;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  &__note {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.55;
+  }
+}

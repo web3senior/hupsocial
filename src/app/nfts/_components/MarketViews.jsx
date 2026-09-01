@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
-import { SlidersHorizontalIcon, RocketLaunchIcon, ShieldCheckIcon, SquaresFourIcon, RankingIcon } from '@phosphor-icons/react'
+import { PaintBrushIcon, RocketLaunchIcon, ShieldCheckIcon, SquaresFourIcon, RankingIcon } from '@phosphor-icons/react'
 import { appChains, CONTRACTS } from '@/config/contracts'
 import Tooltip from '@/components/ui/Tooltip'
 import FeaturedCollections from './FeaturedCollections'
@@ -177,12 +177,12 @@ export default function MarketViews({ shellClassName }) {
 
         {/* Quieter than Drops on purpose: minting is what most people came for, and editing a
             collection's metadata is something only its owner ever does. */}
-        <Link href="/nfts/manage" className={styles.views__manage}>
-          <SlidersHorizontalIcon size={15} aria-hidden="true" />
-          Manage
+        <Link href="/nfts/studio" className={styles.views__studio}>
+          <PaintBrushIcon size={15} aria-hidden="true" />
+          Studio
         </Link>
 
-        {/* Same quiet register as Manage: the audit is a tool you reach for, not a destination */}
+        {/* Same quiet register as Studio: the audit is a tool you reach for, not a destination */}
         <Link href="/nfts/audit" className={styles.views__audit}>
           <ShieldCheckIcon size={15} aria-hidden="true" />
           Audit

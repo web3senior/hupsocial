@@ -1,0 +1,209 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+
+  &__images {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.6rem;
+  }
+
+  &__image {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    cursor: pointer;
+    color: var(--text-muted, #888);
+    transition: border-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    img {
+      width: 2.75rem;
+      height: 2.75rem;
+      flex-shrink: 0;
+      border-radius: var(--global-border-radius);
+      object-fit: cover;
+    }
+
+    > svg {
+      flex-shrink: 0;
+      width: 2.75rem;
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--text);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+    }
+  }
+
+  &__image--filled {
+    border-style: solid;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    > span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.6rem 0.75rem;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--text);
+      outline: none;
+      resize: vertical;
+
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+    }
+
+    // Hidden until the box is in use, so the form is not fenced in by scrollbars
+    textarea {
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+
+      &:hover,
+      &:focus {
+        scrollbar-color: var(--thumbBG) transparent;
+      }
+    }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  &__listHead {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    em {
+      font-style: normal;
+      opacity: 0.7;
+    }
+  }
+
+  &__row {
+    display: flex;
+    gap: 0.4rem;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.5rem 0.65rem;
+      font: inherit;
+      font-size: var(--font-size-12);
+      color: var(--text);
+      outline: none;
+
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+    }
+
+    button {
+      all: unset;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      width: 2rem;
+      border-radius: var(--global-border-radius);
+      cursor: pointer;
+      color: var(--text-muted, #888);
+
+      &:hover:not(:disabled) {
+        color: #ef4444;
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+    }
+  }
+
+  &__add {
+    all: unset;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover:not(:disabled) {
+      color: var(--network-color-primary, var(--color-primary));
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  &__save {
+    align-self: flex-start;
+    padding: 0.6rem 1.3rem;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--white);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+
+    &:hover:not(:disabled) {
+      opacity: 0.85;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  &__note {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.55;
+  }
+}

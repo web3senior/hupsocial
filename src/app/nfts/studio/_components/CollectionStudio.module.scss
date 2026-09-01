@@ -1,0 +1,434 @@
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &__head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    h1 {
+      margin: 0;
+      font-size: var(--font-size-20, 1.25rem);
+    }
+
+    p {
+      margin: 0;
+      max-width: 44rem;
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--text-muted, #888);
+      line-height: 1.6;
+    }
+  }
+
+  // Networks as a scrollable row rather than a select: which chain you are on decides whether
+  // an address resolves at all, so it should be visible, not one click away.
+  // The popover's trigger, shaped like the search field beside it so the row reads as one control.
+  // Its width is fixed rather than fitted to the name: chain names run from "Base" to "BNB Smart
+  // Chain", so a shrink-to-fit trigger resized the whole row every time the network changed, and
+  // the search box jumped sideways under the cursor.
+  &__network {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    width: 12.5rem;
+    cursor: pointer;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text);
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    img {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    // Takes the slack so the caret stays pinned right, and truncates instead of widening
+    > span {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    svg {
+      flex-shrink: 0;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  // Chrome only — NativePopover handles anchoring and dismissal
+  &__networkMenu {
+    padding: 0.3rem;
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    scrollbar-width: thin;
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    button {
+      all: unset;
+      box-sizing: border-box;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.5rem;
+      border-radius: var(--global-border-radius);
+      cursor: pointer;
+      font-size: var(--font-size-14, 0.875rem);
+      white-space: nowrap;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--surface-muted);
+      }
+    }
+
+    img {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    // The tick sits at the end, so the names stay left-aligned down the list
+    svg {
+      margin-inline-start: auto;
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__networkOption--active {
+    font-weight: 600;
+  }
+
+  // Anchors the suggestion list to the field above it
+  // Genuinely one row at every width. Nine named chips plus a search box exceed any realistic
+  // container, so rather than wrapping, the chain strip scrolls inside itself and the search box
+  // keeps the remainder. Wrapping put the box on a second line at almost every screen size.
+  &__lookup {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  &__search {
+    position: relative;
+    // Shrinks a long way before the chips do, but never below a width an address is readable in
+    flex: 1 1 16rem;
+    min-width: 9rem;
+  }
+
+  &__field {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0 0.75rem;
+    color: var(--text-muted, #888);
+
+    &:focus-within {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      background: none;
+      border: none;
+      outline: none;
+      padding: 0.6rem 0;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--text);
+    }
+  }
+
+  // Floated over the content below rather than pushing it down — a list that reflows the page
+  // on every keystroke makes the thing you were reaching for move as you reach.
+  &__suggestions {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 0.3rem);
+    left: 0;
+    right: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0.3rem;
+    max-height: 19rem;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    scrollbar-width: thin;
+
+    button {
+      all: unset;
+      box-sizing: border-box;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.45rem 0.5rem;
+      border-radius: var(--global-border-radius);
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--surface-muted);
+      }
+    }
+
+    img {
+      width: 2rem;
+      height: 2rem;
+      flex-shrink: 0;
+      border-radius: var(--global-border-radius);
+      object-fit: cover;
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 0.05rem;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__suggestionMark {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  // The shortcut, not the main route — quieter than the search it sits above, and gone the
+  // moment a collection is chosen.
+  &__mine {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+      gap: 0.4rem;
+    }
+
+    button {
+      all: unset;
+      box-sizing: border-box;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+    }
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__mineHead {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    em {
+      font-style: normal;
+      opacity: 0.7;
+    }
+  }
+
+  &__note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.55;
+    color: var(--text-muted, #888);
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.15rem;
+    }
+
+    code {
+      font-family: var(--font-mono, monospace);
+      background: var(--surface-muted);
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+    }
+  }
+
+  &__note--bad {
+    color: #ef4444;
+  }
+
+  &__facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.75rem 1.25rem;
+    margin: 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+
+    div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+
+    dt {
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted, #888);
+    }
+
+    dd {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  &__section {
+    margin: 0.5rem 0 0;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+  }
+
+  &__editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    > span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.6rem 0.75rem;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      font-family: var(--font-mono, monospace);
+      color: var(--text);
+      outline: none;
+
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+
+      code {
+        font-family: var(--font-mono, monospace);
+      }
+    }
+  }
+
+  &__save {
+    align-self: flex-start;
+    padding: 0.6rem 1.3rem;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--white);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+
+    &:hover:not(:disabled) {
+      opacity: 0.85;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+}
