@@ -552,37 +552,66 @@
   }
 }
 
+// On a phone the six columns become a stack: each row a block, each cell one
+// "LABEL value" line named by its data-label
 .audit {
   @media (max-width: 600px) {
     &__table {
+      display: block;
       min-width: 0;
 
-      th,
-      td {
-        white-space: normal;
+      thead {
+        display: none;
+      }
+
+      tbody,
+      tr {
+        display: block;
+      }
+
+      tr {
+        padding: 0.5rem 0;
       }
 
       td {
         display: flex;
         align-items: flex-start;
         gap: 0.5rem;
+        padding: 0.15rem 0;
+        border-bottom: none;
+        white-space: normal;
         text-align: left;
 
         &::before {
-          flex: 0 0 5.5rem;
+          content: attr(data-label);
+          flex: 0 0 5rem;
+          margin-top: 0.2em;
           font-size: 0.65rem;
           font-weight: 600;
           letter-spacing: 0.06em;
           text-transform: uppercase;
           color: var(--text-muted, #888);
         }
-      }
 
-      // A group's heading row is the only thing that separates one token from the next
-      tr {
-        margin-bottom: 0.75rem;
-      }
+        // The item cell is the card's own heading — it needs no label in front
+        &:first-child::before {
+          content: none;
+        }
 
+        // A hop with nothing to open would render as a labelled dash — drop the line
+        &:last-child:not(:has(a)) {
+          display: none;
+        }
+      }
+    }
+
+    // The heavier group rule moves from the cells to the row itself
+    &__row--group {
+      border-top: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+    }
+
+    &__row--group td {
+      border-top: none;
     }
   }
 }

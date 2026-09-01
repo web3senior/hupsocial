@@ -466,32 +466,77 @@
   }
 }
 
+// On a phone the board becomes a stack of cards: the collection as the heading, the copy
+// button in its corner, every other cell one "LABEL value" line named by its data-label
 .tool {
   @media (max-width: 600px) {
     &__table {
+      display: block;
       min-width: 0;
 
-      th,
-      td {
-        white-space: normal;
+      thead {
+        display: none;
+      }
+
+      tbody,
+      tr {
+        display: block;
+      }
+
+      tr {
+        position: relative;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid var(--border);
+
+        &:last-child {
+          border-bottom: none;
+        }
       }
 
       td {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: 0.5rem;
+        padding: 0.15rem 0;
+        border-bottom: none;
+        white-space: normal;
         text-align: left;
 
         &::before {
-          flex: 0 0 5.5rem;
+          content: attr(data-label);
+          flex: 0 0 5rem;
           font-size: 0.65rem;
           font-weight: 600;
           letter-spacing: 0.06em;
           text-transform: uppercase;
           color: var(--text-muted, #888);
         }
-      }
 
+        // The collection cell is the card's heading; keep it clear of the corner button
+        &:first-child {
+          padding-right: 2.75rem;
+
+          &::before {
+            content: none;
+          }
+        }
+
+        // The copy-link button sits in the card's corner rather than as a labelled line
+        &:last-child {
+          position: absolute;
+          top: 0.6rem;
+          right: 0;
+          padding: 0;
+
+          &::before {
+            content: none;
+          }
+        }
+      }
+    }
+
+    &__findings {
+      min-width: 0;
     }
   }
 }

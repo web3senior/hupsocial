@@ -300,7 +300,7 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
             <span title={audit.auditedAt ? new Date(audit.auditedAt).toLocaleString() : undefined}>Audited {formatRelativeTime(audit.auditedAt) || 'just now'}</span>
             <span>{kindLabel}</span>
             <span>
-              {COUNT.format(report.sampled.tokens)} {report.sampled.tokens === 1 ? 'token' : 'tokens'} · {COUNT.format(report.sampled.assets)} files probed
+              {COUNT.format(report.sampled.tokens)} {report.sampled.tokens === 1 ? 'token' : 'tokens'} · {COUNT.format(report.sampled.assets)} {report.sampled.assets === 1 ? 'file' : 'files'} probed
             </span>
             {showCollectionLink && (
               <Link href={`/nfts/${chainId}/collection/${collection}`} className={styles.audit__metaLink}>
