@@ -85,18 +85,16 @@ export const useBatchLike = () => {
     try {
       setPendingNetworkId(String(group.networkId))
       const batches = chunk(group.ids, MAX_SOLANA_BATCH_LIKE)
-      let sponsoredCount = 0
 
       for (let index = 0; index < batches.length; index++) {
         const batch = batches[index]
         if (batches.length > 1) toast(`Signing batch ${index + 1} of ${batches.length}`, 'info')
 
-        const { sponsored } = await sendHupAction({
+        await sendHupAction({
           networkId,
           signer,
           instructions: batch.map((id) => hupInstruction.like({ networkId, actor, id })),
         })
-        if (sponsored) sponsoredCount++
 
         // Same as the EVM path: flag every signed post as liked right away, clear per batch
         markLikeOverride(actor, group.networkId, batch, true)
@@ -104,7 +102,7 @@ export const useBatchLike = () => {
       }
 
       const likedLabel = group.ids.length === 1 ? 'Post Liked' : 'Posts Liked'
-      toast(sponsoredCount === batches.length ? `${likedLabel} — gas covered by Hup!` : likedLabel, 'success')
+      toast(likedLabel, 'success')
     } catch (err) {
       console.error('Solana batch like failed:', err)
       toast(shortTxError(err, 'Batch like failed'), 'error')
@@ -223,7 +221,6 @@ export const useBatchLike = () => {
         // The pre-check only skips a relay round trip that the local cooldown mirror already
         // knows is doomed; the server stays the authority once a request goes out.
         let relayUsable = isGaslessEnabled(networkId) && gaslessCooldown('batchLike', networkId, address) === 0
-        let relayedCount = 0
 
         for (let index = 0; index < batches.length; index++) {
           const batch = batches[index]
@@ -245,7 +242,6 @@ export const useBatchLike = () => {
               })
 
               sent = true
-              relayedCount++
             } catch (err) {
               // Unlike posting, a like cooldown falls back to the paid path instead of
               // stopping: the free-like window can be a long wait, hearts that stop working
@@ -289,14 +285,7 @@ export const useBatchLike = () => {
         }
 
         const likedLabel = queue.length === 1 ? 'Post Liked' : 'Posts Liked'
-        toast(
-          relayedCount === batches.length
-            ? `${likedLabel} — gas covered by Hup!`
-            : sessionUsable
-              ? `${likedLabel} via active session key!`
-              : likedLabel,
-          'success',
-        )
+        toast(likedLabel, 'success')
       } catch (err) {
         console.error('Batch like transaction failed:', err)
         toast(shortTxError(err, 'Batch like failed'), 'error')

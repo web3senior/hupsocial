@@ -258,7 +258,7 @@ export const Like = ({ post, onUpdate }) => {
       markLikeOverride(actor, post.network_id, post.id, liked)
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
       if (typeof onUpdate === 'function') onUpdate(post.id, { is_liked: liked ? 1 : 0, total_likes: nextCount })
-      toast(`${liked ? 'Liked' : 'Like removed'}${sponsored ? ' — gas covered by Hup!' : ' onchain!'}`, 'success')
+      toast(`${liked ? 'Liked' : 'Like removed'}${sponsored ? '' : ' onchain!'}`, 'success')
     } catch (err) {
       console.error(`${liked ? 'Like' : 'Unlike'} failed:`, err)
       toast(shortTxError(err, liked ? 'Could not like post' : 'Could not remove like'), 'error')
@@ -294,7 +294,7 @@ export const Like = ({ post, onUpdate }) => {
     // counter never jump while the action settles
     mutate({ isLiked: liked, likeCount: nextCount, isProcessing: true }, { revalidate: false })
 
-    const settle = (via) => {
+    const settle = () => {
       // Pin the optimistic state past the cidex indexing lag so the revalidation cannot
       // flip the heart back
       markLikeOverride(actor, post.network_id, post.id, liked)
@@ -304,14 +304,14 @@ export const Like = ({ post, onUpdate }) => {
         onUpdate(post.id, { is_liked: liked ? 1 : 0, total_likes: nextCount })
       }
 
-      toast(`${liked ? 'Liked' : 'Like removed'}${via}`, 'success')
+      toast(liked ? 'Liked' : 'Like removed', 'success')
     }
 
     try {
       const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
 
       if (await tryGaslessHeart(functionName, args, target, session.active)) {
-        settle(' — gas covered by Hup!')
+        settle()
         return
       }
 
@@ -326,7 +326,7 @@ export const Like = ({ post, onUpdate }) => {
           args,
         })
 
-        settle(' via active session key!')
+        settle()
         return
       }
 

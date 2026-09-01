@@ -151,7 +151,7 @@ export const Repost = ({ post, onQuote }) => {
         ],
       })
 
-      toast(sponsored ? 'Reposted — gas covered by Hup!' : 'Repost saved onchain!', 'success')
+      toast(sponsored ? 'Reposted!' : 'Repost saved onchain!', 'success')
     } catch (err) {
       console.error('Repost failed:', err)
       toast(err.shortMessage || err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -228,7 +228,7 @@ export const Repost = ({ post, onQuote }) => {
       // session key and for a wallet signing for itself. The wallet fallback below keeps
       // its ZERO_ADDRESS direct-call form.
       if (await tryGaslessRepost([address, ContentType.Repost, '', BigInt(id), false])) {
-        toast('Reposted — gas covered by Hup!', 'success')
+        toast('Reposted!', 'success')
         return
       }
 
