@@ -233,11 +233,20 @@ function buildApiFilters(filters, priceDecimals, search) {
   return api
 }
 
-// Counts only what the popover alone can show — status/referral/sort stay visible in the
-// quick row (the panel merely mirrors them) and the network in the page's logo strip, so
-// badging them would flag filters the user can already see
+// Counts every non-default setting the closed panel hides; the network isn't counted
+// because the page's logo strip already shows it
 const hiddenFilterCount = (filters) =>
-  [filters.collection, filters.standard, filters.token, filters.seller, filters.minPrice, filters.maxPrice].filter(Boolean).length
+  [
+    filters.collection,
+    filters.standard,
+    filters.token,
+    filters.seller,
+    filters.minPrice,
+    filters.maxPrice,
+    filters.referral,
+    filters.status !== DEFAULT_FILTERS.status,
+    filters.sort !== DEFAULT_FILTERS.sort,
+  ].filter(Boolean).length
 
 const sellerLabel = (user) => user.display_name || shortAddress(user.wallet_address)
 
@@ -256,32 +265,6 @@ function SellerAvatar({ user }) {
     )
   }
   return <Avatar className={styles.filtersPanel__sellerAvatar} src={profile.profileImage} size={24} />
-}
-
-/**
- * Quick Select
- * One pill in the always-visible filter row. Carries no label of its own — the selected
- * option is the label — so it needs an aria-label to stay announceable, and highlights
- * itself whenever it holds something other than its default. The tooltip is where the
- * label went: what the pill filters on, in a sentence, without a word of chrome in the row.
- */
-function QuickSelect({ label, value, defaultValue, options, onChange, tooltip }) {
-  return (
-    <Tooltip content={tooltip}>
-      <select
-        aria-label={label}
-        className={clsx(styles.market__quickSelect, value !== defaultValue && styles['market__quickSelect--active'])}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </Tooltip>
-  )
 }
 
 /**
@@ -650,39 +633,10 @@ export default function NftMarketGrid() {
         />
       </label>
 
-      {/* The filters users reach for constantly sit in the open; the narrower ones
-          (collection, standard, payment token, price) stay behind the funnel. The pills
-          scroll, the funnel does not — it must stay reachable at any width. The chain is
-          not here at all: it is the page's filter, picked from the logo strip above both
-          views (MarketViews), and arrives through the URL like everything else. */}
+      {/* Every filter lives behind the funnel. The chain is not here at all: it is the
+          page's filter, picked from the logo strip above both views (MarketViews), and
+          arrives through the URL like everything else. */}
       <div className={styles.market__toolbar}>
-        <div className={styles.market__quickFilters}>
-          <QuickSelect
-            label="Status"
-            tooltip="Where a listing stands onchain. Active is what you can buy right now — widen it to see what already sold."
-            value={filters.status}
-            defaultValue="active"
-            options={STATUS_OPTIONS}
-            onChange={(value) => setFilters((f) => ({ ...f, status: value }))}
-          />
-          <QuickSelect
-            label="Referral reward"
-            tooltip="The cut of the sale a listing pays whoever brings the buyer. Filter for listings that pay at least a set share."
-            value={filters.referral}
-            defaultValue=""
-            options={REFERRAL_OPTIONS}
-            onChange={(value) => setFilters((f) => ({ ...f, referral: value }))}
-          />
-          <QuickSelect
-            label="Sort"
-            tooltip="Order the grid — by listing age, price, referral reward, or when it last sold. Price order only lines up across listings priced in the same token."
-            value={filters.sort}
-            defaultValue="newest"
-            options={SORT_OPTIONS}
-            onChange={handleSortChange}
-          />
-        </div>
-
         {/* How the listings render — the collection page's toggle, with List swapping the
             tiles for the market table */}
         <LayoutToggle value={layout} onChange={setLayout} label="Grid layout" />
@@ -720,7 +674,7 @@ export default function NftMarketGrid() {
               placement="top-end"
               content={
                 hiddenCount > 0
-                  ? `${hiddenCount} more ${hiddenCount === 1 ? 'filter is' : 'filters are'} set here — collection, seller, NFT standard, payment token and price range.`
+                  ? `${hiddenCount} ${hiddenCount === 1 ? 'filter is' : 'filters are'} set in this panel.`
                   : 'Every filter in one panel — sort, status, referral, collection, seller, NFT standard, payment token and price range.'
               }
             >
@@ -733,8 +687,6 @@ export default function NftMarketGrid() {
         >
           {() => (
             <div className={styles.filtersPanel__body}>
-              {/* The quick row's three, mirrored so this one panel holds every filter —
-                  narrow screens scroll the pills partly out of reach */}
               <div className={styles.filtersPanel__field}>
                 <label htmlFor="nftFilterSort">Sort</label>
                 <select id="nftFilterSort" value={filters.sort} onChange={(e) => handleSortChange(e.target.value)}>
