@@ -39,8 +39,9 @@ export const getServerPublicClient = (chainId) => {
   const client = createPublicClient({
     chain,
     // Metadata resolution fires several reads per token — batching folds them into
-    // one JSON-RPC request so public endpoints don't rate-limit a feed render.
-    transport: http(rpcUrl, { batch: true }),
+    // one JSON-RPC request so public endpoints don't rate-limit a feed render. Bounded so
+    // an endpoint that stops answering costs a request twenty seconds, not viem's default four attempts.
+    transport: http(rpcUrl, { batch: true, timeout: 10_000, retryCount: 1 }),
   })
 
   clients.set(cacheKey, client)

@@ -94,14 +94,15 @@ export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}
  * documents — a collection's metadata JSON — where the wait is the whole cost and no single
  * host is worth waiting on: the primary holds our own pins, and a collection's document is
  * almost never one of those, so it answers 504 within a second while the host that does hold
- * it is never asked. Losers are aborted so their sockets are freed; the winner's is not.
+ * it is never asked. Losers are aborted so their sockets are freed; the winner is read to the
+ * end inside the same bound.
  *
  * Per-attempt controllers rather than AbortSignal.any, which older Safari lacks — this runs in
  * the browser too, behind the token-icon and NFT hooks.
  * @param {string} cid Bare CID or path, already stripped of its `ipfs://` prefix.
  * @param {{timeoutMs?: number, init?: RequestInit}} [options] Per-gateway timeout, fetch
  * options (`init.signal` is replaced by the race's own).
- * @returns {Promise<Response>} The first OK response.
+ * @returns {Promise<Response>} The first OK response, its body already buffered.
  * @throws {Error & {attempted: number, statuses: number[], timedOut: boolean}} When every
  * gateway failed: how many were asked, every HTTP status that came back (a host that never
  * answered contributes none) and whether any of them ran out the clock.
@@ -122,9 +123,14 @@ export async function raceIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {} 
     }, timeoutMs)
     try {
       const response = await fetch(attempt.url, { redirect: 'follow', ...init, signal: attempt.controller.signal })
-      if (response.ok) return { response, attempt }
-      statuses.push(response.status)
-      throw Object.assign(new Error(`IPFS gateway error: ${response.status}`), { status: response.status })
+      if (!response.ok) {
+        statuses.push(response.status)
+        throw Object.assign(new Error(`IPFS gateway error: ${response.status}`), { status: response.status })
+      }
+      // Headers are not delivery: a gateway can answer 200 and then stall the bytes, so the
+      // body is read while the clock is still running rather than after it has been cleared.
+      const body = await response.arrayBuffer()
+      return { response: new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers }), attempt }
     } catch (error) {
       /* A loser cancelled because another host delivered says nothing about the CID */
       if (attempt.controller.signal.aborted && !attempt.expired) throw error

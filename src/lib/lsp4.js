@@ -1,6 +1,7 @@
 // Shared LSP4 (LUKSO digital asset metadata) helpers — used by useNftMetadata for
 // LSP8 collections and useTokenIcon for LSP7 payment tokens in the browser, and by the
-// metadata caches on the server. Isomorphic: only global fetch/atob, which both runtimes have.
+// metadata caches on the server. Isomorphic: only global fetch/atob/TextDecoder, which both
+// runtimes have.
 
 import { hexToString } from 'viem'
 import { isIPFSHash, resolveStorageUrl } from '@/lib/storageHelper'
@@ -86,6 +87,28 @@ const isDeadPrefix = (prefix) => {
 // is a statement about the host, and the host is what the dead-prefix rule remembers.
 const DEFINITIVE_STATUSES = new Set([400, 404, 410, 451])
 
+// atob yields one character per byte; the bytes are UTF-8 and have to be decoded as such, or
+// every non-ASCII character in the document — µ, an accent, an emoji — comes out as mojibake.
+const decodeBase64Utf8 = (payload) => new TextDecoder().decode(Uint8Array.from(atob(payload), (char) => char.charCodeAt(0)))
+
+// Documents in flight or just fetched, by URI. Numbered editions that share one document (a
+// base URI ending in `#`) would otherwise fetch it once per token, every grid.
+const DOCUMENT_MEMO_MS = 30 * 1000
+const DOCUMENT_MEMO_LIMIT = 500
+const documents = new Map()
+
+const rememberDocument = (key, promise) => {
+  if (documents.size >= DOCUMENT_MEMO_LIMIT) {
+    const now = Date.now()
+    for (const [entryKey, entry] of documents) if (entry.until <= now) documents.delete(entryKey)
+  }
+  documents.set(key, { promise, until: Infinity })
+  promise.then(
+    () => documents.set(key, { promise, until: Date.now() + DOCUMENT_MEMO_MS }),
+    () => documents.delete(key),
+  )
+}
+
 /**
  * Fetches and parses a metadata JSON document from any storage URI.
  *
@@ -100,6 +123,9 @@ const DEFINITIVE_STATUSES = new Set([400, 404, 410, 451])
  * every LUKSO collection's CID while the gateway that held it was never asked, and the
  * collection cache filled with whatever the indexer remembered instead. The race keeps the
  * same bound: no gateway waits past the clock, and the losers are cancelled.
+ *
+ * Callers asking for the same document at once share one fetch, and the answer is kept for
+ * half a minute. The returned object is shared too — read it, never mutate it.
  *
  * @param {string} uri ipfs://, https:// or a data: URI.
  * @param {{ baseUrl?: string, timeoutMs?: number }} [options] `baseUrl` makes the
@@ -116,7 +142,7 @@ export const fetchMetadataJson = async (uri, options = {}) => {
     // choke on the plain-text body.
     const isBase64 = comma !== -1 && uri.slice(0, comma).includes(';base64')
     const payload = uri.slice(comma + 1)
-    if (isBase64) return JSON.parse(atob(payload))
+    if (isBase64) return JSON.parse(decodeBase64Utf8(payload))
     // Percent-decoding is best effort — a body containing a bare `%` is not valid
     // percent-encoding but is still valid JSON.
     try {
@@ -126,6 +152,17 @@ export const fetchMetadataJson = async (uri, options = {}) => {
     }
   }
 
+  const key = `${uri}|${options.baseUrl || ''}`
+  const memo = documents.get(key)
+  if (memo && memo.until > Date.now()) return memo.promise
+
+  const promise = fetchMetadataDocument(uri, options)
+  rememberDocument(key, promise)
+  return promise
+}
+
+// One fetch of one document, bounded, with the host remembered when it is the problem.
+const fetchMetadataDocument = async (uri, options) => {
   // Keyed on the onchain URI rather than the gateway URL it resolves to, so the prefix is the
   // collection's own (`ipfs://<cid>`, `https://api.collection.xyz/token`) and never the
   // gateway's.
