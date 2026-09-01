@@ -63,8 +63,8 @@ function DropRow({ drop, chainId, onAttached }) {
  * Closed drops are filtered out: their card can't mint, so attaching one to a fresh post is
  * almost certainly a mistake.
  *
- * Re-attached allowlist-gated drops carry no allowlist file pointer (it only travels in the
- * original post's payload), so their card mints work for open/follower gates only.
+ * Allowlist-gated drops re-attach cleanly — the list lives onchain in the engine, so any
+ * card can check eligibility and mint with nothing extra in the payload.
  *
  * @param {Object} props
  * @param {number} props.chainId The chain the post lands on — the drop is pinned to it too.

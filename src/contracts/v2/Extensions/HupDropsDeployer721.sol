@@ -43,7 +43,7 @@ contract HupDropsDeployer721 is IHupDropsDeployer {
   /**
    * @notice Deploys a HupDropCollection721 owned by `_creator`, minted only by the engine.
    * @param _params abi.encode(string name, string symbol, string baseURI, string uriSuffix,
-   *        string contractURI, address royaltyReceiver, uint96 royaltyBps)
+   *        string contractURI, address royaltyReceiver, uint96 royaltyBps, bool burnable)
    */
   function deploy(address _creator, uint256 _maxSupply, bytes calldata _params) external returns (address collection) {
     if (msg.sender != drops) revert OnlyDrops();
@@ -55,9 +55,10 @@ contract HupDropsDeployer721 is IHupDropsDeployer {
       string memory uriSuffix,
       string memory contractURI,
       address royaltyReceiver,
-      uint96 royaltyBps
-    ) = abi.decode(_params, (string, string, string, string, string, address, uint96));
+      uint96 royaltyBps,
+      bool burnable
+    ) = abi.decode(_params, (string, string, string, string, string, address, uint96, bool));
 
-    collection = address(new HupDropCollection721(drops, _creator, _maxSupply, name, symbol, baseURI, uriSuffix, contractURI, royaltyReceiver, royaltyBps));
+    collection = address(new HupDropCollection721(drops, _creator, _maxSupply, name, symbol, baseURI, uriSuffix, contractURI, royaltyReceiver, royaltyBps, burnable));
   }
 }

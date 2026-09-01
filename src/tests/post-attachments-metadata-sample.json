@@ -37,7 +37,7 @@
 
   "nftDrop": {
     "dropId": "4",
-    "chainId": 4201,
+    "chainId": 42,
     "collection": "0x073F00000000000000000000000000000082DaC0",
     "standardId": 3,
     "name": "Alpha Node Passes",

@@ -2,43 +2,53 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { formatUnits, isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { LockSimpleOpenIcon, LockSimpleIcon, MinusIcon, PlusIcon, UsersIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
+import ProgressBar from '@/components/ui/ProgressBar'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { DROP_GATES, allowlistProof, formatPhaseTime, gateLabel, phaseStatus, PHASE_STATUS } from '@/lib/drops'
+import { DROP_GATES, formatPhaseTime, gateLabel, phaseStatus, PHASE_STATUS } from '@/lib/drops'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
-import { handleBrokenImage } from '@/lib/utils'
 import { networkColorStyle } from '@/lib/networkColors'
+import { describeWalletError } from '@/lib/walletErrors'
+import { handleBrokenImage } from '@/lib/utils'
 import dropsAbi from '@/abis/HupDrops.json'
 import { toast } from '@/components/NextToast'
+import MintReviewDialog from './MintReviewDialog'
 import styles from './DropCard.module.scss'
 
 const amountFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
 const countFormat = new Intl.NumberFormat('en')
 
+const ERC20_TOKEN_ABI = [
+  { name: 'allowance', type: 'function', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [{ type: 'bool' }] },
+  { name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+  { name: 'symbol', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+]
+
+const LSP7_TOKEN_ABI = [
+  { name: 'authorizedAmountFor', type: 'function', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { name: 'authorizeOperator', type: 'function', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }, { type: 'bytes' }], outputs: [] },
+  { name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+]
+
 /**
  * Drop Card
- * Embedded mint card for posts carrying an `nftDrop` content reference — the launchpad's feed
- * surface. The content JSON is only a pointer plus static art (dropId, chainId, collection,
- * standardId, name, symbol, image, allowlistCid); supply, phases, and progress resolve live
- * from the HupDrops engine so the card can never render stale mint state.
- * @param {Object} props
- * @param {Object} props.drop The post's nftDrop content payload.
- * @param {string} [props.referral] Reposter credited with mints that arrive via their share —
- * the drop's creator-set referral share pays out to them, exactly like TradeCard sales.
- * @param {boolean} [props.showDetailsLink] Renders the View link to /drops/[networkId]/[dropId].
- * @param {boolean} [props.compact] Mint panel only — no media or title. For the drop page,
- * which already presents the artwork at full size.
+ * Embedded mint card for posts carrying an `nftDrop` content reference. The payload is only a
+ * pointer plus static art; supply, phases, progress, and gate eligibility resolve live from the engine.
+ * @param {string} [props.referral] Reposter credited with mints that arrive via their share.
+ * @param {boolean} [props.compact] Mint panel only — no media or title.
  */
 const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) => {
   const [quantity, setQuantity] = useState(1)
   const [selectedPhase, setSelectedPhase] = useState(null)
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
   const { address } = useConnection()
   const mintedToastRef = useRef(false)
 
@@ -49,7 +59,6 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
   const nativeCurrency = chainInfo?.nativeCurrency
   const dropId = drop?.dropId ? BigInt(drop.dropId) : null
 
-  // Live drop state — the single source of truth for supply, phases, and progress
   const { data: liveDrop, refetch: refetchDrop } = useReadContract({
     abi: dropsAbi,
     address: dropsAddress,
@@ -68,9 +77,18 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
     query: { enabled: Boolean(dropsAddress && dropId) },
   })
 
-  // First live phase is the default lane; explicit selection only matters when several
-  // windows overlap (public + allowlist running together)
+  // Flat per-item platform fee; it applies to free phases too
+  const { data: feeReads } = useReadContracts({
+    contracts: [
+      { address: dropsAddress ?? undefined, abi: dropsAbi, functionName: 'mintFee', chainId },
+      { address: dropsAddress ?? undefined, abi: dropsAbi, functionName: 'mintFeeEnabled', chainId },
+    ],
+    query: { enabled: Boolean(dropsAddress) },
+  })
+  const platformFee = feeReads?.[1]?.result === true ? (feeReads[0]?.result ?? 0n) : 0n
+
   const activeIndex = useMemo(() => phases.findIndex((phase) => phaseStatus(phase) === PHASE_STATUS.LIVE), [phases])
+  const phaseLabel = (phase, index) => phase?.name?.trim() || `Stage ${index + 1}`
   const phaseIndex = selectedPhase ?? (activeIndex === -1 ? 0 : activeIndex)
   const phase = phases[phaseIndex] ?? null
 
@@ -83,7 +101,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
     query: { enabled: Boolean(dropsAddress && dropId && address && phase) },
   })
 
-  // Gate probe — everything except an allowlist proof, which only the client holds
+  // isMintable covers every gate onchain, the allowlist included
   const { data: gatePasses } = useReadContract({
     abi: dropsAbi,
     address: dropsAddress,
@@ -93,13 +111,42 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
     query: { enabled: Boolean(dropsAddress && dropId && address && phase) },
   })
 
+  const phaseToken = phase?.token && phase.token !== zeroAddress ? phase.token : null
+  const { data: tokenMetaReads } = useReadContracts({
+    contracts: [
+      { address: phaseToken ?? undefined, abi: ERC20_TOKEN_ABI, functionName: 'decimals', chainId },
+      { address: phaseToken ?? undefined, abi: ERC20_TOKEN_ABI, functionName: 'symbol', chainId },
+    ],
+    query: { enabled: Boolean(phaseToken) },
+  })
+  // LSP7 answers decimals() but keeps its symbol in ERC725Y, so a missing symbol is normal
+  const tokenMeta = phaseToken
+    ? { decimals: Number(tokenMetaReads?.[0]?.result ?? 18), symbol: tokenMetaReads?.[1]?.result || 'tokens' }
+    : null
+
+  const reviewRef = useRef(null)
+
+  // Read here rather than only inside handleMint: the review screen has to say whether this is a
+  // one- or two-transaction mint BEFORE the first prompt, and finding out at the second one is
+  // exactly the surprise the screen exists to prevent.
+  const { data: allowanceRaw } = useReadContract({
+    address: phaseToken ?? undefined,
+    abi: phase?.isLsp7 ? LSP7_TOKEN_ABI : ERC20_TOKEN_ABI,
+    functionName: phase?.isLsp7 ? 'authorizedAmountFor' : 'allowance',
+    args: phase?.isLsp7 ? [dropsAddress, address ?? zeroAddress] : [address ?? zeroAddress, dropsAddress],
+    chainId,
+    query: { enabled: Boolean(phaseToken && address && dropsAddress) },
+  })
+
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = isPending || isConfirming || isBurnerBusy
+  // Separate hook: sharing `hash` with the mint would fire the confirmed effect on the approval's receipt
+  const { writeContractAsync: writeApprovalAsync } = useWriteContract()
+  const isBusy = isPending || isConfirming || isBurnerBusy || isApproving
 
   useEffect(() => {
     if (!submitError) return
-    toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
+    toast(describeWalletError(submitError, { fallback: 'Transaction rejected' }), 'error')
   }, [submitError])
 
   useEffect(() => {
@@ -120,17 +167,16 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
   const isClosed = Boolean(liveDrop?.closed)
   const isSoldOut = maxSupply > 0 && minted >= maxSupply
   const isOpenEdition = maxSupply === 0
-  const progress = isOpenEdition ? 0 : Math.min(100, Math.round((minted / maxSupply) * 100))
 
   const status = phase ? phaseStatus(phase) : null
   const isLive = status === PHASE_STATUS.LIVE && !isClosed && !isSoldOut
 
   const price = phase ? phase.price : 0n
+  const isTokenPriced = Boolean(phase?.token && phase.token !== zeroAddress)
   const perWallet = phase ? Number(phase.perWallet) : 0
   const allocation = phase ? Number(phase.allocation) : 0
   const gate = phase ? Number(phase.gate) : DROP_GATES.OPEN
 
-  // How many this wallet could still take through this phase, bounded like the engine bounds it
   const supplyRemaining = isOpenEdition ? Infinity : Math.max(0, maxSupply - minted)
   const allocationRemaining = allocation === 0 ? Infinity : Math.max(0, allocation - Number(phase?.minted ?? 0))
   const walletRemaining = perWallet === 0 ? Infinity : Math.max(0, perWallet - Number(mintedByMe))
@@ -139,51 +185,76 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
 
   const totalPrice = price * BigInt(boundedQuantity)
   const isFree = price === 0n
-  const priceNumber = Number(formatUnits(price, nativeCurrency?.decimals ?? 18))
-  const totalNumber = Number(formatUnits(totalPrice, nativeCurrency?.decimals ?? 18))
-  const symbol = nativeCurrency?.symbol ?? ''
+  // The platform fee is always native, so it never folds into totalPrice (the phase's currency)
+  const totalPlatformFee = platformFee * BigInt(boundedQuantity)
+  const hasPlatformFee = totalPlatformFee > 0n
+  const platformFeeNumber = Number(formatUnits(totalPlatformFee, nativeCurrency?.decimals ?? 18))
+  const nativeSymbol = nativeCurrency?.symbol ?? ''
+  // Token prices are in the token's own decimals
+  const paymentDecimals = isTokenPriced ? (tokenMeta?.decimals ?? 18) : (nativeCurrency?.decimals ?? 18)
+  const priceNumber = Number(formatUnits(price, paymentDecimals))
+  const totalNumber = Number(formatUnits(totalPrice, paymentDecimals))
+  const symbol = isTokenPriced ? (tokenMeta?.symbol ?? 'tokens') : (nativeCurrency?.symbol ?? '')
 
-  // Gate verdicts the engine can already answer (followers, asset holders); allowlist
-  // membership resolves at mint time from the published list
-  const gateBlocked = Boolean(address && phase && gate !== DROP_GATES.OPEN && gate !== DROP_GATES.ALLOWLIST && gatePasses === false)
+  const gateBlocked = Boolean(address && phase && gate !== DROP_GATES.OPEN && gatePasses === false)
 
-  // The engine rejects self- and creator-referrals — silently drop the attribution instead
-  // of failing the mint, mirroring TradeCard
+  // The engine rejects self- and creator-referrals
   const referralArg =
     referral && isAddress(referral) && referral.toLowerCase() !== address?.toLowerCase() && referral.toLowerCase() !== creator?.toLowerCase()
       ? referral
       : zeroAddress
 
   const imageUrl = drop.image ? resolveStorageImageUrl(drop.image) : null
+  const markerUrl = drop.image ? resolveStorageImageUrl(drop.image, { width: 48 }) : null
 
   const handleMint = async (e) => {
     e.stopPropagation()
     if (!phase || !address) return
 
-    let proof = []
-    if (gate === DROP_GATES.ALLOWLIST) {
-      if (!drop.allowlistCid) {
-        toast('This phase is allowlist-only and its list is not published', 'error')
-        return
-      }
-      try {
-        const res = await fetch(resolveStorageImageUrl(drop.allowlistCid))
-        const list = await res.json()
-        proof = allowlistProof(list?.addresses ?? [], address)
-      } catch {
-        proof = null
-      }
-      if (!proof) {
-        toast("You're not on this phase's allowlist", 'error')
-        return
-      }
+    if (gate === DROP_GATES.ALLOWLIST && gatePasses === false) {
+      toast("You're not on this drop's allowlist", 'error')
+      return
     }
 
     mintedToastRef.current = false
-    const args = [address, dropId, BigInt(phaseIndex), BigInt(boundedQuantity), referralArg, proof]
+    const args = [address, dropId, BigInt(phaseIndex), BigInt(boundedQuantity), referralArg]
+    // A token phase sends only the native platform fee as value — the engine pulls the token price
+    const mintValue = (isTokenPriced ? 0n : totalPrice) + totalPlatformFee
 
-    // Route through the burner session key if one's active — same convenience TradeCard gets
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+    if (isTokenPriced && totalPrice > 0n) {
+      try {
+        setIsApproving(true)
+        // ERC20 allowance is (owner, spender); LSP7 is (operator, owner)
+        const allowance = await publicClient.readContract({
+          address: phase.token,
+          abi: phase.isLsp7 ? LSP7_TOKEN_ABI : ERC20_TOKEN_ABI,
+          functionName: phase.isLsp7 ? 'authorizedAmountFor' : 'allowance',
+          args: phase.isLsp7 ? [dropsAddress, address] : [address, dropsAddress],
+        })
+
+        if (allowance < totalPrice) {
+          toast('Approve the token first — one transaction, then the mint', 'success')
+          await writeApprovalAsync({
+            address: phase.token,
+            abi: phase.isLsp7 ? LSP7_TOKEN_ABI : ERC20_TOKEN_ABI,
+            functionName: phase.isLsp7 ? 'authorizeOperator' : 'approve',
+            args: phase.isLsp7 ? [dropsAddress, totalPrice, '0x'] : [dropsAddress, totalPrice],
+            chainId,
+          })
+        }
+      } catch (err) {
+        toast(describeWalletError(err, { fallback: 'Approving the token failed' }), 'error')
+        return
+      } finally {
+        setIsApproving(false)
+      }
+    }
+
+    // Burner sessions send msg.value 0, so any paid mint (platform fee included) uses the connected wallet
+    const session =
+      mintValue === 0n
+        ? await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+        : { active: false }
 
     if (session.active) {
       setIsBurnerBusy(true)
@@ -193,7 +264,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
           contractAddress: dropsAddress,
           abi: dropsAbi,
           functionName: 'mint',
-          args: [...args, { value: totalPrice }],
+          args: [...args, { value: mintValue }],
         })
 
         toast('Minted — it now belongs to you', 'success')
@@ -214,7 +285,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
       functionName: 'mint',
       args,
       chainId,
-      value: totalPrice,
+      value: mintValue,
     })
   }
 
@@ -253,6 +324,11 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
             {phase && (
               <div className={styles.dropCard__meta}>
                 <span className={styles.dropCard__chip}>{isFree ? 'Free' : `${amountFormat.format(priceNumber)} ${symbol}`}</span>
+                {hasPlatformFee && (
+                  <span className={clsx(styles.dropCard__chip, styles['dropCard__chip--muted'])}>
+                    + {amountFormat.format(Number(formatUnits(platformFee, nativeCurrency?.decimals ?? 18)))} {nativeSymbol} fee
+                  </span>
+                )}
                 <span className={clsx(styles.dropCard__chip, styles['dropCard__chip--muted'])}>
                   {gate === DROP_GATES.OPEN ? <LockSimpleOpenIcon size={11} /> : gate === DROP_GATES.FOLLOWERS ? <UsersIcon size={11} /> : <LockSimpleIcon size={11} />}
                   {gateLabel(gate)}
@@ -266,30 +342,24 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
         </div>
       )}
 
-      {/* Universal Page's progress bar: X/Y minted, or a running count for open editions */}
-      <div className={styles.dropCard__progress}>
-        <span className={styles.dropCard__progressLabel}>
-          {isOpenEdition ? `${countFormat.format(minted)} minted · open edition` : `${countFormat.format(minted)}/${countFormat.format(maxSupply)} minted`}
-        </span>
-        {!isOpenEdition && (
-          <span
-            className={styles.dropCard__progressTrack}
-            // Same rule the directory tiles follow: the fill belongs to the drop's network, not to
-            // whichever chain the viewer's wallet happens to sit on
-            style={chainInfo?.primaryColor ? { '--network-color-primary': chainInfo.primaryColor } : undefined}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={maxSupply}
-            aria-valuenow={minted}
-            aria-label={`${countFormat.format(minted)} of ${countFormat.format(maxSupply)} minted`}
-          >
-            <span
-              className={clsx(styles.dropCard__progressFill, isLive && styles['dropCard__progressFill--minting'])}
-              style={{ width: `${progress}%` }}
-            />
-          </span>
-        )}
-      </div>
+      {isOpenEdition ? (
+        <div className={styles.dropCard__progress}>
+          <span className={styles.dropCard__progressLabel}>{countFormat.format(minted)} minted · open edition</span>
+        </div>
+      ) : (
+        <ProgressBar
+          className={styles.dropCard__progress}
+          label={<span className={styles.dropCard__progressLabel}>{`${countFormat.format(minted)}/${countFormat.format(maxSupply)} minted`}</span>}
+          value={minted}
+          max={maxSupply}
+          color={chainInfo?.primaryColor}
+          animated={isLive}
+          sparkle={isLive}
+          marker={markerUrl ? <img src={markerUrl} alt="" loading="lazy" /> : <HupMark size={9} />}
+          markerSize={16}
+          ariaLabel={`${countFormat.format(minted)} of ${countFormat.format(maxSupply)} minted`}
+        />
+      )}
 
       {phases.length > 1 && (
         <div className={styles.dropCard__phases}>
@@ -305,7 +375,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
                 })}
                 onClick={() => setSelectedPhase(i)}
               >
-                Phase {i + 1}
+                {phaseLabel(p, i)}
                 {s === PHASE_STATUS.LIVE && <em>Live</em>}
               </button>
             )
@@ -349,9 +419,23 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
             {walletRemaining === 0 ? (
               <span className={styles.dropCard__badge}>Wallet limit reached</span>
             ) : (
-              <button type="button" className={styles.dropCard__mint} onClick={handleMint} disabled={isBusy || !address}>
-                {isBusy ? 'Minting…' : isFree ? 'Mint free' : `Mint · ${amountFormat.format(totalNumber)} ${symbol}`}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={styles.dropCard__mint}
+                  onClick={() => reviewRef.current?.open()}
+                  disabled={isBusy || !address}
+                >
+                  {isBusy ? 'Minting…' : isFree ? 'Mint free' : `Mint · ${amountFormat.format(totalNumber)} ${symbol}`}
+                </button>
+                {hasPlatformFee && (
+                  <span className={styles.dropCard__feeNote}>
+                    {isFree ? 'Free to mint · ' : ''}
+                    {amountFormat.format(platformFeeNumber)} {nativeSymbol} platform fee
+                    {boundedQuantity > 1 ? ` (${boundedQuantity} × ${amountFormat.format(Number(formatUnits(platformFee, nativeCurrency?.decimals ?? 18)))})` : ''}
+                  </span>
+                )}
+              </>
             )}
           </>
         )}
@@ -361,6 +445,27 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false }) =
             View
           </Link>
         )}
+
+        {/* The card still owns the mint — the dialog only gathers the confirmation, so every
+            path out of it (session key, approval, plain write) stays in one place */}
+        <MintReviewDialog
+          ref={reviewRef}
+          name={drop.name || 'this drop'}
+          imageUrl={imageUrl}
+          quantity={boundedQuantity}
+          unitPrice={price}
+          totalPrice={totalPrice}
+          priceSymbol={symbol}
+          priceDecimals={paymentDecimals}
+          platformFeeTotal={totalPlatformFee}
+          nativeSymbol={nativeSymbol}
+          nativeDecimals={nativeCurrency?.decimals ?? 18}
+          needsApproval={Boolean(isTokenPriced && totalPrice > 0n && (allowanceRaw ?? 0n) < totalPrice)}
+          recipient={address ?? ''}
+          chainName={chainInfo?.name}
+          busy={isBusy}
+          onConfirm={handleMint}
+        />
       </div>
     </div>
   )

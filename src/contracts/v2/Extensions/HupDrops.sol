@@ -5,7 +5,10 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./ILSP7Minimal.sol";
 import "./IHupDrops.sol";
 
 /**
@@ -14,8 +17,9 @@ import "./IHupDrops.sol";
  * @notice The Hup NFT launchpad engine — one address per chain. Creators deploy real,
  *         creator-owned collection contracts (LSP7/LSP8 on LUKSO, ERC721/ERC1155 elsewhere)
  *         and sell the primary mint through phases, each with its own window, price, per-wallet
- *         limit, allocation, and gate: open to everyone, merkle allowlist, LSP26 followers of
- *         the creator, or holders of an asset. Mint proceeds are pushed straight to the creator
+ *         limit, allocation, and gate: open to everyone, the drop's onchain allowlist, LSP26
+ *         followers of the creator, members of a Hup community, or holders of an asset. A
+ *         creator can append phases to a live drop; existing ones are never editable. Mint proceeds are pushed straight to the creator
  *         on every mint — the engine escrows nothing but its own fees.
  * @dev Collection creation code lives in per-standard deployer satellites (registered via
  *      `setDeployer`) so this engine stays under the EIP-170 size limit and a future token
@@ -28,7 +32,8 @@ import "./IHupDrops.sol";
  *      Supports rotatable ERC2771 trusted forwarders for meta-transactions, AccessControl for
  *      admin permissions, Pausable for emergency controls, and ReentrancyGuard for protected
  *      settlement. Every state change emits an event; offchain indexers derive full drop state
- *      from DropCreated / PhaseConfigured / PhasePausedSet / Minted / DropClosed alone.
+ *      from DropCreated / PhaseConfigured / PhasePausedSet / Minted / DropClosed /
+ *      AllowlistUpdated / PayoutDestinationUpdated alone.
  * @custom:version 1.0.0
  * @custom:chain multichain
  * @custom:website https://hup.social
@@ -36,6 +41,9 @@ import "./IHupDrops.sol";
  * @custom:emoji 💧
  */
 contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC2771Context {
+  using EnumerableSet for EnumerableSet.AddressSet;
+  using SafeERC20 for IERC20;
+
   // --- STATE VARIABLES ---
 
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -43,7 +51,17 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   uint256 public constant ABSOLUTE_MAX_MINT_FEE_BPS = 1_000;
   uint256 public constant MAX_REFERRAL_BPS = 5_000;
   uint256 public constant MAX_PHASES = 8;
+
+  /// @notice Longest a phase's label may be, in bytes. Counted in bytes rather than characters
+  ///         because that is what storage costs: 31 bytes is one slot, and this allows two. A
+  ///         non-Latin script spends 2-4 bytes per character, so the practical limit is shorter
+  ///         for some creators than others — the cap is on cost, not on alphabet.
+  uint256 public constant MAX_PHASE_NAME_BYTES = 64;
   uint256 public constant MAX_PER_TX = 100;
+
+  /// @notice Hard cap on setAllowlistedBatch's array length, so a creator can't submit a batch
+  ///         large enough to exceed the block gas limit and revert with nothing written.
+  uint256 public constant MAX_BATCH_SIZE = 100;
 
   /// @notice The Hup Core contract instance (burner session resolution only). Admin-rotatable
   ///         so a Hup Core redeploy doesn't strand live drops behind a stale session source.
@@ -53,6 +71,11 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   ///         chain without one — creating a Followers-gated phase there reverts instead of
   ///         silently gating nobody.
   address public followerSystem;
+
+  /// @notice The chain's HupCommunity registry, read by the Community gate. address(0) on a
+  ///         chain without one — creating a Community-gated phase there reverts instead of
+  ///         silently gating nobody. Admin-rotatable, like the follower system.
+  address public communitySystem;
 
   /// @notice Total number of drops ever created; ids are 1..dropCount
   uint256 public dropCount;
@@ -72,10 +95,40 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   /// @notice dropId => phaseIndex => resolved primary wallet => items minted
   mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public mintedInPhaseBy;
 
+  /// @notice dropId => wallet => passes the drop's Allowlist gate. Stored onchain like
+  ///         HupCommunity's whitelist — a drop is a long-lived object, so its list is worth its
+  ///         SSTOREs, unlike a poll's (HupPolls keeps the merkle design for exactly that reason).
+  mapping(uint256 => mapping(address => bool)) public allowlist;
+
+  /// @dev `allowlist` mirrored into an EnumerableSet purely so the contract itself can answer
+  ///      "list the allowlist" (allowlistCount/allowlistOf) — no indexer required for
+  ///      correctness. cidex still indexes AllowlistUpdated for a faster/richer read path.
+  mapping(uint256 => EnumerableSet.AddressSet) private _allowlistSet;
+
+  /// @notice dropId => where the creator's share of mint proceeds is sent. address(0) (the
+  ///         default) means the creator. Pushed straight from mint() like HupCommunity's
+  ///         join fees — the engine never holds it — so a destination that can't receive
+  ///         native coin makes mints revert until the creator re-points it. Self-inflicted
+  ///         and fixable in one tx, which is why no escrow/claim ledger is needed.
+  ///         Only the creator's own address can move this — see `_requireDirectCreator`.
+  mapping(uint256 => address) public payoutDestination;
+
   mapping(address => bool) public trustedForwarders;
 
   /// @notice Platform share of paid mints, in basis points (100 = 1%)
   uint256 public mintFeeBps = 0;
+
+  /// @notice Flat native fee charged per item minted, on top of the phase price and paid by the
+  ///         minter. Deliberately not a share of the price: a basis-point cut earns nothing on a
+  ///         free drop, which is the format most of this launchpad's supply ships in. Charged on
+  ///         every mint — free, native-priced, and token-priced alike — and always in the chain's
+  ///         native coin, so it lands in the same balance `withdraw` already drains.
+  uint256 public mintFee = 0;
+
+  /// @notice Whether `mintFee` is actually charged. Separate from the amount so an admin can
+  ///         switch the fee off without losing a configured figure, and back on without having to
+  ///         re-derive it from the chain's coin price.
+  bool public mintFeeEnabled = false;
 
   /// @notice Flat native fee charged by createDrop
   uint256 public creationFee = 0;
@@ -151,27 +204,26 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     emit DropCreated(dropId, creator, collection, _standardId, _maxSupply, _referralBps);
 
     for (uint256 i = 0; i < _phaseInputs.length; i++) {
-      PhaseInput calldata p = _phaseInputs[i];
+      _appendPhase(dropId, _maxSupply, _phaseInputs[i]);
+    }
+  }
 
-      if (p.endTime != 0 && p.endTime <= p.startTime) revert InvalidPhases();
-      if (_maxSupply != 0 && p.allocation > _maxSupply) revert InvalidPhases();
-      _validateGate(p.gate, p.gateAsset, p.gateData, p.gateMin);
+  function addPhase(uint256 _dropId, PhaseInput calldata _phase) external whenNotPaused returns (uint256 phaseIndex) {
+    _requireDropCreator(_dropId);
+    if (_phases[_dropId].length >= MAX_PHASES) revert InvalidPhases();
 
-      _phases[dropId].push(Phase({
-        startTime: p.startTime,
-        endTime: p.endTime,
-        paused: p.paused,
-        price: p.price,
-        perWallet: p.perWallet,
-        allocation: p.allocation,
-        gate: p.gate,
-        gateAsset: p.gateAsset,
-        gateData: p.gateData,
-        gateMin: p.gateMin,
-        minted: 0
-      }));
+    return _appendPhase(_dropId, _drops[_dropId].maxSupply, _phase);
+  }
 
-      emit PhaseConfigured(dropId, i, p.startTime, p.endTime, p.price, p.perWallet, p.allocation, p.gate, p.gateAsset, p.gateData, p.gateMin, p.paused);
+  function addPhaseBatch(uint256 _dropId, PhaseInput[] calldata _phaseInputs) external whenNotPaused returns (uint256 firstPhaseIndex) {
+    _requireDropCreator(_dropId);
+    if (_phaseInputs.length == 0 || _phases[_dropId].length + _phaseInputs.length > MAX_PHASES) revert InvalidPhases();
+
+    uint256 maxSupply = _drops[_dropId].maxSupply;
+    firstPhaseIndex = _phases[_dropId].length;
+
+    for (uint256 i = 0; i < _phaseInputs.length; i++) {
+      _appendPhase(_dropId, maxSupply, _phaseInputs[i]);
     }
   }
 
@@ -180,8 +232,7 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     uint256 _dropId,
     uint256 _phaseIndex,
     uint256 _quantity,
-    address _referral,
-    bytes32[] calldata _proof
+    address _referral
   ) external payable whenNotPaused nonReentrant {
     Drop storage drop = _drops[_dropId];
     if (drop.collection == address(0)) revert DropNotFound();
@@ -210,10 +261,23 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
       if (already + _quantity > phase.perWallet) revert WalletLimitReached(phase.perWallet);
     }
 
-    _checkGate(phase, creator, minter, _proof);
+    _checkGate(_dropId, phase, creator, minter);
 
     uint256 totalPaid = phase.price * _quantity;
-    if (msg.value != totalPaid) revert InsufficientPayment(msg.value, totalPaid);
+    // The flat fee rides on top of the price rather than coming out of it, so the creator's take
+    // is unchanged by it and a "free" phase stays free from the creator's side. Always native,
+    // even on a token phase — pricing a platform fee in whatever ERC20 the creator picked would
+    // leave the engine holding dust in arbitrary tokens.
+    uint256 flatFee = mintFeeEnabled ? mintFee * _quantity : 0;
+    // Native phases are paid with the transaction; token phases are pulled from the minter in
+    // settlement, so the only value a token phase may carry is the flat fee — anything else
+    // would strand in the engine.
+    if (phase.token == address(0)) {
+      uint256 required = totalPaid + flatFee;
+      if (msg.value != required) revert InsufficientPayment(msg.value, required);
+    } else if (msg.value != flatFee) {
+      revert InsufficientPayment(msg.value, flatFee);
+    }
 
     // Effects before interactions: every counter moves before any native transfer or the
     // collection's LSP1/receiver hooks can re-enter.
@@ -222,7 +286,13 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     phase.minted += _quantity;
     mintedInPhaseBy[_dropId][_phaseIndex][minter] += _quantity;
 
-    (uint256 feeAmount, uint256 referralAmount) = _settleMint(creator, _referral, drop.referralBps, totalPaid);
+    (uint256 priceFee, uint256 referralAmount) = _settleMint(_dropId, phase, creator, minter, _referral, drop.referralBps, totalPaid);
+
+    // The flat fee needs no settlement of its own: it arrived as value and simply stays here,
+    // waiting for withdraw, which is why it also works on a free mint that skips settlement
+    // entirely. Reported folded into feeAmount so the event still carries the platform's total
+    // take on the mint and its signature is unchanged for indexers.
+    uint256 feeAmount = priceFee + flatFee;
 
     // Deliver last, once payment has fully settled.
     IHupDropCollection(drop.collection).engineMint(minter, firstTokenId, _quantity);
@@ -231,19 +301,36 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   }
 
   function setPhasePaused(uint256 _dropId, uint256 _phaseIndex, bool _paused) external whenNotPaused {
-    Drop storage drop = _drops[_dropId];
-    if (drop.collection == address(0)) revert DropNotFound();
-    if (drop.closed) revert DropNotActive();
+    _requireDropCreator(_dropId);
     if (_phaseIndex >= _phases[_dropId].length) revert PhaseNotFound();
-
-    // Creator only, accepting their active burner session. Admins deliberately have no say
-    // here: moderation's levers are closeDrop and the engine-wide pause, while a phase's
-    // on/off switch belongs to whoever is running the sale.
-    if (_resolveActor(drop.creator) != drop.creator) revert Unauthorized();
 
     _phases[_dropId][_phaseIndex].paused = _paused;
 
     emit PhasePausedSet(_dropId, _phaseIndex, _paused);
+  }
+
+  function setAllowlisted(uint256 _dropId, address _wallet, bool _allowed) external whenNotPaused {
+    _requireDropCreator(_dropId);
+
+    _setAllowlistedOne(_dropId, _wallet, _allowed);
+  }
+
+  function setAllowlistedBatch(uint256 _dropId, address[] calldata _wallets, bool _allowed) external whenNotPaused {
+    if (_wallets.length > MAX_BATCH_SIZE) revert BatchTooLarge();
+
+    _requireDropCreator(_dropId);
+
+    for (uint256 i = 0; i < _wallets.length; i++) {
+      _setAllowlistedOne(_dropId, _wallets[i], _allowed);
+    }
+  }
+
+  function setPayoutDestination(uint256 _dropId, address _destination) external whenNotPaused {
+    _requireDirectCreator(_dropId);
+
+    payoutDestination[_dropId] = _destination;
+
+    emit PayoutDestinationUpdated(_dropId, _destination);
   }
 
   function closeDrop(uint256 _dropId) external whenNotPaused {
@@ -307,9 +394,15 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     if (phase.allocation != 0 && phase.minted + _quantity > phase.allocation) return false;
     if (phase.perWallet != 0 && mintedInPhaseBy[_dropId][_phaseIndex][_wallet] + _quantity > phase.perWallet) return false;
 
-    // Everything except an Allowlist proof, which only the client holds.
+    // Every check mint itself makes — what this returns, mint accepts.
+    if (phase.gate == GateType.Allowlist) {
+      return allowlist[_dropId][_wallet];
+    }
     if (phase.gate == GateType.Followers) {
       return ILSP26Minimal(followerSystem).isFollowing(_wallet, drop.creator);
+    }
+    if (phase.gate == GateType.Community) {
+      return _passesCommunityGate(phase.gateData, _wallet);
     }
     if (phase.gate == GateType.AssetHolders) {
       return IGateBalance(phase.gateAsset).balanceOf(_wallet) >= phase.gateMin;
@@ -319,6 +412,18 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     }
 
     return true;
+  }
+
+  function allowlistCount(uint256 _dropId) external view returns (uint256) {
+    _requireCreatorView(_dropId);
+
+    return _allowlistSet[_dropId].length();
+  }
+
+  function allowlistOf(uint256 _dropId, uint256 _offset, uint256 _limit) external view returns (address[] memory) {
+    _requireCreatorView(_dropId);
+
+    return _page(_allowlistSet[_dropId], _offset, _limit);
   }
 
   // --- ADMIN CONFIGURATION ---
@@ -348,6 +453,26 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     emit MintFeeUpdated(oldValue, _mintFeeBps);
   }
 
+  /**
+   * @notice Sets the flat per-item native mint fee. Uncapped, like `creationFee`: a sane ceiling
+   *         is a coin-price question, not a bytecode one, and it differs on every chain the
+   *         engine deploys to.
+   * @dev Setting it does not switch it on — `mintFeeEnabled` does, so the amount can be staged
+   *      ahead of the flip.
+   */
+  function setMintFee(uint256 _mintFee) external onlyDirectAdmin {
+    uint256 oldValue = mintFee;
+    mintFee = _mintFee;
+
+    emit FlatMintFeeUpdated(oldValue, _mintFee);
+  }
+
+  function setMintFeeEnabled(bool _enabled) external onlyDirectAdmin {
+    mintFeeEnabled = _enabled;
+
+    emit MintFeeEnabledUpdated(_enabled);
+  }
+
   function setCreationFee(uint256 _creationFee) external onlyDirectAdmin {
     uint256 oldValue = creationFee;
     creationFee = _creationFee;
@@ -360,6 +485,13 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     followerSystem = _followerSystem;
 
     emit FollowerSystemUpdated(oldValue, _followerSystem);
+  }
+
+  function setCommunitySystem(address _communitySystem) external onlyDirectAdmin {
+    address oldValue = communitySystem;
+    communitySystem = _communitySystem;
+
+    emit CommunitySystemUpdated(oldValue, _communitySystem);
   }
 
   function setTrustedForwarder(address _forwarder, bool _trusted) external onlyDirectAdmin {
@@ -391,6 +523,22 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     emit Withdrawal(_receiver, balance);
   }
 
+  function withdrawToken(address _token, address _receiver, bool _isLsp7) external onlyDirectAdmin nonReentrant {
+    if (_token == address(0) || _receiver == address(0)) revert InvalidAddress();
+
+    uint256 balance = IERC20(_token).balanceOf(address(this));
+    if (balance == 0) revert TransferFailed();
+
+    // balanceOf is selector-compatible across ERC20 and LSP7; the transfers are not.
+    if (_isLsp7) {
+      ILSP7Minimal(_token).transfer(address(this), _receiver, balance, true, "");
+    } else {
+      IERC20(_token).safeTransfer(_receiver, balance);
+    }
+
+    emit Withdrawal(_receiver, balance);
+  }
+
   // --- ROLE MANAGEMENT ---
 
   function grantRole(bytes32 role, address account) public override {
@@ -414,15 +562,147 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   // --- INTERNAL & OVERRIDE HELPERS ---
 
   /**
+   * @dev The shared gate in front of every creator-only lever (phase pause, allowlist edits):
+   *      the drop must exist and still be open, and the caller must be its creator or their
+   *      active burner session. Admins deliberately have no say here — moderation's levers are
+   *      closeDrop and the engine-wide pause, while a sale's own controls belong to whoever is
+   *      running it.
+   */
+  function _requireDropCreator(uint256 _dropId) internal view {
+    Drop storage drop = _drops[_dropId];
+    if (drop.collection == address(0)) revert DropNotFound();
+    if (drop.closed) revert DropNotActive();
+
+    if (_resolveActor(drop.creator) != drop.creator) revert Unauthorized();
+  }
+
+  /**
+   * @dev The payout lever's gate, deliberately stricter than _requireDropCreator: the caller must
+   *      be the creator's own address — not a burner session, not a forwarder relay. Both of those
+   *      resolve identity through admin-rotatable references (`hupContract` for sessions,
+   *      `trustedForwarders` for relays), so honouring them here would mean a compromised admin
+   *      key could point another creator's revenue at itself by swapping in a session source or a
+   *      forwarder that vouches for anyone. Redirecting money is worth one direct signature — the
+   *      same reasoning that keeps `onlyDirectAdmin` on `msg.sender`.
+   */
+  function _requireDirectCreator(uint256 _dropId) private view {
+    Drop storage drop = _drops[_dropId];
+    if (drop.collection == address(0)) revert DropNotFound();
+    if (drop.closed) revert DropNotActive();
+
+    if (msg.sender != drop.creator) revert Unauthorized();
+  }
+
+  /**
+   * @dev The listing views' gate: creator (or their burner session) only, like HupCommunity's
+   *      whitelist views — but without the closed check, since the list outlives the sale.
+   *      Everyone else answers "is X on it" through the public `allowlist` getter.
+   */
+  function _requireCreatorView(uint256 _dropId) private view {
+    Drop storage drop = _drops[_dropId];
+    if (drop.collection == address(0)) revert DropNotFound();
+
+    if (_resolveActor(drop.creator) != drop.creator) revert Unauthorized();
+  }
+
+  /// @dev HupCommunity's pagination routine: clamps against the remaining tail rather than
+  ///      truncating offset + limit afterwards — the sum overflows to a panic revert on a
+  ///      caller passing an unbounded `limit`.
+  function _page(EnumerableSet.AddressSet storage _set, uint256 _offset, uint256 _limit) private view returns (address[] memory page) {
+    uint256 total = _set.length();
+    if (_offset >= total || _limit == 0) return new address[](0);
+
+    uint256 remaining = total - _offset;
+    uint256 end = _offset + (_limit < remaining ? _limit : remaining);
+
+    page = new address[](end - _offset);
+    for (uint256 i = _offset; i < end; i++) {
+      page[i - _offset] = _set.at(i);
+    }
+  }
+
+  /**
+   * @dev Validates one phase and pushes it onto a drop's schedule, emitting PhaseConfigured
+   *      with the index it landed at. Shared by createDrop and addPhase so an appended phase
+   *      can never be held to looser rules than one declared at creation, and so indexers see
+   *      an identical event either way.
+   */
+  function _appendPhase(uint256 _dropId, uint256 _maxSupply, PhaseInput calldata _phase) private returns (uint256 phaseIndex) {
+    if (bytes(_phase.name).length > MAX_PHASE_NAME_BYTES) revert PhaseNameTooLong();
+    if (_phase.endTime != 0 && _phase.endTime <= _phase.startTime) revert InvalidPhases();
+    if (_maxSupply != 0 && _phase.allocation > _maxSupply) revert InvalidPhases();
+    // A free phase has nothing to charge in, so naming a token there is a mistake worth
+    // catching rather than storing — it would read as a priced phase to every client.
+    if (_phase.price == 0 && _phase.token != address(0)) revert InvalidPaymentToken();
+    _validateGate(_phase.gate, _phase.gateAsset, _phase.gateData, _phase.gateMin);
+
+    phaseIndex = _phases[_dropId].length;
+
+    _phases[_dropId].push(Phase({
+      name: _phase.name,
+      startTime: _phase.startTime,
+      endTime: _phase.endTime,
+      paused: _phase.paused,
+      token: _phase.token,
+      isLsp7: _phase.isLsp7,
+      price: _phase.price,
+      perWallet: _phase.perWallet,
+      allocation: _phase.allocation,
+      gate: _phase.gate,
+      gateAsset: _phase.gateAsset,
+      gateData: _phase.gateData,
+      gateMin: _phase.gateMin,
+      minted: 0
+    }));
+
+    emit PhaseConfigured(
+      _dropId,
+      phaseIndex,
+      _phase.startTime,
+      _phase.endTime,
+      _phase.price,
+      _phase.perWallet,
+      _phase.allocation,
+      _phase.gate,
+      _phase.gateAsset,
+      _phase.gateData,
+      _phase.gateMin,
+      _phase.paused,
+      _phase.token,
+      _phase.isLsp7,
+      _phase.name
+    );
+  }
+
+  /**
+   * @dev One allowlist entry flipped, mapping and enumerable mirror together — HupCommunity's
+   *      _setWhitelistedOne, drop-scoped.
+   */
+  function _setAllowlistedOne(uint256 _dropId, address _wallet, bool _allowed) private {
+    allowlist[_dropId][_wallet] = _allowed;
+
+    if (_allowed) {
+      _allowlistSet[_dropId].add(_wallet);
+    } else {
+      _allowlistSet[_dropId].remove(_wallet);
+    }
+
+    emit AllowlistUpdated(_dropId, _wallet, _allowed);
+  }
+
+  /**
    * @dev Rejects gate configurations that could never pass or would silently gate nobody.
+   *      Allowlist needs none — its list lives in `allowlist` and may be filled before or
+   *      after the phase opens.
    */
   function _validateGate(GateType _gate, address _gateAsset, bytes32 _gateData, uint256 _gateMin) internal view {
-    if (_gate == GateType.Open) return;
+    if (_gate == GateType.Open || _gate == GateType.Allowlist) return;
 
-    if (_gate == GateType.Allowlist) {
-      if (_gateData == bytes32(0)) revert InvalidGateConfig();
-    } else if (_gate == GateType.Followers) {
+    if (_gate == GateType.Followers) {
       if (followerSystem == address(0)) revert InvalidGateConfig();
+    } else if (_gate == GateType.Community) {
+      // Community id 0 is never a real community, so it would gate everyone out silently
+      if (communitySystem == address(0) || _gateData == bytes32(0)) revert InvalidGateConfig();
     } else {
       // AssetHolders / AssetHolders1155
       if (_gateAsset == address(0) || _gateMin == 0) revert InvalidGateConfig();
@@ -430,20 +710,30 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   }
 
   /**
-   * @dev Reverts with GateNotPassed unless `_minter` passes the phase's gate. Allowlist leaves
-   *      follow the OpenZeppelin StandardMerkleTree convention:
-   *      keccak256(bytes.concat(keccak256(abi.encode(address)))).
+   * @dev Membership of the community `_gateData` names. A banned wallet is excluded even where
+   *      the registry still records it as a member — a ban is the community saying no, and a
+   *      gate that ignored it would hand banned wallets the mint anyway.
    */
-  function _checkGate(Phase storage _phase, address _creator, address _minter, bytes32[] calldata _proof) internal view {
+  function _passesCommunityGate(bytes32 _gateData, address _minter) internal view returns (bool) {
+    (bool isMember, , , bool isBanned, ) = IHupCommunityMinimal(communitySystem).registry(uint256(_gateData), _minter);
+
+    return isMember && !isBanned;
+  }
+
+  /**
+   * @dev Reverts with GateNotPassed unless `_minter` passes the phase's gate.
+   */
+  function _checkGate(uint256 _dropId, Phase storage _phase, address _creator, address _minter) internal view {
     GateType gate = _phase.gate;
 
     if (gate == GateType.Open) return;
 
     if (gate == GateType.Allowlist) {
-      bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_minter))));
-      if (!MerkleProof.verify(_proof, _phase.gateData, leaf)) revert GateNotPassed();
+      if (!allowlist[_dropId][_minter]) revert GateNotPassed();
     } else if (gate == GateType.Followers) {
       if (!ILSP26Minimal(followerSystem).isFollowing(_minter, _creator)) revert GateNotPassed();
+    } else if (gate == GateType.Community) {
+      if (!_passesCommunityGate(_phase.gateData, _minter)) revert GateNotPassed();
     } else if (gate == GateType.AssetHolders) {
       if (IGateBalance(_phase.gateAsset).balanceOf(_minter) < _phase.gateMin) revert GateNotPassed();
     } else {
@@ -453,17 +743,57 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
 
   /**
    * @dev Splits a paid mint: the platform fee stays in the contract, the referral share goes to
-   *      the referrer, and the remainder is pushed straight to the creator. Free mints skip
+   *      the referrer, and the remainder is pushed straight to the drop's payout destination —
+   *      the creator unless they re-pointed it. Direct push, one address, resolved now: rules
+   *      richer than "one wallet" live in the destination contract, not here. Free mints skip
    *      settlement entirely.
    */
-  function _settleMint(address _creator, address _referral, uint256 _referralBps, uint256 _totalPaid) internal returns (uint256 feeAmount, uint256 referralAmount) {
+  function _settleMint(
+    uint256 _dropId,
+    Phase storage _phase,
+    address _creator,
+    address _minter,
+    address _referral,
+    uint256 _referralBps,
+    uint256 _totalPaid
+  ) internal returns (uint256 feeAmount, uint256 referralAmount) {
     if (_totalPaid == 0) return (0, 0);
 
     feeAmount = (_totalPaid * mintFeeBps) / FEE_DENOMINATOR;
     referralAmount = _referral == address(0) ? 0 : (_totalPaid * _referralBps) / FEE_DENOMINATOR;
 
-    _sendNative(_creator, _totalPaid - feeAmount - referralAmount);
-    if (referralAmount > 0) _sendNative(_referral, referralAmount);
+    address recipient = payoutDestination[_dropId];
+    if (recipient == address(0)) recipient = _creator;
+
+    uint256 creatorAmount = _totalPaid - feeAmount - referralAmount;
+
+    if (_phase.token == address(0)) {
+      _sendNative(recipient, creatorAmount);
+      if (referralAmount > 0) _sendNative(_referral, referralAmount);
+      return (feeAmount, referralAmount);
+    }
+
+    // Token phases move value straight from the minter to each party, so the engine never
+    // custodies the creator's or referrer's share — only its own fee lands here, waiting for
+    // withdrawToken. The minter must have approved (ERC20) or authorized this engine as an
+    // operator (LSP7) for the full total beforehand.
+    _pullToken(_phase, _minter, recipient, creatorAmount);
+    if (referralAmount > 0) _pullToken(_phase, _minter, _referral, referralAmount);
+    if (feeAmount > 0) _pullToken(_phase, _minter, address(this), feeAmount);
+  }
+
+  /**
+   * @dev One token transfer out of the minter's balance. LSP7 has no `transferFrom` and its
+   *      `transfer` is not selector-compatible with ERC20's, so the two standards need
+   *      different calls — the same split HupCommunity's paid joins make. `force` is true so a
+   *      plain EOA or a UP without an LSP1 delegate can receive.
+   */
+  function _pullToken(Phase storage _phase, address _from, address _to, uint256 _amount) private {
+    if (_phase.isLsp7) {
+      ILSP7Minimal(_phase.token).transfer(_from, _to, _amount, true, "");
+    } else {
+      IERC20(_phase.token).safeTransferFrom(_from, _to, _amount);
+    }
   }
 
   /**

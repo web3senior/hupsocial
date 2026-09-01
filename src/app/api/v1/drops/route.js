@@ -8,8 +8,12 @@
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { appChains } from '@/config/contracts'
 
 export const runtime = 'nodejs'
+
+// A retired chain's indexed rows outlive its config, so only chains the app still ships are served
+const LIVE_NETWORK_IDS = appChains.map((chain) => chain.id)
 
 // uint256 columns are DECIMAL(65,0) in MariaDB and must come back as strings — price-scale
 // values routinely exceed Number.MAX_SAFE_INTEGER.
@@ -24,6 +28,8 @@ const DROP_COLUMNS = `
   d.referral_bps,
   d.name,
   d.symbol,
+  d.metadata_uri,
+  d.payout_destination,
   d.closed,
   d.created_at,
   d.tx_hash,
@@ -40,8 +46,8 @@ export async function GET(request) {
     const limit = Math.min(parseInt(searchParams.get('limit')) || 25, 50)
     const offset = (page - 1) * limit
 
-    const filters = ['1 = 1']
-    const args = []
+    const filters = [`d.network_id IN (${LIVE_NETWORK_IDS.map(() => '?').join(',')})`]
+    const args = [...LIVE_NETWORK_IDS]
     if (networkId) {
       filters.push('d.network_id = ?')
       args.push(networkId)
@@ -49,6 +55,9 @@ export async function GET(request) {
     if (creator) {
       filters.push('d.creator = ?')
       args.push(creator)
+    }
+    if (searchParams.get('status') === 'live') {
+      filters.push('d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)')
     }
 
     const [rows] = await pool.execute(
@@ -60,6 +69,29 @@ export async function GET(request) {
        LIMIT ${limit} OFFSET ${offset}`,
       args,
     )
+
+    // Phases are fetched after LIMIT — MariaDB runs select-list subqueries for every row pre-sort
+    if (rows.length > 0) {
+      const pairs = rows.map(() => '(?, ?)').join(', ')
+      const pairArgs = rows.flatMap((row) => [row.network_id, row.drop_id])
+      const [phases] = await pool.execute(
+        `SELECT network_id, drop_id, phase_index, start_time, end_time, CAST(price AS CHAR) AS price,
+                per_wallet, allocation, gate, paused, payment_token, is_lsp7, minted
+         FROM drop_phases
+         WHERE (network_id, drop_id) IN (${pairs})
+         ORDER BY network_id, drop_id, phase_index ASC`,
+        pairArgs,
+      )
+      const byDrop = new Map()
+      for (const phase of phases) {
+        const key = `${phase.network_id}:${phase.drop_id}`
+        if (!byDrop.has(key)) byDrop.set(key, [])
+        byDrop.get(key).push(phase)
+      }
+      for (const row of rows) {
+        row.phases = byDrop.get(`${row.network_id}:${row.drop_id}`) ?? []
+      }
+    }
 
     return NextResponse.json({ success: true, data: rows })
   } catch (error) {

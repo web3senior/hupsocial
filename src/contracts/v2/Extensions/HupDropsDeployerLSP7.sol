@@ -43,7 +43,7 @@ contract HupDropsDeployerLSP7 is IHupDropsDeployer {
   /**
    * @notice Deploys a HupDropCollectionLSP7 owned by `_creator`, minted only by the engine.
    * @param _params abi.encode(string name, string symbol, bytes lsp4MetadataValue,
-   *        address royaltyReceiver, uint96 royaltyBps)
+   *        address royaltyReceiver, uint96 royaltyBps, bool burnable)
    */
   function deploy(address _creator, uint256 _maxSupply, bytes calldata _params) external returns (address collection) {
     if (msg.sender != drops) revert OnlyDrops();
@@ -53,9 +53,10 @@ contract HupDropsDeployerLSP7 is IHupDropsDeployer {
       string memory symbol,
       bytes memory lsp4MetadataValue,
       address royaltyReceiver,
-      uint96 royaltyBps
-    ) = abi.decode(_params, (string, string, bytes, address, uint96));
+      uint96 royaltyBps,
+      bool burnable
+    ) = abi.decode(_params, (string, string, bytes, address, uint96, bool));
 
-    collection = address(new HupDropCollectionLSP7(drops, _creator, _maxSupply, name, symbol, lsp4MetadataValue, royaltyReceiver, royaltyBps));
+    collection = address(new HupDropCollectionLSP7(drops, _creator, _maxSupply, name, symbol, lsp4MetadataValue, royaltyReceiver, royaltyBps, burnable));
   }
 }

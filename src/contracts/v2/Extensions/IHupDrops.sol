@@ -9,7 +9,7 @@ import "./../IHup.sol";
  * @notice Shared interface for the Hup Drops protocol — the NFT launchpad. A drop deploys a real,
  *         creator-owned collection contract (LSP7/LSP8 on LUKSO, ERC721/ERC1155 elsewhere) and
  *         sells its primary mint through phases: each phase carries its own window, price,
- *         per-wallet limit, allocation, and gate (open, merkle allowlist, LSP26 followers, or
+ *         per-wallet limit, allocation, and gate (open, onchain allowlist, LSP26 followers, or
  *         asset holders).
  * @dev Completes the Hup NFT stack: HupDrops is primary issuance, HupTrade (one-of-ones) and
  *      HupEditions (balance-based) are the secondary markets — a drop-minted collection is
@@ -26,17 +26,24 @@ interface IHupDrops {
   // --- SHARED TYPES ---
 
   /// @notice Who may mint during a phase.
-  /// @dev `Allowlist` verifies an OpenZeppelin StandardMerkleTree proof against `gateData`.
+  /// @dev `Allowlist` checks the drop's onchain allowlist — a stored set the creator edits via
+  ///      `setAllowlisted`/`setAllowlistedBatch`, the same shape as HupCommunity's whitelist, so
+  ///      eligibility is one public mapping read with no offchain file or proof to carry.
   ///      `Followers` asks the chain's LSP26 follower system whether the minter follows the
   ///      drop's creator. `AssetHolders` checks `balanceOf(address)` on `gateAsset` (covers
   ///      ERC20, ERC721, LSP7, and LSP8); `AssetHolders1155` checks
-  ///      `balanceOf(address, uint256(gateData))` for id-scoped ERC1155 balances.
+  ///      `balanceOf(address, uint256(gateData))` for id-scoped ERC1155 balances. `Community`
+  ///      asks the chain's HupCommunity registry whether the minter is a member of the
+  ///      community whose id `gateData` carries, and is not banned from it.
+  /// @dev Appended to, never reordered: the numbers are stored in every drop ever created and
+  ///      indexed offchain against them.
   enum GateType {
     Open,
     Allowlist,
     Followers,
     AssetHolders,
-    AssetHolders1155
+    AssetHolders1155,
+    Community
   }
 
   /// @notice One mint phase. A phase's terms are fixed at creation — Universal Page's "you can
@@ -44,13 +51,27 @@ interface IHupDrops {
   ///         shift under them. `paused` is the single exception: the creator's on/off switch
   ///         over their own sale, replayable by indexers from `PhasePausedSet`.
   /// @dev `endTime` 0 means open-ended. `perWallet` 0 means unlimited. `allocation` 0 means the
-  ///      phase draws freely from the drop's total supply. `gateData` is overloaded per gate:
-  ///      merkle root for `Allowlist`, ERC1155 token id for `AssetHolders1155`, zero otherwise.
+  ///      phase draws freely from the drop's total supply. `gateData` carries the ERC1155 token
+  ///      id for `AssetHolders1155`, the community id for `Community`, and is zero otherwise.
   ///      A `paused` phase never mints, whatever its window says.
+  /// @notice What a phase charges. `token` address(0) is the chain's native coin — the default
+  ///         and the only one-transaction path. Anything else is an ERC20, or an LSP7 when
+  ///         `isLsp7` is set: LSP7's `transfer(from,to,amount,force,data)` is not
+  ///         selector-compatible with ERC20's `transferFrom`, so the two need different calls
+  ///         (unlike `balanceOf`, which is why the asset gates need no such flag).
+  /// @dev A token mint costs the minter an approval first — `approve` for ERC20,
+  ///      `authorizeOperator` for LSP7 — so it is two transactions where native is one.
+  /// @dev `name` is the creator's own label for the phase ("Presale", "Christmas Edition") —
+  ///      stored onchain rather than in an indexer so `phasesOf` answers it directly and no
+  ///      offchain record has to be kept in step with the schedule. Capped at
+  ///      MAX_PHASE_NAME_BYTES; empty is fine and clients fall back to the index.
   struct Phase {
+    string name;
     uint64 startTime;
     uint64 endTime;
     bool paused;
+    address token;
+    bool isLsp7;
     uint256 price;
     uint256 perWallet;
     uint256 allocation;
@@ -65,9 +86,12 @@ interface IHupDrops {
   ///         phase with `paused` true is how a drop waits for the creator to press start
   ///         rather than for a clock.
   struct PhaseInput {
+    string name;
     uint64 startTime;
     uint64 endTime;
     bool paused;
+    address token;
+    bool isLsp7;
     uint256 price;
     uint256 perWallet;
     uint256 allocation;
@@ -95,13 +119,15 @@ interface IHupDrops {
 
   // --- SHARED EVENTS ---
 
-  /// @notice Emitted once per drop. Together with PhaseConfigured, PhasePausedSet, Minted, and
-  ///         DropClosed this is the single source of truth for offchain indexers — full drop
-  ///         state is derivable from these five events alone.
+  /// @notice Emitted once per drop. Together with PhaseConfigured, PhasePausedSet, Minted,
+  ///         DropClosed, AllowlistUpdated, and PayoutDestinationUpdated this is the single
+  ///         source of truth for offchain indexers — full drop state is derivable from these
+  ///         seven events alone.
   event DropCreated(uint256 indexed dropId, address indexed creator, address indexed collection, uint256 standardId, uint256 maxSupply, uint256 referralBps);
 
-  /// @notice Emitted once per phase at creation, in index order.
-  event PhaseConfigured(uint256 indexed dropId, uint256 indexed phaseIndex, uint64 startTime, uint64 endTime, uint256 price, uint256 perWallet, uint256 allocation, GateType gate, address gateAsset, bytes32 gateData, uint256 gateMin, bool paused);
+  /// @notice Emitted once per phase — at creation in index order, and again for each phase a
+  ///         creator appends later with `addPhase`, carrying its new index.
+  event PhaseConfigured(uint256 indexed dropId, uint256 indexed phaseIndex, uint64 startTime, uint64 endTime, uint256 price, uint256 perWallet, uint256 allocation, GateType gate, address gateAsset, bytes32 gateData, uint256 gateMin, bool paused, address token, bool isLsp7, string name);
 
   /// @notice Emitted whenever a creator pauses or resumes one of their phases — including the
   ///         first start of a phase created paused.
@@ -116,6 +142,16 @@ interface IHupDrops {
   /// @notice Emitted when a drop is closed for good, by its creator or by moderation.
   event DropClosed(uint256 indexed dropId, bool byAdmin);
 
+  /// @notice Emitted when a creator adds a wallet to, or removes it from, a drop's allowlist —
+  ///         one event per wallet, batch or not, mirroring HupCommunity's WhitelistUpdated.
+  ///         Indexers replay these for search; correctness never needs them, since the list is
+  ///         enumerable onchain via `allowlistCount`/`allowlistOf`.
+  event AllowlistUpdated(uint256 indexed dropId, address indexed wallet, bool allowed);
+
+  /// @notice Emitted when a creator re-points where their share of mint proceeds is sent.
+  ///         address(0) means back to the creator.
+  event PayoutDestinationUpdated(uint256 indexed dropId, address indexed destination);
+
   /// @notice Emitted when a standard's deployer satellite is registered or replaced. Registering
   ///         a new standard id is how a future token standard joins without redeploying the
   ///         engine.
@@ -124,11 +160,22 @@ interface IHupDrops {
   /// @notice Emitted when the platform's share of mint proceeds (basis points) is updated.
   event MintFeeUpdated(uint256 oldValue, uint256 newValue);
 
+  /// @notice Emitted when the flat per-item native mint fee is updated. Distinct from
+  ///         MintFeeUpdated: that one carries basis points, this one a native amount.
+  event FlatMintFeeUpdated(uint256 oldValue, uint256 newValue);
+
+  /// @notice Emitted when the flat per-item mint fee is switched on or off, leaving its
+  ///         configured amount untouched.
+  event MintFeeEnabledUpdated(bool enabled);
+
   /// @notice Emitted when the flat native fee charged by createDrop is updated.
   event CreationFeeUpdated(uint256 oldValue, uint256 newValue);
 
   /// @notice Emitted when the LSP26 follower system reference is rotated.
   event FollowerSystemUpdated(address oldValue, address newValue);
+
+  /// @notice Emitted when the HupCommunity registry reference is rotated.
+  event CommunitySystemUpdated(address oldValue, address newValue);
 
   /// @notice Emitted when a trusted forwarder's status is updated.
   event TrustedForwarderUpdated(address indexed forwarder, bool trusted);
@@ -152,17 +199,21 @@ interface IHupDrops {
   error InvalidStandard();
   /// @notice The phase list is empty, longer than MAX_PHASES, or a phase's window is inverted.
   error InvalidPhases();
-  /// @notice A gate is missing its required configuration (allowlist without a root, follower
-  ///         gate on a chain with no follower system, asset gate without asset or minimum).
+  error PhaseNameTooLong();
+  /// @notice A gate is missing its required configuration (follower gate on a chain with no
+  ///         follower system, community gate with no registry or a zero community id, asset
+  ///         gate without asset or minimum).
   error InvalidGateConfig();
+  /// @notice setAllowlistedBatch received more than MAX_BATCH_SIZE addresses.
+  error BatchTooLarge();
   error DropNotFound();
   /// @notice The drop is closed, or the engine is paused for moderation.
   error DropNotActive();
   error PhaseNotFound();
   /// @notice The phase's time window is not currently open, or its creator has paused it.
   error PhaseNotActive();
-  /// @notice The minter does not pass the phase's gate (bad proof, not a follower, or balance
-  ///         below the gate minimum).
+  /// @notice The minter does not pass the phase's gate (not on the allowlist, not a follower,
+  ///         or balance below the gate minimum).
   error GateNotPassed();
   /// @notice This wallet has reached the phase's per-wallet limit.
   error WalletLimitReached(uint256 limit);
@@ -171,6 +222,8 @@ interface IHupDrops {
   /// @notice The requested quantity exceeds the drop's remaining supply.
   error SupplyExceeded(uint256 requested, uint256 remaining);
   error InsufficientPayment(uint256 provided, uint256 required);
+  /// @notice A token-priced phase was sent native value, or a phase priced at zero named a token.
+  error InvalidPaymentToken();
   /// @notice The referrer must be neither the minter nor the creator, and referrals require the
   ///         drop to carry a referral share.
   error InvalidReferral();
@@ -183,16 +236,22 @@ interface IHupDrops {
   function version() external pure returns (string memory);
   function hupContract() external view returns (IHup);
   function followerSystem() external view returns (address);
+  /// @notice The chain's HupCommunity registry, read by the Community gate. address(0) on a
+  ///         chain without one — creating a Community-gated phase there reverts.
+  function communitySystem() external view returns (address);
   function ADMIN_ROLE() external view returns (bytes32);
   function trustedForwarders(address forwarder) external view returns (bool);
   function isTrustedForwarder(address forwarder) external view returns (bool);
   function mintFeeBps() external view returns (uint256);
+  function mintFee() external view returns (uint256);
+  function mintFeeEnabled() external view returns (bool);
   function creationFee() external view returns (uint256);
   function FEE_DENOMINATOR() external view returns (uint256);
   function ABSOLUTE_MAX_MINT_FEE_BPS() external view returns (uint256);
   function MAX_REFERRAL_BPS() external view returns (uint256);
   function MAX_PHASES() external view returns (uint256);
   function MAX_PER_TX() external view returns (uint256);
+  function MAX_BATCH_SIZE() external view returns (uint256);
   /// @notice Total number of drops ever created; drop ids are 1..dropCount.
   function dropCount() external view returns (uint256);
   /// @notice The deployer satellite for a standard id, or address(0) when the standard is not
@@ -203,6 +262,14 @@ interface IHupDrops {
   function dropIdOf(address collection) external view returns (uint256);
   /// @notice How many items `wallet` minted in a phase, keyed by the resolved primary wallet.
   function mintedInPhaseBy(uint256 dropId, uint256 phaseIndex, address wallet) external view returns (uint256);
+  /// @notice Whether `wallet` passes a drop's Allowlist gate — the one read a client needs to
+  ///         show "you're on the list". Public deliberately: the list's members are as public
+  ///         as the events that built it.
+  function allowlist(uint256 dropId, address wallet) external view returns (bool);
+  /// @notice Where a drop's share of mint proceeds is pushed. address(0) (the default) means
+  ///         the creator; anything else is an explicit override — a co-founder split, a DAO
+  ///         treasury, or a splitter contract enforcing whatever rules it likes.
+  function payoutDestination(uint256 dropId) external view returns (address);
 
   // --- MUTATIVE LOGIC ---
 
@@ -235,10 +302,8 @@ interface IHupDrops {
    * @param _quantity How many items. 1..MAX_PER_TX.
    * @param _referral The referrer credited with the mint, or address(0) for none. Must be
    *        neither minter nor creator.
-   * @param _proof Merkle proof for Allowlist phases (leaf = double-hashed minter address, the
-   *        OpenZeppelin StandardMerkleTree convention). Empty for other gates.
    */
-  function mint(address _minter, uint256 _dropId, uint256 _phaseIndex, uint256 _quantity, address _referral, bytes32[] calldata _proof) external payable;
+  function mint(address _minter, uint256 _dropId, uint256 _phaseIndex, uint256 _quantity, address _referral) external payable;
 
   /**
    * @notice Pauses or resumes one phase, any number of times in either direction. Callable by
@@ -250,6 +315,58 @@ interface IHupDrops {
    *       `activePhaseOf`, whatever its window says.
    */
   function setPhasePaused(uint256 _dropId, uint256 _phaseIndex, bool _paused) external;
+
+  /**
+   * @notice Adds or removes a wallet from a drop's allowlist. Only meaningful for phases using
+   *         the Allowlist gate, but not restricted to them — a creator can populate the list
+   *         before their gated phase opens, or keep curating it while the sale runs. Callable
+   *         by the drop's creator (or their active burner session) only.
+   */
+  function setAllowlisted(uint256 _dropId, address _wallet, bool _allowed) external;
+
+  /// @notice Batch version of setAllowlisted, for adding/removing several addresses in one tx.
+  ///         Capped at MAX_BATCH_SIZE entries so a batch can never exceed the block gas limit
+  ///         and revert with nothing written.
+  function setAllowlistedBatch(uint256 _dropId, address[] calldata _wallets, bool _allowed) external;
+
+  /**
+   * @notice Re-points where the creator's share of each mint is sent — the HupCommunity
+   *         payout model. Rules richer than "one wallet" (a split between collaborators, a
+   *         treasury) live in the destination contract, not in this engine. address(0) clears
+   *         it: proceeds go to the creator again. Takes effect for mints after this tx.
+   * @dev Creator-only, and stricter than the drop's other levers: the call must come from the
+   *      creator's own address, never a burner session or a forwarder relay. Session and relay
+   *      identity both resolve through admin-rotatable references, so accepting them here would
+   *      put a creator's revenue within reach of a compromised admin key. Proceeds are pushed,
+   *      not escrowed, so a destination that can't
+   *      receive native coin makes mints revert until this is changed — visible immediately,
+   *      fixable in one tx, and only the creator's own drop is affected, which is why no
+   *      escrow/claim ledger exists. The platform fee and referral share are unaffected.
+   */
+  function setPayoutDestination(uint256 _dropId, address _destination) external;
+
+  /**
+   * @notice Appends one phase to a drop's schedule — the lane a creator forgot, or one the
+   *         sale turned out to need. Callable by the drop's creator (or their active burner
+   *         session) while the drop is open, up to MAX_PHASES in total.
+   * @dev Appending is the only way a schedule ever changes. Existing phases stay untouchable,
+   *      so nobody who already minted can have their terms moved; a new phase only ever adds a
+   *      way to buy, and can never lift the drop's immutable `maxSupply`. Validated exactly as
+   *      `createDrop` validates its own phases, and emits the same `PhaseConfigured` with the
+   *      new index, so indexers need no new event.
+   * @return phaseIndex The appended phase's index.
+   */
+  function addPhase(uint256 _dropId, PhaseInput calldata _phase) external returns (uint256 phaseIndex);
+
+  /**
+   * @notice Appends several phases in one transaction — a whole follow-up schedule in a single
+   *         signature rather than one per lane.
+   * @dev Same rules and the same PhaseConfigured event per entry as `addPhase`; the combined
+   *      length still cannot exceed MAX_PHASES. All-or-nothing: one bad phase reverts the lot,
+   *      so a creator can never end up with half a schedule.
+   * @return firstPhaseIndex The index the first appended phase landed at; the rest follow it.
+   */
+  function addPhaseBatch(uint256 _dropId, PhaseInput[] calldata _phases) external returns (uint256 firstPhaseIndex);
 
   /**
    * @notice Closes a drop permanently. Callable by the drop's creator (or their active burner
@@ -278,11 +395,22 @@ interface IHupDrops {
   function activePhaseOf(uint256 _dropId) external view returns (bool found, uint256 index);
 
   /**
-   * @notice Returns whether `_wallet` could mint `_quantity` through a phase right now, checking
-   *         everything except an Allowlist proof (which only the client holds). For Allowlist
-   *         phases a true result still requires a valid proof at mint time.
+   * @notice Returns whether `_wallet` could mint `_quantity` through a phase right now — every
+   *         check `mint` itself makes, gates included. What this returns, mint accepts.
    */
   function isMintable(uint256 _dropId, uint256 _phaseIndex, address _wallet, uint256 _quantity) external view returns (bool);
+
+  /**
+   * @notice How many wallets a drop's allowlist holds. Creator-gated like the paged listing —
+   *         everyone else answers "is X on it" through the public `allowlist` getter.
+   */
+  function allowlistCount(uint256 _dropId) external view returns (uint256);
+
+  /**
+   * @notice One page of a drop's allowlist, for the creator's manage panel. Offset past the end
+   *         or a zero limit returns an empty page rather than reverting.
+   */
+  function allowlistOf(uint256 _dropId, uint256 _offset, uint256 _limit) external view returns (address[] memory);
 
   // --- ADMIN CONFIGURATION ---
 
@@ -290,11 +418,22 @@ interface IHupDrops {
   function unpause() external;
   function setDeployer(uint256 _standardId, address _deployer) external;
   function setMintFeeBps(uint256 _mintFeeBps) external;
+  function setMintFee(uint256 _mintFee) external;
+  function setMintFeeEnabled(bool _enabled) external;
   function setCreationFee(uint256 _creationFee) external;
   function setFollowerSystem(address _followerSystem) external;
+  function setCommunitySystem(address _communitySystem) external;
   function setTrustedForwarder(address _forwarder, bool _trusted) external;
   function setHupContract(address _hupAddress) external;
   function withdrawAll(address payable _receiver) external;
+
+  /**
+   * @notice Sweeps the platform's accumulated fees in one ERC20 or LSP7 to `_receiver`.
+   * @dev The native twin is `withdrawAll`. Token-priced phases accrue their fee here in that
+   *      token, so each one needs its own sweep — there is no enumeration of which tokens the
+   *      engine holds, by design: the admin knows what they priced drops in.
+   */
+  function withdrawToken(address _token, address _receiver, bool _isLsp7) external;
 }
 
 /**
@@ -329,6 +468,16 @@ interface IHupDropCollection {
  */
 interface ILSP26Minimal {
   function isFollowing(address follower, address addr) external view returns (bool);
+}
+
+/**
+ * @title IHupCommunityMinimal
+ * @notice The single HupCommunity call the Community gate needs. Its `registry` returns a
+ *         wallet's full standing in one community; the gate reads membership and the ban flag
+ *         and ignores the rest.
+ */
+interface IHupCommunityMinimal {
+  function registry(uint256 id, address user) external view returns (bool isMember, bool isPending, bool isModerator, bool isBanned, bool canPost);
 }
 
 /**

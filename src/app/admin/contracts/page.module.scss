@@ -410,6 +410,13 @@
     gap: 0.5rem;
   }
 
+  // Sits under a fee form's buttons to spell out a consequence the number alone hides
+  &__hint {
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
   &__input {
     width: 100%;
     background: var(--background);

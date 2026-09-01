@@ -2,7 +2,14 @@
 pragma solidity ^0.8.35;
 
 import { LSP7DigitalAsset } from "@lukso/lsp7-contracts/contracts/LSP7DigitalAsset.sol";
-import { _LSP4_METADATA_KEY, _LSP4_TOKEN_TYPE_NFT } from "@lukso/lsp4-contracts/contracts/LSP4Constants.sol";
+import { LSP7Burnable } from "@lukso/lsp7-contracts/contracts/extensions/LSP7Burnable/LSP7Burnable.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {
+  _LSP4_METADATA_KEY,
+  _LSP4_TOKEN_TYPE_NFT,
+  _LSP4_CREATORS_ARRAY_KEY,
+  _LSP4_CREATORS_MAP_KEY_PREFIX
+} from "@lukso/lsp4-contracts/contracts/LSP4Constants.sol";
 
 /**
  * @title Hup Drop Collection (LSP7)
@@ -26,7 +33,7 @@ import { _LSP4_METADATA_KEY, _LSP4_TOKEN_TYPE_NFT } from "@lukso/lsp4-contracts/
  * @custom:security-contact security@hup.social
  * @custom:emoji 💧
  */
-contract HupDropCollectionLSP7 is LSP7DigitalAsset {
+contract HupDropCollectionLSP7 is LSP7Burnable {
   // --- STATE VARIABLES ---
 
   uint96 public constant MAX_ROYALTY_BPS = 1_000;
@@ -39,6 +46,12 @@ contract HupDropCollectionLSP7 is LSP7DigitalAsset {
 
   /// @notice Total mintable editions, fixed forever. 0 = open edition.
   uint256 public immutable maxSupply;
+
+  /// @notice Whether holders can destroy their own tokens. Chosen by the creator at launch and
+  ///         immutable after, because it is a term of the sale: a collector deciding whether to
+  ///         mint is entitled to know, up front and permanently, whether these tokens can be
+  ///         destroyed.
+  bool public immutable burnable;
 
   /// @notice Editions minted so far.
   uint256 public totalMinted;
@@ -64,6 +77,11 @@ contract HupDropCollectionLSP7 is LSP7DigitalAsset {
   error MetadataIsFrozen();
   error InvalidRoyalty();
   error InvalidAddress();
+  error BurningDisabled();
+
+  /// @dev LSP0ERC725Account's ERC165 id — what a Universal Profile answers true for, and what
+  ///      live LUKSO assets carry in their LSP4CreatorsMap entries.
+  bytes4 private constant _INTERFACEID_LSP0 = 0x24871b3d;
 
   // --- MODIFIERS ---
 
@@ -84,6 +102,7 @@ contract HupDropCollectionLSP7 is LSP7DigitalAsset {
    *        placeholder until reveal. Empty to set later via `setData`.
    * @param royaltyReceiver_ ERC2981 receiver (address(0) with 0 bps to skip).
    * @param royaltyBps_ ERC2981 royalty, capped at MAX_ROYALTY_BPS.
+   * @param burnable_ Whether holders may burn their editions. Fixed forever at this value.
    */
   constructor(
     address drops_,
@@ -93,16 +112,20 @@ contract HupDropCollectionLSP7 is LSP7DigitalAsset {
     string memory symbol_,
     bytes memory lsp4MetadataValue_,
     address royaltyReceiver_,
-    uint96 royaltyBps_
+    uint96 royaltyBps_,
+    bool burnable_
   ) LSP7DigitalAsset(name_, symbol_, creator_, _LSP4_TOKEN_TYPE_NFT, true) {
     if (drops_ == address(0)) revert InvalidAddress();
 
     drops = drops_;
     maxSupply = maxSupply_;
+    burnable = burnable_;
 
     if (lsp4MetadataValue_.length > 0) {
       _setData(_LSP4_METADATA_KEY, lsp4MetadataValue_);
     }
+
+    _recordCreator(creator_);
 
     if (royaltyBps_ > 0) {
       if (royaltyBps_ > MAX_ROYALTY_BPS) revert InvalidRoyalty();
@@ -120,12 +143,72 @@ contract HupDropCollectionLSP7 is LSP7DigitalAsset {
    *      is true so plain EOAs and Universal Profiles without an LSP1 delegate can receive —
    *      the same reasoning as HupTrade's payouts.
    */
+  /**
+   * @notice The supply ceiling explorers read. 0 = open edition.
+   * @dev A plain view rather than LSP7CappedSupply, for the same reason its LSP8 twin gives:
+   *      that extension caps against `totalSupply()`, which drops when editions burn, so it
+   *      would let a burnable drop re-mint past its cap. `totalMinted` never moves on a burn.
+   */
+  function tokenSupplyCap() public view returns (uint256) {
+    return maxSupply;
+  }
+
+  /**
+   * @notice Destroys `amount` of `from`'s editions, if this collection was launched burnable.
+   * @dev Overrides LSP7Burnable purely to add that check — authorisation stays the extension's,
+   *      and the base decrements `totalSupply` for us. `totalMinted` deliberately does not
+   *      move: it is the drop's high-water mark, so it diverges from circulating supply once
+   *      anything burns.
+   */
+  function burn(address from, uint256 amount, bytes memory data) public virtual override {
+    if (!burnable) revert BurningDisabled();
+
+    super.burn(from, amount, data);
+  }
+
   function engineMint(address _to, uint256, uint256 _quantity) external onlyDrops {
     if (maxSupply != 0 && totalMinted + _quantity > maxSupply) revert SupplyExceeded();
 
     totalMinted += _quantity;
 
     _mint(_to, _quantity, true, "");
+  }
+
+  /**
+   * @dev Publishes the creator into `LSP4Creators[]` — see the LSP8 twin for the encoding and
+   *      why the interface id is probed rather than assumed.
+   */
+  function _recordCreator(address creator_) private {
+    _setData(_LSP4_CREATORS_ARRAY_KEY, abi.encodePacked(bytes16(uint128(1))));
+
+    _setData(
+      bytes32(bytes.concat(bytes16(_LSP4_CREATORS_ARRAY_KEY), bytes16(uint128(0)))),
+      abi.encodePacked(creator_)
+    );
+
+    _setData(
+      bytes32(bytes.concat(_LSP4_CREATORS_MAP_KEY_PREFIX, bytes2(0), bytes20(creator_))),
+      abi.encodePacked(_creatorInterfaceId(creator_), bytes16(uint128(0)))
+    );
+  }
+
+  /**
+   * @dev `LSP0ERC725Account` when the creator is a Universal Profile, zero when it is a plain
+   *      EOA. Probed, never assumed: a Hup drop can be created from either, and stamping the
+   *      UP id on an EOA would be a false claim about what the creator is. The call reverts on
+   *      an address with no code, which the catch turns into the EOA answer.
+   */
+  function _creatorInterfaceId(address creator_) private view returns (bytes4) {
+    // Code check first — see the LSP8 twin: the compiler's extcodesize check on a
+    // data-returning external call reverts outside the try, so an EOA creator would take the
+    // whole drop down with it.
+    if (creator_.code.length == 0) return bytes4(0);
+
+    try IERC165(creator_).supportsInterface(_INTERFACEID_LSP0) returns (bool supported) {
+      return supported ? _INTERFACEID_LSP0 : bytes4(0);
+    } catch {
+      return bytes4(0);
+    }
   }
 
   // --- CREATOR CONFIGURATION ---

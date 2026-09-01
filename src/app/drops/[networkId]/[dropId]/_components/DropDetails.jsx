@@ -3,12 +3,12 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useReadContract } from 'wagmi'
-import { zeroAddress } from 'viem'
+import { formatEther, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { ArrowSquareOutIcon, CaretLeftIcon, CheckIcon, CopyIcon, WarningIcon } from '@phosphor-icons/react'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
-import { dropStandardLabel, isLuksoStandard } from '@/lib/drops'
+import { PHASE_STATUS, dropStandardLabel, formatPhaseTime, gateLabel, isLuksoStandard, phaseStatus } from '@/lib/drops'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { networkColorStyle } from '@/lib/networkColors'
 import { handleBrokenImage } from '@/lib/utils'
@@ -16,6 +16,7 @@ import { useDropCollection } from '@/hooks/useDropCollection'
 import dropsAbi from '@/abis/HupDrops.json'
 import { buildAssetLinks } from '@/components/TradeCard'
 import DropCard from '@/components/DropCard'
+import DropEligibility from '@/components/DropEligibility'
 import DropManagePanel from '@/components/DropManagePanel'
 import Profile from '@/components/Profile'
 import PageTitle from '@/components/PageTitle'
@@ -26,8 +27,6 @@ import styles from './DropDetails.module.scss'
 
 const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
 
-// The destination varies by standard and chain, so the tooltip names the host rather than
-// promising a marketplace the link may not go to
 const linkHost = (url) => {
   try {
     return new URL(url).hostname.replace(/^www\./, '')
@@ -41,12 +40,11 @@ const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium' })
 
 /**
  * Drop Details
- * The standalone page behind DropCard's View link. Drop state has no indexed API — everything
- * resolves live from the HupDrops engine and the drop's collection contract, so the page can
- * never present stale supply or phase state. The compact DropCard supplies the mint panel;
- * this page presents the artwork at full size (the same TradeCard-compact split the NFT
- * listing page uses).
+ * The page behind DropCard's View link. Everything resolves live from the HupDrops engine and the
+ * collection contract; the compact DropCard supplies the mint panel, this page the artwork.
  */
+const countFormat = new Intl.NumberFormat('en')
+
 export default function DropDetails({ networkId, dropId }) {
   const router = useRouter()
   const chainId = Number(networkId)
@@ -72,8 +70,34 @@ export default function DropDetails({ networkId, dropId }) {
 
   const collection = drop?.collection && drop.collection !== zeroAddress ? drop.collection : null
 
-  // Identity resolves per standard family — LSP collections carry it in ERC725Y data keys,
-  // EVM ones in name()/symbol()/contractURI()
+  const { data: payoutDestination } = useReadContract({
+    abi: dropsAbi,
+    address: dropsAddress,
+    functionName: 'payoutDestination',
+    args: [id ?? 0n],
+    chainId,
+    query: { enabled: Boolean(dropsAddress && id) },
+  })
+  const payoutOverride = payoutDestination && payoutDestination !== zeroAddress ? payoutDestination : null
+
+  // Same phase pick as DropCard, so the eligibility panel and the mint panel agree
+  const { data: phases = [] } = useReadContract({
+    abi: dropsAbi,
+    address: dropsAddress,
+    functionName: 'phasesOf',
+    args: [id ?? 0n],
+    chainId,
+    query: { enabled: Boolean(dropsAddress && id) },
+  })
+  const livePhaseIndex = phases.findIndex((entry) => phaseStatus(entry) === PHASE_STATUS.LIVE)
+
+  // Straight off the engine's drop record — the stats strip should agree with the mint panel
+  // to the token, and both read the same source rather than one trusting an indexed copy.
+  const minted = Number(drop?.minted ?? 0)
+  const maxSupply = Number(drop?.maxSupply ?? 0)
+  const isOpenEdition = maxSupply === 0
+  const eligibilityIndex = livePhaseIndex === -1 ? 0 : livePhaseIndex
+
   const { name, symbol, description, image, banner, links, refreshMetadata } = useDropCollection({
     chainId,
     collection,
@@ -82,8 +106,6 @@ export default function DropDetails({ networkId, dropId }) {
   const imageUrl = image ? resolveStorageImageUrl(image) : null
   const bannerUrl = banner ? resolveStorageImageUrl(banner) : null
 
-  // Same resolver the NFT market uses: LUKSO collections open on Universal Everything, ERC ones
-  // on OpenSea where the chain has a slug, and everything else on the chain's explorer
   const { collectionUrl } = buildAssetLinks({
     chainId,
     chainInfo,
@@ -102,9 +124,6 @@ export default function DropDetails({ networkId, dropId }) {
     }
   }
 
-  // The mint panel resolves everything else live; the page only seeds the static identity.
-  // No allowlistCid here — that file's pointer only travels in posts, so allowlist mints
-  // happen from the feed card while this page still shows the phase terms.
   const cardDrop = useMemo(() => ({ dropId, chainId, name, symbol, image }), [dropId, chainId, name, symbol, image])
 
   if (!chainInfo || !dropsAddress) {
@@ -164,9 +183,32 @@ export default function DropDetails({ networkId, dropId }) {
             {isClosed && <span className={clsx(styles.drop__chip, styles['drop__chip--closed'])}>Closed</span>}
           </div>
 
-          {/* The creator reads as a person, not a hex string — same Profile the feed uses,
-              with its avatar, chain badge, and follow card */}
           <Profile creator={drop.creator} networkId={chainId} variant="compact" className={styles.drop__creator} />
+
+          {/* Primary-sale facts only. A launchpad page has no floor, no volume and no top offer
+              until a secondary market exists for the collection, and printing em-dashes under
+              six headings says less than four numbers that are actually true. */}
+          <dl className={styles.drop__stats}>
+            <div>
+              <dt>Minted</dt>
+              <dd>
+                {countFormat.format(minted)}
+                {isOpenEdition ? '' : ` / ${countFormat.format(maxSupply)}`}
+              </dd>
+            </div>
+            <div>
+              <dt>Supply</dt>
+              <dd>{isOpenEdition ? 'Open' : countFormat.format(maxSupply)}</dd>
+            </div>
+            <div>
+              <dt>Stages</dt>
+              <dd>{countFormat.format(phases.length)}</dd>
+            </div>
+            <div>
+              <dt>Standard</dt>
+              <dd>{dropStandardLabel(drop.standardId)}</dd>
+            </div>
+          </dl>
 
           {description && <p className={styles.drop__description}>{description}</p>}
 
@@ -183,6 +225,52 @@ export default function DropDetails({ networkId, dropId }) {
           )}
 
           <DropCard drop={cardDrop} compact showDetailsLink={false} />
+
+          {phases.length > 0 && (
+            <section className={styles.drop__schedule}>
+              <h2>Mint schedule</h2>
+              <ol>
+                {phases.map((phase, index) => {
+                  const status = phaseStatus(phase)
+                  const priced = phase.price > 0n
+                  return (
+                    <li key={index} className={clsx(status === PHASE_STATUS.LIVE && styles['drop__stage--live'])}>
+                      <div className={styles.drop__stageHead}>
+                        <strong>{phase.name?.trim() || `Stage ${index + 1}`}</strong>
+                        {status === PHASE_STATUS.LIVE && <em>Live</em>}
+                      </div>
+                      <small>
+                        {priced ? `${formatEther(phase.price)} ${chainInfo.nativeCurrency?.symbol ?? ''}` : 'Free'}
+                        {' · '}
+                        {Number(phase.perWallet) === 0 ? 'Unlimited per wallet' : `${countFormat.format(Number(phase.perWallet))} per wallet`}
+                        {' · '}
+                        {gateLabel(Number(phase.gate))}
+                      </small>
+                      <small className={styles.drop__stageWhen}>
+                        {status === PHASE_STATUS.ENDED
+                          ? `Ended ${formatPhaseTime(phase.endTime)}`
+                          : status === PHASE_STATUS.PAUSED
+                            ? 'Paused by the creator'
+                            : status === PHASE_STATUS.UPCOMING
+                              ? `Starts ${formatPhaseTime(phase.startTime)}`
+                              : phase.endTime && Number(phase.endTime) > 0
+                                ? `Open until ${formatPhaseTime(phase.endTime)}`
+                                : 'Open — no end date'}
+                      </small>
+                    </li>
+                  )
+                })}
+              </ol>
+            </section>
+          )}
+
+          <DropEligibility
+            chainId={chainId}
+            dropId={dropId}
+            phaseIndex={eligibilityIndex}
+            phase={phases[eligibilityIndex] ?? null}
+            creator={drop.creator}
+          />
 
           <dl className={styles.drop__facts}>
             <div>
@@ -207,6 +295,14 @@ export default function DropDetails({ networkId, dropId }) {
                 <dd>{percentFormat.format(referralBps / 100)}% of each paid mint</dd>
               </div>
             )}
+            {payoutOverride && (
+              <div>
+                <dt>Proceeds go to</dt>
+                <dd className={styles.drop__address} title={payoutOverride}>
+                  {shortAddress(payoutOverride)}
+                </dd>
+              </div>
+            )}
             {createdAt > 0 && (
               <div>
                 <dt>Created</dt>
@@ -215,7 +311,6 @@ export default function DropDetails({ networkId, dropId }) {
             )}
           </dl>
 
-          {/* Creator-only management — renders nothing for everyone else */}
           <DropManagePanel
             chainId={chainId}
             dropId={dropId}

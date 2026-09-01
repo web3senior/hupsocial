@@ -120,7 +120,6 @@
     }
   }
 
-  // The 0/1-minted bar Universal Page made canonical
   &__progress {
     display: flex;
     flex-direction: column;
@@ -131,50 +130,6 @@
     color: var(--text-muted);
     font-size: 0.8rem;
     font-weight: 600;
-  }
-
-  &__progressTrack {
-    display: block;
-    width: 100%;
-    height: 6px;
-    border-radius: 999px;
-    background-color: color-mix(in srgb, var(--text-muted) 18%, transparent);
-    overflow: hidden;
-  }
-
-  &__progressFill {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    position: relative;
-    overflow: hidden;
-    // Same fill the directory tiles use, so a drop looks the same in the grid, the feed, and
-    // on its own page: dim at the start, full strength at the leading edge
-    background-image: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 45%, transparent),
-      var(--network-color-primary, var(--color-primary))
-    );
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  // Sold out is a finished story — only a mintable drop keeps the sheen moving
-  &__progressFill--minting::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-    animation: dropCardSheen 2.4s ease-in-out infinite;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    &__progressFill {
-      transition: none;
-
-      &::after {
-        animation: none;
-      }
-    }
   }
 
   &__phases {
@@ -276,6 +231,12 @@
     }
   }
 
+  &__feeNote {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
   &__view {
     margin-left: auto;
     padding: 0.5rem 1.1rem;
@@ -301,12 +262,3 @@
   }
 }
 
-@keyframes dropCardSheen {
-  from {
-    transform: translateX(-100%);
-  }
-
-  to {
-    transform: translateX(100%);
-  }
-}

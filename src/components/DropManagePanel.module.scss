@@ -48,6 +48,47 @@
     }
   }
 
+  // The earnings headline. Big enough to be the first thing read, quiet enough not to shout
+  // when it says 0 — which is what it says for most of a drop's life.
+  &__earnings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+  }
+
+  &__earningsLabel {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  &__earningsValue {
+    font-size: 2.25rem;
+    line-height: 1.1;
+    font-weight: 700;
+    // Tabular figures so the number does not jitter as mints land
+    font-variant-numeric: tabular-nums;
+    word-break: break-all;
+
+    em {
+      font-style: normal;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-muted, #888);
+      margin-left: 0.3rem;
+    }
+  }
+
+  &__earningsNote {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.5;
+  }
+
   &__stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -63,8 +104,7 @@
     flex-direction: column;
     gap: 0.15rem;
     border-radius: var(--global-border-radius);
-    // --background equals --surface in the light and terminal themes, so a borderless block
-    // nested on a surface must step in with --surface-muted or it renders invisible
+    // --background equals --surface in the light and terminal themes, so a nested block needs --surface-muted
     background: var(--surface-muted);
     padding: 0.7rem 0.8rem;
 
@@ -92,6 +132,35 @@
   }
 
   &__phases,
+  // Wide content scrolls inside its own box rather than being clipped or pushing the panel
+  // sideways. It also owns the rounded corners, since the table can no longer clip its own.
+  &__tableScroll {
+    overflow-x: auto;
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+
+    &:hover,
+    &:focus-within {
+      scrollbar-color: var(--thumbBG) transparent;
+    }
+  }
+
+  &__splitTable {
+    margin-bottom: 0.75rem;
+
+    // Its last column is prose, not a number — it keeps the left edge and may wrap, unlike the
+    // share column beside it. The shared rule above assumes every column after the first is
+    // numeric, which is true of the activity table and not of this one.
+    th:last-child,
+    td:last-child {
+      text-align: start;
+      width: auto;
+      white-space: normal;
+    }
+  }
+
   &__activity {
     display: flex;
     flex-direction: column;
@@ -161,6 +230,343 @@
     font-variant-numeric: tabular-nums;
   }
 
+  &__allowlistBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      font-size: var(--font-size-14, 0.875rem);
+
+      small {
+        font-weight: 400;
+        color: var(--text-muted, #888);
+        font-size: var(--font-size-12);
+      }
+    }
+  }
+
+  &__allowlistList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+
+    li {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-radius: 999px;
+      // --background equals --surface in the light and terminal themes, so a nested block needs --surface-muted
+      background: var(--surface-muted);
+      padding: 0.25rem 0.6rem;
+      font-size: var(--font-size-12);
+
+      code {
+        font-variant-numeric: tabular-nums;
+      }
+
+      button {
+        display: inline-flex;
+        border: none;
+        background: none;
+        color: var(--text-muted, #888);
+        padding: 0;
+        cursor: pointer;
+
+        &:hover:not(:disabled) {
+          color: var(--primary, #ec4899);
+        }
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+
+  &__allowlistAdd {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+
+    textarea {
+      flex: 1;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: inherit;
+      padding: 0.5rem 0.7rem;
+      font-size: var(--font-size-12);
+      font-family: inherit;
+    }
+
+    button {
+      align-self: flex-end;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        border-color: var(--primary, #ec4899);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__addPhase {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px dashed var(--border);
+    background: none;
+    color: inherit;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+
+    em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+
+    &:hover:not(:disabled) {
+      border-color: var(--primary, #ec4899);
+      border-style: solid;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__newPhase {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    padding: 0.75rem;
+  }
+
+  &__phaseHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    strong {
+      font-size: var(--font-size-12);
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border: none;
+      background: none;
+      color: var(--text-muted, #888);
+      padding: 0;
+      font: inherit;
+      font-size: var(--font-size-12);
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        color: var(--primary, #ec4899);
+      }
+    }
+  }
+
+  &__newPhaseGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+
+    @media (max-width: 420px) {
+      grid-template-columns: 1fr;
+    }
+
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface);
+      color: inherit;
+      padding: 0.55rem 0.7rem;
+      font: inherit;
+      font-size: var(--font-size-12);
+    }
+  }
+
+  &__newPhaseToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    cursor: pointer;
+  }
+
+  &__tokenUri {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    code {
+      word-break: break-all;
+    }
+  }
+
+  &__tokenUriRow {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__tokenUriActions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    button,
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        border-color: var(--primary, #ec4899);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  // The hidden input drives the disabled look; the label itself never gets :disabled
+  &__folderPick:has(input:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &__creators {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      font-size: var(--font-size-14, 0.875rem);
+
+      small {
+        font-weight: 400;
+        color: var(--text-muted, #888);
+        font-size: var(--font-size-12);
+      }
+    }
+  }
+
+  &__payout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    code {
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__payoutRow {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: inherit;
+      padding: 0.5rem 0.7rem;
+      font-size: var(--font-size-12);
+      font-family: inherit;
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        border-color: var(--primary, #ec4899);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
   &__royalty {
     display: flex;
     flex-direction: column;
@@ -204,7 +610,6 @@
       cursor: not-allowed;
     }
 
-    // Starting is the affirmative action, so it carries the accent; pausing stays quiet
     &--start {
       background: var(--primary, #ec4899);
       border-color: var(--primary, #ec4899);
@@ -212,15 +617,13 @@
     }
   }
 
-  &__activity {
+  &__tableScroll {
     table {
       width: 100%;
+      // Below this the columns crush into each other; the scroller takes over instead
+      min-width: 20rem;
       border-collapse: collapse;
       font-size: var(--font-size-12);
-      // Reads as one block like the phase list rather than text floating on the card
-      background: var(--surface-muted);
-      border-radius: var(--global-border-radius);
-      overflow: hidden;
     }
 
     th {
@@ -229,12 +632,30 @@
       color: var(--text-muted, #888);
       padding: 0.45rem 0.6rem;
       border-bottom: 1px solid var(--border);
+      white-space: nowrap;
     }
 
     td {
       padding: 0.45rem 0.6rem;
       border-bottom: 1px solid var(--border);
       font-variant-numeric: tabular-nums;
+      vertical-align: middle;
+    }
+
+    // Columns 2-4 are Items, Paid and Date — numbers, aligned on their right edge so the digits
+    // line up down the column. `width: 1%` with nowrap is the shrink-to-fit idiom: each takes
+    // exactly its content and the name column keeps whatever is left, rather than the name being
+    // forced to 100% and squashing everything beside it.
+    th:not(:first-child),
+    td:not(:first-child) {
+      text-align: end;
+      width: 1%;
+      white-space: nowrap;
+    }
+
+    // Only the minter's name is prose, and only it may break mid-word — a wrapped date or a
+    // hyphenated amount is worse than a narrower column.
+    td:first-child {
       overflow-wrap: anywhere;
     }
 
@@ -299,7 +720,6 @@
     color: var(--text-muted, #888);
   }
 
-  /* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
   &__dialog {
     padding: 0;
     border: 1px solid var(--border);
@@ -439,6 +859,10 @@
     small {
       font-size: var(--font-size-10, 0.625rem);
       color: var(--text-muted, #888);
+    }
+
+    &--narrow {
+      flex: 0 1 8rem;
     }
   }
 

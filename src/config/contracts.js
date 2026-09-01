@@ -1,16 +1,13 @@
 /**
  * @file config/contracts.js
- * @description Server-safe chain and contract-address data. API routes and lib/
- * readers import from here instead of config/wagmi so evaluating them never
- * constructs wallet connectors (WalletConnect touches browser-only storage such
- * as indexedDB the moment it is instantiated). config/wagmi re-exports these for
- * client code.
+ * Server-safe chain and contract-address data. API routes and lib/ readers import from here
+ * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, bsc, celo, lukso, luksoTestnet, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, baseSepolia, bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
-// Robinhood Chain (Arbitrum Orbit L2, ETH as native gas token)
+// Arbitrum Orbit L2, ETH as gas
 export const robinhood = defineChain({
   id: 4663,
   name: 'Robinhood',
@@ -28,29 +25,25 @@ export const robinhood = defineChain({
   },
 })
 
-// RPC pins: viem's defaults for these two chains reject keyless server-side callers (56 refuses
-// datacenter IPs, 42 answers with a 403 HTML page), so every server read came back empty while
-// browsers, whose wallets bring their own RPC, looked fine. Mutating the shared chain object
-// keeps every importer pinned. Only http[0] is read server-side.
+// Server reads take http[0]. viem's defaults refuse keyless server callers on these chains
+// (56 blocks datacenter IPs, 42 answers 403, sepolia.base.org does not answer), so pin ones
+// that work. Browsers need the reverse order on LUKSO — see BROWSER_RPC_URLS in config/wagmi.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
-/* Do not reorder these two to put the official node first: server reads take http[0], and 42's
-   official node 403s them. The browser needs the opposite order and gets it from an explicit
-   fallback() in config/wagmi rather than from this array — a bare http() would read http[0] here
-   and put every page on thirdweb's keyless tier, which rate-limits with -32005. */
 lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.com', 'https://rpc.mainnet.lukso.network'] } }
+baseSepolia.rpcUrls = {
+  ...baseSepolia.rpcUrls,
+  default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
+}
 
-// Single source of truth for the wagmi config's `chains` tuple and for server-side RPC lookups
-// (chain.rpcUrls.default.http). L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, luksoTestnet]
+// Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
+export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia]
 
-// Field notes:
-//   ''              — not deployed or not applicable on that chain.
-//   hupForwarder    — set only where Hup core trusts a forwarder other than `forwarder`.
-//   univ3*/univ4*/sushiV2Router/wnative — swap venues raced by the swap page. Resolve every
-//     address from the DEX's own official registry and verify onchain before enabling a chain
-//     (router.factory() == quoter.factory(), router.WETH() == wnative): a wrong quoter fails
-//     safe, a wrong router is where user funds would go.
-//   nativeIsErc20   — the chain's native coin is itself an ERC20: approve, never msg.value.
+// ''            — not deployed on that chain.
+// hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
+// drops         — the HupDrops engine; deployer satellites are registered inside it, not here.
+// univ3*/univ4*/sushiV2Router/wnative — swap venues; verify onchain against the DEX registry
+//                 before enabling a chain. A wrong router is where user funds would go.
+// nativeIsErc20 — the native coin is an ERC20: approve, never msg.value.
 export const CONTRACTS = {
   chain1: {
     name: 'ethereum',
@@ -67,14 +60,7 @@ export const CONTRACTS = {
     events: '',
     predict: '0xc77372d05ccc2d30938aa58686671625769f88bd',
     apps: '',
-    // 2026-08-26 mainnet wave — the same fixed 1.0.0 build as LUKSO above landed on every
-    // remaining mainnet (ethereum, bnb, monad, base, celo, arbitrum, robinhood) from one
-    // deployer, each trusting that chain's `forwarder`. Blocks and deploy txs are recorded in
-    // cidex's add-polls.sql; setFollowerSystem(followerSystem) is still the admin's click per
-    // chain on /admin/contracts → Polls, so FollowsCreator fails closed until then.
     polls: '0xF01F5519a05b3Bd214fc0E038F609C4a9Bf008F1',
-    // HupDrops: `drops` is the engine; deployer satellites are registered inside it per standard
-    // (1 = ERC721, 2 = ERC1155, 3 = LSP7, 4 = LSP8) and never read by the app.
     drops: '',
     launch: '',
     univ3Router: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
@@ -90,68 +76,53 @@ export const CONTRACTS = {
     name: 'lukso',
     forwarder: '0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972',
     forwarderName: 'HupChatForwarder',
-    // Hup core trusts this one, not the chat forwarder above — relaying `create` through
-    // `forwarder` reverts with ERC2771UntrustfulTarget.
+    // Hup core trusts this one, not `forwarder`
     hupForwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     hupForwarderName: 'HupForwarder',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
-    // Deployed 2026-08-24 (block 8236155, tx 0xd68b12d2a69a1028bb6621a7a278f5111577711d3f5644db8402d46e68e1dfad)
-    // — the first HupCommunity on a mainnet. Direct-push payout-destination build; trusts the
-    // HupChatForwarder above (`forwarder`), like every other extension here. cidex row 126.
-    // setFollowerSystem(LSP26 below) is still the admin's click; FollowsCreator fails closed
-    // until then.
     community: '0xB7Af957f4157aeAdA5Cab17D3B55fB1f1315F41A',
     chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
     trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
-    // Takes no forwarder and honors no burner session, so `msg.sender` is the only identity it
-    // acts on and gasless relaying never applies to these calls.
     offers: '0xf0c1dB3059608bb589726B651108D3984060D5d8',
     events: '0x29fAdA247735a95Ad92A70890cb21106D12a5E0C',
     predict: '0xD76dcBB664a002247269c1fBB161B0440674C570',
     apps: '0xe30350Cf486210C299Aef91De61799Daed1Df6C5',
-    // Deployed 2026-08-25 (block 8241147, tx 0xd448977676d0c10f90ebde46cbc65693f990c8a73df7ace2c64d0d700b47c6b3)
-    // — the first HupPolls on a mainnet, the fixed 1.0.0 build. Trusts the HupChatForwarder
-    // above (`forwarder`), not `hupForwarder`; the relay helper tries both. setFollowerSystem
-    // (LSP26 below) is still the admin's click on /admin/contracts → Polls; FollowsCreator
-    // fails closed and the composer hides the followers gate until then.
     polls: '0x7A5134435E029b5bBFF0d4EB5aEbCf0255D76D88',
-    drops: '',
-    // No Uniswap on LUKSO, and launches are one-phase Uniswap pools — so no launches or swaps here.
+    // LSP8 satellite 0xa54Cef63a1fa3bf9aaB93b873cbCeAb9dfa956b5 registered; LSP7 not deployed yet
+    drops: '0x5a89471b1577e8BAd50877Cc25fFb705Bd528C06',
+    // No Uniswap on LUKSO
     launch: '',
     univ3Router: '',
     univ3Quoter: '',
   },
-  chain4201: {
-    name: 'lukso-testnet',
-    forwarder: '0xab100B28D06e93fF52DAE95DB8e90F83680671FC',
+  // Dev chain
+  chain84532: {
+    name: 'base-sepolia',
+    forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
     forwarderName: 'HupChatForwarder',
-    hup: '0xb0b992E90e11b6bCE51cb5ea4de160D06098B955',
+    hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
     status: '',
-    // Redeployed 2026-08-24 (block 8378861) with the direct-push payout destination
-    // (setPayoutDestination). The 0xd664… deploy from 08-13 is retired and deactivated in
-    // cidex. Fresh core: setFollowerSystem(LSP26 below) still needs the admin's click.
-    community: '0xe155bA21032bcf244e279A92Df4F9A721619D7Ee',
+    community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
+    polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
     chat: '',
-    // Canonical LSP26, same address as every other chain.
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    // No LSP26 on Base Sepolia: follower gates are unavailable here
+    followerSystem: '',
     store: '',
-    tipper: '',
+    tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
     trade: '',
-    // Nothing to make offers against until this chain gets a HupTrade.
     offers: '',
     events: '',
     predict: '',
     apps: '',
-    polls: '',
-    // Satellites: LSP7 0xb489…3F06, LSP8 0x761B…62b1.
-    drops: '0x073F3E3FF95b7EA8cb0Afb22389774E694782DaC',
+    drops: '',
     launch: '',
-    univ3Router: '',
-    univ3Quoter: '',
+    univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
+    univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
+    wnative: '0x4200000000000000000000000000000000000006',
   },
   chain143: {
     name: 'monad',
@@ -175,7 +146,6 @@ export const CONTRACTS = {
     launch: '',
     univ3Router: '0xfE31F71C1b106EAc32F1A19239c9a9A72ddfb900',
     univ3Quoter: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
-    // No sushiV2Router: Sushi's addresses have no code on Monad.
     wnative: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A', // WMON
     univ4Router: '0x0D97Dc33264bfC1c226207428A79b26757fb9dc3',
     univ4PoolManager: '0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e',
@@ -201,11 +171,9 @@ export const CONTRACTS = {
     launch: '',
     univ3Router: '0x5615CDAb10dc425a742d643d949a7F474C01abc4',
     univ3Quoter: '0x82825d0554fA07f7FC52Ab63c961F330fdEFa8E8',
-    // Uniswap's and Sushi's Celo deploys have no WETH9 — pools pair against the CELO token itself.
-    wnative: '0x471EcE3750Da237f93B8E339c536989b8978a438',
+    wnative: '0x471EcE3750Da237f93B8E339c536989b8978a438', // CELO itself — no WETH9 on Celo
     nativeIsErc20: true,
-    // v4 exists here, but its currency-0x0 model does not apply where the coin is an ERC20; the
-    // swap page only probes v4 on genuinely-native chains, so these stay recorded for later use.
+    // Recorded but unused: the swap page skips v4 where the native coin is an ERC20
     univ4Router: '0xcb695bc5D3Aa22cAD1E6DF07801b061a05A0233A',
     univ4PoolManager: '0x288dc841A52FCA2707c6947B3A777c5E56cd87BC',
     univ4Quoters: ['0x28566da1093609182dFf2cB2A91CFD72e61d66cd'],
@@ -217,12 +185,6 @@ export const CONTRACTS = {
     forwarder: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
-    // Deployed 2026-08-26 (block 50482657, tx 0xc8a723f70e70cb0b436d9581d89ec6227c40ba6f1739d1b0ff16197e27f5d5c9)
-    // — the second HupCommunity on a mainnet, the same direct-push payout-destination build
-    // as LUKSO. Trusts the `forwarder` above, confirmed onchain with isTrustedForwarder.
-    // cidex row 128.
-    // setFollowerSystem(LSP26 below) is still the admin's click; FollowsCreator fails closed
-    // until then.
     community: '0x77986dE55d0C746351F3A0797b745306c5Fc072C',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
@@ -286,9 +248,7 @@ export const CONTRACTS = {
     polls: '0xC77372D05CCC2d30938Aa58686671625769f88bd',
     drops: '',
     launch: '',
-    // V4 only — no official Uniswap v3 or Sushi deployment here. Two quoters exist; both are
-    // wired and the batch quote uses whichever answers. Meme-launch pools use the 2500/25 fee
-    // tier (probed by lib/uniswap-v4.js).
+    // v4 only; both quoters are wired and the batch quote uses whichever answers
     univ3Router: '',
     univ3Quoter: '',
     univ4Router: '0x8876789976dEcBfCbBbe364623C63652db8C0904',
@@ -340,13 +300,8 @@ export const CONTRACTS = {
   },
 }
 
-/**
- * Contracts an embedded mini app may call with the viewer's burner session key via the bridge's
- * hup_sessionCall method — value-less, rate-limited, and gated behind a one-time per-app consent.
- * Keyed by chainId, then the app's onchain registry appId; an app absent here cannot session-call.
- * Keep it host-owned and explicit: a wildcard or app-supplied target would hand every embedded
- * frame the viewer's identity on Hup Core.
- */
+// Contracts an embedded mini app may call through hup_sessionCall, keyed by chainId then
+// registry appId. Host-owned and explicit: an app absent here cannot session-call.
 export const SESSION_CALL_ALLOWLIST = {
   10143: {
     // Hup Miner — its own registry listing (frame served from localhost/hupminer).

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.35;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -25,7 +26,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @custom:security-contact security@hup.social
  * @custom:emoji 💧
  */
-contract HupDropCollection1155 is ERC1155, ERC2981, Ownable {
+contract HupDropCollection1155 is ERC1155Burnable, ERC2981, Ownable {
   // --- STATE VARIABLES ---
 
   uint96 public constant MAX_ROYALTY_BPS = 1_000;
@@ -38,6 +39,15 @@ contract HupDropCollection1155 is ERC1155, ERC2981, Ownable {
 
   /// @notice Total mintable editions, fixed forever. 0 = open edition.
   uint256 public immutable maxSupply;
+
+  /// @notice Whether holders can destroy their own tokens. Chosen by the creator at launch and
+  ///         immutable after, because it is a term of the sale: a collector deciding whether to
+  ///         mint is entitled to know, up front and permanently, whether these tokens can be
+  ///         destroyed.
+  bool public immutable burnable;
+
+  /// @notice Editions destroyed so far. Only ever moves on a burnable collection.
+  uint256 public totalBurned;
 
   /// @notice Editions minted so far.
   uint256 public totalMinted;
@@ -68,6 +78,7 @@ contract HupDropCollection1155 is ERC1155, ERC2981, Ownable {
   error MetadataIsFrozen();
   error InvalidRoyalty();
   error InvalidAddress();
+  error BurningDisabled();
 
   // --- MODIFIERS ---
 
@@ -88,6 +99,7 @@ contract HupDropCollection1155 is ERC1155, ERC2981, Ownable {
    * @param contractURI_ Collection-level metadata URI (OpenSea `contractURI` convention).
    * @param royaltyReceiver_ ERC2981 default receiver (address(0) with 0 bps to skip).
    * @param royaltyBps_ ERC2981 royalty, capped at MAX_ROYALTY_BPS.
+   * @param burnable_ Whether holders may burn their editions. Fixed forever at this value.
    */
   constructor(
     address drops_,
@@ -98,11 +110,13 @@ contract HupDropCollection1155 is ERC1155, ERC2981, Ownable {
     string memory tokenURI_,
     string memory contractURI_,
     address royaltyReceiver_,
-    uint96 royaltyBps_
+    uint96 royaltyBps_,
+    bool burnable_
   ) ERC1155("") Ownable(creator_) {
     if (drops_ == address(0)) revert InvalidAddress();
 
     drops = drops_;
+    burnable = burnable_;
     maxSupply = maxSupply_;
     name = name_;
     symbol = symbol_;
@@ -191,9 +205,33 @@ contract HupDropCollection1155 is ERC1155, ERC2981, Ownable {
     return _contractURI;
   }
 
-  /// @notice Marketplace convenience; equals `totalMinted` since nothing burns.
+  /**
+   * @notice Destroys `value` of `account`'s editions, if this collection was launched burnable.
+   * @dev Both ERC1155Burnable entry points are overridden — leaving `burnBatch` open would be a
+   *      hole straight past this check. Authorisation stays the extension's (holder or approved
+   *      operator). `totalMinted` is the drop's high-water mark and never moves.
+   */
+  function burn(address account, uint256 id, uint256 value) public virtual override {
+    if (!burnable) revert BurningDisabled();
+
+    totalBurned += value;
+    super.burn(account, id, value);
+  }
+
+  function burnBatch(address account, uint256[] memory ids, uint256[] memory values) public virtual override {
+    if (!burnable) revert BurningDisabled();
+
+    for (uint256 i = 0; i < values.length; i++) {
+      totalBurned += values[i];
+    }
+
+    super.burnBatch(account, ids, values);
+  }
+
+  /// @notice Marketplace convenience: editions currently in circulation, which is `totalMinted`
+  ///         until something burns.
   function totalSupply() external view returns (uint256) {
-    return totalMinted;
+    return totalMinted - totalBurned;
   }
 
   function supportsInterface(bytes4 _interfaceId) public view override(ERC1155, ERC2981) returns (bool) {

@@ -44,7 +44,10 @@ contract HupDropsDeployerLSP8 is IHupDropsDeployer {
    * @notice Deploys a HupDropCollectionLSP8 owned by `_creator`, minted only by the engine.
    * @param _params abi.encode(string name, string symbol, uint256 tokenType,
    *        bytes lsp4MetadataValue, bytes baseURIValue, address royaltyReceiver,
-   *        uint96 royaltyBps)
+   *        uint96 royaltyBps, bool burnable)
+   * @dev No tokenIdFormat field: the collection always declares NUMBER, because `engineMint`
+   *      only ever mints `bytes32(n)`. Offering the choice let a caller declare a format the
+   *      collection could not produce.
    */
   function deploy(address _creator, uint256 _maxSupply, bytes calldata _params) external returns (address collection) {
     if (msg.sender != drops) revert OnlyDrops();
@@ -56,9 +59,24 @@ contract HupDropsDeployerLSP8 is IHupDropsDeployer {
       bytes memory lsp4MetadataValue,
       bytes memory baseURIValue,
       address royaltyReceiver,
-      uint96 royaltyBps
-    ) = abi.decode(_params, (string, string, uint256, bytes, bytes, address, uint96));
+      uint96 royaltyBps,
+      bool burnable
+    ) = abi.decode(_params, (string, string, uint256, bytes, bytes, address, uint96, bool));
 
-    collection = address(new HupDropCollectionLSP8(drops, _creator, _maxSupply, name, symbol, tokenType, lsp4MetadataValue, baseURIValue, royaltyReceiver, royaltyBps));
+    collection = address(
+      new HupDropCollectionLSP8(
+        drops,
+        _creator,
+        _maxSupply,
+        name,
+        symbol,
+        tokenType,
+        lsp4MetadataValue,
+        baseURIValue,
+        royaltyReceiver,
+        royaltyBps,
+        burnable
+      )
+    );
   }
 }

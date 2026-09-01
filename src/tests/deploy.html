@@ -198,6 +198,56 @@
   <script>
     const FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 
+    // Read-only RPC fallbacks per chain. The page's two chain reads — is the factory here, is
+    // the predicted address already taken — normally go through the wallet, but a wallet
+    // pointed at a rate-limited endpoint answers eth_getCode with a 429 and the page stalls
+    // before anything can be deployed. These are tried in order when that happens. Signing
+    // always stays with the wallet; these never see a transaction.
+    const READ_RPCS = {
+      42: ["https://rpc.mainnet.lukso.network", "https://42.rpc.thirdweb.com"],
+    };
+
+    const readProviderCache = new Map();
+
+    function readProvidersFor(chainId) {
+      if (!readProviderCache.has(chainId)) {
+        const urls = READ_RPCS[chainId] || [];
+        readProviderCache.set(
+          chainId,
+          urls.map((url) => {
+            // staticNetwork skips the chainId round trip, but the option's shape has moved
+            // across ethers 6.x — fall back to the plain constructor rather than let a CDN
+            // version bump break every read on the page.
+            try {
+              return new ethers.JsonRpcProvider(url, chainId, { staticNetwork: true });
+            } catch (err) {
+              return new ethers.JsonRpcProvider(url);
+            }
+          }),
+        );
+      }
+      return readProviderCache.get(chainId);
+    }
+
+    /**
+     * eth_getCode that survives a rate-limited wallet RPC: the wallet first (authoritative for
+     * the chain the user is actually on), then each configured fallback for that chain. Throws
+     * only once every source has failed, so callers can tell "empty" from "couldn't find out".
+     */
+    async function readCode(address) {
+      const errors = [];
+      const sources = provider ? [provider, ...readProvidersFor(currentChainId)] : readProvidersFor(currentChainId);
+
+      for (const source of sources) {
+        try {
+          return await source.getCode(address);
+        } catch (err) {
+          errors.push(err.shortMessage || err.message || String(err));
+        }
+      }
+      throw new Error(errors.length ? errors.join("; ") : "no RPC available for this chain");
+    }
+
     // The page's default salt, and the one the canonical LSP26 address derives from — which
     // is why picking LSP26 restores it rather than deploying under whatever was typed since.
     const DEFAULT_SALT = "0x7c0acd1428c1a42815d06ceeb50b11fcb9beddb1dcc582ddf5f9ca37979c7e4d";
@@ -258,18 +308,38 @@
     // hunt through config/contracts.js. Anything missing stays blank.
     const CTOR_DEFAULTS = {
       HupDrops: {
-        4201: [
-          "0xb0b992E90e11b6bCE51cb5ea4de160D06098B955", // Hup core
-          "0xab100B28D06e93fF52DAE95DB8e90F83680671FC", // HupChatForwarder
+        // LUKSO mainnet. Trusts the HupChatForwarder, the same one HupCommunity and HupPolls
+        // trust here — not hupForwarder, which only Hup core accepts.
+        42: [
+          "0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8", // Hup core
+          "0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972", // HupChatForwarder
           "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
           "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA", // canonical LSP26
         ],
+      },
+      // The deployer satellites take one argument: the engine they answer to, which is
+      // immutable in them. Redeploy an engine and every satellite must follow it — the old ones
+      // reject the new engine with OnlyDrops. These defaults carry the CREATE2 address of the
+      // current engine build (onchain allowlist + payout destination + flat mint fee), derived
+      // from this factory, the default salt, and the checked-in artifact with the args above —
+      // deploy the engine FIRST and confirm it lands on that address, because a drifted input
+      // silently moves every satellite too.
+      HupDropsDeployerLSP7: {
+        42: ["0x5a89471b1577e8BAd50877Cc25fFb705Bd528C06"], // HupDrops engine on LUKSO mainnet
+      },
+      HupDropsDeployerLSP8: {
+        42: ["0x5a89471b1577e8BAd50877Cc25fFb705Bd528C06"], // HupDrops engine on LUKSO mainnet
+      },
+      // No 42 entry for the ERC pair on purpose: LUKSO mainnet mints LSP7/LSP8, and a
+      // satellite nothing will ever register is only a way to burn real LYX.
+      HupDropsDeployer721: {
+      },
+      HupDropsDeployer1155: {
       },
       // One argument, deliberately: HupOffers takes no Hup core reference and no forwarder. It
       // credits msg.sender and nothing else, so there is no address to point it at but the admin.
       HupOffers: {
         42: ["0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // admin
-        4201: ["0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // admin
       },
       // Forwarder = the chain's HupChatForwarder (`forwarder` in contracts.js) — the one every
       // Hup extension trusts (HupApps on 42 confirmed onchain), NOT `hupForwarder`, which only
@@ -277,10 +347,6 @@
       HupCommunity: {
         42: [
           "0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972", // HupChatForwarder (LUKSO mainnet)
-          "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
-        ],
-        4201: [
-          "0xab100B28D06e93fF52DAE95DB8e90F83680671FC", // HupChatForwarder
           "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
         ],
       },
@@ -320,6 +386,8 @@
     els.saltInput.value = DEFAULT_SALT;
 
     let provider = null;
+    // Mirrors the wallet's chain so readCode can pick that chain's fallback RPCs
+    let currentChainId = null;
     let signer = null;
 
     function log(message, level) {
@@ -365,6 +433,7 @@
       const network = await provider.getNetwork();
       const address = await signer.getAddress();
       const chainId = Number(network.chainId);
+      currentChainId = chainId;
       const name = CHAIN_NAMES[chainId] || `chain ${chainId}`;
       els.walletInfo.textContent = `${address.slice(0, 6)}…${address.slice(-4)} on ${name} (${chainId})`;
       els.checkBtn.disabled = false;
@@ -388,21 +457,42 @@
 
     async function checkChain() {
       if (!provider) return;
-      const factoryCode = await provider.getCode(FACTORY);
-      const factoryOk = factoryCode !== "0x";
-      els.factoryStatus.textContent = factoryOk ? "✅ deployed" : "❌ MISSING — cannot deterministic-deploy here";
-      if (!factoryOk) log("CREATE2 factory is missing on this chain.", "err");
+
+      // null = could not find out. Only a definite "missing" blocks deploying: an unreachable
+      // RPC is the page's problem, not a reason to stop someone deploying to a chain whose
+      // factory they know is there.
+      let factoryOk = null;
+      try {
+        factoryOk = (await readCode(FACTORY)) !== "0x";
+      } catch (err) {
+        log(`Could not read the factory: ${err.message}`, "warn");
+      }
+      els.factoryStatus.textContent =
+        factoryOk === null ? "⚠️ unknown — every RPC failed" : factoryOk ? "✅ deployed" : "❌ MISSING — cannot deterministic-deploy here";
+      if (factoryOk === false) log("CREATE2 factory is missing on this chain.", "err");
 
       const predicted = updatePrediction();
       if (!predicted) return;
-      const targetCode = await provider.getCode(predicted);
+
+      let targetCode;
+      try {
+        targetCode = await readCode(predicted);
+      } catch (err) {
+        // Deploying blind is safe here: the factory reverts if the address is taken, so the
+        // worst case is a failed transaction rather than a clobbered contract.
+        els.targetStatus.textContent = "⚠️ unknown — every RPC failed";
+        els.deployBtn.disabled = factoryOk === false;
+        log(`Could not read the target address: ${err.message}`, "warn");
+        return;
+      }
+
       if (targetCode !== "0x") {
         els.targetStatus.textContent = "✅ contract already deployed at this address";
         els.deployBtn.disabled = true;
         adoptToken(predicted);
       } else {
         els.targetStatus.textContent = "empty — ready to deploy";
-        els.deployBtn.disabled = !factoryOk;
+        els.deployBtn.disabled = factoryOk === false;
       }
     }
 
@@ -422,11 +512,17 @@
           log("Transaction reverted.", "err");
           return;
         }
-        const code = await provider.getCode(predicted);
-        if (code !== "0x") {
-          log(`✅ Deployed! Code confirmed at ${predicted}`, "ok");
-        } else {
-          log("Tx succeeded but no code at predicted address — check salt/bytecode.", "warn");
+        // The receipt already succeeded — a read failure here means the RPC is unreachable,
+        // not that the deploy failed, and must never be reported as the latter.
+        try {
+          const code = await readCode(predicted);
+          if (code !== "0x") {
+            log(`✅ Deployed! Code confirmed at ${predicted}`, "ok");
+          } else {
+            log("Tx succeeded but no code at predicted address — check salt/bytecode.", "warn");
+          }
+        } catch (err) {
+          log(`✅ Tx confirmed in block ${receipt.blockNumber}. Could not read back the code (${err.message}) — verify ${predicted} on the explorer.`, "ok");
         }
         await checkChain();
       } catch (err) {
@@ -812,7 +908,7 @@
 
       tokenEls.info.textContent = "Reading…";
       try {
-        if ((await provider.getCode(address)) === "0x") {
+        if ((await readCode(address)) === "0x") {
           tokenEls.info.textContent = "No contract at this address on the current chain.";
           return;
         }

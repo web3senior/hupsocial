@@ -7,7 +7,7 @@ import { createPublicClient, http, isAddress, keccak256, stringToHex, formatEthe
 import Link from 'next/link'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
-import { config, CONTRACTS } from '@/config/wagmi'
+import { browserTransport, config, CONTRACTS } from '@/config/wagmi'
 import storeAbi from '@/abis/HupBazaar.json'
 import eventsAbi from '@/abis/HupEvents.json'
 import appsAbi from '@/abis/HupApps.json'
@@ -18,7 +18,7 @@ import tipperAbi from '@/abis/HupTipper.json'
 import communityAbi from '@/abis/HupCommunity.json'
 import pollsAbi from '@/abis/HupPolls.json'
 import dropsAbi from '@/abis/HupDrops.json'
-import { dropStandardLabel, dropStandardsFor } from '@/lib/drops'
+import { dropStandardLabel, dropStandardRowsFor } from '@/lib/drops'
 import { TIP_TOKENS } from '@/lib/tokens'
 import styles from './page.module.scss'
 
@@ -223,6 +223,8 @@ export default function Page() {
   const [dropsDeployerInputs, setDropsDeployerInputs] = useState({})
   const [dropsDeployerTxStates, setDropsDeployerTxStates] = useState({})
   const [dropsFollowerInputs, setDropsFollowerInputs] = useState({})
+  const [dropsCommunityInputs, setDropsCommunityInputs] = useState({})
+  const [dropsCommunityTxStates, setDropsCommunityTxStates] = useState({})
   const [dropsFollowerTxStates, setDropsFollowerTxStates] = useState({})
   const [dropsFeeInputs, setDropsFeeInputs] = useState({})
   const [dropsFeeTxStates, setDropsFeeTxStates] = useState({})
@@ -272,12 +274,20 @@ export default function Page() {
     setContractBalances((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], loading: true, error: null } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
-      const values = await Promise.all(targets.map((target) => client.getBalance({ address: target.address })))
-      const items = targets.map((target, index) => ({ ...target, value: values[index] }))
-      const total = items.reduce((sum, item) => sum + item.value, 0n)
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      // allSettled: one unreadable contract must not blank every withdraw card on the chain
+      const settled = await Promise.allSettled(targets.map((target) => client.getBalance({ address: target.address })))
+      const items = targets.map((target, index) => ({
+        ...target,
+        value: settled[index].status === 'fulfilled' ? settled[index].value : undefined,
+      }))
+      const total = items.reduce((sum, item) => sum + (item.value ?? 0n), 0n)
 
-      setContractBalances((prev) => ({ ...prev, [chain.id]: { loading: false, items, total } }))
+      const allFailed = items.every((item) => item.value === undefined)
+      setContractBalances((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, items, total, error: allFailed ? 'Every balance read failed' : null },
+      }))
     } catch (err) {
       console.error(`Balance read error for chain ${chain.id}:`, err)
       setContractBalances((prev) => ({
@@ -345,10 +355,9 @@ export default function Page() {
     }))
 
     try {
-      const rpcUrl = chain.rpcUrls.default.http[0]
       const client = createPublicClient({
         chain,
-        transport: http(rpcUrl),
+        transport: browserTransport(chain.id),
       })
 
       const domainData = await client.readContract({
@@ -463,7 +472,7 @@ export default function Page() {
     setRoleChecks((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const hasRole = await client.readContract({
         address: storeAddress,
         abi: storeAbi,
@@ -584,7 +593,7 @@ export default function Page() {
     setEventsFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const [listingFee, featuredFee] = await Promise.all([
         client.readContract({ address: eventsAddress, abi: eventsAbi, functionName: 'listingFee' }),
         client.readContract({ address: eventsAddress, abi: eventsAbi, functionName: 'featuredFee' }),
@@ -682,7 +691,7 @@ export default function Page() {
     setAppsFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const [listingFee, featuredFee] = await Promise.all([
         client.readContract({ address: appsAddress, abi: appsAbi, functionName: 'listingFee' }),
         client.readContract({ address: appsAddress, abi: appsAbi, functionName: 'featuredFee' }),
@@ -780,7 +789,7 @@ export default function Page() {
     setPredictConfigs((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const [feeBps, creatorFeeBps, featuredFee, resolveWindow, nativeFees] = await Promise.all([
         client.readContract({ address: predictAddress, abi: predictAbi, functionName: 'predictFeeBps' }),
         client.readContract({ address: predictAddress, abi: predictAbi, functionName: 'creatorFeeBps' }),
@@ -911,7 +920,7 @@ export default function Page() {
     setTradeFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const feeBps = await client.readContract({ address: tradeAddress, abi: tradeAbi, functionName: 'tradeFeeBps' })
 
       setTradeFees((prev) => ({ ...prev, [chain.id]: { loading: false, feeBps } }))
@@ -1004,7 +1013,7 @@ export default function Page() {
     setOfferFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const [feeBps, accruedNative] = await Promise.all([
         client.readContract({ address: offersAddress, abi: offersAbi, functionName: 'offerFeeBps' }),
         client.readContract({ address: offersAddress, abi: offersAbi, functionName: 'accruedFees', args: [zeroAddress] }),
@@ -1100,7 +1109,7 @@ export default function Page() {
     setTipperVersions((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const version = await client.readContract({ address: tipperAddress, abi: tipperAbi, functionName: 'version' })
 
       setTipperVersions((prev) => ({ ...prev, [chain.id]: { loading: false, version } }))
@@ -1143,7 +1152,7 @@ export default function Page() {
     setErc677Checks((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const enabled = await client.readContract({
         address: tipperAddress,
         abi: tipperAbi,
@@ -1203,7 +1212,7 @@ export default function Page() {
     setFollowerSystems((prev) => ({ ...prev, [stateKey]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const followerSystem = await client.readContract({
         address: CONTRACTS[`chain${chain.id}`][target.key],
         abi: target.abi,
@@ -1418,22 +1427,25 @@ export default function Page() {
     </section>
   )
 
-  // Read a chain's HupDrops wiring: the deployer satellite per standard the chain actually
-  // uses (LSP7/LSP8 on LUKSO, ERC721/1155 elsewhere), the follower registry the Followers
-  // gate asks, and both fee knobs
+  // Read a chain's HupDrops wiring: the deployer satellite for every standard the chain can
+  // register (its native pair, plus the other family on the dev chain), the two registries the
+  // Followers and Community gates ask, and all three fee knobs
   const loadDropsConfig = async (chain, dropsAddress) => {
     setDropsConfigs((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
     try {
-      const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0]) })
-      const standards = dropStandardsFor(chain.id)
-      const standardIds = [standards.editions, standards.numbered]
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      const standardIds = dropStandardRowsFor(chain.id).map((row) => row.id)
 
-      const [editionsDeployer, numberedDeployer, followerSystem, mintFeeBps, creationFee] = await Promise.all([
-        client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'deployers', args: [BigInt(standards.editions)] }),
-        client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'deployers', args: [BigInt(standards.numbered)] }),
+      const [deployerAddresses, followerSystem, communitySystem, mintFeeBps, mintFee, mintFeeEnabled, creationFee] = await Promise.all([
+        Promise.all(
+          standardIds.map((id) => client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'deployers', args: [BigInt(id)] })),
+        ),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'followerSystem' }),
+        client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'communitySystem' }),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'mintFeeBps' }),
+        client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'mintFee' }),
+        client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'mintFeeEnabled' }),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'creationFee' }),
       ])
 
@@ -1441,10 +1453,13 @@ export default function Page() {
         ...prev,
         [chain.id]: {
           loading: false,
-          deployers: { [standards.editions]: editionsDeployer, [standards.numbered]: numberedDeployer },
+          deployers: Object.fromEntries(standardIds.map((id, index) => [id, deployerAddresses[index]])),
           standardIds,
           followerSystem,
+          communitySystem,
           mintFeeBps,
+          mintFee,
+          mintFeeEnabled,
           creationFee,
         },
       }))
@@ -1541,8 +1556,64 @@ export default function Page() {
     }
   }
 
-  // Set the mint fee (entered in %, stored in bps, hard-capped at 10% by the contract) or the
-  // flat drop-creation fee on a chain's HupDrops (admin wallet signs)
+  // Until set, a Community-gated phase reverts InvalidGateConfig and the composer hides the gate.
+  // Takes the resolved draft: the seeded input state is undefined until someone types.
+  const handleSetDropsCommunity = async (chain, dropsAddress, draft) => {
+    const registry = draft?.trim()
+    if (!isAddress(registry)) {
+      setDropsCommunityTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid registry address' } }))
+      return
+    }
+
+    setDropsCommunityTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: dropsAddress,
+        abi: dropsAbi,
+        functionName: 'setCommunitySystem',
+        args: [registry],
+        chainId: chain.id,
+      })
+
+      setDropsCommunityTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadDropsConfig(chain, dropsAddress), 3000)
+    } catch (err) {
+      console.error(`Drops community system update error on chain ${chain.id}:`, err)
+      setDropsCommunityTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  const handleToggleDropsMintFee = async (chain, dropsAddress, enabled) => {
+    setDropsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which: 'flatToggle', loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: dropsAddress,
+        abi: dropsAbi,
+        functionName: 'setMintFeeEnabled',
+        args: [enabled],
+        chainId: chain.id,
+      })
+
+      setDropsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which: 'flatToggle', loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadDropsConfig(chain, dropsAddress), 3000)
+    } catch (err) {
+      console.error(`Drops mint fee toggle error on chain ${chain.id}:`, err)
+      setDropsFeeTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { which: 'flatToggle', loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Set a HupDrops fee knob (admin wallet signs): the mint cut (entered in %, stored in bps,
+  // capped at 10% by the contract), the flat per-item fee, or the drop-creation fee
   const handleSetDropsFee = async (chain, dropsAddress, which) => {
     const draft = dropsFeeInputs[chain.id]?.[which]?.trim()
     let functionName
@@ -1556,6 +1627,14 @@ export default function Page() {
       }
       functionName = 'setMintFeeBps'
       value = BigInt(Math.round(percent * 100))
+    } else if (which === 'flat') {
+      try {
+        value = parseEther(draft || '')
+      } catch {
+        setDropsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid amount in native units' } }))
+        return
+      }
+      functionName = 'setMintFee'
     } else {
       try {
         value = parseEther(draft || '')
@@ -3636,16 +3715,18 @@ export default function Page() {
                 {visibleChains('drops').map((chain) => {
                   const deployment = CONTRACTS[`chain${chain.id}`]
                   const state = dropsConfigs[chain.id]
-                  const standards = dropStandardsFor(chain.id)
-                  const standardRows = [
-                    { id: standards.editions, hint: 'editions' },
-                    { id: standards.numbered, hint: 'numbered' },
-                  ]
+                  const standardRows = dropStandardRowsFor(chain.id)
                   const deployerTx = dropsDeployerTxStates[chain.id]
                   const followerTx = dropsFollowerTxStates[chain.id]
                   const feeTx = dropsFeeTxStates[chain.id]
                   const withdrawTx = dropsWithdrawStates[chain.id]
                   const followerDraft = dropsFollowerInputs[chain.id] ?? ''
+                  const communityTx = dropsCommunityTxStates[chain.id]
+                  const communityDraft = dropsCommunityInputs[chain.id] ?? deployment.community ?? ''
+                  const onChainCommunity = state?.communitySystem
+                  const communityUnset = onChainCommunity && onChainCommunity.toLowerCase() === zeroAddress
+                  const communityMatches =
+                    onChainCommunity && deployment.community && onChainCommunity.toLowerCase() === deployment.community.toLowerCase()
                   const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
                   const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
                   const onChainFollower = state?.followerSystem
@@ -3812,6 +3893,58 @@ export default function Page() {
                         </div>
 
                         <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Community System</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {communityUnset ? (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                                ⚠️ Not set — the Community gate is unavailable on this chain
+                              </div>
+                            ) : (
+                              onChainCommunity && (
+                                <div
+                                  className={clsx(
+                                    styles['admin-contracts__validation'],
+                                    communityMatches ? styles['admin-contracts__validation--success'] : styles['admin-contracts__validation--warning'],
+                                  )}
+                                >
+                                  {communityMatches ? '✓ Wired to' : '⚠️ Set to'} <code>{onChainCommunity}</code>
+                                  {communityMatches ? '' : ", which is not this chain's configured HupCommunity"}
+                                </div>
+                              )
+                            )}
+
+                            <form
+                              className={styles['admin-contracts__edit-form']}
+                              onSubmit={(e) => {
+                                e.preventDefault()
+                                handleSetDropsCommunity(chain, deployment.drops, communityDraft)
+                              }}
+                            >
+                              <div className={styles['admin-contracts__input-group']}>
+                                <input
+                                  type="text"
+                                  className={styles['admin-contracts__input']}
+                                  value={communityDraft}
+                                  onChange={(e) => setDropsCommunityInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                                  placeholder="0x… HupCommunity"
+                                />
+                              </div>
+                              <div className={styles['admin-contracts__actions']}>
+                                <button
+                                  type="submit"
+                                  disabled={!communityDraft.trim() || communityTx?.loading}
+                                  className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                                >
+                                  {communityTx?.loading ? 'Writing...' : 'Set Community System'}
+                                </button>
+                              </div>
+                              {communityTx?.error && <span style={{ color: '#ef4444' }}>❌ {communityTx.error}</span>}
+                              {communityTx?.success && <span style={{ color: '#10b981' }}>🚀 Community system updated.</span>}
+                            </form>
+                          </div>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Mint Fee</span>
                           <div className={styles['admin-contracts__detail-value']}>
                             {state && !state.loading && !state.error && <strong>{Number(state.mintFeeBps ?? 0n) / 100}%</strong>}
@@ -3847,6 +3980,72 @@ export default function Page() {
                               </div>
                               {feeTx?.which === 'mint' && feeTx?.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
                               {feeTx?.which === 'mint' && feeTx?.success && <span style={{ color: '#10b981' }}>🚀 Mint fee updated.</span>}
+                            </form>
+                          </div>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Flat Mint Fee</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {state && !state.loading && !state.error && (
+                              <strong>
+                                {formatNative(state.mintFee)} {symbol} per item{' '}
+                                <span style={{ color: state.mintFeeEnabled ? '#10b981' : '#ef4444' }}>
+                                  {state.mintFeeEnabled ? '(charging)' : '(off)'}
+                                </span>
+                              </strong>
+                            )}
+                            <form
+                              className={styles['admin-contracts__edit-form']}
+                              onSubmit={(e) => {
+                                e.preventDefault()
+                                handleSetDropsFee(chain, deployment.drops, 'flat')
+                              }}
+                            >
+                              <div className={styles['admin-contracts__input-group']}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  className={styles['admin-contracts__input']}
+                                  value={dropsFeeInputs[chain.id]?.flat ?? ''}
+                                  onChange={(e) =>
+                                    setDropsFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], flat: e.target.value } }))
+                                  }
+                                  placeholder={`Flat fee per item minted, in ${symbol}`}
+                                />
+                              </div>
+                              <div className={styles['admin-contracts__actions']}>
+                                <button
+                                  type="submit"
+                                  disabled={feeTx?.which === 'flat' && feeTx?.loading}
+                                  className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                                >
+                                  {feeTx?.which === 'flat' && feeTx?.loading ? 'Writing...' : 'Set Flat Fee'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!state || state.loading || state.error || (feeTx?.which === 'flatToggle' && feeTx?.loading)}
+                                  onClick={() => handleToggleDropsMintFee(chain, deployment.drops, !state?.mintFeeEnabled)}
+                                  className={styles['admin-contracts__button']}
+                                >
+                                  {feeTx?.which === 'flatToggle' && feeTx?.loading
+                                    ? 'Writing...'
+                                    : state?.mintFeeEnabled
+                                      ? 'Disable'
+                                      : 'Enable'}
+                                </button>
+                              </div>
+                              <span className={styles['admin-contracts__hint']}>
+                                Charged on top of the phase price, on every mint including free ones — the only knob a free drop pays.
+                                Turning it on also ends gasless session-key minting, which needs a zero-value transaction.
+                              </span>
+                              {(feeTx?.which === 'flat' || feeTx?.which === 'flatToggle') && feeTx?.error && (
+                                <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>
+                              )}
+                              {(feeTx?.which === 'flat' || feeTx?.which === 'flatToggle') && feeTx?.success && (
+                                <span style={{ color: '#10b981' }}>🚀 Flat mint fee updated.</span>
+                              )}
                             </form>
                           </div>
                         </div>
