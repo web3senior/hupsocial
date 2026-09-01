@@ -3318,7 +3318,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 />
               </div>
               {/* LSP7 is LUKSO's token standard — only worth asking there */}
-              {paymentTokenAddress && (chainId === 42 || chainId === 4201) && (
+              {paymentTokenAddress && chainId === 42 && (
                 <div
                   className={styles.card__field}
                   style={{ marginTop: '0.5rem', flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}

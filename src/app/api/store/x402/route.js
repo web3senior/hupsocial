@@ -16,7 +16,7 @@
 import { NextResponse } from 'next/server'
 import { createPublicClient, createWalletClient, http, isAddress, isAddressEqual, parseSignature, erc20Abi, zeroAddress } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia } from 'wagmi/chains'
+import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia } from 'wagmi/chains'
 import storeAbi from '@/abis/HupBazaar.json'
 import { STORE_ADDRESSES, USDC, X402_NETWORKS } from '@/lib/tokens'
 import { decryptContent, isConfigured } from '@/lib/storeCrypto'
@@ -26,7 +26,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const SUPPORTED_CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia]
+const SUPPORTED_CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia]
 
 const TRANSFER_WITH_AUTHORIZATION_ABI = [
   {

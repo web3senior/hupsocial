@@ -52,6 +52,21 @@ const errorChain = (error) => {
 
 const REJECTION_PATTERN = /user rejected|user denied|rejected the request|request rejected|denied transaction/i
 
+// Node throttling, not a contract failure. Writes go through the wallet's own RPC, so the app's
+// fallback endpoints cannot rescue it; -32005 is the code every major node uses for it.
+const RATE_LIMIT_PATTERN = /exceeds defined limit|rate.?limit|too many requests|429|request limit|compute units?/i
+
+const isRateLimited = (error) =>
+  errorChain(error).some(
+    (link) =>
+      link.code === -32005 ||
+      link.status === 429 ||
+      RATE_LIMIT_PATTERN.test(`${firstLine(link.shortMessage)} ${firstLine(link.details)} ${firstLine(link.message)}`)
+  )
+
+const DEFAULT_RATE_LIMITED =
+  'The network’s RPC is rate-limiting this wallet. Wait a few seconds and try again — if it keeps happening, switch the RPC for this network in your wallet.'
+
 /** A wallet-level "no thanks", which should never be dressed up as a failure. */
 export const isUserRejection = (error) =>
   errorChain(error).some(
@@ -82,13 +97,16 @@ const DEFAULT_REJECTION = 'You rejected the request in your wallet.'
  *   place their meaning can live is a map like this one, owned by the caller that knows the ABI.
  * @param {string} [options.fallback] - shown when the whole chain turns out to be placeholders
  * @param {string} [options.rejection] - shown when the user simply declined in their wallet
+ * @param {string} [options.rateLimited] - shown when the node throttled the request (-32005/429)
  * @returns {string} never empty, never longer than a toast can hold
  */
 export const describeWalletError = (error, options = {}) => {
   if (!error) return ''
-  const { known = {}, fallback = DEFAULT_FALLBACK, rejection = DEFAULT_REJECTION } = options
+  const { known = {}, fallback = DEFAULT_FALLBACK, rejection = DEFAULT_REJECTION, rateLimited = DEFAULT_RATE_LIMITED } = options
 
   if (isUserRejection(error)) return rejection
+  // Before the custom-error map: a throttled node never reached the contract
+  if (isRateLimited(error)) return rateLimited
 
   const links = errorChain(error)
 

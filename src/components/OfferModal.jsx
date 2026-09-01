@@ -24,8 +24,8 @@ const STANDARD_LSP8 = 1
 const ERC677_ACTION_MAKE = 1
 
 // Chains whose native asset standard is LSP7, so the custom-token field offers that option.
-// Includes the testnet, unlike TipModal's list — 4201 is where LSP7s actually get exercised.
-const LUKSO_CHAIN_IDS = [42, 4201]
+// LSP7 is a LUKSO standard, so the token pickers only offer it there.
+const LUKSO_CHAIN_IDS = [42]
 
 // LSP7 has no symbol() — LSP4 metadata lives in ERC725Y storage, read via getData
 // with the keccak256('LSP4TokenSymbol') data key

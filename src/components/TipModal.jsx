@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useConnection, usePublicClient, useReadContract, useWriteContract } from 'wagmi'
+import { useConnection, useReadContract, useWriteContract } from 'wagmi'
 import { waitForTransactionReceipt } from 'wagmi/actions'
 import { encodeAbiParameters, erc20Abi, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
 import clsx from 'clsx'
@@ -9,7 +9,6 @@ import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { trackTip } from '@/lib/tipTracking'
 import { shortTxError } from '@/lib/utils'
 import tipperAbi from '@/abis/HupTipper.json'
@@ -113,9 +112,9 @@ const TipModal = ({ item, setShowTipModal }) => {
   const [customToken, setCustomToken] = useState('')
   const [tokenSearchResults, setTokenSearchResults] = useState([])
   // Flipped on synchronously at the top of every send handler so the button locks on the
-  // click itself — the session check is two RPC round trips, and wagmi only reports isPending
-  // once the write actually starts. Held until the handler settles: for a tip that is the
-  // hash (the modal closes on it), for an approval it is the receipt (the modal stays open).
+  // click itself — wagmi only reports isPending once the write actually starts. Held until
+  // the handler settles: for a tip that is the hash (the modal closes on it), for an approval
+  // it is the receipt (the modal stays open).
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { address } = useConnection()
   const dialogRef = useRef(null)
@@ -123,7 +122,6 @@ const TipModal = ({ item, setShowTipModal }) => {
 
   // Tips settle on the post's own chain, not whichever chain is currently active
   const chainId = Number(item.network_id)
-  const publicClient = usePublicClient({ chainId })
   const chainInfo = appChains.find((c) => c.id === chainId)
   const tipperAddress = CONTRACTS[`chain${chainId}`]?.tipper || null
   const nativeCurrency = chainInfo?.nativeCurrency
@@ -314,8 +312,7 @@ const TipModal = ({ item, setShowTipModal }) => {
     setIsSubmitting(true)
     try {
       // ERC677: one transaction, no approve. The tipper is credited from onTokenTransfer, which
-      // reads the post id out of the payload. Burner sessions can't apply here — the tokens have
-      // to leave the wallet that actually holds them — so this path always uses wagmi.
+      // reads the post id out of the payload.
       if (isErc677) {
         const hash = await writeContractAsync({
           abi: erc677Abi,
@@ -332,24 +329,7 @@ const TipModal = ({ item, setShowTipModal }) => {
       // only commits the post id, amount, and token
       const args = [address, BigInt(item.id), amountUnits, tokenAddress ?? zeroAddress, isLsp7, '0x']
 
-      // Route through the burner session key if one's active — same convenience BuyButton gets,
-      // skipping the wallet popup. Approve/authorizeOperator stays wagmi-only regardless.
-      const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
-
-      if (session.active) {
-        // Back at the hash, not the receipt — the tracker does the waiting, not the modal
-        const tx = await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: tipperAddress,
-          abi: tipperAbi,
-          functionName: 'tip',
-          args: isTokenTip ? args : [...args, { value: amountUnits }],
-          waitForReceipt: false,
-        })
-        handOff(tx.hash)
-        return
-      }
-
+      // Always the connected wallet, never the session key — it holds no funds
       const hash = await writeContractAsync({
         abi: tipperAbi,
         address: tipperAddress,

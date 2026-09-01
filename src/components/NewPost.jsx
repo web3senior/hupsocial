@@ -41,10 +41,11 @@ import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
-import { uploadFileToIPFS as uploadToIPFS } from '@/lib/ipfs'
+import { uploadFileToIPFS as uploadToIPFS, withAuthor } from '@/lib/ipfs'
 import { captureVideoPoster } from '@/lib/videoPoster'
 import { shortUploadError } from '@/lib/uploadErrors'
 import { canOptimizeVideo, optimizeVideo } from '@/lib/videoOptimizer'
+import { detectAiProvenance } from '@/lib/aiProvenance'
 
 const MAX_MEDIA_ITEMS = 8
 const MAX_MEDIA_SIZE_MB = 10
@@ -995,6 +996,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       width: meta.width,
       height: meta.height,
       duration: meta.duration,
+      // Only ever set, never false — older posts stay indistinguishable from ones with no credential
+      aiGenerated: meta.aiGenerated || undefined,
       spoiler: false,
       status: 'uploading',
       progress: 0,
@@ -1123,12 +1126,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         continue
       }
 
-      const dimensions = await getMediaDimensions(file, mediaType)
+      // Provenance is scanned on the original file: the video path re-encodes, which strips metadata
+      const [dimensions, provenance] = await Promise.all([
+        getMediaDimensions(file, mediaType),
+        detectAiProvenance(file),
+      ])
       attachFile(file, mediaType, {
         alt: `Hup asset ${mediaType} | ${postText.slice(0, 30)}...`,
         width: dimensions.width,
         height: dimensions.height,
         duration: mediaType !== 'image' ? (dimensions.duration || 0) : undefined,
+        aiGenerated: provenance.aiGenerated,
       })
     }
   }
@@ -1451,6 +1459,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         contentForUpload = await sealForCommunity(serializableContent)
         if (contentForUpload === null) return
       }
+
+      // Encrypted community posts are pinned without the author stamp: a rotated or leaked key
+      // would otherwise attribute every message in the room
+      if (!contentForUpload.encrypted) contentForUpload = withAuthor(contentForUpload, signerAddress)
 
       const resultIPFS = await uploadObjectToIPFS(contentForUpload)
       const metadata = resultIPFS.cid

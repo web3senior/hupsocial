@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server'
 import { fetchIPFS } from '@/lib/ipfsGateways'
 import { createPublicClient, http, hashMessage, recoverMessageAddress, isAddress, isAddressEqual, getAddress } from 'viem'
-import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia } from 'wagmi/chains'
+import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia } from 'wagmi/chains'
 import storeAbi from '@/abis/HupBazaar.json'
 import { decryptContent, isConfigured } from '@/lib/storeCrypto'
 import { STORE_ADDRESSES } from '@/lib/tokens'
@@ -20,7 +20,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const SUPPORTED_CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia]
+const SUPPORTED_CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia, baseSepolia]
 const SIG_MAX_AGE_MS = 5 * 60 * 1000
 const ERC1271_ABI = [
   {

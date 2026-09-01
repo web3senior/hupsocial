@@ -25,7 +25,7 @@ const EXPIRY_OPTIONS = [
 
 const computeExpiresAt = (seconds) => BigInt(Math.floor(Date.now() / 1000) + seconds)
 
-const LUKSO_CHAIN_IDS = [42, 4201]
+const LUKSO_CHAIN_IDS = [42]
 
 // Key still says otc- so drafts saved before the P2P rename still load. Drafts are keyed per chain: token addresses and curated payment options differ between
 // chains, so restoring one chain's half-typed deal onto another would hand back an address

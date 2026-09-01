@@ -16,8 +16,8 @@ Every interaction on Hup is a "Content" object:
 2. **Indexer Optimization:** One contract to track; events are unified by Content ID.
 3. **Recursive Threading:** Because comments are posts, a comment can have its own comments indefinitely using the same `postChildren` logic.
 
-### Scalability with 0G
-By moving the actual text and media to **0G Storage** and only keeping the `Content` struct on-chain, this single contract can handle millions of interactions across any EVM chain without hitting state bloat limits.
+### Scalability with IPFS
+By moving the actual text and media to **IPFS** and only keeping the `Content` struct onchain, this single contract can handle millions of interactions across any EVM chain without hitting state bloat limits.
 
 
 ### One potential risk: The 24KB Limit
@@ -39,13 +39,62 @@ Yes, absolutely. You can 100% decouple additional data layers and build them as 
 How it works architecturally
 Your new contract will simply use an interface to talk to your deployed Hup contract. When someone tries to attach data to Post #42, the extension contract performs an external call to Hup.allContent(42) to verify who the actual creator is. If the msg.sender matches the creator address returned by Hup, it allows the write operation.
 
+# HupDrops standard ids
+
+The drops engine does not know how to deploy a collection. It holds a registry of **deployer
+satellites**, one per token standard, and calls whichever the creator asked for:
+
+```solidity
+mapping(uint256 => address) public deployers;   // standardId => satellite
+```
+
+| id | Standard | Shape | Chains |
+| -- | -------- | ----- | ------ |
+| 1 | ERC721 | numbered — unique sequential ids | every EVM chain |
+| 2 | ERC1155 | editions — copies of one artwork | every EVM chain |
+| 3 | LSP7 | editions | LUKSO only |
+| 4 | LSP8 | numbered | LUKSO only |
+
+These are Hup's own registry numbers, not anything from the ERC or LSP specs. They are
+**append-only**: every drop ever created stores its `standardId`, and indexers key on it, so a
+number is never reused or renumbered. A future standard claims id 5.
+
+Defined in `src/lib/drops.js` (`DROP_STANDARDS`) and mirrored in `src/config/contracts.js`.
+
+## Why satellites instead of one engine
+
+Two reasons, both structural:
+
+- **EIP-170.** The engine plus four collection bytecodes would blow past the 24,576-byte limit.
+  Each satellite carries exactly one collection's creation code.
+- **Adding a standard needs no engine redeploy.** `setDeployer(id, satellite)` is one admin
+  transaction. That matters more than it sounds: a collection stores its engine as
+  `address public immutable drops`, so **redeploying the engine strands every collection ever
+  minted through it** — no new phases, no new mints, ever. Anything that can be done without
+  touching the engine, should be.
+
+A standard with no registered satellite is simply unavailable: `createDrop` reverts
+`InvalidStandard`, and the composer reads `deployers(standardId)` first so the creator sees
+"not enabled on this network yet" instead of a failed transaction. So a chain can launch with
+one standard and gain the rest later.
+
+## Deploying a chain
+
+1. Deploy the engine. Its constructor takes `(hup, trustedForwarder, admin, followerSystem)`.
+2. Deploy each satellite you want — each takes the **engine address**, immutably.
+3. `setDeployer(id, satellite)` per standard. LUKSO registers 3 and 4; other EVM chains 1 and 2.
+4. `setCommunitySystem` — it is not a constructor argument, and Community-gated phases fail
+   closed until it is set. `setFollowerSystem` too if the chain has LSP26 and the constructor
+   was passed `address(0)`.
+5. Fill `drops` in `src/config/contracts.js`, then register the address in cidex.
+
+Order matters: the satellites take the engine's address, so the engine must land first and be
+confirmed before any satellite is deployed.
+
 # Metadata
 
 - IPFS://
-- 0G://
 - or plain text
-
-if (metadata.startsWith('0G://')) trigger the 0G Storage proxy downloader.
 
 if (metadata.startsWith('IPFS://')) route through your public IPFS gateway provider.
 
@@ -316,7 +365,7 @@ const postContent = {
             type: 'image',
             cid: 'Qm1234...image-cid',
             alt: 'Image description',
-            storage: '0G',
+            storage: 'IPFS',
             mimeType: 'image/jpeg',
             spoiler: false,
           },
@@ -324,7 +373,7 @@ const postContent = {
             type: 'video',
             cid: 'Qm5678...video-cid',
             alt: 'Video description',
-            storage: '0G',
+            storage: 'IPFS',
             mimeType: 'video/mp4',
             duration: 45,
             spoiler: false,
@@ -436,6 +485,42 @@ Power then comes from the electorate rather than from being creator, while day-t
 
 This project strictly adheres to [Semantic Versioning (SemVer)](https://semver.org/) via the `MAJOR.MINOR.PATCH` format to ensure predictable deployments and reliable cross-chain indexing.
 
+
+# Microbounties (Community-Funded Work)
+
+A microbounty is three things: escrow, a submission window, and a payout decision. "Design a logo, $500 to the winner." The obvious way to build it is a governance pipeline — a proposal contract, quorum rules, and an executor that releases the funds once a vote passes. That executor is the part that would have to be trusted, and it is the part Hup does not build.
+
+## Funding is the greenlight
+
+`HupCommunity` already resolves a community's money to a single address. `setPayoutDestination(id, destination)` points join fees at a wallet, a Safe, a DAO treasury, or a splitter contract, and `join()` pushes the fee straight there in the same transaction — nothing rests in the contract, there is no ledger to reconcile, and there is no withdraw call for anyone to authorize. Rules richer than "one address" (a co-founder split, a quorum, a vesting schedule) live inside the destination, not inside Hup. Under DAO mode the setter is reachable by the governor as well, since `onlyCreator` admits `governors[id]` alongside the creator.
+
+A bounty funds from that same address, and that single fact removes the need for the pipeline:
+
+- **Proposal and discussion** are a Hup Poll plus the thread under it. Non-binding by design — it is signal.
+- **Second confirmation** is whoever controls the payout destination signing the bounty's `create` transaction. A Safe destination makes it literally the second signature. A Governor destination makes it a passed proposal executing a call. A single wallet makes it one person deciding — an honest reflection of what that community actually is.
+
+The funding transaction *is* the execution of the vote. Nothing stands between the poll result and the money, so nothing there can be captured, bribed, or bugged. Hup operates no executor, no keeper, and no privileged role that can move a community's funds.
+
+## What the bounty contract still owes
+
+Escrow is not governance, so it stays small and unopinionated:
+
+- **`create(token, amount, deadline, kind)`** — the funder deposits once. Native plus ERC20/LSP7, because a "$500 bounty" is a stablecoin, not gas coin.
+- **`submit(bountyId, postId)`** — entries are ordinary posts. Post ids are per-network, so entries key on `network_id:id`.
+- **`award(bountyId, winners[], splits[])`** — paid with `.call{value: ...}("")` so Universal Profiles with LSP1 delegates receive normally.
+- **`refund()` after the deadline** when nothing was awarded. Non-negotiable: escrow without a timeout is a hostage, and a community that funds a bounty nobody wins has to be able to recover it.
+
+One contract covers the variants. A JokeRace-style contest, a call for peer review, and a karmagap-style project application differ only in `kind` and in what the submission points at — a post, an article, a project. Forking the contract per use case would multiply the audit surface for no new mechanism.
+
+## Honest limits
+
+- **Judging is not trustless, and pretending otherwise is worse.** Somebody decides which logo wins. Creator-picks is fast and centralized; poll-picks is slow and only as sybil-resistant as the community's join cost. The refund deadline, not the judging rule, is what protects the funder.
+- **Quality is offchain.** The contract can prove a payment happened; it cannot prove the work was good. Reputation for that lives in the thread and the leaderboard.
+- **Sybil resistance is inherited, not added.** A poll-picked winner is only as meaningful as the membership rule behind the electorate — Public communities get Public-community results.
+
+## Indexing
+
+Bounty and entry events are cidex's, per the standing rule that the app reads the database and never scans chain itself: a `runBountySync` runner filling `bounties` and `bounty_entries`, surfaced at `/jobs` — today that route renders the leaderboard, which becomes one tab of it.
 
 # Monetization: Subscription NFT (Future)
 

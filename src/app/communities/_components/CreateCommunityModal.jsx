@@ -71,7 +71,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const chainId = activeChain?.id
   const publicClient = usePublicClient({ chainId })
   const nativeCurrency = getNativeCurrency(chainId)
-  const isLuksoChain = chainId === 42 || chainId === 4201
+  const isLuksoChain = chainId === 42
   const { categories } = useCommunityCategories()
 
   // Stays mounted for the whole page life (like the app's other modals) so a half-filled

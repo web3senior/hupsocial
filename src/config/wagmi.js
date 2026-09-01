@@ -3,10 +3,10 @@ import {
   arbitrum,
   arbitrumSepolia,
   base,
+  baseSepolia,
   bsc,
   celo,
   lukso,
-  luksoTestnet,
   mainnet,
   monad,
   optimismSepolia,
@@ -32,10 +32,10 @@ lukso.faucetUrl = `https://faucet.testnet.lukso.network/`
 lukso.primaryColor = `#FD1669`
 lukso.textColor = `#fff`
 
-// LUKSO Testnet — same hexagon as mainnet, greyed
-luksoTestnet.faucetUrl = `https://faucet.testnet.lukso.network/`
-luksoTestnet.primaryColor = `#FD1669`
-luksoTestnet.textColor = `#fff`
+// Base Sepolia
+baseSepolia.faucetUrl = `https://faucets.chain.link/base-sepolia`
+baseSepolia.primaryColor = `#0052FF`
+baseSepolia.textColor = `#fff`
 
 // CELO
 celo.faucetUrl = `https://faucet.celo.org/celo-sepolia/`
@@ -107,7 +107,7 @@ const iconChains = [
   mainnet,
   sepolia,
   lukso,
-  luksoTestnet,
+  baseSepolia,
   celo,
   base,
   monad,
@@ -124,6 +124,27 @@ iconChains.forEach((chain) => {
   chain.iconUrl = `data:image/svg+xml,${encodeURIComponent(chain.icon)}`
 })
 
+// Browser-side RPC order per chain. Anything building its own viem client must use this too,
+// so wagmi and ad-hoc clients never disagree on which endpoint is rate-limited.
+// Chains absent here use viem's default.
+export const BROWSER_RPC_URLS = {
+  // viem's default (eth.merkle.io) sends no CORS headers
+  [mainnet.id]: ['https://ethereum-rpc.publicnode.com'],
+  // Reverse of the server order in config/contracts: the official node passes CORS and has no
+  // keyless cap in browsers; thirdweb rate-limits busy pages with -32005
+  [lukso.id]: ['https://rpc.mainnet.lukso.network', 'https://42.rpc.thirdweb.com'],
+  // The official endpoint sends a malformed Access-Control-Allow-Origin ('*,*')
+  [robinhood.id]: ['https://robinhood-rpc.publicnode.com'],
+  // sepolia.base.org is unreliable; publicnode leads
+  [baseSepolia.id]: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'],
+}
+
+/** Fails over across the chain's known-good endpoints; viem's default where there are none. */
+export const browserTransport = (chainId) => {
+  const urls = BROWSER_RPC_URLS[chainId]
+  return urls?.length ? fallback(urls.map((url) => http(url))) : http()
+}
+
 export const config = createConfig({
   chains: appChains,
   // WalletConnect's provider touches browser-only storage (indexedDB) the
@@ -131,34 +152,7 @@ export const config = createConfig({
   // (SSR and any API route reaching wagmi through an import chain) — so
   // connectors only exist in the browser.
   connectors: typeof window === 'undefined' ? [] : [injected(), walletConnect({ projectId }), safe(), emailWallet()],
-  transports: {
-    // viem's default mainnet endpoint (eth.merkle.io) sends no Access-Control-Allow-Origin, so
-    // every browser read on chain 1 fails CORS — the profile Assets tab showed no Ethereum row
-    // at all until this was pinned to an endpoint that allows cross-origin calls.
-    [mainnet.id]: http('https://ethereum-rpc.publicnode.com'),
-    /* LUKSO is the one chain whose browser and server callers need DIFFERENT endpoints, and a bare
-       http() cannot express that: it reads chain.rpcUrls.default.http[0], the same slot the server
-       reads. That slot has to stay thirdweb, because the official node answers server-side callers
-       with a 403 HTML page (see the RPC pins in config/contracts).
-       In a browser the ordering is exactly backwards — thirdweb's keyless tier answers a busy page
-       with -32005 "Request exceeds defined limit", and its error responses carry no CORS headers,
-       so the failure surfaces as an unexplained "Failed to fetch" instead. The official node has
-       no such cap from a browser and passes preflight. Hence an explicit list here: official
-       first, thirdweb kept only as a fallback for the case where the official node is down. */
-    [lukso.id]: fallback([http('https://rpc.mainnet.lukso.network'), http('https://42.rpc.thirdweb.com')]),
-    /* The testnet's default is already the official node, which browsers can reach; wrapped only
-       so a blip retries instead of failing the read outright. */
-    [luksoTestnet.id]: fallback([http('https://rpc.testnet.lukso.network')]),
-    [bsc.id]: http(),
-    // The official Robinhood endpoint (rpc.mainnet.chain.robinhood.com) sends a malformed
-    // Access-Control-Allow-Origin ('*,*') that browsers reject — every client-side read on
-    // 4663 (swap quotes, balances) fails CORS against it. Publicnode passes preflight.
-    [robinhood.id]: http('https://robinhood-rpc.publicnode.com'),
-    [monad.id]: http(),
-    [arbitrum.id]: http(),
-    [base.id]: http(),
-    [celo.id]: http(),
-  },
+  transports: Object.fromEntries(appChains.map((chain) => [chain.id, browserTransport(chain.id)])),
   ssr: true,
   // storage: createStorage({
   //   storage: noopStorage, // <-- Tell wagmi to use a no-op storage on the server

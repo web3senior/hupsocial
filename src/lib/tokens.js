@@ -53,6 +53,10 @@ export const TIP_TOKENS = {
     { symbol: 'USDT', address: '0x55d398326f99059fF775485246999027B3197955' }, // 18 decimals
     { symbol: 'USDC', address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d' }, // Binance-Peg, 18 decimals
   ],
+  84532: [
+    // Circle testnet USDC
+    { symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' },
+  ],
   8453: [
     { symbol: 'USDC', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' }, // native Circle USDC
   ],
