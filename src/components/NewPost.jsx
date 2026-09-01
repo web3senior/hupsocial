@@ -1970,9 +1970,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           </div>
 
           <div className={styles.footerActions}>
-            <span className={clsx(styles.charCount, { [styles['charCount--over']]: isTextOverLimit })}>
-              {postText.length}/{MAX_POST_LENGTH}
-            </span>
+            {/* Hidden while busy: the freed width keeps "Signing..." from wrapping the toolbar */}
+            {!isBusy && (
+              <span className={clsx(styles.charCount, { [styles['charCount--over']]: isTextOverLimit })}>
+                {postText.length}/{MAX_POST_LENGTH}
+              </span>
+            )}
             <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain || hasFailedUploads}>
               {/* No confirming state: the composer closes as soon as the transaction is sent, so
                   the only wait left in here is the author's own signature */}
