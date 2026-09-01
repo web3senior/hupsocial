@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, ImageIcon, ListChecksIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, ImageIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -26,9 +26,7 @@ import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
-import DialogHeader from '@/components/ui/DialogHeader'
 import NetworkSelect from '@/components/ui/NetworkSelect'
-import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
@@ -1641,21 +1639,22 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       }}
       onClose={handleClose}
     >
-      <DialogHeader
-        title={
-          actionType === 'edit'
-            ? 'Edit post'
-            : isComment
-              ? 'Reply'
-              : isQuote
-                ? 'Quote post'
-                : communityTarget
-                  ? `Post to ${communityTarget.name || 'community'}`
-                  : 'New post'
-        }
-        onCancel={(e) => handleClose(e)}
-        actions={isChainPinned ? null : <NetworkSelect placement="bottom-end" />}
-      />
+      <header className={styles.header}>
+        <button type="button" className={styles.header__close} onClick={handleClose} aria-label="Close composer">
+          <XIcon size={20} />
+        </button>
+        {(actionType === 'edit' || isComment || isQuote || Boolean(communityTarget)) && (
+          <span className={styles.header__context}>
+            {actionType === 'edit'
+              ? 'Edit post'
+              : isComment
+                ? 'Reply'
+                : isQuote
+                  ? 'Quote post'
+                  : `Posting to ${communityTarget.name || 'community'}`}
+          </span>
+        )}
+      </header>
 
       {isSolanaTarget && !solanaWallet.address && (
         <div className={styles.chainWarning} role="alert">
@@ -1710,360 +1709,280 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             </div>
           )}
 
-          <Profile variant="full" creator={signerAddress} />
+          <div className={styles.composerRow}>
+            <Profile variant="imageOnly" size={40} creator={signerAddress} className={styles.composerAvatar} />
 
-          <div className={styles.composerBody}>
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              className={clsx(styles.editor, { [styles.editor_comment]: isComment })}
-              onInput={handleEditorInput}
-              onKeyDown={handleEditorKeyDown}
-              onPaste={handlePaste}
-              data-placeholder={isComment ? 'Post your reply' : isQuote ? 'Add a comment' : "What's happening?"}
-            />
-
-            <div className={styles.toolbar} aria-label="Post tools">
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => triggerFileInput('image')}
-                aria-label="Add image"
-                disabled={isBusy}
-              >
-                <ImageIcon size={20} />
-                <span>Image</span>
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => triggerFileInput('video')}
-                aria-label="Add video"
-                disabled={isBusy}
-              >
-                <MonitorPlayIcon size={20} />
-                <span>Video</span>
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={openGifPicker}
-                aria-label="Add GIF"
-                disabled={isBusy}
-              >
-                {/* GifIcon already renders the letters "GIF" — a text label would duplicate it */}
-                <GifIcon size={20} />
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => triggerFileInput('audio')}
-                aria-label="Add audio"
-                disabled={isBusy}
-              >
-                <MicrophoneIcon size={20} />
-                <span>Audio</span>
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => applyFormat('strong')}
-                aria-label="Bold"
-                disabled={isBusy}
-              >
-                <TextBIcon size={20} />
-                <span>Bold</span>
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => applyFormat('em')}
-                aria-label="Italic"
-                disabled={isBusy}
-              >
-                <TextItalicIcon size={20} />
-                <span>Italic</span>
-              </button>
-              {canAttachNft && nftTradeAvailable && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setShowSellNftModal(true)}
-                  aria-label="Sell an NFT"
-                  disabled={isBusy || Boolean(nftListing)}
-                >
-                  <StorefrontIcon size={20} />
-                  <span>Sell NFT</span>
-                </button>
+            <div className={styles.composerBody}>
+              {!isChainPinned && (
+                <div className={styles.audience}>
+                  <NetworkSelect placement="bottom-start" />
+                </div>
               )}
-              {canAttachNft && predictAvailable && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setShowAttachMarket(true)}
-                  aria-label="Attach a prediction market"
-                  disabled={isBusy || Boolean(predictMarket)}
-                >
-                  <ChartLineUpIcon size={20} />
-                  <span>Predict</span>
-                </button>
+
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                className={clsx(styles.editor, { [styles.editor_comment]: isComment })}
+                onInput={handleEditorInput}
+                onKeyDown={handleEditorKeyDown}
+                onPaste={handlePaste}
+                data-placeholder={isComment ? 'Post your reply' : isQuote ? 'Add a comment' : "What's happening?"}
+              />
+
+              {nftListing && (
+                <div className={styles.nftAttachment}>
+                  <StorefrontIcon size={16} />
+                  <span>NFT for sale attached (listing #{nftListing.listingId})</span>
+                  <button type="button" onClick={() => setNftListing(null)} aria-label="Detach NFT listing" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
               )}
-              {canAttachNft && launchAvailable && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setShowAttachLaunch(true)}
-                  aria-label="Launch a token"
-                  disabled={isBusy || Boolean(tokenLaunch)}
-                >
-                  <CoinIcon size={20} />
-                  <span>Token</span>
-                </button>
+
+              {predictMarket && (
+                <div className={styles.nftAttachment}>
+                  <ChartLineUpIcon size={16} />
+                  <span>Prediction market attached (market #{predictMarket.marketId})</span>
+                  <button type="button" onClick={() => setPredictMarket(null)} aria-label="Detach prediction market" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
               )}
-              {canAttachNft && dropsAvailable && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setShowAttachDrop(true)}
-                  aria-label="Attach an NFT drop"
-                  disabled={isBusy || Boolean(nftDrop)}
-                >
-                  <ImageIcon size={20} />
-                  <span>Drop</span>
-                </button>
+
+              {tokenLaunch && (
+                <div className={styles.nftAttachment}>
+                  <CoinIcon size={16} />
+                  <span>Token launch attached (launch #{tokenLaunch.launchId})</span>
+                  <button type="button" onClick={() => setTokenLaunch(null)} aria-label="Detach token launch" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
               )}
-              {canAttachNft && pollsAvailable && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => attachPollRef.current?.open()}
-                  aria-label="Add a poll"
-                  disabled={isBusy || Boolean(poll)}
-                >
-                  <ListChecksIcon size={20} />
-                  <span>Poll</span>
-                </button>
+
+              {nftDrop && (
+                <div className={styles.nftAttachment}>
+                  <ImageIcon size={16} />
+                  <span>NFT drop attached (drop #{nftDrop.dropId})</span>
+                  <button type="button" onClick={() => setNftDrop(null)} aria-label="Detach NFT drop" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
               )}
-              {canAttachNft && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => attachMiniAppRef.current?.open()}
-                  aria-label="Attach a mini app"
-                  disabled={isBusy || Boolean(miniApp)}
-                >
-                  <PuzzlePieceIcon size={20} />
-                  <span>Mini app</span>
-                </button>
+
+              {article && (
+                <div className={styles.nftAttachment}>
+                  <ArticleIcon size={16} />
+                  <span>Article attached — {article.title}</span>
+                  <button type="button" onClick={() => setArticle(null)} aria-label="Detach article" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
               )}
-            </div>
 
-            {nftListing && (
-              <div className={styles.nftAttachment}>
-                <StorefrontIcon size={16} />
-                <span>NFT for sale attached (listing #{nftListing.listingId})</span>
-                <button type="button" onClick={() => setNftListing(null)} aria-label="Detach NFT listing" disabled={isBusy}>
-                  <XIcon size={14} />
-                </button>
-              </div>
-            )}
+              {miniApp && (
+                <div className={styles.nftAttachment}>
+                  <PuzzlePieceIcon size={16} />
+                  <span>Mini app attached (app #{miniApp.appId})</span>
+                  <button type="button" onClick={() => setMiniApp(null)} aria-label="Detach mini app" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              )}
 
-            {predictMarket && (
-              <div className={styles.nftAttachment}>
-                <ChartLineUpIcon size={16} />
-                <span>Prediction market attached (market #{predictMarket.marketId})</span>
-                <button type="button" onClick={() => setPredictMarket(null)} aria-label="Detach prediction market" disabled={isBusy}>
-                  <XIcon size={14} />
-                </button>
-              </div>
-            )}
+              {poll && (
+                <div className={styles.nftAttachment}>
+                  <ListChecksIcon size={16} />
+                  <span>Poll attached (poll #{poll.pollId})</span>
+                  <button type="button" onClick={() => setPoll(null)} aria-label="Detach poll" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              )}
 
-            {tokenLaunch && (
-              <div className={styles.nftAttachment}>
-                <CoinIcon size={16} />
-                <span>Token launch attached (launch #{tokenLaunch.launchId})</span>
-                <button type="button" onClick={() => setTokenLaunch(null)} aria-label="Detach token launch" disabled={isBusy}>
-                  <XIcon size={14} />
-                </button>
-              </div>
-            )}
-
-            {nftDrop && (
-              <div className={styles.nftAttachment}>
-                <ImageIcon size={16} />
-                <span>NFT drop attached (drop #{nftDrop.dropId})</span>
-                <button type="button" onClick={() => setNftDrop(null)} aria-label="Detach NFT drop" disabled={isBusy}>
-                  <XIcon size={14} />
-                </button>
-              </div>
-            )}
-
-            {article && (
-              <div className={styles.nftAttachment}>
-                <ArticleIcon size={16} />
-                <span>Article attached — {article.title}</span>
-                <button type="button" onClick={() => setArticle(null)} aria-label="Detach article" disabled={isBusy}>
-                  <XIcon size={14} />
-                </button>
-              </div>
-            )}
-
-            {miniApp && (
-              <div className={styles.nftAttachment}>
-                <PuzzlePieceIcon size={16} />
-                <span>Mini app attached (app #{miniApp.appId})</span>
-                <button type="button" onClick={() => setMiniApp(null)} aria-label="Detach mini app" disabled={isBusy}>
-                  <XIcon size={14} />
-                </button>
-              </div>
-            )}
-
-            {poll && (
-              <div className={styles.nftAttachment}>
-                <ListChecksIcon size={16} />
-                <span>Poll attached (poll #{poll.pollId})</span>
-                <button type="button" onClick={() => setPoll(null)} aria-label="Detach poll" disabled={isBusy}>
-                  <XIcon size={14} />
-                </button>
-              </div>
-            )}
-
-            <div className={styles.composerMeta}>
-              <span>{mediaItems.length}/{MAX_MEDIA_ITEMS} media</span>
-              <span className={clsx({ [styles.metaDanger]: isTextOverLimit })}>
-                {postText.length}/{MAX_POST_LENGTH}
-              </span>
-            </div>
-
-            {mediaItems.some((item) => item.type !== 'audio') && (
-              <div className={styles.mediaGrid}>
-                {mediaItems.map((item, index) => {
-                  if (item.type === 'audio') return null
-                  const mediaSrc = getMediaPreviewSrc(item)
-                  const isUploadingItem = isTransferring(item)
-                  const isFailedItem = item.status === 'failed'
-                  const percent = Math.floor((item.progress || 0) * 100)
-                  return (
-                    <figure
-                      key={`${item.uploadId || item.cid || item.localUrl || index}`}
-                      className={clsx(styles.mediaItem, {
-                        [styles['mediaItem--uploading']]: isUploadingItem,
-                        [styles['mediaItem--failed']]: isFailedItem,
-                      })}
-                    >
-                      {item.type === 'image' ? (
-                        <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
-                      ) : (
-                        <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
-                      )}
-                      {isUploadingItem && (
-                        <span className={styles.mediaItem__badge}>
-                          {item.status === 'optimizing' ? `Optimizing ${percent}%` : `${percent}%`}
-                        </span>
-                      )}
-                      {isFailedItem && (
-                        <span className={clsx(styles.mediaItem__badge, styles['mediaItem__badge--failed'])}>Upload failed</span>
-                      )}
-                      {isUploadingItem && (
-                        <div
-                          className={styles.mediaItem__progress}
-                          role="progressbar"
-                          aria-label="Upload progress"
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={percent}
-                        >
-                          <span className={styles.mediaItem__progressBar} style={{ width: `${percent}%` }} />
-                        </div>
-                      )}
-                      {/* Actions sit under the media, always visible — there is no hover on a phone */}
-                      <figcaption>
-                        {isFailedItem ? (
-                          <button type="button" onClick={() => retryUpload(item.uploadId)}>
-                            <ArrowClockwiseIcon size={14} />
-                            <span>Retry</span>
-                          </button>
+              {mediaItems.some((item) => item.type !== 'audio') && (
+                <div className={styles.mediaGrid}>
+                  {mediaItems.map((item, index) => {
+                    if (item.type === 'audio') return null
+                    const mediaSrc = getMediaPreviewSrc(item)
+                    const isUploadingItem = isTransferring(item)
+                    const isFailedItem = item.status === 'failed'
+                    const percent = Math.floor((item.progress || 0) * 100)
+                    return (
+                      <figure
+                        key={`${item.uploadId || item.cid || item.localUrl || index}`}
+                        className={clsx(styles.mediaItem, {
+                          [styles['mediaItem--uploading']]: isUploadingItem,
+                          [styles['mediaItem--failed']]: isFailedItem,
+                        })}
+                      >
+                        {item.type === 'image' ? (
+                          <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
                         ) : (
-                          <button type="button" onClick={() => toggleSpoiler(index)}>
-                            <XIcon size={14} />
-                            <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
+                          <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
+                        )}
+                        {isUploadingItem && (
+                          <span className={styles.mediaItem__badge}>
+                            {item.status === 'optimizing' ? `Optimizing ${percent}%` : `${percent}%`}
+                          </span>
+                        )}
+                        {isFailedItem && (
+                          <span className={clsx(styles.mediaItem__badge, styles['mediaItem__badge--failed'])}>Upload failed</span>
+                        )}
+                        {isUploadingItem && (
+                          <div
+                            className={styles.mediaItem__progress}
+                            role="progressbar"
+                            aria-label="Upload progress"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={percent}
+                          >
+                            <span className={styles.mediaItem__progressBar} style={{ width: `${percent}%` }} />
+                          </div>
+                        )}
+                        {/* Actions sit under the media, always visible — there is no hover on a phone */}
+                        <figcaption>
+                          {isFailedItem ? (
+                            <button type="button" onClick={() => retryUpload(item.uploadId)}>
+                              <ArrowClockwiseIcon size={14} />
+                              <span>Retry</span>
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => toggleSpoiler(index)}>
+                              <XIcon size={14} />
+                              <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
+                            </button>
+                          )}
+                          <button type="button" onClick={() => handleRemoveMedia(index)}>
+                            <TrashIcon size={14} />
+                            <span>{isUploadingItem ? 'Cancel' : 'Remove'}</span>
+                          </button>
+                        </figcaption>
+                      </figure>
+                    )
+                  })}
+                </div>
+              )}
+
+              {mediaItems.some((item) => item.type === 'audio') && (
+                <div className={styles.audioList}>
+                  {mediaItems.map((item, index) => {
+                    if (item.type !== 'audio') return null
+                    const mediaSrc = getMediaPreviewSrc(item)
+                    return (
+                      <div
+                        key={`${item.uploadId || item.cid || item.localUrl || index}`}
+                        className={clsx(styles.audioListItem, {
+                          [styles['audioListItem--uploading']]: item.status === 'uploading',
+                          [styles['audioListItem--failed']]: item.status === 'failed',
+                        })}
+                      >
+                        <audio src={mediaSrc} controls />
+                        {item.status === 'uploading' && (
+                          <span className={styles.audioListItem__status}>{Math.floor((item.progress || 0) * 100)}%</span>
+                        )}
+                        {item.status === 'failed' && (
+                          <button type="button" className={styles.audioRemoveButton} onClick={() => retryUpload(item.uploadId)} aria-label="Retry upload">
+                            <ArrowClockwiseIcon size={14} />
                           </button>
                         )}
-                        <button type="button" onClick={() => handleRemoveMedia(index)}>
+                        <button
+                          type="button"
+                          className={styles.audioRemoveButton}
+                          onClick={() => handleRemoveMedia(index)}
+                          aria-label={item.status === 'uploading' ? 'Cancel upload' : 'Remove audio'}
+                        >
                           <TrashIcon size={14} />
-                          <span>{isUploadingItem ? 'Cancel' : 'Remove'}</span>
                         </button>
-                      </figcaption>
-                    </figure>
-                  )
-                })}
-              </div>
-            )}
-
-            {mediaItems.some((item) => item.type === 'audio') && (
-              <div className={styles.audioList}>
-                {mediaItems.map((item, index) => {
-                  if (item.type !== 'audio') return null
-                  const mediaSrc = getMediaPreviewSrc(item)
-                  return (
-                    <div
-                      key={`${item.uploadId || item.cid || item.localUrl || index}`}
-                      className={clsx(styles.audioListItem, {
-                        [styles['audioListItem--uploading']]: item.status === 'uploading',
-                        [styles['audioListItem--failed']]: item.status === 'failed',
-                      })}
-                    >
-                      <audio src={mediaSrc} controls />
-                      {item.status === 'uploading' && (
-                        <span className={styles.audioListItem__status}>{Math.floor((item.progress || 0) * 100)}%</span>
-                      )}
-                      {item.status === 'failed' && (
-                        <button type="button" className={styles.audioRemoveButton} onClick={() => retryUpload(item.uploadId)} aria-label="Retry upload">
-                          <ArrowClockwiseIcon size={14} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className={styles.audioRemoveButton}
-                        onClick={() => handleRemoveMedia(index)}
-                        aria-label={item.status === 'uploading' ? 'Cancel upload' : 'Remove audio'}
-                      >
-                        <TrashIcon size={14} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
+        {/* The one reply setting, worded as the scope it grants rather than as a switch */}
+        {!isComment && (
+          <button
+            type="button"
+            className={styles.replyControl}
+            aria-pressed={allowComments}
+            onClick={() => setAllowComments((value) => !value)}
+          >
+            {allowComments ? <GlobeHemisphereWestIcon size={16} weight="fill" /> : <LockSimpleIcon size={16} weight="fill" />}
+            <span>{allowComments ? 'Everyone can reply' : 'Replies are turned off'}</span>
+          </button>
+        )}
+
         <footer className={styles.footer}>
-          <div className={styles.postOptions}>
-            {/* One setting, so it sits in the open — a disclosure that hides a single switch
-                behind two taps is all cost and no saving */}
-            {!isComment && (
-              <div className={styles.postOption}>
-                <label htmlFor="allowComments">Allow comments</label>
-                <ToggleSwitch
-                  id="allowComments"
-                  checked={allowComments}
-                  onChange={(event) => setAllowComments(event.target.checked)}
-                />
-              </div>
+          <div className={styles.toolbar} aria-label="Post tools">
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('image')} title="Image" aria-label="Add image" disabled={isBusy}>
+              <ImageIcon size={20} />
+            </button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('video')} title="Video" aria-label="Add video" disabled={isBusy}>
+              <MonitorPlayIcon size={20} />
+            </button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={openGifPicker} title="GIF" aria-label="Add GIF" disabled={isBusy}>
+              <GifIcon size={20} />
+            </button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('audio')} title="Audio" aria-label="Add audio" disabled={isBusy}>
+              <MicrophoneIcon size={20} />
+            </button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('strong')} title="Bold" aria-label="Bold" disabled={isBusy}>
+              <TextBIcon size={20} />
+            </button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('em')} title="Italic" aria-label="Italic" disabled={isBusy}>
+              <TextItalicIcon size={20} />
+            </button>
+            {canAttachNft && nftTradeAvailable && (
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowSellNftModal(true)} title="Sell an NFT" aria-label="Sell an NFT" disabled={isBusy || Boolean(nftListing)}>
+                <StorefrontIcon size={20} />
+              </button>
+            )}
+            {canAttachNft && predictAvailable && (
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowAttachMarket(true)} title="Prediction market" aria-label="Attach a prediction market" disabled={isBusy || Boolean(predictMarket)}>
+                <ChartLineUpIcon size={20} />
+              </button>
+            )}
+            {canAttachNft && launchAvailable && (
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowAttachLaunch(true)} title="Launch a token" aria-label="Launch a token" disabled={isBusy || Boolean(tokenLaunch)}>
+                <CoinIcon size={20} />
+              </button>
+            )}
+            {canAttachNft && dropsAvailable && (
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowAttachDrop(true)} title="NFT drop" aria-label="Attach an NFT drop" disabled={isBusy || Boolean(nftDrop)}>
+                <ImageIcon size={20} />
+              </button>
+            )}
+            {canAttachNft && pollsAvailable && (
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => attachPollRef.current?.open()} title="Poll" aria-label="Add a poll" disabled={isBusy || Boolean(poll)}>
+                <ListChecksIcon size={20} />
+              </button>
+            )}
+            {canAttachNft && (
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => attachMiniAppRef.current?.open()} title="Mini app" aria-label="Attach a mini app" disabled={isBusy || Boolean(miniApp)}>
+                <PuzzlePieceIcon size={20} />
+              </button>
             )}
           </div>
 
-          <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain || hasFailedUploads}>
-            {/* No confirming state: the composer closes as soon as the transaction is sent, so
-                the only wait left in here is the author's own signature */}
-            {isSubmitting && hasPendingUploads
-              ? 'Uploading...'
-              : isSigning
-                ? 'Signing...'
-                : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : 'Post'}
-          </button>
+          <div className={styles.footerActions}>
+            <span className={clsx(styles.charCount, { [styles['charCount--over']]: isTextOverLimit })}>
+              {postText.length}/{MAX_POST_LENGTH}
+            </span>
+            <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain || hasFailedUploads}>
+              {/* No confirming state: the composer closes as soon as the transaction is sent, so
+                  the only wait left in here is the author's own signature */}
+              {isSubmitting && hasPendingUploads
+                ? 'Uploading...'
+                : isSigning
+                  ? 'Signing...'
+                  : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : 'Post'}
+            </button>
+          </div>
         </footer>
       </form>
 
