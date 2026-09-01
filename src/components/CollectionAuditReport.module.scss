@@ -304,8 +304,21 @@
   &__table {
     width: 100%;
     min-width: 38rem;
+    border: 0;
     border-collapse: collapse;
+    table-layout: auto;
     font-size: var(--font-size-14, 0.875rem);
+
+    // The global _table.scss frames every bare table, fixes its layout — long cells then
+    // paint over their neighbours — and shades hovered rows; all undone like the offers table
+    tr {
+      border: 0;
+      background-color: transparent;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
 
     th,
     td {
@@ -322,6 +335,7 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--text-muted, #888);
+      background-color: transparent;
     }
 
     tbody tr:last-child td {
@@ -606,11 +620,11 @@
     }
 
     // The heavier group rule moves from the cells to the row itself
-    &__row--group {
+    &__table &__row--group {
       border-top: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
     }
 
-    &__row--group td {
+    &__table &__row--group td {
       border-top: none;
     }
   }

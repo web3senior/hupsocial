@@ -279,8 +279,17 @@
   &__table {
     width: 100%;
     min-width: 40rem;
+    border: 0;
     border-collapse: collapse;
+    table-layout: auto;
     font-size: var(--font-size-14, 0.875rem);
+
+    // The global _table.scss frames every bare table and fixes its layout, which crushes
+    // the name column until long names paint over the chain cell — undone like the offers table
+    tr {
+      border: 0;
+      background-color: transparent;
+    }
 
     th,
     td {
@@ -297,6 +306,7 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--text-muted, #888);
+      background-color: transparent;
     }
 
     tbody tr:hover {
