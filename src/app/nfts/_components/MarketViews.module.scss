@@ -95,6 +95,33 @@
 
   // Solid where the tabs are outlined: it leaves the page, and must not read as a third
   // reading of the market
+  // Shares the pill shape with __drops but not its weight — outlined rather than filled, and
+  // it gives up the auto margin so the two sit together at the end of the strip.
+  &__manage,
+  &__audit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      border-color: var(--network-color-primary, var(--color-primary));
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
   &__drops {
     display: inline-flex;
     align-items: center;

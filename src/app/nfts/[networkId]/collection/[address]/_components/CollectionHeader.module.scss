@@ -374,6 +374,23 @@
       background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 10%, transparent);
       color: var(--network-color-primary, var(--color-primary));
     }
+
+    // The permanence grade carries its own colour (set inline from the grade), never the chain's
+    &--audit {
+      border-color: color-mix(in srgb, var(--audit-color) 45%, var(--border));
+      background-color: color-mix(in srgb, var(--audit-color) 10%, transparent);
+      color: var(--audit-color);
+      text-decoration: none;
+
+      &:hover,
+      &:focus-visible {
+        background-color: color-mix(in srgb, var(--audit-color) 18%, transparent);
+      }
+    }
+
+    &--auditing {
+      color: var(--text-muted, #888);
+    }
   }
 
   // Four boxed measures across the card's foot — volume, high sale, NFTs traded, supply

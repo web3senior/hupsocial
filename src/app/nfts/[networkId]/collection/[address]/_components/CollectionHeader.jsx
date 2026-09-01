@@ -12,10 +12,14 @@ import {
   CubeIcon,
   DotsThreeIcon,
   LinkSimpleIcon,
+  ShieldCheckIcon,
+  SpinnerGapIcon,
 } from '@phosphor-icons/react'
 import { buildAssetLinks } from '@/components/TradeCard'
 import { formatStake } from '@/hooks/useStakeToken'
 import { handleBrokenImage } from '@/lib/utils'
+import { describeBadge, gradeColor } from '@/lib/collectionAuditFormat'
+import useCollectionAudit from '@/hooks/useCollectionAudit'
 import Profile from '@/components/Profile'
 import HupMark from '@/components/ui/HupMark'
 import NativePopover from '@/components/ui/NativePopover'
@@ -91,6 +95,13 @@ const isXLink = (url) => {
 export default function CollectionHeader({ chainId, chainInfo, address, info, stats, onRefresh, isRefreshing }) {
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
+
+  // The permanence grade, as cidex scored it. Looking at a collection is what puts it in the
+  // queue, so the market audits itself as people browse it; the chip links to the full report.
+  const permanence = useCollectionAudit({ chainId, collection: address, summary: true, autoRequest: true })
+  const permanenceTitle = permanence.audit?.grade
+    ? `${permanence.audit.score}/100 · ${permanence.audit.badges.map((id) => describeBadge(id).label).join(' · ')} — open the full audit`
+    : undefined
 
   const isLsp8 = Boolean(info.isLsp8)
   // LUKSO's standard reads as "NFT 2.0" in the UI; the literal LSP8 name lives in the tooltip
@@ -295,6 +306,24 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
                   {standard}
                 </span>
               )}
+              {/* Where the bytes live, graded — the one chip that can say a collection is
+                  already gone. Painted in the grade's colour, not the chain's. */}
+              {permanence.audit?.grade ? (
+                <Link
+                  href={`/nfts/audit?network=${chainId}&address=${address}`}
+                  className={clsx(styles.header__chip, styles['header__chip--audit'])}
+                  style={{ '--audit-color': gradeColor(permanence.audit.grade) }}
+                  title={permanenceTitle}
+                >
+                  <ShieldCheckIcon size={12} weight="fill" />
+                  Permanence {permanence.audit.grade}
+                </Link>
+              ) : permanence.isPending ? (
+                <span className={clsx(styles.header__chip, styles['header__chip--auditing'])} title="Hup is probing where this collection's bytes live">
+                  <SpinnerGapIcon size={12} className={styles['header__menuItem--spinning']} />
+                  Auditing
+                </span>
+              ) : null}
               {/* Same badge its tiles carry, raised to the collection: this drop has NFTs
                   you can turn around, not just look at */}
               {info.models?.models > 0 && (

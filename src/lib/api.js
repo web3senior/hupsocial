@@ -1176,3 +1176,56 @@ export async function updateTelegramId(post, wallet_addr) {
   if (!response.ok) throw new Response('Failed to get data', { status: 500 })
   return response.json()
 }
+
+/**
+ * Get NFT Collection Audit
+ * The permanence audit for one collection, plus where it sits in cidex's queue (`status`:
+ * none | pending | running | refreshing | failed | done). `summary` leaves the report and
+ * history out, for a chip that only needs the grade.
+ * @param {number|string} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ * @param {{summary?: boolean}} [options]
+ */
+export const getNftCollectionAudit = async (networkId, address, { summary = false } = {}) => {
+  // Polled while an audit runs — the browser cache must not answer for the server
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/audit${summary ? '?summary=1' : ''}`, { cache: 'no-store' })
+  if (!response.ok) throw new Error('Failed to fetch the collection audit')
+
+  return response.json()
+}
+
+/**
+ * Request NFT Collection Audit
+ * Asks cidex to audit (or re-audit) a collection. Resolves to the queue state; throws with
+ * the server's message when the collection was audited too recently.
+ * @param {number|string} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ */
+export const requestNftCollectionAudit = async (networkId, address) => {
+  const response = await fetch(`/api/v1/nfts/collections/${networkId}/${address.toLowerCase()}/audit`, { method: 'POST' })
+  const body = await response.json().catch(() => null)
+  if (!response.ok || !body?.success) {
+    const error = new Error(body?.error || `Audit request failed (${response.status})`)
+    error.throttled = Boolean(body?.throttled)
+    error.status = body?.status || null
+    error.data = body?.data || null
+    throw error
+  }
+
+  return body
+}
+
+/**
+ * Get NFT Collection Audits
+ * Audited collections as a board — most recent, best or worst scores.
+ * @param {{networkId?: number|string, sort?: 'recent'|'top'|'bottom', limit?: number}} [options]
+ */
+export const getNftCollectionAudits = async ({ networkId, sort = 'recent', limit = 20 } = {}) => {
+  const query = new URLSearchParams({ sort, limit: String(limit) })
+  if (networkId) query.set('networkId', String(networkId))
+
+  const response = await fetch(`/api/v1/nfts/audits?${query.toString()}`)
+  if (!response.ok) throw new Error('Failed to fetch collection audits')
+
+  return response.json()
+}

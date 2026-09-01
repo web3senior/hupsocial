@@ -1,0 +1,497 @@
+.tool {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &__head {
+    p {
+      margin: 0;
+      max-width: 52rem;
+      font-size: var(--font-size-14, 0.875rem);
+      line-height: 1.6;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  // Network and search share one row; the chain decides whether an address resolves at all,
+  // so it stays visible beside the box it qualifies
+  &__lookup {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  // Fixed width so the search box never jumps when the chain name changes length
+  &__network {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    width: 12.5rem;
+    cursor: pointer;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text);
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    img {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    > span {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    svg {
+      flex-shrink: 0;
+      color: var(--text-muted, #888);
+    }
+
+    @media (max-width: 600px) {
+      width: 3.25rem;
+      justify-content: center;
+
+      > span,
+      svg {
+        display: none;
+      }
+    }
+  }
+
+  // Chrome only — NativePopover handles anchoring and dismissal
+  &__networkMenu {
+    padding: 0.3rem;
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    scrollbar-width: thin;
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    button {
+      all: unset;
+      box-sizing: border-box;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.5rem;
+      border-radius: var(--global-border-radius);
+      cursor: pointer;
+      font-size: var(--font-size-14, 0.875rem);
+      white-space: nowrap;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--surface-muted);
+      }
+    }
+
+    img {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    svg {
+      margin-inline-start: auto;
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__networkOption--active {
+    font-weight: 600;
+  }
+
+  &__search {
+    position: relative;
+    flex: 1 1 16rem;
+    min-width: 9rem;
+  }
+
+  &__field {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0 0.75rem;
+    color: var(--text-muted, #888);
+
+    &:focus-within {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      background: none;
+      border: none;
+      outline: none;
+      padding: 0.6rem 0;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--text);
+    }
+  }
+
+  // Floated over the content below rather than pushing it down
+  &__suggestions {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 0.3rem);
+    left: 0;
+    right: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0.3rem;
+    max-height: 19rem;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    scrollbar-width: thin;
+
+    button {
+      all: unset;
+      box-sizing: border-box;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.45rem 0.5rem;
+      border-radius: var(--global-border-radius);
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--surface-muted);
+      }
+    }
+
+    img {
+      width: 2rem;
+      height: 2rem;
+      flex-shrink: 0;
+      border-radius: var(--global-border-radius);
+      object-fit: cover;
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 0.05rem;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__mark {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  &__note {
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.55;
+    color: var(--text-muted, #888);
+  }
+
+  // What has been scored so far — the reason to come back without an address in hand
+  &__board {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  &__boardHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 700;
+    }
+  }
+
+  // Wide on purpose; the wrapper scrolls so the page never does
+  &__tableWrap {
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+    min-width: 40rem;
+    border-collapse: collapse;
+    font-size: var(--font-size-14, 0.875rem);
+
+    th,
+    td {
+      padding: 0.55rem 0.6rem;
+      text-align: left;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    th {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted, #888);
+    }
+
+    tbody tr:hover {
+      background: color-mix(in srgb, var(--text) 3%, transparent);
+    }
+  }
+
+  &__rowTarget {
+    all: unset;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+    min-width: 0;
+
+    img {
+      width: 2rem;
+      height: 2rem;
+      flex-shrink: 0;
+      border-radius: var(--global-border-radius);
+      object-fit: cover;
+    }
+
+    > span {
+      display: flex;
+      flex-direction: column;
+      gap: 0.05rem;
+      min-width: 0;
+    }
+
+    strong {
+      max-width: 16rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    &:hover strong,
+    &:focus-visible strong {
+      text-decoration: underline;
+    }
+  }
+
+  &__chain {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--network-color-primary, var(--text));
+
+    img {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+  }
+
+  // The grade letter on its colour, the score beside it in the mono figure font
+  &__grade {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    b {
+      display: grid;
+      place-items: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      background: var(--audit-grade-color);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    small {
+      font-family: var(--ff-mono);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  // The one cell allowed to wrap: three chips outgrow any fixed column, and a nowrap cell
+  // would push them under the neighbouring date instead
+  &__findings {
+    white-space: normal;
+    min-width: 16rem;
+  }
+
+  &__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  &__badge {
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #888);
+
+    &--good {
+      border-color: color-mix(in srgb, #16a34a 45%, var(--border));
+      color: #16a34a;
+    }
+
+    &--warn {
+      border-color: color-mix(in srgb, #d97706 45%, var(--border));
+      color: #d97706;
+    }
+
+    &--bad {
+      border-color: color-mix(in srgb, #dc2626 45%, var(--border));
+      color: #dc2626;
+    }
+  }
+
+  &__when {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  // An icon-only header cell still needs a name for screen readers
+  &__srOnly {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  // Copies the report's URL; the tick is the whole confirmation, no toast needed
+  &__copy {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--network-color-primary, var(--color-primary));
+      color: var(--network-color-primary, var(--color-primary));
+    }
+
+    &--done {
+      border-color: #16a34a;
+      color: #16a34a;
+    }
+  }
+}
+
+.tool {
+  @media (max-width: 600px) {
+    &__table {
+      min-width: 0;
+
+      th,
+      td {
+        white-space: normal;
+      }
+
+      td {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        text-align: left;
+
+        &::before {
+          flex: 0 0 5.5rem;
+          font-size: 0.65rem;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--text-muted, #888);
+        }
+      }
+
+    }
+  }
+}
