@@ -319,9 +319,12 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
                   Permanence {permanence.audit.grade}
                 </Link>
               ) : permanence.isPending ? (
-                <span className={clsx(styles.header__chip, styles['header__chip--auditing'])} title="Hup is probing where this collection's bytes live">
+                <span
+                  className={clsx(styles.header__chip, styles['header__chip--auditing'])}
+                  title={permanence.audit?.startedAt ? "Hup is probing where this collection's bytes live" : "Queued for Hup's permanence audit — a worker picks it up next"}
+                >
                   <SpinnerGapIcon size={12} className={styles['header__menuItem--spinning']} />
-                  Auditing
+                  {permanence.audit?.startedAt ? 'Auditing' : 'Audit queued'}
                 </span>
               ) : null}
               {/* Same badge its tiles carry, raised to the collection: this drop has NFTs

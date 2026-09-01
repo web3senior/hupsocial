@@ -12,8 +12,21 @@ const RUNNING_POLL_MS = 3000
 // A settled row still changes on its own — the daily re-audit, a re-check asked for elsewhere —
 // so it is re-read on a slow clock rather than never
 const SETTLED_POLL_MS = 60000
+// A row still waiting after this long has no worker draining the queue — ease off the polling
+const PENDING_STALE_MS = 5 * 60 * 1000
+const STALE_POLL_MS = 30000
 const PENDING_STATES = new Set(['pending', 'running', 'refreshing'])
 const RUNNING_STATES = new Set(['running', 'refreshing'])
+
+const pollIntervalFor = (latest) => {
+  if (!latest) return 0
+  if (RUNNING_STATES.has(latest.status) && latest.data?.startedAt) return RUNNING_POLL_MS
+  if (PENDING_STATES.has(latest.status)) {
+    const waited = Date.now() - Date.parse(latest.data?.requestedAt || '')
+    return waited > PENDING_STALE_MS ? STALE_POLL_MS : PENDING_POLL_MS
+  }
+  return latest.status === 'done' ? SETTLED_POLL_MS : 0
+}
 
 /**
  * The permanence audit for one collection, as cidex holds it: the score, grade and badges
@@ -38,7 +51,7 @@ export default function useCollectionAudit({ chainId, collection, enabled = true
 
   const { data, error, isLoading, mutate } = useSWR(key, () => getNftCollectionAudit(chainId, collection, { summary }), {
     revalidateOnFocus: false,
-    refreshInterval: (latest) => (latest && RUNNING_STATES.has(latest.status) && latest.data?.startedAt ? RUNNING_POLL_MS : latest && PENDING_STATES.has(latest.status) ? PENDING_POLL_MS : latest?.status === 'done' ? SETTLED_POLL_MS : 0),
+    refreshInterval: pollIntervalFor,
   })
 
   const status = data?.status || (isLoading ? 'loading' : 'none')
