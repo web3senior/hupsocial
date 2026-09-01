@@ -148,8 +148,8 @@ const buildScene = (variant, dense = false) => {
 }
 
 /**
- * Decorative spiral-galaxy particle animation for the drops hero. Pure Canvas 2D — pauses when
- * offscreen or the tab hides, and prefers-reduced-motion gets a single static frame.
+ * Decorative spiral-galaxy particle animation. Pure Canvas 2D — pauses when offscreen or the
+ * tab hides, and prefers-reduced-motion gets a single static frame.
  * Variants: 'nebula' (violet-to-emerald ramp), 'chains' (stars keyed to app-chain colours,
  * Hup pink core), 'cinematic' (tighter arms, denser stars, nebula haze).
  */

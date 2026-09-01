@@ -13,10 +13,9 @@ import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { networkColorStyle } from '@/lib/networkColors'
 import { PHASE_STATUS, dropStandardLabel, phaseStatus } from '@/lib/drops'
 import CreateDropDialog from '@/components/CreateDropDialog'
-import GalaxyCanvas from './GalaxyCanvas'
 import HupMark from '@/components/ui/HupMark'
 import ProgressBar from '@/components/ui/ProgressBar'
-import { CornersOutIcon, ImageIcon } from '@phosphor-icons/react'
+import { ImageIcon } from '@phosphor-icons/react'
 import styles from './DropsDirectory.module.scss'
 
 const PAGE_SIZE = 24
@@ -43,19 +42,6 @@ const chainIconFor = (chain) => {
 }
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
-
-// Fullscreens the galaxy band it sits in; Esc (or the browser UI) exits
-function FullscreenButton({ targetRef }) {
-  const toggle = () => {
-    if (document.fullscreenElement) document.exitFullscreen()
-    else targetRef.current?.requestFullscreen?.()
-  }
-  return (
-    <button type="button" className={styles.directory__fullscreenBtn} onClick={toggle} aria-label="View fullscreen" title="View fullscreen">
-      <CornersOutIcon size={16} weight="bold" />
-    </button>
-  )
-}
 
 /**
  * One drop in the grid, rendered from its indexed /api/v1/drops row with no RPC reads. Only the
@@ -165,9 +151,6 @@ function DropTile({ row }) {
  */
 const DropsDirectory = () => {
   const createDialogRef = useRef(null)
-  const heroRef = useRef(null)
-  const chainsBandRef = useRef(null)
-  const cinematicBandRef = useRef(null)
   const { chainId } = useActiveChain()
   const { address } = useConnection()
 
@@ -182,39 +165,22 @@ const DropsDirectory = () => {
 
   return (
     <div className={styles.directory}>
-      <header className={styles.directory__hero} ref={heroRef}>
-        <GalaxyCanvas className={styles.directory__heroCanvas} />
-        <span className={styles.directory__compareTag}>V1 · Nebula</span>
-        <FullscreenButton targetRef={heroRef} />
-        <div className={styles.directory__header}>
-          {/* No heading here — PageTitle already puts "Drops" in the fixed header */}
-          <p>Every drop deploys a collection you own outright. Fixed phases, gated mints, referral rewards.</p>
-          <div className={styles.directory__actions}>
-            <button
-              type="button"
-              className={styles.directory__create}
-              onClick={() => createDialogRef.current?.open()}
-              disabled={!dropsAddress}
-              title={dropsAddress ? undefined : 'NFT drops are not available on this network yet'}
-            >
-              <ImageIcon size={16} weight="fill" />
-              Create drop
-            </button>
-          </div>
+      <header className={styles.directory__header}>
+        {/* No heading here — PageTitle already puts "Drops" in the fixed header */}
+        <p>Every drop deploys a collection you own outright. Fixed phases, gated mints, referral rewards.</p>
+        <div className={styles.directory__actions}>
+          <button
+            type="button"
+            className={styles.directory__create}
+            onClick={() => createDialogRef.current?.open()}
+            disabled={!dropsAddress}
+            title={dropsAddress ? undefined : 'NFT drops are not available on this network yet'}
+          >
+            <ImageIcon size={16} weight="fill" />
+            Create drop
+          </button>
         </div>
       </header>
-
-      {/* Temporary three-way compare — collapse to the winner and drop the tags */}
-      <div className={styles.directory__compareBand} ref={chainsBandRef}>
-        <GalaxyCanvas variant="chains" className={styles.directory__heroCanvas} />
-        <span className={styles.directory__compareTag}>V2 · Chain colours</span>
-        <FullscreenButton targetRef={chainsBandRef} />
-      </div>
-      <div className={styles.directory__compareBand} ref={cinematicBandRef}>
-        <GalaxyCanvas variant="cinematic" className={styles.directory__heroCanvas} />
-        <span className={styles.directory__compareTag}>V3 · Cinematic</span>
-        <FullscreenButton targetRef={cinematicBandRef} />
-      </div>
 
       {!anyChainEnabled && <p className={styles.directory__empty}>NFT drops aren&rsquo;t live yet.</p>}
 
