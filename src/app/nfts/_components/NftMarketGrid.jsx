@@ -233,9 +233,9 @@ function buildApiFilters(filters, priceDecimals, search) {
   return api
 }
 
-// Counts only what the popover still hides — status/referral/sort live in the always-visible
-// quick row and the network in the page's logo strip, so badging them would flag filters
-// the user can already see
+// Counts only what the popover alone can show — status/referral/sort stay visible in the
+// quick row (the panel merely mirrors them) and the network in the page's logo strip, so
+// badging them would flag filters the user can already see
 const hiddenFilterCount = (filters) =>
   [filters.collection, filters.standard, filters.token, filters.seller, filters.minPrice, filters.maxPrice].filter(Boolean).length
 
@@ -503,6 +503,18 @@ export default function NftMarketGrid() {
     setFilters((f) => ({ ...f, seller: '' }))
   }, [setFilters])
 
+  // Sorting by sale time while Active hides every sold row would order nothing —
+  // widen to Active + sold; a deliberate Sold status is kept as-is
+  const handleSortChange = useCallback(
+    (value) =>
+      setFilters((f) => ({
+        ...f,
+        sort: value,
+        status: value === 'recently_sold' && f.status === 'active' ? 'active_sold' : f.status,
+      })),
+    [setFilters],
+  )
+
   useEffect(() => {
     // Same inputs as the result already on screen (a restored snapshot, or StrictMode
     // replaying the mount) — refetching would truncate the list back to page 1
@@ -667,15 +679,7 @@ export default function NftMarketGrid() {
             value={filters.sort}
             defaultValue="newest"
             options={SORT_OPTIONS}
-            // Sorting by sale time while Active hides every sold row would order nothing —
-            // widen to Active + sold; a deliberate Sold status is kept as-is
-            onChange={(value) =>
-              setFilters((f) => ({
-                ...f,
-                sort: value,
-                status: value === 'recently_sold' && f.status === 'active' ? 'active_sold' : f.status,
-              }))
-            }
+            onChange={handleSortChange}
           />
         </div>
 
@@ -717,7 +721,7 @@ export default function NftMarketGrid() {
               content={
                 hiddenCount > 0
                   ? `${hiddenCount} more ${hiddenCount === 1 ? 'filter is' : 'filters are'} set here — collection, seller, NFT standard, payment token and price range.`
-                  : 'The narrower filters: collection, seller, NFT standard, payment token and price range.'
+                  : 'Every filter in one panel — sort, status, referral, collection, seller, NFT standard, payment token and price range.'
               }
             >
               <button type="button" className={styles.market__filterButton} aria-label="More filters">
@@ -729,6 +733,41 @@ export default function NftMarketGrid() {
         >
           {() => (
             <div className={styles.filtersPanel__body}>
+              {/* The quick row's three, mirrored so this one panel holds every filter —
+                  narrow screens scroll the pills partly out of reach */}
+              <div className={styles.filtersPanel__field}>
+                <label htmlFor="nftFilterSort">Sort</label>
+                <select id="nftFilterSort" value={filters.sort} onChange={(e) => handleSortChange(e.target.value)}>
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.filtersPanel__field}>
+                <label htmlFor="nftFilterStatus">Status</label>
+                <select id="nftFilterStatus" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}>
+                  {STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.filtersPanel__field}>
+                <label htmlFor="nftFilterReferral">Referral reward</label>
+                <select id="nftFilterReferral" value={filters.referral} onChange={(e) => setFilters((f) => ({ ...f, referral: e.target.value }))}>
+                  {REFERRAL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className={styles.filtersPanel__field}>
                 <label htmlFor="nftFilterCollection">Collection</label>
                 <select
