@@ -1,0 +1,440 @@
+// The stage is a lit room seen through dark chrome, so its HUD keeps its own ink/paper
+// palette in both themes; only the accent follows the collection's chain.
+$ink: #111214;
+$ink-glass: rgba(17, 18, 20, 0.74);
+$paper: #f3f1ec;
+$paper-muted: #9aa0aa;
+$line: rgba(243, 241, 236, 0.14);
+
+.gallery {
+  --gallery-accent: var(--network-color-primary, var(--color-primary, #c9a86a));
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__stage {
+    position: relative;
+    isolation: isolate;
+    height: clamp(420px, 68vh, 820px);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: $ink;
+    color: $paper;
+
+    &--fullscreen {
+      height: 100vh;
+      border: 0;
+      border-radius: 0;
+    }
+  }
+
+  &__canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: crosshair;
+    outline: none;
+    transition: filter 220ms ease, transform 220ms ease;
+
+    // Behind an overlay the room goes soft. Blurring the canvas rather than backdrop-filtering
+    // the overlay: a backdrop blur samples nothing past the stage's edge and paints a dark band
+    // there, while a blurred canvas scaled up a touch pushes its own fringe out of the clip
+    &--dimmed {
+      filter: blur(10px);
+      transform: scale(1.06);
+    }
+  }
+
+  &__hud {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+
+    > * {
+      pointer-events: none;
+    }
+  }
+
+  &__counter {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: calc(100% - 80px);
+    padding: 8px 12px;
+    border: 1px solid $line;
+    border-radius: 6px;
+    background-color: $ink-glass;
+
+    strong {
+      overflow: hidden;
+      font-size: 0.82rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      color: $paper-muted;
+      font-size: 0.72rem;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__fullscreen {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px 0 11px;
+    border: 1px solid color-mix(in srgb, var(--gallery-accent) 55%, $line);
+    border-radius: 6px;
+    background-color: $ink-glass;
+    color: $paper;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    pointer-events: auto;
+
+    &:hover {
+      border-color: var(--gallery-accent);
+      background-color: color-mix(in srgb, var(--gallery-accent) 18%, $ink-glass);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--gallery-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  &__crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 1px solid color-mix(in srgb, var(--gallery-accent) 60%, transparent);
+    border-radius: 50%;
+    transition: transform 160ms ease, border-color 160ms ease;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      margin: -2px 0 0 -2px;
+      border-radius: 50%;
+      background-color: var(--gallery-accent);
+    }
+
+    &--hot {
+      transform: scale(1.35);
+      border-color: var(--gallery-accent);
+    }
+  }
+
+  &__legend {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid $line;
+    border-radius: 6px;
+    background-color: $ink-glass;
+    color: $paper-muted;
+    font-size: 0.74rem;
+
+    > div {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+
+  &__keys {
+    display: inline-flex;
+    gap: 3px;
+
+    kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      border: 1px solid $line;
+      border-bottom-color: color-mix(in srgb, var(--gallery-accent) 50%, transparent);
+      border-radius: 3px;
+      background-color: $ink;
+      color: $paper;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.68rem;
+      font-weight: 600;
+    }
+  }
+
+  &__map {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    width: 168px;
+    height: 108px;
+    border: 1px solid $line;
+    border-radius: 6px;
+    background-color: $ink-glass;
+  }
+
+  // The museum label for whatever the visitor is looking at
+  &__label {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: min(340px, calc(100% - 28px));
+    padding: 12px 16px;
+    border-left: 3px solid var(--gallery-accent);
+    border-radius: 4px;
+    background-color: #faf8f3;
+    color: $ink;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    transform: translateX(-50%);
+    animation: galleryLabelIn 180ms ease-out;
+
+    small {
+      color: #6f6a60;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-variant-numeric: tabular-nums;
+    }
+
+    strong {
+      overflow: hidden;
+      font-size: 1.05rem;
+      line-height: 1.2;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      color: #4d4a44;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    em {
+      color: #7a756b;
+      font-size: 0.74rem;
+      font-style: normal;
+    }
+  }
+
+  &__labelActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  // The market's own quick-buy pill, coloured by the collection's chain on this light card
+  &__buy {
+    --primary: var(--gallery-accent);
+
+    display: flex;
+    color: var(--gallery-accent);
+    pointer-events: auto;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  &__open {
+    padding: 7px 12px;
+    border-radius: 4px;
+    background-color: $ink;
+    color: $paper;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    pointer-events: auto;
+
+    &:hover {
+      background-color: #26282d;
+    }
+  }
+
+  &__joy {
+    position: absolute;
+    width: 116px;
+    height: 116px;
+    margin: -58px 0 0 -58px;
+    border: 1px solid $line;
+    border-radius: 50%;
+    background-color: rgba(17, 18, 20, 0.35);
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  &__joyKnob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, var(--gallery-accent) 85%, transparent);
+  }
+
+  // Intro, pause, empty and error states all sit on the same dimmed room
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background-color: rgba(17, 18, 20, 0.5);
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(400px, 100%);
+    padding: 24px 26px;
+    border: 1px solid $line;
+    border-top: 2px solid var(--gallery-accent);
+    border-radius: 6px;
+    background-color: #1a1b1f;
+    color: $paper;
+
+    strong {
+      font-size: 1.35rem;
+      line-height: 1.15;
+      text-wrap: balance;
+    }
+
+    p {
+      margin: 0;
+      color: #d9d5cc;
+      font-size: 0.86rem;
+      line-height: 1.45;
+      max-width: 42ch;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  &__enter {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 16px;
+    border: 1px solid var(--gallery-accent);
+    border-radius: 4px;
+    background-color: var(--gallery-accent);
+    color: var(--network-color-text, $ink);
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      filter: brightness(1.08);
+    }
+
+    &:focus-visible {
+      outline: 2px solid $paper;
+      outline-offset: 2px;
+    }
+
+    // The second choice on the card: same cut, no fill
+    &--quiet {
+      border-color: $line;
+      background-color: transparent;
+      color: $paper;
+
+      &:hover {
+        border-color: var(--gallery-accent);
+        filter: none;
+      }
+    }
+  }
+
+  &__coverage {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-12, 0.78rem);
+  }
+}
+
+@keyframes galleryLabelIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (max-width: 640px) {
+  .gallery {
+    &__stage {
+      height: clamp(360px, 62vh, 620px);
+    }
+
+    &__legend,
+    &__map {
+      display: none;
+    }
+
+    &__label {
+      bottom: 14px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery {
+    &__label {
+      animation: none;
+    }
+
+    &__crosshair,
+    &__canvas {
+      transition: none;
+    }
+  }
+}

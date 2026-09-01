@@ -19,6 +19,21 @@ const withImageHints = (url, { width, quality, still }) => {
   return `${url}${url.includes('?') ? '&' : '?'}${params.join('&')}`
 }
 
+/**
+ * The displayable image URL for a metadata payload, at the caller's size. Exported for
+ * surfaces that resolve tokens imperatively (the walkable gallery hangs a room at a time).
+ * @param {Object|null|undefined} data Payload from loadNftMetadata / resolveNftMetadata.
+ * @param {{width?: number, still?: boolean}} [options]
+ * @returns {string|null}
+ */
+export const resolveNftImageUrl = (data, { width, still } = {}) => {
+  if (!data?.image) return null
+  if (data.imageIsProxied) return withImageHints(data.image, { width, still })
+  // Only reachable on the RPC fallback path — degraded, but it still renders.
+  if (isInlineDataUri(data.image)) return data.image
+  return resolveStorageImageUrl(data.image, { width, still })
+}
+
 const fetchNftMetadata = async ({ publicClient, chainId, collection, tokenId, isLsp8 }) => {
   try {
     // Coalesced with every other card mounting in the same tick — see lib/nftMetadataBatch.
@@ -82,17 +97,7 @@ export default function useNftMetadata({ chainId, collection, tokenId, isLsp8, e
     }
   }, [ready, isRefreshing, chainId, collection, tokenId, isLsp8, mutate])
 
-  let image = null
-  if (data?.image) {
-    if (data.imageIsProxied) {
-      image = withImageHints(data.image, { width: imageWidth, still })
-    } else if (isInlineDataUri(data.image)) {
-      // Only reachable on the RPC fallback path — degraded, but it still renders.
-      image = data.image
-    } else {
-      image = resolveStorageImageUrl(data.image, { width: imageWidth, still })
-    }
-  }
+  const image = resolveNftImageUrl(data, { width: imageWidth, still })
 
   // 3D files route through the plain storage resolver, never the image proxy — the mesh has
   // to arrive intact, and sharp would either mangle it or refuse it outright.

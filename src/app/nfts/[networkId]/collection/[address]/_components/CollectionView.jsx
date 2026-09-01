@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { XIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
+import { networkColorStyle } from '@/lib/networkColors'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import useCollectionStats from '@/hooks/useCollectionStats'
@@ -20,6 +21,7 @@ import NftMarketCard from '@/components/NftMarketCard'
 import LayoutToggle from '@/components/ui/LayoutToggle'
 import SegmentedControl from '@/components/ui/SegmentedControl'
 import CollectionBrowser from './CollectionBrowser'
+import CollectionGallery from './CollectionGallery'
 import CollectionHeader from './CollectionHeader'
 import CollectionTable from './CollectionTable'
 import FloorChart from './FloorChart'
@@ -31,15 +33,19 @@ const PAGE_SIZE = 24
 
 // The first three slice this app's listings — 'all' is everything still on the market, since
 // cancelled listings are never served; 'collection' leaves the order book entirely and browses
-// the collection's tokens themselves — see CollectionBrowser
+// the collection's tokens themselves — see CollectionBrowser; 'walk' hangs the live listings
+// in a room the reader walks through — see CollectionGallery
 const STATUS_TABS = [
   { value: 'active', label: 'For sale' },
   { value: 'sold', label: 'Sold' },
   { value: 'all', label: 'Everything' },
   { value: 'collection', label: 'Whole collection' },
+  { value: 'walk', label: '3D gallery' },
 ]
 
-const STATUS_VALUES = STATUS_TABS.map((tab) => tab.value)
+// The room is a visit, not a habit: it loads a renderer and a wall of artwork, so it is never
+// the remembered tab — leaving it returns to whichever listing view was chosen before
+const STATUS_VALUES = STATUS_TABS.filter((tab) => tab.value !== 'walk').map((tab) => tab.value)
 
 /**
  * Collection View
@@ -54,6 +60,8 @@ export default function CollectionView({ networkId, address }) {
   const chainId = Number(networkId)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
   const collection = address.toLowerCase()
+  // Computed once, ahead of the memoized hooks below, so the compiler can keep their memo
+  const chainStyle = networkColorStyle(chainInfo)
 
   const info = useCollectionInfo({ chainId, collection })
   const stats = useCollectionStats({ chainId, collection, chainInfo })
@@ -61,6 +69,7 @@ export default function CollectionView({ networkId, address }) {
   // Both of these are the reader's habit rather than the collection's, so they are remembered
   // across collections. Density is shared by both grids, so switching tabs never reshapes the page
   const [status, setStatus] = useStoredChoice('nft-collection-status', STATUS_VALUES, 'active')
+  const [isWalking, setIsWalking] = useState(false)
   const [layout, setLayout] = useGridLayout('nft-collection-layout')
   // Bumped after a sweep, to remount the browse grid. Its token list is a plain fetch, not an
   // SWR key, so a sweep that dropped rows for tokens that don't exist would otherwise keep
@@ -75,7 +84,20 @@ export default function CollectionView({ networkId, address }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
 
-  const isBrowsingCollection = status === 'collection'
+  const view = isWalking ? 'walk' : status
+  const handleViewChange = (value) => {
+    if (value === 'walk') {
+      setIsWalking(true)
+      return
+    }
+    setIsWalking(false)
+    setStatus(value)
+  }
+
+  // Neither uses the listing grid's own fetch: the browse tab reads the collection's tokens
+  // and the room pages the live listings itself, so the grid's chrome (traits, load more)
+  // stands down for either
+  const isBrowsingCollection = status === 'collection' || isWalking
 
   const tableRows = items.map((listing) => ({
     key: `${listing.network_id}-${listing.listing_id}`,
@@ -193,7 +215,8 @@ export default function CollectionView({ networkId, address }) {
   }
 
   return (
-    <div className={`${styles.collection} animate fade`}>
+    // Colours come from the collection's chain, not the connected wallet's
+    <div className={`${styles.collection} animate fade`} style={chainStyle}>
       {/* Fixed-header + document title carry the collection's name; the clearance spacer
           already renders at page level, outside the container */}
       <PageTitle name={info.name || 'NFT collection'} spacer={false} />
@@ -222,10 +245,11 @@ export default function CollectionView({ networkId, address }) {
           <div className={styles.collection__filters}>
             {/* Tabs rather than a pressed group: each one swaps the grid below for a different
                 set of NFTs, which is the panel a tablist exists to describe */}
-            <SegmentedControl options={STATUS_TABS} value={status} onChange={setStatus} label="Listing status" as="tabs" />
+            <SegmentedControl options={STATUS_TABS} value={view} onChange={handleViewChange} label="Listing status" as="tabs" />
 
-            {/* Drives whichever grid is showing — the listings or the whole collection */}
-            <LayoutToggle value={layout} onChange={setLayout} label="Grid layout" />
+            {/* Drives whichever grid is showing — the listings or the whole collection; the
+                room has no density to switch */}
+            {!isWalking && <LayoutToggle value={layout} onChange={setLayout} label="Grid layout" />}
           </div>
 
           <div className={styles.collection__tools}>
@@ -268,7 +292,9 @@ export default function CollectionView({ networkId, address }) {
           </div>
         )}
 
-        {isBrowsingCollection ? (
+        {isWalking ? (
+          <CollectionGallery key={browseKey} chainId={chainId} collection={collection} collectionName={info.name} isLsp8={info.isLsp8} chainInfo={chainInfo} />
+        ) : isBrowsingCollection ? (
           <CollectionBrowser
             key={browseKey}
             chainId={chainId}

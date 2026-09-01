@@ -31,6 +31,55 @@ const CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400, stale-while-revalid
 
 // A data URI this large is a broken or hostile contract, not artwork worth decoding.
 const MAX_DATA_URI_CHARS = 12 * 1024 * 1024
+// Off-site artwork fetched on a reader's behalf — bounded so a hostile host can't tie up the route.
+const MAX_REMOTE_BYTES = 25 * 1024 * 1024
+const REMOTE_TIMEOUT_MS = 15000
+
+/**
+ * Only public web hosts may be fetched from here: the URL comes from token metadata, which a
+ * collection author controls, so loopback, link-local and private ranges stay unreachable.
+ */
+function isPublicHttpUrl(value) {
+  let url
+  try {
+    url = new URL(value)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return false
+  if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) return false
+  const v4 = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/)
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])]
+    if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224) return false
+  }
+  return true
+}
+
+async function fetchRemoteImage(url) {
+  if (!isPublicHttpUrl(url)) throw Object.assign(new Error('Artwork host is not reachable from here'), { status: 422 })
+  let response
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(REMOTE_TIMEOUT_MS), headers: { accept: 'image/*' } })
+  } catch (error) {
+    const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError'
+    throw Object.assign(new Error(timedOut ? 'Artwork host took too long' : 'Artwork host could not be reached'), { status: timedOut ? 504 : 502 })
+  }
+  if (!response.ok) throw Object.assign(new Error(`Artwork host answered ${response.status}`), { status: 502 })
+  // A throttling or error page arrives as 200 text/html; it is not artwork and sharp would choke on it
+  const type = (response.headers.get('content-type') || '').toLowerCase()
+  if (type && !type.startsWith('image/') && !type.startsWith('application/octet-stream')) {
+    throw Object.assign(new Error('Artwork host did not send an image'), { status: 502 })
+  }
+  const declared = Number(response.headers.get('content-length') || 0)
+  if (declared > MAX_REMOTE_BYTES) throw Object.assign(new Error('Artwork exceeds the size limit'), { status: 413 })
+  const buffer = Buffer.from(await response.arrayBuffer())
+  if (buffer.length > MAX_REMOTE_BYTES) throw Object.assign(new Error('Artwork exceeds the size limit'), { status: 413 })
+  if (buffer.length === 0) throw Object.assign(new Error('Artwork host sent nothing'), { status: 502 })
+  return buffer
+}
 
 function intParam(value, fallback, min, max) {
   const parsed = Number.parseInt(value ?? '', 10)
@@ -119,6 +168,9 @@ export async function GET(request) {
   const width = intParam(searchParams.get('w'), null, 1, 4096)
   const quality = intParam(searchParams.get('q'), 80, 1, 100)
   const stillOnly = searchParams.get('still') === '1'
+  // WebGL textures and canvases can only read bytes served from this origin, so a caller
+  // that needs them asks for off-site artwork to come through here instead of a redirect
+  const sameOrigin = searchParams.get('sameOrigin') === '1'
 
   if (!chainId || !collection || !tokenId) {
     return NextResponse.json({ error: 'chainId, collection and tokenId are required' }, { status: 400 })
@@ -139,6 +191,24 @@ export async function GET(request) {
     if (!isInlineDataUri(image)) {
       const resolved = resolveStorageImageUrl(image, { width, quality, still: stillOnly })
       if (!resolved) return NextResponse.json({ error: 'Unresolvable artwork reference' }, { status: 404 })
+
+      if (sameOrigin && /^https?:\/\//i.test(resolved)) {
+        const remote = await fetchRemoteImage(resolved)
+        let optimizedBuffer
+        try {
+          optimizedBuffer = await encodeToWebp(remote, { width, quality, stillOnly })
+        } catch {
+          // A truncated or mislabelled body from the host — theirs to fix, ours to report as such
+          throw Object.assign(new Error('Artwork could not be decoded'), { status: 502 })
+        }
+        return new Response(optimizedBuffer, {
+          headers: {
+            'Content-Type': 'image/webp',
+            'Cache-Control': CACHE_CONTROL,
+          },
+        })
+      }
+
       return NextResponse.redirect(new URL(resolved, origin), 302)
     }
 
@@ -160,6 +230,7 @@ export async function GET(request) {
       },
     })
   } catch (error) {
+    if (error.status) return NextResponse.json({ error: error.message }, { status: error.status })
     console.error('NFT_IMAGE_ROUTE_ERROR:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
