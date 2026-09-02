@@ -36,7 +36,11 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
  * @param {string} [props.className] Extra class for toolbar placement.
  */
 export default function SegmentedControl({ options, value, onChange, label = 'View', as = 'group', size = 'md', iconOnly = false, className }) {
+  const shellRef = useRef(null)
   const trackRef = useRef(null)
+  // First placement jumps, later ones glide — an animated scroll on mount reads as the control
+  // fixing itself rather than responding to anything
+  const hasPlacedRef = useRef(false)
   // null until measured. The slider is not rendered before then, which is also what keeps it from
   // travelling in from the left edge on the first paint — a freshly inserted element does not
   // transition from a previous position, it simply appears where it belongs.
@@ -68,20 +72,58 @@ export default function SegmentedControl({ options, value, onChange, label = 'Vi
     setSlider((current) => (current && current.x === next.x && current.w === next.w ? current : next))
   }, [activeIndex])
 
+  // The track scrolls with its scrollbar hidden, so these fades are the only sign that options
+  // continue past the edge. Toggled as attributes straight on the shell: scroll fires every frame
+  // of a drag, and a state round-trip would re-render the whole control for two booleans.
+  const updateOverflow = useCallback(() => {
+    const shell = shellRef.current
+    const track = trackRef.current
+    if (!shell || !track) return
+
+    shell.toggleAttribute('data-overflow-start', track.scrollLeft > 1)
+    shell.toggleAttribute('data-overflow-end', track.scrollLeft + track.clientWidth < track.scrollWidth - 1)
+  }, [])
+
   useIsomorphicLayoutEffect(() => {
     const track = trackRef.current
     if (!track) return
 
     measure()
+    updateOverflow()
 
-    const observer = new ResizeObserver(measure)
+    const handleScroll = () => updateOverflow()
+    track.addEventListener('scroll', handleScroll, { passive: true })
+
+    const observer = new ResizeObserver(() => {
+      measure()
+      updateOverflow()
+    })
     observer.observe(track)
     // Each segment as well as the track: a label reflowing when its webfont swaps in changes the
     // slider's target without the track's own box moving at all
     track.querySelectorAll(`.${styles.segmented__option}`).forEach((button) => observer.observe(button))
 
-    return () => observer.disconnect()
-  }, [measure, optionKey, iconOnly, size])
+    return () => {
+      track.removeEventListener('scroll', handleScroll)
+      observer.disconnect()
+    }
+  }, [measure, updateOverflow, optionKey, iconOnly, size])
+
+  // On a track narrow enough to scroll, the chosen segment can sit half past the edge — a stored
+  // choice restored on mount, or a press on a partially visible label. Bring it fully into view.
+  useEffect(() => {
+    const track = trackRef.current
+    const active = track?.querySelectorAll(`.${styles.segmented__option}`)[activeIndex]
+    if (!track || !active) return
+
+    const behavior = hasPlacedRef.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant'
+    hasPlacedRef.current = true
+
+    const left = active.offsetLeft
+    const right = left + active.offsetWidth
+    if (left < track.scrollLeft) track.scrollTo({ left, behavior })
+    else if (right > track.scrollLeft + track.clientWidth) track.scrollTo({ left: right - track.clientWidth, behavior })
+  }, [activeIndex, optionKey])
 
   // Arrow keys walk the track, wrapping at both ends, with focus following the selection — the
   // native behaviour of the tablist this borrows its roles from
@@ -96,40 +138,35 @@ export default function SegmentedControl({ options, value, onChange, label = 'Vi
   }
 
   return (
-    <div
-      ref={trackRef}
-      className={clsx(styles.segmented, iconOnly && styles['segmented--iconOnly'], className)}
-      data-size={size}
-      role={isTabs ? 'tablist' : 'group'}
-      aria-label={label}
-      onKeyDown={handleKeyDown}
-    >
-      {slider && <span className={styles.segmented__slider} aria-hidden="true" style={{ '--segmented-x': `${slider.x}px`, '--segmented-w': `${slider.w}px` }} />}
+    <div ref={shellRef} className={clsx(styles.segmented, iconOnly && styles['segmented--iconOnly'], className)} data-size={size}>
+      <div ref={trackRef} className={styles.segmented__track} role={isTabs ? 'tablist' : 'group'} aria-label={label} onKeyDown={handleKeyDown}>
+        {slider && <span className={styles.segmented__slider} aria-hidden="true" style={{ '--segmented-x': `${slider.x}px`, '--segmented-w': `${slider.w}px` }} />}
 
-      {options.map((option) => {
-        const isActive = option.value === value
-        const Icon = option.icon
+        {options.map((option) => {
+          const isActive = option.value === value
+          const Icon = option.icon
 
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role={isTabs ? 'tab' : undefined}
-            aria-selected={isTabs ? isActive : undefined}
-            aria-pressed={isTabs ? undefined : isActive}
-            aria-label={iconOnly ? option.label : undefined}
-            title={option.title ?? (iconOnly ? option.label : undefined)}
-            // Only the selected segment is a tab stop, so the control is one step in the page's
-            // tab order and the arrow keys move within it
-            tabIndex={isActive ? 0 : -1}
-            className={clsx(styles.segmented__option, isActive && styles['segmented__option--active'])}
-            onClick={() => onChange(option.value)}
-          >
-            {Icon && <Icon size={16} aria-hidden="true" />}
-            {!iconOnly && <span>{option.label}</span>}
-          </button>
-        )
-      })}
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role={isTabs ? 'tab' : undefined}
+              aria-selected={isTabs ? isActive : undefined}
+              aria-pressed={isTabs ? undefined : isActive}
+              aria-label={iconOnly ? option.label : undefined}
+              title={option.title ?? (iconOnly ? option.label : undefined)}
+              // Only the selected segment is a tab stop, so the control is one step in the page's
+              // tab order and the arrow keys move within it
+              tabIndex={isActive ? 0 : -1}
+              className={clsx(styles.segmented__option, isActive && styles['segmented__option--active'])}
+              onClick={() => onChange(option.value)}
+            >
+              {Icon && <Icon size={16} aria-hidden="true" />}
+              {!iconOnly && <span>{option.label}</span>}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -27,6 +27,7 @@
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
+    min-width: 0; // Lets the tab strip shrink to the row and scroll, instead of clipping offscreen
   }
 
   &__tools {
