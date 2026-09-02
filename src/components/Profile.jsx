@@ -14,7 +14,6 @@ import { addressTag, sameAddress, shortAddress } from '@/lib/address'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
-import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import AgentBadge from './ui/AgentBadge'
 import Avatar from './ui/Avatar'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
@@ -23,7 +22,7 @@ import clsx from 'clsx'
 import UPlogo from '@/../public/up.png'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, className }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, className }) {
   const router = useRouter()
   const { profile, isLoading } = useProfile(creator)
   const [popoverOpened, setPopoverOpened] = useState(false)
@@ -86,39 +85,57 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
     )
   }
 
+  // The picture is the same whether it opens the hover card or, inside that card, links out.
+  const picture = (
+    <>
+      <Avatar
+        className={clsx(styles.imageWrapper__avatar, 'rounded-full')}
+        alt={profile.name}
+        src={profile.profileImage}
+        size={size}
+      />
+      <Identicon
+        name={profile.name}
+        profileImage={profile.profileImage}
+        address={creator}
+        size={Math.round(size / 2)}
+        className={clsx(styles.imageWrapper__fingerprint)}
+      />
+    </>
+  )
+
   return (
     <div className={clsx(styles.profile, 'flex align-items-center', className)} style={avatarBox}>
-      <NativePopover
-        trigger={
-          <button
-            type="button"
-            className={styles.imageWrapper}
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Open profile card for ${profile.name}`}
-          >
-            <Avatar
-              className={clsx(styles.imageWrapper__avatar, 'rounded-full')}
-              alt={profile.name}
-              src={profile.profileImage}
-              size={size}
-            />
-            <Identicon
-              name={profile.name}
-              profileImage={profile.profileImage}
-              address={creator}
-              size={Math.round(size / 2)}
-              className={clsx(styles.imageWrapper__fingerprint)}
-            />
-          </button>
-        }
-        openOnHover
-        placement="bottom-start"
-        onToggle={(e) => {
-          if (e.newState === 'open') setPopoverOpened(true)
-        }}
-      >
-        {() => (popoverOpened ? <ProfileHoverCard creator={creator} profile={profile} networkId={networkId} /> : null)}
-      </NativePopover>
+      {hoverCard ? (
+        <NativePopover
+          trigger={
+            <button
+              type="button"
+              className={styles.imageWrapper}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Open profile card for ${profile.name}`}
+            >
+              {picture}
+            </button>
+          }
+          openOnHover
+          placement="bottom-start"
+          onToggle={(e) => {
+            if (e.newState === 'open') setPopoverOpened(true)
+          }}
+        >
+          {() => (popoverOpened ? <ProfileHoverCard creator={creator} profile={profile} networkId={networkId} /> : null)}
+        </NativePopover>
+      ) : (
+        <Link
+          href={creator ? `/${creator}` : '#'}
+          className={styles.imageWrapper}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Open the profile of ${profile.name}`}
+        >
+          {picture}
+        </Link>
+      )}
 
       {variant !== 'imageOnly' && (
         <div className={clsx(styles.nameColumn, 'flex flex-column align-items-start justify-content-center gap-025')}>
@@ -136,7 +153,6 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two
                 say where a post came from, this one says what published it. */}
             <AgentBadge agent={profile.agent} />
-            {/* <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} /> */}
             {chainInfo && (
               <div className={styles.badge} title={chainInfo.name}>
                 <img src={chainInfo.iconUrl} alt="" />
@@ -182,7 +198,6 @@ export const CommunityBadge = ({ badge, size = 'sm' }) => {
 // follow/follower affordances on the full profile page, scoped to the post's own chain
 // instead of whichever chain the wallet is currently connected to.
 const ProfileHoverCard = ({ creator, profile, networkId }) => {
-  const router = useRouter()
   const { address, isConnected } = useConnection()
   const [fallbackChain] = getActiveChain()
   const targetNetworkId = networkId || fallbackChain?.id
@@ -249,18 +264,14 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
 
   return (
     <div className={clsx(styles.hoverCard, 'flex flex-column align-items-start gap-050')} onClick={(e) => e.stopPropagation()}>
-      <button type="button" className={styles.hoverCard__avatar} onClick={() => creator && router.push(`/${creator}`)}>
-        <Avatar alt={profile.name} src={profile.profileImage} size={48} />
-      </button>
-
-      <div className={styles.nameRow}>
-        <Link href={creator ? `/${creator}` : '#'} className={styles.name}>
-          {profile.fullName || profile.name}
-        </Link>
-        <CommunityBadge badge={profile.badge} />
-        <AgentBadge agent={profile.agent} />
-        <Image alt="verified" src={blueCheckMarkIcon} width={12} height={12} />
-      </div>
+      <Profile
+        creator={creator}
+        networkId={networkId}
+        variant="compact"
+        size={48}
+        hoverCard={false}
+        className={styles.hoverCard__profile}
+      />
 
       {creator && (
         <button
