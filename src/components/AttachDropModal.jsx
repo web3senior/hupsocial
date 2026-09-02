@@ -23,8 +23,9 @@ const countFormat = new Intl.NumberFormat('en')
  * re-deriving anything.
  */
 function DropRow({ drop, chainId, onAttached }) {
-  const { image } = useDropCollection({ chainId, collection: drop.collection, standardId: drop.standard_id })
-  const imageUrl = image ? resolveStorageImageUrl(image) : null
+  const { image, icon } = useDropCollection({ chainId, collection: drop.collection, standardId: drop.standard_id })
+  const artwork = image || icon
+  const imageUrl = artwork ? resolveStorageImageUrl(artwork) : null
   const isOpenEdition = Number(drop.max_supply) === 0
 
   return (
@@ -39,7 +40,7 @@ function DropRow({ drop, chainId, onAttached }) {
             standardId: drop.standard_id,
             name: drop.name ?? '',
             symbol: drop.symbol ?? '',
-            image,
+            image: artwork,
           })
         }
       >

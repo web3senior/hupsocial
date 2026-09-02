@@ -98,12 +98,14 @@ export default function DropDetails({ networkId, dropId }) {
   const isOpenEdition = maxSupply === 0
   const eligibilityIndex = livePhaseIndex === -1 ? 0 : livePhaseIndex
 
-  const { name, symbol, description, image, banner, links, refreshMetadata } = useDropCollection({
+  const { name, symbol, description, image, icon, banner, links, refreshMetadata } = useDropCollection({
     chainId,
     collection,
     standardId: drop ? Number(drop.standardId) : undefined,
   })
-  const imageUrl = image ? resolveStorageImageUrl(image) : null
+  /* An LSP4 collection may carry only its square `icon` (images empty) — never blank the hero */
+  const artwork = image || icon
+  const imageUrl = artwork ? resolveStorageImageUrl(artwork) : null
   const bannerUrl = banner ? resolveStorageImageUrl(banner) : null
 
   const { collectionUrl } = buildAssetLinks({
@@ -124,7 +126,7 @@ export default function DropDetails({ networkId, dropId }) {
     }
   }
 
-  const cardDrop = useMemo(() => ({ dropId, chainId, name, symbol, image }), [dropId, chainId, name, symbol, image])
+  const cardDrop = useMemo(() => ({ dropId, chainId, name, symbol, image: artwork }), [dropId, chainId, name, symbol, artwork])
 
   if (!chainInfo || !dropsAddress) {
     return (
@@ -316,7 +318,7 @@ export default function DropDetails({ networkId, dropId }) {
             dropId={dropId}
             drop={drop}
             collection={collection}
-            collectionIdentity={{ name, symbol, description, image, banner, links }}
+            collectionIdentity={{ name, symbol, description, image, icon, banner, links }}
             onMetadataUpdated={refreshMetadata}
             onClosed={refetchDrop}
           />

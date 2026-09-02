@@ -4,10 +4,18 @@ import { useMemo } from 'react'
 import useSWR from 'swr'
 import { useReadContract } from 'wagmi'
 import { LSP4_DATA_KEYS, decodeDataString, decodeVerifiableURI, isLuksoStandard } from '@/lib/drops'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { fetchIPFS } from '@/lib/ipfsGateways'
+import { extractIPFSCid, resolveStorageUrl } from '@/lib/storageHelper'
 import collectionAbi from '@/abis/HupDropCollection.json'
 
-const jsonFetcher = (url) => fetch(url).then((res) => res.json())
+/* A JSON document, not an image — through the media proxy it comes back as a redirect to
+   whichever gateway won server-side, which the browser may not be able to reach (CORS). Walk
+   the gateway list directly instead, Filebase first. */
+const metadataFetcher = async (uri) => {
+  const cid = extractIPFSCid(uri)
+  const res = cid ? await fetchIPFS(cid) : await fetch(resolveStorageUrl(uri))
+  return res.json()
+}
 
 /**
  * useDropCollection
@@ -47,7 +55,7 @@ export function useDropCollection({ chainId, collection, standardId }) {
     return contractURI || null
   }, [isLukso, lsp4Values, contractURI])
 
-  const { data: metadata, mutate: refreshMetadata } = useSWR(metadataUri ? resolveStorageImageUrl(metadataUri) : null, jsonFetcher)
+  const { data: metadata, mutate: refreshMetadata } = useSWR(metadataUri, metadataFetcher)
 
   // LSP4 metadata JSON nests under `LSP4Metadata`; EVM contractURI JSON is flat
   const body = metadata?.LSP4Metadata ?? metadata
