@@ -131,7 +131,6 @@
     line-height: 1.5;
   }
 
-  &__phases,
   // Wide content scrolls inside its own box rather than being clipped or pushing the panel
   // sideways. It also owns the rounded corners, since the table can no longer clip its own.
   &__tableScroll {
@@ -161,6 +160,8 @@
     }
   }
 
+  // The ul/li rules are the stages list's card rows; activity holds a table and ignores them
+  &__phases,
   &__activity {
     display: flex;
     flex-direction: column;
@@ -624,6 +625,14 @@
       min-width: 20rem;
       border-collapse: collapse;
       font-size: var(--font-size-12);
+      // The global table sheet leaks in: fixed layout would clip the 1% shrink-to-fit
+      // columns below, and its outer border fights the scroller's rounded corners
+      table-layout: auto;
+      border: 0;
+    }
+
+    tr {
+      border: 0;
     }
 
     th {
@@ -654,13 +663,45 @@
     }
 
     // Only the minter's name is prose, and only it may break mid-word — a wrapped date or a
-    // hyphenated amount is worse than a narrower column.
+    // hyphenated amount is worse than a narrower column. `start` counters the global center.
     td:first-child {
       overflow-wrap: anywhere;
+      text-align: start;
     }
 
     tr:last-child td {
       border-bottom: none;
+    }
+
+    // The global sheet collapses every table into label-stacked blocks under 600px; these
+    // tables carry no data-labels and scroll sideways instead — restore real table display
+    @media screen and (max-width: 600px) {
+      thead {
+        position: static;
+        clip: auto;
+        height: auto;
+        width: auto;
+        margin: 0;
+        overflow: visible;
+      }
+
+      tr {
+        display: table-row;
+        margin-bottom: 0;
+      }
+
+      td {
+        display: table-cell;
+        font-size: var(--font-size-12);
+
+        &::before {
+          content: none;
+        }
+      }
+
+      td:last-child {
+        border-bottom: 1px solid var(--border);
+      }
     }
   }
 
