@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
+import useSWRImmutable from 'swr/immutable'
 import {
   ArrowSquareOutIcon,
   ArrowsClockwiseIcon,
@@ -16,7 +17,9 @@ import {
   SpinnerGapIcon,
 } from '@phosphor-icons/react'
 import { buildAssetLinks } from '@/components/TradeCard'
+import { getNftCollectionTokens } from '@/lib/api'
 import { formatStake } from '@/hooks/useStakeToken'
+import useNftMetadata from '@/hooks/useNftMetadata'
 import { handleBrokenImage } from '@/lib/utils'
 import { describeBadge, gradeColor } from '@/lib/collectionAuditFormat'
 import useCollectionAudit from '@/hooks/useCollectionAudit'
@@ -74,6 +77,61 @@ const isXLink = (url) => {
 }
 
 /**
+ * One sample token's artwork in the icon mosaic. A hook can't run in a loop over a
+ * variable-length list, so the mosaic renders a fixed three of these — each resolves through
+ * the same metadata read-through the listing grid below already fills, so the tiles are
+ * usually free.
+ */
+function SampleTile({ chainId, collection, sample }) {
+  const metadata = useNftMetadata({
+    chainId,
+    collection,
+    tokenId: sample?.token_id,
+    isLsp8: Boolean(sample?.is_lsp8),
+    enabled: Boolean(sample),
+    imageWidth: 192,
+    still: true,
+  })
+
+  if (!sample) return null
+
+  return (
+    <span className={styles.header__iconTile}>
+      {metadata.image ? (
+        <img src={metadata.image} alt="" loading="lazy" decoding="async" onError={handleBrokenImage} />
+      ) : (
+        <span className={styles.header__iconTileFallback}>
+          <HupMark size={14} />
+        </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * The bannerless fallback: the lead sample's artwork blown up and blurred past recognition,
+ * so whatever its aspect ratio, the band reads as the collection's own colour rather than a
+ * crop of one NFT.
+ */
+function SampleBanner({ chainId, collection, sample }) {
+  // A source that dies after resolving would blur the line-art placeholder into the band —
+  // hiding it keeps the tinted plate instead, which at least isn't pretending to be artwork
+  const [failed, setFailed] = useState(false)
+  const metadata = useNftMetadata({
+    chainId,
+    collection,
+    tokenId: sample.token_id,
+    isLsp8: Boolean(sample.is_lsp8),
+    imageWidth: 1024,
+    still: true,
+  })
+
+  if (!metadata.image || failed) return <HupMark size={48} />
+
+  return <img className={styles.header__bannerAmbient} src={metadata.image} alt="" onError={() => setFailed(true)} />
+}
+
+/**
  * Collection Header
  * The collection's onchain identity as a hero: a full-bleed LSP4 banner with the identity
  * card floating over it — icon, name, creators, description, standard/chain chips, the
@@ -102,6 +160,25 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
   const permanenceTitle = permanence.audit?.grade
     ? `${permanence.audit.score}/100 · ${permanence.audit.badges.map((id) => describeBadge(id).label).join(' · ')} — open the full audit`
     : undefined
+
+  // A cached icon or banner whose bytes have since died counts as missing too — the swap
+  // to the fallback happens on the img's error, and resets when the URL itself changes
+  // (a new collection, or a refresh that found working artwork)
+  const [iconFailed, setIconFailed] = useState(false)
+  const [bannerFailed, setBannerFailed] = useState(false)
+  useEffect(() => setIconFailed(false), [info.icon])
+  useEffect(() => setBannerFailed(false), [info.banner])
+  const hasIcon = Boolean(info.icon) && !iconFailed
+  const hasBanner = Boolean(info.banner) && !bannerFailed
+
+  // Artless collections dress themselves in their own tokens: up to three for the icon
+  // mosaic, the first as the banner's ambient wash. Only fetched when something is actually
+  // missing, and only from the cache — a collection Hup has never seen keeps the plain mark.
+  const needsSampleArt = !info.isLoading && (!hasIcon || !hasBanner)
+  const { data: sampleData } = useSWRImmutable(needsSampleArt ? ['nft-collection-samples', chainId, address] : null, () =>
+    getNftCollectionTokens(chainId, address, 1, 3),
+  )
+  const samples = sampleData?.data || []
 
   const isLsp8 = Boolean(info.isLsp8)
   // LUKSO's standard reads as "NFT 2.0" in the UI; the literal LSP8 name lives in the tooltip
@@ -169,8 +246,14 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
     <header className={styles.header}>
       {/* The LSP4 backgroundImage — or, failing that, a tinted plate — runs the full width of
           the viewport, with the card below floating over its lower edge */}
-      <div className={clsx(styles.header__banner, !info.banner && styles['header__banner--fallback'])}>
-        {info.banner ? <img src={info.banner} alt="" onError={handleBrokenImage} /> : <HupMark size={48} />}
+      <div className={clsx(styles.header__banner, !hasBanner && styles['header__banner--fallback'])}>
+        {hasBanner ? (
+          <img src={info.banner} alt="" onError={() => setBannerFailed(true)} />
+        ) : samples.length > 0 ? (
+          <SampleBanner chainId={chainId} collection={address} sample={samples[0]} />
+        ) : (
+          <HupMark size={48} />
+        )}
       </div>
 
       <nav className={styles.header__crumbs} aria-label="Breadcrumb">
@@ -181,8 +264,21 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
 
       <div className={styles.header__card}>
         <div className={styles.header__main}>
-          {info.icon ? (
-            <img className={styles.header__icon} src={info.icon} alt="" onError={handleBrokenImage} />
+          {hasIcon ? (
+            <img className={styles.header__icon} src={info.icon} alt="" onError={() => setIconFailed(true)} />
+          ) : samples.length > 0 ? (
+            <span
+              className={clsx(styles.header__icon, styles['header__icon--mosaic'], samples.length < 2 && styles['header__icon--single'])}
+              aria-hidden="true"
+            >
+              <SampleTile chainId={chainId} collection={address} sample={samples[0]} />
+              {samples.length > 1 && (
+                <span className={styles.header__iconSide}>
+                  <SampleTile chainId={chainId} collection={address} sample={samples[1]} />
+                  <SampleTile chainId={chainId} collection={address} sample={samples[2]} />
+                </span>
+              )}
+            </span>
           ) : (
             <span className={clsx(styles.header__icon, styles['header__icon--fallback'])}>
               <HupMark size={44} />

@@ -22,13 +22,6 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-
-      // Stamped by handleBrokenImage once the source 404s — the placeholder is
-      // line-art, so contain it at icon scale rather than cover-crop it
-      &[data-broken] {
-        object-fit: contain;
-        padding: 5%;
-      }
     }
 
     // Sinks the banner into the card it sits on, so the breadcrumb over it stays readable and
@@ -52,6 +45,15 @@
       background-color: color-mix(in srgb, var(--text) 6%, transparent);
       animation: collectionHeaderPulse 1.4s ease-in-out infinite;
     }
+  }
+
+  // The bannerless wash — blurred past recognition and overscaled so its softened edges never
+  // show, reading as the collection's colour under the same scrim the real banner gets
+  &__bannerAmbient {
+    position: absolute;
+    inset: 0;
+    transform: scale(1.25);
+    filter: blur(40px) saturate(1.35);
   }
 
   // Rides in the banner's lower band, right above the card, like the reference
@@ -133,21 +135,67 @@
     object-fit: cover;
     background-color: var(--surface-muted);
 
-    &[data-broken] {
-      object-fit: contain;
-      padding: 22%;
-    }
-
     &--fallback {
       display: grid;
       place-items: center;
       color: var(--text-muted, #888);
     }
 
+    // An artless collection wears three of its own tokens instead — the market rail's
+    // lead-plus-two mosaic at icon scale, so the fallback still reads as a collection
+    &--mosaic {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 2px;
+      overflow: hidden;
+    }
+
+    // With a single sample the lead takes the whole box rather than leaving a grey column
+    &--single {
+      grid-template-columns: 1fr;
+    }
+
     @media (max-width: 600px) {
       width: 84px;
       height: 84px;
       border-radius: 14px;
+    }
+  }
+
+  // Auto rows, not a fixed pair — two samples leave one thumb here, and it should fill the
+  // column rather than leave half of it grey
+  &__iconSide {
+    display: grid;
+    grid-auto-rows: 1fr;
+    gap: 2px;
+    min-height: 0;
+  }
+
+  &__iconTileFallback {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted, #888);
+  }
+
+  &__iconTile {
+    min-width: 0;
+    min-height: 0;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is
+      // line-art, so contain it at icon scale rather than cover-crop it
+      &[data-broken] {
+        object-fit: contain;
+        padding: 25%;
+      }
     }
   }
 
