@@ -7,11 +7,13 @@
 }
 
 .profile {
-  width: max-content; /* Let it size to its contents naturally */
-  // ...but never past the row it sits in, or a long display name pushes the post's own menu off
-  // the card. min-width is what lets it shrink at all — a flex item's automatic minimum is its
-  // min-content, and the nowrap name counts in full towards that however well it truncates. The
-  // floor is the picture, which never gives; the name is what does.
+  // Sized to its contents, but never past the row it sits in — a long display name used to widen
+  // this block until the post's own menu fell off the card. A nowrap name has no min-content
+  // narrower than itself, so both halves of that are deliberate: min-width lets a flex parent
+  // shrink it below that, and fit-content (not max-content) is what lets a grid track do the
+  // same, since a track's floor is the item's min-content unless its width can depend on the
+  // track. The floor is the picture, which never gives; the name is what does.
+  width: fit-content;
   max-width: 100%;
   min-width: var(--profile-avatar-size, 32px);
   gap: 0.7rem;
