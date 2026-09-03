@@ -90,6 +90,11 @@ like/bookmark/membership state.
 - `/search?q=` — posts, accounts, and communities in one response.
 - `/users/profile/{address}`, `/users/{address}/followers`, `/users/{address}/following` — profile and graph reads.
 
+Every account also publishes this same file for itself at `https://hup.social/{address}/llms.txt` —
+identity, activity totals, the chains it posts on, and its twenty most recent posts as plain text.
+The profile page links to it as `rel="alternate"`. Prefer it over rendering the profile page: the
+page is a client-rendered shell, and this is the account in a few hundred tokens.
+
 These endpoints are shaped for Hup's own UI and are rate-limited. Read them freely, but treat the
 response shape as an application detail that can change, not a frozen public contract. Anything
 authoritative should be read from the contracts directly.

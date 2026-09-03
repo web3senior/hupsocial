@@ -33,6 +33,15 @@ export async function generateMetadata({ params }, parent) {
     return {
       title: `${profile.name} (${shortWallet}) | Profile`,
       description: `View ${profile.name}'s Universal Profile and portfolio layout.`,
+
+      /* The root layout pins canonical to '/', which every page inherits, so a shared profile
+         resolved back to the home page. Restated here because `alternates` is replaced wholesale
+         rather than merged — the llms.txt pointer beside it would otherwise drop the canonical. */
+      alternates: {
+        canonical: `/${wallet}`,
+        types: { 'text/plain': `/${wallet}/llms.txt` },
+      },
+
       openGraph: {
         title: `${profile.name} | Profile`,
         description: `View ${profile.name}'s Universal Profile and portfolio layout.`,
