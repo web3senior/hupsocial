@@ -32,9 +32,18 @@ const RECEIPT_TIMEOUT_MS = 120_000
 
 const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
+/** Whether the cover is already what Hup now holds. A removal of a cover there never was counts. */
+const backgroundMatchesOnchain = (base, fields) => {
+  if (fields.backgroundUri) return false
+  if (!fields.removeBackground) return true
+
+  return !Array.isArray(base.backgroundImage) || base.backgroundImage.length === 0
+}
+
 /** Whether the document onchain already says what Hup now holds — if so, no signature is asked for. */
 const matchesOnchain = (base, fields, links) =>
   !fields.imageUri &&
+  backgroundMatchesOnchain(base, fields) &&
   fields.name === String(base.name ?? '').trim() &&
   fields.description === String(base.description ?? '').trim() &&
   sameList(fields.tags, Array.isArray(base.tags) ? base.tags : []) &&
@@ -46,7 +55,8 @@ const matchesOnchain = (base, fields, links) =>
  * @param {object} params
  * @param {string} params.address The Universal Profile to write.
  * @param {object} params.fields Saved values — `name`, `description`, `tags`, `links` (editor
- * rows), and for a newly pinned picture `imageUri` (`ipfs://…`) plus its `imageSize`.
+ * rows), for a newly pinned picture `imageUri` (`ipfs://…`) plus its `imageSize`, and for a
+ * newly pinned cover `backgroundUri` plus its `backgroundSize`, or `removeBackground` to clear it.
  * @param {Function} [params.mutate] The profile page's SWR mutate, re-pulled once the write lands.
  */
 export async function syncProfileToUniversalProfile({ address, fields, mutate }) {
@@ -64,8 +74,8 @@ export async function syncProfileToUniversalProfile({ address, fields, mutate })
     }
 
     /* Read at sync time rather than when the editor opened: this is the document the write
-       merges into, and everything it holds that Hup does not edit — the background image above
-       all — survives only because it is the base. A read that fails must stop the write. */
+       merges into, and everything it holds that Hup does not edit survives only because it is
+       the base. A read that fails must stop the write. */
     const base = await readLsp3Profile(publicClient, address)
     if (!base) {
       report('Saved on Hup. Your Universal Profile could not be read, so it is not synced yet.', 'info')
@@ -86,8 +96,25 @@ export async function syncProfileToUniversalProfile({ address, fields, mutate })
       profileImage = [lsp3ImageEntry(fields.imageUri, imageDigest, fields.imageSize)]
     }
 
+    /* null leaves the document's own cover alone; an empty array is the user having removed it. */
+    let backgroundImage = null
+    if (fields.backgroundUri) {
+      const backgroundDigest = await hashIpfsContent(fields.backgroundUri)
+      backgroundImage = [lsp3ImageEntry(fields.backgroundUri, backgroundDigest, fields.backgroundSize)]
+    } else if (fields.removeBackground) {
+      backgroundImage = []
+    }
+
     const json = withAuthor(
-      buildLsp3ProfileJson({ base, name: fields.name, description: fields.description, tags: fields.tags, links, profileImage }),
+      buildLsp3ProfileJson({
+        base,
+        name: fields.name,
+        description: fields.description,
+        tags: fields.tags,
+        links,
+        profileImage,
+        backgroundImage,
+      }),
       address,
     )
     const uri = normalizeIpfsUri(await uploadObjectToIPFS(json))

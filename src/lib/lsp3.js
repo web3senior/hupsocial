@@ -113,8 +113,12 @@ export const linksToRows = (raw) => {
 /** LSP3 links from editor rows. */
 export const rowsToLsp3Links = (rows) => rows.map((row) => ({ title: String(row.name ?? '').trim(), url: String(row.url ?? '').trim() }))
 
-/** LSP3Profile JSON: Hup's fields over `base`, so images and anything Hup doesn't edit survive the write. */
-export const buildLsp3ProfileJson = ({ base = {}, name, description, tags, links, profileImage = null }) => ({
+/**
+ * LSP3Profile JSON: Hup's fields over `base`, so anything Hup doesn't edit survives the write.
+ * Both image fields take null for "leave whatever the document already holds" — an empty array
+ * is a deliberate erasure and is written through as one.
+ */
+export const buildLsp3ProfileJson = ({ base = {}, name, description, tags, links, profileImage = null, backgroundImage = null }) => ({
   LSP3Profile: {
     ...base,
     name,
@@ -122,7 +126,7 @@ export const buildLsp3ProfileJson = ({ base = {}, name, description, tags, links
     links,
     tags,
     profileImage: profileImage ?? base.profileImage ?? [],
-    backgroundImage: base.backgroundImage ?? [],
+    backgroundImage: backgroundImage ?? base.backgroundImage ?? [],
   },
 })
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
-import { AVATAR_MAX_SIZE, resolveAvatarImageUrl } from '@/lib/storageHelper'
+import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 import { queryUniversalProfile } from '@/lib/lukso'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 import { resolveAgentProfile } from '@/lib/agentProfile'
@@ -42,6 +42,33 @@ async function resolveOrigin(code) {
     return describeOrigin(normalized)
   }
 }
+
+/* One width for every cover on the site, for the same reason the avatar ladder has rungs: the
+   sharp proxy keys its cache and the CDN its object on the exact width, so a shared one is warm
+   for everybody after the first visitor. A cover is laid out full-bleed across the profile card,
+   which tops out around 600 CSS px — 1200 is that at 2x, and the proxy never enlarges past the
+   original. */
+const PROFILE_COVER_WIDTH = 1200
+
+/* "This profile has no cover, and means it" — as opposed to never having set one here.
+   Deliberately not the empty string: an older form already wrote empties into this column, and
+   reading one of those as a removal would hide a Universal Profile's real cover from its own
+   page. A ref is always an `ipfs://` URI, so a bare word can never collide with one. */
+const COVER_REMOVED = 'removed'
+
+/**
+ * The three states `users.profileHeader` can hold, told apart in one place:
+ * `ref` is the picture, `removed` is the user having taken it down, and `set` is the two of them
+ * together — everything else, legacy empties included, is "never set here".
+ */
+const readStoredCover = (value) => ({
+  ref: value && value !== COVER_REMOVED ? value : null,
+  removed: value === COVER_REMOVED,
+  set: Boolean(value),
+})
+
+/** A stored cover reference as something an <img> can use. */
+const resolveCoverUrl = (src) => (src ? resolveStorageImageUrl(src, { width: PROFILE_COVER_WIDTH }) : null)
 
 export async function GET(request, { params }) {
   try {
@@ -100,6 +127,7 @@ export async function GET(request, { params }) {
       const liveStamp = String(profile.lastMetadataUpdate ?? '')
       const storedStamp = rows[0]?.profile_sync_stamp ?? null
       const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
+      const storedCover = readStoredCover(rows[0]?.profileHeader)
 
       if (hupIsAhead) {
         profile.name = rows[0].name
@@ -113,6 +141,8 @@ export async function GET(request, { params }) {
         /* The stored reference rather than the resolved URL: a retry has to put this picture back
            into an LSP3 document, and a proxy URL cannot be turned back into a CID. */
         profile.profileImageRef = rows[0].profileImage || null
+        profile.profileHeaderRef = storedCover.ref
+        profile.coverRemoved = storedCover.removed
         /* What the editor offers a Sync button for. */
         profile.syncPending = true
       } else if (storedStamp !== null) {
@@ -131,6 +161,14 @@ export async function GET(request, { params }) {
         : profile.profileImages && profile.profileImages.length > 0
           ? resolveAvatarImageUrl(profile.profileImages[0].src, AVATAR_MAX_SIZE)
           : null
+
+      /* The LSP3 backgroundImage, which the indexer serves as `backgroundImages`.
+         Unlike the avatar above, a Hup row that is ahead does NOT simply win here: most rows
+         have never held a cover, and reading that as "no cover" would blank a real one off the
+         profile for as long as an edit sat unsigned. Only a row that has actually set the cover
+         one way or the other — a picture, or a removal — speaks for it. */
+      const indexedCover = profile.backgroundImages?.[0]?.src ?? null
+      profile.profileHeader = resolveCoverUrl(hupIsAhead && storedCover.set ? storedCover.ref : indexedCover)
 
       profile.wallet_address = normalizeAddress(address) // Ensure wallet address is included in the response for consistency
 
@@ -166,6 +204,7 @@ export async function GET(request, { params }) {
 
     /* Resolve profile image from any protocol (IPFS, UP cloud, http, etc.) */
     dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
+    dbProfile.profileHeader = resolveCoverUrl(readStoredCover(dbProfile.profileHeader).ref)
 
     /* Only meaningful beside a Universal Profile, which this branch by definition is not. */
     delete dbProfile.profile_sync_stamp
@@ -205,6 +244,7 @@ const OPTIONAL_COLUMNS = {
   badge_network_id: 'cidex/scripts/add-community-badges.sql',
   origin_code: 'the users.origin_code migration',
   profile_sync_stamp: 'cidex/scripts/add-profile-sync-stamp.sql',
+  profileHeader: 'cidex/scripts/add-profile-header.sql',
 }
 
 /**
@@ -232,6 +272,8 @@ export async function PUT(request, { params }) {
     const description = formData.get('description')
     const birthday = formData.get('birthday')
     const profileImage = formData.get('profileImage')
+    const profileHeader = formData.get('profileHeader')
+    const removeProfileHeader = formData.get('removeProfileHeader') === '1'
     const tags = formData.get('tags')
     const links = formData.get('links')
     const badge = parseBadgeSelection(formData.get('badge'))
@@ -268,6 +310,15 @@ export async function PUT(request, { params }) {
     if (typeof profileImage === 'string' && profileImage.trim() !== '') {
       updateFields.push('`profileImage` = ?')
       queryValues.push(profileImage)
+    }
+
+    /* The cover, on the same "an empty field changes nothing" rule as the picture above — a
+       removal has to say so out loud, and is stored as its own marker rather than as nothing at
+       all, because for a Universal Profile "removed" and "never set here" are opposite answers. */
+    const coverRef = typeof profileHeader === 'string' && profileHeader.trim() !== '' ? profileHeader : null
+    if ((coverRef || removeProfileHeader) && (await canWrite('profileHeader'))) {
+      updateFields.push('`profileHeader` = ?')
+      queryValues.push(coverRef ?? COVER_REMOVED)
     }
 
     if (tags !== null) {

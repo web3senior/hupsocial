@@ -415,11 +415,14 @@
 }
 
 .profileWrapper {
+  // Carried as a custom property so the cover can cancel it without the number living twice
+  --profile-gutter: 2rem;
+
   position: relative;
-  padding: 2rem;
+  padding: var(--profile-gutter);
 
   @include responsive.md-down {
-    padding: 1rem;
+    --profile-gutter: 1rem;
   }
 
   .gift {
@@ -447,6 +450,26 @@
   footer {
     width: 100%;
     align-items: stretch;
+  }
+
+  /* Bleeds out of the wrapper's padding to sit flush against the card's own edges, which the
+     page container already rounds and clips. Fixed-height rather than an aspect ratio: covers
+     arrive at every proportion, and the identity block below has to start in the same place
+     whatever was uploaded. */
+  &__cover {
+    flex-shrink: 0;
+    width: calc(100% + var(--profile-gutter) * 2);
+    height: clamp(110px, 26vw, 200px);
+    margin: calc(var(--profile-gutter) * -1) calc(var(--profile-gutter) * -1) 0;
+    overflow: hidden;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   }
 
   &__pfp {
@@ -1008,6 +1031,96 @@
     &:hover {
       background: var(--color-primary);
       color: #fff;
+    }
+  }
+
+  // Cover
+  &__coverWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  &__coverLabel {
+    cursor: pointer;
+    display: block;
+    position: relative;
+
+    &:hover .profileModal__coverOverlay {
+      opacity: 1;
+    }
+  }
+
+  &__cover {
+    // 3:1, the shape the profile's own strip settles at on a desktop card
+    aspect-ratio: 3 / 1;
+    width: 100%;
+    margin: 0;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &--empty {
+      border-style: dashed;
+    }
+  }
+
+  &__coverEmpty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font-size: var(--system-12-font-size);
+    color: var(--text-muted);
+  }
+
+  &__coverOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  &__coverActions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__coverRemove {
+    flex-shrink: 0;
+    padding: 0.15rem 0.5rem;
+    background: transparent;
+    border: none;
+    border-radius: 0.4rem;
+    font-size: var(--system-12-font-size);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
+
+    &:hover {
+      background-color: var(--hover);
+      color: var(--text);
     }
   }
 

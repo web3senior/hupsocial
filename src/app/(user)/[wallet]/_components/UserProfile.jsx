@@ -41,7 +41,7 @@ import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
 import ProfileLinks from './ProfileLinks'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
-import { CakeIcon, MapPinIcon } from '@phosphor-icons/react'
+import { CakeIcon, CameraIcon, ImageIcon, MapPinIcon } from '@phosphor-icons/react'
 import styles from './UserProfile.module.scss'
 
 // Compares month/day only — the stored year is irrelevant to "is it their birthday today".
@@ -419,6 +419,9 @@ const Profile = ({ addr }) => {
   const [isItUp, setIsItUp] = useState(false)
   const [viewCount, setViewCount] = useState(null)
   const [birthdayBurstKey, setBirthdayBurstKey] = useState(0) // bumped to replay the confetti burst on tap
+  // A cover whose bytes have died counts as no cover: the strip collapses rather than showing a
+  // broken image where the profile's own header should be.
+  const [coverFailed, setCoverFailed] = useState(false)
   const followListDialogRef = useRef(null)
 
   const params = useParams()
@@ -445,6 +448,10 @@ const Profile = ({ addr }) => {
       .then((res) => res.success && setViewCount(res.total))
       .catch(() => {})
   }, [addr])
+
+  // A new cover deserves its own chance to load — without this, one dead picture would hide
+  // every replacement the user saved after it.
+  useEffect(() => setCoverFailed(false), [profile?.profileHeader])
 
   // LSP26-compatible follow/unfollow. followerSystem is deployed identically on every chain, so
   // follower count / isFollowing are read from cidex's cross-network aggregate (the `follows`
@@ -566,6 +573,7 @@ const Profile = ({ addr }) => {
     : `${explorerBaseUrl}/address/${targetWallet}`
   const birthdayLabel = formatBirthday(profile.birthday)
   const isCelebratingBirthday = isBirthdayToday(profile.birthday)
+  const cover = coverFailed ? null : profile.profileHeader
 
   return (
     <>
@@ -583,6 +591,15 @@ const Profile = ({ addr }) => {
 
       <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
         {isCelebratingBirthday && <BirthdayConfetti burst={birthdayBurstKey} />}
+
+        {/* The cover — a Universal Profile's LSP3 backgroundImage, or the one set here. It runs
+            the full width of the card, so it escapes the wrapper's own padding rather than
+            sitting inside it; only a profile that has one gets the strip at all. */}
+        {cover && (
+          <div className={styles.profile__cover}>
+            <img src={cover} alt="" onError={() => setCoverFailed(true)} />
+          </div>
+        )}
 
         <header className="flex flex-row align-items-center justify-content-between gap-050 w-100">
           <div className="flex-1 flex flex-column align-items-start justify-content-center gap-025">
@@ -1070,6 +1087,11 @@ const PLACEHOLDER_NAMES = new Set(['new-user', 'hup-user'])
 const MAX_AVATAR_MB = 16
 const MAX_AVATAR_BYTES = MAX_AVATAR_MB * 1024 * 1024
 
+/* A cover is served at one width and never animated in a 26px circle, so the ceiling above buys
+   it nothing — this is simply the largest photograph anyone sensibly uploads for a 1200px strip. */
+const MAX_COVER_MB = 8
+const MAX_COVER_BYTES = MAX_COVER_MB * 1024 * 1024
+
 // "is this the selected one" — community ids are only unique within one deployment.
 const badgeKey = (badge) => (badge ? `${badge.networkId}:${badge.contractAddress}:${badge.communityId}` : '')
 
@@ -1114,6 +1136,15 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // onchain half ships with the build, so the picker is usable the instant the modal opens and
   // this only fills in the rest.
   const [countries, setCountries] = useState([])
+  /* The cover is state rather than a ref-poked <img> like the avatar beside it, because it has an
+     empty state to render and a Remove button that has to change what is on screen. `coverCleared`
+     is separate from `coverPreview` being null: only the former is an instruction to erase what is
+     stored, and a profile that simply never had a cover must not send one. */
+  const [coverPreview, setCoverPreview] = useState(profile?.profileHeader || null)
+  const [coverCleared, setCoverCleared] = useState(false)
+  /* A stored cover whose bytes have died draws the empty state, but it is still a cover as far as
+     the save is concerned — a picture nobody can load is not the user asking for it to go. */
+  const [coverBroken, setCoverBroken] = useState(false)
   const [editingLinkIndex, setEditingLinkIndex] = useState(null)
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
@@ -1173,11 +1204,24 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // Refs
   const pfpRef = useRef()
   const previewUrlRef = useRef(null)
+  const coverInputRef = useRef(null)
+  const coverUrlRef = useRef(null)
   const nameRef = useRef(null)
   const descriptionRef = useRef(null)
   const tagRef = useRef()
   const linkNameRef = useRef()
   const linkURLRef = useRef()
+
+  /* Object URLs outlive the elements pointing at them, and a picked GIF avatar is the heaviest
+     thing this modal ever holds — the blob stays in memory until it is handed back. */
+  useEffect(
+    () => () => {
+      for (const held of [previewUrlRef, coverUrlRef]) {
+        if (held.current) URL.revokeObjectURL(held.current)
+      }
+    },
+    [],
+  )
 
   /* Hup's row can be thinner than the profile onchain — one created while the LUKSO indexer was
      unreachable holds no name at all — and a form seeded from that alone would push blanks over a
@@ -1239,6 +1283,10 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
         tags: parseSafeList(profile?.tags),
         links: linksToRows(profile?.links),
         imageUri: profile?.profileImageRef ?? null,
+        /* A cover removed here but never pushed onchain — the one case where having nothing to
+           send IS the thing to send. */
+        backgroundUri: profile?.profileHeaderRef ?? null,
+        removeBackground: Boolean(profile?.coverRemoved),
       },
       mutate,
     })
@@ -1285,9 +1333,45 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
       }
     }
 
+    // The cover, pinned on the same terms and for the same two readers as the picture above
+    const coverFile = formData.get('profileHeader')
+    const hasNewCover = coverFile instanceof File && coverFile.size > 0
+
+    let coverUri = null
+    let coverSize = null
+    if (hasNewCover) {
+      if (coverFile.size > MAX_COVER_BYTES) {
+        setError(`That cover is too large. Cover images have to be ${MAX_COVER_MB}MB or smaller.`)
+        setIsPending(false)
+        return
+      }
+
+      try {
+        toast('Uploading cover ...', 'info')
+        const [uploaded, size] = await Promise.all([uploadFileToIPFS(coverFile), readImageSize(coverFile)])
+
+        if (!uploaded) {
+          throw new Error('Failed to upload')
+        }
+
+        coverUri = normalizeIpfsUri(uploaded)
+        coverSize = size
+      } catch (uploadErr) {
+        console.error('Profile cover upload error:', uploadErr)
+        setError(uploadErr.message || 'Failed to upload the cover to decentralized storage.')
+        setIsPending(false)
+        return
+      }
+    }
+
     /* An untouched file input still sends an empty File, which must never overwrite the stored
        picture — the API keeps what it has when this arrives empty. */
     formData.set('profileImage', imageUri ?? formData.get('profileImage_hidden') ?? '')
+    /* Same rule for the cover, which is why removing one has to be said in a field of its own
+       rather than by sending nothing. */
+    formData.set('profileHeader', coverUri ?? '')
+    const removesCover = !coverUri && coverCleared
+    formData.set('removeProfileHeader', removesCover ? '1' : '')
     formData.set('tags', JSON.stringify(tags.list))
     formData.set('links', JSON.stringify(links.list))
 
@@ -1334,6 +1418,9 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
           links: links.list,
           imageUri,
           imageSize,
+          backgroundUri: coverUri,
+          backgroundSize: coverSize,
+          removeBackground: removesCover,
         },
         mutate,
       })
@@ -1364,6 +1451,39 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
     previewUrlRef.current = URL.createObjectURL(file)
     pfpRef.current.src = previewUrlRef.current
+  }
+
+  const showCover = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.size > MAX_COVER_BYTES) {
+      setError(`That cover is too large. Cover images have to be ${MAX_COVER_MB}MB or smaller.`)
+      e.target.value = ''
+      return
+    }
+
+    setError(null)
+
+    if (coverUrlRef.current) URL.revokeObjectURL(coverUrlRef.current)
+    coverUrlRef.current = URL.createObjectURL(file)
+    setCoverPreview(coverUrlRef.current)
+    // Picking a replacement is not a removal, however the empty state was reached
+    setCoverCleared(false)
+    setCoverBroken(false)
+  }
+
+  /* Emptying the file input is what makes this a removal rather than a re-upload of whatever was
+     picked a moment ago — the submit reads the input, not the preview. */
+  const removeCover = () => {
+    if (coverUrlRef.current) {
+      URL.revokeObjectURL(coverUrlRef.current)
+      coverUrlRef.current = null
+    }
+    if (coverInputRef.current) coverInputRef.current.value = ''
+    setCoverPreview(null)
+    setCoverCleared(true)
+    setCoverBroken(false)
   }
 
   const addTag = (e) => {
@@ -1447,6 +1567,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // its first one, and saving anything else on the form would quietly wipe it. Carrying the saved
   // country as its own option closes that door; onchain origins ship with the build and are
   // always present already.
+  const coverArt = Boolean(coverPreview) && !coverBroken
+
   const savedOrigin = profile?.origin ?? null
   const savedCountryMissing =
     Boolean(savedOrigin) && isCountryCode(savedOrigin.code) && !countries.some((country) => country.iso_code === savedOrigin.code)
@@ -1496,6 +1618,43 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 </button>
               </div>
             )}
+
+            {/* Cover — first here because it is first on the profile. A Universal Profile's is
+                the LSP3 backgroundImage; everyone else's is Hup's own. */}
+            <div className={styles.profileModal__coverWrap}>
+              <label htmlFor="pm-profileHeader" className={styles.profileModal__coverLabel}>
+                <figure className={clsx(styles.profileModal__cover, !coverArt && styles['profileModal__cover--empty'])}>
+                  {coverArt ? (
+                    <img src={coverPreview} alt="Cover preview" onError={() => setCoverBroken(true)} />
+                  ) : (
+                    <span className={styles.profileModal__coverEmpty}>
+                      <ImageIcon size={20} />
+                      Add a cover
+                    </span>
+                  )}
+                  <div className={styles.profileModal__coverOverlay}>
+                    <CameraIcon size={20} />
+                  </div>
+                </figure>
+              </label>
+              <input
+                ref={coverInputRef}
+                id="pm-profileHeader"
+                type="file"
+                name="profileHeader"
+                accept="image/*"
+                onChange={showCover}
+                className={styles.profileModal__fileInput}
+              />
+              <div className={styles.profileModal__coverActions}>
+                <small className={styles.profileModal__avatarHint}>Runs across the top of your profile</small>
+                {coverPreview && (
+                  <button type="button" className={styles.profileModal__coverRemove} onClick={removeCover}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Avatar */}
             <div className={styles.profileModal__avatarWrap}>
