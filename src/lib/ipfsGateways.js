@@ -141,6 +141,29 @@ export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}
   throw lastError ?? new Error('no IPFS gateway is configured')
 }
 
+/* Which host last served a directory. A grid of sixty tokens is sixty documents out of one
+   directory, and racing every gateway for each of them is four times the requests for an
+   answer the first document already gave. Bounded well inside the caller's budget, so a host
+   that has gone bad since costs a fraction of it before the field is opened up again. */
+const KNOWN_HOST_TIMEOUT_MS = 4000
+const KNOWN_HOST_TTL_MS = 60 * 1000
+const knownHosts = new Map()
+
+const knownHostFor = (prefix) => {
+  const entry = knownHosts.get(prefix)
+  if (!entry) return null
+  if (entry.until > Date.now()) return entry.gateway
+  knownHosts.delete(prefix)
+  return null
+}
+
+// Headers are not delivery: a gateway can answer 200 and then stall the bytes, so the body is
+// read while the clock is still running rather than after it has been cleared.
+const buffered = async (response) => {
+  const body = await response.arrayBuffer()
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
+}
+
 /**
  * Fetches a CID from every gateway at once and takes the first OK response. For small
  * documents — a collection's metadata JSON — where the wait is the whole cost and no single
@@ -148,6 +171,9 @@ export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}
  * almost never one of those, so it answers 504 within a second while the host that does hold
  * it is never asked. Losers are aborted so their sockets are freed; the winner is read to the
  * end inside the same bound.
+ *
+ * Given a `prefix`, the host that answered for it last is asked alone first, so a grid of one
+ * directory's tokens costs one race and then one request per document.
  *
  * Called from the browser — behind the token-icon and NFT hooks — it races nothing itself: the
  * read goes through /api/ipfs/object and the race happens there.
@@ -159,10 +185,26 @@ export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}
  * gateway failed: how many were asked, every HTTP status that came back (a host that never
  * answered contributes none) and whether any of them ran out the clock.
  */
-export async function raceIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {} } = {}) {
+export async function raceIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}, prefix = null } = {}) {
   if (inBrowser()) return fetchThroughProxy(cid, { timeoutMs, init })
 
+  const known = prefix ? knownHostFor(prefix) : null
+  if (known) {
+    try {
+      const response = await fetch(`${known}${cid}`, {
+        redirect: 'follow',
+        ...init,
+        signal: AbortSignal.timeout(Math.min(timeoutMs, KNOWN_HOST_TIMEOUT_MS)),
+      })
+      if (response.ok) return await buffered(response)
+    } catch {
+      /* Falls through to the full race, which is the only thing that can answer for the CID */
+    }
+    knownHosts.delete(prefix)
+  }
+
   const attempts = gatewayList().map((gateway) => ({
+    gateway,
     url: `${gateway}${cid}`,
     host: gateway.replace(/^https?:\/\//, '').split('/')[0],
     controller: new AbortController(),
@@ -181,10 +223,7 @@ export async function raceIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {} 
         statuses.push(response.status)
         throw Object.assign(new Error(`IPFS gateway error: ${response.status}`), { status: response.status })
       }
-      // Headers are not delivery: a gateway can answer 200 and then stall the bytes, so the
-      // body is read while the clock is still running rather than after it has been cleared.
-      const body = await response.arrayBuffer()
-      return { response: new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers }), attempt }
+      return { response: await buffered(response), attempt }
     } catch (error) {
       /* A loser cancelled because another host delivered says nothing about the CID */
       if (attempt.controller.signal.aborted && !attempt.expired) throw error
@@ -206,7 +245,10 @@ export async function raceIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {} 
     }
   }
 
-  if (winner) return winner.response
+  if (winner) {
+    if (prefix) knownHosts.set(prefix, { gateway: winner.attempt.gateway, until: Date.now() + KNOWN_HOST_TTL_MS })
+    return winner.response
+  }
 
   throw Object.assign(new Error(attempts.length ? 'no IPFS gateway could serve this content' : 'no IPFS gateway is configured'), {
     attempted: attempts.length,

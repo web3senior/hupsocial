@@ -20,8 +20,11 @@ export const dynamic = 'force-dynamic'
 // Matches the image proxy: onchain art is mutable, so this is not `immutable`.
 const CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400'
 
-// Resolving a whole grid at once must not open 30 simultaneous RPC/gateway conversations.
-const BATCH_CONCURRENCY = 8
+/* Resolving a whole grid at once must not open an unbounded number of RPC/gateway
+   conversations. A token of a collection already being read now costs one batched RPC read
+   and one request to the gateway that served its neighbour, rather than five reads and a
+   four-host race, so the same politeness budget buys twice the workers. */
+const BATCH_CONCURRENCY = 16
 const MAX_BATCH = 60
 
 /**

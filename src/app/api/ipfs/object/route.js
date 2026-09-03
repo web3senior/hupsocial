@@ -101,9 +101,15 @@ export async function GET(req) {
   const requested = Number(searchParams.get('t'))
   const timeoutMs = Math.min(Number.isFinite(requested) && requested > 0 ? requested : DEFAULT_READ_TIMEOUT_MS, MAX_READ_TIMEOUT_MS)
 
+  // A grid reads one directory's documents one path at a time; naming the directory lets the
+  // race be run once for it rather than per document. A bare CID names one object and shares
+  // nothing, so it stays a full race.
+  const slash = cid.lastIndexOf('/')
+  const prefix = slash > 0 ? cid.slice(0, slash) : null
+
   let upstream
   try {
-    upstream = await raceIPFS(cid, { timeoutMs })
+    upstream = await raceIPFS(cid, { timeoutMs, prefix })
   } catch (error) {
     const statuses = error.statuses || []
     // Every gateway looked and every one of them said the same thing: that is an answer about the

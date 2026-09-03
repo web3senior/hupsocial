@@ -38,12 +38,36 @@ export const decodeVerifiableUri = (bytes) => {
   return match ? match[0] : null
 }
 
+/**
+ * The first usable URL in one image field, whatever shape it was written in.
+ *
+ * LSP4 nests image entries two deep — `images[0][0].url`, one array per image, one entry per
+ * resolution — but a document is written by whoever minted it: flattened to a single array,
+ * reduced to one object, or a bare URL string. A token that resolves through an ERC721-shaped
+ * document has a plain `image` string and nothing else. A reader that only understood the
+ * nested shape reported no artwork for any of the others.
+ *
+ * Returns '' rather than null: its callers seed form inputs, which cannot hold null.
+ * @param {*} value An LSP4 image field, or anything else a document put in its place.
+ * @returns {string}
+ */
+export const pickImageUrl = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return pickImageUrl(value[0])
+  return typeof value.url === 'string' ? value.url : ''
+}
+
 // LSP4Metadata images are size-variant arrays; the first variant of the first image is the
-// canonical one. Icon is the square fallback.
-export const pickLsp4Image = (lsp4) => lsp4?.images?.[0]?.[0]?.url || lsp4?.icon?.[0]?.url || null
+// canonical one. Icon is the square fallback — and after those, the shapes a document is
+// allowed to be: an LSP8 whose base URI serves ERC721-style JSON has only a plain `image`,
+// and reading nothing there is what left those collections' tokens as bare numbers.
+export const pickLsp4Image = (lsp4) =>
+  lsp4?.images?.[0]?.[0]?.url || lsp4?.icon?.[0]?.url || pickImageUrl(lsp4?.images) || pickImageUrl(lsp4?.icon) || pickImageUrl(lsp4?.image) || pickImageUrl(lsp4?.image_url) || null
 
 // For token avatars the square icon is the primary asset and images are the fallback.
-export const pickLsp4Icon = (lsp4) => lsp4?.icon?.[0]?.url || lsp4?.images?.[0]?.[0]?.url || null
+export const pickLsp4Icon = (lsp4) =>
+  lsp4?.icon?.[0]?.url || lsp4?.images?.[0]?.[0]?.url || pickImageUrl(lsp4?.icon) || pickImageUrl(lsp4?.images) || pickImageUrl(lsp4?.image) || pickImageUrl(lsp4?.image_url) || null
 
 // A document fetch has to be bounded. The gateway behind NEXT_PUBLIC_IPFS_GATEWAY_URL hands
 // back a pinned object in a second or two but takes a full thirty seconds to admit it cannot
@@ -173,7 +197,9 @@ const fetchMetadataDocument = async (uri, options) => {
   if (isIPFSHash(uri)) {
     let response
     try {
-      response = await raceIPFS(uri.replace(/^ipfs:\/\//, ''), { timeoutMs })
+      // The prefix is the collection's own directory, so the host that served one of its
+      // tokens is asked alone for the rest instead of every gateway being raced per document
+      response = await raceIPFS(uri.replace(/^ipfs:\/\//, ''), { timeoutMs, prefix })
     } catch (error) {
       // Only a round in which every gateway looked and answered about the document is an
       // answer about the document; a host that never answered, or asked us to back off,
@@ -208,4 +234,29 @@ const fetchMetadataDocument = async (uri, options) => {
   }
   if (!response.ok) return null
   return response.json()
+}
+
+/**
+ * The LSP4Metadata document a collection currently points at, unwrapped.
+ *
+ * The display resolvers (lib/nftMetadata, lib/collectionMetadata) answer questions about a
+ * collection — what its banner is, whether that banner is really just its icon. An editor
+ * needs the document itself, because it rewrites the whole file: every field it was not shown
+ * is a field its save would drop.
+ *
+ * @param {Object} params
+ * @param {Object} params.publicClient viem client already bound to the right chain.
+ * @param {string} params.collection LSP7 or LSP8 contract address.
+ * @param {string} [params.baseUrl] Absolute origin for proxy-relative URLs; server-side only.
+ * @returns {Promise<Object|null>} The document's LSP4Metadata object, or null when the
+ * collection points nowhere or the document could not be read.
+ */
+export const fetchLsp4Document = async ({ publicClient, collection, baseUrl }) => {
+  const bytes = await publicClient
+    .readContract({ abi: erc725yGetDataAbi, address: collection, functionName: 'getData', args: [LSP4_METADATA_KEY] })
+    .catch(() => null)
+
+  const uri = decodeVerifiableUri(bytes)
+  const json = uri ? await fetchMetadataJson(uri, { baseUrl }).catch(() => null) : null
+  return json?.LSP4Metadata ?? json ?? null
 }

@@ -5,11 +5,12 @@ import { usePublicClient, useReadContract, useReadContracts } from 'wagmi'
 import { isAddress, toHex } from 'viem'
 import clsx from 'clsx'
 import { ArrowLeftIcon, CaretLeftIcon, CaretRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
-import { LSP4_METADATA_KEY, decodeVerifiableUri, fetchMetadataJson } from '@/lib/lsp4'
-import { resolveNftMetadata } from '@/lib/nftMetadata'
+import { LSP4_METADATA_KEY, pickImageUrl } from '@/lib/lsp4'
+import { resolveLsp8TokenDocument, resolveNftMetadata } from '@/lib/nftMetadata'
 import { loadNftMetadata } from '@/lib/nftMetadataBatch'
 import { mapWithConcurrency } from '@/lib/concurrency'
 import { resolveNftImageUrl } from '@/hooks/useNftMetadata'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { handleBrokenImage } from '@/lib/utils'
 import { toast } from '@/components/NextToast'
 import Lsp4MetadataEditor from './Lsp4MetadataEditor'
@@ -17,12 +18,14 @@ import styles from './TokenMetadataEditor.module.scss'
 
 const PAGE_SIZE = 60
 
-/* Artwork is asked for one grid row at a time, two rows in flight: a whole page in one request
-   would paint nothing until its slowest token answered, and more rows at once would multiply the
-   RPC budget the batch route keeps per request. */
-const THUMB_CHUNK = 12
-const THUMB_CHUNKS_IN_FLIGHT = 2
+/* The page's artwork goes out as one request — the coalescer folds a tick's worth of tokens
+   into a single POST, and asking a row at a time paid the round trip and the batch route's
+   own worker pool once per row for the same work. Only the fallback below needs a bound: it
+   is browser-side RPC, one unbatched conversation per token. */
+const THUMB_FALLBACK_CONCURRENCY = 6
 const THUMB_WIDTH = 192
+// The one token being edited, at the size its slot in the header actually paints
+const HEAD_WIDTH = 96
 const countFormat = new Intl.NumberFormat('en')
 
 const TOKEN_ABI = [
@@ -33,6 +36,28 @@ const TOKEN_ABI = [
 
 /** LSP8 ids are numbers cast to bytes32, left-padded — the same convention the drops engine mints. */
 const tokenIdToBytes32 = (n) => toHex(BigInt(n), { size: 32 })
+
+const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
+
+/**
+ * What the form underneath actually holds, said plainly. Editing a document the token already
+ * owns and starting one from what it inherits look identical on screen and are not the same
+ * act — the second one gives the token a copy of the collection's document, forever.
+ * @param {Object} token The open token's state.
+ * @returns {string}
+ */
+const describeToken = (token) => {
+  if (token.loading) return 'Reading its metadata…'
+  if (token.missing) return 'Never minted'
+
+  const held = `held by ${shortAddress(token.owner)}`
+  if (token.hasOverride) {
+    return token.tier === 'override' ? `${held} · has its own metadata` : `${held} · has its own metadata, but it could not be read`
+  }
+  if (token.tier === 'baseUri') return `${held} · follows the collection — saving gives it its own copy`
+  if (token.tier === 'collection') return `${held} · no token document yet, so these fields describe the collection`
+  return `${held} · nothing resolves for it yet`
+}
 
 /**
  * Token Metadata Editor
@@ -119,39 +144,51 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
 
     let cancelled = false
     const done = new Set()
-    const chunks = []
-    for (let i = 0; i < wanted.length; i += THUMB_CHUNK) chunks.push(wanted.slice(i, i + THUMB_CHUNK))
 
-    const resolveOne = async (id) => {
-      const tokenId = tokenIdToBytes32(id)
-      try {
-        return await loadNftMetadata({ chainId: Number(chainId), collection, tokenId, isLsp8: true })
-      } catch {
-        if (!publicClient) return null
-        const metadata = await resolveNftMetadata({ publicClient, collection, tokenId, isLsp8: true }).catch(() => null)
-        return metadata ? { ...metadata, imageIsProxied: false } : null
-      }
-    }
-
-    mapWithConcurrency(chunks, THUMB_CHUNKS_IN_FLIGHT, async (chunk) => {
-      if (cancelled) return
-      // Issued in one tick, so the coalescer folds the row into a single request
-      const results = await Promise.all(chunk.map(resolveOne))
-      if (cancelled) return
-      chunk.forEach((id) => done.add(id))
+    // `null` is an answer — the token resolves to nothing and the cell keeps its number.
+    const paint = (entries) => {
+      if (cancelled || entries.length === 0) return
+      entries.forEach(([id]) => done.add(id))
       setThumbs((prev) => {
         const next = { ...prev }
-        chunk.forEach((id, index) => {
-          next[id] = results[index]
+        entries.forEach(([id, metadata]) => {
+          next[id] = metadata
         })
         return next
       })
       setPending((prev) => {
         const next = new Set(prev)
-        chunk.forEach((id) => next.delete(id))
+        entries.forEach(([id]) => next.delete(id))
         return next
       })
-    })
+    }
+
+    const run = async () => {
+      // Issued in one tick, so the coalescer folds the whole page into a single request
+      const answers = await Promise.all(
+        wanted.map((id) =>
+          loadNftMetadata({ chainId: Number(chainId), collection, tokenId: tokenIdToBytes32(id), isLsp8: true })
+            .then((metadata) => [id, metadata])
+            .catch(() => [id, undefined]),
+        ),
+      )
+      if (cancelled) return
+
+      paint(answers.filter(([, metadata]) => metadata !== undefined))
+
+      // The batch endpoint going away (the database with it) drops each token back to the same
+      // browser-side RPC read the cards fall back to.
+      const unanswered = answers.filter(([, metadata]) => metadata === undefined).map(([id]) => id)
+      if (unanswered.length === 0 || !publicClient) return
+
+      await mapWithConcurrency(unanswered, THUMB_FALLBACK_CONCURRENCY, async (id) => {
+        if (cancelled) return
+        const metadata = await resolveNftMetadata({ publicClient, collection, tokenId: tokenIdToBytes32(id), isLsp8: true }).catch(() => null)
+        paint([[id, metadata ? { ...metadata, imageIsProxied: false } : null]])
+      })
+    }
+
+    run()
 
     return () => {
       cancelled = true
@@ -176,52 +213,56 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
   const open = async (id) => {
     if (!publicClient || !isAddress(collection)) return
 
+    const idBytes = tokenIdToBytes32(id)
+    // Opens on the artwork the grid already resolved, so the token you clicked is on screen
+    // while its document is still being read rather than a beat of nothing.
+    const thumb = thumbs[id]
+    setToken({ id, idBytes, loading: true, name: thumb?.name, image: resolveNftImageUrl(thumb, { width: HEAD_WIDTH, still: true }) })
     setLoading(true)
-    setToken(null)
-    try {
-      const idBytes = tokenIdToBytes32(id)
 
-      // A token that was never minted has no owner, and writing metadata for it would be
-      // writing into a slot nothing resolves — say so rather than opening an editor over it.
-      const owner = await publicClient
-        .readContract({ address: collection, abi: TOKEN_ABI, functionName: 'tokenOwnerOf', args: [idBytes] })
-        .catch(() => null)
+    try {
+      /*
+       * Ownership and the document, together. A token that was never minted has no owner, and
+       * writing metadata for it would be writing into a slot nothing resolves.
+       */
+      const [owner, resolved] = await Promise.all([
+        publicClient
+          .readContract({ address: collection, abi: TOKEN_ABI, functionName: 'tokenOwnerOf', args: [idBytes] })
+          .catch(() => null),
+        resolveLsp8TokenDocument({ publicClient, collection, tokenId: idBytes }),
+      ])
+
       if (!owner) {
-        toast(`Token ${id} has not been minted`, 'error')
+        setToken({ id, idBytes, missing: true })
         return
       }
 
       /*
-       * Its own override, if it has one. An empty value is the normal case and not a failure: it
-       * means the token still resolves through the collection's base URI, and the editor should
-       * open blank rather than pretending the base document is this token's own.
+       * Seeded from whatever the token resolves to today, not only from an override it may not
+       * have: most tokens follow the collection's base URI, and an editor that opened blank over
+       * them showed none of the artwork the grid had just painted — and saved a document that
+       * threw all of it away. The tier says whether these fields are the token's own, inherited
+       * from the base URI, or the collection's, which describes the set rather than this piece.
        */
-      const stored = await publicClient
-        .readContract({ address: collection, abi: TOKEN_ABI, functionName: 'getDataForTokenId', args: [idBytes, LSP4_METADATA_KEY] })
-        .catch(() => null)
-
-      let current = {}
-      let hasOverride = false
-      if (stored && stored !== '0x') {
-        hasOverride = true
-        const uri = decodeVerifiableUri(stored)
-        const json = uri ? await fetchMetadataJson(uri).catch(() => null) : null
-        const lsp4 = json?.LSP4Metadata ?? json
-        if (lsp4) {
-          current = {
-            name: lsp4.name ?? '',
-            description: lsp4.description ?? '',
-            icon: lsp4.icon?.[0]?.[0]?.url ?? '',
-            banner: { url: lsp4.images?.[0]?.[0]?.url ?? '' },
-            links: lsp4.links ?? [],
-            attributes: lsp4.attributes ?? [],
-          }
-        }
-      }
-
-      setToken({ id, idBytes, owner, hasOverride, current })
+      const current = resolved.json?.LSP4Metadata ?? resolved.json ?? {}
+      setToken({
+        id,
+        idBytes,
+        owner,
+        current,
+        name: current.name,
+        hasOverride: resolved.hasOverride,
+        tier: resolved.tier,
+        image:
+          resolveNftImageUrl(thumb, { width: HEAD_WIDTH, still: true }) ||
+          resolveStorageImageUrl(pickImageUrl(current.images) || pickImageUrl(current.image) || pickImageUrl(current.icon), {
+            width: HEAD_WIDTH,
+            still: true,
+          }),
+      })
     } catch (err) {
       toast(err.message || 'Could not read that token', 'error')
+      setToken(null)
     } finally {
       setLoading(false)
     }
@@ -234,24 +275,36 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
           <button type="button" className={styles.token__back} onClick={() => setToken(null)} disabled={busy}>
             <ArrowLeftIcon size={14} /> All tokens
           </button>
-          <span>
-            <strong>Token #{token.id}</strong>
-            <small>
-              held by {token.owner.slice(0, 6)}…{token.owner.slice(-4)} ·{' '}
-              {token.hasOverride ? 'has its own metadata' : 'currently follows the collection'}
-            </small>
+          <span className={clsx(styles.token__art, styles.token__headArt)}>
+            {token.image ? <img src={token.image} alt="" onError={handleBrokenImage} /> : <em>#{token.id}</em>}
+          </span>
+          <span className={styles.token__headText}>
+            <strong>{String(token.name || '').trim() || `Token #${token.id}`}</strong>
+            <small>{describeToken(token)}</small>
           </span>
         </div>
 
+        {token.loading && <p className={styles.token__note}>Reading this token&rsquo;s metadata…</p>}
+
+        {token.missing && (
+          <p className={styles.token__note}>
+            Token #{token.id} has not been minted, so there is nothing to point at yet. Its number is on this page
+            because the collection&rsquo;s supply once reached it — a burn leaves the gap behind.
+          </p>
+        )}
+
         {/* Keyed on the id so moving between tokens remounts the form rather than carrying one
             token's edits into the next. */}
-        <Lsp4MetadataEditor
-          key={token.idBytes}
-          current={token.current}
-          name={`#${token.id}`}
-          busy={busy}
-          onSave={(uri) => onSave?.(token.idBytes, uri)}
-        />
+        {!token.loading && !token.missing && (
+          <Lsp4MetadataEditor
+            key={token.idBytes}
+            current={token.current}
+            name={`#${token.id}`}
+            subject="token"
+            busy={busy}
+            onSave={(uri) => onSave?.(token.idBytes, uri)}
+          />
+        )}
       </div>
     )
   }

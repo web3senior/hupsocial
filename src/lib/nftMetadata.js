@@ -309,6 +309,110 @@ const formatTokenIdForUri = (tokenId, formatBytes) => {
   return tokenId.slice(2)
 }
 
+// Four of the five reads an LSP8 token resolves through are the collection's, identical for
+// every id, so a grid of sixty paid them sixty times. Short-lived because a creator editing
+// the collection has to see the change without a restart.
+const COLLECTION_KEYS_MEMO_MS = 30 * 1000
+const COLLECTION_KEYS_MEMO_LIMIT = 200
+const collectionKeys = new Map()
+
+/**
+ * The collection-level ERC725Y values every one of its tokens resolves through, read once.
+ * @param {Object} publicClient viem client already bound to the right chain.
+ * @param {string} collection LSP8 contract address.
+ * @returns {Promise<Array<string|null>>} LSP4TokenName, base URI, token id format and
+ * collection LSP4Metadata, each null when the read failed.
+ */
+const readLsp8CollectionKeys = (publicClient, collection) => {
+  const key = `${publicClient.chain?.id ?? publicClient.uid}|${String(collection).toLowerCase()}`
+  const memo = collectionKeys.get(key)
+  if (memo && memo.until > Date.now()) return memo.promise
+
+  if (collectionKeys.size >= COLLECTION_KEYS_MEMO_LIMIT) {
+    const now = Date.now()
+    for (const [entryKey, entry] of collectionKeys) if (entry.until <= now) collectionKeys.delete(entryKey)
+  }
+
+  const promise = Promise.all(
+    [LSP4_TOKEN_NAME_KEY, LSP8_TOKEN_METADATA_BASE_URI_KEY, LSP8_TOKEN_ID_FORMAT_KEY, LSP4_METADATA_KEY].map((dataKey) =>
+      publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getData', args: [dataKey] }).catch(() => null),
+    ),
+  )
+  // Held while it is in flight so the rest of the grid waits on it rather than reissuing it,
+  // and dropped if it throws so a bad minute is not remembered.
+  collectionKeys.set(key, { promise, until: Infinity })
+  promise.then(
+    () => collectionKeys.set(key, { promise, until: Date.now() + COLLECTION_KEYS_MEMO_MS }),
+    () => collectionKeys.delete(key),
+  )
+  return promise
+}
+
+/**
+ * The document one LSP8 token actually resolves to, and which of the standard's three tiers
+ * answered it.
+ *
+ * Resolution order: per-token LSP4Metadata (Dracos-style), then the collection's token base
+ * URI + formatted token id (Chillwhales-style), then collection-level LSP4Metadata as the last
+ * resort — that one only knows the collection, not the token, so the tier travels with the
+ * document and consumers can label collection-only data honestly.
+ *
+ * Separate from resolveNftMetadata because an editor needs the document itself — every field
+ * it is about to rewrite — not the handful of display properties a card reads off it.
+ *
+ * @param {Object} params
+ * @param {Object} params.publicClient viem client already bound to the right chain.
+ * @param {string} params.collection LSP8 contract address.
+ * @param {string} params.tokenId bytes32 hex.
+ * @param {string} [params.baseUrl] Absolute origin for resolving proxy-relative metadata
+ * URLs — required server-side, omitted in the browser.
+ * @returns {Promise<{json: Object|null, uri: string|null, collectionName: string|null,
+ * hasOverride: boolean, tier: 'override'|'baseUri'|'collection'|null}>} `tier` is null when
+ * nothing answered — including when a tier pointed somewhere the document could not be read.
+ */
+export const resolveLsp8TokenDocument = async ({ publicClient, collection, tokenId, baseUrl }) => {
+  const [[nameBytes, baseUriBytes, tokenIdFormatBytes, collectionMetadataBytes], tokenMetadataBytes] = await Promise.all([
+    readLsp8CollectionKeys(publicClient, collection),
+    publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getDataForTokenId', args: [tokenId, LSP4_METADATA_KEY] }).catch(() => null),
+  ])
+
+  let collectionName = null
+  if (nameBytes && nameBytes !== '0x') {
+    try {
+      collectionName = hexToString(nameBytes).trim() || null
+    } catch {
+      collectionName = null
+    }
+  }
+
+  let tier = 'override'
+  let uri = decodeVerifiableUri(tokenMetadataBytes)
+  if (!uri) {
+    const resolvedBaseUri = decodeVerifiableUri(baseUriBytes)
+    const tokenIdSegment = resolvedBaseUri ? formatTokenIdForUri(tokenId, tokenIdFormatBytes) : null
+    if (resolvedBaseUri && tokenIdSegment !== null) {
+      uri = `${resolvedBaseUri}${tokenIdSegment}`
+      tier = 'baseUri'
+    }
+  }
+  if (!uri) {
+    uri = decodeVerifiableUri(collectionMetadataBytes)
+    tier = uri ? 'collection' : null
+  }
+
+  const json = await fetchMetadataJson(uri, { baseUrl }).catch(() => null)
+
+  return {
+    json,
+    uri,
+    collectionName,
+    // Written bytes, not a readable document: a token whose own pin has gone away still has
+    // an override, and saying otherwise would invite overwriting it by accident.
+    hasOverride: Boolean(tokenMetadataBytes && tokenMetadataBytes !== '0x'),
+    tier: json ? tier : null,
+  }
+}
+
 /**
  * Reads display metadata for one token straight from its contract.
  * @param {Object} params
@@ -324,40 +428,7 @@ const formatTokenIdForUri = (tokenId, formatBytes) => {
  */
 export const resolveNftMetadata = async ({ publicClient, collection, tokenId, isLsp8, baseUrl }) => {
   if (isLsp8) {
-    const [nameBytes, tokenMetadataBytes, baseUriBytes, tokenIdFormatBytes, collectionMetadataBytes] = await Promise.all([
-      publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getData', args: [LSP4_TOKEN_NAME_KEY] }).catch(() => null),
-      publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getDataForTokenId', args: [tokenId, LSP4_METADATA_KEY] }).catch(() => null),
-      publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getData', args: [LSP8_TOKEN_METADATA_BASE_URI_KEY] }).catch(() => null),
-      publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getData', args: [LSP8_TOKEN_ID_FORMAT_KEY] }).catch(() => null),
-      publicClient.readContract({ abi: lsp8MetadataAbi, address: collection, functionName: 'getData', args: [LSP4_METADATA_KEY] }).catch(() => null),
-    ])
-
-    let collectionName = null
-    if (nameBytes && nameBytes !== '0x') {
-      try {
-        collectionName = hexToString(nameBytes).trim() || null
-      } catch {
-        collectionName = null
-      }
-    }
-
-    // Resolution order: per-token LSP4Metadata (Dracos-style), then the collection's token
-    // base URI + formatted token id (Chillwhales-style), then collection-level LSP4Metadata
-    // as the last resort — that one only knows the collection, not the token, so `source`
-    // records which tier answered and consumers can label collection-only data honestly.
-    let source = 'token'
-    let uri = decodeVerifiableUri(tokenMetadataBytes)
-    if (!uri) {
-      const resolvedBaseUri = decodeVerifiableUri(baseUriBytes)
-      const tokenIdSegment = resolvedBaseUri ? formatTokenIdForUri(tokenId, tokenIdFormatBytes) : null
-      if (resolvedBaseUri && tokenIdSegment !== null) uri = `${resolvedBaseUri}${tokenIdSegment}`
-    }
-    if (!uri) {
-      uri = decodeVerifiableUri(collectionMetadataBytes)
-      source = uri ? 'collection' : null
-    }
-
-    const json = await fetchMetadataJson(uri, { baseUrl }).catch(() => null)
+    const { json, collectionName, tier } = await resolveLsp8TokenDocument({ publicClient, collection, tokenId, baseUrl })
     const lsp4 = json?.LSP4Metadata || json
 
     return {
@@ -367,7 +438,9 @@ export const resolveNftMetadata = async ({ publicClient, collection, tokenId, is
       image: pickLsp4Image(lsp4),
       model: await pickLsp4Model(lsp4),
       attributes: normalizeAttributes(json, lsp4),
-      source: json ? source : null,
+      // Both per-token tiers are statements about this id; only the collection document
+      // describes something else, so it is the one consumers have to label differently.
+      source: tier && tier !== 'collection' ? 'token' : tier,
     }
   }
 
