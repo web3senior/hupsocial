@@ -9,7 +9,10 @@ const FILEBASE_GATEWAY = 'https://ipfs.filebase.io/ipfs/'
    the ones still reachable: creators pinned their own artwork to their own Pinata accounts, and
    until now no gateway in this list was the host holding it — we were asking Filebase to go
    find blocks over bitswap instead of asking the node that has them. */
-const BUILT_IN_FALLBACK_GATEWAYS = [FILEBASE_GATEWAY, 'https://gateway.pinata.cloud/ipfs/', 'https://ipfs.io/ipfs/']
+const BUILT_IN_FALLBACK_GATEWAYS = [FILEBASE_GATEWAY, 'https://gateway.pinata.cloud/ipfs/']
+/* ipfs.io is asked last wherever the environment puts it: it rate-limits hard, and a throttled
+   or errored answer from it carries no Access-Control-Allow-Origin header at all. */
+const LAST_RESORT_GATEWAYS = ['https://ipfs.io/ipfs/']
 
 /**
  * Puts a configured gateway into the one shape the callers append a CID to.
@@ -30,7 +33,17 @@ function normalize(gateway) {
  * @returns {string} Base URL ending in a slash, ready for the CID to be appended.
  */
 export function primaryGateway() {
-  return normalize(process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_PRIMARY || FILEBASE_GATEWAY)
+  const configured = normalize(process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_PRIMARY || FILEBASE_GATEWAY)
+  return isLastResort(configured) ? FILEBASE_GATEWAY : configured
+}
+
+/**
+ * Whether a gateway may only ever be asked after every other one.
+ * @param {string} gateway A normalized base URL.
+ * @returns {boolean} True when it belongs at the end of the list.
+ */
+function isLastResort(gateway) {
+  return LAST_RESORT_GATEWAYS.map(normalize).includes(gateway)
 }
 
 /**
@@ -51,11 +64,47 @@ export function gatewayUrl(cid) {
  */
 export function gatewayList() {
   const configured = [process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL, process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL_FALLBACK]
-  const normalized = [primaryGateway(), ...configured, ...BUILT_IN_FALLBACK_GATEWAYS].filter(Boolean).map(normalize)
-  return [...new Set(normalized)]
+  const normalized = [primaryGateway(), ...configured, ...BUILT_IN_FALLBACK_GATEWAYS, ...LAST_RESORT_GATEWAYS].filter(Boolean).map(normalize)
+  const ordered = [...new Set(normalized)]
+  return [...ordered.filter((gateway) => !isLastResort(gateway)), ...ordered.filter(isLastResort)]
 }
 
 const DEFAULT_TIMEOUT_MS = 10000
+
+/* A document read from the browser never touches a public gateway. Falling through hosts is what
+   makes these readers survive a bad minute, and in the browser it cannot work: a gateway that is
+   rate-limiting or erroring answers without an Access-Control-Allow-Origin header, so the read
+   dies as a CORS failure instead of moving on — and every host we ask cross-origin logs one of
+   those in the console even when another gateway already served the document. Same-origin proxy
+   instead, which walks this very list server-side with Filebase leading. */
+const DOCUMENT_PROXY_PATH = '/api/ipfs/object'
+/* The proxy races the gateways under the caller's own budget; this is the slack it needs to
+   report back afterwards, so the browser hears the verdict rather than aborting on top of it. */
+const PROXY_GRACE_MS = 3000
+
+const inBrowser = () => typeof window !== 'undefined'
+
+/**
+ * Reads a CID through our own origin. Rejects with the shape the gateway readers throw, so
+ * callers can still tell "the document is gone" from "no host answered".
+ * @param {string} cid Bare CID or path, already stripped of its `ipfs://` prefix.
+ * @param {{timeoutMs: number, init: RequestInit}} options Budget and fetch options.
+ * @returns {Promise<Response>} The document, its body already buffered by the proxy.
+ */
+async function fetchThroughProxy(cid, { timeoutMs, init }) {
+  const url = `${DOCUMENT_PROXY_PATH}?cid=${encodeURIComponent(cid)}&t=${timeoutMs}`
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs + PROXY_GRACE_MS) })
+  if (response.ok) return response
+
+  const detail = await response.json().catch(() => ({}))
+  throw Object.assign(new Error(detail.error || `IPFS proxy error: ${response.status}`), {
+    status: response.status,
+    host: 'ipfs proxy',
+    attempted: detail.attempted ?? 0,
+    statuses: detail.statuses ?? [],
+    timedOut: Boolean(detail.timedOut),
+  })
+}
 
 /* Leading with one host only helps if it is a preference and never a single point of failure:
    the primary holds our own pins, but a CID somebody else pinned can have it answering 504 for
@@ -63,13 +112,16 @@ const DEFAULT_TIMEOUT_MS = 10000
 
 /**
  * Fetches a CID from the first gateway that answers, in list order. For readers that want the
- * bytes; the media proxy has its own racing version with a per-phase budget.
+ * bytes; the media proxy has its own racing version with a per-phase budget. In the browser the
+ * read goes through /api/ipfs/object, which does the same walk server-side.
  * @param {string} cid Bare CID or path, already stripped of its `ipfs://` prefix.
  * @param {{timeoutMs?: number, init?: RequestInit}} [options] Per-gateway timeout, fetch options.
  * @returns {Promise<Response>} The first OK response.
  * @throws {Error & {status?: number}} When every gateway failed, carrying the last HTTP status seen.
  */
 export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {} } = {}) {
+  if (inBrowser()) return fetchThroughProxy(cid, { timeoutMs, init })
+
   let lastError = null
 
   for (const gateway of gatewayList()) {
@@ -97,8 +149,8 @@ export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}
  * it is never asked. Losers are aborted so their sockets are freed; the winner is read to the
  * end inside the same bound.
  *
- * Per-attempt controllers rather than AbortSignal.any, which older Safari lacks — this runs in
- * the browser too, behind the token-icon and NFT hooks.
+ * Called from the browser — behind the token-icon and NFT hooks — it races nothing itself: the
+ * read goes through /api/ipfs/object and the race happens there.
  * @param {string} cid Bare CID or path, already stripped of its `ipfs://` prefix.
  * @param {{timeoutMs?: number, init?: RequestInit}} [options] Per-gateway timeout, fetch
  * options (`init.signal` is replaced by the race's own).
@@ -108,6 +160,8 @@ export async function fetchIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {}
  * answered contributes none) and whether any of them ran out the clock.
  */
 export async function raceIPFS(cid, { timeoutMs = DEFAULT_TIMEOUT_MS, init = {} } = {}) {
+  if (inBrowser()) return fetchThroughProxy(cid, { timeoutMs, init })
+
   const attempts = gatewayList().map((gateway) => ({
     url: `${gateway}${cid}`,
     host: gateway.replace(/^https?:\/\//, '').split('/')[0],

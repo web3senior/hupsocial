@@ -3,7 +3,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 // import ABI from './../abi/pollpal.json'
 // import LSP0ERC725Account from '@lukso/lsp0-contracts/compatibility-abis/LSP0ERC725Account-v0.12.0.json'
-import { gatewayUrl } from '@/lib/ipfsGateways'
+import { fetchIPFS } from '@/lib/ipfsGateways'
 import { toast } from '../components/NextToast'
 import { Spinner as Loading } from './../components/Loading'
 import Web3 from 'web3'
@@ -19,17 +19,16 @@ export const isAuth = async () => localStorage.getItem('accessToken')
 export const chainID = async () => await web3.eth.getChainId()
 
 export const getIPFS = async (CID) => {
-  console.log(`CID:`, CID)
-  //  console.log(CID)
-  let requestOptions = {
-    method: 'GET',
-    redirect: 'follow',
+  /* One hardcoded gateway used to be the whole answer here, so its bad minute was the profile
+     failing to load. fetchIPFS falls through the list — from the browser, through our own origin,
+     where a rate-limited gateway cannot turn a fall-through into a CORS error. */
+  try {
+    const response = await fetchIPFS(CID)
+    return await response.json()
+  } catch (e) {
+    console.warn(`[auth] could not read ${CID}:`, e.message)
+    return { result: false }
   }
-  /* Was NEXT_PUBLIC_IPFS_GATEWAY, a var that has never existed in any env file — every call
-     here fetched `undefined<CID>` against our own origin. */
-  const response = await fetch(gatewayUrl(CID), requestOptions)
-  if (!response.ok) return { result: false } //throw new Response('Failed to get data', { status: 500 })
-  return response.json()
 }
 
 /**
