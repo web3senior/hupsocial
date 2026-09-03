@@ -6,6 +6,7 @@ import { queryUniversalProfile } from '@/lib/lukso'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 import { resolveAgentProfile } from '@/lib/agentProfile'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
+import { hasColumn } from '@/lib/schema'
 
 /** Stored JSON list columns come back as text; the indexer's own fields are already arrays. */
 function parseJsonList(value) {
@@ -195,6 +196,28 @@ export async function GET(request, { params }) {
   }
 }
 
+/* Columns a save can touch that the database it is running against may not have yet: production
+   is migrated by hand, so every one of these lands here days before it lands there. Naming a
+   missing column rejects the whole statement, which is how a marker nobody asked for takes the
+   name and description someone did type down with it — the field is dropped from the update
+   instead, and starts being written by itself once the migration runs (see lib/schema.js). */
+const OPTIONAL_COLUMNS = {
+  badge_network_id: 'cidex/scripts/add-community-badges.sql',
+  origin_code: 'the users.origin_code migration',
+  profile_sync_stamp: 'cidex/scripts/add-profile-sync-stamp.sql',
+}
+
+/**
+ * Whether an optional profile column can be written here.
+ * @param {keyof OPTIONAL_COLUMNS} column The column the save wants to set.
+ * @returns {Promise<boolean>} True when it exists; false, with a warning naming the migration.
+ */
+async function canWrite(column) {
+  if (await hasColumn('users', column)) return true
+  console.warn(`[PROFILE_COLUMN_MISSING]: users.${column} — this field was not saved. Apply ${OPTIONAL_COLUMNS[column]}.`)
+  return false
+}
+
 export async function PUT(request, { params }) {
   try {
     const { address } = await params
@@ -262,10 +285,11 @@ export async function PUT(request, { params }) {
     if (badge.action === 'invalid') {
       return NextResponse.json({ error: 'Invalid badge selection' }, { status: 400 })
     }
-    if (badge.action === 'clear') {
+    const badgeStorable = badge.action === 'clear' || badge.action === 'set' ? await canWrite('badge_network_id') : false
+    if (badge.action === 'clear' && badgeStorable) {
       updateFields.push('`badge_network_id` = NULL', '`badge_contract_address` = NULL', '`badge_community_id` = NULL')
     }
-    if (badge.action === 'set') {
+    if (badge.action === 'set' && badgeStorable) {
       const wearable = await findWearableBadge(address, badge.selection)
       if (!wearable) {
         return NextResponse.json({ error: 'You are not a member of that community, or it has no tag' }, { status: 403 })
@@ -281,10 +305,11 @@ export async function PUT(request, { params }) {
     if (origin.action === 'invalid') {
       return NextResponse.json({ error: 'Invalid origin selection' }, { status: 400 })
     }
-    if (origin.action === 'clear') {
+    const originStorable = origin.action === 'clear' || origin.action === 'set' ? await canWrite('origin_code') : false
+    if (origin.action === 'clear' && originStorable) {
       updateFields.push('`origin_code` = NULL')
     }
-    if (origin.action === 'set') {
+    if (origin.action === 'set' && originStorable) {
       if (isCountryCode(origin.code)) {
         const [known] = await pool.execute('SELECT iso_code FROM countries WHERE iso_code = ? LIMIT 1', [origin.code])
         if (known.length === 0) {
@@ -298,7 +323,7 @@ export async function PUT(request, { params }) {
     /* Sent only by the owner's editor, and only for a Universal Profile: it carries the indexer
        stamp this save has just overtaken, which is what makes the read above prefer this row
        until the matching onchain write lands. */
-    if (typeof syncStamp === 'string') {
+    if (typeof syncStamp === 'string' && (await canWrite('profile_sync_stamp'))) {
       updateFields.push('`profile_sync_stamp` = ?')
       queryValues.push(syncStamp)
     }
