@@ -9,6 +9,7 @@ const SCENES = [
   { variant: 'nebula', label: 'Nebula' },
   { variant: 'chains', label: 'Chain colours' },
   { variant: 'cinematic', label: 'Cinematic' },
+  { variant: 'robinhood', label: 'Robinhood green' },
 ]
 
 // Fullscreens the scene it sits in; Esc (or the browser UI) exits

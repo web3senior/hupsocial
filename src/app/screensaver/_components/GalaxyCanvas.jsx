@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { appChains } from '@/config/contracts'
+import { appChains, robinhood } from '@/config/contracts'
 
 const ARM_STAR_COUNT = 1700
 const FIELD_STAR_COUNT = 260
@@ -20,19 +20,19 @@ const RAMP = [
   [1, [52, 211, 153]],
 ]
 
-const rampRgb = (t) => {
-  for (let i = 1; i < RAMP.length; i++) {
-    if (t <= RAMP[i][0]) {
-      const [t0, c0] = RAMP[i - 1]
-      const [t1, c1] = RAMP[i]
+const rampRgb = (t, ramp = RAMP) => {
+  for (let i = 1; i < ramp.length; i++) {
+    if (t <= ramp[i][0]) {
+      const [t0, c0] = ramp[i - 1]
+      const [t1, c1] = ramp[i]
       const k = (t - t0) / (t1 - t0)
       return c0.map((v, j) => Math.round(v + (c1[j] - v) * k))
     }
   }
-  return RAMP[RAMP.length - 1][1]
+  return ramp[ramp.length - 1][1]
 }
 
-const rampColor = (t) => `rgb(${rampRgb(t).join(',')})`
+const rampColor = (t, ramp) => `rgb(${rampRgb(t, ramp).join(',')})`
 
 // Sum of three uniforms approximates a gaussian, keeping arms dense at the ridge
 const gauss = () => Math.random() + Math.random() + Math.random() - 1.5
@@ -52,6 +52,21 @@ const starColor = (rgb, k) => {
 
 const chainPalette = () => appChains.filter((chain) => chain.primaryColor).map((chain) => parseHex(chain.primaryColor))
 
+const liftRgb = (rgb, k) => rgb.map((v) => Math.round(v + (255 - v) * k))
+const mixRgb = (rgb, other, k) => rgb.map((v, i) => Math.round(v + (other[i] - v) * k))
+
+// Robinhood's brand green drives the whole ramp: mint core, brand-green arms, teal rim.
+// Built lazily — config/wagmi.js stamps primaryColor onto the chain object at import time.
+const greenRamp = () => {
+  const base = parseHex(robinhood.primaryColor || '#00C805')
+  return [
+    [0, liftRgb(base, 0.85)],
+    [0.3, liftRgb(base, 0.45)],
+    [0.68, base],
+    [1, mixRgb(base, [45, 212, 191], 0.75)],
+  ]
+}
+
 // Soft radial sprite for the cinematic variant's nebula haze
 const hazeSprite = (rgb) => {
   const sprite = document.createElement('canvas')
@@ -70,17 +85,21 @@ const hazeSprite = (rgb) => {
 // band-sized population spreads too thin
 const buildScene = (variant, dense = false) => {
   const chainColors = variant === 'chains' ? chainPalette() : null
-  const cinematic = variant === 'cinematic'
+  const green = variant === 'robinhood'
+  const ramp = green ? greenRamp() : RAMP
+  // Robinhood borrows the cinematic build: tighter arms, denser stars, nebula haze
+  const cinematic = variant === 'cinematic' || green
   const starCount = Math.round((cinematic ? 2600 : ARM_STAR_COUNT) * (dense ? 1.7 : 1))
   const winding = cinematic ? 2.95 * Math.PI : WINDING
   // Chains own concentric bands of the disk; the jitter blends the seams into clusters
   const armColor = (radial) => {
-    if (!chainColors) return rampColor(Math.min(1, radial + gauss() * 0.07))
+    if (!chainColors) return rampColor(Math.min(1, radial + gauss() * 0.07), ramp)
     const idx = Math.round(radial * (chainColors.length - 1) + gauss() * 0.8)
     return starColor(chainColors[Math.min(chainColors.length - 1, Math.max(0, idx))], 0.08 + Math.random() * 0.3)
   }
+  const dustPair = green ? [rampColor(0.68, ramp), rampColor(0.2, ramp)] : ['rgb(168,85,247)', 'rgb(103,232,249)']
   const dustColor = () => {
-    if (!chainColors) return Math.random() < 0.5 ? 'rgb(168,85,247)' : 'rgb(103,232,249)'
+    if (!chainColors) return dustPair[Math.random() < 0.5 ? 0 : 1]
     return starColor(chainColors[Math.floor(Math.random() * chainColors.length)], 0.15)
   }
   const stars = []
@@ -130,7 +149,7 @@ const buildScene = (variant, dense = false) => {
 
   const haze = []
   if (cinematic) {
-    const sprites = [0.05, 0.3, 0.55, 0.8, 1].map((t) => hazeSprite(rampRgb(t)))
+    const sprites = [0.05, 0.3, 0.55, 0.8, 1].map((t) => hazeSprite(rampRgb(t, ramp)))
     for (let i = 0; i < 150; i++) {
       const radial = Math.pow(Math.random(), 0.7)
       haze.push({
@@ -151,7 +170,8 @@ const buildScene = (variant, dense = false) => {
  * Decorative spiral-galaxy particle animation. Pure Canvas 2D — pauses when offscreen or the
  * tab hides, and prefers-reduced-motion gets a single static frame.
  * Variants: 'nebula' (violet-to-emerald ramp), 'chains' (stars keyed to app-chain colours,
- * Hup pink core), 'cinematic' (tighter arms, denser stars, nebula haze).
+ * Hup pink core), 'cinematic' (tighter arms, denser stars, nebula haze), 'robinhood' (cinematic
+ * build ramped from the Robinhood chain's brand green).
  */
 export default function GalaxyCanvas({ className, variant = 'nebula' }) {
   const canvasRef = useRef(null)
@@ -214,7 +234,12 @@ export default function GalaxyCanvas({ className, variant = 'nebula' }) {
       ctx.translate(cx, cy)
       ctx.scale(1, tilt + 0.16)
       const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, scale * 0.55)
-      if (variant === 'chains') {
+      if (variant === 'robinhood') {
+        glow.addColorStop(0, 'rgba(214, 255, 223, 0.6)')
+        glow.addColorStop(0.18, 'rgba(0, 200, 5, 0.3)')
+        glow.addColorStop(0.5, 'rgba(0, 160, 70, 0.12)')
+        glow.addColorStop(1, 'rgba(0, 160, 70, 0)')
+      } else if (variant === 'chains') {
         glow.addColorStop(0, 'rgba(251, 207, 232, 0.55)')
         glow.addColorStop(0.2, 'rgba(236, 72, 153, 0.26)')
         glow.addColorStop(1, 'rgba(236, 72, 153, 0)')
