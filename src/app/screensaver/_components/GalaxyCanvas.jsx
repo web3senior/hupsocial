@@ -55,15 +55,27 @@ const chainPalette = () => appChains.filter((chain) => chain.primaryColor).map((
 const liftRgb = (rgb, k) => rgb.map((v) => Math.round(v + (255 - v) * k))
 const mixRgb = (rgb, other, k) => rgb.map((v, i) => Math.round(v + (other[i] - v) * k))
 
-// Robinhood's brand green drives the whole ramp: mint core, brand-green arms, teal rim.
-// Built lazily — config/wagmi.js stamps primaryColor onto the chain object at import time.
-const greenRamp = () => {
-  const base = parseHex(robinhood.primaryColor || '#00C805')
+// A chain's brand colour drives the whole ramp: pale core, brand-colour arms, teal rim.
+// Built lazily — config/wagmi.js stamps primaryColor onto the chain objects at import time.
+const chainRamp = (hex) => {
+  const base = parseHex(hex)
   return [
     [0, liftRgb(base, 0.85)],
     [0.3, liftRgb(base, 0.45)],
     [0.68, base],
     [1, mixRgb(base, [45, 212, 191], 0.75)],
+  ]
+}
+
+// Core glow in the same family, so the centre never fights the arms
+const chainGlow = (hex) => {
+  const base = parseHex(hex)
+  const outer = mixRgb(base, [0, 90, 60], 0.4)
+  return [
+    [0, `rgba(${liftRgb(base, 0.88).join(',')}, 0.6)`],
+    [0.18, `rgba(${base.join(',')}, 0.3)`],
+    [0.5, `rgba(${outer.join(',')}, 0.12)`],
+    [1, `rgba(${outer.join(',')}, 0)`],
   ]
 }
 
@@ -83,13 +95,15 @@ const hazeSprite = (rgb) => {
 
 // `dense` bumps particle counts for large canvases (fullscreen), where the fixed
 // band-sized population spreads too thin
-const buildScene = (variant, dense = false) => {
+const buildScene = ({ variant, dense = false, chainColor, density = 1 }) => {
   const chainColors = variant === 'chains' ? chainPalette() : null
-  const green = variant === 'robinhood'
-  const ramp = green ? greenRamp() : RAMP
-  // Robinhood borrows the cinematic build: tighter arms, denser stars, nebula haze
-  const cinematic = variant === 'cinematic' || green
-  const starCount = Math.round((cinematic ? 2600 : ARM_STAR_COUNT) * (dense ? 1.7 : 1))
+  // 'robinhood' is the Robinhood chain's colour taking the same generic path
+  const brand = chainColor || (variant === 'robinhood' ? robinhood.primaryColor || '#00C805' : null)
+  const ramp = brand ? chainRamp(brand) : RAMP
+  const glowStops = brand ? chainGlow(brand) : null
+  // Brand-coloured scenes borrow the cinematic build: tighter arms, denser stars, nebula haze
+  const cinematic = variant === 'cinematic' || Boolean(brand)
+  const starCount = Math.round((cinematic ? 2600 : ARM_STAR_COUNT) * (dense ? 1.7 : 1) * density)
   const winding = cinematic ? 2.95 * Math.PI : WINDING
   // Chains own concentric bands of the disk; the jitter blends the seams into clusters
   const armColor = (radial) => {
@@ -97,7 +111,7 @@ const buildScene = (variant, dense = false) => {
     const idx = Math.round(radial * (chainColors.length - 1) + gauss() * 0.8)
     return starColor(chainColors[Math.min(chainColors.length - 1, Math.max(0, idx))], 0.08 + Math.random() * 0.3)
   }
-  const dustPair = green ? [rampColor(0.68, ramp), rampColor(0.2, ramp)] : ['rgb(168,85,247)', 'rgb(103,232,249)']
+  const dustPair = brand ? [rampColor(0.68, ramp), rampColor(0.2, ramp)] : ['rgb(168,85,247)', 'rgb(103,232,249)']
   const dustColor = () => {
     if (!chainColors) return dustPair[Math.random() < 0.5 ? 0 : 1]
     return starColor(chainColors[Math.floor(Math.random() * chainColors.length)], 0.15)
@@ -121,7 +135,7 @@ const buildScene = (variant, dense = false) => {
   }
 
   const field = []
-  for (let i = 0; i < FIELD_STAR_COUNT * (dense ? 2 : 1); i++) {
+  for (let i = 0; i < Math.round(FIELD_STAR_COUNT * (dense ? 2 : 1) * density); i++) {
     field.push({
       ux: Math.random(),
       uy: Math.random(),
@@ -134,7 +148,7 @@ const buildScene = (variant, dense = false) => {
   }
 
   const dust = []
-  for (let i = 0; i < Math.round((cinematic ? 60 : DUST_COUNT) * (dense ? 1.5 : 1)); i++) {
+  for (let i = 0; i < Math.round((cinematic ? 60 : DUST_COUNT) * (dense ? 1.5 : 1) * density); i++) {
     dust.push({
       r: 0.2 + Math.random() * 0.95,
       theta: Math.random() * Math.PI * 2,
@@ -150,7 +164,7 @@ const buildScene = (variant, dense = false) => {
   const haze = []
   if (cinematic) {
     const sprites = [0.05, 0.3, 0.55, 0.8, 1].map((t) => hazeSprite(rampRgb(t, ramp)))
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < Math.round(150 * density); i++) {
       const radial = Math.pow(Math.random(), 0.7)
       haze.push({
         r: 0.08 + radial,
@@ -163,7 +177,7 @@ const buildScene = (variant, dense = false) => {
     }
   }
 
-  return { stars, field, dust, haze, dense }
+  return { stars, field, dust, haze, dense, glowStops }
 }
 
 /**
@@ -171,16 +185,17 @@ const buildScene = (variant, dense = false) => {
  * tab hides, and prefers-reduced-motion gets a single static frame.
  * Variants: 'nebula' (violet-to-emerald ramp), 'chains' (stars keyed to app-chain colours,
  * Hup pink core), 'cinematic' (tighter arms, denser stars, nebula haze), 'robinhood' (cinematic
- * build ramped from the Robinhood chain's brand green).
+ * build ramped from the Robinhood chain's brand green). Pass `chainColor` for any other chain's
+ * brand colour, and `density` to thin the particles out in small tiles.
  */
-export default function GalaxyCanvas({ className, variant = 'nebula' }) {
+export default function GalaxyCanvas({ className, variant = 'nebula', chainColor, density = 1 }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
-    let scene = buildScene(variant)
+    let scene = buildScene({ variant, chainColor, density })
 
     let frame = 0
     let width = 0
@@ -199,7 +214,7 @@ export default function GalaxyCanvas({ className, variant = 'nebula' }) {
       canvas.height = Math.max(1, Math.round(height * dpr))
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       const dense = width * height > 900_000
-      if (dense !== scene.dense) scene = buildScene(variant, dense)
+      if (dense !== scene.dense) scene = buildScene({ variant, dense, chainColor, density })
     }
 
     const draw = (t) => {
@@ -234,11 +249,8 @@ export default function GalaxyCanvas({ className, variant = 'nebula' }) {
       ctx.translate(cx, cy)
       ctx.scale(1, tilt + 0.16)
       const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, scale * 0.55)
-      if (variant === 'robinhood') {
-        glow.addColorStop(0, 'rgba(214, 255, 223, 0.6)')
-        glow.addColorStop(0.18, 'rgba(0, 200, 5, 0.3)')
-        glow.addColorStop(0.5, 'rgba(0, 160, 70, 0.12)')
-        glow.addColorStop(1, 'rgba(0, 160, 70, 0)')
+      if (scene.glowStops) {
+        for (const [stop, color] of scene.glowStops) glow.addColorStop(stop, color)
       } else if (variant === 'chains') {
         glow.addColorStop(0, 'rgba(251, 207, 232, 0.55)')
         glow.addColorStop(0.2, 'rgba(236, 72, 153, 0.26)')
@@ -324,7 +336,7 @@ export default function GalaxyCanvas({ className, variant = 'nebula' }) {
 
     const resizeObserver = new ResizeObserver(() => {
       resize()
-      if (reducedMotion.matches) draw(0)
+      draw(performance.now() / 1000)
     })
     resizeObserver.observe(canvas)
 
@@ -339,9 +351,20 @@ export default function GalaxyCanvas({ className, variant = 'nebula' }) {
       sync()
     }
     document.addEventListener('visibilitychange', onVisibility)
+
+    const onFullscreen = () => {
+      if (document.fullscreenElement?.contains(canvas)) inView = true
+      else {
+        const r = canvas.getBoundingClientRect()
+        inView = r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth
+      }
+      sync()
+    }
+    document.addEventListener('fullscreenchange', onFullscreen)
     reducedMotion.addEventListener('change', sync)
 
     resize()
+    draw(performance.now() / 1000)
     sync()
 
     return () => {
@@ -349,9 +372,10 @@ export default function GalaxyCanvas({ className, variant = 'nebula' }) {
       resizeObserver.disconnect()
       intersectionObserver.disconnect()
       document.removeEventListener('visibilitychange', onVisibility)
+      document.removeEventListener('fullscreenchange', onFullscreen)
       reducedMotion.removeEventListener('change', sync)
     }
-  }, [variant])
+  }, [variant, chainColor, density])
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" />
 }

@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { CornersOutIcon } from '@phosphor-icons/react'
 import GalaxyCanvas from './GalaxyCanvas'
+import NetworkGrid from './NetworkGrid'
 import styles from './ScreensaverGallery.module.scss'
 
 const SCENES = [
@@ -41,6 +42,7 @@ export default function ScreensaverGallery() {
       {SCENES.map((scene) => (
         <Scene key={scene.variant} {...scene} />
       ))}
+      <NetworkGrid />
     </div>
   )
 }

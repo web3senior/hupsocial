@@ -1,0 +1,127 @@
+.network {
+  position: relative;
+  // The board is 1:1 so a fullscreen capture is already square
+  aspect-ratio: 1;
+  border-radius: 20px;
+  background: #030014;
+  overflow: hidden;
+
+  &__board {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    height: 100%;
+    gap: 1px;
+    background: rgba(148, 163, 184, 0.14);
+  }
+
+  &__cell {
+    position: relative;
+    display: grid;
+    place-items: center;
+    background: #030014;
+    overflow: hidden;
+  }
+
+  &__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  // Rides the galaxy core; the plate keeps light logos legible over the bright centre
+  &__badge {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 30%;
+    min-width: 26px;
+    max-width: 84px;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: rgba(3, 0, 20, 0.55);
+    box-shadow: 0 0 0 1px rgba(226, 232, 240, 0.16), 0 6px 22px rgba(3, 0, 20, 0.7);
+    backdrop-filter: blur(3px);
+
+    img {
+      width: 62%;
+      height: 62%;
+      object-fit: contain;
+    }
+
+    b {
+      color: #f4f4f5;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+  }
+
+  &__name {
+    position: absolute;
+    inset-block-end: 0.5rem;
+    inset-inline: 0;
+    text-align: center;
+    color: rgba(226, 229, 250, 0.72);
+    text-shadow: 0 1px 8px rgba(3, 0, 20, 0.9);
+    font-size: var(--font-size-10, 0.625rem);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  &__tag {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 0.6rem;
+    inset-inline-start: 0.75rem;
+    border-radius: 4px;
+    background: rgba(20, 22, 28, 0.62);
+    backdrop-filter: blur(6px);
+    color: #f4f4f5;
+    padding: 0.22rem 0.6rem;
+    font-size: var(--font-size-10, 0.625rem);
+    font-weight: 600;
+  }
+
+  &__fullscreen {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 0.6rem;
+    inset-inline-end: 0.6rem;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 8px;
+    background: rgba(20, 22, 28, 0.62);
+    backdrop-filter: blur(6px);
+    color: #f4f4f5;
+    padding: 0.35rem;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(20, 22, 28, 0.85);
+    }
+  }
+
+  // Fullscreen keeps the board square and centred on black, chrome hidden
+  &:fullscreen {
+    display: grid;
+    place-items: center;
+    aspect-ratio: auto;
+    border-radius: 0;
+
+    .network__board {
+      width: auto;
+      height: 100%;
+      aspect-ratio: 1;
+    }
+
+    .network__fullscreen,
+    .network__tag {
+      display: none;
+    }
+  }
+}
