@@ -106,12 +106,11 @@
   &__toggleRow {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
     font-size: var(--font-size-14, 0.875rem);
-    cursor: pointer;
 
-    input {
-      accent-color: var(--primary, #0d6efd);
+    label {
+      cursor: pointer;
     }
   }
 

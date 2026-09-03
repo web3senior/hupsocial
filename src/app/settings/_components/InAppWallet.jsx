@@ -257,8 +257,10 @@ export default function InAppWallet({ onOpenSecurity }) {
 
   return (
     <div className={clsx(styles.page, 'relative')}>
-      <div className="__container" data-width="medium">
-        <div className={clsx('col-desktop-8', styles.section)}>
+      {/* No __container here: the settings pane is already one, and a nested container takes
+          the sidebar clearance a second time and pushes this card past the pane */}
+      <div className={styles.stack}>
+        <div className={styles.section}>
           <div className={styles.sectionBody}>
             <div className="flex justify-between align-items-center">
               <h4>In app wallet</h4>
@@ -277,11 +279,13 @@ export default function InAppWallet({ onOpenSecurity }) {
                 <div className={styles.bgLight}>
                   <p className="m-0 mb-5">
                     <strong>Burner Address:</strong> <br />
-                    <code>{burnerAddress}</code>
+                    <code className={styles.address}>{burnerAddress}</code>
                   </p>
-                  <p className="m-0 mb-5">
+                  {/* Balance renders a block, so it cannot sit in a <p> — the browser closes
+                      the paragraph before it and the layout loses the wrapper */}
+                  <div className="m-0 mb-5">
                     <strong>Balance:</strong> <Balance addr={burnerAddress} />
-                  </p>
+                  </div>
                   {expiresAt && (
                     <p className="m-0">
                       <strong>Expires At:</strong> <br />
@@ -417,20 +421,20 @@ export default function InAppWallet({ onOpenSecurity }) {
           </div>
         </div>
 
-        <div className={clsx('col-desktop-4 flex align-items-center justify-content-between gap-1')}>
+        <div className={styles.prefRow}>
           <span>Batch Like</span>
-          <ToggleSwitch checked={isOn} onChange={handleToggleChange} />
+          <ToggleSwitch checked={isOn} onChange={handleToggleChange} aria-label="Batch Like" />
         </div>
 
-        <div className={clsx('col-desktop-4 flex align-items-center justify-content-between gap-1')}>
-          <div className="flex flex-column">
+        <div className={styles.prefRow}>
+          <div className={styles.prefRow__text}>
             <span>Gasless Actions</span>
             {/* Whoever just learned their posts are paid for is exactly who might chip in */}
             <Link href="/gas" className={styles.subtleLink}>
               See the gas tank
             </Link>
           </div>
-          <ToggleSwitch checked={isGaslessOn} onChange={handleGaslessToggleChange} />
+          <ToggleSwitch checked={isGaslessOn} onChange={handleGaslessToggleChange} aria-label="Gasless Actions" />
         </div>
       </div>
     </div>

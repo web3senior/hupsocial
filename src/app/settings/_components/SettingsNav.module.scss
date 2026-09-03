@@ -27,7 +27,10 @@ $border-radius-item: 8px;
 
 // Sidebar container configuration
 .sidebar {
-  width: $sidebar-width;
+  // The settings card is capped at 768px and sits beside the app aside, so between the mobile
+  // breakpoint and a wide desktop a fixed 280px column starves the content pane — at an 824px
+  // viewport it left 182px for the panel. The nav gives ground first instead.
+  width: clamp(200px, 36%, #{$sidebar-width});
   padding: 12px;
   border-right: 1px solid $color-border;
   flex-shrink: 0;
@@ -109,7 +112,8 @@ $border-radius-item: 8px;
 // Secondary content detailing panels
 .contentPane {
   flex-grow: 1;
-  padding: 24px 32px;
+  min-width: 0;
+  padding: 24px clamp(16px, 3vw, 32px);
 
   .subMenuList {
     display: flex;

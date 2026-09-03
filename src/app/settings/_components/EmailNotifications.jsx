@@ -6,6 +6,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { toast } from '@/components/NextToast'
+import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import styles from './EmailNotifications.module.scss'
 
 const postJson = async (url, body, method = 'POST') => {
@@ -175,10 +176,16 @@ export default function EmailNotifications() {
           <p className={styles.emailNotif__hint}>
             Verified: <strong>{masked}</strong>
           </p>
-          <label className={styles.emailNotif__toggleRow}>
-            <input type="checkbox" checked={enabled} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
-            <span>Send me notification digests</span>
-          </label>
+          {/* A label cannot nest the switch — it brings its own — so the row is a div with htmlFor */}
+          <div className={styles.emailNotif__toggleRow}>
+            <ToggleSwitch
+              id="email-digests"
+              checked={enabled}
+              disabled={busy}
+              onChange={(e) => toggle(e.target.checked)}
+            />
+            <label htmlFor="email-digests">Send me notification digests</label>
+          </div>
           <button className={styles.emailNotif__link} type="button" onClick={remove} disabled={busy}>
             Remove this email
           </button>
