@@ -18,13 +18,16 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
-import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, useWriteContract } from 'wagmi'
+import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useWriteContract } from 'wagmi'
+import { lukso } from 'wagmi/chains'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
 import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
 import ProfileInsights from '@/components/ProfileInsights'
 import UPlogo from '@/../public/up.png'
 import { uploadFileToIPFS } from '@/lib/ipfs'
+import { isUniversalProfile, linksToRows, normalizeIpfsUri, readImageSize, readLsp3Profile } from '@/lib/lsp3'
+import { syncProfileToUniversalProfile } from '@/lib/profileUpdateTracking'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import AssetsTab from '@/components/tabs/AssetsTab'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
@@ -508,8 +511,6 @@ const Profile = ({ addr }) => {
     else disconnectEvm()
   }
 
-  // UP-sourced profiles are managed on universaleverything.io, but birthday is a
-  // Hup-native field — so the modal still opens for them, in birthday-only mode.
   const editProfile = () => {
     setShowProfileModal(true)
   }
@@ -1057,6 +1058,18 @@ const Status = ({ addr, profile, selfView }) => {
 }
 
 // Identity of a wearable badge: its deployment plus its id. Used for the React key and for
+/* What a profile picture may weigh.
+ *
+ * Animated GIFs are the only avatars that come anywhere near it — the biggest one in our own
+ * users table is 13.6MB — and they are the reason there is a ceiling at all rather than a
+ * smaller one. Past 32MB the media cache stops holding an original, so every rung of the avatar
+ * ladder re-downloads the whole picture on every cold instance; this sits above the real GIFs
+ * and well below that cliff. */
+const PLACEHOLDER_NAMES = new Set(['new-user', 'hup-user'])
+
+const MAX_AVATAR_MB = 16
+const MAX_AVATAR_BYTES = MAX_AVATAR_MB * 1024 * 1024
+
 // "is this the selected one" — community ids are only unique within one deployment.
 const badgeKey = (badge) => (badge ? `${badge.networkId}:${badge.contractAddress}:${badge.communityId}` : '')
 
@@ -1069,21 +1082,16 @@ const badgeKey = (badge) => (badge ? `${badge.networkId}:${badge.contractAddress
  * @returns {JSX.Element}
  */
 const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, isUP = false }) => {
-  // Safe helper to parse structural lists from DB and strip away malformed or empty data structures
-  const parseSafeList = (data, isLinkList = false) => {
+  // Safe helper to parse the tag list from DB and strip away malformed or empty entries. Links
+  // go through linksToRows instead: they arrive titled two different ways depending on whether
+  // the profile came from our own row or from the LUKSO indexer.
+  const parseSafeList = (data) => {
     try {
       if (!data || data === '[]') return []
       const parsed = typeof data === 'string' ? JSON.parse(data) : data
       if (!Array.isArray(parsed)) return []
 
-      // Clean out corrupt or empty structural entries like [{""}] or empty keys
-      return parsed.filter((item) => {
-        if (!item) return false
-        if (isLinkList) {
-          return typeof item === 'object' && item.name && item.name.trim() !== ''
-        }
-        return typeof item === 'string' && item.trim() !== ''
-      })
+      return parsed.filter((item) => typeof item === 'string' && item.trim() !== '')
     } catch (e) {
       // Handles completely malformed JSON syntax safely without crashing
       console.error('Failed to parse list from database profile data:', e)
@@ -1094,8 +1102,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // State
   const [error, setError] = useState(null)
   const [isPending, setIsPending] = useState(false)
-  const [tags, setTags] = useState({ list: parseSafeList(profile?.tags, false) })
-  const [links, setLinks] = useState({ list: parseSafeList(profile?.links, true) })
+  const [tags, setTags] = useState({ list: parseSafeList(profile?.tags) })
+  const [links, setLinks] = useState({ list: linksToRows(profile?.links) })
   // The community tag worn beside the name. `badgesLoaded` is not cosmetic: without it a failed
   // fetch would submit an empty picker as an explicit "wear nothing" and quietly strip a badge
   // the user never touched.
@@ -1109,6 +1117,12 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const [editingLinkIndex, setEditingLinkIndex] = useState(null)
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
+  const luksoClient = usePublicClient({ chainId: lukso.id })
+  /* `isUP` says only that the LUKSO indexer answered for this wallet, and it answers for nobody
+     when it is unreachable or rate limiting us. The chain is asked separately, and it is the one
+     that decides whether saving here also writes LSP3Profile. */
+  const [isOnchainUP, setIsOnchainUP] = useState(false)
+  const syncsOnchain = isUP || isOnchainUP
 
   // This modal only exists while it is open, so mounting is the right moment to ask. The list is
   // memberships that can actually become a badge — see api/v1/users/[address]/badges.
@@ -1143,13 +1157,93 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     }
   }, [])
 
+  useEffect(() => {
+    if (!address || !luksoClient) return
+    let cancelled = false
+
+    isUniversalProfile(luksoClient, address).then((confirmed) => {
+      if (!cancelled) setIsOnchainUP(confirmed)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [address, luksoClient])
+
   // Refs
   const pfpRef = useRef()
+  const previewUrlRef = useRef(null)
+  const nameRef = useRef(null)
+  const descriptionRef = useRef(null)
   const tagRef = useRef()
   const linkNameRef = useRef()
   const linkURLRef = useRef()
 
+  /* Hup's row can be thinner than the profile onchain — one created while the LUKSO indexer was
+     unreachable holds no name at all — and a form seeded from that alone would push blanks over a
+     real name, tags and links the moment it was saved. So the onchain document fills whatever
+     the row does not hold, and only that: anything already here is left alone, including a list
+     the user has just emptied on purpose. */
+  useEffect(() => {
+    if (!syncsOnchain || !address || !luksoClient) return
+    let cancelled = false
+
+    readLsp3Profile(luksoClient, address).then((doc) => {
+      if (cancelled || !doc) return
+
+      setTags((current) => (current.list.length === 0 && Array.isArray(doc.tags) && doc.tags.length > 0 ? { list: doc.tags } : current))
+      setLinks((current) => (current.list.length === 0 && linksToRows(doc.links).length > 0 ? { list: linksToRows(doc.links) } : current))
+
+      for (const [ref, value] of [
+        [nameRef, doc.name],
+        [descriptionRef, doc.description],
+      ]) {
+        const input = ref.current
+        if (!input || !value) continue
+
+        const held = input.value.trim()
+        if (held === '' || PLACEHOLDER_NAMES.has(held)) input.value = value
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [syncsOnchain, address, luksoClient])
+
   // Handlers
+  // The badge field as the API expects it; null when the picker never loaded, which it reads as
+  // "leave the badge alone".
+  const badgeField = () => {
+    if (!badgesLoaded) return null
+
+    return selectedBadge
+      ? JSON.stringify({
+          networkId: selectedBadge.networkId,
+          contractAddress: selectedBadge.contractAddress,
+          communityId: selectedBadge.communityId,
+        })
+      : ''
+  }
+
+  /* Pushes what Hup already holds out to the Universal Profile. Reachable when an earlier save
+     stored the profile here but never made it onchain — a declined signature, a wallet on the
+     wrong network, LUKSO unreachable at the time. */
+  const syncOnchain = () => {
+    setShowProfileModal(false)
+    syncProfileToUniversalProfile({
+      address,
+      fields: {
+        name: String(profile?.name ?? '').trim(),
+        description: String(profile?.description ?? '').trim(),
+        tags: parseSafeList(profile?.tags),
+        links: linksToRows(profile?.links),
+        imageUri: profile?.profileImageRef ?? null,
+      },
+      mutate,
+    })
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isConnected) return
@@ -1158,85 +1252,118 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     setError(null)
 
     const formData = new FormData(e.target)
+    const file = formData.get('profileImage')
+    const hasNewImage = file instanceof File && file.size > 0
 
-    // UP-sourced profiles only edit Hup-native fields here (birthday); name, bio,
-    // image, tags and links stay managed by the Universal Profile itself.
-    if (!isUP) {
-      const fileInput = formData.get('profileImage')
+    /* Pinned before the save rather than after it, because both halves need the same reference:
+       the row stores it, and the onchain document has to carry it too. */
+    let imageUri = null
+    let imageSize = null
+    if (hasNewImage) {
+      if (file.size > MAX_AVATAR_BYTES) {
+        setError(`That picture is too large. Profile pictures have to be ${MAX_AVATAR_MB}MB or smaller.`)
+        setIsPending(false)
+        return
+      }
 
-      // Fallback to existing image name/hash
-      let profileImageHash = formData.get('profileImage_hidden')
+      try {
+        toast('Uploading image ...', 'info')
+        // Dimensions are read from the file itself; the LSP3 image entry has to declare them
+        const [uploaded, size] = await Promise.all([uploadFileToIPFS(file), readImageSize(file)])
 
-      // Check if the user actually picked a new file
-      if (fileInput && fileInput.size > 0) {
-        try {
-          toast('Uploading image ...', 'info')
-          const rootHash = await uploadFileToIPFS(fileInput)
-
-          if (!rootHash) {
-            throw new Error('Failed to upload')
-          }
-
-          profileImageHash = rootHash
-        } catch (uploadErr) {
-          console.error('Profile image upload error:', uploadErr)
-          setError(uploadErr.message || 'Failed to upload image to decentralized storage.')
-          setIsPending(false)
-          return
+        if (!uploaded) {
+          throw new Error('Failed to upload')
         }
+
+        imageUri = normalizeIpfsUri(uploaded)
+        imageSize = size
+      } catch (uploadErr) {
+        console.error('Profile image upload error:', uploadErr)
+        setError(uploadErr.message || 'Failed to upload image to decentralized storage.')
+        setIsPending(false)
+        return
       }
-
-      // Explicitly overwrite or append the finalized values to the FormData instance
-      formData.set('profileImage', profileImageHash)
-      formData.set('tags', JSON.stringify(tags.list))
-      formData.set('links', JSON.stringify(links.list))
     }
 
-    // Hup-native, like birthday, so it is sent for Universal Profiles too — a UP has no notion of
-    // Hup community membership. Omitted entirely when the picker never loaded, which the API
-    // reads as "leave the badge alone".
-    if (badgesLoaded) {
-      formData.set(
-        'badge',
-        selectedBadge
-          ? JSON.stringify({
-              networkId: selectedBadge.networkId,
-              contractAddress: selectedBadge.contractAddress,
-              communityId: selectedBadge.communityId,
-            })
-          : '',
-      )
-    }
+    /* An untouched file input still sends an empty File, which must never overwrite the stored
+       picture — the API keeps what it has when this arrives empty. */
+    formData.set('profileImage', imageUri ?? formData.get('profileImage_hidden') ?? '')
+    formData.set('tags', JSON.stringify(tags.list))
+    formData.set('links', JSON.stringify(links.list))
 
+    const badge = badgeField()
+    if (badge !== null) formData.set('badge', badge)
+
+    /* Awaited rather than read off state, so a save made moments after the modal opened still
+       syncs. The check is memoised, so it costs nothing once it has answered. */
+    const writesOnchain = syncsOnchain || (await isUniversalProfile(luksoClient, address))
+
+    /* Hup is where every save lands first, a Universal Profile's included. The stamp records the
+       indexer state this row now overtakes, so the profile reads back as what was just typed
+       instead of what LUKSO still says — see cidex/scripts/add-profile-sync-stamp.sql. */
+    if (writesOnchain) formData.set('syncStamp', String(profile?.lastMetadataUpdate ?? ''))
+
+    let saved
     try {
-      const res = await updateProfile(formData, address)
-      if (res.success) {
-        toast(`Your profile has been updated.`, 'success')
-        mutate()
-        setShowProfileModal(false)
-      } else {
-        setError(res.error || 'Failed to update profile')
-      }
+      saved = await updateProfile(formData, address)
     } catch (err) {
       console.error(err)
       setError('An unexpected error occurred')
-    } finally {
       setIsPending(false)
+      return
     }
+
+    if (!saved.success) {
+      setError(saved.error || 'Failed to update profile')
+      setIsPending(false)
+      return
+    }
+
+    mutate()
+    setShowProfileModal(false)
+
+    if (writesOnchain) {
+      /* Owns its own toast from here: pinning the document, the signature and the receipt all
+         outlive this modal, and the save above stands whatever the chain decides. */
+      syncProfileToUniversalProfile({
+        address,
+        fields: {
+          name: String(formData.get('name') ?? '').trim(),
+          description: String(formData.get('description') ?? '').trim(),
+          tags: tags.list,
+          links: links.list,
+          imageUri,
+          imageSize,
+        },
+        mutate,
+      })
+      return
+    }
+
+    toast(`Your profile has been updated.`, 'success')
   }
 
   const showPFP = (e) => {
-    const preview = pfpRef.current
     const file = e.target.files[0]
-    const reader = new FileReader()
+    if (!file) return
 
-    reader.addEventListener('load', () => {
-      preview.src = reader.result
-    })
-
-    if (file) {
-      reader.readAsDataURL(file)
+    /* Caught here as well as on submit, so a picture that cannot be used is refused while the
+       file picker is still the thing the user is thinking about. */
+    if (file.size > MAX_AVATAR_BYTES) {
+      setError(`That picture is too large. Profile pictures have to be ${MAX_AVATAR_MB}MB or smaller.`)
+      e.target.value = ''
+      return
     }
+
+    setError(null)
+
+    /* An object URL rather than a FileReader data URL. Animated GIFs are the heaviest avatars
+       anyone uploads, and base64 puts a third more than the file's own weight into the DOM as a
+       string — on a 13MB GIF that is an 18MB attribute for a 96px circle. This also plays: a
+       data URL animates too, but only after the whole thing has been read and re-encoded. */
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    previewUrlRef.current = URL.createObjectURL(file)
+    pfpRef.current.src = previewUrlRef.current
   }
 
   const addTag = (e) => {
@@ -1301,6 +1428,14 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   }
 
   // Effects
+  // The preview URL is only alive while this modal is
+  useEffect(
+    () => () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    },
+    [],
+  )
+
   useEffect(() => {
     if (typeof getActiveChain === 'function') {
       setActiveChain(getActiveChain())
@@ -1335,77 +1470,86 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-          <h3 className={styles.profileModal__title}>{isUP ? 'Edit Birthday' : 'Edit Profile'}</h3>
+          <h3 className={styles.profileModal__title}>Edit Profile</h3>
           <div className={styles.profileModal__headerSpacer} />
         </header>
 
         <form className={styles.profileModal__form} onSubmit={handleSubmit} encType="multipart/form-data">
           <main className={styles.profileModal__body}>
-            {isUP && (
+            {syncsOnchain && (
               <p className={styles.profileModal__upHint}>
-                Your name, bio, image and links are managed by your{' '}
+                Changes save to Hup straight away, then sync to your{' '}
                 <a href={`https://universaleverything.io/${profile?.wallet_address}`} target="_blank" rel="noopener noreferrer">
                   Universal Profile
-                </a>
-                . Your birthday is stored on Hup.
+                </a>{' '}
+                onchain — your wallet asks you to sign that part. Birthday and origin stay on Hup.
               </p>
             )}
 
-            {!isUP && (
-              <>
-                {/* Avatar */}
-                <div className={styles.profileModal__avatarWrap}>
-                  <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
-                    <figure className={styles.profileModal__avatar}>
-                      {/* Stays a bare img rather than an Avatar: showPFP writes the picked
-                          file's data URL straight onto this node, and a controlled component
-                          would put the saved picture back on its next render */}
-                      <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" onError={handleBrokenAvatar} />
-                      <div className={styles.profileModal__avatarOverlay}>
-                        <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                          <circle cx="12" cy="13" r="4" />
-                        </svg>
-                      </div>
-                    </figure>
-                  </label>
-                  <input
-                    id="pm-profileImage"
-                    type="file"
-                    name="profileImage"
-                    accept="image/*"
-                    onChange={showPFP}
-                    className={styles.profileModal__fileInput}
-                  />
-                  <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
-                  <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
-                </div>
-
-                {/* Name */}
-                <div className={styles.profileModal__field}>
-                  <label className={styles.profileModal__label}>Name</label>
-                  <input
-                    className={styles.profileModal__input}
-                    type="text"
-                    name="name"
-                    defaultValue={profile?.name}
-                    placeholder="Your name"
-                  />
-                </div>
-
-                {/* Bio */}
-                <div className={styles.profileModal__field}>
-                  <label className={styles.profileModal__label}>Bio</label>
-                  <textarea
-                    className={styles.profileModal__textarea}
-                    name="description"
-                    defaultValue={profile?.description}
-                    placeholder="Tell us about yourself..."
-                    rows={3}
-                  />
-                </div>
-              </>
+            {/* An earlier save that never reached the chain: the profile here is right, the
+                Universal Profile behind it is still the old one. */}
+            {profile?.syncPending && (
+              <div className={styles.profileModal__syncNotice}>
+                <span>Saved on Hup, not yet on your Universal Profile.</span>
+                <button type="button" className={styles.profileModal__syncBtn} onClick={syncOnchain}>
+                  Sync
+                </button>
+              </div>
             )}
+
+            {/* Avatar */}
+            <div className={styles.profileModal__avatarWrap}>
+              <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
+                <figure className={styles.profileModal__avatar}>
+                  {/* Stays a bare img rather than an Avatar: showPFP points this node straight at an
+                      object URL for the picked file, and a controlled component would put the
+                      saved picture back on its next render */}
+                  <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" onError={handleBrokenAvatar} />
+                  <div className={styles.profileModal__avatarOverlay}>
+                    <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                  </div>
+                </figure>
+              </label>
+              <input
+                id="pm-profileImage"
+                type="file"
+                name="profileImage"
+                accept="image/*"
+                onChange={showPFP}
+                className={styles.profileModal__fileInput}
+              />
+              <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
+              <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
+            </div>
+
+            {/* Name */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Name</label>
+              <input
+                ref={nameRef}
+                className={styles.profileModal__input}
+                type="text"
+                name="name"
+                defaultValue={PLACEHOLDER_NAMES.has(profile?.name) ? '' : profile?.name}
+                placeholder="Your name"
+              />
+            </div>
+
+            {/* Bio */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Bio</label>
+              <textarea
+                ref={descriptionRef}
+                className={styles.profileModal__textarea}
+                name="description"
+                defaultValue={profile?.description}
+                placeholder="Tell us about yourself..."
+                rows={3}
+              />
+            </div>
 
             {/* Birthday */}
             <div className={styles.profileModal__field}>
@@ -1485,97 +1629,93 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
               </div>
             )}
 
-            {!isUP && (
-              <>
-                {/* Tags */}
-                <div className={styles.profileModal__field}>
-                  <label className={styles.profileModal__label}>Tags</label>
-                  {tags.list.length > 0 && (
-                    <div className={styles.profileModal__chips}>
-                      {tags.list.map((tag, i) => (
-                        <span key={`tag-${i}`} className={styles.profileModal__chip}>
-                          #{tag}
-                          <button type="button" onClick={(e) => removeTag(e, tag)} aria-label={`Remove ${tag}`}>
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className={styles.profileModal__addRow}>
-                    <input
-                      ref={tagRef}
-                      type="text"
-                      placeholder="Add a tag…"
-                      className={styles.profileModal__input}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          addTag()
-                        }
-                      }}
-                    />
-                    <button type="button" onClick={addTag} className={styles.profileModal__addBtn}>
-                      Add
-                    </button>
-                  </div>
+            {/* Tags */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Tags</label>
+              {tags.list.length > 0 && (
+                <div className={styles.profileModal__chips}>
+                  {tags.list.map((tag, i) => (
+                    <span key={`tag-${i}`} className={styles.profileModal__chip}>
+                      #{tag}
+                      <button type="button" onClick={(e) => removeTag(e, tag)} aria-label={`Remove ${tag}`}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
                 </div>
+              )}
+              <div className={styles.profileModal__addRow}>
+                <input
+                  ref={tagRef}
+                  type="text"
+                  placeholder="Add a tag…"
+                  className={styles.profileModal__input}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addTag()
+                    }
+                  }}
+                />
+                <button type="button" onClick={addTag} className={styles.profileModal__addBtn}>
+                  Add
+                </button>
+              </div>
+            </div>
 
-                {/* Links */}
-                <div className={styles.profileModal__field}>
-                  <label className={styles.profileModal__label}>Links</label>
-                  {links.list.length > 0 && (
-                    <div className={styles.profileModal__linkList}>
-                      {links.list.map((link, i) => (
-                        <div
-                          key={`link-${i}`}
-                          className={clsx(styles.profileModal__linkItem, i === editingLinkIndex && styles['profileModal__linkItem--editing'])}
-                        >
-                          <div className={styles.profileModal__linkInfo}>
-                            <span className={styles.profileModal__linkName}>{link.name}</span>
-                            <span className={styles.profileModal__linkUrl}>{link.url}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => startEditLink(e, i)}
-                            aria-label={`Edit ${link.name}`}
-                            className={styles.profileModal__linkEdit}
-                          >
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => removeLink(e, i)}
-                            aria-label={`Remove ${link.name}`}
-                            className={styles.profileModal__linkRemove}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className={styles.profileModal__addRow}>
-                    <input ref={linkNameRef} type="text" placeholder="Label" className={styles.profileModal__input} />
-                    <input ref={linkURLRef} type="text" placeholder="https://…" className={styles.profileModal__input} />
-                    <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>
-                      {editingLinkIndex !== null ? 'Update' : 'Add'}
-                    </button>
-                    {editingLinkIndex !== null && (
+            {/* Links */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Links</label>
+              {links.list.length > 0 && (
+                <div className={styles.profileModal__linkList}>
+                  {links.list.map((link, i) => (
+                    <div
+                      key={`link-${i}`}
+                      className={clsx(styles.profileModal__linkItem, i === editingLinkIndex && styles['profileModal__linkItem--editing'])}
+                    >
+                      <div className={styles.profileModal__linkInfo}>
+                        <span className={styles.profileModal__linkName}>{link.name}</span>
+                        <span className={styles.profileModal__linkUrl}>{link.url}</span>
+                      </div>
                       <button
                         type="button"
-                        onClick={cancelEditLink}
-                        className={clsx(styles.profileModal__addBtn, styles['profileModal__addBtn--ghost'])}
+                        onClick={(e) => startEditLink(e, i)}
+                        aria-label={`Edit ${link.name}`}
+                        className={styles.profileModal__linkEdit}
                       >
-                        Cancel
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                        </svg>
                       </button>
-                    )}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={(e) => removeLink(e, i)}
+                        aria-label={`Remove ${link.name}`}
+                        className={styles.profileModal__linkRemove}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              </>
-            )}
+              )}
+              <div className={styles.profileModal__addRow}>
+                <input ref={linkNameRef} type="text" placeholder="Label" className={styles.profileModal__input} />
+                <input ref={linkURLRef} type="text" placeholder="https://…" className={styles.profileModal__input} />
+                <button type="button" onClick={addLink} className={styles.profileModal__addBtn}>
+                  {editingLinkIndex !== null ? 'Update' : 'Add'}
+                </button>
+                {editingLinkIndex !== null && (
+                  <button
+                    type="button"
+                    onClick={cancelEditLink}
+                    className={clsx(styles.profileModal__addBtn, styles['profileModal__addBtn--ghost'])}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
 
             {error && <p className={styles.profileModal__error}>{error}</p>}
           </main>

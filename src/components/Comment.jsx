@@ -11,7 +11,7 @@ import {
   initPostCommentContract,
   getHasLikedPost,
 } from '@/lib/communication'
-import { getProfile, getUniversalProfile, getViewPost } from '@/lib/api'
+import { getProfile, getViewPost } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { getActiveChain } from '@/lib/communication'
 import commentAbi from '@/abi/post-comment.json'
@@ -26,7 +26,6 @@ import {
 } from '@/components/Icons'
 import { renderMarkdown } from '@/lib/markdown'
 import { getIPFS } from '@/lib/ipfs'
-import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import Avatar from './ui/Avatar'
 import MediaGallery from './Gallery'
 import styles from './Post.module.scss'
@@ -526,40 +525,21 @@ const ConnectedProfile = ({ addr }) => {
   const [profile, setProfile] = useState()
   const activeChain = getActiveChain()
   const defaultUsername = `hup-user`
-  const [isItUp, setIsItUp] = useState()
+
+  /* The same read the profile page and every byline use. Going to the LUKSO indexer directly
+     instead, as this did, means a name or picture saved on Hup does not appear here until the
+     matching onchain write has been mined and indexed — and never at all if it was not signed. */
   useEffect(() => {
-    getUniversalProfile(addr).then((res) => {
-      // console.log(res)
-      if (res.data && Array.isArray(res.data.Profile) && res.data.Profile.length > 0) {
-        setIsItUp(true)
-        setProfile({
-          wallet: res.data.id,
-          name: res.data.Profile[0].name,
-          description: res.data.description,
-          profileImage:
-            res.data.Profile[0].profileImages.length > 0
-              ? res.data.Profile[0].profileImages[0].src
-              : resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 }),
-          profileHeader: '',
-          tags: JSON.stringify(res.data.tags),
-          links: JSON.stringify(res.data.links_),
-          lastUpdate: '',
-        })
-      } else {
-        getProfile(addr).then((res) => {
-          //  console.log(res)
-          if (res.wallet) {
-            const profileImage =
-              res.profileImage !== ''
-                ? `${process.env.NEXT_PUBLIC_UPLOAD_URL}${res.profileImage}`
-                : resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
-            res.profileImage = profileImage
-            setProfile(res)
-          }
-        })
-      }
+    let cancelled = false
+
+    getProfile(addr).then((res) => {
+      if (!cancelled && res?.data) setProfile(res.data)
     })
-  }, [])
+
+    return () => {
+      cancelled = true
+    }
+  }, [addr])
 
   if (!profile)
     return (

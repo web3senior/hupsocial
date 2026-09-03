@@ -980,6 +980,37 @@
     }
   }
 
+  // The row offering to push an already-saved profile onchain
+  &__syncNotice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: var(--system-12-font-size);
+    color: var(--text);
+    background-color: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.6rem 0.75rem;
+  }
+
+  &__syncBtn {
+    flex-shrink: 0;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: var(--color-primary);
+    font-size: var(--system-12-font-size);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-primary);
+      color: #fff;
+    }
+  }
+
   // Avatar
   &__avatarWrap {
     display: flex;

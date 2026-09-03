@@ -7,6 +7,18 @@ import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/
 import { resolveAgentProfile } from '@/lib/agentProfile'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 
+/** Stored JSON list columns come back as text; the indexer's own fields are already arrays. */
+function parseJsonList(value) {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string' || value.trim() === '') return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 /**
  * The origin a profile shows, resolved to something renderable. An onchain origin needs nothing
  * but the build's own list; a country needs its name, and that is a second small query rather
@@ -79,9 +91,43 @@ export async function GET(request, { params }) {
     const profile = upData?.data?.Profile?.[0]
 
     if (profile && (profile.name || profile.fullName)) {
+      /* Hup-first editing. A Universal Profile edited here is written to our own row straight
+         away and pushed onchain afterwards, so between those two moments — and for as long as a
+         signature is never given — the indexer is still serving the metadata the user has just
+         replaced. The stamp says which copy is newer, by equality against the indexer's own
+         value: see cidex/scripts/add-profile-sync-stamp.sql. */
+      const liveStamp = String(profile.lastMetadataUpdate ?? '')
+      const storedStamp = rows[0]?.profile_sync_stamp ?? null
+      const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
+
+      if (hupIsAhead) {
+        profile.name = rows[0].name
+        profile.description = rows[0].description
+        profile.tags = parseJsonList(rows[0].tags)
+        profile.links = parseJsonList(rows[0].links)
+        /* fullName is the indexer's own "name#tag" rendering of the name that was just replaced.
+           Dropping it lets a byline rebuild one from the name above instead of showing the old
+           one — see the displayName memo in components/Profile.jsx. */
+        profile.fullName = null
+        /* The stored reference rather than the resolved URL: a retry has to put this picture back
+           into an LSP3 document, and a proxy URL cannot be turned back into a CID. */
+        profile.profileImageRef = rows[0].profileImage || null
+        /* What the editor offers a Sync button for. */
+        profile.syncPending = true
+      } else if (storedStamp !== null) {
+        /* The chain has moved past the edit — our own write landed, or the profile was changed on
+           another client. Either way the indexer is authoritative again and the marker has done
+           its job. Fire and forget: a failed clear costs one more comparison on the next read,
+           never the profile itself. */
+        pool
+          .execute('UPDATE users SET profile_sync_stamp = NULL WHERE wallet_address = ?', [address])
+          .catch((clearError) => console.error('[SYNC_STAMP_CLEAR_ERROR]:', clearError.message))
+      }
+
       /* Fallback to profileImages array elements if they exist as per incoming payload */
-      profile.profileImage =
-        profile.profileImages && profile.profileImages.length > 0
+      profile.profileImage = hupIsAhead
+        ? resolveAvatarImageUrl(rows[0].profileImage, AVATAR_MAX_SIZE)
+        : profile.profileImages && profile.profileImages.length > 0
           ? resolveAvatarImageUrl(profile.profileImages[0].src, AVATAR_MAX_SIZE)
           : null
 
@@ -119,6 +165,9 @@ export async function GET(request, { params }) {
 
     /* Resolve profile image from any protocol (IPFS, UP cloud, http, etc.) */
     dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
+
+    /* Only meaningful beside a Universal Profile, which this branch by definition is not. */
+    delete dbProfile.profile_sync_stamp
 
     /* The raw pointer columns say nothing a client can render, and a stale one must never be
        mistaken for a badge — only the verified resolution above is exposed. */
@@ -164,6 +213,7 @@ export async function PUT(request, { params }) {
     const links = formData.get('links')
     const badge = parseBadgeSelection(formData.get('badge'))
     const origin = parseOriginSelection(formData.get('origin'))
+    const syncStamp = formData.get('syncStamp')
 
     // Verify profile exists before executing update
     const [existing] = await pool.execute('SELECT wallet_address FROM users WHERE wallet_address = ?', [address])
@@ -243,6 +293,14 @@ export async function PUT(request, { params }) {
       }
       updateFields.push('`origin_code` = ?')
       queryValues.push(origin.code)
+    }
+
+    /* Sent only by the owner's editor, and only for a Universal Profile: it carries the indexer
+       stamp this save has just overtaken, which is what makes the read above prefer this row
+       until the matching onchain write lands. */
+    if (typeof syncStamp === 'string') {
+      updateFields.push('`profile_sync_stamp` = ?')
+      queryValues.push(syncStamp)
     }
 
     if (updateFields.length === 0) {
