@@ -8,7 +8,12 @@
 
 .profile {
   width: max-content; /* Let it size to its contents naturally */
-  flex-shrink: 0; /* Prevent the compose input from squishing this block */
+  // ...but never past the row it sits in, or a long display name pushes the post's own menu off
+  // the card. min-width is what lets it shrink at all — a flex item's automatic minimum is its
+  // min-content, and the nowrap name counts in full towards that however well it truncates. The
+  // floor is the picture, which never gives; the name is what does.
+  max-width: 100%;
+  min-width: var(--profile-avatar-size, 32px);
   gap: 0.7rem;
 
   code {
