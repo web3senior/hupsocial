@@ -18,7 +18,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
-import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useWriteContract } from 'wagmi'
+import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useReadContract, useWriteContract } from 'wagmi'
 import { lukso } from 'wagmi/chains'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
@@ -453,39 +453,46 @@ const Profile = ({ addr }) => {
   // every replacement the user saved after it.
   useEffect(() => setCoverFailed(false), [profile?.profileHeader])
 
-  // LSP26-compatible follow/unfollow. followerSystem is deployed identically on every chain, so
-  // follower count / isFollowing are read from cidex's cross-network aggregate (the `follows`
-  // table) rather than a live on-chain read — a direct read would only ever reflect whichever
-  // chain the *viewer's* wallet happens to be connected to, not a true cross-chain total.
-  // followerSystem itself is still only used for the actual follow()/unfollow() transaction,
-  // which always targets whatever chain the wallet is currently on.
+  // The connected chain decides follow vs unfollow — that is where the tx lands, and the
+  // cross-network aggregate can disagree with it (indexer lag, or a follow made on another chain).
   const followerSystemAddress = activeChain?.[1]?.followerSystem
+  const activeChainId = activeChain?.[0]?.id
+  const canReadFollowState = Boolean(followerSystemAddress && walletKind !== 'solana' && isEvmAddress(address) && isEvmAddress(addr))
 
+  const {
+    data: onchainFollowing,
+    isLoading: isFollowStateLoading,
+    refetch: refetchOnchainFollowing,
+  } = useReadContract({
+    address: followerSystemAddress,
+    abi: followerSystemAbi,
+    functionName: 'isFollowing',
+    args: [address, addr],
+    chainId: activeChainId,
+    query: { enabled: canReadFollowState },
+  })
+
+  // The count stays the cross-network aggregate from cidex; only the button is per-chain
   const [followerCount, setFollowerCount] = useState(0)
-  const [isFollowingTarget, setIsFollowingTarget] = useState(false)
+  // Set on click, cleared once the chain has been re-read after the tx settles or fails
+  const [optimisticFollowing, setOptimisticFollowing] = useState(null)
+  const isFollowingTarget = optimisticFollowing ?? Boolean(onchainFollowing)
 
-  const refetchFollowStats = () => {
+  const refetchFollowerCount = () => {
     if (!addr) return
-    const qs = address ? `?viewer_address=${address}` : ''
-    fetch(`/api/v1/users/${addr}/followers${qs}`)
+    fetch(`/api/v1/users/${addr}/followers`)
       .then((r) => r.json())
-      .then((res) => {
-        if (!res.success) return
-        setFollowerCount(res.meta.total)
-        if (res.isFollowing !== null) setIsFollowingTarget(Boolean(res.isFollowing))
-      })
+      .then((res) => res.success && setFollowerCount(res.meta.total))
       .catch(() => {})
   }
 
   useEffect(() => {
-    refetchFollowStats()
-  }, [addr, address])
+    refetchFollowerCount()
+  }, [addr])
 
-  // cidex needs a few seconds to catch the event, so the confirmed-tx refetch below is a
-  // reconciliation pass — the follow() handler already updates isFollowingTarget/followerCount
-  // optimistically for instant feedback.
   useEffect(() => {
-    if (isConfirmed) refetchFollowStats()
+    if (!isConfirmed) return
+    refetchOnchainFollowing().finally(() => setOptimisticFollowing(null))
   }, [isConfirmed])
 
   const follow = () => {
@@ -494,7 +501,7 @@ const Profile = ({ addr }) => {
       return
     }
     const wasFollowing = isFollowingTarget
-    setIsFollowingTarget(!wasFollowing)
+    setOptimisticFollowing(!wasFollowing)
     setFollowerCount((prev) => Math.max(0, prev + (wasFollowing ? -1 : 1)))
 
     writeContract({
@@ -502,6 +509,7 @@ const Profile = ({ addr }) => {
       abi: followerSystemAbi,
       functionName: wasFollowing ? 'unfollow' : 'follow',
       args: [addr],
+      chainId: activeChainId,
     })
   }
 
@@ -509,8 +517,9 @@ const Profile = ({ addr }) => {
     const error = submitError || receiptError
     if (!error) return
     toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
-    // The optimistic flip in follow() didn't happen — revert it now that the tx actually failed.
-    refetchFollowStats()
+    // Nothing changed onchain — drop the optimistic flip and put the count back
+    setOptimisticFollowing(null)
+    refetchFollowerCount()
   }, [submitError, receiptError])
 
   const handleDisconnect = async () => {
@@ -755,7 +764,7 @@ const Profile = ({ addr }) => {
                   className={`${styles.profile__btnFollow} w-100`}
                   type="button"
                   onClick={follow}
-                  disabled={isSigning || isConfirming}
+                  disabled={isSigning || isConfirming || isFollowStateLoading}
                 >
                   {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
                 </button>

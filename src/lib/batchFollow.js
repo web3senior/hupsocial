@@ -15,18 +15,16 @@ export const MAX_BATCH_FOLLOW_COUNT = 50
 const MAX_FOLLOWING_READ_COUNT = 500
 
 /**
- * Splits a selection into the addresses followBatch will accept and the ones it
- * would revert on. The authoritative "already following" answer is the active
- * chain's contract — the cross-network aggregate that seeds row state can say
- * "not following" while this chain says otherwise.
+ * Every address the viewer follows on the active chain, lowercased. This is the answer
+ * that decides follow vs unfollow — the tx lands on this chain, and the cross-network
+ * aggregate can disagree with it (indexer lag, or a follow made on another chain).
  * @param {Object} params
  * @param {Object} params.client Public client bound to the active chain.
  * @param {string} params.contractAddress LSP26 followerSystem on that chain.
- * @param {Array<string>} params.addresses Selected profile addresses.
- * @param {string} params.viewer Wallet the follows are attributed to.
- * @returns {Promise<{followable: Array<string>, dropped: Array<{address: string, reason: string}>}>}
+ * @param {string} params.viewer Wallet whose follows are read.
+ * @returns {Promise<Set<string>>}
  */
-export const preflightSelection = async ({ client, contractAddress, addresses, viewer }) => {
+export const readFollowingSet = async ({ client, contractAddress, viewer }) => {
   const followingCount = await client.readContract({
     abi: followerSystemAbi,
     address: contractAddress,
@@ -34,7 +32,7 @@ export const preflightSelection = async ({ client, contractAddress, addresses, v
     args: [viewer],
   })
 
-  const alreadyFollowing = new Set()
+  const following = new Set()
   const total = Number(followingCount)
 
   for (let start = 0; start < total; start += MAX_FOLLOWING_READ_COUNT) {
@@ -45,8 +43,24 @@ export const preflightSelection = async ({ client, contractAddress, addresses, v
       functionName: 'getFollowsByIndex',
       args: [viewer, BigInt(start), BigInt(end)],
     })
-    for (const followed of slice) alreadyFollowing.add(followed.toLowerCase())
+    for (const followed of slice) following.add(followed.toLowerCase())
   }
+
+  return following
+}
+
+/**
+ * Splits a selection into the addresses followBatch will accept and the ones it
+ * would revert on, judged by the active chain's contract.
+ * @param {Object} params
+ * @param {Object} params.client Public client bound to the active chain.
+ * @param {string} params.contractAddress LSP26 followerSystem on that chain.
+ * @param {Array<string>} params.addresses Selected profile addresses.
+ * @param {string} params.viewer Wallet the follows are attributed to.
+ * @returns {Promise<{followable: Array<string>, dropped: Array<{address: string, reason: string}>}>}
+ */
+export const preflightSelection = async ({ client, contractAddress, addresses, viewer }) => {
+  const alreadyFollowing = await readFollowingSet({ client, contractAddress, viewer })
 
   const followable = []
   const dropped = []
