@@ -50,7 +50,7 @@ const compactFormatter = new Intl.NumberFormat('en-US', {
 })
 
 const EMPTY_STATS = {
-  active_users: 0,
+  users: 0,
   root_posts: 0,
   comments: 0,
   likes: 0,
@@ -155,9 +155,7 @@ export default function LeaderboardPage() {
           </header>
 
           <section className={styles.summaryGrid} aria-label="Leaderboard summary">
-            {/* active_users counts wallets that posted, not members — "Users" read as a
-                contradiction next to a longer ranked list and the member count elsewhere */}
-            <StatCard icon={UsersIcon} label="Posters" value={stats.active_users} />
+            <StatCard icon={UsersIcon} label={period === 'all' ? 'Users' : 'New users'} value={stats.users} />
             <StatCard icon={FlameIcon} label="Posts" value={stats.root_posts} />
             <StatCard icon={ChatCircleIcon} label="Comments" value={stats.comments} />
             <StatCard icon={HeartIcon} label="Likes" value={stats.likes} />

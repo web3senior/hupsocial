@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { resolveAvatarImageUrl } from '@/lib/storageHelper'
+import { MEMBER_ROW_SQL } from '@/lib/members'
 
 export const runtime = 'nodejs'
 
@@ -27,9 +28,6 @@ const FACE_COUNT = 3
 const FACE_SIZE = 26
 const CACHE_TTL_MS = 60_000
 
-/* A row only counts as a member once it carries a profile — see the file header for why */
-const HAS_PROFILE = `((name IS NOT NULL AND name <> '') OR (profileImage IS NOT NULL AND profileImage <> ''))`
-
 let cache = { at: 0, payload: null }
 
 export async function GET() {
@@ -39,7 +37,7 @@ export async function GET() {
     }
 
     const [[countRows], [faceRows]] = await Promise.all([
-      pool.execute(`SELECT COUNT(*) AS total FROM users WHERE ${HAS_PROFILE}`),
+      pool.execute(`SELECT COUNT(*) AS total FROM users WHERE ${MEMBER_ROW_SQL}`),
       pool.execute(
         `SELECT wallet_address, profileImage AS profile_image
            FROM users

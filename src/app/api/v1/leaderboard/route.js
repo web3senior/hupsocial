@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { MEMBER_ROW_SQL } from '@/lib/members'
 
 export const runtime = 'nodejs'
 
@@ -319,29 +320,11 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
 }
 
 function buildStatsQuery(networkId, since) {
-  const postFilter = buildWhere({
-    alias: 'p',
-    timeColumn: 'created_at',
-    networkId,
-    since,
-    baseConditions: ['p.wallet_address IS NOT NULL'],
-  })
-  const likeFilter = buildWhere({
-    alias: 'pl',
-    timeColumn: 'inserted_at',
-    networkId,
-    since,
-  })
-  const viewFilter = buildWhere({
-    alias: 'pv',
-    timeColumn: 'viewed_at',
-    networkId,
-    since,
-  })
+  const { memberFilter, postFilter, likeFilter, viewFilter } = buildStatsFilters(networkId, since)
 
   return `
     SELECT
-      (SELECT COUNT(DISTINCT p.wallet_address) FROM posts p ${postFilter.where}) AS active_users,
+      (SELECT COUNT(*) FROM users ${memberFilter.where}) AS users,
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NULL AND p.is_repost IS NULL) AS root_posts,
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NOT NULL) AS comments,
       (SELECT COUNT(*) FROM post_likes pl ${likeFilter.where}) AS likes,
@@ -350,33 +333,37 @@ function buildStatsQuery(networkId, since) {
 }
 
 function buildStatsParams(networkId, since) {
-  const postFilter = buildWhere({
-    alias: 'p',
-    timeColumn: 'created_at',
-    networkId,
-    since,
-    baseConditions: ['p.wallet_address IS NOT NULL'],
-  })
-  const likeFilter = buildWhere({
-    alias: 'pl',
-    timeColumn: 'inserted_at',
-    networkId,
-    since,
-  })
-  const viewFilter = buildWhere({
-    alias: 'pv',
-    timeColumn: 'viewed_at',
-    networkId,
-    since,
-  })
+  const { memberFilter, postFilter, likeFilter, viewFilter } = buildStatsFilters(networkId, since)
 
   return [
-    ...postFilter.params,
+    ...memberFilter.params,
     ...postFilter.params,
     ...postFilter.params,
     ...likeFilter.params,
     ...viewFilter.params,
   ]
+}
+
+function buildStatsFilters(networkId, since) {
+  return {
+    /* Members are cross-network, so only the period applies: all time is the whole community, a window is who joined in it */
+    memberFilter: buildWhere({
+      alias: 'users',
+      timeColumn: 'created_at',
+      networkId: null,
+      since,
+      baseConditions: [MEMBER_ROW_SQL],
+    }),
+    postFilter: buildWhere({
+      alias: 'p',
+      timeColumn: 'created_at',
+      networkId,
+      since,
+      baseConditions: ['p.wallet_address IS NOT NULL'],
+    }),
+    likeFilter: buildWhere({ alias: 'pl', timeColumn: 'inserted_at', networkId, since }),
+    viewFilter: buildWhere({ alias: 'pv', timeColumn: 'viewed_at', networkId, since }),
+  }
 }
 
 function buildWhere({ alias, timeColumn, networkId, since, baseConditions = [] }) {
@@ -448,7 +435,7 @@ function serializeLeader(row, rank) {
 
 function serializeStats(stats = {}) {
   return {
-    active_users: toNumber(stats.active_users),
+    users: toNumber(stats.users),
     root_posts: toNumber(stats.root_posts),
     comments: toNumber(stats.comments),
     likes: toNumber(stats.likes),
