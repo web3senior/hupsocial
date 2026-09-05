@@ -11,6 +11,8 @@ import { toRelativeTime } from '@/lib/dateHelper'
 import { displayLinks } from '@/lib/socialLinks'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { getCommunityCategory } from '@/config/communityCategories'
+import { appChains } from '@/config/contracts'
+import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
 import useCommunityCategories from '@/hooks/useCommunityCategories'
 import { ADMISSION_OPTIONS } from '../../../membershipOptions'
 import { CommunityCard, CreatorName } from '../../../page'
@@ -65,6 +67,8 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
   }, [resolvedNetworkId, resolvedCommunityId, activeAccountAddress, hasSeed])
 
   const name = community?.name || `Community #${resolvedCommunityId}`
+  const chainInfo = appChains.find((chain) => chain.id === Number(community?.network_id ?? resolvedNetworkId))
+  const chainIcon = chainIconFor(chainInfo)
 
   // cidex keeps the community's whole IPFS metadata JSON in the indexed row, so the optional
   // website/socials come along with the columns it also splits out — no extra fetch, and a
@@ -89,8 +93,9 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
 
         {!community && <div className={clsx('shimmer', styles.details__shimmer)} />}
 
+        {/* Colours come from the community's chain, not the connected wallet's */}
         {community && (
-          <div className={`${styles.details__header} animate fade`}>
+          <div className={`${styles.details__header} animate fade`} style={networkColorStyle(chainInfo)}>
             {community.cover_url ? (
               <img src={resolveStorageImageUrl(community.cover_url, { width: 1200 })} alt="" className={styles.details__cover} />
             ) : (
@@ -115,6 +120,12 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
             </div>
 
             <div className={styles.details__tags}>
+              {chainInfo && (
+                <span className={clsx(styles.details__tag, styles['details__tag--chain'])} title={`Created on ${chainInfo.name}`}>
+                  {chainIcon && <img src={chainIcon} alt="" />}
+                  {chainInfo.name}
+                </span>
+              )}
               {/* Indexed `category` slug; NULL (pre-category communities, off-list values) renders as "Other" */}
               <span className={styles.details__tag} title="Category">
                 {getCommunityCategory(community.category, categories).label}

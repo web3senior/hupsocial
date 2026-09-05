@@ -474,6 +474,18 @@
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     border: 1px solid var(--border);
+
+    &--chain {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      img {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+      }
+    }
   }
 }
 

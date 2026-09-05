@@ -158,6 +158,12 @@
     &--muted {
       color: var(--text-muted);
     }
+
+    &--chain img {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
   }
 
   // Website + socials from the metadata's links array (optional, creator-supplied)

@@ -39,6 +39,8 @@ import {
 import { getActiveChain } from '@/lib/communication'
 import { useProfile } from '@/hooks/useProfile'
 import { config, CONTRACTS } from '@/config/wagmi'
+import { appChains } from '@/config/contracts'
+import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
 import { getPosts } from '@/lib/api'
 import { getIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
@@ -321,6 +323,8 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // write to that chain — reads via a chain-bound public client, writes via wagmi's chainId
   // param (which prompts a network switch when the wallet is elsewhere).
   const chainId = networkId ? Number(networkId) : activeChainId
+  const chainInfo = appChains.find((chain) => chain.id === chainId)
+  const chainIcon = chainIconFor(chainInfo)
   const publicClient = usePublicClient({ chainId })
   const vault = useCommunityVault()
   const router = useRouter()
@@ -2544,7 +2548,8 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // Modify and Manage Members open as NativeDialog modals (CardDialog below) rather than
   // expanding the card inline, so the card itself never stretches the directory grid
   return (
-    <div className={hideHeader ? undefined : styles.card}>
+    // Colours come from the community's chain, not the connected wallet's
+    <div className={hideHeader ? undefined : styles.card} style={networkColorStyle(chainInfo)}>
       <>
           {hideHeader ? (
             <>
@@ -2624,6 +2629,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                 <p className={styles.card__summary}>{metadata.summary || metadata.description}</p>
 
                 <div className={styles.card__tags} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                  {/* The directory defaults to every network, so each card names the chain it lives on */}
+                  {chainInfo && (
+                    <span className={clsx(styles.card__tag, styles['card__tag--chain'])} title={`Created on ${chainInfo.name}`}>
+                      {chainIcon && <img src={chainIcon} alt="" loading="lazy" />}
+                      {chainInfo.name}
+                    </span>
+                  )}
                   {/* Unknown/missing slugs render as "Other" — see config/communityCategories.js */}
                   <span className={styles.card__tag} title="Category">
                     {getCommunityCategory(metadata.category, categories).label}
