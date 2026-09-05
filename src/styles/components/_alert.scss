@@ -59,6 +59,64 @@ $alerts: (
   ),
 );
 
+// Dark-theme twin of $alerts: the hue as a translucent tint over the page, lighter ink on top
+$alerts-dark: (
+  primary: (
+    background: rgba(28, 120, 192, 0.18),
+    color: #7dc0f7,
+    stroke: rgba(28, 120, 192, 0.45),
+    link: #b4dcff,
+  ),
+  secondary: (
+    background: rgba(148, 163, 184, 0.14),
+    color: #cbd5e1,
+    stroke: rgba(148, 163, 184, 0.35),
+    link: #e2e8f0,
+  ),
+  danger: (
+    background: rgba(254, 0, 91, 0.14),
+    color: #ff7aa8,
+    stroke: rgba(254, 0, 91, 0.4),
+    link: #ffb8d1,
+  ),
+  info: (
+    background: rgba(6, 182, 212, 0.14),
+    color: #67e8f9,
+    stroke: rgba(6, 182, 212, 0.4),
+    link: #a5f3fc,
+  ),
+  warning: (
+    background: rgba(245, 158, 11, 0.14),
+    color: #fbbf24,
+    stroke: rgba(245, 158, 11, 0.4),
+    link: #fde68a,
+  ),
+  dark: (
+    background: rgba(255, 255, 255, 0.08),
+    color: #d4d4d8,
+    stroke: rgba(255, 255, 255, 0.16),
+    link: #f4f4f5,
+  ),
+  light: (
+    background: rgba(255, 255, 255, 0.04),
+    color: #a1a1aa,
+    stroke: rgba(255, 255, 255, 0.1),
+    link: #d4d4d8,
+  ),
+  success: (
+    background: rgba(34, 197, 94, 0.14),
+    color: #4ade80,
+    stroke: rgba(34, 197, 94, 0.4),
+    link: #bbf7d0,
+  ),
+  important: (
+    background: rgba(189, 52, 254, 0.2),
+    color: #c084fc,
+    stroke: #9e5cff,
+    link: #d8b4fe,
+  ),
+);
+
 $border: (
   width: 1px,
   style: solid,
@@ -112,6 +170,25 @@ $padding: (
       hr {
         border-top-color: map.get($alerts, $alert, stroke);
       }
+
+      // The palette above assumes a white page; both dark themes swap to $alerts-dark
+      [data-theme='dark'] &,
+      [data-theme='terminal'] & {
+        color: map.get($alerts-dark, $alert, color);
+        background-color: map.get($alerts-dark, $alert, background);
+        border-color: map.get($alerts-dark, $alert, stroke);
+
+        .alert__link {
+          color: map.get($alerts-dark, $alert, link);
+        }
+
+        .alert__icon {
+          color: map.get($alerts-dark, $alert, color);
+        }
+        hr {
+          border-top-color: map.get($alerts-dark, $alert, stroke);
+        }
+      }
     }
   }
 }
@@ -133,6 +210,12 @@ $padding: (
     line-height: 1;
     color: #000;
     text-shadow: 0 1px 0 #fff;
+
+    [data-theme='dark'] &,
+    [data-theme='terminal'] & {
+      color: inherit;
+      text-shadow: none;
+    }
   }
 }
 
