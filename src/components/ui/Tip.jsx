@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
@@ -16,19 +15,19 @@ const plainUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD
 /** Earned dollars for the badge: always two decimals, compact past 1k. */
 const formatEarned = (usd) => (usd >= 1000 ? compactUsd : plainUsd).format(usd)
 
+/** The same figure without its currency sign — the pill draws the sign itself. */
+const formatEarnedFigure = (usd) =>
+  (usd >= 1000 ? compactUsd : plainUsd)
+    .formatToParts(usd)
+    .filter((part) => part.type !== 'currency')
+    .map((part) => part.value)
+    .join('')
+    .trim()
+
+// The spinning dollar sign the earned pill wears in place of a "+$" prefix
+const DOLLAR_SIGN_SRC = '/dollar.webp'
+
 const compactCount = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
-const compactToken = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 })
-
-/** Soul label for the last tip: dollars when priced, token amount on unpriced chains. */
-const formatLastTip = (lastTip) => {
-  if (lastTip?.usd > 0) return formatEarned(lastTip.usd)
-  if (lastTip?.amount > 0 && lastTip.symbol) return `${compactToken.format(lastTip.amount)} ${lastTip.symbol}`
-  return null
-}
-
-// Souls already released this page load, keyed by post AND label — scrolling back past a
-// post stays quiet, but a genuinely new tip landing live (the label changes) replays it.
-const playedSouls = new Set()
 
 /**
  * Tip Interaction Component
@@ -36,8 +35,6 @@ const playedSouls = new Set()
  * cidex-indexed tips table and priced at read time). Prices are best effort — on a chain
  * with no market price the badge falls back to the tip count, which is what it always was.
  * The TipModal mutates the same stats key after a confirmed tip.
- * When the post settles into view, the most recent tip (last_tip from the same API
- * helper) rises out of the badge and dissolves — once per post per page load.
  * @param {Object} props
  * @param {Object} props.post Core content model with network metadata.
  * @param {Function} props.onTip Opens the tip modal for this post.
@@ -46,46 +43,10 @@ export const Tip = ({ post, onTip }) => {
   const isMounted = useClientMounted()
   const { isConnected } = useConnection()
   const { stats } = usePostStats(post)
-  const buttonRef = useRef(null)
-  const [soul, setSoul] = useState(null)
 
   const tipCount = Number(stats?.total_tips) || 0
   const earnedUsd = Number(stats?.tips_usd) || 0
   const hasEarned = earnedUsd > 0
-
-  const soulLabel = formatLastTip(stats?.last_tip)
-  const soulKey = soulLabel ? `${post.network_id}:${post.id}:${soulLabel}` : null
-
-  // Release the soul when the reader actually lands on the post: 60% of the button in
-  // view held for a beat, so souls don't stream out of every card during a fast scroll.
-  useEffect(() => {
-    const node = buttonRef.current
-    if (!node || !soulKey || playedSouls.has(soulKey) || typeof IntersectionObserver === 'undefined') return
-
-    let dwellTimer
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          dwellTimer = setTimeout(() => {
-            playedSouls.add(soulKey)
-            setSoul(soulLabel)
-            observer.disconnect()
-          }, 450)
-        } else {
-          clearTimeout(dwellTimer)
-        }
-      },
-      { threshold: 0.6 },
-    )
-    observer.observe(node)
-
-    return () => {
-      clearTimeout(dwellTimer)
-      observer.disconnect()
-    }
-    // isMounted: the button doesn't exist on the first (pre-mount) render, so the
-    // effect must re-run once it does or the observer never attaches.
-  }, [isMounted, soulKey, soulLabel])
 
   const handleTip = (e) => {
     e.stopPropagation()
@@ -102,28 +63,23 @@ export const Tip = ({ post, onTip }) => {
 
   return (
     <Tooltip
-      // Tooltip clones the child with its own ref, so the button ref must ride the
-      // Tooltip's forwarded ref to reach the real trigger node.
-      ref={buttonRef}
       content={hasEarned ? `Earned ${formatEarned(earnedUsd)} from ${tipCount} ${tipCount === 1 ? 'tip' : 'tips'}` : 'Tip creator'}
       placement="bottom"
       size="compact"
       hoverOnly
     >
       <button data-action="tip" data-earned={hasEarned || undefined} aria-label="Tip the author" onClick={handleTip}>
-        {/* The soul rises from the icon — the body — so both share one positioning anchor */}
-        <span className={styles.tipSoulAnchor}>
-          <TipIcon />
-          {soul && (
-            <span className={styles.tipSoul} aria-hidden="true" onAnimationEnd={() => setSoul(null)}>
-              +{soul}
-            </span>
-          )}
-        </span>
+        <TipIcon />
         {hasEarned ? (
           // Keyed on the dollar figure so the counter replays its slide-up when a tip lands,
           // not on every price tick that leaves the rounded label unchanged.
-          <Counter value={formatEarned(earnedUsd)}>+{formatEarned(earnedUsd)}</Counter>
+          <Counter value={formatEarned(earnedUsd)}>
+            {/* The spinning sign stands in for the "+$" — the figure is what it earned */}
+            <span className={styles.tipEarned}>
+              <img className={styles.tipEarned__sign} src={DOLLAR_SIGN_SRC} alt="" />
+              {formatEarnedFigure(earnedUsd)}
+            </span>
+          </Counter>
         ) : (
           tipCount > 0 && <Counter value={tipCount}>{compactCount.format(tipCount)}</Counter>
         )}
