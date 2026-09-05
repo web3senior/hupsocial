@@ -117,5 +117,6 @@ authoritative should be read from the contracts directly.
 
 ## Optional
 
-- [Sitemap](https://hup.social/sitemap.xml): crawlable URL index.
+- [Sitemap index](https://hup.social/sitemap-index.xml): every sitemap, including the paginated profile sitemaps that list each account and its llms.txt.
+- [Sitemap](https://hup.social/sitemap.xml): articles and section pages.
 - [robots.txt](https://hup.social/robots.txt): crawl rules.

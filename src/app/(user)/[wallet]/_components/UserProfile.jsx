@@ -41,7 +41,7 @@ import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
 import ProfileLinks from './ProfileLinks'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
-import { CakeIcon, CameraIcon, ImageIcon, MapPinIcon } from '@phosphor-icons/react'
+import { CakeIcon, CameraIcon, ImageIcon, MapPinIcon, RobotIcon } from '@phosphor-icons/react'
 import styles from './UserProfile.module.scss'
 
 // Compares month/day only — the stored year is irrelevant to "is it their birthday today".
@@ -716,6 +716,17 @@ const Profile = ({ addr }) => {
                 )}
 
                 <ProfileQRCode profileUrl={`https://hup.social/${addr}`} styles={styles} />
+
+                <a
+                  className={styles.profile__llmsLink}
+                  href={`/${addr}/llms.txt`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="This profile as plain text for AI agents"
+                  aria-label="llms.txt"
+                >
+                  <RobotIcon size={14} />
+                </a>
               </div>
             </li>
 

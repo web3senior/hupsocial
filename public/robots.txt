@@ -17,3 +17,4 @@ Disallow: /saved
 Disallow: /liked
 
 Sitemap: https://hup.social/sitemap.xml
+Sitemap: https://hup.social/sitemap-index.xml

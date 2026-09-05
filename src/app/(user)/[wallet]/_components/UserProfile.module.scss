@@ -1625,3 +1625,18 @@
     pointer-events: none;
   }
 }
+
+.profile__llmsLink {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1000px;
+  color: var(--text-muted, #888888);
+  transition: color 0.2s ease-in-out;
+
+  &:hover {
+    color: var(--text);
+  }
+}
