@@ -262,9 +262,9 @@ export const CONTRACTS = {
     predict: '0x08c4631B621959468770c3C9831E867aF9014780',
     apps: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     polls: '0xC77372D05CCC2d30938Aa58686671625769f88bd',
-    drops: '',
-    splits: '',
-    nativeGate: '',
+    drops: '0xa9a40F6Cd90E840A29319100d18AE7aE1C549d2F',
+    splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
+    nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
     launch: '',
     // v4 only; both quoters are wired and the batch quote uses whichever answers
     univ3Router: '',
