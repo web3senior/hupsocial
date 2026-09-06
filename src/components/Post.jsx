@@ -56,6 +56,7 @@ import LaunchCard from './LaunchCard'
 import MiniAppEmbed from './MiniAppEmbed'
 import CashtagStrip from './CashtagStrip'
 import NewPost from './NewPost'
+import LinkPreview from './LinkPreview'
 import { shouldOfferTranslation } from '@/lib/languageHelper'
 import { usePreferredLanguage } from '@/hooks/usePreferredLanguage'
 import Like from './ui/Like'
@@ -336,6 +337,11 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               )}
 
               {displayItem?.content?.quoteOf && (
+              {/* The first link's own content — an X post with its media, a YouTube player or an
+                  Open Graph card — resolved live from the text. Hidden when the post carries its
+                  own gallery, the way X does, so a row never stacks two sets of pictures. */}
+              <LinkPreview text={sourceText} hasMedia={displayItem?.content?.elements?.[1]?.data?.items?.length > 0} />
+
                 <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} quotedBy={displayItem.wallet_address} />
               )}
 

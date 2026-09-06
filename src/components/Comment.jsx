@@ -28,6 +28,7 @@ import { renderMarkdown } from '@/lib/markdown'
 import { getIPFS } from '@/lib/ipfs'
 import Avatar from './ui/Avatar'
 import MediaGallery from './Gallery'
+import LinkPreview from './LinkPreview'
 import styles from './Post.module.scss'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 moment.defineLocale('en-short', {
@@ -147,6 +148,11 @@ export default function Comment({ item, showContent, actions, chainId }) {
               dangerouslySetInnerHTML={{ __html: renderMarkdown(`${item.content}`) }}
             />
           )}
+
+          <LinkPreview
+            text={postContent?.elements?.[0]?.data?.text ?? `${item.content ?? ''}`}
+            hasMedia={postContent?.elements?.[1]?.data?.items?.length > 0}
+          />
         </main>
 
         <footer className={`${styles.post__footer}`}>
