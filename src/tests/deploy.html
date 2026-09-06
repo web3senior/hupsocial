@@ -159,6 +159,13 @@
       </div>
 
       <div class="deployer__row">
+        <label class="deployer__meta" for="feeMode">Fee</label>
+        <!-- What the page bids per gas. Gas USED is fixed by the bytecode; only the price moves. -->
+        <select id="feeMode" class="deployer__input" style="width: auto;">
+          <option value="auto">chain default</option>
+          <option value="cheapest">cheapest — base fee, no tip; waits if the fee rises</option>
+          <option value="priority">priority — tip bumped for the next block</option>
+        </select>
         <button id="checkBtn" class="deployer__button deployer__button--secondary" disabled>Check chain</button>
         <button id="deployBtn" class="deployer__button" disabled>Deploy</button>
       </div>
@@ -475,6 +482,7 @@
       targetStatus: document.getElementById("targetStatus"),
       checkBtn: document.getElementById("checkBtn"),
       deployBtn: document.getElementById("deployBtn"),
+      feeMode: document.getElementById("feeMode"),
       log: document.getElementById("log"),
     };
 
@@ -592,28 +600,69 @@
       }
     }
 
+    const CHAIN_SYMBOLS = { 1: "ETH", 42: "LYX", 56: "BNB", 143: "MON", 4663: "ETH", 8453: "ETH", 42161: "ETH", 42220: "CELO", 10143: "MON" };
+
     /**
-     * EIP-1559 fields for the current chain when it has a PRIORITY entry, empty otherwise. Read
-     * from the wallet's provider at send time so the bump tracks the network as it is now. A
-     * failed estimate falls back to the wallet's defaults rather than blocking the deploy.
+     * EIP-1559 fields for the deploy, by the fee mode picked on the page:
+     *   auto      — the chain's PRIORITY bump where one is configured, else the wallet's defaults
+     *   cheapest  — the node's own tip suggestion capped at 5% of the base fee, and a ceiling 10%
+     *               over the current base fee: the tx waits if the fee rises and never overpays
+     *   priority  — the tip multiplied so the tx lands in the next block or two
+     * Gas USED is fixed by the bytecode, so this is the whole lever. Read from the wallet's
+     * provider at send time; a failed estimate falls back to the wallet's defaults.
      */
     async function feeOverrides() {
-      const bump = PRIORITY[currentChainId];
-      if (!bump || !provider) return {};
+      const mode = els.feeMode.value;
+      if (!provider) return {};
+      if (mode === "auto" && !PRIORITY[currentChainId]) return {};
       try {
-        const fee = await provider.getFeeData();
-        if (fee.maxFeePerGas == null || fee.maxPriorityFeePerGas == null) return {};
-        const minTip = ethers.parseUnits(bump.minTipGwei, "gwei");
-        let tip = fee.maxPriorityFeePerGas * bump.tipMultiplier;
-        if (tip < minTip) tip = minTip;
-        // The ceiling must clear the tip with room for the base fee to move while the tx waits
-        let maxFee = fee.maxFeePerGas * bump.feeMultiplier;
-        if (maxFee < tip * 2n) maxFee = tip * 2n;
-        log(`Priority fee on ${CHAIN_NAMES[currentChainId] || currentChainId}: tip ${ethers.formatUnits(tip, "gwei")} gwei, ceiling ${ethers.formatUnits(maxFee, "gwei")} gwei.`);
+        const [fee, block] = await Promise.all([provider.getFeeData(), provider.getBlock("latest")]);
+        const base = block?.baseFeePerGas ?? null;
+        if (fee.maxFeePerGas == null || fee.maxPriorityFeePerGas == null || base == null) {
+          log("No EIP-1559 fee data on this chain — sending with the wallet's defaults.", "warn");
+          return {};
+        }
+
+        let tip;
+        let maxFee;
+        if (mode === "cheapest") {
+          tip = fee.maxPriorityFeePerGas;
+          const cap = base / 20n;
+          if (tip > cap) tip = cap;
+          maxFee = (base * 11n) / 10n + tip;
+        } else {
+          const bump = PRIORITY[currentChainId] || { tipMultiplier: 2n, minTipGwei: "0", feeMultiplier: 2n };
+          const minTip = ethers.parseUnits(bump.minTipGwei, "gwei");
+          tip = fee.maxPriorityFeePerGas * bump.tipMultiplier;
+          if (tip < minTip) tip = minTip;
+          // The ceiling must clear the tip with room for the base fee to move while the tx waits
+          maxFee = fee.maxFeePerGas * bump.feeMultiplier;
+          if (maxFee < tip * 2n) maxFee = tip * 2n;
+        }
+        log(`${mode} fee on ${CHAIN_NAMES[currentChainId] || currentChainId}: base ${ethers.formatUnits(base, "gwei")} gwei, tip ${ethers.formatUnits(tip, "gwei")} gwei, ceiling ${ethers.formatUnits(maxFee, "gwei")} gwei.`);
         return { maxFeePerGas: maxFee, maxPriorityFeePerGas: tip };
       } catch (err) {
         log(`Could not estimate fees (${err.message}) — sending with the wallet's defaults.`, "warn");
         return {};
+      }
+    }
+
+    /**
+     * What the deploy will cost, said before the wallet prompt: gas estimate times the ceiling
+     * for the worst case, and times the current base fee plus tip for what is actually charged.
+     */
+    async function logCostEstimate(data, overrides) {
+      try {
+        const [gas, block, fee] = await Promise.all([provider.estimateGas({ to: FACTORY, data }), provider.getBlock("latest"), provider.getFeeData()]);
+        const symbol = CHAIN_SYMBOLS[currentChainId] || "native";
+        const base = block?.baseFeePerGas ?? null;
+        const ceiling = overrides.maxFeePerGas ?? fee.maxFeePerGas ?? fee.gasPrice;
+        const tip = overrides.maxPriorityFeePerGas ?? fee.maxPriorityFeePerGas ?? 0n;
+        const charged = base != null ? base + tip : ceiling;
+        const fmt = (wei) => Number(ethers.formatEther(wei)).toPrecision(3);
+        log(`Estimated gas ${gas.toLocaleString()} → about ${fmt(gas * charged)} ${symbol} at today's base fee (ceiling ${fmt(gas * ceiling)} ${symbol}; the difference is refunded).`);
+      } catch (err) {
+        log(`Could not estimate the cost (${err.message}).`, "warn");
       }
     }
 
@@ -626,7 +675,9 @@
       try {
         els.deployBtn.disabled = true;
         log(`Deploying to ${predicted} via factory...`);
-        const tx = await signer.sendTransaction({ to: FACTORY, data, ...(await feeOverrides()) });
+        const overrides = await feeOverrides();
+        await logCostEstimate(data, overrides);
+        const tx = await signer.sendTransaction({ to: FACTORY, data, ...overrides });
         log(`Tx sent: ${tx.hash} — waiting for confirmation...`);
         const receipt = await tx.wait();
         if (receipt.status !== 1) {
