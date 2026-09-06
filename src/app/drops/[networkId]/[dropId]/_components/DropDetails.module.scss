@@ -535,6 +535,10 @@
       list-style: none;
       margin: 0;
       padding: 0;
+      // Roughly eight rows; a busy drop scrolls here instead of stretching the page
+      max-height: 24rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     li {
