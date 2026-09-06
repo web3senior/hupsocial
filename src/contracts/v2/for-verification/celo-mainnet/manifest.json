@@ -1,0 +1,129 @@
+{
+  "chainId": 42220,
+  "network": "Celo mainnet",
+  "explorer": "https://celoscan.io",
+  "method": "Solidity (Standard JSON input)",
+  "compiler": "v0.8.36+commit.8a079791",
+  "contracts": [
+    {
+      "contract": "HupDrops",
+      "address": "0x52900b137403a52402CE0D83E6C96c54708f6B42",
+      "file": "HupDrops.json",
+      "contractName": "v2/Extensions/HupDrops.sol:HupDrops",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x000000000000000000000000dda507afa7be1e70b9dceeb3b34c9b886c98ff7300000000000000000000000046a3dfcb1f4ec29db7f96c0d3962df20e6edb25900000000000000000000000020e229667cec8a0e9d3c6fb89693b2a44ec2c50e000000000000000000000000f01103e5a9909fc0dbe8166da7085e0285daddca",
+      "note": "engine — args: Hup core, HupChatForwarder, admin, LSP26"
+    },
+    {
+      "contract": "HupSplits",
+      "address": "0x0e12F47E8EE3488343A68bb792C89c934c428349",
+      "file": "HupSplits.json",
+      "contractName": "v2/Extensions/HupSplits.sol:HupSplits",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x",
+      "note": "split factory — no constructor args"
+    },
+    {
+      "contract": "HupNativeBalance",
+      "address": "0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890",
+      "file": "HupNativeBalance.json",
+      "contractName": "v2/Extensions/HupNativeBalance.sol:HupNativeBalance",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x",
+      "note": "native-coin gate adapter — no constructor args"
+    },
+    {
+      "contract": "HupDropsDeployer721",
+      "address": "0x220877B5e7bD948A9b290E6885FdFFE4D7a4e7f4",
+      "file": "HupDropsDeployer721.json",
+      "contractName": "v2/Extensions/HupDropsDeployer721.sol:HupDropsDeployer721",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x00000000000000000000000052900b137403a52402ce0d83e6c96c54708f6b42",
+      "note": "ERC721 satellite — args: engine (re-encode with src/tests/ctor-args.js if the engine moves)"
+    },
+    {
+      "contract": "HupDropsDeployer1155",
+      "address": "0x227ba981e755B2184C8E8aB3bBf1Df3eB627f1c5",
+      "file": "HupDropsDeployer1155.json",
+      "contractName": "v2/Extensions/HupDropsDeployer1155.sol:HupDropsDeployer1155",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x00000000000000000000000052900b137403a52402ce0d83e6c96c54708f6b42",
+      "note": "ERC1155 satellite — args: engine (re-encode with src/tests/ctor-args.js if the engine moves)"
+    },
+    {
+      "contract": "HupSplitter",
+      "address": "one per split, created by HupSplits",
+      "file": "HupSplitter.json",
+      "contractName": "v2/Extensions/HupSplitter.sol:HupSplitter",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "from the creation tx: abi.encode(Payee[] payees)",
+      "note": "verify one; the rest follow by similarity"
+    },
+    {
+      "contract": "HupDropCollection721",
+      "address": "one per drop, created by the ERC721 satellite",
+      "file": "HupDropCollection721.json",
+      "contractName": "v2/Extensions/HupDropCollection721.sol:HupDropCollection721",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "from the creation tx",
+      "note": "verify one; the rest follow by similarity"
+    },
+    {
+      "contract": "HupDropCollection1155",
+      "address": "one per drop, created by the ERC1155 satellite",
+      "file": "HupDropCollection1155.json",
+      "contractName": "v2/Extensions/HupDropCollection1155.sol:HupDropCollection1155",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "from the creation tx",
+      "note": "verify one; the rest follow by similarity"
+    }
+  ]
+}

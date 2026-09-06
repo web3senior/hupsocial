@@ -1,0 +1,27 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "v2/Extensions/HupNativeBalance.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.35;\n\n/**\n * @title Hup Native Balance\n * @author Hup Labs\n * @notice The chain's native coin, answered through the `balanceOf` every Hup gate speaks. A drop\n *         phase gated on this address admits wallets holding at least the phase minimum of the\n *         coin itself — no wrapping, and no change to the engine, which reads it like any asset.\n * @dev Stateless and ownerless. `decimals` is 18 so a minimum typed in whole coins scales the\n *      same way it does for an ERC20. No constructor arguments, so CREATE2 with one salt puts it\n *      at the same address on every chain. The balance read is the one left AFTER the mint's\n *      `msg.value` has moved, so a paid phase gated here sees the wallet minus the price it is\n *      paying — a minimum meant as \"holds at least X\" should allow for that.\n * @custom:version 1.0.0\n * @custom:chain multichain\n * @custom:website https://hup.social\n * @custom:security-contact security@hup.social\n * @custom:emoji 💧\n */\ncontract HupNativeBalance {\n  // --- VIEW FUNCTIONS ---\n\n  function balanceOf(address account) external view returns (uint256) {\n    return account.balance;\n  }\n\n  function decimals() external pure returns (uint8) {\n    return 18;\n  }\n\n  function name() external pure returns (string memory) {\n    return \"Native coin balance\";\n  }\n\n  function symbol() external pure returns (string memory) {\n    return \"NATIVE\";\n  }\n\n  function version() external pure returns (string memory) {\n    return \"1.0.0\";\n  }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "viaIR": true,
+    "evmVersion": "cancun",
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "metadata"
+        ]
+      }
+    },
+    "remappings": []
+  }
+}
