@@ -257,6 +257,13 @@
     }
   }
 
+  // Same cap as the drop page's recent mints list; a busy drop scrolls here instead of stretching the panel
+  &__activity &__tableScroll {
+    max-height: 24rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   &__phaseTrack {
     margin-block-end: 0.15rem;
   }
