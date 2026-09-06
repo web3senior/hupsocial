@@ -156,19 +156,10 @@
     inset-block-start: 0.6rem;
     inset-inline: 0.6rem;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 0.4rem;
     pointer-events: none;
-  }
-
-  // Chain chip first, the featured chip under it
-  &__chips {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.35rem;
-    min-width: 0;
   }
 
   // The creator's picture at the right corner, ringed so it reads on any artwork; the only
@@ -205,22 +196,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
 
-    &--age,
-    &--featured {
+    &--age {
       padding-inline-start: calc((var(--chip-height) - var(--chip-icon)) / 2);
 
-      img,
-      svg {
+      img {
         display: block;
         flex-shrink: 0;
         width: var(--chip-icon);
         height: var(--chip-icon);
         border-radius: 999px;
       }
-    }
-
-    &--featured svg {
-      color: #f5a524;
     }
 
     &--status {
@@ -246,8 +231,9 @@
     min-width: 0;
   }
 
+  // Shrinks to its text so the featured star sits right after the name, not off by the ticker
   &__name {
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 0;
     font-size: var(--font-size-16, 1rem);
     font-weight: 600;
@@ -256,8 +242,16 @@
     white-space: nowrap;
   }
 
+  // Featured mark, an icon beside the name; the name gives way before it does
+  &__star {
+    flex-shrink: 0;
+    align-self: center;
+    color: #f5a524;
+  }
+
   &__ticker {
     flex-shrink: 0;
+    margin-inline-start: auto;
     max-width: 6rem;
     border-radius: var(--chip-border-radius);
     background: color-mix(in srgb, var(--text-muted, #888) 14%, transparent);

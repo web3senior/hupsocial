@@ -6,6 +6,7 @@ import { XIcon } from '@phosphor-icons/react'
 import { getNftListings } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { networkColorStyle } from '@/lib/networkColors'
+import useCollectionDrop from '@/hooks/useCollectionDrop'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import useCollectionStats from '@/hooks/useCollectionStats'
@@ -23,10 +24,12 @@ import SegmentedControl from '@/components/ui/SegmentedControl'
 import CollectionBrowser from './CollectionBrowser'
 import CollectionGallery from './CollectionGallery'
 import CollectionHeader from './CollectionHeader'
+import CollectionMint from './CollectionMint'
 import CollectionTable from './CollectionTable'
 import FloorChart from './FloorChart'
 import OwnedTokens from './OwnedTokens'
 import TraitFilter from './TraitFilter'
+import EmptyState from '@/components/ui/EmptyState'
 import styles from './CollectionView.module.scss'
 
 const PAGE_SIZE = 24
@@ -65,6 +68,8 @@ export default function CollectionView({ networkId, address }) {
 
   const info = useCollectionInfo({ chainId, collection })
   const stats = useCollectionStats({ chainId, collection, chainInfo })
+  // Asked of the engine, not the index: a collection HupDrops deployed carries its drop with it
+  const hupDrop = useCollectionDrop({ chainId, collection })
 
   // Both of these are the reader's habit rather than the collection's, so they are remembered
   // across collections. Density is shared by both grids, so switching tabs never reshapes the page
@@ -229,7 +234,22 @@ export default function CollectionView({ networkId, address }) {
         stats={stats}
         onRefresh={handleRefreshCollection}
         isRefreshing={isRefreshing}
+        dropId={hupDrop.dropId}
       />
+
+      {/* The primary sale comes before everything secondary: while a Hup-launched collection
+          is still minting, minting is what a visitor came to do */}
+      {hupDrop.dropId && hupDrop.drop && (
+        <CollectionMint
+          chainId={chainId}
+          chainInfo={chainInfo}
+          collection={collection}
+          dropId={hupDrop.dropId}
+          drop={hupDrop.drop}
+          phases={hupDrop.phases}
+          collectionName={info.name}
+        />
+      )}
 
       {/* Above the market, because what you already hold is the more immediate thing —
           renders nothing at all when disconnected or holding none here */}
@@ -309,13 +329,13 @@ export default function CollectionView({ networkId, address }) {
             topOffers={topOffers}
           />
         ) : items.length === 0 && !isLoading ? (
-          <p className={styles.collection__empty}>
+          <EmptyState align="center" className={styles.collection__empty}>
             {traits.length > 0
               ? 'No NFT here matches those traits — try removing one.'
               : status === 'active'
-              ? 'Nothing from this collection is up for sale right now.'
-              : 'No listings match this view.'}
-          </p>
+                ? 'Nothing from this collection is up for sale right now.'
+                : 'No listings match this view.'}
+          </EmptyState>
         ) : isTable ? (
           <CollectionTable
             chainId={chainId}

@@ -206,12 +206,16 @@ function intParam(value, fallback, min, max) {
  * @param {{kind: 'body'|'redirect'|'error'}} entry A mediaCache entry.
  * @returns {Response} The response to serve.
  */
-function respond(entry) {
+function respond(entry, { req, cid } = {}) {
   if (entry.kind === 'redirect') {
     return new NextResponse(null, { status: 302, headers: { Location: entry.location, 'Cache-Control': SUCCESS_CACHE_CONTROL } })
   }
 
   if (entry.kind === 'error') {
+    /* 504 is the one verdict that says nothing about the content — every gateway was slow for
+       the seconds it was given, which a freshly pinned CID does on its first view. A caller that
+       paints pictures gets the gateway itself, the same handoff a slow resolve gets. */
+    if (entry.status === 504 && req && cid && rendersImages(req)) return handOffToGateway(cid)
     return NextResponse.json({ error: entry.message }, { status: entry.status, headers: { 'Cache-Control': failureCacheControl(entry.ttlMs ?? FAILURE_TTL_MS) } })
   }
 
@@ -679,7 +683,9 @@ function rendersImages(req) {
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
-  const cid = searchParams.get('cid')
+  // Stripped before the cache key is built, so `ipfs://<cid>` and the bare CID are one entry —
+  // and a document's doubled prefix cannot poison the durable-failure table with a dead key
+  const cid = (searchParams.get('cid') || '').replace(/^(?:ipfs:\/\/)+/, '').trim()
 
   const width = intParam(searchParams.get('w'), null, 1, 4096)
   const quality = intParam(searchParams.get('q'), 80, 1, 100)
@@ -699,7 +705,7 @@ export async function GET(req) {
   const cacheKey = `${cid}|${width ?? ''}|${quality}|${stillOnly ? 1 : 0}|${format}`
 
   const cached = readMedia(cacheKey)
-  if (cached) return respond(cached)
+  if (cached) return respond(cached, { req, cid })
 
   /* Coalesced, so a page of cards pointing at one CID spends a single database lookup and,
      if it is not a known-dead one, a single gateway fetch behind it. */
@@ -717,7 +723,7 @@ export async function GET(req) {
   })
 
   const entry = await withDeadline(resolving, RESPONSE_DEADLINE_MS)
-  if (entry) return respond(entry)
+  if (entry) return respond(entry, { req, cid })
 
   /* The deadline won, so the caller is sent to the gateway for this view and gets the resized
      encode on the next one. `after` hands the unfinished resolve to the platform's waitUntil so

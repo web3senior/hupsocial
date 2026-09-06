@@ -2,8 +2,9 @@
 
 import { useRef } from 'react'
 import { CornersOutIcon } from '@phosphor-icons/react'
+import { appChains } from '@/config/contracts'
 import GalaxyCanvas from './GalaxyCanvas'
-import NetworkGrid from './NetworkGrid'
+import NetworkGrid, { chainIconFor } from './NetworkGrid'
 import styles from './ScreensaverGallery.module.scss'
 
 const SCENES = [
@@ -14,7 +15,7 @@ const SCENES = [
 ]
 
 // Fullscreens the scene it sits in; Esc (or the browser UI) exits
-function Scene({ variant, label }) {
+function Scene({ variant, chainColor, label, icon }) {
   const bandRef = useRef(null)
   const toggle = () => {
     if (document.fullscreenElement) document.exitFullscreen()
@@ -22,7 +23,12 @@ function Scene({ variant, label }) {
   }
   return (
     <div className={styles.gallery__band} ref={bandRef}>
-      <GalaxyCanvas variant={variant} className={styles.gallery__canvas} />
+      <GalaxyCanvas variant={variant} chainColor={chainColor} className={styles.gallery__canvas} />
+      {icon && (
+        <span className={styles.gallery__logo}>
+          <img src={icon} alt="" width={30} height={30} loading="lazy" />
+        </span>
+      )}
       <span className={styles.gallery__tag}>{label}</span>
       <button type="button" className={styles.gallery__fullscreen} onClick={toggle} aria-label="View fullscreen" title="View fullscreen">
         <CornersOutIcon size={16} weight="bold" />
@@ -43,6 +49,9 @@ export default function ScreensaverGallery() {
         <Scene key={scene.variant} {...scene} />
       ))}
       <NetworkGrid />
+      {appChains.map((chain) => (
+        <Scene key={chain.id} chainColor={chain.primaryColor} label={chain.name} icon={chainIconFor(chain)} />
+      ))}
     </div>
   )
 }

@@ -26,6 +26,36 @@
     height: 100%;
   }
 
+  // Rides the galaxy core: the canvas puts it at 62%/54% in a wide band, dead centre in fullscreen
+  &__logo {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 54%;
+    inset-inline-start: 62%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    width: 44px;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: rgba(3, 0, 20, 0.55);
+    box-shadow: 0 6px 22px rgba(3, 0, 20, 0.7);
+    backdrop-filter: blur(3px);
+
+    img {
+      width: 62%;
+      height: 62%;
+      object-fit: contain;
+    }
+  }
+
+  // Fullscreen is a wallpaper, not a tile — the mark scales with the screen
+  &__band:fullscreen &__logo {
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    width: clamp(96px, 14vmin, 200px);
+  }
+
   &__tag {
     position: absolute;
     z-index: 1;

@@ -10,6 +10,7 @@ import useNftMetadata from '@/hooks/useNftMetadata'
 import { displayTokenId } from '@/lib/walletNfts'
 import { formatStake } from '@/hooks/useStakeToken'
 import OfferModal from '@/components/OfferModal'
+import { handleBrokenImage } from '@/lib/utils'
 import CollectionTable from './CollectionTable'
 import styles from './CollectionBrowser.module.scss'
 
@@ -34,7 +35,7 @@ function TokenTile({ chainId, collection, collectionName, tokenId, isLsp8, listi
     <>
       <span className={styles.browser__art}>
         {meta.image ? (
-          <img src={meta.image} alt="" loading="lazy" decoding="async" />
+          <img src={meta.image} alt="" loading="lazy" decoding="async" onError={handleBrokenImage} />
         ) : (
           <span className={styles.browser__artFallback} aria-hidden="true" />
         )}

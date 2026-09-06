@@ -2,7 +2,10 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding-top: 1.25rem;
+  // Clears the fixed header, which the routes themselves do through the PageTitle spacer
+  padding-top: 4.5rem;
+  // Held back a beat: a route that arrives quickly never shows a skeleton at all
+  animation: loading-reveal 200ms ease-out 150ms both;
 
   &__header {
     padding: 0 1.25rem;
@@ -47,5 +50,14 @@
     padding: 0.5rem 1.25rem;
     text-align: center;
     color: var(--gray-400);
+  }
+}
+
+@keyframes loading-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

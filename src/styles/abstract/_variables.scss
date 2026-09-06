@@ -316,7 +316,7 @@ $secondary-color: #9e481d;
   // Don't add sibling sans tokens; the old --font-family-system / --ff-sans / --ff-segoe
   // duplicates were removed on purpose.
   //
-  // --font-archivo is declared by next/font in app/layout.jsx and self-hosted; everything after
+  // --font-montserrat is declared by next/font in app/layout.jsx and self-hosted; everything after
   // it is the fallback chain, which also covers the paint before the file lands. The inline
   // ui-sans-serif fallback inside var() matters: an undefined custom property with no fallback
   // invalidates the whole font-family declaration rather than just skipping that one entry.

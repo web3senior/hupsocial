@@ -47,3 +47,7 @@ next-env.d.ts
 
 # local agent config
 .claude
+
+# forge test outputs
+src/contracts/forge-test/out*/
+src/contracts/forge-test/cache*/

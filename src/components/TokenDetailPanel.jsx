@@ -8,6 +8,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import {
   ArrowsClockwiseIcon,
   ArrowSquareOutIcon,
+  CaretRightIcon,
   ChartLineUpIcon,
   ClockCounterClockwiseIcon,
   CrownSimpleIcon,
@@ -17,11 +18,14 @@ import {
   PaperPlaneTiltIcon,
   ProhibitIcon,
   ReceiptIcon,
+  SealCheckIcon,
   SquaresFourIcon,
   StackIcon,
   TagIcon,
   TextAlignLeftIcon,
+  XIcon,
 } from '@phosphor-icons/react'
+import { useReadContracts } from 'wagmi'
 import { appChains, CONTRACTS } from '@/config/contracts'
 import { toRelative } from '@/lib/predict'
 import { displayTokenId, normalizeTokenId } from '@/lib/walletNfts'
@@ -33,6 +37,10 @@ import useNftMetadata from '@/hooks/useNftMetadata'
 import useNftTokenMarket from '@/hooks/useNftTokenMarket'
 import useTokenOwner from '@/hooks/useTokenOwner'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
+import useCollectionDrop from '@/hooks/useCollectionDrop'
+import { useIssuedAssets } from '@/hooks/useIssuedAssets'
+import { handleBrokenImage } from '@/lib/utils'
+import HupMark from '@/components/ui/HupMark'
 import useCollectionFloor from '@/hooks/useCollectionFloor'
 import useCollectionRarity from '@/hooks/useCollectionRarity'
 import useCollectionTraits from '@/hooks/useCollectionTraits'
@@ -71,6 +79,25 @@ const sharePercent = (share) =>
   new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: share < 0.01 ? 2 : 0 }).format(share)
 
 const countFormatter = new Intl.NumberFormat()
+const royaltyFormatter = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 2 })
+
+// Facts the cached collection row does not carry, asked of the contract itself. Every one is
+// allowed to fail: LSP8 spells the ceiling tokenSupplyCap, Hup's ERC721 spells it maxSupply, and
+// royaltyInfo is ERC-2981, which plenty of collections never implemented.
+const COLLECTION_FACTS_ABI = [
+  { type: 'function', name: 'totalSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'tokenSupplyCap', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'maxSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  {
+    type: 'function',
+    name: 'royaltyInfo',
+    stateMutability: 'view',
+    inputs: [{ type: 'uint256' }, { type: 'uint256' }],
+    outputs: [{ type: 'address' }, { type: 'uint256' }],
+  },
+]
+// royaltyInfo quoted against a 10 000 sale price answers in basis points
+const ROYALTY_PROBE_PRICE = 10_000n
 const chartDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 const chartPrice = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 3 })
 
@@ -195,6 +222,56 @@ export default function TokenDetailPanel({
   const owner = useTokenOwner({ chainId: chain, collection, tokenId, isLsp8 })
   const collectionInfo = useCollectionInfo({ chainId: chain, collection, isLsp8 })
   const collectionRefresh = useCollectionMetadataRefresh({ chainId: chain, collection })
+
+  // Asked of the engine, not the index: a collection HupDrops deployed carries its drop with it
+  const hupDrop = useCollectionDrop({ chainId: chain, collection })
+
+  // The id as a number, for ERC-2981 — a bytes32 LSP8 id is a number too, just written wide
+  const tokenIdUint = useMemo(() => {
+    try {
+      return BigInt(tokenId)
+    } catch {
+      return null
+    }
+  }, [tokenId])
+  const { data: collectionFacts } = useReadContracts({
+    contracts: [
+      { address: collection, abi: COLLECTION_FACTS_ABI, functionName: 'totalSupply', chainId: chain },
+      { address: collection, abi: COLLECTION_FACTS_ABI, functionName: 'tokenSupplyCap', chainId: chain },
+      { address: collection, abi: COLLECTION_FACTS_ABI, functionName: 'maxSupply', chainId: chain },
+      { address: collection, abi: COLLECTION_FACTS_ABI, functionName: 'royaltyInfo', args: [tokenIdUint ?? 0n, ROYALTY_PROBE_PRICE], chainId: chain },
+    ],
+    query: { enabled: Boolean(collection) },
+  })
+  const factAt = (index) => (collectionFacts?.[index]?.status === 'success' ? collectionFacts[index].result : null)
+  // Live first: the cached row is allowed to be a day old, and supply moves while a drop mints
+  const totalSupply = factAt(0) !== null ? Number(factAt(0)) : collectionInfo.totalSupply !== null ? Number(collectionInfo.totalSupply) : null
+  const capRead = [factAt(1), factAt(2)].find((value) => typeof value === 'bigint' && value > 0n)
+  const maxSupply = capRead !== undefined ? Number(capRead) : hupDrop.drop?.maxSupply ? Number(hupDrop.drop.maxSupply) : null
+  const royaltyBps = tokenIdUint !== null && factAt(3) !== null ? Number(factAt(3)[1]) : null
+
+  /*
+   * Whether the creator stands behind this collection onchain. A HupDrops collection is: the
+   * engine deployed it for the wallet that called createDrop and records that creator, which is
+   * a stronger claim than any self-declaration. Otherwise, on LUKSO, the creator's own Universal
+   * Profile can list it among the assets it issued (LSP12IssuedAssets[]) — the closest thing the
+   * chain has to a blue tick. Silent, rather than "not verified", while either answer is still
+   * on its way or the profile's list was too long to read to the end.
+   */
+  const creatorProfile = collectionInfo.creators[0] ?? null
+  const issued = useIssuedAssets({ profile: creatorProfile, chainId: chain, enabled: isLsp8 && Boolean(creatorProfile) && !hupDrop.dropId })
+  const verification = hupDrop.dropId
+    ? 'verified'
+    : !isLsp8 || !creatorProfile || issued.status !== 'ready'
+      ? null
+      : issued.assets.some((asset) => asset.address?.toLowerCase() === collection.toLowerCase())
+        ? 'verified'
+        : issued.truncated
+          ? null
+          : 'unverified'
+  const verificationTitle = hupDrop.dropId
+    ? 'Deployed for its creator by HupDrops, which records who launched it onchain'
+    : 'The creator’s Universal Profile lists this collection among the assets it issued (LSP12IssuedAssets)'
 
   // What every price on this page is measured against — the ask as much as each bid, so it is
   // fetched wherever there is a price, not only where HupOffers is deployed. Shares its cache key
@@ -368,10 +445,16 @@ export default function TokenDetailPanel({
             <dt>Standard</dt>
             <dd title={standardTitle}>{standard}</dd>
           </div>
-          {collectionInfo.totalSupply !== null && (
+          {maxSupply !== null && (
             <div className={styles.token__stat}>
-              <dt>Items</dt>
-              <dd>{countFormatter.format(collectionInfo.totalSupply)}</dd>
+              <dt>Max supply</dt>
+              <dd>{countFormatter.format(maxSupply)}</dd>
+            </div>
+          )}
+          {totalSupply !== null && (
+            <div className={styles.token__stat}>
+              <dt>Total supply</dt>
+              <dd>{countFormatter.format(totalSupply)}</dd>
             </div>
           )}
           {lastSale && (
@@ -383,6 +466,41 @@ export default function TokenDetailPanel({
             </div>
           )}
         </dl>
+
+        {/* What the collection says about itself onchain, as badges: only claims the contract or
+            the creator's profile actually makes — never a fabricated "verified" */}
+        {(hupDrop.dropId || verification || royaltyBps !== null) && (
+          <ul className={styles.token__badges} aria-label="Collection facts">
+            {hupDrop.dropId && (
+              <li>
+                <Link href={`/drops/${chain}/${hupDrop.dropId}`} className={clsx(styles.token__badge, styles['token__badge--hup'])} title="Deployed and minted through HupDrops">
+                  <HupMark size={11} />
+                  Launched on Hup
+                </Link>
+              </li>
+            )}
+            {verification === 'verified' && (
+              <li className={clsx(styles.token__badge, styles['token__badge--good'])} title={verificationTitle}>
+                <SealCheckIcon size={12} weight="fill" aria-hidden="true" />
+                Verified by creator
+              </li>
+            )}
+            {verification === 'unverified' && (
+              <li
+                className={clsx(styles.token__badge, styles['token__badge--warn'])}
+                title="The creator’s Universal Profile does not list this collection among the assets it issued (LSP12IssuedAssets)"
+              >
+                <XIcon size={11} weight="bold" aria-hidden="true" />
+                Not verified by creator
+              </li>
+            )}
+            {royaltyBps !== null && (
+              <li className={styles.token__badge} title="The ERC-2981 royalty the creator receives on sales through marketplaces that honour it">
+                {royaltyBps > 0 ? `${royaltyFormatter.format(royaltyBps / 10_000)} royalty` : 'No royalties'}
+              </li>
+            )}
+          </ul>
+        )}
       </header>
 
       {/* Price card. When there is a live ask, TradeCard is the card: it resolves price and status
@@ -841,6 +959,14 @@ export default function TokenDetailPanel({
               </dd>
             </div>
             <div>
+              <dt>Storage</dt>
+              {/* The audit page with this token filled in: the collection's grade, and under it this
+                  exact token decoded — where its bytes live, what its artwork loads, which contracts render it */}
+              <dd>
+                <Link href={`/nfts/audit?network=${chain}&address=${collection}&tokenId=${encodeURIComponent(String(tokenId))}`}>Inspect this token</Link>
+              </dd>
+            </div>
+            <div>
               <dt>NFT standard</dt>
               <dd title={standardTitle}>{standard}</dd>
             </div>
@@ -856,10 +982,22 @@ export default function TokenDetailPanel({
                 <dd>#{listing.listing_id}</dd>
               </div>
             )}
-            {collectionInfo.totalSupply !== null && (
+            {maxSupply !== null && (
               <div>
-                <dt>Collection size</dt>
-                <dd>{countFormatter.format(collectionInfo.totalSupply)} items</dd>
+                <dt>Max supply</dt>
+                <dd>{countFormatter.format(maxSupply)} items</dd>
+              </div>
+            )}
+            {totalSupply !== null && (
+              <div>
+                <dt>Total supply</dt>
+                <dd>{countFormatter.format(totalSupply)} items</dd>
+              </div>
+            )}
+            {royaltyBps !== null && (
+              <div>
+                <dt>Royalties</dt>
+                <dd>{royaltyBps > 0 ? royaltyFormatter.format(royaltyBps / 10_000) : 'None'}</dd>
               </div>
             )}
           </dl>
@@ -905,6 +1043,27 @@ export default function TokenDetailPanel({
           </div>
         </DetailSection>
       </div>
+
+      {/* The way onward: one NFT is usually the door to its collection, and the reader has just
+          scrolled past everything this page knows about the one */}
+      {showCollectionLink && (
+        <aside className={styles.token__more}>
+          <span className={styles.token__moreIcon} aria-hidden="true">
+            {collectionInfo.icon ? <img src={collectionInfo.icon} alt="" onError={handleBrokenImage} /> : <HupMark size={16} />}
+          </span>
+          <div className={styles.token__moreText}>
+            <strong>More from {collectionLabel || 'this collection'}</strong>
+            <span>
+              {totalSupply !== null ? `${countFormatter.format(totalSupply)} NFTs · ` : ''}
+              the whole collection, what is for sale and where the floor sits.
+            </span>
+          </div>
+          <Link href={collectionHref} className={styles.token__moreLink}>
+            View collection
+            <CaretRightIcon size={13} weight="bold" aria-hidden="true" />
+          </Link>
+        </aside>
+      )}
 
       {sellOpen && (
         <SellNftModal

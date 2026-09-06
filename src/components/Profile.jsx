@@ -22,7 +22,7 @@ import clsx from 'clsx'
 import UPlogo from '@/../public/up.png'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, className }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, className }) {
   const router = useRouter()
   const { profile, isLoading } = useProfile(creator)
   const [popoverOpened, setPopoverOpened] = useState(false)
@@ -94,13 +94,17 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
         src={profile.profileImage}
         size={size}
       />
-      <Identicon
-        name={profile.name}
-        profileImage={profile.profileImage}
-        address={creator}
-        size={Math.round(size / 2)}
-        className={clsx(styles.imageWrapper__fingerprint)}
-      />
+      {/* The fingerprint tells lookalike profiles apart; a purely decorative picture — a corner
+          of a tile — can drop it and show the face alone */}
+      {fingerprint && (
+        <Identicon
+          name={profile.name}
+          profileImage={profile.profileImage}
+          address={creator}
+          size={Math.round(size / 2)}
+          className={clsx(styles.imageWrapper__fingerprint)}
+        />
+      )}
     </>
   )
 

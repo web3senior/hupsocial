@@ -7,12 +7,8 @@
  */
 
 import { hexToString } from 'viem'
-import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, erc725yGetDataAbi, decodeVerifiableUri, fetchMetadataJson } from '@/lib/lsp4'
+import { LSP4_CREATORS_ARRAY_KEY, LSP4_METADATA_KEY, LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY, erc725yGetDataAbi, decodeVerifiableUri, fetchMetadataJson } from '@/lib/lsp4'
 import { isSameStoredImage } from '@/lib/storageHelper'
-
-// keccak256 data keys per the LSP4 spec, like the ones in lib/lsp4
-const LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756'
-const LSP4_CREATORS_ARRAY_KEY = '0x114bd03b3a46d48759680d81ebb2b414fda7d030a7105a851867accf1c2352e7'
 
 // Creators beyond this stay onchain-only — the UI shows a few profile chips, not a
 // registry, and each extra creator is another storage read plus a profile resolution.

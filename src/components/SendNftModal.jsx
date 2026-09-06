@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useConnection, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi'
 import clsx from 'clsx'
 import { appChains } from '@/config/contracts'
 import { normalizeAddress } from '@/lib/walletAssets'
@@ -47,44 +47,39 @@ const erc721Abi = [
 
 /**
  * SendNftModal
- * Wallet-to-wallet transfer of a single NFT from the profile Assets tab. LSP8 takes the bytes32
- * id the index already hands back; ERC721 takes the same id widened to uint256.
+ * Wallet-to-wallet transfer of a single NFT. LSP8 takes the bytes32 id the index already hands
+ * back; ERC721 takes the same id widened to uint256.
  *
- * Mount = open / unmount = close, matching the other dialogs.
+ * The dialog stays open, locked, from the wallet prompt to the receipt, and closes itself once
+ * the transfer has landed. Mount = open / unmount = close, matching the other dialogs.
+ *
+ * @param {Object} props
+ * @param {Object} props.nft The token, the way the gallery and detail panel hand it over.
+ * @param {string} props.owner The wallet that holds it — the connected wallet has to match.
+ * @param {Function} [props.onSent] Called once the transfer confirmed, so lists re-read.
+ * @param {Function} [props.onClose]
  */
 export default function SendNftModal({ nft, owner, onSent, onClose }) {
   const dialogRef = useRef(null)
   const { address, chain: walletChain } = useConnection()
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain()
   const { writeContractAsync } = useWriteContract()
+  const publicClient = usePublicClient({ chainId: nft.chainId })
 
   const [recipient, setRecipient] = useState(EMPTY_RECIPIENT)
-  const [hash, setHash] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash, chainId: nft.chainId })
+  // Which wait the button names: null idle, 'wallet' awaiting the signature, 'mining' the receipt
+  const [phase, setPhase] = useState(null)
 
   const chain = useMemo(() => appChains.find((item) => item.id === nft.chainId), [nft.chainId])
   const recipientAddress = recipient.address
   const wrongChain = Boolean(walletChain) && walletChain.id !== nft.chainId
-  const isBusy = isSubmitting || isSwitching || isConfirming
+  const isBusy = phase !== null || isSwitching
   const canSubmit = Boolean(recipientAddress) && !isBusy
   const image = nft.image ? resolveStorageImageUrl(nft.image, { width: 320 }) : null
 
   useEffect(() => {
     dialogRef.current?.open()
   }, [])
-
-  useEffect(() => {
-    if (!isConfirmed) return
-    toast(`Sent ${nft.name}`, 'success')
-    // Only a confirmed transfer earns a place in the recipient shortlist
-    rememberRecipient(owner, { address: recipientAddress, ...recipient.profile })
-    onSent?.()
-    dialogRef.current?.close()
-    // Firing on confirmation only — re-running on the nft identity would double-toast
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConfirmed])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -96,16 +91,18 @@ export default function SendNftModal({ nft, owner, onSent, onClose }) {
       return
     }
 
-    setIsSubmitting(true)
+    const to = recipientAddress
+    setPhase('wallet')
+
     try {
       if (wrongChain) await switchChainAsync({ chainId: nft.chainId })
 
-      const submitted = nft.isLsp8
+      const hash = nft.isLsp8
         ? await writeContractAsync({
             address: nft.address,
             abi: lsp8Abi,
             functionName: 'transfer',
-            args: [sender, recipientAddress, nft.tokenId, true, '0x'],
+            args: [sender, to, nft.tokenId, true, '0x'],
             chainId: nft.chainId,
           })
         : await writeContractAsync({
@@ -113,16 +110,27 @@ export default function SendNftModal({ nft, owner, onSent, onClose }) {
             abi: erc721Abi,
             functionName: 'safeTransferFrom',
             // The gallery stores every id as bytes32; ERC721 wants the same value as a number
-            args: [sender, recipientAddress, BigInt(nft.tokenId)],
+            args: [sender, to, BigInt(nft.tokenId)],
             chainId: nft.chainId,
           })
 
-      setHash(submitted)
+      // viem hands back a reverted receipt rather than throwing, so the status is the verdict
+      setPhase('mining')
+      const receipt = await publicClient.waitForTransactionReceipt({ hash })
+      if (receipt.status === 'reverted') throw new Error('The transfer failed onchain')
+
+      toast(`Sent ${nft.name}`, 'success')
+      // Only a confirmed transfer earns a place in the recipient shortlist
+      rememberRecipient(owner, { address: to, ...recipient.profile })
+      onSent?.()
+      dialogRef.current?.close()
     } catch (error) {
       toast(error?.shortMessage || error?.message || 'Transaction rejected', 'error')
-      setIsSubmitting(false)
+      setPhase(null)
     }
   }
+
+  const label = isSwitching ? 'Switching network…' : phase === 'wallet' ? 'Confirm in wallet…' : phase === 'mining' ? 'Sending…' : 'Send'
 
   return (
     <NativeDialog
@@ -132,8 +140,11 @@ export default function SendNftModal({ nft, owner, onSent, onClose }) {
       onClick={(event) => event.stopPropagation()}
       // React's synthetic close/cancel bubble where the native events don't — without this,
       // dismissing this dialog from inside another one (the token detail panel's Transfer)
-      // would close its host too
-      onCancel={(event) => event.stopPropagation()}
+      // would close its host too. Esc is also refused mid-transfer: there is nothing to go back to.
+      onCancel={(event) => {
+        event.stopPropagation()
+        if (isBusy) event.preventDefault()
+      }}
       onClose={(event) => {
         event.stopPropagation()
         onClose?.()
@@ -173,7 +184,7 @@ export default function SendNftModal({ nft, owner, onSent, onClose }) {
         {wrongChain && chain && <p className={styles.sendNft__hint}>Your wallet will be asked to switch to {chain.name} first.</p>}
 
         <button type="submit" className={clsx(styles.sendNft__submit, 'w-100')} disabled={!canSubmit}>
-          {isSwitching ? 'Switching network…' : isSubmitting && !isConfirming ? 'Confirm in wallet…' : isConfirming ? 'Sending…' : 'Send'}
+          {label}
         </button>
       </form>
     </NativeDialog>

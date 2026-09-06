@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { isAddress } from 'viem'
 import clsx from 'clsx'
 import useSWR from 'swr'
-import { CaretDownIcon, CheckIcon, CopyIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, CheckIcon, CopyIcon, HashIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { appChains } from '@/config/contracts'
 import { getNftCollectionAudits } from '@/lib/api'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
@@ -14,7 +14,11 @@ import { networkColorStyle } from '@/lib/networkColors'
 import { handleBrokenImage } from '@/lib/utils'
 import { describeBadge, formatRelativeTime, gradeColor, KIND_LABELS } from '@/lib/collectionAuditFormat'
 import useCollectionAudit from '@/hooks/useCollectionAudit'
+import useContractChains from '@/hooks/useContractChains'
+import useTokenInspection from '@/hooks/useTokenInspection'
 import CollectionAuditReport from '@/components/CollectionAuditReport'
+import TokenInspection from '@/components/TokenInspection'
+import EmptyState from '@/components/ui/EmptyState'
 import { toast } from '@/components/NextToast'
 import NativePopover from '@/components/ui/NativePopover'
 import SegmentedControl from '@/components/ui/SegmentedControl'
@@ -25,6 +29,8 @@ import styles from './CollectionAuditTool.module.scss'
 const DEFAULT_CHAIN_ID = 42
 const BOARD_LIMIT = 20
 const BOARD_BADGES = 3
+// A whole number, or a bytes32 hex value for LSP8
+const TOKEN_ID_PATTERN = /^(\d{1,78}|0x[0-9a-fA-F]{1,64})$/
 
 const BOARD_SORTS = [
   { value: 'recent', label: 'Recent' },
@@ -49,32 +55,38 @@ const fetcher = (url) => fetch(url).then((res) => res.json())
  * The target rides in the query string (`?network=42&address=0x…`) so a report can be linked.
  */
 export default function CollectionAuditTool() {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const paramChain = Number(searchParams.get('network'))
   const paramAddress = searchParams.get('address') || ''
+  const paramTokenId = searchParams.get('tokenId') || ''
   const [chainId, setChainId] = useState(() => (appChains.some((chain) => chain.id === paramChain) ? paramChain : DEFAULT_CHAIN_ID))
   const [input, setInput] = useState(() => (isAddress(paramAddress) ? paramAddress : ''))
+  // The one token decoded under the report, when the reader asks for one
+  const [tokenInput, setTokenInput] = useState(() => (TOKEN_ID_PATTERN.test(paramTokenId) ? paramTokenId : ''))
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [boardSort, setBoardSort] = useState('recent')
   // Which row's link was just copied, for the tick that replaces its icon for a moment
   const [copiedKey, setCopiedKey] = useState(null)
 
   const target = useMemo(() => (isAddress(input.trim()) ? input.trim().toLowerCase() : null), [input])
+  const tokenId = useMemo(() => (TOKEN_ID_PATTERN.test(tokenInput.trim()) ? tokenInput.trim() : null), [tokenInput])
   const chain = appChains.find((candidate) => candidate.id === chainId)
   const chainIcon = chainIconFor(chain)
 
-  // Keep the URL in step with what is on screen, quietly — no history entry per keystroke
+  // Keep the URL in step with what is on screen, quietly — no history entry per keystroke, and
+  // through the History API rather than the router: a changed query string is a new page segment
+  // to the router, which would fetch it, flash the loading boundary and remount this tool
   useEffect(() => {
     const query = new URLSearchParams()
     if (target) {
       query.set('network', String(chainId))
       query.set('address', target)
+      if (tokenId) query.set('tokenId', tokenId)
     }
     const next = query.toString()
-    if (next !== searchParams.toString()) router.replace(next ? `/nfts/audit?${next}` : '/nfts/audit', { scroll: false })
-  }, [chainId, target, router, searchParams])
+    if (next !== searchParams.toString()) window.history.replaceState(null, '', next ? `/nfts/audit?${next}` : '/nfts/audit')
+  }, [chainId, target, tokenId, searchParams])
 
   // Suggestions come from collections the market has already read — a convenience, never a
   // gate: any pasted address works whether or not it was ever listed here
@@ -85,7 +97,21 @@ export default function CollectionAuditTool() {
   )
   const matches = suggestions?.data ?? []
 
-  const audit = useCollectionAudit({ chainId, collection: target, enabled: Boolean(target), autoRequest: true })
+  // Looked for before anything is queued: an address on the wrong network used to sit in the
+  // queue as "starts as soon as a worker is free", which was never going to be true
+  const presence = useContractChains({ address: target, chainId, enabled: Boolean(target) })
+  const audit = useCollectionAudit({ chainId, collection: target, enabled: Boolean(target) && presence.hasCode === true, autoRequest: true })
+  // Independent of the audit queue: a token decodes on demand, whether or not the report has landed
+  const inspection = useTokenInspection({ chainId, collection: target, tokenId, enabled: Boolean(target) && Boolean(tokenId) && presence.hasCode === true })
+  const sampledTokens = audit.audit?.report?.tokens ?? []
+  const auditKind = audit.audit?.kind || audit.audit?.report?.contract?.kind || null
+
+  // The Inspect pills in the report fill the field below and bring it into view
+  const inspectToken = useCallback((id) => {
+    setTokenInput(String(id))
+    requestAnimationFrame(() => document.getElementById('audit-inspect')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }, [])
+  const foundElsewhere = presence.elsewhere.map((id) => appChains.find((candidate) => candidate.id === id)).filter(Boolean)
 
   const { data: board, isLoading: isBoardLoading } = useSWR(['nft-collection-audits', boardSort], () => getNftCollectionAudits({ sort: boardSort, limit: BOARD_LIMIT }), {
     revalidateOnFocus: false,
@@ -107,6 +133,7 @@ export default function CollectionAuditTool() {
   const pick = useCallback((networkId, address) => {
     setChainId(Number(networkId))
     setInput(address)
+    setTokenInput('')
     setShowSuggestions(false)
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [])
@@ -115,9 +142,10 @@ export default function CollectionAuditTool() {
     <div className={styles.tool}>
       <header className={styles.tool__head}>
         <p>
-          Paste any NFT collection. Hup follows every pointer — metadata, artwork, icon — to where the bytes actually live, checks
-          them against the hashes committed onchain, counts who still pins them, and reads the contract for what can change. A token
-          is only as permanent as the weakest hop.
+          Will an NFT&rsquo;s picture still be there in ten years? Paste any collection and Hup checks four things: where its files are
+          stored, whether they open today, whether they are the originals, and whether anyone can change them. You get a score out of
+          100, a grade from A to F, and a short list of what would raise it. Under the report, any single token can be decoded layer by
+          layer: what the contract hands back, what its artwork loads from outside, and which contracts render it.
         </p>
       </header>
 
@@ -206,17 +234,115 @@ export default function CollectionAuditTool() {
 
       {input.trim() && !target && <p className={styles.tool__note}>That is not a valid contract address.</p>}
 
-      {target && (
-        <CollectionAuditReport
-          chainId={chainId}
-          chainInfo={chain}
-          collection={target}
-          audit={audit.audit}
-          status={audit.status}
-          onRequest={audit.request}
-          isRequesting={audit.isRequesting}
-          requestError={audit.requestError}
-        />
+      {target && presence.isChecking && <p className={styles.tool__note}>Checking {chain?.name}…</p>}
+
+      {/* The honest answer, and the fix beside it: the address is usually right and the network wrong */}
+      {target && presence.hasCode === false && (
+        <div className={styles.tool__wrongChain} role="status">
+          <strong>Nothing is deployed at this address on {chain?.name}.</strong>
+          {presence.isSearching ? (
+            <p>Looking for it on the other networks…</p>
+          ) : foundElsewhere.length > 0 ? (
+            <>
+              <p>It does exist on {foundElsewhere.length === 1 ? 'another network' : 'other networks'} — switch and the audit runs there.</p>
+              <div className={styles.tool__wrongChainActions}>
+                {foundElsewhere.map((candidate) => {
+                  const icon = chainIconFor(candidate)
+                  return (
+                    <button key={candidate.id} type="button" onClick={() => setChainId(candidate.id)}>
+                      {icon ? <img src={icon} alt="" /> : null}
+                      Switch to {candidate.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <p>It was not found on any network Hup speaks either. Check the address, or the network it was deployed on.</p>
+          )}
+        </div>
+      )}
+
+      {target && presence.hasCode === true && (
+        <>
+          <CollectionAuditReport
+            chainId={chainId}
+            chainInfo={chain}
+            collection={target}
+            audit={audit.audit}
+            status={audit.status}
+            onRequest={audit.request}
+            isRequesting={audit.isRequesting}
+            requestError={audit.requestError}
+            onInspectToken={inspectToken}
+          />
+
+          {/* The audit scores the collection from a sample; this decodes one token all the way down */}
+          <section id="audit-inspect" className={styles.tool__inspect} aria-label="Inspect one token">
+            <div className={styles.tool__inspectHead}>
+              <h2>Inspect one token</h2>
+              <p>
+                The grade above comes from a sample. Pick or type a token id and this token alone is decoded layer by layer: what the contract hands back, the document behind it,
+                the artwork inside that, everything the artwork loads from outside, and which contracts took part in rendering it.
+              </p>
+            </div>
+
+            <div className={styles.tool__inspectLookup}>
+              <span className={clsx(styles.tool__field, styles['tool__field--token'])}>
+                <HashIcon size={15} />
+                <input
+                  type="text"
+                  value={tokenInput}
+                  spellCheck={false}
+                  inputMode="numeric"
+                  placeholder={auditKind === 'lsp7' ? 'Any id — an LSP7 edition shares one document' : 'Token id'}
+                  aria-label="Token id"
+                  onChange={(event) => setTokenInput(event.target.value)}
+                />
+              </span>
+              {(sampledTokens.length > 0 || auditKind === 'lsp7') && (
+                <span className={styles.tool__chips} aria-label="Sampled tokens">
+                  {auditKind === 'lsp7' && (
+                    <button type="button" className={clsx(styles.tool__chip, tokenInput === '0' && styles['tool__chip--active'])} onClick={() => setTokenInput('0')}>
+                      Collection document
+                    </button>
+                  )}
+                  {sampledTokens.map((token) => (
+                    <button
+                      key={token.tokenId}
+                      type="button"
+                      className={clsx(styles.tool__chip, tokenInput === String(token.tokenId) && styles['tool__chip--active'])}
+                      onClick={() => setTokenInput(String(token.tokenId))}
+                      title={String(token.tokenId)}
+                    >
+                      #{token.display}
+                    </button>
+                  ))}
+                </span>
+              )}
+            </div>
+
+            {tokenInput.trim() && !tokenId && <p className={styles.tool__note}>A token id is a whole number — or, for LSP8, a bytes32 hex value.</p>}
+
+            {tokenId ? (
+              <TokenInspection
+                chainId={chainId}
+                chainInfo={chain}
+                collection={target}
+                tokenId={tokenId}
+                inspection={inspection.inspection}
+                error={inspection.error}
+                isLoading={inspection.isLoading}
+                onRefresh={inspection.refresh}
+                isRefreshing={inspection.isRefreshing}
+              />
+            ) : (
+              <EmptyState icon={HashIcon} className={styles.tool__inspectEmpty}>
+                Type a token id{sampledTokens.length > 0 ? ', or pick one of the sampled tokens' : ''} — the number after the # on a marketplace.
+              </EmptyState>
+            )}
+          </section>
+        </>
       )}
 
       <section className={styles.tool__board} aria-label="Audited collections">

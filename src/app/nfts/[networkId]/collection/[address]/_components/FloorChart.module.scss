@@ -218,12 +218,9 @@
     }
   }
 
+  // Type comes from EmptyState; only the room around it is this card's
   &__empty {
-    margin: 0;
     padding: 2rem 0;
-    color: var(--text-muted);
-    font-size: var(--font-size-12, 0.78rem);
-    text-align: center;
   }
 
   &__tooltip {

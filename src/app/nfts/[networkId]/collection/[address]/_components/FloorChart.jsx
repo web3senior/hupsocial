@@ -11,6 +11,7 @@ import { getNftCollectionHistory } from '@/lib/api'
 import { formatStake } from '@/hooks/useStakeToken'
 import { displayTokenId } from '@/lib/walletNfts'
 import NativeDialog from '@/components/ui/NativeDialog'
+import EmptyState from '@/components/ui/EmptyState'
 import styles from './FloorChart.module.scss'
 
 const RANGES = [
@@ -372,9 +373,9 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
       )}
 
       {!hasTrend ? (
-        <p className={styles.chart__empty}>
+        <EmptyState align="center" className={styles.chart__empty}>
           {isLoading ? 'Loading floor history…' : `Nothing was listed on enough days in the last ${days} days to chart a floor.`}
-        </p>
+        </EmptyState>
       ) : (
         /* Refetching a new range dims the existing render instead of swapping in a skeleton —
            the axis and the line hold their geometry, so the card never jumps */

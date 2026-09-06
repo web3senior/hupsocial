@@ -116,9 +116,9 @@
     }
 
     &[data-network='8453'],
-    &[data-network='84532'] {
-      --chain-color: #2f6dff;
-    }
+    // &[data-network='84532'] {
+      // --chain-color: #2f6dff;
+    // }
 
     &[data-network='42161'] {
       --chain-color: #12aaff;

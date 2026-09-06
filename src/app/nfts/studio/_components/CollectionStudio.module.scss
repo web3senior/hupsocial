@@ -1,24 +1,36 @@
 .studio {
+  container: studio / inline-size;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 
-  &__head {
+  &__loading,
+  &__idle {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-
-    h1 {
-      margin: 0;
-      font-size: var(--font-size-20, 1.25rem);
-    }
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    min-height: 13rem;
+    text-align: center;
 
     p {
       margin: 0;
-      max-width: 44rem;
-      font-size: var(--font-size-14, 0.875rem);
-      color: var(--text-muted, #888);
+      max-width: 36ch;
+      font-size: var(--font-size-12);
       line-height: 1.6;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__idle {
+    padding: 1.5rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+
+    svg {
+      color: var(--text-muted, #888);
+      opacity: 0.75;
     }
   }
 
@@ -251,63 +263,6 @@
     text-transform: uppercase;
   }
 
-  // The shortcut, not the main route — quieter than the search it sits above, and gone the
-  // moment a collection is chosen.
-  &__mine {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-
-    ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-      gap: 0.4rem;
-    }
-
-    button {
-      all: unset;
-      box-sizing: border-box;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 0.1rem;
-      padding: 0.55rem 0.7rem;
-      border: 1px solid var(--border);
-      border-radius: var(--global-border-radius);
-      cursor: pointer;
-
-      &:hover,
-      &:focus-visible {
-        border-color: var(--network-color-primary, var(--color-primary));
-      }
-    }
-
-    strong {
-      font-size: var(--font-size-14, 0.875rem);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    small {
-      font-size: var(--font-size-12);
-      color: var(--text-muted, #888);
-    }
-  }
-
-  &__mineHead {
-    font-size: var(--font-size-12);
-    color: var(--text-muted, #888);
-
-    em {
-      font-style: normal;
-      opacity: 0.7;
-    }
-  }
-
   &__note {
     display: flex;
     align-items: flex-start;
@@ -334,80 +289,573 @@
     color: #ef4444;
   }
 
-  &__facts {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-    gap: 0.75rem 1.25rem;
-    margin: 0;
-    padding: 0.9rem 1rem;
+  // Where the address actually lives, offered as buttons right under the "nothing here" line
+  &__elsewhere {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.6rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    button {
+      all: unset;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+
+      img {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+    }
+  }
+
+  // A plain phrase whose technical detail rides in a tooltip instead of sitting inline
+  &__term {
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+    cursor: help;
+  }
+
+  &__preview {
     border: 1px solid var(--border);
     border-radius: var(--global-border-radius);
+    overflow: hidden;
+    background: var(--background);
+  }
 
-    div {
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-      min-width: 0;
+  // A tinted plate when there is no banner, so the header never reads as broken. Sized by
+  // height alone: an aspect-ratio capped by max-height transfers that cap into a max-width,
+  // and the band stopped short of the card's right edge.
+  &__previewBanner {
+    position: relative;
+    height: clamp(5.5rem, 17vw, 11rem);
+    background: color-mix(in srgb, var(--network-color-primary, var(--text)) 12%, var(--surface-muted));
+
+    &--empty {
+      height: 4.5rem;
     }
 
-    dt {
-      font-size: 0.7rem;
-      letter-spacing: 0.06em;
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__previewBody {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 0 1rem 0.9rem;
+  }
+
+  // Overlaps the banner the way marketplace cards do, so the two images read as one card.
+  // Positioned, or the banner — itself positioned for its image — paints over the icon's top half.
+  &__previewIcon {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    margin-top: -2.25rem;
+    border: 3px solid var(--background);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    em {
+      font-style: normal;
+      font-weight: 700;
+      font-size: var(--font-size-20, 1.25rem);
       text-transform: uppercase;
       color: var(--text-muted, #888);
     }
+  }
 
-    dd {
-      margin: 0;
-      font-size: var(--font-size-14, 0.875rem);
+  &__previewText {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    padding-top: 0.6rem;
+  }
+
+  &__previewName {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--font-size-18, 1.125rem);
+    overflow-wrap: anywhere;
+
+    small {
+      font-size: var(--font-size-12);
       font-weight: 600;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  // The main artwork beside the text; below it on a phone, where a side column would squeeze the name
+  &__previewArt {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0.85rem 0 0;
+    width: 8.5rem;
+
+    img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+    }
+
+    figcaption {
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      color: var(--text-muted, #888);
+    }
+
+    @media (max-width: 560px) {
+      width: 6rem;
+    }
+  }
+
+  &__previewChips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+
+    li {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.15rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      white-space: nowrap;
+    }
+
+    img {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+  }
+
+  &__previewChip--frozen {
+    color: var(--text);
+    border-color: var(--text-muted, #888);
+  }
+
+  &__previewChip--yours {
+    color: var(--network-color-primary, var(--color-primary));
+    border-color: currentColor;
+  }
+
+  &__previewCreators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+  }
+
+  &__previewDescription {
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.55;
+    color: var(--text-muted, #888);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  &__previewDescription--empty {
+    font-style: italic;
+    opacity: 0.7;
+  }
+
+  &__previewLinks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.8rem;
+
+    a {
+      font-size: var(--font-size-12);
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 2px;
       overflow-wrap: anywhere;
     }
   }
 
-  // The segmented strip from SectionTabs, sized to its labels rather than the row: a track the
-  // width of the card would make two pills read as a form control
-  &__tabs {
-    align-self: flex-start;
+  &__previewActions {
     display: flex;
-    gap: 0.2rem;
-    padding: 0.2rem;
-    border: 1px solid var(--border);
-    border-radius: var(--global-border-radius);
-    background-color: var(--surface-muted);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--border);
+
+    code {
+      margin-inline-start: auto;
+      font-family: var(--font-mono, monospace);
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
   }
 
-  &__tab {
-    all: unset;
-    box-sizing: border-box;
+  // In the side column the card reads top to bottom: a shorter band, the text under the icon,
+  // the artwork full width beneath, the actions stacked
+  &__preview {
+    .studio__previewBanner {
+      height: 6rem;
+    }
+
+    .studio__previewBody {
+      flex-wrap: wrap;
+      gap: 0.6rem 0.9rem;
+    }
+
+    .studio__previewText {
+      flex-basis: 100%;
+      order: 2;
+      padding-top: 0;
+    }
+
+    .studio__previewArt {
+      order: 3;
+      width: 100%;
+      margin-top: 0;
+    }
+
+    .studio__previewActions {
+      flex-direction: column;
+      align-items: stretch;
+
+      code {
+        margin-inline-start: 0;
+        text-align: center;
+      }
+    }
+
+    .studio__previewAction {
+      justify-content: center;
+    }
+  }
+
+  &__previewAction {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    min-width: 8rem;
-    min-height: 32px;
-    padding: 0 0.9rem;
-    border-radius: var(--global-border-radius);
-    cursor: pointer;
-    color: var(--text-muted, #888);
-    font-size: var(--font-size-14, 0.875rem);
+    gap: 0.3rem;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-12);
     font-weight: 600;
+    color: inherit;
+    text-decoration: none;
     white-space: nowrap;
-    transition: background-color 150ms ease, color 150ms ease;
 
     &:hover {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  // One job per card — the token grid, the pointer, the creators — so looking and doing never
+  // share a border
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+  }
+
+  &__cardHead {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+      font-weight: 700;
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      line-height: 1.55;
+      color: var(--text-muted, #888);
+      overflow-wrap: anywhere;
+
+      code {
+        font-family: var(--font-mono, monospace);
+        background: var(--surface-muted);
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+      }
+    }
+  }
+
+  // What the chain holds right now, as a link — the reference point for everything below it
+  &__current {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.4rem;
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    em {
+      font-style: italic;
+    }
+
+    code {
+      font-family: var(--font-mono, monospace);
       color: var(--text);
+      background: var(--surface-muted);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  &__currentLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--text);
+    text-decoration: none;
+
+    &:hover code {
+      text-decoration: underline;
+    }
+  }
+
+  &__currentInline {
+    color: #16a34a !important;
+  }
+
+  // The link shapes that work, as one row of pills; each pill's example and reason live in its tooltip
+  &__examples {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  &__examplesLabel {
+    margin-inline-end: 0.2rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__example {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    height: 1.6rem;
+    padding: 0 0.65rem;
+    border: 1px solid color-mix(in srgb, #16a34a 40%, var(--border));
+    border-radius: 999px;
+    background: color-mix(in srgb, #16a34a 8%, transparent);
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--text);
+    cursor: help;
+    white-space: nowrap;
+
+    svg {
+      color: #16a34a;
     }
 
     &:focus-visible {
-      color: var(--text);
-      box-shadow: inset 0 0 0 1px var(--text-muted, #888);
+      outline: 2px solid var(--network-color-primary, var(--color-primary));
+      outline-offset: 2px;
     }
 
-    // A solid surface rather than the network accent, which is only set once a wallet connects
-    &--active {
+    &--avoid {
+      border-color: color-mix(in srgb, #dc2626 40%, var(--border));
+      background: color-mix(in srgb, #dc2626 8%, transparent);
+      color: var(--text-muted, #888);
+
+      svg {
+        color: #dc2626;
+      }
+    }
+  }
+
+  // Inside the tooltip: the example link on its own line, the reason under it
+  &__exampleTip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    max-width: 22rem;
+    text-align: left;
+    line-height: 1.45;
+
+    code {
+      font-family: var(--font-mono, monospace);
+      overflow-wrap: anywhere;
+    }
+  }
+
+  // What a save will and will not touch, said before the upload rather than after the transaction
+  &__alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.65rem 0.8rem;
+    font-size: var(--font-size-12);
+    line-height: 1.55;
+    color: #92400e;
+    background: color-mix(in srgb, #f59e0b 12%, transparent);
+    border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+    border-radius: var(--global-border-radius);
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.15rem;
+      color: #d97706;
+    }
+
+    strong {
+      font-weight: 700;
+    }
+  }
+
+  &__creatorList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+    }
+
+    button {
+      all: unset;
+      display: grid;
+      place-items: center;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      cursor: pointer;
+      color: var(--text-muted, #888);
+
+      &:hover:not(:disabled) {
+        color: #ef4444;
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+    }
+  }
+
+  &__creatorAdd {
+    display: flex;
+    gap: 0.5rem;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.6rem 0.75rem;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      font-family: var(--font-mono, monospace);
       color: var(--text);
-      background-color: var(--surface);
-      box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+      outline: none;
+
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+    }
+
+    button {
+      flex-shrink: 0;
+      padding: 0 1.1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: none;
+      cursor: pointer;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+      color: var(--text);
+
+      &:hover:not(:disabled) {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
     }
   }
 
@@ -415,12 +863,6 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-  }
-
-  &__section {
-    margin: 0.5rem 0 0;
-    font-size: var(--font-size-14, 0.875rem);
-    font-weight: 700;
   }
 
   &__editor {
@@ -463,6 +905,35 @@
     }
   }
 
+  // The raw pointers, folded away: the forms above them are the normal path, and a bare URI
+  // field is only for people who host their own files
+  &__advanced {
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.75rem 1rem;
+
+    summary {
+      cursor: pointer;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text-muted, #888);
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+
+    &[open] summary {
+      margin-bottom: 0.9rem;
+    }
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+  }
+
   &__save {
     align-self: flex-start;
     padding: 0.6rem 1.3rem;
@@ -483,4 +954,398 @@
       cursor: default;
     }
   }
+
+  // Each region is its own container on the page, none nested in another: the search bar, the
+  // collections, and the three columns of the editing view
+  &__bar,
+  &__section {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  // Everything the wallet can manage, as tiles: square art, the chain riding over it, the name under
+  &__tiles {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  &__tile {
+    position: relative;
+    container-type: inline-size;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--background);
+    transition: border-color 0.15s ease;
+
+    &:hover,
+    &:focus-within {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__tileOpen {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  &__tileArt {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__tileBody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.6rem 0.7rem 0.7rem;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  // The chain over the artwork, in its own colour and mark — the same chip the drop tiles wear
+  &__tileChain {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    height: 1.6rem;
+    padding: 0 0.55rem;
+    border-radius: 999px;
+    background: rgba(20, 22, 28, 0.62);
+    backdrop-filter: blur(8px);
+    color: #f4f4f5;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    pointer-events: none;
+
+    img {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+  }
+
+  // A Hup drop keeps its mint controls on the drop page; the way there rides the tile's corner
+  &__tileManage {
+    position: absolute;
+    // Bottom-right of the square artwork (100cqw tall), clear of the chain chip in the top-left
+    top: calc(100cqw - 1.6rem - 0.5rem);
+    right: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    height: 1.6rem;
+    padding: 0 0.6rem;
+    border-radius: 999px;
+    background: var(--network-color-primary, var(--color-primary));
+    color: #fff;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  &__tile:hover &__tileManage,
+  &__tile:focus-within &__tileManage {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    &__tileManage {
+      opacity: 1;
+    }
+  }
+
+  // The editing view: three containers side by side where the studio is wide enough, the card
+  // preview kept in view; two where it is not, with the token files under the card; one on a
+  // phone, preview first. Sized by the studio's own width, since the sidebar takes a slice of
+  // every window.
+  &__columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'side'
+      'card'
+      'tokens';
+    gap: 1rem;
+    align-items: start;
+
+    @container studio (min-width: 760px) {
+      grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+      grid-template-areas:
+        'card side'
+        'tokens side';
+    }
+
+    @container studio (min-width: 1200px) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(17rem, 20rem);
+      grid-template-areas: 'card tokens side';
+    }
+
+    // Nothing to edit on the card — a visitor, or a frozen collection with no creators to name
+    &--noCard {
+      grid-template-areas:
+        'side'
+        'tokens';
+
+      @container studio (min-width: 760px) {
+        grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+        grid-template-areas: 'tokens side';
+      }
+    }
+
+    // No token files of their own — an LSP7 edition, whose copies show the card itself
+    &--noTokens {
+      grid-template-areas:
+        'side'
+        'card';
+
+      @container studio (min-width: 760px) {
+        grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+        grid-template-areas: 'card side';
+      }
+    }
+  }
+
+  &__column {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+    padding: 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+
+    &--card {
+      grid-area: card;
+    }
+
+    &--tokens {
+      grid-area: tokens;
+    }
+  }
+
+  // The side column holds the preview and the downloads, one card each, and stays in view
+  &__side {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+
+    @container studio (min-width: 760px) {
+      position: sticky;
+      // Clears the fixed header, the same offset the app's other sticky rails use
+      top: 5rem;
+    }
+  }
+
+  // Sample files: what it is, what shape, and the way to copy or save it
+  &__downloads {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    // Icon down the left, the words beside it, the buttons on their own line under the words —
+    // a side column is too narrow for all three across
+    li {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: start;
+      gap: 0.45rem 0.6rem;
+      padding: 0.7rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--background);
+
+      > svg {
+        grid-row: 1 / span 2;
+        margin-top: 0.1rem;
+        color: var(--text-muted, #888);
+      }
+
+      > span:first-of-type {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+        min-width: 0;
+      }
+
+      strong {
+        font-size: var(--font-size-14, 0.875rem);
+      }
+
+      small {
+        font-size: var(--font-size-12);
+        line-height: 1.45;
+        color: var(--text-muted, #888);
+      }
+    }
+  }
+
+  &__downloadActions {
+    grid-column: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    justify-self: start;
+
+    a,
+    button {
+      all: unset;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      height: 1.7rem;
+      padding: 0 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+    }
+  }
+
+  // The document behind the link, folded: read it, copy it, start your own from it
+  &__document {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-12);
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text-muted, #888);
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.6rem;
+    }
+
+    pre {
+      margin: 0;
+      max-height: 18rem;
+      overflow: auto;
+      padding: 0.7rem 0.8rem;
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      font-family: var(--font-mono, monospace);
+      font-size: 0.72rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      scrollbar-width: thin;
+    }
+  }
+
+  &__documentBar {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  // Each column opens with what it is for, in words a first-time creator can act on
+  &__columnHead {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+      font-weight: 700;
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      line-height: 1.55;
+      color: var(--text-muted, #888);
+    }
+
+    small {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem 0.35rem;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+
+      code {
+        font-family: var(--font-mono, monospace);
+        color: var(--text);
+        background: var(--surface-muted);
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        overflow-wrap: anywhere;
+      }
+    }
+  }
+
 }

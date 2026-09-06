@@ -106,6 +106,14 @@
     filter: blur(40px) saturate(1.4);
   }
 
+  // No artwork of its own either: the listing mosaic, edge to edge. Taken out of the art
+  // layer's flow to get there — its row is auto-sized, so a grid item there is as tall as
+  // three square thumbs want to be and the slide would wear a mosaic twice its own height.
+  &__mosaic {
+    position: absolute;
+    inset: 0;
+  }
+
   // The banner's own label, top left — the same dark chip the drops tiles wear over their
   // artwork (DropsDirectory.module.scss), sitting at the logo's offsets on the other corner
   &__flag {

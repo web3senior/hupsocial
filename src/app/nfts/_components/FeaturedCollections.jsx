@@ -1,15 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
 import { StarIcon } from '@phosphor-icons/react'
 import { getNftCollectionRanking } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
-import { isSameStoredImage, resolveStorageImageUrl } from '@/lib/storageHelper'
+import { collectionBannerUri, collectionSamples } from '@/lib/collectionArtwork'
 import { networkColorStyle } from '@/lib/networkColors'
-import HupMark from '@/components/ui/HupMark'
+import useStoredImage from '@/hooks/useStoredImage'
+import { CollectionMosaic } from '@/components/CollectionCover'
 import styles from './FeaturedCollections.module.scss'
 
 // How many collections the banner cycles through, and how many ranking rows it reads to find
@@ -50,12 +51,6 @@ const quote = (value, symbol, decimals, chain) => {
 
 // A ranking row's identity, as the slides and the dots are keyed
 const keyOf = (row) => `${row.network_id}-${row.collection}`
-
-// A banner that is the icon's own file is no banner: a square logo stretched 2.6:1 is worse
-// than the icon blurred behind the name, which is what a slide does without one. The
-// resolvers no longer cache such a banner, but rows written before they learned that live
-// out their TTL, and chillwhales fronted the market that way for a day.
-const bannerOf = (row) => (row.banner_uri && !isSameStoredImage(row.banner_uri, row.icon_uri) ? row.banner_uri : null)
 
 /**
  * The top named collections, in server order; artwork never reorders the deck — an artless
@@ -106,39 +101,6 @@ const buildStats = (row, chain) => {
 }
 
 /**
- * One artwork layer's source, and what to do when it fails. Artwork reaches the browser
- * through the image proxy, which resizes it — but the proxy can only serve what an IPFS
- * gateway still holds, and a banner the LUKSO indexer remembered may survive only on the
- * indexer's own CDN: First Beings' and HALO's last IPFS provider was Infura's node, which is
- * gone, and Winged Legends' has none at all. So a proxy miss retries the stored URL itself
- * when that is a plain https address, and only then is the layer given up.
- * @param {string|null} stored The URI as cached — ipfs://, https://, or null for none.
- * @param {string|null} proxied The proxy URL resolved for it.
- * @returns {{ src: string|null, onError: Function }} `src` is null once nothing is left to try.
- */
-const useArtwork = (stored, proxied) => {
-  const candidates = useMemo(() => {
-    const list = []
-    if (proxied) list.push(proxied)
-    if (stored && /^https?:\/\//i.test(stored) && stored !== proxied) list.push(stored)
-    return list
-  }, [stored, proxied])
-  const [attempt, setAttempt] = useState(0)
-
-  // Two layers can show the same file — the icon blurred behind the name and sharp in the
-  // corner — so one failure arrives twice; only the source that actually failed advances
-  const onError = useCallback(
-    (event) => {
-      const failed = event.currentTarget.getAttribute('src')
-      setAttempt((current) => (candidates[current] === failed ? current + 1 : current))
-    },
-    [candidates],
-  )
-
-  return { src: candidates[attempt] || null, onError }
-}
-
-/**
  * One featured collection: its banner artwork edge to edge, the name and chain over the lower
  * band, the four figures in a frosted panel, and the collection's own mark in the corner. The
  * whole slide is the link to the collection page.
@@ -153,21 +115,21 @@ function Slide({ row, index, count, isActive }) {
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)
   const address = String(row.collection).toLowerCase()
-  const bannerUri = bannerOf(row)
 
   // 1600 wide is what the collection page asks for, so the artwork a click lands on is the
   // very file the browser already holds
-  const banner = useArtwork(bannerUri, resolveStorageImageUrl(bannerUri, { width: 1600 }))
-  const icon = useArtwork(row.icon_uri, resolveStorageImageUrl(row.icon_uri, { width: 128, still: true }))
+  const banner = useStoredImage(collectionBannerUri(row), { width: 1600 })
+  const icon = useStoredImage(row.icon_uri, { width: 128, still: true })
   const stats = buildStats(row, chain)
 
   // An image that fails — every gateway behind the proxy came up empty, and the CDN copy
   // after it — steps aside rather than swapping in a placeholder: at banner scale the
-  // line-art mark would be the whole slide. The fallback is the next layer down, the blurred
-  // icon, and after that the tinted plate. The slide itself stays: it earned its place on
-  // volume, not on artwork, and failures don't arrive together — the proxy gives each gateway
-  // seconds, the browser queues the low-priority banners, the CDN retry hangs on a slow host —
-  // so a deck that shed slides as their images gave up emptied itself minutes into a page view.
+  // line-art mark would be the whole slide. The fallback is the next layer down: the blurred
+  // icon, then what is actually listed inside the collection, and only then the tinted plate.
+  // The slide itself stays: it earned its place on volume, not on artwork, and failures don't
+  // arrive together — the proxy gives each gateway seconds, the browser queues the
+  // low-priority banners, the CDN retry hangs on a slow host — so a deck that shed slides as
+  // their images gave up emptied itself minutes into a page view.
   const showBanner = Boolean(banner.src)
   const showIcon = Boolean(icon.src)
 
@@ -200,7 +162,8 @@ function Slide({ row, index, count, isActive }) {
           // collection's own colours instead of a grey plate
           <img className={styles.featured__blur} src={icon.src} alt="" decoding="async" onError={icon.onError} />
         ) : (
-          <HupMark size={64} />
+          // No artwork of its own at all: what is on the shelf inside it, edge to edge
+          <CollectionMosaic networkId={networkId} collection={address} samples={collectionSamples(row)} markSize={64} className={styles.featured__mosaic} />
         )}
       </div>
 
@@ -254,6 +217,11 @@ function Slide({ row, index, count, isActive }) {
  * route backfills the rest after each response, so a nameless collection earns its slot a
  * page view or two later.
  *
+ * Native-coin markets only. The table below can print a figure in whatever token a collection
+ * trades in, because it labels every one and never claims a ranking between them; the banner
+ * picks five out of the whole market, and there a sale paid in a token anyone can mint for
+ * nothing counts the same as one paid in the chain's coin.
+ *
  * A native scroll-snap track underneath: a swipe on touch, the dots on anything, and a slow
  * rotation that stops while the pointer or focus is on it, while the tab is hidden, and for
  * readers who asked for less motion.
@@ -277,8 +245,14 @@ export default function FeaturedCollections({ networkId }) {
       setIsLoading(true)
       try {
         // Lifetime volume rather than the last day's: a hero that reshuffles every morning is
-        // a hero nobody learns, and on a young market a day's ranking is mostly ties anyway
-        const res = await getNftCollectionRanking({ limit: FETCH_LIMIT, networkId: networkId || undefined, sort: 'volumeTotal' })
+        // a hero nobody learns, and on a young market a day's ranking is mostly ties anyway.
+        // Native only, so the volume that wins a slot is volume in the chain's own coin.
+        const res = await getNftCollectionRanking({
+          limit: FETCH_LIMIT,
+          networkId: networkId || undefined,
+          sort: 'volumeTotal',
+          currency: 'native',
+        })
         if (cancelled) return
         setSlides(pickSlides(res.data || []))
         // A new set starts from its first slide. The track itself remounts fresh — the

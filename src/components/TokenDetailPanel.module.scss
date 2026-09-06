@@ -673,6 +673,120 @@ $rarity: (
     flex-wrap: wrap;
     gap: 0.5rem;
   }
+
+  // Claims the contract or the creator's profile actually make, one chip each. One height for
+  // all of them, icon or not, so the row never staggers.
+  &__badges {
+    --badge-height: 1.7rem;
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.4rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: var(--badge-height);
+    padding: 0 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    white-space: nowrap;
+
+    &--hup {
+      color: var(--network-color-primary, var(--color-primary));
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 45%, transparent);
+
+      &:hover {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+    }
+
+    &--good {
+      color: #16a34a;
+      background: color-mix(in srgb, #16a34a 10%, transparent);
+      border-color: color-mix(in srgb, #16a34a 35%, transparent);
+    }
+
+    &--warn {
+      color: #dc2626;
+      background: color-mix(in srgb, #dc2626 10%, transparent);
+      border-color: color-mix(in srgb, #dc2626 35%, transparent);
+    }
+  }
+
+  // The door onward, after everything about the one token: icon, a line, one button
+  &__more {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.9rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  &__moreIcon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    overflow: hidden;
+    color: var(--gray-400);
+    background: var(--background);
+    border-radius: 12px;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__moreText {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+
+    strong {
+      font-size: 0.95rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      font-size: 0.8rem;
+      color: var(--gray-400);
+    }
+  }
+
+  &__moreLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--network-color-text);
+    text-decoration: none;
+    background: var(--network-color-primary);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
 }
 
 @keyframes token-detail-spin {

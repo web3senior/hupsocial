@@ -1,0 +1,44 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  a,
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted, #888);
+    padding: 0.35rem 0.75rem;
+    font: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      color: var(--text, inherit);
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  // Armed, and only then, it says what it is about to do
+  &__delete--armed {
+    color: #ef4444;
+    border-color: #ef4444;
+
+    &:hover:not(:disabled) {
+      color: #dc2626;
+      border-color: #dc2626;
+    }
+  }
+}

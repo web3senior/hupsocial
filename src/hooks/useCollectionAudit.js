@@ -51,8 +51,22 @@ export default function useCollectionAudit({ chainId, collection, enabled = true
 
   const { data, error, isLoading, mutate } = useSWR(key, () => getNftCollectionAudit(chainId, collection, { summary }), {
     revalidateOnFocus: false,
-    refreshInterval: pollIntervalFor,
   })
+
+  /*
+   * Polled from here rather than through SWR's refreshInterval. Given a function, SWR asks it
+   * for the next delay only when it schedules a tick — and it schedules the first at mount, when
+   * nothing has been fetched yet. A collection opened by URL therefore answered 0 and never
+   * polled: the chip said "Auditing" until a reload, which mounted with a pending row and worked.
+   * Keyed on the row, so the cadence follows its state; an interval rather than a timeout, so a
+   * poll that comes back identical (deep-equal, same reference) keeps ticking instead of stopping.
+   */
+  useEffect(() => {
+    const interval = pollIntervalFor(data)
+    if (!interval) return undefined
+    const timer = setInterval(() => mutate(), interval)
+    return () => clearInterval(timer)
+  }, [data, mutate])
 
   const status = data?.status || (isLoading ? 'loading' : 'none')
   const audit = data?.data || null

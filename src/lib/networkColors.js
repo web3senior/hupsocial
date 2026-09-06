@@ -16,3 +16,15 @@
  */
 export const networkColorStyle = (chain) =>
   chain?.primaryColor ? { '--network-color-primary': chain.primaryColor, '--network-color-text': chain.textColor } : undefined
+
+/**
+ * A chain's logo as an image source: the hosted icon when the config carries one, else its inline
+ * SVG as a data URL. Null for a chain with neither.
+ * @param {Object|null|undefined} chain An entry from appChains.
+ * @returns {string|null}
+ */
+export const chainIconFor = (chain) => {
+  if (!chain) return null
+  if (chain.iconUrl) return chain.iconUrl
+  return chain.icon ? `data:image/svg+xml,${encodeURIComponent(chain.icon)}` : null
+}

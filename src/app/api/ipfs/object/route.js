@@ -90,7 +90,7 @@ const IMMUTABLE_CACHE = 'public, max-age=31536000, s-maxage=31536000, immutable'
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
-  const cid = (searchParams.get('cid') || '').replace(/^ipfs:\/\//, '').trim()
+  const cid = (searchParams.get('cid') || '').replace(/^(?:ipfs:\/\/)+/, '').trim()
 
   // The gateway origins come from env and never from the caller; the CID is held to the shape of
   // a path segment so a crafted value cannot climb out of it

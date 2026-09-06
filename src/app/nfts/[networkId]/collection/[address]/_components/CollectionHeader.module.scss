@@ -415,12 +415,41 @@
     letter-spacing: 0.04em;
     color: var(--text-muted, #888);
 
+    // The chain, in its own colour with its own mark: `--chip-color` is the chain's primary,
+    // set inline from appChains, so it never inherits the wallet's chain off :root
+    &--chain {
+      border-color: color-mix(in srgb, var(--chip-color, var(--network-color-primary, var(--color-primary))) 45%, var(--border));
+      background-color: color-mix(in srgb, var(--chip-color, var(--network-color-primary, var(--color-primary))) 10%, transparent);
+      color: var(--chip-color, var(--network-color-primary, var(--color-primary)));
+
+      img {
+        width: 14px;
+        height: 14px;
+        margin-inline-end: 0.15rem;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+    }
+
     // The one chip that describes what the artwork does rather than how it is stored, so
     // it carries the network accent instead of sitting in the muted row
     &--model {
       border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 45%, var(--border));
       background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 10%, transparent);
       color: var(--network-color-primary, var(--color-primary));
+    }
+
+    // Provenance the engine proves, in the network accent — and a link, to the drop page
+    &--drop {
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 45%, var(--border));
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 10%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+      text-decoration: none;
+
+      &:hover,
+      &:focus-visible {
+        background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 18%, transparent);
+      }
     }
 
     // The permanence grade carries its own colour (set inline from the grade), never the chain's

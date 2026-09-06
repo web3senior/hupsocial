@@ -1,0 +1,65 @@
+.not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 4rem 1.25rem;
+  text-align: center;
+  color: var(--text);
+
+  &__code {
+    margin: 0;
+    font-family: var(--font-geist-mono), monospace;
+    font-size: clamp(3rem, 12vw, 5rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--text-muted);
+  }
+
+  &__title {
+    margin: 0;
+  }
+
+  &__message {
+    margin: 0;
+    max-width: 32rem;
+    color: var(--text-muted);
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  &__action {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--text);
+    background-color: var(--surface-muted);
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.025);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    // The chain colour reaches :root only after a wallet action; the inverted pair is the wallet-less default
+    &--primary {
+      border-color: transparent;
+      color: var(--network-color-text, var(--background));
+      background-color: var(--network-color-primary, var(--foreground));
+    }
+  }
+}

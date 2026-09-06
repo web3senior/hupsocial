@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import {
@@ -23,8 +23,12 @@ import {
 } from '@phosphor-icons/react'
 import NewPost from '@/components/NewPost'
 import { toast } from '@/components/NextToast'
+import { getPostById } from '@/lib/api'
 import {
   MAX_ARTICLE_BODY_BYTES,
+  articlePath,
+  fetchArticleBody,
+  isArticle,
   MAX_ARTICLE_SUBTITLE,
   MAX_ARTICLE_TAGS,
   MAX_ARTICLE_TITLE,
@@ -80,6 +84,16 @@ const loadDraft = () => {
  */
 export default function ArticleEditor() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  /* Editing an existing article rather than writing a new one. The post is named in the URL so
+     the editor is linkable from the article page and survives a refresh. */
+  const editNetworkId = Number(searchParams.get('network')) || null
+  const editPostId = searchParams.get('post') || null
+  const isEditing = Boolean(editNetworkId && editPostId)
+
+  const [editing, setEditing] = useState(null)
+  const [loadError, setLoadError] = useState('')
   /* The body is pinned here, under its own CID, before the composer ever opens — so it carries
      its own author stamp rather than inheriting the one on the post that will link to it. */
   const { address } = useConnection()
@@ -110,16 +124,58 @@ export default function ArticleEditor() {
   // without desyncing hydration, so the read has to happen here. It runs a single time and sets
   // one state object — which is why the draft is one object and not five useStates.
   useEffect(() => {
+    // An edit fills itself from the post below; the stored draft belongs to the unwritten article
+    if (isEditing) return
+
     /* eslint-disable react-hooks/set-state-in-effect */
     setDraft(loadDraft())
     setDraftLoaded(true)
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [])
+  }, [isEditing])
+
+  /* Load the article being edited: the post for its content reference and ownership, then the
+     body from the CID that reference points at. Both have to land before the fields mean anything,
+     so they fill the same one draft object the writer path uses. */
+  useEffect(() => {
+    if (!isEditing) return
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const response = await getPostById(editNetworkId, editPostId, null)
+        const post = response?.data
+        if (!post || post.is_deleted) throw new Error('That article no longer exists')
+
+        const content = typeof post.content === 'string' ? JSON.parse(post.content) : post.content
+        if (!isArticle(content)) throw new Error('That post is not an article')
+
+        const body = await fetchArticleBody(content.article.bodyCid)
+        if (cancelled) return
+
+        setEditing({ post, article: content.article })
+        setDraft({
+          title: content.article.title ?? '',
+          subtitle: content.article.subtitle ?? '',
+          cover: content.article.cover ?? '',
+          tags: Array.isArray(content.article.tags) ? content.article.tags : [],
+          // A body the gateways cannot serve would silently publish an empty article
+          markdown: body?.markdown ?? body ?? '',
+        })
+        setDraftLoaded(true)
+      } catch (error) {
+        if (!cancelled) setLoadError(error.message || 'Could not open that article')
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isEditing, editNetworkId, editPostId])
 
   // Autosave. Skipped until the stored draft has been read, or the first render would overwrite
   // a real draft with the empty initial state.
   useEffect(() => {
-    if (!draftLoaded) return
+    if (!draftLoaded || isEditing) return
 
     const timer = setTimeout(() => {
       try {
@@ -131,7 +187,7 @@ export default function ArticleEditor() {
     }, DRAFT_SAVE_DEBOUNCE_MS)
 
     return () => clearTimeout(timer)
-  }, [draftLoaded, draft])
+  }, [draftLoaded, isEditing, draft])
 
   const wordCount = useMemo(() => countWords(markdown), [markdown])
   const bodyBytes = useMemo(() => new Blob([markdown]).size, [markdown])
@@ -158,12 +214,18 @@ export default function ArticleEditor() {
       const { selectionStart, selectionEnd, value } = el
 
       /* Restore the caret after React has committed the new value, otherwise the browser puts
-         it at the end and the next keystroke lands in the wrong place. */
+         it at the end and the next keystroke lands in the wrong place.
+
+         The scroll has to be put back too: assigning a textarea's value resets scrollTop to 0, so
+         formatting a word halfway down a long article threw the writer back to the first line. It
+         is restored after setSelectionRange, which does its own scrolling. */
       const commit = (next, start, end) => {
+        const { scrollTop } = el
         patch({ markdown: next })
         requestAnimationFrame(() => {
           el.focus()
           el.setSelectionRange(start, end)
+          el.scrollTop = scrollTop
         })
       }
 
@@ -311,6 +373,11 @@ export default function ArticleEditor() {
   /* Only a post that actually reached the indexer clears the draft. Closing the composer without
      publishing — or a transaction the wallet rejected — leaves the article exactly where it was. */
   const handlePublished = () => {
+    if (isEditing) {
+      router.replace(articlePath({ networkId: editNetworkId, postId: editPostId, title }))
+      return
+    }
+
     localStorage.removeItem(DRAFT_KEY)
     router.replace('/')
   }
@@ -489,6 +556,8 @@ export default function ArticleEditor() {
         <NewPost
           article={pendingArticle}
           text={title.trim()}
+          actionType={isEditing ? 'edit' : 'post'}
+          existingPost={editing?.post ?? null}
           onClose={() => setPendingArticle(null)}
           onConfirmed={handlePublished}
         />

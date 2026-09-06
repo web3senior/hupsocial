@@ -24,7 +24,7 @@ export const erc725ySetDataAbi = [
   },
 ]
 
-export const normalizeIpfsUri = (value) => (value?.startsWith('ipfs://') ? value : `ipfs://${value}`)
+export { normalizeIpfsUri } from '@/lib/storageHelper'
 
 const erc165Abi = [
   {

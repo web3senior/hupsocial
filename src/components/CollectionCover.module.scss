@@ -1,0 +1,73 @@
+// The artwork box shared by every surface that stands for a collection — the market rail,
+// the ranking table, the featured banner. Only the ladder and the mosaic's internals live
+// here; the box's size, radius and aspect come from whichever module is using it.
+.cover {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-muted);
+
+  &__art {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  // A square icon standing in for a wide banner: blown up and blurred, so the box wears the
+  // collection's own colours rather than a letterboxed logo
+  &__art--fill {
+    transform: scale(1.4);
+    filter: blur(40px) saturate(1.4);
+  }
+
+  &__mosaic {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 3px;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__mosaic--single {
+    grid-template-columns: 1fr;
+  }
+
+  // Auto rows, not a fixed 1fr 1fr — a collection with exactly two listings has one thumb
+  // here, and it should fill the column rather than leave half of it grey
+  &__side {
+    display: grid;
+    grid-auto-rows: 1fr;
+    gap: 3px;
+    min-height: 0;
+  }
+
+  &__tile {
+    position: relative;
+    min-height: 0;
+    background-color: var(--surface-muted);
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is line-art, so
+      // contain it at icon scale rather than cover-crop it. The inset is capped because a
+      // percentage one resolves against WIDTH: on a banner-wide tile 30% is taller than the
+      // tile itself, and a border-box that cannot fit its own padding grows the whole row.
+      &[data-broken] {
+        object-fit: contain;
+        padding: min(30%, 24px);
+      }
+    }
+  }
+
+  &__mark {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted);
+  }
+}

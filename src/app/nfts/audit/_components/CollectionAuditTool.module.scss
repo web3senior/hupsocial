@@ -248,6 +248,61 @@
     color: var(--text-muted, #888);
   }
 
+  // The wrong-network answer: what is missing here, and the buttons that take you to where it is
+  &__wrongChain {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid color-mix(in srgb, #d97706 40%, var(--border));
+    border-radius: 14px;
+    background: color-mix(in srgb, #d97706 7%, var(--surface));
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      line-height: 1.55;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__wrongChainActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+
+    button {
+      all: unset;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+
+      img {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+    }
+  }
+
   // What has been scored so far — the reason to come back without an address in hand
   &__board {
     display: flex;
@@ -548,5 +603,90 @@
     &__findings {
       min-width: 0;
     }
+  }
+}
+
+// The single-token decode under the collection report: its own heading, the id field and
+// the sampled tokens as chips that fill it
+.tool {
+  &__inspect {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    scroll-margin-top: 5rem;
+  }
+
+  &__inspectHead {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+
+    p {
+      margin: 0;
+      max-width: 52rem;
+      font-size: var(--font-size-14, 0.875rem);
+      line-height: 1.6;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__inspectLookup {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  // The id field on its own row, beside the chips; a bytes32 id scrolls inside it
+  &__field--token {
+    width: auto;
+    flex: 0 1 18rem;
+    min-width: 10rem;
+
+    input {
+      font-family: var(--ff-mono);
+    }
+
+    @media (max-width: 600px) {
+      flex-basis: 100%;
+    }
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__chip {
+    all: unset;
+    box-sizing: border-box;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-family: var(--ff-mono);
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible,
+    &--active {
+      border-color: var(--network-color-primary, var(--color-primary));
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  // Spacing only: the copy comes from EmptyState
+  &__inspectEmpty {
+    padding: 0.25rem 0 0.75rem;
   }
 }

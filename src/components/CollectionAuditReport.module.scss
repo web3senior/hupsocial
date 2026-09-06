@@ -77,18 +77,77 @@
     }
   }
 
-  &__grade {
+  &__ringWrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  // A ring filled to the score. Still by design: it is read, not watched.
+  &__ring {
+    --audit-ring-score: 0;
+
+    position: relative;
     display: grid;
     place-items: center;
-    width: 4.25rem;
-    height: 4.25rem;
+    align-content: center;
+    gap: 0;
+    width: 7rem;
+    height: 7rem;
     border-radius: 50%;
-    background: var(--audit-color);
-    color: #fff;
-    font-size: 2.1rem;
+    background: conic-gradient(var(--audit-color) calc(var(--audit-ring-score) * 1%), color-mix(in srgb, var(--audit-color) 14%, var(--surface-muted)) 0);
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 8px;
+      border-radius: 50%;
+      background: var(--surface);
+    }
+
+    > * {
+      position: relative;
+    }
+  }
+
+  &__ringGrade {
+    font-size: 2.2rem;
     font-weight: 800;
+    line-height: 1;
     letter-spacing: -0.03em;
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--audit-color) 18%, transparent);
+    color: var(--audit-color);
+  }
+
+  &__ringScore {
+    font-family: var(--ff-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text);
+
+    small {
+      font-weight: 600;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  // The number to chase, as a pill that points at the list of how
+  &__nudge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--audit-color) 45%, var(--border));
+    border-radius: 999px;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--audit-color);
+    text-decoration: none;
+    white-space: nowrap;
+
+    &:hover {
+      background: color-mix(in srgb, var(--audit-color) 10%, transparent);
+    }
   }
 
   &__headline {
@@ -284,6 +343,157 @@
     color: var(--text);
   }
 
+  // The verdict in four sentences: icon, question and answer, the part-score at the end
+  &__plain {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+
+    @media (min-width: 760px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  &__plainRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+
+    > svg {
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    &--good > svg {
+      color: #16a34a;
+    }
+
+    &--warn > svg {
+      color: #d97706;
+    }
+
+    &--bad > svg {
+      color: #dc2626;
+    }
+
+    &--neutral > svg {
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__plainText {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    span {
+      font-size: var(--font-size-12);
+      line-height: 1.5;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__plainValue {
+    flex-shrink: 0;
+    font-family: var(--ff-mono);
+    font-style: normal;
+    font-size: var(--font-size-12);
+    font-weight: 700;
+    color: var(--text-muted, #888);
+    cursor: help;
+  }
+
+  // What to do about it, numbered, most damaging first — the reason the ring points down here
+  &__improve {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid color-mix(in srgb, var(--audit-color) 35%, var(--border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--audit-color) 6%, var(--surface));
+    scroll-margin-top: 5rem;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--audit-color);
+    }
+
+    > p {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      line-height: 1.55;
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    li {
+      padding-left: 0.2rem;
+
+      strong {
+        font-size: var(--font-size-14, 0.875rem);
+      }
+
+      p {
+        margin: 0.15rem 0 0;
+        font-size: var(--font-size-12);
+        line-height: 1.55;
+        color: var(--text-muted, #888);
+      }
+
+      a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-top: 0.35rem;
+        font-size: var(--font-size-12);
+        font-weight: 600;
+        color: var(--audit-color);
+      }
+    }
+
+    &--done {
+      border-color: color-mix(in srgb, #16a34a 35%, var(--border));
+      background: color-mix(in srgb, #16a34a 6%, var(--surface));
+
+      h3 {
+        color: #16a34a;
+      }
+    }
+  }
+
+  &__sectionsHead {
+    margin: 0.4rem 0 -0.2rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #888);
+  }
+
   &__sections {
     display: flex;
     flex-direction: column;
@@ -381,7 +591,32 @@
     gap: 0.05rem;
 
     strong {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
       font-size: var(--font-size-14, 0.875rem);
+    }
+  }
+
+  // The way down to one token's full decode, beside the token's name — a button on the audit
+  // page, a link anywhere else, dressed the same
+  &__inspect {
+    all: unset;
+    box-sizing: border-box;
+    padding: 0.05rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #888);
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--network-color-primary, var(--color-primary));
+      color: var(--network-color-primary, var(--color-primary));
     }
 
     small {

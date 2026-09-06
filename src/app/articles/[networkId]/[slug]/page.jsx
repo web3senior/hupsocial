@@ -7,6 +7,7 @@ import { renderArticleMarkdown } from '@/lib/markdown'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
+import ArticleOwnerActions from './_components/ArticleOwnerActions'
 import styles from './page.module.scss'
 
 /* Deduplicate the fetch so generateMetadata and Page share one request per render */
@@ -154,6 +155,10 @@ export default async function Page({ params }) {
                   <span aria-hidden="true">·</span>
                   <span>{readingTimeLabel(article.wordCount)}</span>
                 </div>
+
+                {/* A client island: what it renders depends on who is connected, which the server
+                    cannot know without making this page unshareable */}
+                <ArticleOwnerActions networkId={post.network_id} postId={postId} author={post.wallet_address} />
               </div>
             </header>
 

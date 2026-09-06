@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
 import useSWRImmutable from 'swr/immutable'
+import { useReadContract } from 'wagmi'
 import {
   ArrowSquareOutIcon,
   ArrowsClockwiseIcon,
@@ -27,9 +28,13 @@ import Profile from '@/components/Profile'
 import HupMark from '@/components/ui/HupMark'
 import NativePopover from '@/components/ui/NativePopover'
 import { toast } from '@/components/NextToast'
+import { chainIconFor } from '@/lib/networkColors'
 import styles from './CollectionHeader.module.scss'
 
 const COUNT_FORMAT = new Intl.NumberFormat('en')
+
+// LSP8 always answers it; on ERC721 it is the Enumerable extension, so the read may simply fail
+const TOTAL_SUPPLY_ABI = [{ type: 'function', name: 'totalSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }]
 
 // Past this, the description collapses behind "Read more" — roughly the three lines the card
 // gives it, so a short blurb never sprouts a toggle that does nothing
@@ -149,10 +154,21 @@ function SampleBanner({ chainId, collection, sample }) {
  * @param {Object} props.stats Result of useCollectionStats for this collection.
  * @param {Function} props.onRefresh Re-reads collection identity + token metadata from chain.
  * @param {boolean} props.isRefreshing Whether that sweep is in flight.
+ * @param {string|null} [props.dropId] The HupDrops id when the engine deployed this collection.
  */
-export default function CollectionHeader({ chainId, chainInfo, address, info, stats, onRefresh, isRefreshing }) {
+export default function CollectionHeader({ chainId, chainInfo, address, info, stats, onRefresh, isRefreshing, dropId }) {
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
+
+  // One cheap read, because the cached row is allowed to be a day old and supply is the one
+  // figure here that moves while a drop is still minting
+  const { data: liveSupply } = useReadContract({
+    address,
+    abi: TOTAL_SUPPLY_ABI,
+    functionName: 'totalSupply',
+    chainId,
+    query: { enabled: Boolean(address) },
+  })
 
   // The permanence grade, as cidex scored it. Looking at a collection is what puts it in the
   // queue, so the market audits itself as people browse it; the chip links to the full report.
@@ -225,7 +241,10 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
     {
       key: 'supply',
       label: 'Total supply',
-      value: info.totalSupply !== null ? formatSupply(info.totalSupply) : null,
+      // Live first: the cached figure is a day-old snapshot, which on a collection still
+      // minting reads as a supply the chain left behind hours ago
+      value: liveSupply !== undefined ? formatSupply(liveSupply) : info.totalSupply !== null ? formatSupply(info.totalSupply) : null,
+      title: liveSupply !== undefined ? 'Read from the contract just now' : undefined,
     },
   ]
 
@@ -396,7 +415,25 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
             )}
 
             <div className={styles.header__chips}>
-              {chainInfo?.name && <span className={styles.header__chip}>{chainInfo.name}</span>}
+              {/* The engine's own reverse index says it deployed this collection — the one origin
+                  claim on the page proven onchain rather than declared. Links to the drop. */}
+              {dropId && (
+                <Link
+                  href={`/drops/${chainId}/${dropId}`}
+                  className={clsx(styles.header__chip, styles['header__chip--drop'])}
+                  title="Deployed by Hup's drop engine — open the drop"
+                >
+                  <HupMark size={11} />
+                  Launched on Hup
+                </Link>
+              )}
+              {/* The chain in its own colour and mark — the one chip a reader recognises before reading it */}
+              {chainInfo?.name && (
+                <span className={clsx(styles.header__chip, styles['header__chip--chain'])} style={{ '--chip-color': chainInfo.primaryColor }}>
+                  {chainIconFor(chainInfo) ? <img src={chainIconFor(chainInfo)} alt="" /> : null}
+                  {chainInfo.name}
+                </span>
+              )}
               {standard && (
                 <span className={styles.header__chip} title={standardTitle}>
                   {standard}

@@ -1,5 +1,7 @@
 .nftDetail {
-  position: relative; // Anchors the close button over the scrolling body
+  // No `position` here: a top-layer dialog with position relative computes to absolute and anchors
+  // to the top of the document, so one opened after scrolling lands above the fold. The UA's fixed
+  // positioning already makes the dialog the containing block for the close button.
   width: min(940px, calc(100vw - 28px));
   max-height: calc(100vh - 40px);
   // iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport

@@ -17,6 +17,9 @@
  * currency-denominated column across networks therefore ranks unlike numbers; the table says
  * so in the column's tooltip rather than pretending otherwise.
  *
+ * `currency=native` narrows every aggregate to the chain's own coin, for a caller that has to
+ * rank collections against each other rather than label each one's own figures.
+ *
  * Native-coin rows come back with null symbol/decimals — store_tokens has no row for a
  * chain's own currency — and the client fills both from its chain config, same as the floor
  * chart and the hero cards.
@@ -31,6 +34,7 @@
 import { NextResponse, after } from 'next/server'
 import pool from '@/lib/db'
 import { getCollectionMetadata } from '@/lib/collectionMetadataCache'
+import { attachCollectionSamples } from '@/lib/nftCollectionCover'
 
 export const runtime = 'nodejs'
 
@@ -61,6 +65,20 @@ const SORTS = {
 }
 
 const DEFAULT_SORT = 'volume24h'
+
+/**
+ * Payment-currency filters, as WHERE fragments. A whitelist for the same reason SORTS is one:
+ * the value lands in the SQL text.
+ *
+ * The dominant-token rule keeps every figure honestly LABELLED, but it cannot make two of them
+ * comparable — 100 of a mint-your-own LSP7 is the same integer as 100 LYX, so a collection
+ * whose only sale was paid in a token nobody prices anything in outranks the whole market.
+ * `native` is for callers that rank collections against each other rather than print one at a
+ * time. cidex writes the zero address for a native sale; rows indexed earlier can hold NULL.
+ */
+const CURRENCIES = {
+  native: " AND (payment_token IS NULL OR payment_token = '0x0000000000000000000000000000000000000000')",
+}
 
 // Ranks reshuffle only as fast as trades and listings land, and the table is a scan-and-click
 // surface — half a minute of staleness costs a reader nothing and saves the whole rollup
@@ -121,6 +139,13 @@ export async function GET(request) {
     const chain = networkId ? ' AND network_id = ?' : ''
     const chainParam = networkId ? [networkId] : []
 
+    // Goes wherever `chain` goes, and for the same reason: a currency filter applied to the
+    // finished rows would still have ranked a top N chosen on figures this request never
+    // prints. It narrows the candidate set too — a collection with nothing priced in the
+    // chain's coin has no native market to rank.
+    const currency = CURRENCIES[searchParams.get('currency')] ? searchParams.get('currency') : null
+    const paidIn = currency ? CURRENCIES[currency] : ''
+
     const now = Math.floor(Date.now() / 1000)
     const since24 = now - DAY_SECONDS
     const since48 = now - DAY_SECONDS * 2
@@ -131,14 +156,14 @@ export async function GET(request) {
           SELECT network_id, collection, MAX(is_lsp8) AS is_lsp8,
                  COUNT(*) AS active_count, MAX(listed_at) AS last_listed_at
             FROM nft_listings
-           WHERE status = 1 AND backed = 1${chain}
+           WHERE status = 1 AND backed = 1${chain}${paidIn}
            GROUP BY network_id, collection
         ),
         floor_by_token AS (
           SELECT network_id, collection, payment_token,
                  MIN(price) AS floor_price, COUNT(*) AS token_count
             FROM nft_listings
-           WHERE status = 1 AND backed = 1${chain}
+           WHERE status = 1 AND backed = 1${chain}${paidIn}
            GROUP BY network_id, collection, payment_token
         ),
         floor_dominant AS (
@@ -151,7 +176,7 @@ export async function GET(request) {
           SELECT network_id, collection, payment_token,
                  MAX(price) AS best_offer, COUNT(*) AS offer_count
             FROM nft_offers
-           WHERE status = ? AND expires_at > UNIX_TIMESTAMP()${chain}
+           WHERE status = ? AND expires_at > UNIX_TIMESTAMP()${chain}${paidIn}
            GROUP BY network_id, collection, payment_token
         ),
         offer_dominant AS (
@@ -168,7 +193,7 @@ export async function GET(request) {
                  SUM(sold_at >= ?) AS sales_24h,
                  COUNT(*) AS sales_total
             FROM nft_trades
-           WHERE 1 = 1${chain}
+           WHERE 1 = 1${chain}${paidIn}
            GROUP BY network_id, collection, payment_token
         ),
         trade_dominant AS (
@@ -240,9 +265,14 @@ export async function GET(request) {
       delete row.market_cap
     }
 
+    // What the covers fall back to: a collection whose LSP4 document carries no artwork
+    // still has artwork inside it. Only the ones with something listed have samples — a
+    // collection that is only here on past trades has nothing on the shelf to show.
+    await attachCollectionSamples(rows)
+
     backfillIdentities(rows, new URL(request.url).origin)
 
-    return NextResponse.json({ success: true, sort, data: rows }, { headers: { 'Cache-Control': CACHE_CONTROL } })
+    return NextResponse.json({ success: true, sort, currency, data: rows }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (error) {
     console.error('[GET_NFT_COLLECTION_RANKING_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })

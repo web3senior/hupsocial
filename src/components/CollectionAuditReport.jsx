@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
 import {
+  ArrowDownIcon,
   ArrowSquareOutIcon,
   ArrowsClockwiseIcon,
   CheckCircleIcon,
+  LightbulbIcon,
   MinusIcon,
   QuestionIcon,
   ShieldCheckIcon,
+  TrophyIcon,
   WarningCircleIcon,
   XCircleIcon,
 } from '@phosphor-icons/react'
@@ -23,7 +26,10 @@ import {
   formatRelativeTime,
   gradeColor,
   HASH_LABELS,
+  improvementsFor,
   KIND_LABELS,
+  nextGradeTarget,
+  plainCategories,
   ROLE_LABELS,
   shortenReference,
 } from '@/lib/collectionAuditFormat'
@@ -69,16 +75,16 @@ const sourceLabel = { token: 'own pointer', base: 'base URI', collection: 'colle
  */
 const hopRowsOf = (report) => {
   const rows = []
-  const push = (group, role, hop, note) => {
+  const push = (group, role, hop, note, tokenId = null) => {
     if (!hop) return
-    rows.push({ key: `${group}:${role}:${rows.length}`, group, role, hop, note })
+    rows.push({ key: `${group}:${role}:${rows.length}`, group, role, hop, note, tokenId })
   }
   push('Collection', 'doc', report.collectionDoc)
   for (const asset of report.collectionAssets || []) push('Collection', asset.role, asset)
   for (const token of report.tokens || []) {
     const group = `Token ${token.display}`
-    push(group, 'doc', token.doc, sourceLabel[token.source] || null)
-    for (const asset of token.assets || []) push(group, asset.role, asset)
+    push(group, 'doc', token.doc, sourceLabel[token.source] || null, token.tokenId)
+    for (const asset of token.assets || []) push(group, asset.role, asset, null, token.tokenId)
   }
   return rows
 }
@@ -149,12 +155,44 @@ function Hash({ hop }) {
   )
 }
 
+const TONE_ICON = { good: CheckCircleIcon, warn: WarningCircleIcon, bad: XCircleIcon, neutral: MinusIcon }
+
+/**
+ * The grade as a ring filled to the score — still, read rather than watched. Under it, the
+ * number a creator can act on: how many points to the next grade.
+ */
+function GradeRing({ grade, score, color }) {
+  const next = nextGradeTarget(score)
+  return (
+    <div className={styles.audit__ringWrap}>
+      <div className={styles.audit__ring} style={{ '--audit-ring-score': score, '--audit-color': color }} role="img" aria-label={`Grade ${grade}, ${score} out of 100`}>
+        <span className={styles.audit__ringGrade}>{grade}</span>
+        <span className={styles.audit__ringScore}>
+          {score}
+          <small>/100</small>
+        </span>
+      </div>
+      {next ? (
+        <a href="#audit-improve" className={styles.audit__nudge}>
+          <ArrowDownIcon size={12} weight="bold" aria-hidden="true" />
+          {next.points} {next.points === 1 ? 'point' : 'points'} to {next.grade}
+        </a>
+      ) : (
+        <span className={styles.audit__nudge}>
+          <TrophyIcon size={12} weight="fill" aria-hidden="true" />
+          Top grade
+        </span>
+      )}
+    </div>
+  )
+}
+
 // Seconds since a timestamp, ticking once a second — the one clock on the page that has to move
 const useElapsedSeconds = (since) => {
   const [now, setNow] = useState(() => Date.now())
+  // The first tick lands a second in; the initial state already carries a fresh clock
   useEffect(() => {
     if (!since) return undefined
-    setNow(Date.now())
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [since])
@@ -221,8 +259,10 @@ function PendingState({ audit, status }) {
  * @param {boolean} props.isRequesting Whether that request is in flight.
  * @param {Error|null} [props.requestError] The last request's failure, e.g. the cooldown.
  * @param {boolean} [props.showCollectionLink=true] Link through to the collection page.
+ * @param {Function} [props.onInspectToken] Called with a sampled token's id when its Inspect pill
+ * is pressed — the audit page decodes it underneath; without it the pill links there.
  */
-export default function CollectionAuditReport({ chainId, chainInfo, collection, audit, status, onRequest, isRequesting, requestError, showCollectionLink = true }) {
+export default function CollectionAuditReport({ chainId, chainInfo, collection, audit, status, onRequest, isRequesting, requestError, showCollectionLink = true, onInspectToken = null }) {
   const report = audit?.report || null
   const isPending = status === 'pending' || status === 'running' || status === 'refreshing'
   const color = gradeColor(audit?.grade)
@@ -276,19 +316,19 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
         ? 'The owner can rewrite every pointer through setData (ERC725Y)'
         : `The owner can rewrite pointers through ${contract.setters.join(', ')}`
 
+  // The verdict in plain words, and what would raise it — the two things a creator or a
+  // collector actually came for; the probes that produced them wait folded below
+  const plain = plainCategories({ categories: audit.categories, badges: audit.badges, contract })
+  const studioHref = `/nfts/studio?network=${chainId}&address=${collection}`
+  const improvements = improvementsFor({ badges: audit.badges, categories: audit.categories, contract, studio: studioHref, explorer: explorerAddress })
+
   return (
     <article className={styles.audit} style={style} aria-label="Collection permanence audit">
       <header className={styles.audit__hero}>
-        <span className={styles.audit__grade} aria-label={`Grade ${audit.grade}`}>
-          {audit.grade}
-        </span>
+        <GradeRing grade={audit.grade} score={audit.score} color={color} />
         <div className={styles.audit__headline}>
           <div className={styles.audit__scoreRow}>
-            <strong className={styles.audit__score}>
-              {audit.score}
-              <small>/100</small>
-            </strong>
-            <span className={styles.audit__title}>Permanence score</span>
+            <span className={styles.audit__title}>Will this collection’s files still be there in ten years?</span>
             {status === 'refreshing' && (
               <span className={styles.audit__refreshing}>
                 <ArrowsClockwiseIcon size={12} className={styles.audit__spin} /> {audit.startedAt ? audit.progress || 're-auditing' : audit.queueAhead > 0 ? `queued, ${COUNT.format(audit.queueAhead)} ahead` : 're-audit queued'}
@@ -323,6 +363,52 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
         </div>
       </header>
 
+      {/* Four questions a collector would actually ask, each answered in a sentence */}
+      <ul className={styles.audit__plain} aria-label="What this means">
+        {plain.map((row) => {
+          const Icon = TONE_ICON[row.tone] || MinusIcon
+          return (
+            <li key={row.key} className={clsx(styles.audit__plainRow, styles[`audit__plainRow--${row.tone}`])}>
+              <Icon size={18} weight={row.tone === 'neutral' ? 'regular' : 'fill'} aria-hidden="true" />
+              <span className={styles.audit__plainText}>
+                <strong>{row.label}</strong>
+                <span>{row.text}</span>
+              </span>
+              <em className={styles.audit__plainValue} title={`${row.value} out of 100 for this part`}>
+                {row.value}
+              </em>
+            </li>
+          )
+        })}
+      </ul>
+
+      <section id="audit-improve" className={clsx(styles.audit__improve, improvements.length === 0 && styles['audit__improve--done'])}>
+        <h3>
+          {improvements.length === 0 ? <TrophyIcon size={16} weight="fill" aria-hidden="true" /> : <LightbulbIcon size={16} weight="fill" aria-hidden="true" />}
+          {improvements.length === 0 ? 'Nothing to fix' : 'How to improve'}
+        </h3>
+        {improvements.length === 0 ? (
+          <p>This is as permanent as it gets. Re-check now and then — a pin can lapse without anyone noticing.</p>
+        ) : (
+          <ol>
+            {improvements.map((step) => (
+              <li key={step.id}>
+                <strong>{step.title}</strong>
+                <p>{step.text}</p>
+                {step.action &&
+                  (step.action.external ? (
+                    <a href={step.action.href} target="_blank" rel="noopener noreferrer">
+                      {step.action.label} <ArrowSquareOutIcon size={12} />
+                    </a>
+                  ) : (
+                    <Link href={step.action.href}>{step.action.label}</Link>
+                  ))}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
       <div className={styles.audit__badges}>
         {audit.badges.map((id) => {
           const badge = describeBadge(id)
@@ -334,31 +420,35 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
         })}
       </div>
 
-      <div className={styles.audit__categories}>
-        {AUDIT_CATEGORIES.map((category) => {
-          const value = audit.categories?.[category.key] ?? 0
-          return (
-            <div key={category.key} className={styles.audit__category} title={category.hint}>
-              <ProgressBar
-                percent={value}
-                color={gradeColor(value >= 85 ? 'A' : value >= 70 ? 'B' : value >= 55 ? 'C' : value >= 40 ? 'D' : 'F')}
-                height={6}
-                label={
-                  <span className={styles.audit__categoryLabel}>
-                    {category.label}
-                    <small>{PERCENT.format(AUDIT_WEIGHTS[category.key])} of the score</small>
-                  </span>
-                }
-                hint={<span className={styles.audit__categoryValue}>{value}</span>}
-                ariaLabel={category.label}
-              />
-            </div>
-          )
-        })}
-      </div>
-
+      {/* Everything the verdict rests on, folded: the bars, every probe, the contract, the history */}
+      <h3 className={styles.audit__sectionsHead}>Full report</h3>
       <div className={styles.audit__sections}>
-        <DetailSection title="Where the bytes live" count={hopRows.length} defaultOpen>
+        <DetailSection title="Score by part">
+          <div className={styles.audit__categories}>
+            {AUDIT_CATEGORIES.map((category) => {
+              const value = audit.categories?.[category.key] ?? 0
+              return (
+                <div key={category.key} className={styles.audit__category} title={category.hint}>
+                  <ProgressBar
+                    percent={value}
+                    color={gradeColor(value >= 85 ? 'A' : value >= 70 ? 'B' : value >= 55 ? 'C' : value >= 40 ? 'D' : 'F')}
+                    height={6}
+                    label={
+                      <span className={styles.audit__categoryLabel}>
+                        {category.label}
+                        <small>{PERCENT.format(AUDIT_WEIGHTS[category.key])} of the score</small>
+                      </span>
+                    }
+                    hint={<span className={styles.audit__categoryValue}>{value}</span>}
+                    ariaLabel={category.label}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Every file, and where it lives" count={hopRows.length}>
           {hopRows.length === 0 ? (
             <p className={styles.audit__note}>No metadata pointer could be followed for this collection.</p>
           ) : (
@@ -385,7 +475,21 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
                       <tr key={row.key} className={clsx(firstOfGroup && styles['audit__row--group'])}>
                         <td data-label="Item">
                           <span className={styles.audit__item}>
-                            {firstOfGroup && <strong>{row.group}</strong>}
+                            {firstOfGroup && (
+                              <strong>
+                                {row.group}
+                                {row.tokenId &&
+                                  (onInspectToken ? (
+                                    <button type="button" className={styles.audit__inspect} onClick={() => onInspectToken(row.tokenId)} title="Decode this token layer by layer, below">
+                                      Inspect
+                                    </button>
+                                  ) : (
+                                    <Link href={`/nfts/audit?network=${chainId}&address=${collection}&tokenId=${encodeURIComponent(row.tokenId)}`} className={styles.audit__inspect} title="Decode this token layer by layer">
+                                      Inspect
+                                    </Link>
+                                  ))}
+                              </strong>
+                            )}
                             <small>
                               {ROLE_LABELS[row.role] || row.role}
                               {row.note ? ` · ${row.note}` : ''}
@@ -441,7 +545,7 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
           )}
         </DetailSection>
 
-        <DetailSection title="Contract" defaultOpen>
+        <DetailSection title="The contract">
           <dl className={styles.audit__facts}>
             <div>
               <dt>Standard</dt>

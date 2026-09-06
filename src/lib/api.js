@@ -248,11 +248,15 @@ export const getNftCollections = async (limit = 12, networkId) => {
  * @param {string} [options.sort='volume24h'] One of volume24h, volumeTotal, sales24h,
  * change24h, floor, bestOffer, marketCap, listed, supply. Anything else falls back to the
  * default rather than erroring.
+ * @param {string} [options.currency] `'native'` narrows every figure to the chain's own coin,
+ * for a caller that ranks collections against each other — across payment tokens the numbers
+ * are labelled correctly but not comparable. Omit for the whole market.
  */
-export const getNftCollectionRanking = async ({ limit = 50, networkId, sort } = {}) => {
+export const getNftCollectionRanking = async ({ limit = 50, networkId, sort, currency } = {}) => {
   const params = new URLSearchParams({ limit })
   if (networkId) params.set('networkId', networkId)
   if (sort) params.set('sort', sort)
+  if (currency) params.set('currency', currency)
 
   const response = await fetch(`/api/v1/nfts/collections/ranking?${params.toString()}`)
   if (!response.ok) throw new Error('Failed to fetch the collections ranking')
@@ -1228,4 +1232,28 @@ export const getNftCollectionAudits = async ({ networkId, sort = 'recent', limit
   if (!response.ok) throw new Error('Failed to fetch collection audits')
 
   return response.json()
+}
+
+/**
+ * Get NFT Token Inspection
+ * One token decoded layer by layer: pointer, document, artwork, what the artwork loads, which
+ * contracts render it, and the verdict. Throws with the server's reason when it cannot.
+ * @param {number|string} networkId Chain the collection lives on.
+ * @param {string} address Collection contract address.
+ * @param {string} tokenId Decimal, or bytes32 hex for LSP8.
+ * @param {{fresh?: boolean}} [options] `fresh` skips the server's short memo.
+ */
+export const getNftTokenInspection = async (networkId, address, tokenId, { fresh = false } = {}) => {
+  const query = new URLSearchParams({ networkId: String(networkId), address: address.toLowerCase(), tokenId: String(tokenId) })
+  if (fresh) query.set('fresh', '1')
+
+  const response = await fetch(`/api/v1/nfts/inspect?${query.toString()}`, { cache: fresh ? 'no-store' : 'default' })
+  const body = await response.json().catch(() => null)
+  if (!response.ok || !body?.success) {
+    const error = new Error(body?.error || `Inspection failed (${response.status})`)
+    error.status = response.status
+    throw error
+  }
+
+  return body
 }

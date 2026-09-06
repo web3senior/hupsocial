@@ -94,6 +94,105 @@ export const formatRelativeTime = (value) => {
   return null
 }
 
+// The same bands cidex grades with, so "points to the next grade" is never off by one
+export const GRADE_BANDS = [
+  ['A', 85],
+  ['B', 70],
+  ['C', 55],
+  ['D', 40],
+  ['F', 0],
+]
+
+export const gradeFor = (score) => GRADE_BANDS.find(([, floor]) => Number(score) >= floor)?.[0] || 'F'
+
+/**
+ * The grade one step up and how far away it is — the number a creator can act on.
+ * @param {number} score
+ * @returns {{ grade: string, points: number }|null} Null at the top.
+ */
+export const nextGradeTarget = (score) => {
+  const value = Number(score) || 0
+  const above = [...GRADE_BANDS].reverse().find(([, floor]) => floor > value)
+  return above ? { grade: above[0], points: above[1] - value } : null
+}
+
+/**
+ * The four categories said plainly, one line each, for a reader who has never heard of a
+ * gateway or a digest. Tone drives the icon; the number stays available beside it.
+ * @param {{ categories: Object, badges: string[], contract?: Object }} audit
+ * @returns {Array<{ key: string, label: string, text: string, tone: string, value: number }>}
+ */
+export const plainCategories = ({ categories = {}, badges = [], contract = null }) => {
+  const has = (id) => badges.includes(id)
+  const storage = has('content-lost')
+    ? { tone: 'bad', text: 'The files could not be found anywhere.' }
+    : has('onchain')
+      ? { tone: 'good', text: 'The files are stored on the blockchain itself — they cannot go missing.' }
+      : has('arweave')
+        ? { tone: 'good', text: 'The files are on Arweave, paid for once and kept permanently.' }
+        : has('web2')
+          ? { tone: 'warn', text: 'At least one file sits on an ordinary web server — it vanishes if that site goes down.' }
+          : has('ipfs')
+            ? { tone: (categories.storage ?? 0) >= 70 ? 'good' : 'warn', text: 'The files are on IPFS — safe for as long as at least one copy stays pinned.' }
+            : { tone: 'neutral', text: 'Where the files live could not be worked out.' }
+
+  const availability = categories.availability ?? 0
+  const reach =
+    availability >= 100
+      ? { tone: 'good', text: 'Every file opened when Hup checked just now.' }
+      : availability >= 70
+        ? { tone: 'warn', text: 'Most files opened, but not all of them.' }
+        : availability > 0
+          ? { tone: 'bad', text: 'Several files did not open.' }
+          : { tone: 'bad', text: 'Nothing could be opened.' }
+
+  const integrity = has('hash-mismatch')
+    ? { tone: 'bad', text: 'What is being served is not what was promised onchain.' }
+    : has('hash-verified')
+      ? { tone: 'good', text: 'The files match the fingerprint stored onchain — they are the originals.' }
+      : { tone: 'neutral', text: 'No onchain fingerprint to check the files against.' }
+
+  const control = contract?.isProxy
+    ? { tone: 'warn', text: 'The contract’s code can be swapped by its owner.' }
+    : contract && !contract.mutable
+      ? { tone: 'good', text: 'Nobody can change where the files point — not even the creator.' }
+      : { tone: 'warn', text: 'The owner can still change where the files point.' }
+
+  return [
+    { key: 'storage', label: 'Where the files live', value: categories.storage ?? 0, ...storage },
+    { key: 'availability', label: 'Do they open today?', value: availability, ...reach },
+    { key: 'integrity', label: 'Are they the originals?', value: categories.integrity ?? 0, ...integrity },
+    { key: 'contract', label: 'Can anyone change them?', value: categories.contract ?? 0, ...control },
+  ]
+}
+
+/**
+ * What would raise the score, as things a person can go and do, most damaging first. Empty
+ * means there is nothing to fix. `studio` and `explorer` are the pages an action links to.
+ * @param {{ badges: string[], categories: Object, contract?: Object, studio?: string|null, explorer?: string|null }} audit
+ */
+export const improvementsFor = ({ badges = [], categories = {}, contract = null, studio = null, explorer = null }) => {
+  const has = (id) => badges.includes(id)
+  const steps = []
+  const fix = (id, title, text, action = null) => steps.push({ id, title, text, action })
+
+  if (has('content-lost')) fix('lost', 'Bring the files back', 'None of the artwork could be found. Upload it again and point the collection at the new files.', studio && { label: 'Open in Studio', href: studio })
+  if (has('web2')) fix('web2', 'Move the files off the web server', 'A website disappears the day its hosting stops being paid. Upload the files to IPFS or Arweave and point the collection there.', studio && { label: 'Open in Studio', href: studio })
+  if (has('hash-mismatch')) fix('hash', 'Serve the original files', 'What is served today is not what was committed onchain. Pin the originals again, or point the collection at where they really are.', studio && { label: 'Open in Studio', href: studio })
+  if (has('at-risk') || (has('ipfs') && (categories.availability ?? 100) < 100)) {
+    fix('pin', 'Keep more than one copy pinned', 'IPFS only keeps what someone pins. Pin the files with a second provider — Filebase, Pinata or web3.storage — so one lapsed subscription cannot take them down.')
+  }
+  if (has('no-metadata')) fix('metadata', 'Give the collection its metadata', 'No metadata could be found at all. Point the collection at a document describing it.', studio && { label: 'Open in Studio', href: studio })
+  if (has('unverified-source')) fix('source', 'Verify the contract on the explorer', 'Publishing the source lets anyone confirm what the contract does. Explorers verify it from the compiler settings in a minute or two.', explorer && { label: 'Open the explorer', href: explorer, external: true })
+  if (has('unlinked-creator') || has('partly-verified-creator')) fix('creator', 'Claim the collection from your profile', 'Add it to your Universal Profile’s issued assets, so wallets and marketplaces can show it is really yours.')
+  if (has('upgradeable')) fix('proxy', 'Lock the code', 'A proxy lets the owner swap the code behind this address. Once the collection is finished, give up the right to upgrade it.')
+  if (contract?.mutable && !contract?.isProxy && !has('content-lost') && !has('web2') && !has('hash-mismatch')) {
+    fix('freeze', 'Freeze the metadata once the artwork is final', 'While the pointers can still move, collectors are trusting you not to move them. Hup drop collections have a Freeze switch in the manage panel.')
+  }
+
+  return steps
+}
+
 /** A CID or URL shortened for a table cell. */
 export const shortenReference = (value, keep = 10) => {
   if (!value || typeof value !== 'string') return '—'

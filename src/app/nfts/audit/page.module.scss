@@ -18,5 +18,22 @@
       border-radius: 0;
       padding: 1rem;
     }
+
+    // The route's loading shell: the same card holding a centred spinner, revealed only after
+    // a beat so a fast fetch never shows it
+    &--loading {
+      display: grid;
+      place-items: center;
+      animation: page-reveal 200ms ease-out 150ms both;
+    }
+  }
+}
+
+@keyframes page-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

@@ -47,6 +47,8 @@
 // --- Post ---
 .post {
   --post-button-bg: var(--surface-muted);
+  // Owns its text colour: the post details wrapper paints --text, which dims to 65% white in dark
+  color: var(--foreground);
 
   -webkit-tap-highlight-color: transparent;
   position: relative;
@@ -305,7 +307,7 @@
 
     &__content {
       overflow: hidden;
-      font-family: var(--font-sans);
+      font-family: var(--font-sans) !important;
       font-size: var(--system-16-font-size);
       line-height: 1.4;
       position: relative;

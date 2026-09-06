@@ -6,7 +6,7 @@ import { ImageIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
 import { buildLsp4MetadataJson, encodeVerifiableURIFromDigest } from '@/lib/drops'
 import { pickImageUrl } from '@/lib/lsp4'
 import { hashIpfsContent, uploadFileToIPFS, uploadObjectToIPFS } from '@/lib/ipfs'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { collapseIpfsPrefix, normalizeIpfsUri, resolveStorageImageUrl } from '@/lib/storageHelper'
 import { handleBrokenImage } from '@/lib/utils'
 import { toast } from '@/components/NextToast'
 import styles from './Lsp4MetadataEditor.module.scss'
@@ -18,17 +18,22 @@ const emptyAttribute = () => ({ key: '', value: '' })
 const COPY = {
   collection: {
     nameRequired: 'A collection needs a name',
-    imageHint: 'The collection’s main image',
+    imageHint: 'The collection’s main image · square, 1000 × 1000 or larger',
+    bannerHint: 'The wide picture behind the collection page · 1600 × 640',
     attributes: 'collection-level traits',
     note: 'The whole document is re-pinned and the collection re-pointed at it',
   },
   token: {
     nameRequired: 'A token needs a name',
-    imageHint: 'This token’s main image',
+    imageHint: 'This token’s main image · square, 1000 × 1000 or larger',
+    bannerHint: 'A wide picture behind this token’s page · 1600 × 640',
     attributes: 'this token’s traits',
     note: 'The whole document is re-pinned and this token re-pointed at it',
   },
 }
+
+// The same sizes the drop composer recommends, so an asset made for one form fits the other
+const ICON_HINT = 'The small square wallets show · 256 × 256 or larger'
 
 /**
  * LSP4 Metadata Editor
@@ -63,11 +68,15 @@ export default function Lsp4MetadataEditor({ current, name: onchainName, subject
    */
   const [name, setName] = useState(() => opened.name || onchainName || '')
   const [description, setDescription] = useState(() => opened.description || '')
-  const [icon, setIcon] = useState(() => pickImageUrl(opened.icon))
+  /* Seeded through the collapse: a document already carrying `ipfs://ipfs://…` would otherwise
+     be re-pinned with the same unresolvable URL by anyone who saves without re-uploading. */
+  const [icon, setIcon] = useState(() => collapseIpfsPrefix(pickImageUrl(opened.icon)))
   // `images` is where LSP4 puts it; the rest are the shapes documents actually arrive in.
-  const [image, setImage] = useState(
-    () => pickImageUrl(opened.images) || pickImageUrl(opened.banner) || pickImageUrl(opened.image) || pickImageUrl(opened.image_url),
+  const [image, setImage] = useState(() =>
+    collapseIpfsPrefix(pickImageUrl(opened.images) || pickImageUrl(opened.banner) || pickImageUrl(opened.image) || pickImageUrl(opened.image_url)),
   )
+  // The wide picture behind the page: LSP4's backgroundImage, or the ERC card's banner_image
+  const [banner, setBanner] = useState(() => collapseIpfsPrefix(pickImageUrl(opened.backgroundImage) || pickImageUrl(opened.banner_image)))
   const [links, setLinks] = useState(() => {
     if (Array.isArray(opened.links)) return opened.links.map((l) => ({ title: l.title ?? '', url: l.url ?? '' }))
     // An ERC721 document's one link, which LSP4 has no other place for
@@ -92,8 +101,7 @@ export default function Lsp4MetadataEditor({ current, name: onchainName, subject
     try {
       const cid = await uploadFileToIPFS(file)
       if (!cid) throw new Error('Upload failed')
-      // Already an ipfs:// URI — wrapping it again produced ipfs://ipfs://… no gateway can serve
-      setter(cid.startsWith('ipfs://') ? cid : `ipfs://${cid}`)
+      setter(normalizeIpfsUri(cid))
     } catch (err) {
       toast(err.message || 'Image upload failed', 'error')
     } finally {
@@ -112,9 +120,10 @@ export default function Lsp4MetadataEditor({ current, name: onchainName, subject
        * otherwise produce a hash nothing can reproduce. `hashIpfsContent` fetches and hashes what
        * is really there, and a null digest degrades to an unverified entry rather than a wrong one.
        */
-      const [iconHash, imageHash] = await Promise.all([
+      const [iconHash, imageHash, bannerHash] = await Promise.all([
         icon ? hashIpfsContent(icon).catch(() => '') : '',
         image ? hashIpfsContent(image).catch(() => '') : '',
+        banner ? hashIpfsContent(banner).catch(() => '') : '',
       ])
 
       const built = buildLsp4MetadataJson({
@@ -124,24 +133,28 @@ export default function Lsp4MetadataEditor({ current, name: onchainName, subject
         iconHash,
         imageUrl: image,
         imageHash,
+        backgroundImageUrl: banner,
+        backgroundImageHash: bannerHash,
         links: links.filter((l) => l.url.trim()).map((l) => ({ title: l.title.trim() || l.url.trim(), url: l.url.trim() })),
       })
 
       /*
        * The edited fields over the document that was opened, rather than in place of it: this
-       * form shows six of LSP4's keys, and buildLsp4MetadataJson empties the rest. Pinning that
-       * alone is how a collection's 3D assets and background image disappeared the moment
-       * somebody fixed a typo in its description.
+       * form shows seven of LSP4's keys, and buildLsp4MetadataJson empties the rest. Pinning that
+       * alone is how a collection's 3D assets disappeared the moment somebody fixed a typo in
+       * its description.
        */
       const metadata = { ...opened, ...built.LSP4Metadata }
       if (opened.assets) metadata.assets = opened.assets
-      if (opened.backgroundImage) metadata.backgroundImage = opened.backgroundImage
+      // A background image in a shape the banner slot could not read survives rather than being dropped
+      if (!banner && opened.backgroundImage) metadata.backgroundImage = opened.backgroundImage
 
-      // The form absorbed these when it opened — `image` into the artwork slot, `external_url`
-      // into links — and re-emits them as `images` and `links`. Left behind, they would be a
-      // second copy of the artwork that no later edit ever updates.
+      // The form absorbed these when it opened — `image` into the artwork slot, `banner_image`
+      // into the banner, `external_url` into links — and re-emits them in LSP4's own fields.
+      // Left behind, they would be a second copy of the artwork that no later edit ever updates.
       delete metadata.image
       delete metadata.image_url
+      delete metadata.banner_image
       delete metadata.external_url
 
       // Attributes are not part of buildLsp4MetadataJson's minimal shape, so they go on after —
@@ -157,7 +170,7 @@ export default function Lsp4MetadataEditor({ current, name: onchainName, subject
       const uri = await uploadObjectToIPFS({ LSP4Metadata: metadata })
       if (!uri) throw new Error('Could not pin the metadata')
 
-      const normalised = uri.startsWith('ipfs://') ? uri : `ipfs://${uri}`
+      const normalised = normalizeIpfsUri(uri)
       const digest = await hashIpfsContent(normalised).catch(() => '')
 
       await onSave?.(encodeVerifiableURIFromDigest(normalised, digest))
@@ -174,8 +187,9 @@ export default function Lsp4MetadataEditor({ current, name: onchainName, subject
     <div className={styles.editor}>
       <div className={styles.editor__images}>
         {[
-          { slot: 'icon', label: 'Icon', hint: 'The small square wallets show', value: icon, setter: setIcon },
+          { slot: 'icon', label: 'Icon', hint: ICON_HINT, value: icon, setter: setIcon },
           { slot: 'image', label: 'Artwork', hint: copy.imageHint, value: image, setter: setImage },
+          { slot: 'banner', label: 'Banner', hint: copy.bannerHint, value: banner, setter: setBanner },
         ].map((field) => (
           <label key={field.slot} className={clsx(styles.editor__image, field.value && styles['editor__image--filled'])}>
             {field.value ? (

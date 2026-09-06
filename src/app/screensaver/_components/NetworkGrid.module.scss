@@ -1,7 +1,7 @@
 .network {
   position: relative;
-  // The board is 1:1 so a fullscreen capture is already square
-  aspect-ratio: 1;
+  // Cells stay square; the board follows the column/row count the component picks
+  aspect-ratio: var(--ratio, 1);
   border-radius: 20px;
   background: #030014;
   overflow: hidden;
@@ -11,8 +11,8 @@
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--rows, 3), minmax(0, 1fr));
     width: 100%;
     height: 100%;
     gap: 1px;
@@ -39,13 +39,13 @@
     position: relative;
     display: grid;
     place-items: center;
-    width: 30%;
-    min-width: 26px;
-    max-width: 84px;
+    width: 22%;
+    min-width: 22px;
+    max-width: 62px;
     aspect-ratio: 1;
     border-radius: 999px;
     background: rgba(3, 0, 20, 0.55);
-    box-shadow: 0 0 0 1px rgba(226, 232, 240, 0.16), 0 6px 22px rgba(3, 0, 20, 0.7);
+    box-shadow: 0 6px 22px rgba(3, 0, 20, 0.7);
     backdrop-filter: blur(3px);
 
     img {
@@ -113,10 +113,18 @@
     aspect-ratio: auto;
     border-radius: 0;
 
+    // Fit the whole board on screen: width leads, unless that would overflow the height
     .network__board {
-      width: auto;
-      height: 100%;
-      aspect-ratio: 1;
+      width: min(100vw, calc(100vh * var(--ratio, 1)));
+      height: auto;
+      max-height: 100vh;
+      min-width: 0;
+      aspect-ratio: var(--ratio, 1);
+    }
+
+    // Cells are far bigger here, so let the mark grow with them
+    .network__badge {
+      max-width: 132px;
     }
 
     .network__fullscreen,

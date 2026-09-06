@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, ImageIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, ImageIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -32,6 +32,7 @@ import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
 import AttachLaunchModal from '@/components/AttachLaunchModal'
 import AttachDropModal from '@/components/AttachDropModal'
+import DropCard from '@/components/DropCard'
 import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
 import CreatePollDialog from '@/components/CreatePollDialog'
 import AttachPollDialog from '@/components/AttachPollDialog'
@@ -421,7 +422,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // arrives already onchain. What rides in the payload is only the card — title, cover, excerpt,
   // word count and the bodyCid — so a long read costs the feed the same bytes as a short post.
   const [article, setArticle] = useState(
-    () => restoredContent?.article ?? (actionType === 'edit' ? getContentPayload(existingPost)?.article ?? null : articleSeed)
+    /* articleSeed outranks the stored reference so an edited article can carry its new bodyCid.
+       A plain post edit passes none, and still keeps whatever the post already had. */
+    () => restoredContent?.article ?? articleSeed ?? (actionType === 'edit' ? getContentPayload(existingPost)?.article ?? null : null)
   )
   // Mini apps travel the same way: a thin { appId, chainId } reference, never the frame URL, so
   // a moderator revoking an app takes effect in every post that embedded it
@@ -1402,7 +1405,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // LaunchCard resolves price and curve state live so the post never carries stale numbers
       if (tokenLaunch) serializableContent.tokenLaunch = tokenLaunch
 
-      // NFT drops as well — the drop already exists onchain (created in CreateDropDialog);
+      // NFT drops as well — the drop already exists onchain (created at /drops/create);
       // DropCard resolves supply and phase state live so the post never carries stale numbers
       if (nftDrop) serializableContent.nftDrop = nftDrop
 
@@ -1761,12 +1764,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
               )}
 
               {nftDrop && (
-                <div className={styles.nftAttachment}>
-                  <ImageIcon size={16} />
-                  <span>NFT drop attached (drop #{nftDrop.dropId})</span>
-                  <button type="button" onClick={() => setNftDrop(null)} aria-label="Detach NFT drop" disabled={isBusy}>
-                    <XIcon size={14} />
-                  </button>
+                <div className={styles.dropPreview}>
+                  <div className={styles.nftAttachment}>
+                    <ImageIcon size={16} />
+                    <span>NFT drop attached (drop #{nftDrop.dropId})</span>
+                    <button type="button" onClick={() => setShowAttachDrop(true)} title="Choose what the card shows" aria-label="Choose what the drop card shows" disabled={isBusy}>
+                      <SlidersHorizontalIcon size={14} />
+                    </button>
+                    <button type="button" onClick={() => setNftDrop(null)} aria-label="Detach NFT drop" disabled={isBusy}>
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                  {/* The card as the feed will show it — live supply and price, inert until posted */}
+                  <DropCard drop={nftDrop} preview className={styles.dropPreview__card} />
                 </div>
               )}
 
@@ -2067,8 +2077,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       {showAttachDrop && (
         <AttachDropModal
           chainId={targetChainId}
-          prefillImage={launchPrefillImage}
-          prefillDescription={postText}
+          initial={nftDrop}
           onAttached={(dropReference) => {
             setNftDrop(dropReference)
             setShowAttachDrop(false)

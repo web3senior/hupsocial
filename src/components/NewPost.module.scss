@@ -684,3 +684,16 @@ dialog.newPost {
     gap: 8px;
   }
 }
+
+/* An attached drop: the chip stays the handle (options, remove), the live card sits under it */
+.dropPreview {
+  margin: 0 0 12px;
+
+  .nftAttachment {
+    margin-bottom: 8px;
+  }
+
+  .dropPreview__card {
+    margin-top: 0;
+  }
+}

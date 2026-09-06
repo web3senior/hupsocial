@@ -23,6 +23,10 @@
   line-height: 1.45;
   text-align: start;
   text-wrap: pretty;
+  // The bubble is a DOM child of wherever its trigger sits, so a nowrap or uppercase
+  // ancestor would otherwise leak into it
+  white-space: normal;
+  text-transform: none;
   -webkit-font-smoothing: antialiased;
   box-shadow: var(--tooltip-shadow);
 
@@ -38,6 +42,12 @@
     opacity 0.14s ease,
     overlay 0.14s ease allow-discrete,
     display 0.14s ease allow-discrete;
+
+  // A consumer's broad display rule (e.g. `div { display: flex }`) outranks the UA's
+  // closed-popover display:none — re-assert it so a closed bubble never takes layout
+  &:not(:global(:popover-open)) {
+    display: none;
+  }
 
   &:global(:popover-open) {
     opacity: 1;

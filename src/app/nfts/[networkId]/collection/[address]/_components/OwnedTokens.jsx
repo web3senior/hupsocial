@@ -7,6 +7,7 @@ import { useConnection } from 'wagmi'
 import { displayTokenId, normalizeTokenId } from '@/lib/walletNfts'
 import NftDetailModal from '@/components/NftDetailModal'
 import SendNftModal from '@/components/SendNftModal'
+import { handleBrokenImage } from '@/lib/utils'
 import styles from './OwnedTokens.module.scss'
 
 function OwnedTile({ chainId, collection, collectionName, rawId, isLsp8, onOpen, onSend }) {
@@ -35,7 +36,7 @@ function OwnedTile({ chainId, collection, collectionName, rawId, isLsp8, onOpen,
       <button type="button" className={styles.owned__open} onClick={() => onOpen({ rawId, nft })} aria-label={`Details for ${name}`}>
         <span className={styles.owned__art}>
           {meta.image ? (
-            <img src={meta.image} alt="" loading="lazy" decoding="async" />
+            <img src={meta.image} alt="" loading="lazy" decoding="async" onError={handleBrokenImage} />
           ) : (
             <span className={styles.owned__artFallback} aria-hidden="true" />
           )}
@@ -75,7 +76,7 @@ export default function OwnedTokens({ chainId, collection, collectionName, isLsp
   const [sendNft, setSendNft] = useState(null)
 
   // The read needs the standard to pick between tokenIdsOf and tokenOfOwnerByIndex
-  const { tokenIds, balance, isEnumerable } = useOwnedTokenIds({
+  const { tokenIds, balance, isEnumerable, refresh } = useOwnedTokenIds({
     chainId,
     collection,
     owner: address,
@@ -133,7 +134,7 @@ export default function OwnedTokens({ chainId, collection, collectionName, isLsp
       )}
 
       {sendNft && (
-        <SendNftModal nft={sendNft} owner={address} onSent={() => setSendNft(null)} onClose={() => setSendNft(null)} />
+        <SendNftModal nft={sendNft} owner={address} onSent={refresh} onClose={() => setSendNft(null)} />
       )}
     </section>
   )

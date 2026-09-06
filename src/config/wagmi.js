@@ -3,7 +3,7 @@ import {
   arbitrum,
   arbitrumSepolia,
   base,
-  baseSepolia,
+  // baseSepolia,
   bsc,
   celo,
   lukso,
@@ -32,10 +32,10 @@ lukso.faucetUrl = `https://faucet.testnet.lukso.network/`
 lukso.primaryColor = `#FD1669`
 lukso.textColor = `#fff`
 
-// Base Sepolia
-baseSepolia.faucetUrl = `https://faucets.chain.link/base-sepolia`
-baseSepolia.primaryColor = `#0052FF`
-baseSepolia.textColor = `#fff`
+// Base Sepolia — switched off across the app
+// baseSepolia.faucetUrl = `https://faucets.chain.link/base-sepolia`
+// baseSepolia.primaryColor = `#0052FF`
+// baseSepolia.textColor = `#fff`
 
 // CELO
 celo.faucetUrl = `https://faucet.celo.org/celo-sepolia/`
@@ -107,7 +107,7 @@ const iconChains = [
   mainnet,
   sepolia,
   lukso,
-  baseSepolia,
+  // baseSepolia,
   celo,
   base,
   monad,
@@ -136,7 +136,7 @@ export const BROWSER_RPC_URLS = {
   // The official endpoint sends a malformed Access-Control-Allow-Origin ('*,*')
   [robinhood.id]: ['https://robinhood-rpc.publicnode.com'],
   // sepolia.base.org is unreliable; publicnode leads
-  [baseSepolia.id]: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'],
+  // [baseSepolia.id]: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'],
 }
 
 /** Fails over across the chain's known-good endpoints; viem's default where there are none. */

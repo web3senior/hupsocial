@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import PageTitle from '@/components/PageTitle'
 import CollectionStudio from './_components/CollectionStudio'
 import styles from './page.module.scss'
@@ -12,8 +13,11 @@ export default function CollectionStudioPage() {
     <>
       <PageTitle name="Studio" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
-          <CollectionStudio />
+        <div className={`__container ${styles.page__container}`} data-width="xxlarge">
+          {/* The studio reads its target from the query string, which is a client-side concern */}
+          <Suspense fallback={null}>
+            <CollectionStudio />
+          </Suspense>
         </div>
       </div>
     </>

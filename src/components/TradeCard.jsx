@@ -29,15 +29,20 @@ const STATUS_ACTIVE = 1
 const STATUS_SOLD = 2
 const STATUS_CANCELLED = 3
 
-// External asset pages: Universal Everything renders LSP8 assets; ERC721 goes to OpenSea
-// where a chain slug exists, falling back to the chain's block explorer elsewhere
+// External asset pages: Universal Everything renders LSP8 assets; Monad ERC721 goes to
+// MonadVision, other chains to OpenSea where a slug exists, else the chain's block explorer
 const OPENSEA_CHAIN_SLUGS = {
   1: 'ethereum',
   56: 'bnb',
-  143: 'monad',
   8453: 'base',
   42161: 'arbitrum',
   42220: 'celo',
+}
+
+// Etherscan-style routes: /token/<address> is the collection page, /nft/<address>/<id> one token
+const MONADVISION_BASES = {
+  143: 'https://monadvision.com',
+  10143: 'https://testnet.monadvision.com',
 }
 
 export const buildAssetLinks = ({ chainId, chainInfo, collection, tokenId, isLsp8 }) => {
@@ -51,12 +56,15 @@ export const buildAssetLinks = ({ chainId, chainInfo, collection, tokenId, isLsp
     }
   }
 
-  const openseaBase =
-    chainId === 10143
-      ? 'https://testnets.opensea.io/assets/monad_testnet'
-      : OPENSEA_CHAIN_SLUGS[chainId]
-        ? `https://opensea.io/assets/${OPENSEA_CHAIN_SLUGS[chainId]}`
-        : null
+  const monadVisionBase = MONADVISION_BASES[chainId]
+  if (monadVisionBase) {
+    return {
+      collectionUrl: `${monadVisionBase}/token/${collection.toLowerCase()}`,
+      tokenUrl: `${monadVisionBase}/nft/${collection.toLowerCase()}/${BigInt(tokenId)}`,
+    }
+  }
+
+  const openseaBase = OPENSEA_CHAIN_SLUGS[chainId] ? `https://opensea.io/assets/${OPENSEA_CHAIN_SLUGS[chainId]}` : null
   if (openseaBase) {
     const collectionUrl = `${openseaBase}/${collection.toLowerCase()}`
     return { collectionUrl, tokenUrl: `${collectionUrl}/${BigInt(tokenId)}` }

@@ -13,10 +13,20 @@
   --background: #ffffff;
   --foreground: #171717;
 
+  --dim: #5b6178;
+  --muted: #83889c;
+  --up: #16a34a;
+  --down: #dc2626;
+  --lime: #c6e814;
+  --lime-deep: #a5c603;
+  --on-lime: #12160a;
+  // Lime as ink needs a deeper step here — --lime itself sits at 1.40:1 on white.
+  --lime-ink: #647a00;
+
   --surface: #ffffff;
   // Chart direction — light steps, contrast 3.30:1 / 4.83:1 on #ffffff
-  --chart-up: #16a34a;
-  --chart-down: #dc2626;
+  --chart-up: var(--up);
+  --chart-down: var(--down);
   --surface-muted: #f7f7f8;
   --text: #171717;
   --text-muted: #666666;
@@ -100,12 +110,21 @@
 
   --bg: #131313;
   --background: #131313;
-  --foreground: #ededed;
+  --foreground: #e5ebff;
+
+  --dim: #8e95b1;
+  --muted: #696e81;
+  --up: #22fe6b;
+  --down: #ff3c3f;
+  --lime: #c6e814;
+  --lime-deep: #a5c603;
+  --on-lime: #12160a;
+  --lime-ink: var(--lime);
 
   --surface: #191919;
-  // Chart direction — dark steps, contrast 7.72:1 / 4.67:1 on #191919
-  --chart-up: #22c55e;
-  --chart-down: #ef4444;
+  // Chart direction — dark steps, contrast 12.94:1 / 5.00:1 on #191919
+  --chart-up: var(--up);
+  --chart-down: var(--down);
   --surface-muted: #2a2a2a;
   --text: #ffffffa6;
   --text-muted: #a1a1aa;
@@ -155,10 +174,19 @@
   --background: #07110b;
   --foreground: #a3ffad;
 
+  --dim: #5fbf72;
+  --muted: #3f8a4f;
+  --up: #22c55e;
+  --down: #ef4444;
+  --lime: #c6e814;
+  --lime-deep: #a5c603;
+  --on-lime: #12160a;
+  --lime-ink: var(--lime);
+
   --surface: #07110b;
   // Chart direction — contrast 8.42:1 / 5.10:1 on #07110b
-  --chart-up: #22c55e;
-  --chart-down: #ef4444;
+  --chart-up: var(--up);
+  --chart-down: var(--down);
   --surface-muted: #0d1c12;
   --text: #a3ffad;
   --text-muted: #6ee77d;

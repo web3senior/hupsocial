@@ -2,18 +2,19 @@
  * @file api/v1/nfts/collections/route.js
  * @description Collection-level rollup of the cidex-indexed nft_listings table, powering the
  * NFT Market hero. Returns the collections with live listings — how many are active, how many
- * already sold, the floor, and a few sample token ids the client resolves artwork from.
+ * already sold, the floor, the identity each was given onchain, and a few sample token ids.
  *
- * Collection names and images are NOT indexed (they come from a live per-token read, same as
- * the grid cards), which is why sample token ids ship instead of a name/image.
+ * Identity comes from nft_collection_cache, which is filled read-through: a collection
+ * nothing has resolved yet ships without one, and the samples are what a cover falls back to
+ * meanwhile — a card that would otherwise be a grey plate under a name still shows what is
+ * actually listed inside it.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
+import { attachCollectionIdentities, attachCollectionSamples } from '@/lib/nftCollectionCover'
 
 export const runtime = 'nodejs'
-
-const SAMPLES_PER_COLLECTION = 3
 
 /**
  * Floor price per collection, priced in a single currency.
@@ -53,36 +54,6 @@ async function attachFloors(rows) {
   }
 }
 
-/**
- * A handful of recent token ids per collection for the hero's cover mosaic. Ranked in SQL
- * rather than fetched per collection so it stays one round trip however many collections show.
- */
-async function attachSamples(rows) {
-  const keys = rows.map((r) => [r.network_id, r.collection])
-  const [samples] = await pool.execute(
-    `SELECT network_id, collection, token_id, is_lsp8
-       FROM (
-         SELECT l.network_id, l.collection, l.token_id, l.is_lsp8,
-                ROW_NUMBER() OVER (PARTITION BY l.network_id, l.collection ORDER BY l.listed_at DESC) AS rn
-           FROM nft_listings l
-          WHERE l.status = 1 AND l.backed = 1 AND (l.network_id, l.collection) IN (${keys.map(() => '(?,?)').join(',')})
-       ) ranked
-      WHERE rn <= ?`,
-    [...keys.flat(), SAMPLES_PER_COLLECTION],
-  )
-
-  const byCollection = new Map()
-  for (const sample of samples) {
-    const key = `${sample.network_id}-${sample.collection}`
-    if (!byCollection.has(key)) byCollection.set(key, [])
-    byCollection.get(key).push({ token_id: sample.token_id, is_lsp8: sample.is_lsp8 })
-  }
-
-  for (const row of rows) {
-    row.samples = byCollection.get(`${row.network_id}-${row.collection}`) || []
-  }
-}
-
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -115,7 +86,8 @@ export async function GET(request) {
 
     if (rows.length) {
       await attachFloors(rows)
-      await attachSamples(rows)
+      await attachCollectionIdentities(rows)
+      await attachCollectionSamples(rows)
     }
 
     return NextResponse.json({ success: true, data: rows })

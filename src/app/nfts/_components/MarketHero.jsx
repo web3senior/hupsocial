@@ -7,11 +7,10 @@ import { CaretDownIcon, CaretLeftIcon, CaretRightIcon, CaretUpIcon, MinusIcon, S
 import { getNftCollections, getNftCollectionsHistory } from '@/lib/api'
 import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
-import { handleBrokenImage } from '@/lib/utils'
-import useNftMetadata from '@/hooks/useNftMetadata'
-import HupMark from '@/components/ui/HupMark'
+import CollectionCover from '@/components/CollectionCover'
 import useRailScroll from '@/hooks/useRailScroll'
 import Sparkline from '@/components/ui/Sparkline'
+import InfoHint from '@/components/ui/InfoHint'
 import styles from './MarketHero.module.scss'
 
 const HERO_LIMIT = 12
@@ -26,46 +25,6 @@ const chainIconFor = (chain) => {
   if (!chain) return null
   if (chain.iconUrl) return chain.iconUrl
   return chain.icon ? `data:image/svg+xml,${encodeURIComponent(chain.icon)}` : null
-}
-
-/**
- * One sample token's artwork. A hook can't be called in a loop over a variable-length list,
- * so the cover mosaic renders a fixed number of these instead — each one resolves its own
- * token through the same SWR-immutable cache the grid cards use, so tokens already on screen
- * below cost nothing to draw up here.
- * @param {Object} props
- * @param {Object} [props.sample] Row from the collections API; absent slots render nothing.
- * @param {Function} [props.onName] Called with the collection name once metadata resolves.
- */
-function CoverTile({ networkId, collection, sample, onName, className }) {
-  const metadata = useNftMetadata({
-    chainId: networkId,
-    collection,
-    tokenId: sample?.token_id,
-    isLsp8: Boolean(Number(sample?.is_lsp8)),
-    enabled: Boolean(sample),
-    imageWidth: 256,
-    still: true,
-  })
-
-  useEffect(() => {
-    if (metadata.collectionName) onName?.(metadata.collectionName)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metadata.collectionName])
-
-  if (!sample) return null
-
-  return (
-    <div className={clsx(styles.hero__cover, className)}>
-      {metadata.image ? (
-        <img src={metadata.image} alt="" loading="lazy" onError={handleBrokenImage} />
-      ) : (
-        <span className={styles.hero__coverFallback}>
-          <HupMark size={22} />
-        </span>
-      )}
-    </div>
-  )
 }
 
 /**
@@ -107,9 +66,9 @@ function TrendLine({ trend }) {
 
 /**
  * Collection Card
- * A single showcased collection: a mosaic of its most recent listings, the collection name
- * once it resolves onchain, and the two numbers a buyer scans for — how many are up, and
- * what the cheapest one costs. Links through to the collection's own page.
+ * A single showcased collection: the artwork it was given onchain — or, where it has none,
+ * a mosaic of its most recent listings — the collection name, and the two numbers a buyer
+ * scans for: how many are up, and what the cheapest one costs. Links to the collection page.
  * @param {Object} props
  * @param {Object} [props.trend] This collection's floor series, once the batch resolves.
  * Absent until then, and absent for good on collections with under two priced days.
@@ -119,11 +78,12 @@ function CollectionCard({ collection, trend }) {
   const chain = appChains.find((c) => c.id === networkId)
   const chainIcon = chainIconFor(chain)
 
-  // Collection names live onchain, not in the index — the first cover tile to resolve one
-  // names the card
-  const [name, setName] = useState(null)
+  // The rollup carries the cached name; a collection nothing has resolved yet is named by
+  // the first cover tile to read one instead, and only a cover showing the collection's own
+  // artwork mounts no tiles — those always arrive named.
+  const [resolvedName, setResolvedName] = useState(null)
+  const name = collection.name || resolvedName
 
-  const samples = collection.samples || []
   const activeCount = Number(collection.active_count) || 0
   const soldCount = Number(collection.sold_count) || 0
 
@@ -135,16 +95,11 @@ function CollectionCard({ collection, trend }) {
 
   return (
     <Link href={`/nfts/${networkId}/collection/${collection.collection.toLowerCase()}`} className={styles.hero__card}>
-      <div className={clsx(styles.hero__mosaic, samples.length < 2 && styles['hero__mosaic--single'])}>
-        <CoverTile networkId={networkId} collection={collection.collection} sample={samples[0]} onName={setName} />
-        {samples.length > 1 && (
-          <div className={styles.hero__mosaicSide}>
-            <CoverTile networkId={networkId} collection={collection.collection} sample={samples[1]} onName={setName} />
-            <CoverTile networkId={networkId} collection={collection.collection} sample={samples[2]} onName={setName} />
-          </div>
-        )}
+      {/* A square box, so the square icon leads; a wide banner standing in for it is
+          centre-cropped to the same shape */}
+      <CollectionCover row={collection} prefer="icon" width={512} onName={setResolvedName} className={styles.hero__cover}>
         {chainIcon && <img className={styles.hero__chain} src={chainIcon} alt="" title={chain?.name} />}
-      </div>
+      </CollectionCover>
 
       <div className={styles.hero__meta}>
         <span className={clsx(styles.hero__name, !name && styles['hero__name--pending'])}>{name || 'Loading…'}</span>
@@ -245,12 +200,16 @@ export default function MarketHero({ networkId }) {
   return (
     <section className={styles.hero} aria-label="Listed collections">
       <header className={styles.hero__header}>
-        <div className={styles.hero__titles}>
-          <h2 className={styles.hero__heading}>Collections on the market</h2>
-          <p className={styles.hero__subheading}>
-            {hasOverflow ? `${collections.length} collections — scroll sideways to see them all` : 'Tap a collection to open its page'}
-          </p>
-        </div>
+        <h2 className={styles.hero__heading}>
+          Collections on the{' '}
+          {/* Glued to the last word, so a narrow header wraps the phrase and never strands the dot alone on a line */}
+          <span className={styles.hero__headingTail}>
+            market
+            <InfoHint label="Collections on the market">
+              {hasOverflow ? `${collections.length} collections — scroll sideways to see them all` : 'Tap a collection to open its page'}
+            </InfoHint>
+          </span>
+        </h2>
 
         {/* Only once the rail actually overflows: arrows on a rail that fits would promise
             more cards than there are */}

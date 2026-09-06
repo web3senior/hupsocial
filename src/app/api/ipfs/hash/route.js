@@ -25,7 +25,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
-  const cid = (searchParams.get('cid') || '').replace(/^ipfs:\/\//, '').trim()
+  const cid = (searchParams.get('cid') || '').replace(/^(?:ipfs:\/\/)+/, '').trim()
 
   // The gateway origin comes from env and never from the caller; the CID is restricted to the
   // path segment shape so a crafted value can't climb out of it

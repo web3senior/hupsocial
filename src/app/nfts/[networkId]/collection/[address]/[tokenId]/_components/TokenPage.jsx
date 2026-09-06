@@ -129,7 +129,15 @@ export default function TokenPage({ networkId, collection, tokenId }) {
       <div className={styles.token__layout}>
         {/* Media column — the artwork, and the handful of links that are about this page rather
             than about the token */}
-        <aside className={styles.token__media}>
+        <aside className={clsx(styles.token__media, collectionInfo.banner && styles['token__media--banded'])}>
+          {/* The collection's banner as a band behind the artwork, the way a card sits on a
+              cover — placing the token in its collection before a word is read */}
+          {collectionInfo.banner && (
+            <div className={styles.token__banner} aria-hidden="true">
+              <img src={collectionInfo.banner} alt="" onError={handleBrokenImage} />
+            </div>
+          )}
+
           <div className={styles.token__stage}>
             {showModel && model?.isRenderable ? (
               <ModelViewer src={model.url} poster={metadata.image} alt={`${name} in 3D`} />

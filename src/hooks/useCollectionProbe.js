@@ -12,6 +12,8 @@ import {
   kindFromInterfaces,
   looksLikeProxy,
 } from '@/lib/collectionProbe'
+import { LSP4_METADATA_KEY, LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY, LSP8_TOKEN_METADATA_BASE_URI_KEY } from '@/lib/lsp4'
+import { decodeDataString } from '@/lib/drops'
 
 /* Only what a probe needs. A collection's real ABI is unknown here by definition — this is for
    contracts nobody in this app deployed — so every call is made against a minimal shape and
@@ -22,13 +24,14 @@ const PROBE_ABI = [
   { name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
   { name: 'symbol', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
   { name: 'totalSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { name: 'totalMinted', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { name: 'tokenSupplyCap', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { name: 'maxSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { name: 'getData', type: 'function', stateMutability: 'view', inputs: [{ type: 'bytes32' }], outputs: [{ type: 'bytes' }] },
   { name: 'contractURI', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
   { name: 'tokenURI', type: 'function', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'string' }] },
+  { name: 'metadataFrozen', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
 ]
-
-const LSP4_METADATA_KEY = '0x9afb95cacc9f95858ec44aa8c3b685511002e30ae54415823f406128b85b238e'
-const LSP8_BASE_URI_KEY = '0x1a7628600c3bac7101f53697f48df381ddc36b9015e7d7c9c5633d1252aa2843'
 
 /**
  * Reads a pasted contract address into everything the metadata editor needs: what standard it
@@ -74,15 +77,43 @@ export function useCollectionProbe({ address, chainId, wallet }) {
       ])
       const kind = kindFromInterfaces({ lsp8, lsp7, erc721, erc1155 })
 
-      const [owner, name, symbol, totalSupply] = await Promise.all([read('owner'), read('name'), read('symbol'), read('totalSupply')])
+      /*
+       * How many numbers exist, and how many have been handed out. LSP8 spells the ceiling
+       * `tokenSupplyCap`, the ERC721 collections this app deploys spell it `maxSupply`, and a
+       * collection that declares neither is an open edition or simply does not say — which is
+       * information too: without a ceiling there is no unminted half to separate.
+       *
+       * `totalMinted` is the high-water mark and the honest line between the halves. totalSupply
+       * falls when a token burns, which would quietly move already-minted numbers into the
+       * unminted half.
+       */
+      // metadataFrozen is Hup's own drop collections saying their pointers are locked; anything else answers null
+      const [owner, name, symbol, totalSupply, totalMinted, tokenSupplyCap, maxSupply, frozen] = await Promise.all([
+        read('owner'),
+        read('name'),
+        read('symbol'),
+        read('totalSupply'),
+        read('totalMinted'),
+        read('tokenSupplyCap'),
+        read('maxSupply'),
+        read('metadataFrozen'),
+      ])
+      const metadataFrozen = frozen === true
+      const supplyCap = Number(tokenSupplyCap ?? 0) || Number(maxSupply ?? 0) || 0
 
       // Current metadata, read the way this standard stores it
       let lsp4Metadata = null
       let baseUri = null
       let contractUri = null
+      let lsp4Name = null
+      let lsp4Symbol = null
       if (isLuksoKind(kind)) {
+        // LSP7 and LSP8 keep their name and symbol in ERC725Y, not behind name()/symbol()
+        const [nameBytes, symbolBytes] = await Promise.all([read('getData', [LSP4_TOKEN_NAME_KEY]), read('getData', [LSP4_TOKEN_SYMBOL_KEY])])
+        lsp4Name = decodeDataString(nameBytes) || null
+        lsp4Symbol = decodeDataString(symbolBytes) || null
         lsp4Metadata = await read('getData', [LSP4_METADATA_KEY])
-        if (kind === COLLECTION_KIND.LSP8) baseUri = await read('getData', [LSP8_BASE_URI_KEY])
+        if (kind === COLLECTION_KIND.LSP8) baseUri = await read('getData', [LSP8_TOKEN_METADATA_BASE_URI_KEY])
       } else {
         contractUri = await read('contractURI')
         // Token 1 is the convention this app mints from, and the cheapest sample of the pattern
@@ -98,16 +129,19 @@ export function useCollectionProbe({ address, chainId, wallet }) {
         chainId,
         kind,
         owner,
-        name,
-        symbol,
+        name: name ?? lsp4Name,
+        symbol: symbol ?? lsp4Symbol,
         totalSupply,
+        totalMinted: totalMinted ?? null,
+        supplyCap,
+        metadataFrozen,
         lsp4Metadata,
         baseUri,
         contractUri,
         setters,
         isProxy,
         runtimeSize: code.length / 2 - 1,
-        capabilities: describeCapabilities({ kind, owner, wallet, setters, isProxy }),
+        capabilities: describeCapabilities({ kind, owner, wallet, setters, isProxy, metadataFrozen }),
       })
     } catch (error) {
       setState({ status: 'error', message: error.shortMessage || error.message || 'Could not read that address' })

@@ -6,12 +6,9 @@
  */
 
 import { hexToString, zeroAddress } from 'viem'
-import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, decodeVerifiableUri, pickLsp4Image, fetchMetadataJson } from '@/lib/lsp4'
+import { LSP4_TOKEN_NAME_KEY, LSP4_METADATA_KEY, LSP8_TOKEN_METADATA_BASE_URI_KEY, decodeVerifiableUri, pickLsp4Image, fetchMetadataJson } from '@/lib/lsp4'
 import { resolveStorageUrl } from '@/lib/storageHelper'
 
-// LSP8's second metadata mechanism: a collection-wide base URI the token id gets appended
-// to (e.g. Chillwhales), instead of per-token LSP4Metadata (e.g. Dracos)
-const LSP8_TOKEN_METADATA_BASE_URI_KEY = '0x1a7628600c3bac7101f53697f48df381ddc36b9015e7d7c9c5633d1252aa2843'
 const LSP8_TOKEN_ID_FORMAT_KEY = '0xf675e9361af1c1664c1868cfa3eb97672d6b1a513aa5b81dec34c9ee330e818d'
 
 export const erc721MetadataAbi = [

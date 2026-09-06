@@ -7,10 +7,8 @@ import { CaretDownIcon, CaretUpIcon } from '@phosphor-icons/react'
 import { getNftCollectionRanking } from '@/lib/api'
 import { appChains, CONTRACTS } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
-import { handleBrokenImage } from '@/lib/utils'
+import CollectionCover from '@/components/CollectionCover'
 import Tooltip from '@/components/ui/Tooltip'
-import HupMark from '@/components/ui/HupMark'
 import styles from './CollectionsTable.module.scss'
 
 // Only chains with a HupTrade deployment can have a collection on this table at all
@@ -130,7 +128,6 @@ function CollectionRow({ row, rank }) {
 
   const hasIdentity = Boolean(row.name)
   const name = row.name || `${address.slice(0, 6)}…${address.slice(-4)}`
-  const icon = resolveStorageImageUrl(row.icon_uri, { width: 96, still: true })
 
   const supply = row.total_supply || null
   const activeCount = Number(row.active_count) || 0
@@ -150,16 +147,12 @@ function CollectionRow({ row, rank }) {
 
       <td className={clsx(styles.collections__cell, styles['collections__cell--collection'])}>
         <Link href={`/nfts/${networkId}/collection/${address}`} className={styles.collections__identity}>
-          <span className={styles.collections__thumb}>
-            {icon ? (
-              <img src={icon} alt="" loading="lazy" decoding="async" onError={handleBrokenImage} />
-            ) : (
-              <span className={styles.collections__thumbFallback} aria-hidden="true">
-                <HupMark size={16} />
-              </span>
-            )}
+          {/* The mark, not the listing mosaic, behind a collection with no artwork: three
+              thumbs are unreadable at this size, and fifty rows of them is a page of
+              metadata reads for a 32px square */}
+          <CollectionCover row={row} prefer="icon" width={96} fallback="mark" markSize={16} className={styles.collections__thumb}>
             {chainIcon && <img className={styles.collections__chain} src={chainIcon} alt="" title={chain?.name} />}
-          </span>
+          </CollectionCover>
 
           <span
             className={clsx(styles.collections__name, !hasIdentity && styles['collections__name--pending'])}

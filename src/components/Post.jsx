@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useId, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { isArticle } from '@/lib/article'
 import Link from 'next/link'
 import { usePostStore } from '@/stores/usePostStore'
 import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
@@ -55,8 +56,8 @@ import PollCard from './PollCard'
 import LaunchCard from './LaunchCard'
 import MiniAppEmbed from './MiniAppEmbed'
 import CashtagStrip from './CashtagStrip'
-import NewPost from './NewPost'
 import LinkPreview from './LinkPreview'
+import NewPost from './NewPost'
 import { shouldOfferTranslation } from '@/lib/languageHelper'
 import { usePreferredLanguage } from '@/hooks/usePreferredLanguage'
 import Like from './ui/Like'
@@ -336,12 +337,12 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
                 />
               )}
 
-              {displayItem?.content?.quoteOf && (
               {/* The first link's own content — an X post with its media, a YouTube player or an
                   Open Graph card — resolved live from the text. Hidden when the post carries its
                   own gallery, the way X does, so a row never stacks two sets of pictures. */}
               <LinkPreview text={sourceText} hasMedia={displayItem?.content?.elements?.[1]?.data?.items?.length > 0} />
 
+              {displayItem?.content?.quoteOf && (
                 <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} quotedBy={displayItem.wallet_address} />
               )}
 
@@ -593,6 +594,15 @@ const PostDocumentActions = ({ item, close }) => {
 }
 
 const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
+  const postIsArticle = (() => {
+    try {
+      const content = typeof item?.content === 'string' ? JSON.parse(item.content) : item?.content
+      return isArticle(content)
+    } catch {
+      return false
+    }
+  })()
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -766,10 +776,17 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                 <MenuItem
                   icon={<NotePencilIcon size={20} />}
                   label="Edit"
-                  description="Change what this post says"
+                  description={postIsArticle ? 'Open this article in the editor' : 'Change what this post says'}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setShowEditModal(true)
+                    /* An article's body lives at its own CID and its fields have their own editor.
+                       Sending it to the post composer would drop the reference and turn it back
+                       into a plain post. */
+                    if (postIsArticle) {
+                      router.push(`/compose/article?network=${item.network_id}&post=${item.id}`)
+                    } else {
+                      setShowEditModal(true)
+                    }
                     close()
                   }}
                 />
@@ -1062,23 +1079,23 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
 
 // ■■■ Translation Core Infrastructure ■■■
 
+// Google's endpoint sends no CORS header and answers browsers with a redirect, so the
+// call has to leave from our own origin
 const translationFetcher = async ([text, targetLang]) => {
   if (!text) return ''
 
-  const targetUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
-  const res = await fetch(targetUrl)
+  const res = await fetch('/api/translate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, target: targetLang }),
+  })
 
   if (!res.ok) {
     throw new Error('Translation pipeline network response failed')
   }
 
   const data = await res.json()
-  if (!data || !data[0]) return ''
-
-  return data[0]
-    .map((segment) => segment[0])
-    .filter(Boolean)
-    .join('')
+  return data?.text || ''
 }
 
 // ■■■ Sub-Component Definition ■■■
@@ -1098,13 +1115,14 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
   // Execute external translation pipeline via cached hooks infrastructure. The target
   // language is part of the SWR key, so switching it in Settings re-translates and caches
   // each language separately instead of serving the previous one.
-  const { data: translatedText, isValidating: isTranslating } = useSWR(
+  const { data: translatedText, error: translationError, isValidating: isTranslating, mutate: retryTranslation } = useSWR(
     showTranslation && sourceText ? [sourceText, preferredLanguage] : null,
     translationFetcher,
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       dedupingInterval: 600000,
+      errorRetryCount: 2,
     }
   )
 
@@ -1125,6 +1143,11 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
 
   const handleToggleTranslation = (e) => {
     e.stopPropagation()
+    // A failed translation leaves the original on screen, so the same button retries
+    if (showTranslation && translationError) {
+      retryTranslation()
+      return
+    }
     setShowTranslation((prev) => !prev)
   }
 
@@ -1176,7 +1199,13 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
             onClick={handleToggleTranslation}
             disabled={isTranslating}
           >
-            {isTranslating ? 'Translating...' : showTranslation && translatedText ? 'See original' : 'Translate'}
+            {isTranslating
+              ? 'Translating...'
+              : showTranslation && translationError
+                ? 'Translation unavailable — retry'
+                : showTranslation && translatedText
+                  ? 'See original'
+                  : 'Translate'}
           </button>
         </div>
       )}

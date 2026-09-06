@@ -114,6 +114,10 @@ function DropTile({ row, inStrip = false }) {
         <span className={styles.directory__info}>
           <span className={styles.directory__nameRow}>
             <strong className={styles.directory__name}>{name}</strong>
+            {/* Redundant inside the strip, which is itself the mark */}
+            {Boolean(Number(row.featured)) && !inStrip && (
+              <StarIcon size={14} weight="fill" className={styles.directory__star} aria-label="Featured" />
+            )}
             <span className={styles.directory__ticker}>{row.symbol || dropStandardLabel(row.standard_id)}</span>
           </span>
           <span className={styles.directory__stats}>
@@ -139,19 +143,9 @@ function DropTile({ row, inStrip = false }) {
 
       {/* Rides over the artwork, outside the card's link */}
       <span className={styles.directory__overlay}>
-        <span className={styles.directory__chips}>
-          <span className={clsx(styles.directory__chip, styles['directory__chip--age'])}>
-            {chainIcon && <img src={chainIcon} alt="" loading="lazy" />}
-            {row.created_at ? ageLabel(row.created_at) : chainInfo?.name}
-          </span>
-
-          {/* Redundant inside the strip, which is itself the mark */}
-          {Boolean(Number(row.featured)) && !inStrip && (
-            <span className={clsx(styles.directory__chip, styles['directory__chip--featured'])}>
-              <StarIcon weight="fill" aria-hidden="true" />
-              Featured
-            </span>
-          )}
+        <span className={clsx(styles.directory__chip, styles['directory__chip--age'])}>
+          {chainIcon && <img src={chainIcon} alt="" loading="lazy" />}
+          {row.created_at ? ageLabel(row.created_at) : chainInfo?.name}
         </span>
 
         {/* Who made it, at the other corner — the one part of the overlay that answers a pointer,

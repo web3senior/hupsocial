@@ -44,6 +44,31 @@
     }
   }
 
+  // The collection's banner, cropped to a band; the artwork card below overlaps its foot so the
+  // two read as one object rather than two stacked images
+  &__banner {
+    height: clamp(4.5rem, 12vw, 7.5rem);
+    overflow: hidden;
+    border-radius: 16px 16px 0 0;
+    background: var(--surface-muted, var(--surface));
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__media--banded &__stage {
+    position: relative;
+    z-index: 1;
+    // Inset so the band shows past both edges — the overlap is the whole point of the band
+    width: calc(100% - 1.5rem);
+    margin: -2.75rem auto 0;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  }
+
   // Holds whichever representation is on show — artwork or 3D model — so swapping between them
   // keeps the same square footprint and the toggle can anchor to a corner of it. The frame and
   // the ground sit here rather than on the image: a detail view contains the artwork instead of

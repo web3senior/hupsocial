@@ -35,9 +35,11 @@ import styles from './NftDetailModal.module.scss'
  * @param {string|null} [props.collectionName] Names the token while its own metadata resolves.
  * @param {boolean} [props.showCollectionLink] Passed through — the collection page's own grid
  * turns it off, since a link back to the page you are on is a dead end.
+ * @param {boolean} [props.showFrameMode=true] The frame-mode button over the artwork. The studio
+ * turns it off: a creator checking metadata is not hanging a picture.
  * @param {Function} props.onClose
  */
-export default function NftDetailModal({ chainId, collection, tokenId, isLsp8, collectionName, showCollectionLink = true, onClose }) {
+export default function NftDetailModal({ chainId, collection, tokenId, isLsp8, collectionName, showCollectionLink = true, showFrameMode = true, onClose }) {
   const dialogRef = useRef(null)
   const [showModel, setShowModel] = useState(false)
 
@@ -83,8 +85,9 @@ export default function NftDetailModal({ chainId, collection, tokenId, isLsp8, c
           )}
 
           {/* Over the bottom-left of the artwork, opposite the 3D toggle: hangs the image in a
-              frame on a wall. Only once there is an image to hang. */}
-          {metadata.image && (
+              frame on a wall. Only once there is an image to hang, and only where the reader is
+              a collector — the studio opens this to check metadata, not to decorate a room. */}
+          {showFrameMode && metadata.image && (
             <button
               type="button"
               className={styles.nftDetail__stageFrame}

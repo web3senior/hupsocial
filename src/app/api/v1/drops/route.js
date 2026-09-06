@@ -36,6 +36,11 @@ const DROP_COLUMNS = `
   u.name AS display_name,
   u.profileImage AS profile_image`
 
+/* `featured` arrives with a cidex migration that production applies by hand, so every read of it
+   is written to survive its absence: the query is retried without the column and the flag simply
+   reads as 0 until the migration lands. Without this the drops directory 500s in the gap. */
+const isMissingColumn = (error) => error?.code === 'ER_BAD_FIELD_ERROR'
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -59,21 +64,51 @@ export async function GET(request) {
     if (searchParams.get('status') === 'live') {
       filters.push('d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)')
     }
+    // The complement of live: minted out, or closed by the creator — the drops that are finished
+    if (searchParams.get('status') === 'ended') {
+      filters.push('(d.closed = 1 OR (d.max_supply > 0 AND d.minted >= d.max_supply))')
+    }
 
-    const [rows] = await pool.execute(
-      `SELECT ${DROP_COLUMNS}
+    const listSql = (withFeatured) => `SELECT ${DROP_COLUMNS}${withFeatured ? ', d.featured' : ''}
        FROM drops d
        LEFT JOIN users u ON u.wallet_address = d.creator
        WHERE ${filters.join(' AND ')}
-       ORDER BY d.created_at DESC, d.drop_id DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      args,
-    )
+       ORDER BY ${withFeatured ? 'd.featured DESC, ' : ''}d.created_at DESC, d.drop_id DESC
+       LIMIT ${limit} OFFSET ${offset}`
+
+    let hasFeatured = true
+    let rows
+    try {
+      ;[rows] = await pool.execute(listSql(true), args)
+    } catch (error) {
+      if (!isMissingColumn(error)) throw error
+      hasFeatured = false
+      ;[rows] = await pool.execute(listSql(false), args)
+    }
+
+    /* The strip is its own query rather than a filter over this page: a featured drop created
+       months ago would otherwise fall off page one and vanish from the strip with it. Featured
+       rows stay in the main list too — the client drops the duplicates. */
+    let featured = []
+    if (hasFeatured && page === 1 && searchParams.get('status') === 'live') {
+      const [featuredRows] = await pool.execute(
+        `SELECT ${DROP_COLUMNS}, d.featured
+         FROM drops d
+         LEFT JOIN users u ON u.wallet_address = d.creator
+         WHERE d.network_id IN (${LIVE_NETWORK_IDS.map(() => '?').join(',')})
+           AND d.featured = 1 AND d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)
+         ORDER BY d.created_at DESC, d.drop_id DESC
+         LIMIT 12`,
+        LIVE_NETWORK_IDS,
+      )
+      featured = featuredRows
+    }
 
     // Phases are fetched after LIMIT — MariaDB runs select-list subqueries for every row pre-sort
-    if (rows.length > 0) {
-      const pairs = rows.map(() => '(?, ?)').join(', ')
-      const pairArgs = rows.flatMap((row) => [row.network_id, row.drop_id])
+    const paged = [...rows, ...featured]
+    if (paged.length > 0) {
+      const pairs = paged.map(() => '(?, ?)').join(', ')
+      const pairArgs = paged.flatMap((row) => [row.network_id, row.drop_id])
       const [phases] = await pool.execute(
         `SELECT network_id, drop_id, phase_index, start_time, end_time, CAST(price AS CHAR) AS price,
                 per_wallet, allocation, gate, paused, payment_token, is_lsp7, minted
@@ -88,12 +123,12 @@ export async function GET(request) {
         if (!byDrop.has(key)) byDrop.set(key, [])
         byDrop.get(key).push(phase)
       }
-      for (const row of rows) {
+      for (const row of paged) {
         row.phases = byDrop.get(`${row.network_id}:${row.drop_id}`) ?? []
       }
     }
 
-    return NextResponse.json({ success: true, data: rows })
+    return NextResponse.json({ success: true, data: rows, meta: { featured } })
   } catch (error) {
     // The tables appear with the first cidex drops sync — until then serve an empty list, not a 500
     if (error?.code === 'ER_NO_SUCH_TABLE') {

@@ -130,11 +130,9 @@
     animation: collectionGridPulse 1.4s ease-in-out infinite;
   }
 
+  // Type comes from EmptyState; only the room around it is this page's
   &__empty {
-    margin: 0;
     padding: 3rem 1rem;
-    text-align: center;
-    color: var(--text-muted, #888);
   }
 
   &__loadMoreWrap {

@@ -1,0 +1,169 @@
+.mint {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 1.25rem;
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 35%, var(--border));
+  border-radius: 24px;
+  // The one block on the page that sells rather than shows — washed in the chain's colour
+  // so it reads as an action, not as another stat card
+  background: linear-gradient(180deg, color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 9%, var(--surface)), var(--surface) 70%);
+
+  @media (max-width: 800px) {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  // The sale is over: one line that still says where the collection came from
+  &--over {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.85rem 1.1rem;
+    border-color: var(--border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface-muted) 70%, transparent);
+  }
+
+  &--over &__link {
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  &__mark {
+    flex-shrink: 0;
+    color: var(--network-color-primary, var(--color-primary));
+  }
+
+  &__summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    span {
+      font-size: var(--font-size-12, 0.75rem);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__media {
+    align-self: start;
+    overflow: hidden;
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background-color: var(--surface-muted);
+
+    // A drop with several stages makes this panel far taller than the artwork, so the artwork
+    // rides along rather than scrolling away — the same rail the token page uses
+    @media (min-width: 801px) and (min-height: 700px) {
+      position: sticky;
+      // Clears the fixed header, the same offset the app's other sticky rails use
+      top: 5rem;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+
+      // Stamped by handleBrokenImage once the source 404s — the placeholder is line-art,
+      // so contain it rather than cover-crop it
+      &[data-broken] {
+        object-fit: contain;
+        padding: 24%;
+      }
+    }
+  }
+
+  &__mediaFallback {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted, #888);
+  }
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  &__eyebrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__origin {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-12, 0.75rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+
+    svg {
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__timing {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text-muted) 12%, transparent);
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    &--live {
+      background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 14%, transparent);
+      color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  &__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    align-self: flex-start;
+    padding: 0.5rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+}

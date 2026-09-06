@@ -42,24 +42,26 @@ function isRetryable(error) {
 }
 
 /**
- * Pin to Filebase, retrying transient failures.
+ * One `/api/v0/add` call, retried.
  *
  * @param {() => FormData} buildForm Builds the multipart body. A factory rather than a value
  *   because a FormData carrying a Blob is consumed by the attempt that sends it — reusing one
  *   across retries sends an empty body on the second try.
- * @returns {Promise<string>} The raw CID (no `ipfs://` prefix).
+ * @param {{search?: string, timeoutMs?: number, attempts?: number}} [options]
+ * @returns {Promise<Array<{Name: string, Hash: string, Size: string}>>} One entry per added
+ *   object: the RPC answers with a JSON object per line, and a single file is the one-line case.
  * @throws The last error, with `.attempts` set, when every attempt fails.
  */
-export async function addToFilebase(buildForm) {
+async function postAdd(buildForm, { search = '', timeoutMs = ATTEMPT_TIMEOUT_MS, attempts = ATTEMPTS } = {}) {
   let lastError
 
-  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      const res = await fetch(FILEBASE_RPC_ADD, {
+      const res = await fetch(`${FILEBASE_RPC_ADD}${search}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.FILEBASE_IPFS_RPC_TOKEN}` },
         body: buildForm(),
-        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       })
 
       if (!res.ok) {
@@ -68,25 +70,61 @@ export async function addToFilebase(buildForm) {
         throw error
       }
 
-      const { Hash } = await res.json()
-      if (!Hash) throw new Error('Filebase RPC returned no CID')
+      const entries = (await res.text())
+        .split('\n')
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line))
 
-      if (attempt > 1) console.log(`[filebase] uploaded on attempt ${attempt}, CID:`, Hash)
-      else console.log('[filebase] uploaded, CID:', Hash)
+      if (entries.length === 0) throw new Error('Filebase RPC returned no CID')
 
-      return Hash
+      if (attempt > 1) console.log(`[filebase] added on attempt ${attempt}`)
+
+      return entries
     } catch (error) {
       lastError = error
 
-      if (attempt === ATTEMPTS || !isRetryable(error)) break
+      if (attempt === attempts || !isRetryable(error)) break
 
-      console.warn(`[filebase] attempt ${attempt}/${ATTEMPTS} failed (${error.message}); retrying`)
-      await sleep(BACKOFF_MS[attempt - 1])
+      console.warn(`[filebase] attempt ${attempt}/${attempts} failed (${error.message}); retrying`)
+      await sleep(BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length) - 1])
     }
   }
 
   /* Carried so the error copy can say "after 3 tries" — a reader who has just lost an upload
      deserves to know it was not one unlucky packet. */
-  lastError.attempts = ATTEMPTS
+  lastError.attempts = attempts
   throw lastError
+}
+
+/**
+ * Pin one file to Filebase, retrying transient failures.
+ * @param {() => FormData} buildForm See {@link postAdd}.
+ * @param {{timeoutMs?: number, attempts?: number}} [options]
+ * @returns {Promise<string>} The raw CID (no `ipfs://` prefix).
+ */
+export async function addToFilebase(buildForm, options) {
+  const [entry] = await postAdd(buildForm, options)
+  if (!entry?.Hash) throw new Error('Filebase RPC returned no CID')
+
+  console.log('[filebase] uploaded, CID:', entry.Hash)
+  return entry.Hash
+}
+
+/**
+ * Pin a set of files as one IPFS DIRECTORY and return its root CID — what a numbered
+ * collection needs, since `ipfs://<cid>/7.json` resolves only when <cid> is a directory
+ * listing. Part filenames become the entry names, so append them flat.
+ * @param {() => FormData} buildForm See {@link postAdd}.
+ * @param {{timeoutMs?: number, attempts?: number}} [options]
+ * @returns {Promise<string>} The directory CID (no `ipfs://` prefix).
+ */
+export async function addFolderToFilebase(buildForm, options) {
+  const entries = await postAdd(buildForm, { ...options, search: '?wrap-with-directory=true&cid-version=1' })
+
+  /* The wrapper carries no name, and the RPC emits it after every child it contains. */
+  const root = entries.findLast((entry) => !entry.Name)
+  if (!root?.Hash) throw new Error('Filebase RPC returned no directory CID')
+
+  console.log(`[filebase] pinned folder of ${entries.length - 1} files, CID: ${root.Hash}`)
+  return root.Hash
 }

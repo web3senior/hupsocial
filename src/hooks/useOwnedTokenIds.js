@@ -99,7 +99,7 @@ export default function useOwnedTokenIds({ chainId, collection, owner, isLsp8, e
   const publicClient = usePublicClient({ chainId })
   const ready = Boolean(enabled && publicClient && collection && owner)
 
-  const { data, isLoading } = useSWR(
+  const { data, isLoading, mutate } = useSWR(
     ready ? ['owned-token-ids', chainId, collection.toLowerCase(), owner.toLowerCase(), Boolean(isLsp8)] : null,
     () => fetchOwnedTokenIds({ publicClient, collection, owner, isLsp8 }),
     // Ownership can change under the user, but not while a modal is open — refetching on every
@@ -112,5 +112,7 @@ export default function useOwnedTokenIds({ chainId, collection, owner, isLsp8, e
     balance: data?.balance ?? null,
     isEnumerable: data?.isEnumerable ?? false,
     isLoading: ready && isLoading,
+    // For the moment the wallet itself changed the answer — a transfer it just signed
+    refresh: () => mutate(),
   }
 }
