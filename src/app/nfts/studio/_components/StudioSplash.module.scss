@@ -1,0 +1,116 @@
+// A band, not a column: the pitch reads left to right above the search, and the three points
+// stand in a row beside it rather than pushing the search box off the first screen
+.splash {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 1.5rem 2.5rem;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 90% at 10% 6%, color-mix(in srgb, var(--text) 9%, transparent), transparent 62%),
+    radial-gradient(90% 80% at 95% 98%, color-mix(in srgb, var(--text) 5%, transparent), transparent 58%),
+    var(--surface-muted);
+
+  &::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    right: -12%;
+    bottom: -60%;
+    width: 18rem;
+    height: 18rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--text) 7%, transparent);
+    filter: blur(60px);
+    animation: splash-drift 16s ease-in-out infinite alternate;
+  }
+
+  @media (max-width: 800px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  &__lead {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text);
+    font-size: var(--font-size-16, 1rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  &__copy {
+    margin: 0;
+    max-width: 56ch;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.6;
+    color: var(--text-muted, #888);
+  }
+
+  // Three short rows on a quiet card, so they read as a list of what is possible, not a menu
+  &__points {
+    list-style: none;
+    margin: 0;
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      font-size: var(--font-size-12);
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+      color: var(--text);
+      opacity: 0.75;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+@keyframes splash-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(-2rem, -1.5rem, 0) scale(1.12);
+  }
+}

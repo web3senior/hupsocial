@@ -287,7 +287,7 @@ const HASH_TIMEOUT_MS = 12000
 export async function hashIpfsContent(uri, { timeoutMs = HASH_TIMEOUT_MS } = {}) {
   if (!uri) return null
 
-  const cid = String(uri).replace(/^ipfs:\/\//, '').trim()
+  const cid = String(uri).replace(/^(?:ipfs:\/\/)+/, '').trim()
   if (!cid) return null
 
   try {

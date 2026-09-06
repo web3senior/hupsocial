@@ -10,6 +10,10 @@ import { raceIPFS } from '@/lib/ipfsGateways'
 // LSP4 metadata lives in ERC725Y storage — keccak256 data keys per the LSP4 spec
 export const LSP4_TOKEN_NAME_KEY = '0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b6ecceaf653468af1'
 export const LSP4_METADATA_KEY = '0x9afb95cacc9f95858ec44aa8c3b685511002e30ae54415823f406128b85b238e'
+export const LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756'
+export const LSP4_CREATORS_ARRAY_KEY = '0x114bd03b3a46d48759680d81ebb2b414fda7d030a7105a851867accf1c2352e7'
+// _LSP8_TOKEN_METADATA_BASE_URI: where a token with no document of its own resolves from
+export const LSP8_TOKEN_METADATA_BASE_URI_KEY = '0x1a7628600c3bac7101f53697f48df381ddc36b9015e7d7c9c5633d1252aa2843'
 
 export const erc725yGetDataAbi = [
   {
@@ -199,7 +203,7 @@ const fetchMetadataDocument = async (uri, options) => {
     try {
       // The prefix is the collection's own directory, so the host that served one of its
       // tokens is asked alone for the rest instead of every gateway being raced per document
-      response = await raceIPFS(uri.replace(/^ipfs:\/\//, ''), { timeoutMs, prefix })
+      response = await raceIPFS(uri.replace(/^(?:ipfs:\/\/)+/, ''), { timeoutMs, prefix })
     } catch (error) {
       // Only a round in which every gateway looked and answered about the document is an
       // answer about the document; a host that never answered, or asked us to back off,

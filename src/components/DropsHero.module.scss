@@ -1,0 +1,88 @@
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  border-radius: 1rem;
+  padding: 1.15rem 1.4rem;
+  // Dark in both themes: this is a banner, not a panel that should follow the surface around it
+  background-color: #0c0c0d;
+  // A wash lifting the left edge, where the copy sits — enough that the band is not flat black
+  background-image: radial-gradient(120% 140% at 0% 50%, rgb(255 255 255 / 6%) 0%, transparent 60%);
+  color: #f5f5f5;
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+  }
+
+  &__copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-18, 1.125rem);
+    font-weight: 600;
+    line-height: 1.35;
+    // Slightly recessed, so the line naming the chains carries the weight
+    color: rgb(255 255 255 / 72%);
+  }
+
+  &__line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: var(--font-size-18, 1.125rem);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  &__chain {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    img {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+    }
+  }
+
+  &__action {
+    flex-shrink: 0;
+
+    // The caller passes a link or a button; the band decides how it looks
+    a,
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: none;
+      border-radius: 999px;
+      background: var(--network-color-primary, var(--primary, #ec4899));
+      color: #fff;
+      padding: 0.7rem 1.35rem;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+
+      &:hover:not(:disabled) {
+        opacity: 0.9;
+      }
+
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+    }
+  }
+}

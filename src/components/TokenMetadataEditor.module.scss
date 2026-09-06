@@ -3,6 +3,25 @@
   flex-direction: column;
   gap: 0.6rem;
 
+  // The size of the set, then which half of it you are looking at. The count leads because it is
+  // the number a creator checks against what they uploaded.
+  &__scope {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__scopeSwitch {
+    flex-shrink: 0;
+  }
+
   &__grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr));
@@ -68,6 +87,29 @@
     .token__cellLabel {
       color: var(--text);
       font-weight: 700;
+    }
+  }
+
+  // Nothing of its own behind the picture: the folder holds no file for this number, so the
+  // collection's image is standing in — worth a second look before anyone thinks it's revealed
+  &__cell--borrowed {
+    .token__art {
+      border-style: dashed;
+      opacity: 0.75;
+    }
+
+    .token__cellLabel {
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
+    }
+  }
+
+  // Nothing behind it to open — a folder collection's tokens are shown, not managed
+  &__cell--static {
+    cursor: default;
+
+    &:hover .token__art {
+      border-color: var(--border);
     }
   }
 
@@ -160,21 +202,31 @@
     align-items: center;
     gap: 0.75rem;
 
-    span {
-      display: flex;
-      flex-direction: column;
-      gap: 0.05rem;
-      min-width: 0;
-    }
-
     strong {
       font-size: var(--font-size-14, 0.875rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     small {
       font-size: var(--font-size-12);
       color: var(--text-muted, #888);
     }
+  }
+
+  // The token you clicked, at the size the grid already resolved it — on screen before its
+  // document has been read, so the header is never a number where a picture belongs
+  &__headArt {
+    flex-shrink: 0;
+    width: 3rem;
+  }
+
+  &__headText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
   }
 
   &__back {
@@ -201,6 +253,27 @@
     font-size: var(--font-size-12);
     color: var(--text-muted, #888);
     line-height: 1.55;
+  }
+
+  // What a save reaches — one number — said before the form, in the same amber the studio uses
+  &__alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.65rem 0.8rem;
+    font-size: var(--font-size-12);
+    line-height: 1.55;
+    color: #92400e;
+    background: color-mix(in srgb, #f59e0b 12%, transparent);
+    border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+    border-radius: var(--global-border-radius);
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.15rem;
+      color: #d97706;
+    }
   }
 }
 

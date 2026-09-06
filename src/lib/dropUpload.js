@@ -135,7 +135,6 @@ export function sortZipEntries(entries) {
     const ext = extensionOf(entry.name)
     if (IMAGE_EXT[ext]) images.push({ ...entry, type: IMAGE_EXT[ext], token: tokenNumberOf(entry.name) })
     else if (ext === 'json') jsonFiles.push(entry)
-    else if (ext === 'csv') jsonFiles.push(entry)
     else ignored.push(entry.name)
   }
 
@@ -145,15 +144,9 @@ export function sortZipEntries(entries) {
 
 // --- the trait manifest ---
 
-const parseCsv = (text) => {
-  const rows = text.trim().split(/\r?\n/).map((line) => line.split(',').map((c) => c.trim().replace(/^"|"$/g, '')))
-  const header = rows.shift() ?? []
-  return rows.filter((r) => r.length && r.some(Boolean)).map((r) => Object.fromEntries(header.map((h, i) => [h, r[i] ?? ''])))
-}
-
 /**
- * Reads whatever the artist shipped alongside the art: one JSON array, a CSV, or a folder of
- * per-token JSON files. Returns a map of token number to `{ name, description, attributes }`,
+ * Reads whatever the artist shipped alongside the art: one JSON array, or a folder of per-token
+ * JSON files. Returns a map of token number to `{ name, description, attributes }`,
  * empty when there is no manifest at all — art with no traits is a valid collection.
  */
 export function readTraitManifest(jsonFiles) {
@@ -167,17 +160,12 @@ export function readTraitManifest(jsonFiles) {
    * always carries a number, so a name that is purely a manifest word is the honest signal.
    */
   const combined = jsonFiles.find((f) => {
-    const base = (f.name.split('/').pop() ?? '').replace(/\.(json|csv)$/i, '')
+    const base = (f.name.split('/').pop() ?? '').replace(/\.json$/i, '')
     return /^_?(metadata|manifest|traits|attributes)$/i.test(base)
   })
   if (combined) {
-    const text = decoder.decode(combined.bytes)
-    let rows = []
-    if (extensionOf(combined.name) === 'csv') rows = parseCsv(text)
-    else {
-      const parsed = JSON.parse(text)
-      rows = Array.isArray(parsed) ? parsed : Object.entries(parsed).map(([k, v]) => ({ tokenId: k, ...v }))
-    }
+    const parsed = JSON.parse(decoder.decode(combined.bytes))
+    const rows = Array.isArray(parsed) ? parsed : Object.entries(parsed).map(([k, v]) => ({ tokenId: k, ...v }))
 
     rows.forEach((row, index) => {
       // An explicit id wins; otherwise position, 1-based, matching how ids are minted
@@ -201,7 +189,7 @@ export function readTraitManifest(jsonFiles) {
   return byToken
 }
 
-/** Accepts the OpenSea shape, the LSP4 shape, or flat CSV columns, and lands on one form. */
+/** Accepts the OpenSea shape or the LSP4 shape, and lands on one form. */
 const normaliseManifestRow = (row) => {
   const inner = row.LSP4Metadata ?? row
   const raw = inner.attributes ?? []
@@ -213,14 +201,6 @@ const normaliseManifestRow = (row) => {
       .filter((a) => a.key !== '' && a.value !== '')
   } else if (raw && typeof raw === 'object') {
     attributes = Object.entries(raw).map(([key, value]) => ({ key, value }))
-  }
-
-  // Flat CSV columns become traits, minus the ones that are not traits
-  if (!attributes.length) {
-    const skip = new Set(['tokenid', 'token_id', 'id', 'edition', 'name', 'description', 'image', 'file', 'filename'])
-    attributes = Object.entries(inner)
-      .filter(([k, v]) => !skip.has(k.toLowerCase()) && v !== '' && typeof v !== 'object')
-      .map(([key, value]) => ({ key, value }))
   }
 
   return { name: inner.name ?? '', description: inner.description ?? '', attributes }
@@ -277,6 +257,66 @@ export const metadataFileName = (standardId, token) => (isLuksoStandard(standard
 
 /** The Suffix field that pairs with `metadataFileName`. LSP8 has no suffix at all. */
 export const metadataSuffix = (standardId) => (isLuksoStandard(standardId) ? '' : '.json')
+
+// --- metadata files already written ---
+
+/**
+ * A set of finished metadata files — one per token, named by its number with or without `.json`
+ * — as opposed to artwork this pipeline would write metadata for. Anything else in the archive
+ * is left aside, the way junk and stray files are for artwork.
+ * @param {Array<{name: string, bytes: Uint8Array}>} entries
+ * @returns {{ files: Array<{name: string, bytes: Uint8Array, token: number}>, ignored: string[] }}
+ */
+export function sortReadyMadeEntries(entries) {
+  const files = []
+  const ignored = []
+  for (const entry of entries) {
+    const base = entry.name.split('/').pop() ?? entry.name
+    const match = base.match(/^(\d+)(?:\.json)?$/i)
+    if (match) files.push({ ...entry, token: parseInt(match[1], 10) })
+    else ignored.push(entry.name)
+  }
+  files.sort((a, b) => a.token - b.token)
+  return { files, ignored }
+}
+
+/**
+ * The checks the artwork gets, for a set of finished files: duplicates, gaps, a count that does
+ * not match the supply, and JSON that would not parse — which is a token that resolves to nothing.
+ */
+export function validateReadyMade({ files, maxSupply }) {
+  const errors = []
+  const warnings = []
+
+  const seen = new Map()
+  for (const file of files) seen.set(file.token, (seen.get(file.token) ?? 0) + 1)
+  const duplicates = [...seen.entries()].filter(([, n]) => n > 1).map(([token]) => token)
+  if (duplicates.length) errors.push(`Token ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? '…' : ''} appear${duplicates.length === 1 ? 's' : ''} more than once`)
+  if (seen.has(0)) errors.push('Token numbers start at 1 — there is no token 0')
+
+  const tokens = [...seen.keys()].sort((a, b) => a - b)
+  if (tokens.length) {
+    if (tokens[0] > 1) warnings.push(`Numbering starts at ${tokens[0]}, but token ids are minted from 1`)
+    const gaps = []
+    for (let i = 1; i <= tokens[tokens.length - 1] && gaps.length < 6; i++) if (!seen.has(i)) gaps.push(i)
+    if (gaps.length) warnings.push(`Missing token${gaps.length === 1 ? '' : 's'} ${gaps.slice(0, 5).join(', ')}${gaps.length > 5 ? '…' : ''}`)
+  }
+
+  if (maxSupply > 0 && files.length !== maxSupply) warnings.push(`${files.length} file${files.length === 1 ? '' : 's'} for a supply of ${maxSupply}`)
+
+  const decoder = new TextDecoder()
+  let broken = 0
+  for (const file of files) {
+    try {
+      JSON.parse(decoder.decode(file.bytes))
+    } catch {
+      broken += 1
+    }
+  }
+  if (broken) errors.push(`${broken} file${broken === 1 ? ' is' : 's are'} not valid JSON`)
+
+  return { errors, warnings }
+}
 
 /** keccak256 of a file's exact bytes — the digest LSP4 verification carries. */
 export const hashBytes = (bytes) => keccak256(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes))

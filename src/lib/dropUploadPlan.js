@@ -145,3 +145,35 @@ export function estimateRemaining({ bytesDone, bytesTotal, elapsedMs }) {
   const remainingMs = (bytesTotal - bytesDone) / bytesPerMs
   return { remainingMs, bytesPerSecond: bytesPerMs * 1000 }
 }
+
+/** The most tokens a template will generate for. Past this the metadata directory outgrows one request. */
+export const MAX_TEMPLATE_TOKENS = 1000
+
+/** The token name a template resolves for one id, and the `{name}` a description interpolates. */
+export const templateTokenName = (baseName, token) => `${baseName}${token}`
+
+/**
+ * Per-token metadata generated from a template instead of a zip: every token carries the
+ * collection artwork, its own number in the name, and one description with `{name}` filled in.
+ *
+ * It exists because the alternative is what a drop used to launch with — every id pointing at the
+ * one collection file, so a wallet showing #7 beside #700 shows the same name twice. A creator
+ * with no per-token art still deserves numbered tokens.
+ */
+export function buildTemplateMetadataFiles({ standardId, count, baseName, description = '', imageUrl, imageHash }) {
+  return Array.from({ length: count }, (_, index) => {
+    const token = index + 1
+    const name = templateTokenName(baseName, token)
+
+    const metadata = buildTokenMetadata({
+      standardId,
+      token,
+      imageUrl,
+      imageHash,
+      collectionName: baseName,
+      entry: { name, description: description.replaceAll('{name}', name), attributes: [] },
+    })
+
+    return { name: metadataFileName(standardId, token), content: JSON.stringify(metadata, null, 2) }
+  })
+}

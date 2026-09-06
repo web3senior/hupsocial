@@ -1,0 +1,17 @@
+.infoHint {
+  display: inline-flex;
+  vertical-align: -0.15em;
+  margin-inline-start: 0.3rem;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-muted, #888);
+  opacity: 0.65;
+  cursor: help;
+  transition: opacity 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+  }
+}

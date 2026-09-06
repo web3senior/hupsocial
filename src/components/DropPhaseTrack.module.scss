@@ -1,0 +1,116 @@
+.track {
+  // --network-color-primary is only set once a wallet connects, hence the fallback
+  --phase-color: var(--network-color-primary, var(--color-primary, #ec4899));
+  --phase-height: 6px;
+  --phase-gap: 0.28rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+
+  &__slots {
+    display: flex;
+    align-items: center;
+    gap: var(--phase-gap);
+    width: 100%;
+  }
+
+  &__slot {
+    flex: 1 1 0;
+    min-width: 0.6rem;
+    // A little breathing room around a bar this thin, so the row never reads as a hairline
+    padding-block: 0.3rem;
+  }
+
+  &__bar {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: var(--phase-height);
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--text-muted, #888) 20%, transparent);
+    overflow: hidden;
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  &__fill {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    display: block;
+    border-radius: inherit;
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--phase-color) 55%, transparent), var(--phase-color));
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  &__slot--ended &__bar {
+    background-color: color-mix(in srgb, var(--text-muted, #888) 55%, transparent);
+  }
+
+  &__slot--live &__bar {
+    background-color: color-mix(in srgb, var(--phase-color) 22%, transparent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--phase-color) 45%, transparent);
+  }
+
+  &__slot--paused &__bar {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--text-muted, #888) 55%, transparent) 0 3px,
+      transparent 3px 6px
+    );
+  }
+
+  // A rung the drop hasn't spent yet reads as a hairline, never as a phase waiting its turn
+  &__slot--ghost &__bar {
+    height: 2px;
+    margin-block: calc((var(--phase-height) - 2px) / 2);
+    background-color: color-mix(in srgb, var(--text-muted, #888) 22%, transparent);
+  }
+
+  &__slot--current &__bar {
+    outline: 1px solid color-mix(in srgb, var(--phase-color) 65%, transparent);
+    outline-offset: 2px;
+  }
+
+  &__caption {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    b {
+      flex-shrink: 0;
+      color: var(--text);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    em {
+      flex-shrink: 0;
+      margin-inline-start: auto;
+      font-style: normal;
+      font-weight: 600;
+    }
+  }
+
+  &__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__status--live {
+    color: var(--green-500, #22c55e);
+  }
+
+  &__status--paused {
+    color: var(--yellow-500, #eab308);
+  }
+}

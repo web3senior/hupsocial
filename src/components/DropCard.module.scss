@@ -14,6 +14,48 @@
     margin-top: 0;
   }
 
+  &--preview {
+    .dropCard__actions,
+    .dropCard__pieces {
+      pointer-events: none;
+    }
+  }
+
+  &__pieces {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  &__piece {
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--color-primary)) 10%, var(--surface-muted));
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+
+      &[data-broken] {
+        object-fit: contain;
+        padding: 24%;
+      }
+    }
+  }
+
+  &__pieceFallback {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted);
+  }
+
   &__top {
     display: flex;
     align-items: center;
@@ -132,40 +174,9 @@
     font-weight: 600;
   }
 
-  &__phases {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-
-  &__phase {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.7rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: none;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 600;
-    cursor: pointer;
-
-    em {
-      color: var(--green-500, #22c55e);
-      font-style: normal;
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    &--selected {
-      border-color: var(--network-color-primary, var(--color-primary));
-      color: var(--text);
-    }
-  }
-
   &__actions {
+    // one height for every control in the row, so the stepper and the mint button match
+    --drop-card-control: 2.25rem;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -176,15 +187,16 @@
     display: inline-flex;
     align-items: center;
     gap: 0.2rem;
+    height: var(--drop-card-control);
+    padding: 0 0.15rem;
     border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 0.15rem;
 
     button {
       display: grid;
       place-items: center;
-      width: 26px;
-      height: 26px;
+      width: 1.625rem;
+      height: 1.625rem;
       border: none;
       border-radius: 999px;
       background: none;
@@ -211,7 +223,11 @@
   }
 
   &__mint {
-    padding: 0.55rem 1.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--drop-card-control);
+    padding: 0 1.2rem;
     border: none;
     border-radius: 999px;
     background-color: var(--network-color-primary, var(--color-primary));
@@ -238,8 +254,11 @@
   }
 
   &__view {
+    display: inline-flex;
+    align-items: center;
+    height: var(--drop-card-control);
     margin-left: auto;
-    padding: 0.5rem 1.1rem;
+    padding: 0 1.1rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     color: var(--text);

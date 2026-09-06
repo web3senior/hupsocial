@@ -1,0 +1,148 @@
+.dropPreview {
+  --preview-radius: 1rem;
+
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--preview-radius);
+  background: var(--surface);
+  overflow: hidden;
+
+  &__media {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    background: var(--surface-muted);
+
+    > img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  // Rides the artwork the way the mint badge does on a live card
+  &__price {
+    position: absolute;
+    inset-block-start: 0.55rem;
+    inset-inline-start: 0.55rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 999px;
+    padding: 0.28rem 0.6rem;
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+
+    img {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+    }
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.75rem 0.85rem 0.85rem;
+  }
+
+  &__nameRow {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  &__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-15, 0.9375rem);
+  }
+
+  &__ticker {
+    flex-shrink: 0;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--network-color-primary, var(--primary, #ec4899));
+  }
+
+  &__description {
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.45;
+    color: var(--text-muted, #888);
+    // Two lines is what the directory tile affords; the rest is on the drop page
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__stats {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    b {
+      font-size: var(--font-size-13, 0.8125rem);
+    }
+
+    em {
+      font-style: normal;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__progress {
+    margin-block-start: 0.1rem;
+  }
+
+  &__standard {
+    font-size: var(--font-size-11, 0.6875rem);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #888);
+  }
+
+  &__token {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    border-block-start: 1px solid var(--border);
+    padding: 0.7rem 0.85rem 0.8rem;
+
+    strong {
+      font-size: var(--font-size-13, 0.8125rem);
+      color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
+    }
+  }
+}

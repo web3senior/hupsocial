@@ -8,10 +8,10 @@ import { fetchIPFS } from '@/lib/ipfsGateways'
 import { extractIPFSCid, resolveStorageUrl } from '@/lib/storageHelper'
 import collectionAbi from '@/abis/HupDropCollection.json'
 
-/* A JSON document, not an image — through the media proxy it comes back as a redirect to
-   whichever gateway won server-side, which the browser may not be able to reach (CORS). Walk
-   the gateway list directly instead, Filebase first. */
-const metadataFetcher = async (uri) => {
+/* A JSON document, not an image — the media proxy would answer with a redirect to whichever
+   gateway won server-side, and the browser cannot always reach that host (CORS). fetchIPFS reads
+   documents through our own origin instead, so the gateway walk happens where CORS does not. */
+export const metadataFetcher = async (uri) => {
   const cid = extractIPFSCid(uri)
   const res = cid ? await fetchIPFS(cid) : await fetch(resolveStorageUrl(uri))
   return res.json()
@@ -66,11 +66,16 @@ export function useDropCollection({ chainId, collection, standardId }) {
     description: body?.description || '',
     image: body?.images?.[0]?.[0]?.url || body?.image || '',
     // LSP4's separate square logo; EVM metadata has no standard slot for it, so a plain
-    // `icon` key carries it there
-    icon: body?.icon?.[0]?.[0]?.url || (typeof body?.icon === 'string' ? body.icon : '') || '',
-    // LSP4Metadata nests the collection banner like images; EVM contractURI uses OpenSea's
-    // contract-level `banner_image` field
-    banner: body?.backgroundImage?.[0]?.[0]?.url || body?.banner_image || '',
+    // `icon` key carries it there. Spec LSP4 icon is a flat size array — the nested read
+    // covers metadata written before buildLsp4MetadataJson followed the spec.
+    icon:
+      body?.icon?.[0]?.[0]?.url ||
+      body?.icon?.[0]?.url ||
+      (typeof body?.icon === 'string' ? body.icon : '') ||
+      '',
+    // Nested like images in our own writes, flat in spec LSP3-style metadata; EVM contractURI
+    // uses OpenSea's contract-level `banner_image` field
+    banner: body?.backgroundImage?.[0]?.[0]?.url || body?.backgroundImage?.[0]?.url || body?.banner_image || '',
     links: Array.isArray(body?.links) ? body.links : [],
     metadataUri,
     metadata,

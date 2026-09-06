@@ -56,8 +56,10 @@ export const selectorOf = (signature) => keccak256(toHex(signature)).slice(0, 10
  * names are in the wild for the same job, because each NFT tool picked its own.
  */
 export const ERC_SETTERS = {
-  baseURI: ['setBaseURI(string)', 'setBaseTokenURI(string)', 'setBaseUri(string)'],
-  tokenURI: ['setTokenURI(uint256,string)', 'setURI(string)'],
+  // The two-string form is Hup's own ERC721 drop collection: base and suffix in one write
+  baseURI: ['setBaseURI(string)', 'setBaseTokenURI(string)', 'setBaseUri(string)', 'setBaseURI(string,string)'],
+  // The one-string setTokenURI is Hup's ERC1155 edition: one document for every copy
+  tokenURI: ['setTokenURI(uint256,string)', 'setURI(string)', 'setTokenURI(string)'],
   contractURI: ['setContractURI(string)'],
 }
 
@@ -101,48 +103,80 @@ export function looksLikeProxy(bytecode) {
  * `owner` is compared case-insensitively and may be a Universal Profile rather than an EOA — the
  * caller resolves that before asking, because a UP owner means the write has to be routed through
  * the profile rather than sent directly.
+ *
+ * `metadataFrozen` is what Hup's own drop collections answer once their creator locked them: the
+ * LUKSO pair refuses LSP4Metadata (and LSP8 the base URI) from then on, the ERC pair refuses the
+ * token pointer but keeps the collection card open.
  */
-export function describeCapabilities({ kind, owner, wallet, setters, isProxy }) {
+export function describeCapabilities({ kind, owner, wallet, setters, isProxy, metadataFrozen = false }) {
   const isOwner = Boolean(owner && wallet && owner.toLowerCase() === wallet.toLowerCase())
+  const frozen = Boolean(metadataFrozen)
 
   if (isLuksoKind(kind)) {
     return {
       isOwner,
-      // ERC725Y guarantees it. No probing, no caveat.
-      canEditCollection: isOwner,
-      canEditTokens: isOwner && kind === COLLECTION_KIND.LSP8,
+      metadataFrozen: frozen,
+      // ERC725Y guarantees it. No probing, no caveat — unless the collection froze itself.
+      canEditCollection: isOwner && !frozen,
+      canEditTokens: isOwner && kind === COLLECTION_KIND.LSP8 && !frozen,
       method: 'setData',
-      note: isOwner
-        ? null
-        : 'Only the collection owner can change its metadata. You are connected as a different address.',
+      collectionMethod: 'setData',
+      note: !isOwner
+        ? 'Only the collection owner can change its metadata. You are connected as a different address.'
+        : frozen
+          ? 'This collection froze its metadata: the document and what the tokens point at can never change again. Creators can still be edited.'
+          : null,
     }
   }
 
   if (kind === COLLECTION_KIND.ERC721 || kind === COLLECTION_KIND.ERC1155) {
     const hasBase = Boolean(setters?.baseURI)
     const hasToken = Boolean(setters?.tokenURI)
+    const hasContract = Boolean(setters?.contractURI)
     return {
       isOwner,
-      canEditCollection: isOwner && Boolean(setters?.contractURI),
-      canEditTokens: isOwner && (hasBase || hasToken),
+      metadataFrozen: frozen,
+      canEditCollection: isOwner && hasContract,
+      canEditTokens: isOwner && (hasBase || hasToken) && !frozen,
       method: setters?.baseURI ?? setters?.tokenURI ?? null,
+      collectionMethod: setters?.contractURI ?? null,
       note: isProxy
         ? 'This looks like a proxy, so its setters live in an implementation contract this check cannot see. Editing may still work.'
-        : !hasBase && !hasToken
-          ? 'This collection exposes no metadata setter, so its metadata is immutable — nothing here or anywhere else can change it.'
+        : !hasBase && !hasToken && !hasContract
+          ? 'This collection was deployed with no way to change its metadata — the artwork and details are locked forever, here and everywhere else.'
           : !isOwner
             ? 'Only the collection owner can change its metadata. You are connected as a different address.'
-            : null,
+            : frozen
+              ? hasContract
+                ? 'Token metadata is frozen — what the tokens show can never change again. The collection page — its name, story and cover images — is still yours to edit.'
+                : 'Token metadata is frozen — what the tokens show can never change again, and this contract has no collection page to edit.'
+              : !hasBase && !hasToken
+                ? 'The artwork inside the tokens is locked forever — this contract has no way to change it. The collection page — its name, story and cover images — is still yours to edit below.'
+                : null,
     }
   }
 
   return {
     isOwner: false,
+    metadataFrozen: false,
     canEditCollection: false,
     canEditTokens: false,
     method: null,
+    collectionMethod: null,
     note: 'That address does not answer as an NFT collection on this network.',
   }
+}
+
+/**
+ * An ERC721 collection keeps its folder private and only answers `tokenURI(1)`, so the base and
+ * the suffix are read back out of that one sample — which is all an unminted number needs to
+ * show what the folder holds for it.
+ * @param {string} uri What `tokenURI(1)` answered.
+ * @returns {{ base: string, suffix: string }}
+ */
+export const splitTokenOneUri = (uri) => {
+  const match = String(uri || '').match(/^(.*?)1(\.[a-z0-9]+)?$/i)
+  return match ? { base: match[1], suffix: match[2] ?? '' } : { base: '', suffix: '' }
 }
 
 /** Reads a supportsInterface sweep into one kind. Order matters: LSP8 and LSP7 both claim ERC725Y. */

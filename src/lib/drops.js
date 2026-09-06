@@ -3,7 +3,8 @@
  * @description Client helpers for the HupDrops launchpad: standard ids, collection param encoding, LSP2 VerifiableURIs, gates.
  */
 
-import { concatHex, encodeAbiParameters, hexToString, isAddress, keccak256, pad, slice, stringToHex, toHex } from 'viem'
+import { concatHex, encodeAbiParameters, hexToString, isAddress, keccak256, pad, slice, stringToHex, toHex, zeroAddress } from 'viem'
+import { LSP4_CREATORS_ARRAY_KEY, LSP4_METADATA_KEY, LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY, LSP8_TOKEN_METADATA_BASE_URI_KEY } from './lsp4'
 
 // IHupDrops deployer registry ids — engine-side `deployers(standardId)`
 export const DROP_STANDARDS = {
@@ -25,6 +26,9 @@ export const DROP_GATES = {
   ASSET_HOLDERS_1155: 4,
   COMMUNITY: 5,
 }
+
+/** The gates that check a balance on a contract the creator names, and so need one configured. */
+export const isAssetGate = (gate) => gate === DROP_GATES.ASSET_HOLDERS || gate === DROP_GATES.ASSET_HOLDERS_1155
 
 /** Mirrors the engine's MAX_PHASES. */
 export const MAX_DROP_PHASES = 8
@@ -115,7 +119,8 @@ export const buildLsp4MetadataJson = ({
     name,
     description,
     links,
-    icon: iconUrl ? [[imageEntry(iconUrl, iconHash)]] : [],
+    // Flat per spec — only `images` nests variants
+    icon: iconUrl ? [imageEntry(iconUrl, iconHash)] : [],
     images: imageUrl ? [[imageEntry(imageUrl, imageHash)]] : [],
     backgroundImage: backgroundImageUrl ? [[imageEntry(backgroundImageUrl, backgroundImageHash)]] : [],
     assets: [],
@@ -130,10 +135,10 @@ export { SOCIAL_LINKS as DROP_SOCIALS, buildLinks as buildDropLinks, parseLinks 
 
 /** ERC725Y identity keys — LSP collections have no name()/symbol()/contractURI(), only getData. */
 export const LSP4_DATA_KEYS = {
-  name: '0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b6ecceaf653468af1', // keccak256('LSP4TokenName')
-  symbol: '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756', // keccak256('LSP4TokenSymbol')
-  metadata: '0x9afb95cacc9f95858ec44aa8c3b685511002e30ae54415823f406128b85b238e', // keccak256('LSP4Metadata')
-  creators: '0x114bd03b3a46d48759680d81ebb2b414fda7d030a7105a851867accf1c2352e7', // keccak256('LSP4Creators[]')
+  name: LSP4_TOKEN_NAME_KEY,
+  symbol: LSP4_TOKEN_SYMBOL_KEY,
+  metadata: LSP4_METADATA_KEY,
+  creators: LSP4_CREATORS_ARRAY_KEY,
 }
 
 // bytes10(keccak256('LSP4CreatorsMap')) — the reverse-lookup prefix
@@ -184,7 +189,7 @@ export const encodeCreatorsWrites = (creators, previous = []) => {
 
 /** LSP8's answer to ERC721's baseURI; the reveal writes it as a VerifiableURI. */
 export const LSP8_DATA_KEYS = {
-  baseUri: '0x1a7628600c3bac7101f53697f48df381ddc36b9015e7d7c9c5633d1252aa2843', // _LSP8_TOKEN_METADATA_BASE_URI
+  baseUri: LSP8_TOKEN_METADATA_BASE_URI_KEY,
 }
 
 export const decodeDataString = (value) => {
@@ -221,6 +226,14 @@ export const decodeVerifiableURI = (value) => {
     return null
   }
 }
+
+/**
+ * Whether every token id resolves to one shared metadata document — the placeholder state a
+ * numbered drop launches in when it ships without per-token artwork. The launcher writes the
+ * collection document terminated with a fragment, which gateways ignore, so id 1 and id 900 fetch
+ * the same file until the creator points the base URI at a folder of their own.
+ */
+export const sharesOneTokenDocument = (tokenUri) => typeof tokenUri === 'string' && tokenUri.includes('#')
 
 // --- Collection constructor params (decoded by the deployer satellites) ---
 
@@ -294,6 +307,58 @@ export const encodeCollectionParams = (standardId, params) => {
   }
 }
 
+// --- Payment splits ---
+
+/** Mirrors HupSplitter's TOTAL_SHARES_BPS: a split's shares must total exactly 100%. */
+export const SPLIT_TOTAL_BPS = 10_000
+
+/** Mirrors HupSplitter's MAX_PAYEES. */
+export const MAX_SPLIT_PAYEES = 20
+
+/** What `createDrop` takes when the creator keeps everything: no split, proceeds to the creator. */
+export const NO_SPLITS = { payoutDestination: zeroAddress, payout: [], royalty: [] }
+
+/**
+ * Turns editor rows into the engine's `Payee[]`, dropping blanks. Rows keep percentages because
+ * that is what the creator types; the contract counts basis points.
+ */
+export const toSplitPayees = (rows) =>
+  (rows ?? [])
+    .filter((row) => isAddress(String(row.address ?? '').trim()) && Number(row.percent) > 0)
+    .map((row) => ({ account: String(row.address).trim(), shareBps: Math.round(Number(row.percent) * 100) }))
+
+/** Whether a table is one the engine will accept: 1..MAX payees, distinct, totalling exactly 100%. */
+export const isValidSplit = (payees) => {
+  if (!payees?.length || payees.length > MAX_SPLIT_PAYEES) return false
+
+  const accounts = new Set(payees.map((payee) => payee.account.toLowerCase()))
+  if (accounts.size !== payees.length) return false
+  if (payees.some((payee) => !(payee.shareBps > 0))) return false
+
+  return payees.reduce((total, payee) => total + payee.shareBps, 0) === SPLIT_TOTAL_BPS
+}
+
+/**
+ * The address a table splits to, read from the chain's HupSplits factory. Deterministic and
+ * answered whether or not the split exists yet, which is how a royalty receiver can be named in
+ * the same transaction that deploys it.
+ */
+export const predictSplitAddress = async ({ publicClient, factory, payees }) =>
+  publicClient.readContract({
+    address: factory,
+    abi: [
+      {
+        name: 'predict',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ type: 'tuple[]', components: [{ name: 'account', type: 'address' }, { name: 'shareBps', type: 'uint16' }] }],
+        outputs: [{ type: 'address' }],
+      },
+    ],
+    functionName: 'predict',
+    args: [payees],
+  })
+
 // --- Allowlist input parsing ---
 
 /** Trims, validates, and case-insensitively dedupes a pasted allowlist for setAllowlistedBatch. */
@@ -323,6 +388,37 @@ export const phaseNameByteLength = (value) => new TextEncoder().encode(String(va
 /** Mirrors the engine's setAllowlistedBatch cap. */
 export const ALLOWLIST_BATCH_SIZE = 100
 
+// --- Engine reads ---
+
+/**
+ * getDrop, in the shape every deployed engine answers with. HupDrops 1.1.0 appends `featured` to
+ * the record, and decoding that longer answer with this tuple simply ignores the extra word — so
+ * reads work against both, where the full ABI cannot decode a drop created before 1.1.0 at all.
+ */
+export const DROP_RECORD_ABI = [
+  {
+    name: 'getDrop',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'dropId', type: 'uint256' }],
+    outputs: [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'collection', type: 'address' },
+          { name: 'creator', type: 'address' },
+          { name: 'standardId', type: 'uint256' },
+          { name: 'maxSupply', type: 'uint256' },
+          { name: 'minted', type: 'uint256' },
+          { name: 'referralBps', type: 'uint256' },
+          { name: 'createdAt', type: 'uint64' },
+          { name: 'closed', type: 'bool' },
+        ],
+      },
+    ],
+  },
+]
+
 // --- Phase presentation ---
 
 export const PHASE_STATUS = { UPCOMING: 'upcoming', LIVE: 'live', PAUSED: 'paused', ENDED: 'ended' }
@@ -343,4 +439,190 @@ const dateTimeFormat = new Intl.DateTimeFormat('en', { dateStyle: 'short', timeS
 export const formatPhaseTime = (unixSeconds) => {
   const value = Number(unixSeconds)
   return value > 0 ? dateTimeFormat.format(new Date(value * 1000)) : null
+}
+
+// --- Phase scheduling (form model) ---
+
+/** How the forms ask for a start. The engine only ever sees a timestamp and `paused`. */
+export const DROP_START_MODES = { NOW: 'now', IN: 'in', AT: 'at', MANUAL: 'manual' }
+
+export const DROP_END_MODES = { NEVER: 'never', AFTER: 'after', AT: 'at' }
+
+export const DURATION_UNITS = [
+  { id: 'minutes', label: 'minutes', seconds: 60 },
+  { id: 'hours', label: 'hours', seconds: 3600 },
+  { id: 'days', label: 'days', seconds: 86400 },
+  { id: 'weeks', label: 'weeks', seconds: 604800 },
+]
+
+/** The lengths drops actually run for, so the common case is one tap. */
+export const DURATION_PRESETS = [
+  { amount: '1', unit: 'hours' },
+  { amount: '24', unit: 'hours' },
+  { amount: '3', unit: 'days' },
+  { amount: '7', unit: 'days' },
+  { amount: '30', unit: 'days' },
+]
+
+const unitSeconds = (unit) => DURATION_UNITS.find((entry) => entry.id === unit)?.seconds ?? 3600
+
+const durationSeconds = (amount, unit) => {
+  const value = Number(amount)
+  return Number.isFinite(value) && value > 0 ? Math.round(value * unitSeconds(unit)) : 0
+}
+
+export const emptySchedule = (overrides = {}) => ({
+  startMode: DROP_START_MODES.NOW,
+  startIn: '',
+  startInUnit: 'hours',
+  startAt: '',
+  endMode: DROP_END_MODES.NEVER,
+  runFor: '',
+  runForUnit: 'days',
+  endAt: '',
+  ...overrides,
+})
+
+export const formatDuration = (amount, unit) => {
+  const value = Number(amount)
+  if (!Number.isFinite(value) || value <= 0) return ''
+  const label = DURATION_UNITS.find((entry) => entry.id === unit)?.label ?? unit
+  return `${value} ${value === 1 ? label.replace(/s$/, '') : label}`
+}
+
+const pad2 = (value) => String(value).padStart(2, '0')
+
+/** `datetime-local` reads and writes local wall-clock time, never an ISO string. */
+export const toDateTimeLocal = (ms) => {
+  const date = new Date(ms)
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
+/**
+ * Turns a form schedule into what the engine takes.
+ * A length is measured from the resolved start — for a hand-started phase, that is creation time.
+ * `errorField` says which half of the control is wrong, so the warning lands under it.
+ * @returns {{ startTime: bigint, endTime: bigint, paused: boolean, error: string|null, errorField: 'start'|'end'|null }}
+ */
+export const resolveSchedule = (schedule, nowMs = Date.now()) => {
+  const now = Math.floor(nowMs / 1000)
+  const value = { ...emptySchedule(), ...(schedule ?? {}) }
+  let error = null
+  let errorField = null
+  const fail = (field, message) => {
+    if (error) return
+    error = message
+    errorField = field
+  }
+  // A minute of slack: block timestamps lag the browser clock, and a start in the future never opens
+  let start = now - 60
+
+  if (value.startMode === DROP_START_MODES.IN) {
+    const offset = durationSeconds(value.startIn, value.startInUnit)
+    if (offset === 0) fail('start', 'say how long until this phase opens')
+    start = now + offset
+  } else if (value.startMode === DROP_START_MODES.AT) {
+    const at = Math.floor(new Date(value.startAt).getTime() / 1000)
+    if (!value.startAt || Number.isNaN(at)) fail('start', 'pick the date this phase opens')
+    else start = at
+  }
+
+  let end = 0
+  if (value.endMode === DROP_END_MODES.AFTER) {
+    const length = durationSeconds(value.runFor, value.runForUnit)
+    if (length === 0) fail('end', 'say how long this phase runs')
+    else end = Math.max(start, now) + length
+  } else if (value.endMode === DROP_END_MODES.AT) {
+    const at = Math.floor(new Date(value.endAt).getTime() / 1000)
+    if (!value.endAt || Number.isNaN(at)) fail('end', 'pick the date this phase closes')
+    else end = at
+  }
+
+  if (!error && end > 0) {
+    if (end <= now) fail('end', 'it has to end in the future')
+    else if (end <= start) fail('end', 'it has to end after it starts')
+  }
+
+  return { startTime: BigInt(start), endTime: BigInt(end), paused: value.startMode === DROP_START_MODES.MANUAL, error, errorField }
+}
+
+/** `resolveSchedule` errors are clauses, so they read either alone or behind a "Phase 2: " prefix. */
+export const scheduleErrorMessage = (error, prefix = '') =>
+  prefix ? `${prefix}${error}` : `${error.charAt(0).toUpperCase()}${error.slice(1)}`
+
+/** One line of plain English about a schedule, for the review step. */
+export const describeSchedule = (schedule, nowMs = Date.now()) => {
+  const value = { ...emptySchedule(), ...(schedule ?? {}) }
+  const { startTime, endTime } = resolveSchedule(value, nowMs)
+
+  const opens =
+    value.startMode === DROP_START_MODES.MANUAL
+      ? 'opens when you start it'
+      : value.startMode === DROP_START_MODES.IN
+        ? `opens in ${formatDuration(value.startIn, value.startInUnit) || '—'}`
+        : value.startMode === DROP_START_MODES.AT
+          ? `opens ${formatPhaseTime(startTime) ?? '—'}`
+          : 'opens right away'
+
+  const closes =
+    value.endMode === DROP_END_MODES.NEVER
+      ? 'no end date'
+      : value.endMode === DROP_END_MODES.AFTER
+        ? `runs ${formatDuration(value.runFor, value.runForUnit) || '—'}`
+        : `until ${formatPhaseTime(endTime) ?? '—'}`
+
+  return `${opens} · ${closes}`
+}
+
+/** True once the creator has touched the schedule, so an untouched draft stays empty. */
+export const scheduleIsSet = (schedule) => {
+  const value = { ...emptySchedule(), ...(schedule ?? {}) }
+  return value.startMode !== DROP_START_MODES.NOW || value.endMode !== DROP_END_MODES.NEVER
+}
+
+/** The next phase picks up where the last one ends, so a two-phase drop needs no arithmetic. */
+export const scheduleFollowing = (previous) => {
+  const prev = { ...emptySchedule(), ...(previous ?? {}) }
+  if (prev.endMode === DROP_END_MODES.AT && prev.endAt) {
+    return emptySchedule({ startMode: DROP_START_MODES.AT, startAt: prev.endAt })
+  }
+  if (prev.endMode === DROP_END_MODES.AFTER) {
+    const { endTime } = resolveSchedule(prev)
+    if (endTime > 0n) return emptySchedule({ startMode: DROP_START_MODES.AT, startAt: toDateTimeLocal(Number(endTime) * 1000) })
+  }
+  return emptySchedule()
+}
+
+/** Draft restore: a saved schedule is untrusted JSON. */
+export const sanitizeSchedule = (value) => {
+  const str = (input, max) => (typeof input === 'string' ? input.slice(0, max) : '')
+  const unit = (input, fallback) => (DURATION_UNITS.some((entry) => entry.id === input) ? input : fallback)
+  return emptySchedule({
+    startMode: Object.values(DROP_START_MODES).includes(value?.startMode) ? value.startMode : DROP_START_MODES.NOW,
+    startIn: str(value?.startIn, 10),
+    startInUnit: unit(value?.startInUnit, 'hours'),
+    startAt: str(value?.startAt, 40),
+    endMode: Object.values(DROP_END_MODES).includes(value?.endMode) ? value.endMode : DROP_END_MODES.NEVER,
+    runFor: str(value?.runFor, 10),
+    runForUnit: unit(value?.runForUnit, 'days'),
+    endAt: str(value?.endAt, 40),
+  })
+}
+
+// --- Card presentation ---
+
+/** What an embedded drop card shows; absent flags mean show, so posts from before the toggles render in full. */
+export const normalizeDropCardOptions = (show) => ({
+  stats: show?.stats !== false,
+  pieces: show?.pieces !== false,
+  mint: show?.mint !== false,
+})
+
+/** Newest-first ids for the pieces strip: both numbered collections mint 1..minted, LSP8 as bytes32 of the same number. */
+export const latestMintedTokenIds = (minted, standardId, count = 3) => {
+  const ids = []
+  for (let id = Number(minted); id >= 1 && ids.length < count; id--) {
+    ids.push(Number(standardId) === DROP_STANDARDS.LSP8 ? toHex(BigInt(id), { size: 32 }) : String(id))
+  }
+  return ids
 }

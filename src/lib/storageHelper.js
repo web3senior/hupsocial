@@ -12,6 +12,26 @@ export const isIPFSHash = (src) => {
   return typeof src === 'string' && src.startsWith('ipfs://')
 }
 
+/* Documents in the wild carry `ipfs://ipfs://<cid>` wherever a tool prefixed a URI that already
+   had one — ours did — and no gateway resolves that, so every reader below collapses it. */
+const IPFS_URI_PREFIX = /^(?:ipfs:\/\/)+/
+
+/**
+ * Collapses a repeated `ipfs://` prefix to a single one. Non-IPFS references pass through
+ * untouched, so a document's `https://` image is never mistaken for a CID.
+ * @param {string} src - A stored reference of any shape.
+ * @returns {string} The same reference carrying at most one `ipfs://`.
+ */
+export const collapseIpfsPrefix = (src) => (typeof src === 'string' ? src.replace(IPFS_URI_PREFIX, 'ipfs://') : src)
+
+/**
+ * Puts a freshly pinned CID into the one shape written onchain. Takes a bare CID or an
+ * already-prefixed URI and answers with exactly one prefix either way.
+ * @param {string} value - A CID or `ipfs://` URI.
+ * @returns {string} `ipfs://<cid>`, or the falsy input unchanged.
+ */
+export const normalizeIpfsUri = (value) => (value ? `ipfs://${String(value).replace(IPFS_URI_PREFIX, '')}` : value)
+
 /**
  * Resolves an IPFS URL to a gateway endpoint.
  * @param {string} ipfsUrl - The IPFS URL containing the hash.
@@ -21,7 +41,7 @@ export const resolveIPFSUrl = (ipfsUrl) => {
   if (!ipfsUrl || !isIPFSHash(ipfsUrl)) return null
 
   /* Strip the protocol prefix to isolate the hash */
-  const hash = ipfsUrl.replace(/^ipfs:\/\//, '')
+  const hash = ipfsUrl.replace(IPFS_URI_PREFIX, '')
 
   /* Point directly to the leading IPFS gateway */
   return gatewayUrl(hash)
@@ -44,7 +64,7 @@ const STREAM_GATEWAY_URL = process.env.NEXT_PUBLIC_IPFS_STREAM_GATEWAY_URL || pr
 export const resolveIPFSStreamUrls = (ipfsUrl) => {
   if (!ipfsUrl || !isIPFSHash(ipfsUrl)) return []
 
-  const hash = ipfsUrl.replace(/^ipfs:\/\//, '')
+  const hash = ipfsUrl.replace(IPFS_URI_PREFIX, '')
   const gateways = [STREAM_GATEWAY_URL, ...gatewayList()]
     .filter(Boolean)
     /* The stream override is raw env — gatewayList() has already normalized the rest */
@@ -68,7 +88,7 @@ export const resolveIPFSImageUrl = (ipfsUrl, options = {}) => {
   if (!ipfsUrl || typeof ipfsUrl !== 'string') return null
 
   /* Accept both ipfs:// URIs and raw CIDs */
-  const hash = ipfsUrl.replace(/^ipfs:\/\//, '')
+  const hash = ipfsUrl.replace(IPFS_URI_PREFIX, '')
   if (!hash) return null
 
   const params = new URLSearchParams({ cid: hash })
@@ -102,7 +122,7 @@ const PROXY_IMAGE_PATH = '/api/ipfs/file'
  */
 export const extractIPFSCid = (src) => {
   if (!src || typeof src !== 'string') return null
-  if (isIPFSHash(src)) return src.replace(/^ipfs:\/\//, '') || null
+  if (isIPFSHash(src)) return src.replace(IPFS_URI_PREFIX, '') || null
   if (src.startsWith(UP_CLOUD_IMAGE_PREFIX)) return src.slice(UP_CLOUD_IMAGE_PREFIX.length).split('?')[0] || null
 
   /* Matched by path rather than by full URL so it reads both the relative form the resolver

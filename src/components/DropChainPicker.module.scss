@@ -1,0 +1,116 @@
+.chainPicker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  // A row each, held to a readable column: the fee sits beside the name so the choice is a
+  // short vertical scan rather than a wide one
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 26rem;
+  margin-inline: auto;
+  gap: 0.6rem;
+
+  &__card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--surface-muted);
+    padding: 0.8rem 0.95rem;
+    text-align: start;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+
+    &:hover:not(:disabled) {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    // The chosen card carries the chain's own colour, so the choice reads before the label does
+    &--chosen {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+      background: color-mix(in srgb, var(--network-color-primary, var(--primary, #ec4899)) 10%, transparent);
+    }
+  }
+
+  &__mark {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--surface);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+
+    strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  /* An inverse chip, not a colour: the chain's own colour is already spoken for by the chosen
+     mark beside it, and a green read as a status light rather than a fact. Inverting the text and
+     surface tokens keeps it dark on light and light on dark without naming either. */
+  &__wallet {
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    padding: 0.18rem 0.45rem;
+    background: var(--text, #171717);
+    color: var(--surface, #fff);
+    font-size: var(--font-size-11, 0.6875rem);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  // Sits last, so it takes the trailing slot whether or not the wallet mark claimed it first
+  &__chosenMark {
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    color: var(--network-color-primary, var(--primary, #ec4899));
+
+    // The wallet mark already took the auto margin
+    .chainPicker__wallet + & {
+      margin-inline-start: 0.35rem;
+    }
+  }
+
+  &__empty {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text-muted, #888);
+  }
+}

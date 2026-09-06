@@ -15,8 +15,10 @@ export async function generateMetadata({ params }, parent) {
   }
 }
 
-export default async function Page({ params }) {
+export default async function Page({ params, searchParams }) {
   const { networkId, dropId } = await params
+  // A shared referral link (?ref=0x…) credits its owner with the mints it brings in
+  const { ref } = await searchParams
 
   return (
     <>
@@ -26,7 +28,7 @@ export default async function Page({ params }) {
       <PageTitle name={`NFT drop #${dropId}`} />
       <div className={styles.page}>
         <div className={`__container ${styles.page__container}`} data-width="large">
-          <DropDetails networkId={networkId} dropId={dropId} />
+          <DropDetails networkId={networkId} dropId={dropId} referral={typeof ref === 'string' ? ref : undefined} />
         </div>
       </div>
     </>

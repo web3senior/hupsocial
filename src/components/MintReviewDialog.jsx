@@ -35,8 +35,11 @@ const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address
  *   this a two-transaction flow and is worth saying before the first prompt rather than after.
  * @param {string} props.recipient Where the tokens land.
  * @param {string} [props.chainName] Chain the mint happens on.
- * @param {boolean} [props.busy] A transaction is already in flight.
- * @param {Function} props.onConfirm Runs the mint. The dialog closes itself first.
+ * @param {boolean} [props.busy] A transaction is in flight: the dialog locks itself open — no
+ *   cancel, no Esc, no backdrop click — until the caller closes it on success or the wallet
+ *   refuses and the minter gets the form back to try again.
+ * @param {'approve'|'wallet'|'mining'|null} [props.stage] Which wait the confirm button names.
+ * @param {Function} props.onConfirm Runs the mint. The caller closes the dialog once it lands.
  */
 const MintReviewDialog = forwardRef(function MintReviewDialog(
   {
@@ -54,6 +57,7 @@ const MintReviewDialog = forwardRef(function MintReviewDialog(
     recipient,
     chainName,
     busy = false,
+    stage = null,
     onConfirm,
   },
   ref,
@@ -77,12 +81,17 @@ const MintReviewDialog = forwardRef(function MintReviewDialog(
       ref={dialogRef}
       className={styles.review}
       aria-label="Review this mint"
-      lightDismiss
+      // Locked open while the mint is in flight: a minter who dismissed it mid-mint would have
+      // nothing on screen but a toast to tell them what their wallet just signed
+      lightDismiss={!busy}
       onClick={(e) => e.stopPropagation()}
       // Rendered inside a card that may itself sit in a dialog — React re-dispatches close and
       // cancel up the tree, so both stop here or closing this closes its host too
       onClose={(e) => e.stopPropagation()}
-      onCancel={(e) => e.stopPropagation()}
+      onCancel={(e) => {
+        e.stopPropagation()
+        if (busy) e.preventDefault()
+      }}
     >
       <header className={styles.review__head}>
         <div>
@@ -160,18 +169,16 @@ const MintReviewDialog = forwardRef(function MintReviewDialog(
         <button type="button" className={styles.review__cancel} onClick={() => dialogRef.current?.close()} disabled={busy}>
           Cancel
         </button>
-        <button
-          type="button"
-          className={styles.review__confirm}
-          disabled={busy}
-          onClick={() => {
-            // Closed before the wallet opens: an open dialog behind a wallet prompt is a dialog
-            // the minter has to dismiss twice, and the outcome arrives as a toast either way.
-            dialogRef.current?.close()
-            onConfirm?.()
-          }}
-        >
-          {busy ? 'Minting…' : needsApproval ? 'Approve and mint' : 'Confirm mint'}
+        <button type="button" className={styles.review__confirm} disabled={busy} onClick={() => onConfirm?.()}>
+          {busy
+            ? stage === 'approve'
+              ? 'Approve in your wallet…'
+              : stage === 'mining'
+                ? 'Minting…'
+                : 'Confirm in your wallet…'
+            : needsApproval
+              ? 'Approve and mint'
+              : 'Confirm mint'}
           <ArrowRightIcon size={15} weight="bold" />
         </button>
       </div>

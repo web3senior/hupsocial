@@ -1,0 +1,46 @@
+.tokenIdentity {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-block-start: 0.35rem;
+  font-size: var(--font-size-12);
+  color: var(--text-muted, #888);
+
+  svg {
+    flex-shrink: 0;
+    color: #10b981;
+  }
+
+  strong {
+    color: var(--text, inherit);
+    font-weight: 600;
+  }
+
+  // InfoHint carries an inline margin for prose labels; in a flex row the gap already spaces it
+  button {
+    margin-inline-start: 0;
+  }
+
+  em {
+    flex-basis: 100%;
+    font-style: normal;
+  }
+
+  // The address resolves, but not to what the kind toggle claims
+  &--warn {
+    color: #b45309;
+
+    svg {
+      color: #f59e0b;
+    }
+  }
+
+  &--bad {
+    color: #dc2626;
+
+    svg {
+      color: #dc2626;
+    }
+  }
+}

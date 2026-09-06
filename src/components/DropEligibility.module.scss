@@ -58,15 +58,10 @@
         cursor: pointer;
 
         &:hover {
-          color: var(--primary, #ec4899);
+          color: var(--network-color-primary, var(--primary, #ec4899));
         }
       }
     }
-  }
-
-  &__row--eligible {
-    // The whole point of the panel is spotting the wallet that works, so it carries the accent
-    box-shadow: inset 2px 0 0 0 #22a06b;
   }
 
   &__verdict {
@@ -82,13 +77,9 @@
 
   &__who {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.35rem;
     min-width: 0;
-
-    code {
-      font-variant-numeric: tabular-nums;
-    }
 
     em {
       font-style: normal;
@@ -142,7 +133,7 @@
       cursor: pointer;
 
       &:hover:not(:disabled) {
-        border-color: var(--primary, #ec4899);
+        border-color: var(--network-color-primary, var(--primary, #ec4899));
       }
 
       &:disabled {

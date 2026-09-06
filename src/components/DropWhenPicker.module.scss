@@ -1,0 +1,150 @@
+// Inherits the host form's scale where it sets one, and stands alone where it doesn't
+.whenPicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--drop-gap, 0.6rem);
+
+  &__row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    border-radius: var(--drop-card-radius, 1rem);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad, 0.8rem 0.95rem);
+  }
+
+  &__label {
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+  }
+
+  // Equal columns so the options read as a block: four across, wrapping into whole rows
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.3rem;
+
+    @media (max-width: 460px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  &__option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-width: 0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted, #888);
+    border-radius: 999px;
+    padding: 0.4rem 0.5rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &--active {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+      color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+  }
+
+  // The typed value the pills above it ask for, on its own line inside the card
+  &__detail {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.05rem;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.75rem;
+  }
+
+  &__duration {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    min-width: 0;
+
+    input {
+      // Grows with the number instead of leaving a gap before the unit
+      width: calc(var(--duration-len, 1) * 1ch + 0.5ch);
+      min-width: 1.5ch;
+      border: none;
+      background: none;
+      color: inherit;
+      padding: 0;
+      font: inherit;
+      font-size: var(--font-size-15, 0.9375rem);
+      font-weight: 600;
+      appearance: textfield;
+
+      &::-webkit-outer-spin-button,
+      &::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+      }
+
+      &:focus-visible {
+        outline: none;
+      }
+
+      &::placeholder {
+        color: var(--text-muted, #888);
+        opacity: 0.75;
+      }
+    }
+
+    select {
+      border: none;
+      background: none;
+      color: inherit;
+      padding: 0;
+      font: inherit;
+      font-size: var(--font-size-15, 0.9375rem);
+      cursor: pointer;
+
+      &:focus-visible {
+        outline: none;
+      }
+    }
+  }
+
+  &__from {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__date {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    padding: 0;
+    font: inherit;
+    font-size: var(--font-size-15, 0.9375rem);
+
+    &:focus-visible {
+      outline: none;
+    }
+  }
+
+  &__caption {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--font-size-12);
+    line-height: 1.45;
+    color: var(--text-muted, #888);
+    opacity: 0.85;
+
+    &--warn {
+      color: var(--color-error, #ef4444);
+      opacity: 1;
+    }
+  }
+}

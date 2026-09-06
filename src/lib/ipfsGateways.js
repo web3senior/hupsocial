@@ -92,7 +92,11 @@ const inBrowser = () => typeof window !== 'undefined'
  * @returns {Promise<Response>} The document, its body already buffered by the proxy.
  */
 async function fetchThroughProxy(cid, { timeoutMs, init }) {
-  const url = `${DOCUMENT_PROXY_PATH}?cid=${encodeURIComponent(cid)}&t=${timeoutMs}`
+  /* A fragment is never part of an IPFS path — it is how a drop in its placeholder state points
+     every token id at one document. Gateways drop it before the request, and so does the
+     server-side branch below simply by handing the URL to fetch; encoding it into the proxy's
+     query string instead made the route reject a CID it could have served. */
+  const url = `${DOCUMENT_PROXY_PATH}?cid=${encodeURIComponent(String(cid ?? '').split('#')[0])}&t=${timeoutMs}`
   const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs + PROXY_GRACE_MS) })
   if (response.ok) return response
 

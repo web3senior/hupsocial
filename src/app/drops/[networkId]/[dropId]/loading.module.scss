@@ -22,25 +22,26 @@
 
   &__layout {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    gap: 1.5rem;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 2.25rem;
     align-items: start;
-    margin-top: 2.4rem;
+    margin-top: 2.6rem;
 
     @media (max-width: 800px) {
       grid-template-columns: minmax(0, 1fr);
+      gap: 1.25rem;
     }
   }
 
   &__media {
     aspect-ratio: 1;
-    border-radius: 16px;
+    border-radius: 24px;
   }
 
   &__info {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: 1.1rem;
     min-width: 0;
   }
 
@@ -49,17 +50,18 @@
     border-radius: 999px;
 
     &--badges {
-      max-width: 260px;
+      height: 24px;
+      max-width: 180px;
     }
 
     &--title {
-      height: 36px;
+      height: 44px;
       max-width: 420px;
     }
   }
 
   &__block {
-    height: 180px;
+    height: 300px;
     border-radius: 16px;
   }
 }

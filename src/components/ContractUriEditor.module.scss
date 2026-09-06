@@ -1,0 +1,158 @@
+// The preview IS the image editor: the card renders the contractURI document the way a
+// marketplace card does, and the banner and artwork slots are replaced by clicking them.
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  &__caption {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+}
+
+.card {
+  max-width: 24rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  overflow: hidden;
+  background: var(--background);
+
+  &__banner {
+    position: relative;
+    display: block;
+    aspect-ratio: 3 / 1;
+    background: var(--surface-muted);
+    cursor: pointer;
+
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  // What an empty slot wants, said in the slot: the name of the picture and the size it should be
+  &__size {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    color: var(--text-muted, #888);
+    text-align: center;
+    pointer-events: none;
+
+    strong {
+      font-size: var(--font-size-12);
+      font-weight: 600;
+    }
+
+    small {
+      font-family: var(--font-mono, monospace);
+      font-size: var(--font-size-12);
+    }
+
+    // The square is 4.5rem across — the size alone fits, at a size that fits
+    &--small small {
+      font-size: 0.6rem;
+      line-height: 1.2;
+    }
+  }
+
+  // Always visible rather than hover-revealed, so touch screens get the same affordance
+  &__hint {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 55%);
+    color: #fff;
+    font-size: var(--font-size-12);
+    pointer-events: none;
+  }
+
+  // Overlaps the banner the way marketplace cards do, so the two images read as one card
+  &__artwork {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    margin: -2.25rem 0 0 1rem;
+    border: 3px solid var(--background);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    overflow: hidden;
+
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  &__hintSmall {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    padding: 0.1rem 0;
+    text-align: center;
+    background: rgb(0 0 0 / 55%);
+    color: #fff;
+    font-size: 0.6rem;
+    pointer-events: none;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.6rem 1rem 0.9rem;
+  }
+
+  &__name {
+    font-size: var(--font-size-16, 1rem);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  &__description {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  &__description--empty {
+    opacity: 0.6;
+    font-style: italic;
+  }
+
+  &__link {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+  }
+}
