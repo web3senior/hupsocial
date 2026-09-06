@@ -172,6 +172,25 @@
     </section>
 
     <section class="deployer__panel">
+      <span class="deployer__label">Verify source</span>
+      <span class="deployer__meta">
+        Submits the loaded contract's standard-JSON input, with the constructor fields above, for the address below on the
+        connected chain. Sourcify needs no key and every Blockscout explorer imports its matches; LUKSO's own explorer is
+        submitted to directly. BscScan, BaseScan and CeloScan need a free Etherscan API key — one key serves them all.
+      </span>
+      <label class="deployer__label" for="verifyAddress">Contract address</label>
+      <input id="verifyAddress" class="deployer__input" spellcheck="false" placeholder="prefilled from the prediction — paste another to verify an earlier deploy" />
+      <label class="deployer__label" for="etherscanKey">Etherscan API key (optional, kept in this browser)</label>
+      <input id="etherscanKey" class="deployer__input" spellcheck="false" placeholder="etherscan.io → API keys" />
+      <div class="deployer__row">
+        <button id="verifySourcifyBtn" class="deployer__button deployer__button--secondary">Verify on Sourcify</button>
+        <button id="verifyBlockscoutBtn" class="deployer__button deployer__button--secondary">Verify on this chain's Blockscout</button>
+        <button id="verifyEtherscanBtn" class="deployer__button deployer__button--secondary">Verify on Etherscan family</button>
+      </div>
+      <span id="verifyStatus" class="deployer__meta">—</span>
+    </section>
+
+    <section class="deployer__panel">
       <span class="deployer__label">Test token · mint &amp; transfer</span>
       <p class="deployer__note">
         Talks to a deployed test token — ERC20, ERC721, LSP7 or LSP8. Fills itself in once the
@@ -483,6 +502,12 @@
       checkBtn: document.getElementById("checkBtn"),
       deployBtn: document.getElementById("deployBtn"),
       feeMode: document.getElementById("feeMode"),
+      verifyAddress: document.getElementById("verifyAddress"),
+      etherscanKey: document.getElementById("etherscanKey"),
+      verifySourcifyBtn: document.getElementById("verifySourcifyBtn"),
+      verifyBlockscoutBtn: document.getElementById("verifyBlockscoutBtn"),
+      verifyEtherscanBtn: document.getElementById("verifyEtherscanBtn"),
+      verifyStatus: document.getElementById("verifyStatus"),
       log: document.getElementById("log"),
     };
 
@@ -530,6 +555,8 @@
       els.predictedAddr.textContent = predicted;
       els.predictedAddr.className = "deployer__address deployer__address--ok";
       els.deployBtn.disabled = !signer;
+      // The address most likely to be verified next; editable for an earlier deploy
+      els.verifyAddress.value = predicted;
       return predicted;
     }
 
@@ -663,6 +690,177 @@
         log(`Estimated gas ${gas.toLocaleString()} → about ${fmt(gas * charged)} ${symbol} at today's base fee (ceiling ${fmt(gas * ceiling)} ${symbol}; the difference is refunded).`);
       } catch (err) {
         log(`Could not estimate the cost (${err.message}).`, "warn");
+      }
+    }
+
+    // --- Source verification -------------------------------------------------------------
+
+    const COMPILER_LONG = "0.8.36+commit.8a079791";
+    // The trimmed standard-JSON inputs are chain-independent; the LSP set lives under lukso-mainnet
+    const VERIFY_BASE = "../contracts/v2/for-verification/";
+    const verifyFolder = (chainId) => (chainId === 42 || chainId === 4201 ? "lukso-mainnet" : "monad-mainnet");
+    // Blockscout explorers with a verification API. The Etherscan family is not Blockscout, and
+    // Sourcify (which Blockscout imports) does not list LUKSO — hence a direct route for it.
+    const BLOCKSCOUT = {
+      42: "https://explorer.execution.mainnet.lukso.network",
+      4201: "https://explorer.execution.testnet.lukso.network",
+      8453: "https://base.blockscout.com",
+      42220: "https://explorer.celo.org/mainnet",
+    };
+    const ETHERSCAN_KEY_STORAGE = "hup-deploy-etherscan-key";
+
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const setVerifyStatus = (text) => {
+      els.verifyStatus.textContent = text;
+    };
+
+    function verifyTarget() {
+      if (!loadedArtifact || loadedArtifact.raw) throw new Error("Pick and load a precompiled contract first — the source to verify is chosen from it.");
+      if (!currentChainId) throw new Error("Connect the wallet first — the chain decides where to verify.");
+      return {
+        address: ethers.getAddress(els.verifyAddress.value.trim()),
+        identifier: `v2/Extensions/${loadedArtifact.id}.sol:${loadedArtifact.id}`,
+        args: (() => {
+          const fields = [...els.ctorFields.querySelectorAll("input")];
+          const types = fields.map((field) => field.dataset.type);
+          const values = fields.map((field) => coerceArg(field.value, field.dataset.type));
+          return types.length ? ethers.AbiCoder.defaultAbiCoder().encode(types, values).slice(2) : "";
+        })(),
+      };
+    }
+
+    async function verificationInput() {
+      const folder = verifyFolder(currentChainId);
+      const response = await fetch(`${VERIFY_BASE}${folder}/${loadedArtifact.id}.json`);
+      if (!response.ok) throw new Error(`No verification file for ${loadedArtifact.id} under ${folder} — regenerate them from the source tree.`);
+      return response.json();
+    }
+
+    const verifyFailed = (where, err) => {
+      setVerifyStatus(`${where}: ${err.message}`);
+      log(`${where}: ${err.message}`, "err");
+    };
+
+    async function verifyOnSourcify() {
+      try {
+        const { address, identifier } = verifyTarget();
+        const input = await verificationInput();
+        setVerifyStatus("Submitting to Sourcify…");
+        const response = await fetch(`https://sourcify.dev/server/v2/verify/${currentChainId}/${address}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ stdJsonInput: input, compilerVersion: COMPILER_LONG, contractIdentifier: identifier }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (response.status === 409) {
+          setVerifyStatus(`Sourcify already holds this contract — https://repo.sourcify.dev/${currentChainId}/${address}`);
+          log(`Sourcify already has ${address} verified.`, "ok");
+          return;
+        }
+        if (!response.ok) throw new Error(body.customCode ? `${body.customCode} — ${body.message}` : body.message || `HTTP ${response.status}`);
+
+        for (let i = 1; i <= 40; i++) {
+          await wait(3000);
+          const job = await fetch(`https://sourcify.dev/server/v2/verify/${body.verificationId}`).then((r) => r.json());
+          if (!job.isJobCompleted) {
+            setVerifyStatus(`Sourcify is compiling… ${i * 3}s`);
+            continue;
+          }
+          if (job.error) throw new Error(`${job.error.customCode || ""} ${job.error.message || JSON.stringify(job.error)}`.trim());
+          const match = job.contract?.match || job.contract?.runtimeMatch || "verified";
+          setVerifyStatus(`Sourcify: ${match} — https://repo.sourcify.dev/${currentChainId}/${address}`);
+          log(`✅ Sourcify ${match}: ${loadedArtifact.id} at ${address} — https://repo.sourcify.dev/${currentChainId}/${address}`, "ok");
+          return;
+        }
+        throw new Error(`no result after two minutes — check https://sourcify.dev/#/lookup/${address}`);
+      } catch (err) {
+        verifyFailed("Sourcify", err);
+      }
+    }
+
+    async function verifyOnBlockscout() {
+      try {
+        const base = BLOCKSCOUT[currentChainId];
+        if (!base) throw new Error("no Blockscout explorer configured for this chain — Sourcify covers it, and Blockscout explorers import Sourcify matches.");
+        const { address, args } = verifyTarget();
+        const input = await verificationInput();
+        const form = new FormData();
+        form.append("compiler_version", `v${COMPILER_LONG}`);
+        form.append("license_type", "mit");
+        form.append("autodetect_constructor_args", args ? "false" : "true");
+        if (args) form.append("constructor_args", args);
+        form.append("files[0]", new Blob([JSON.stringify(input)], { type: "application/json" }), `${loadedArtifact.id}.json`);
+        setVerifyStatus("Submitting to Blockscout…");
+        const response = await fetch(`${base}/api/v2/smart-contracts/${address}/verification/via/standard-input`, { method: "POST", body: form });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
+
+        for (let i = 1; i <= 40; i++) {
+          await wait(3000);
+          const info = await fetch(`${base}/api/v2/smart-contracts/${address}`).then((r) => r.json()).catch(() => null);
+          if (info?.is_verified) {
+            setVerifyStatus(`Blockscout: verified as ${info.name} — ${base}/address/${address}?tab=contract`);
+            log(`✅ Blockscout verified ${info.name} at ${address} — ${base}/address/${address}?tab=contract`, "ok");
+            return;
+          }
+          setVerifyStatus(`Blockscout is verifying… ${i * 3}s`);
+        }
+        throw new Error(`no confirmation after two minutes — check ${base}/address/${address}?tab=contract`);
+      } catch (err) {
+        verifyFailed("Blockscout", err);
+      }
+    }
+
+    async function verifyOnEtherscan() {
+      try {
+        const key = els.etherscanKey.value.trim();
+        if (!key) throw new Error("paste an Etherscan API key first — free at etherscan.io/apis, and one key covers BscScan, BaseScan, CeloScan and the rest.");
+        localStorage.setItem(ETHERSCAN_KEY_STORAGE, key);
+        const { address, identifier, args } = verifyTarget();
+        const input = await verificationInput();
+        const params = new URLSearchParams({
+          apikey: key,
+          module: "contract",
+          action: "verifysourcecode",
+          codeformat: "solidity-standard-json-input",
+          sourceCode: JSON.stringify(input),
+          contractaddress: address,
+          contractname: identifier,
+          compilerversion: `v${COMPILER_LONG}`,
+          // Their spelling, not a typo here
+          constructorArguements: args,
+        });
+        setVerifyStatus("Submitting to the Etherscan API…");
+        const submit = await fetch(`https://api.etherscan.io/v2/api?chainid=${currentChainId}`, { method: "POST", body: params }).then((r) => r.json());
+        if (submit.status !== "1") {
+          if (/already verified/i.test(String(submit.result))) {
+            setVerifyStatus(`Etherscan: ${submit.result}`);
+            log(`Etherscan: ${submit.result} (${address})`, "ok");
+            return;
+          }
+          throw new Error(submit.result || submit.message || "submission rejected");
+        }
+
+        for (let i = 1; i <= 36; i++) {
+          await wait(5000);
+          const check = await fetch(
+            `https://api.etherscan.io/v2/api?chainid=${currentChainId}&module=contract&action=checkverifystatus&guid=${submit.result}&apikey=${key}`,
+          ).then((r) => r.json());
+          const text = String(check.result || "");
+          if (/pending/i.test(text)) {
+            setVerifyStatus(`Etherscan: ${text} ${i * 5}s`);
+            continue;
+          }
+          if (/pass|already verified/i.test(text)) {
+            setVerifyStatus(`Etherscan: ${text}`);
+            log(`✅ Etherscan: ${text} — ${loadedArtifact.id} at ${address}`, "ok");
+            return;
+          }
+          throw new Error(text || "verification failed");
+        }
+        throw new Error("no result after three minutes — check the explorer's contract tab.");
+      } catch (err) {
+        verifyFailed("Etherscan", err);
       }
     }
 
@@ -1281,6 +1479,14 @@
       updatePrediction();
     });
     els.bytecodeInput.addEventListener("input", updatePrediction);
+    els.verifySourcifyBtn.addEventListener("click", verifyOnSourcify);
+    els.verifyBlockscoutBtn.addEventListener("click", verifyOnBlockscout);
+    els.verifyEtherscanBtn.addEventListener("click", verifyOnEtherscan);
+    try {
+      els.etherscanKey.value = localStorage.getItem(ETHERSCAN_KEY_STORAGE) || "";
+    } catch (err) {
+      // Storage can be blocked; the key is then typed per session
+    }
 
     // Salt from a label, so a second deployment of the same bytes on one chain is one word away
     els.deriveSaltBtn.addEventListener("click", () => {
