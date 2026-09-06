@@ -64,6 +64,11 @@
   },
   {
     "inputs": [],
+    "name": "AlreadyFeatured",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "BatchTooLarge",
     "type": "error"
   },
@@ -187,6 +192,27 @@
   {
     "inputs": [],
     "name": "SessionExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "actual",
+        "type": "address"
+      }
+    ],
+    "name": "SplitMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "SplitsUnavailable",
     "type": "error"
   },
   {
@@ -368,6 +394,44 @@
       }
     ],
     "name": "DropCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "dropId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "feePaid",
+        "type": "uint256"
+      }
+    ],
+    "name": "DropFeatured",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldValue",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newValue",
+        "type": "uint256"
+      }
+    ],
+    "name": "FeaturedFeeUpdated",
     "type": "event"
   },
   {
@@ -753,6 +817,25 @@
       }
     ],
     "name": "RoleRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "oldValue",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newValue",
+        "type": "address"
+      }
+    ],
+    "name": "SplitsUpdated",
     "type": "event"
   },
   {
@@ -1274,6 +1357,11 @@
         "type": "uint256"
       },
       {
+        "internalType": "bool",
+        "name": "_featured",
+        "type": "bool"
+      },
+      {
         "components": [
           {
             "internalType": "string",
@@ -1344,6 +1432,52 @@
         "internalType": "struct IHupDrops.PhaseInput[]",
         "name": "_phaseInputs",
         "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "payoutDestination",
+            "type": "address"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              },
+              {
+                "internalType": "uint16",
+                "name": "shareBps",
+                "type": "uint16"
+              }
+            ],
+            "internalType": "struct IHupSplits.Payee[]",
+            "name": "payout",
+            "type": "tuple[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              },
+              {
+                "internalType": "uint16",
+                "name": "shareBps",
+                "type": "uint16"
+              }
+            ],
+            "internalType": "struct IHupSplits.Payee[]",
+            "name": "royalty",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct IHupDrops.SplitsInput",
+        "name": "_splits",
+        "type": "tuple"
       }
     ],
     "name": "createDrop",
@@ -1427,6 +1561,37 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_creator",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dropId",
+        "type": "uint256"
+      }
+    ],
+    "name": "featureDrop",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "featuredFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "followerSystem",
     "outputs": [
@@ -1489,6 +1654,11 @@
           {
             "internalType": "bool",
             "name": "closed",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "featured",
             "type": "bool"
           }
         ],
@@ -1987,6 +2157,19 @@
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "_featuredFee",
+        "type": "uint256"
+      }
+    ],
+    "name": "setFeaturedFee",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "_followerSystem",
         "type": "address"
@@ -2075,6 +2258,42 @@
         "type": "uint256"
       },
       {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "uint16",
+            "name": "shareBps",
+            "type": "uint16"
+          }
+        ],
+        "internalType": "struct IHupSplits.Payee[]",
+        "name": "_payees",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "setPayoutSplit",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "split",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_dropId",
+        "type": "uint256"
+      },
+      {
         "internalType": "uint256",
         "name": "_phaseIndex",
         "type": "uint256"
@@ -2086,6 +2305,19 @@
       }
     ],
     "name": "setPhasePaused",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_splits",
+        "type": "address"
+      }
+    ],
+    "name": "setSplits",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -2106,6 +2338,19 @@
     "name": "setTrustedForwarder",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "splits",
+    "outputs": [
+      {
+        "internalType": "contract IHupSplits",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

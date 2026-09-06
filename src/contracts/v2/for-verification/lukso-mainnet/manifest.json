@@ -1,0 +1,129 @@
+{
+  "chainId": 42,
+  "network": "LUKSO mainnet",
+  "explorer": "https://explorer.execution.mainnet.lukso.network",
+  "method": "Solidity (Standard JSON input)",
+  "compiler": "v0.8.36+commit.8a079791",
+  "contracts": [
+    {
+      "contract": "HupDrops",
+      "address": "0xB1E03B5d2fb35f5414fd209e34E7500DFD6782DC",
+      "file": "HupDrops.json",
+      "contractName": "v2/Extensions/HupDrops.sol:HupDrops",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x000000000000000000000000f6eec4e32a532b23acc56b72865e79c79877cec800000000000000000000000076d610248addd1619c0bc34f18e5436e38dc697200000000000000000000000020e229667cec8a0e9d3c6fb89693b2a44ec2c50e000000000000000000000000f01103e5a9909fc0dbe8166da7085e0285daddca",
+      "note": "engine (salt ethers.id(\"hup-drops\"), block 8321400) — args: Hup core, HupChatForwarder, admin, LSP26"
+    },
+    {
+      "contract": "HupSplits",
+      "address": "0x0e12F47E8EE3488343A68bb792C89c934c428349",
+      "file": "HupSplits.json",
+      "contractName": "v2/Extensions/HupSplits.sol:HupSplits",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x",
+      "note": "split factory (salt ethers.id(\"hup-drops\")) — no constructor args"
+    },
+    {
+      "contract": "HupNativeBalance",
+      "address": "0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890",
+      "file": "HupNativeBalance.json",
+      "contractName": "v2/Extensions/HupNativeBalance.sol:HupNativeBalance",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x",
+      "note": "native-coin gate adapter (salt ethers.id(\"hup-drops\")) — no constructor args"
+    },
+    {
+      "contract": "HupDropsDeployerLSP8",
+      "address": "0xF034f6DbD85C03689f2DEde24e2a979560742fef",
+      "file": "HupDropsDeployerLSP8.json",
+      "contractName": "v2/Extensions/HupDropsDeployerLSP8.sol:HupDropsDeployerLSP8",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x000000000000000000000000b1e03b5d2fb35f5414fd209e34e7500dfd6782dc",
+      "note": "LSP8 satellite — args: engine"
+    },
+    {
+      "contract": "HupDropsDeployerLSP7",
+      "address": "0x939cB416B93CBD147021627F60613f9c16325335",
+      "file": "HupDropsDeployerLSP7.json",
+      "contractName": "v2/Extensions/HupDropsDeployerLSP7.sol:HupDropsDeployerLSP7",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x000000000000000000000000b1e03b5d2fb35f5414fd209e34e7500dfd6782dc",
+      "note": "LSP7 satellite — args: engine"
+    },
+    {
+      "contract": "HupSplitter",
+      "address": "one per split, created by HupSplits",
+      "file": "HupSplitter.json",
+      "contractName": "v2/Extensions/HupSplitter.sol:HupSplitter",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "from the creation tx: abi.encode(Payee[] payees)",
+      "note": "verify one; the explorer marks the rest by bytecode similarity"
+    },
+    {
+      "contract": "HupDropCollectionLSP8",
+      "address": "one per drop, created by the LSP8 satellite",
+      "file": "HupDropCollectionLSP8.json",
+      "contractName": "v2/Extensions/HupDropCollectionLSP8.sol:HupDropCollectionLSP8",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "from the creation tx",
+      "note": "verify one; the rest follow by similarity"
+    },
+    {
+      "contract": "HupDropCollectionLSP7",
+      "address": "one per drop, created by the LSP7 satellite",
+      "file": "HupDropCollectionLSP7.json",
+      "contractName": "v2/Extensions/HupDropCollectionLSP7.sol:HupDropCollectionLSP7",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "from the creation tx",
+      "note": "verify one; the rest follow by similarity"
+    }
+  ]
+}

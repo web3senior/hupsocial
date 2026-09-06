@@ -1,10 +1,10 @@
-/**
+﻿/**
  * @file config/contracts.js
  * Server-safe chain and contract-address data. API routes and lib/ readers import from here
  * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, baseSepolia, bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, /* baseSepolia, */ bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Arbitrum Orbit L2, ETH as gas
@@ -30,17 +30,20 @@ export const robinhood = defineChain({
 // that work. Browsers need the reverse order on LUKSO — see BROWSER_RPC_URLS in config/wagmi.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
 lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.com', 'https://rpc.mainnet.lukso.network'] } }
-baseSepolia.rpcUrls = {
-  ...baseSepolia.rpcUrls,
-  default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
-}
+// Base Sepolia is switched off across the app
+// baseSepolia.rpcUrls = {
+//   ...baseSepolia.rpcUrls,
+//   default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
+// }
 
 // Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia]
+export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood /* , baseSepolia */]
 
 // ''            — not deployed on that chain.
 // hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
 // drops         — the HupDrops engine; deployer satellites are registered inside it, not here.
+// splits        — the HupSplits factory the engine makes payout/royalty splits through.
+// nativeGate    — HupNativeBalance, the native-coin adapter an asset-holder gate can point at.
 // univ3*/univ4*/sushiV2Router/wnative — swap venues; verify onchain against the DEX registry
 //                 before enabling a chain. A wrong router is where user funds would go.
 // nativeIsErc20 — the native coin is an ERC20: approve, never msg.value.
@@ -62,6 +65,8 @@ export const CONTRACTS = {
     apps: '',
     polls: '0xF01F5519a05b3Bd214fc0E038F609C4a9Bf008F1',
     drops: '',
+    splits: '',
+    nativeGate: '',
     launch: '',
     univ3Router: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
     univ3Quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
@@ -92,38 +97,41 @@ export const CONTRACTS = {
     predict: '0xD76dcBB664a002247269c1fBB161B0440674C570',
     apps: '0xe30350Cf486210C299Aef91De61799Daed1Df6C5',
     polls: '0x7A5134435E029b5bBFF0d4EB5aEbCf0255D76D88',
-    // LSP8 satellite 0xa54Cef63a1fa3bf9aaB93b873cbCeAb9dfa956b5 registered; LSP7 not deployed yet
-    drops: '0x5a89471b1577e8BAd50877Cc25fFb705Bd528C06',
+    // Salt ethers.id("hup-drops"); satellites and levers are registered on /admin/contracts
+    drops: '0xB1E03B5d2fb35f5414fd209e34E7500DFD6782DC',
+    splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
+    nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
     // No Uniswap on LUKSO
     launch: '',
     univ3Router: '',
     univ3Quoter: '',
   },
-  // Dev chain
-  chain84532: {
-    name: 'base-sepolia',
-    forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
-    forwarderName: 'HupChatForwarder',
-    hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
-    status: '',
-    community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
-    polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
-    chat: '',
-    // No LSP26 on Base Sepolia: follower gates are unavailable here
-    followerSystem: '',
-    store: '',
-    tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
-    trade: '',
-    offers: '',
-    events: '',
-    predict: '',
-    apps: '',
-    drops: '',
-    launch: '',
-    univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
-    univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
-    wnative: '0x4200000000000000000000000000000000000006',
-  },
+  // Dev chain — Base Sepolia, switched off
+  // chain84532: {
+    // name: 'base-sepolia',
+    // forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
+    // forwarderName: 'HupChatForwarder',
+    // hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
+    // status: '',
+    // community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
+    // polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
+    // chat: '',
+    // // No LSP26 on Base Sepolia: follower gates are unavailable here
+    // followerSystem: '',
+    // store: '',
+    // tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
+    // trade: '',
+    // offers: '',
+    // events: '',
+    // predict: '',
+    // apps: '',
+    // drops: '',
+    // splits: '',
+    // launch: '',
+    // univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
+    // univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
+    // wnative: '0x4200000000000000000000000000000000000006',
+  // },
   chain143: {
     name: 'monad',
     forwarder: '0x09FAf2fddED624958589aD9ca704Bc4C6C232e72',
@@ -142,7 +150,9 @@ export const CONTRACTS = {
     predict: '0xf9df0275821dbcCBd7Fe461c4224F1ccAC46ae20',
     apps: '',
     polls: '0x37E217e474Ed3E3F7366EA027EE9bace79e1BA32',
-    drops: '',
+    drops: '0xE0380267cdDdE4658bF1d933F02670fAef4E3C5a',
+    splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
+    nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
     launch: '',
     univ3Router: '0xfE31F71C1b106EAc32F1A19239c9a9A72ddfb900',
     univ3Quoter: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
@@ -168,6 +178,8 @@ export const CONTRACTS = {
     apps: '',
     polls: '0x35110Bd06F3a6543B7e4Ba47AD809Df0BE4E1dB9',
     drops: '',
+    splits: '',
+    nativeGate: '',
     launch: '',
     univ3Router: '0x5615CDAb10dc425a742d643d949a7F474C01abc4',
     univ3Quoter: '0x82825d0554fA07f7FC52Ab63c961F330fdEFa8E8',
@@ -196,6 +208,8 @@ export const CONTRACTS = {
     apps: '',
     polls: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
     drops: '',
+    splits: '',
+    nativeGate: '',
     launch: '',
     univ3Router: '0x2626664c2603336E57B271c5C0b26F421741e481',
     univ3Quoter: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
@@ -221,6 +235,8 @@ export const CONTRACTS = {
     apps: '',
     polls: '0x98a721bfC608f196Ab66D363f7995E673506b023',
     drops: '',
+    splits: '',
+    nativeGate: '',
     launch: '',
     univ3Router: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
     univ3Quoter: '0x78D78E420Da98ad378D7799bE8f4AF69033EB077',
@@ -247,6 +263,8 @@ export const CONTRACTS = {
     apps: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     polls: '0xC77372D05CCC2d30938Aa58686671625769f88bd',
     drops: '',
+    splits: '',
+    nativeGate: '',
     launch: '',
     // v4 only; both quoters are wired and the batch quote uses whichever answers
     univ3Router: '',
@@ -288,6 +306,8 @@ export const CONTRACTS = {
     apps: '',
     polls: '0x7Fc85A8484E3cf742b1690f486fb7eBd204ac1e6',
     drops: '',
+    splits: '',
+    nativeGate: '',
     launch: '',
     univ3Router: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
     univ3Quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',

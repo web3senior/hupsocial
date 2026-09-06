@@ -2,6 +2,7 @@
 pragma solidity ^0.8.35;
 
 import "./../IHup.sol";
+import { IHupSplits } from "./IHupSplits.sol";
 
 /**
  * @title IHupDrops
@@ -115,14 +116,27 @@ interface IHupDrops {
     uint256 referralBps;
     uint64 createdAt;
     bool closed;
+    bool featured;
+  }
+
+  /// @notice Where a new drop's money goes — mint proceeds and secondary royalties.
+  /// @dev A payee table becomes one split address through the HupSplits factory during
+  ///      `createDrop`; an empty table means no split. `payoutDestination` is the plain
+  ///      one-address form and is used only when `payout` is empty, with address(0) leaving mint
+  ///      proceeds with the creator. `royalty` must resolve to the same address the collection
+  ///      params named as the ERC2981 receiver, or the drop reverts.
+  struct SplitsInput {
+    address payoutDestination;
+    IHupSplits.Payee[] payout;
+    IHupSplits.Payee[] royalty;
   }
 
   // --- SHARED EVENTS ---
 
   /// @notice Emitted once per drop. Together with PhaseConfigured, PhasePausedSet, Minted,
-  ///         DropClosed, AllowlistUpdated, and PayoutDestinationUpdated this is the single
-  ///         source of truth for offchain indexers — full drop state is derivable from these
-  ///         seven events alone.
+  ///         DropClosed, AllowlistUpdated, PayoutDestinationUpdated, and DropFeatured this is
+  ///         the single source of truth for offchain indexers — full drop state is derivable
+  ///         from these eight events alone.
   event DropCreated(uint256 indexed dropId, address indexed creator, address indexed collection, uint256 standardId, uint256 maxSupply, uint256 referralBps);
 
   /// @notice Emitted once per phase — at creation in index order, and again for each phase a
@@ -152,6 +166,10 @@ interface IHupDrops {
   ///         address(0) means back to the creator.
   event PayoutDestinationUpdated(uint256 indexed dropId, address indexed destination);
 
+  /// @notice Emitted when the HupSplits factory this engine makes splits through is set or
+  ///         replaced.
+  event SplitsUpdated(address oldValue, address newValue);
+
   /// @notice Emitted when a standard's deployer satellite is registered or replaced. Registering
   ///         a new standard id is how a future token standard joins without redeploying the
   ///         engine.
@@ -170,6 +188,12 @@ interface IHupDrops {
 
   /// @notice Emitted when the flat native fee charged by createDrop is updated.
   event CreationFeeUpdated(uint256 oldValue, uint256 newValue);
+
+  /// @notice A drop bought the featured tier, at creation or later. Carries what was paid, so an
+  ///         indexer never has to read the fee that happened to be set at the time.
+  event DropFeatured(uint256 indexed dropId, uint256 feePaid);
+
+  event FeaturedFeeUpdated(uint256 oldValue, uint256 newValue);
 
   /// @notice Emitted when the LSP26 follower system reference is rotated.
   event FollowerSystemUpdated(address oldValue, address newValue);
@@ -207,6 +231,7 @@ interface IHupDrops {
   /// @notice setAllowlistedBatch received more than MAX_BATCH_SIZE addresses.
   error BatchTooLarge();
   error DropNotFound();
+  error AlreadyFeatured();
   /// @notice The drop is closed, or the engine is paused for moderation.
   error DropNotActive();
   error PhaseNotFound();
@@ -230,6 +255,11 @@ interface IHupDrops {
   error TransferFailed();
   error Unauthorized();
   error SessionExpired();
+  /// @notice A split was asked for on a chain with no HupSplits factory registered.
+  error SplitsUnavailable();
+  /// @notice The royalty split the engine deployed is not the ERC2981 receiver the collection
+  ///         was created with — resales would have paid the wrong address.
+  error SplitMismatch(address expected, address actual);
 
   // --- STATE GETTERS ---
 
@@ -239,6 +269,9 @@ interface IHupDrops {
   /// @notice The chain's HupCommunity registry, read by the Community gate. address(0) on a
   ///         chain without one — creating a Community-gated phase there reverts.
   function communitySystem() external view returns (address);
+  /// @notice The chain's HupSplits factory. address(0) on a chain without one — asking for a
+  ///         split there reverts.
+  function splits() external view returns (IHupSplits);
   function ADMIN_ROLE() external view returns (bytes32);
   function trustedForwarders(address forwarder) external view returns (bool);
   function isTrustedForwarder(address forwarder) external view returns (bool);
@@ -246,6 +279,8 @@ interface IHupDrops {
   function mintFee() external view returns (uint256);
   function mintFeeEnabled() external view returns (bool);
   function creationFee() external view returns (uint256);
+
+  function featuredFee() external view returns (uint256);
   function FEE_DENOMINATOR() external view returns (uint256);
   function ABSOLUTE_MAX_MINT_FEE_BPS() external view returns (uint256);
   function MAX_REFERRAL_BPS() external view returns (uint256);
@@ -277,18 +312,37 @@ interface IHupDrops {
    * @notice Creates a drop: deploys the collection through the standard's registered deployer
    *         satellite and stores its phase schedule. The collection is owned by the creator from
    *         its first block; this engine only ever holds mint authority.
-   * @dev msg.value must equal `creationFee` exactly. Phases are validated and then immutable.
+   * @dev msg.value must equal `creationFee` plus `featuredFee` when `_featured`, exactly. Phases
+   *      are validated and then immutable.
    * @param _creator The primary wallet creating the drop (or address(0) if caller is primary).
    * @param _standardId Which registered standard to deploy (see `deployers`).
    * @param _collectionParams ABI-encoded constructor parameters, decoded by the standard's
    *        deployer satellite (name, symbol, metadata, royalties — shape is per standard).
    * @param _maxSupply Total mintable items, fixed forever. 0 = open edition.
    * @param _referralBps Share of each paid mint (basis points) paid to the mint-time referrer.
+   * @param _featured Buy the featured tier now, for `featuredFee` on top of the creation fee.
+   *        `featureDrop` does the same thing later, at the fee set then.
    * @param _phases The phase schedule, in order. 1..MAX_PHASES entries.
+   * @param _splits Where the money goes. Either payee table is deployed through the HupSplits
+   *        factory here; `royalty` must match the ERC2981 receiver encoded in
+   *        `_collectionParams`, which the caller predicts from the same table.
    * @return dropId The id of the created drop.
    * @return collection The deployed collection contract.
    */
-  function createDrop(address _creator, uint256 _standardId, bytes calldata _collectionParams, uint256 _maxSupply, uint256 _referralBps, PhaseInput[] calldata _phases) external payable returns (uint256 dropId, address collection);
+  function createDrop(address _creator, uint256 _standardId, bytes calldata _collectionParams, uint256 _maxSupply, uint256 _referralBps, bool _featured, PhaseInput[] calldata _phases, SplitsInput calldata _splits) external payable returns (uint256 dropId, address collection);
+
+  /**
+   * @notice Buys the featured tier for an existing drop. Only the drop's creator may do it, only
+   *         while the drop is open, and only once — the fee is not a subscription, and a second
+   *         payment would be silently lost.
+   * @dev msg.value must equal `featuredFee` exactly.
+   * @param _creator The primary wallet (or address(0) if caller is primary).
+   * @param _dropId The drop to feature.
+   */
+  function featureDrop(address _creator, uint256 _dropId) external payable;
+
+  /// @notice Sets the featured surcharge. Uncapped, like `creationFee`.
+  function setFeaturedFee(uint256 _featuredFee) external;
 
   /**
    * @notice Mints `_quantity` items from a drop's phase. msg.value must exactly equal the phase
@@ -344,6 +398,17 @@ interface IHupDrops {
    *      escrow/claim ledger exists. The platform fee and referral share are unaffected.
    */
   function setPayoutDestination(uint256 _dropId, address _destination) external;
+
+  /**
+   * @notice Points mint proceeds at a split between `_payees`, deploying that split if it does
+   *         not exist yet. The one-transaction form of `setPayoutDestination` for a drop whose
+   *         creator is sharing the money.
+   * @dev Creator-only on the same terms as `setPayoutDestination`. Shares are basis points and
+   *      must total exactly 10 000. Splits are immutable, so changing who gets what later means
+   *      pointing the drop at a different split, never editing this one.
+   * @return split The split now receiving the creator's share of every mint.
+   */
+  function setPayoutSplit(uint256 _dropId, IHupSplits.Payee[] calldata _payees) external returns (address split);
 
   /**
    * @notice Appends one phase to a drop's schedule — the lane a creator forgot, or one the
@@ -423,6 +488,7 @@ interface IHupDrops {
   function setCreationFee(uint256 _creationFee) external;
   function setFollowerSystem(address _followerSystem) external;
   function setCommunitySystem(address _communitySystem) external;
+  function setSplits(address _splits) external;
   function setTrustedForwarder(address _forwarder, bool _trusted) external;
   function setHupContract(address _hupAddress) external;
   function withdrawAll(address payable _receiver) external;
@@ -495,4 +561,14 @@ interface IGateBalance {
  */
 interface IGateBalance1155 {
   function balanceOf(address account, uint256 id) external view returns (uint256);
+}
+
+/**
+ * @title IERC2981Minimal
+ * @notice The royalty read the engine uses to confirm a new collection points its resale
+ *         royalties at the split the creator asked for. Every Hup drop collection answers it,
+ *         whichever standard it speaks.
+ */
+interface IERC2981Minimal {
+  function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
 }

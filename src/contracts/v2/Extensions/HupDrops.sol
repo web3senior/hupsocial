@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./ILSP7Minimal.sol";
+import "./IHupSplits.sol";
 import "./IHupDrops.sol";
 
 /**
@@ -19,8 +20,10 @@ import "./IHupDrops.sol";
  *         and sell the primary mint through phases, each with its own window, price, per-wallet
  *         limit, allocation, and gate: open to everyone, the drop's onchain allowlist, LSP26
  *         followers of the creator, members of a Hup community, or holders of an asset. A
- *         creator can append phases to a live drop; existing ones are never editable. Mint proceeds are pushed straight to the creator
- *         on every mint — the engine escrows nothing but its own fees.
+ *         creator can append phases to a live drop; existing ones are never editable. Mint
+ *         proceeds are pushed straight to the creator on every mint — or to a HupSplits split
+ *         shared with collaborators, which the same call can create for both the mint money and
+ *         the collection's resale royalties. The engine escrows nothing but its own fees.
  * @dev Collection creation code lives in per-standard deployer satellites (registered via
  *      `setDeployer`) so this engine stays under the EIP-170 size limit and a future token
  *      standard is one new satellite plus one admin transaction, never an engine redeploy. The
@@ -33,7 +36,7 @@ import "./IHupDrops.sol";
  *      admin permissions, Pausable for emergency controls, and ReentrancyGuard for protected
  *      settlement. Every state change emits an event; offchain indexers derive full drop state
  *      from DropCreated / PhaseConfigured / PhasePausedSet / Minted / DropClosed /
- *      AllowlistUpdated / PayoutDestinationUpdated alone.
+ *      AllowlistUpdated / PayoutDestinationUpdated / DropFeatured alone.
  * @custom:version 1.0.0
  * @custom:chain multichain
  * @custom:website https://hup.social
@@ -76,6 +79,11 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   ///         chain without one — creating a Community-gated phase there reverts instead of
   ///         silently gating nobody. Admin-rotatable, like the follower system.
   address public communitySystem;
+
+  /// @notice The chain's HupSplits factory, used to turn a creator's payee table into the one
+  ///         address a drop pays. address(0) on a chain without one — asking for a split there
+  ///         reverts rather than quietly paying a single wallet instead.
+  IHupSplits public splits;
 
   /// @notice Total number of drops ever created; ids are 1..dropCount
   uint256 public dropCount;
@@ -133,6 +141,10 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
   /// @notice Flat native fee charged by createDrop
   uint256 public creationFee = 0;
 
+  /// @notice Surcharge (in native wei) for the featured tier — paid at creation or via
+  ///         `featureDrop`. Stays in the contract with the other fees; mint proceeds never touch it.
+  uint256 public featuredFee = 0;
+
   // --- MODIFIERS ---
 
   modifier onlyDirectAdmin() {
@@ -172,13 +184,18 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     bytes calldata _collectionParams,
     uint256 _maxSupply,
     uint256 _referralBps,
-    PhaseInput[] calldata _phaseInputs
+    bool _featured,
+    PhaseInput[] calldata _phaseInputs,
+    SplitsInput calldata _splits
   ) external payable whenNotPaused nonReentrant returns (uint256 dropId, address collection) {
     address deployer = deployers[_standardId];
     if (deployer == address(0)) revert InvalidStandard();
     if (_referralBps > MAX_REFERRAL_BPS) revert InvalidReferralBps();
     if (_phaseInputs.length == 0 || _phaseInputs.length > MAX_PHASES) revert InvalidPhases();
-    if (msg.value != creationFee) revert InsufficientPayment(msg.value, creationFee);
+
+    // The featured surcharge rides on top of the creation fee rather than replacing it
+    uint256 due = creationFee + (_featured ? featuredFee : 0);
+    if (msg.value != due) revert InsufficientPayment(msg.value, due);
 
     address creator = _resolveActor(_creator);
 
@@ -197,11 +214,17 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
       minted: 0,
       referralBps: _referralBps,
       createdAt: uint64(block.timestamp),
-      closed: false
+      closed: false,
+      featured: _featured
     });
     dropIdOf[collection] = dropId;
 
     emit DropCreated(dropId, creator, collection, _standardId, _maxSupply, _referralBps);
+
+    // Emitted after DropCreated so a log-order indexer sees the drop before its flag
+    if (_featured) emit DropFeatured(dropId, featuredFee);
+
+    _configureSplits(dropId, collection, _splits);
 
     for (uint256 i = 0; i < _phaseInputs.length; i++) {
       _appendPhase(dropId, _maxSupply, _phaseInputs[i]);
@@ -333,6 +356,29 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     emit PayoutDestinationUpdated(_dropId, _destination);
   }
 
+  function setPayoutSplit(uint256 _dropId, IHupSplits.Payee[] calldata _payees) external whenNotPaused returns (address split) {
+    _requireDirectCreator(_dropId);
+
+    split = _requireSplits().create(_payees);
+    payoutDestination[_dropId] = split;
+
+    emit PayoutDestinationUpdated(_dropId, split);
+  }
+
+  function featureDrop(address _creator, uint256 _dropId) external payable whenNotPaused {
+    Drop storage drop = _drops[_dropId];
+    if (drop.creator == address(0)) revert DropNotFound();
+    // A closed drop is filtered out of every featured surface, so the fee would buy nothing
+    if (drop.closed) revert DropNotActive();
+    if (drop.featured) revert AlreadyFeatured();
+    if (_resolveActor(_creator) != drop.creator) revert Unauthorized();
+    if (msg.value != featuredFee) revert InsufficientPayment(msg.value, featuredFee);
+
+    drop.featured = true;
+
+    emit DropFeatured(_dropId, msg.value);
+  }
+
   function closeDrop(uint256 _dropId) external whenNotPaused {
     Drop storage drop = _drops[_dropId];
     if (drop.collection == address(0)) revert DropNotFound();
@@ -399,7 +445,8 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
       return allowlist[_dropId][_wallet];
     }
     if (phase.gate == GateType.Followers) {
-      return ILSP26Minimal(followerSystem).isFollowing(_wallet, drop.creator);
+      // Same fallback as _checkGate — the comment above promises these two never disagree
+      return ILSP26Minimal(followerSystem).isFollowing(_wallet, phase.gateAsset == address(0) ? drop.creator : phase.gateAsset);
     }
     if (phase.gate == GateType.Community) {
       return _passesCommunityGate(phase.gateData, _wallet);
@@ -480,6 +527,13 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     emit CreationFeeUpdated(oldValue, _creationFee);
   }
 
+  function setFeaturedFee(uint256 _featuredFee) external onlyDirectAdmin {
+    uint256 oldValue = featuredFee;
+    featuredFee = _featuredFee;
+
+    emit FeaturedFeeUpdated(oldValue, _featuredFee);
+  }
+
   function setFollowerSystem(address _followerSystem) external onlyDirectAdmin {
     address oldValue = followerSystem;
     followerSystem = _followerSystem;
@@ -492,6 +546,13 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     communitySystem = _communitySystem;
 
     emit CommunitySystemUpdated(oldValue, _communitySystem);
+  }
+
+  function setSplits(address _splits) external onlyDirectAdmin {
+    address oldValue = address(splits);
+    splits = IHupSplits(_splits);
+
+    emit SplitsUpdated(oldValue, _splits);
   }
 
   function setTrustedForwarder(address _forwarder, bool _trusted) external onlyDirectAdmin {
@@ -731,7 +792,9 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     if (gate == GateType.Allowlist) {
       if (!allowlist[_dropId][_minter]) revert GateNotPassed();
     } else if (gate == GateType.Followers) {
-      if (!ILSP26Minimal(followerSystem).isFollowing(_minter, _creator)) revert GateNotPassed();
+      // Unset means the creator, so a drop that never names an account behaves exactly as before
+      address followed = _phase.gateAsset == address(0) ? _creator : _phase.gateAsset;
+      if (!ILSP26Minimal(followerSystem).isFollowing(_minter, followed)) revert GateNotPassed();
     } else if (gate == GateType.Community) {
       if (!_passesCommunityGate(_phase.gateData, _minter)) revert GateNotPassed();
     } else if (gate == GateType.AssetHolders) {
@@ -739,6 +802,41 @@ contract HupDrops is IHupDrops, Pausable, ReentrancyGuard, AccessControl, ERC277
     } else {
       if (IGateBalance1155(_phase.gateAsset).balanceOf(_minter, uint256(_phase.gateData)) < _phase.gateMin) revert GateNotPassed();
     }
+  }
+
+  /**
+   * @dev Deploys the creator's payee tables through the HupSplits factory, so a drop's shares
+   *      are onchain from its first block. The royalty split is only checked, not applied: the
+   *      collection took its ERC2981 receiver from the params blob, which is opaque here, so the
+   *      caller predicts the split's (deterministic) address and encodes it there. A collection
+   *      that ended up pointing somewhere else would pay the wrong people on every resale, which
+   *      is worth failing the whole drop over.
+   */
+  function _configureSplits(uint256 _dropId, address _collection, SplitsInput calldata _splits) private {
+    if (_splits.royalty.length > 0) {
+      address royaltySplit = _requireSplits().create(_splits.royalty);
+      (address receiver, ) = IERC2981Minimal(_collection).royaltyInfo(0, FEE_DENOMINATOR);
+
+      if (receiver != royaltySplit) revert SplitMismatch(royaltySplit, receiver);
+    }
+
+    address destination = _splits.payoutDestination;
+    if (_splits.payout.length > 0) destination = _requireSplits().create(_splits.payout);
+
+    if (destination != address(0)) {
+      payoutDestination[_dropId] = destination;
+
+      emit PayoutDestinationUpdated(_dropId, destination);
+    }
+  }
+
+  /**
+   * @dev The splits factory, or a revert naming why a split cannot be made on this chain.
+   */
+  function _requireSplits() private view returns (IHupSplits) {
+    if (address(splits) == address(0)) revert SplitsUnavailable();
+
+    return splits;
   }
 
   /**

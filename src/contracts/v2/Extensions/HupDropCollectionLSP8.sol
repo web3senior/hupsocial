@@ -83,7 +83,6 @@ contract HupDropCollectionLSP8 is LSP8Burnable, LSP8Enumerable {
   error InvalidTokenType();
   error InvalidRoyalty();
   error InvalidAddress();
-  /// @notice The requested LSP8TokenIdFormat is not one this collection can honestly declare.
   error BurningDisabled();
 
   /// @dev LSP0ERC725Account's ERC165 id — what a Universal Profile answers true for, and what

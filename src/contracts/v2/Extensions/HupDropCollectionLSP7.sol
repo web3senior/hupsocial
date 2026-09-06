@@ -138,12 +138,6 @@ contract HupDropCollectionLSP7 is LSP7Burnable {
   // --- MUTATIVE LOGIC ---
 
   /**
-   * @notice Mints `_quantity` editions to `_to`. Engine only.
-   * @dev Edition standard: the id range parameter is ignored, balances are what count. `force`
-   *      is true so plain EOAs and Universal Profiles without an LSP1 delegate can receive —
-   *      the same reasoning as HupTrade's payouts.
-   */
-  /**
    * @notice The supply ceiling explorers read. 0 = open edition.
    * @dev A plain view rather than LSP7CappedSupply, for the same reason its LSP8 twin gives:
    *      that extension caps against `totalSupply()`, which drops when editions burn, so it
@@ -166,6 +160,12 @@ contract HupDropCollectionLSP7 is LSP7Burnable {
     super.burn(from, amount, data);
   }
 
+  /**
+   * @notice Mints `_quantity` editions to `_to`. Engine only.
+   * @dev Edition standard: the id range parameter is ignored, balances are what count. `force`
+   *      is true so plain EOAs and Universal Profiles without an LSP1 delegate can receive —
+   *      the same reasoning as HupTrade's payouts.
+   */
   function engineMint(address _to, uint256, uint256 _quantity) external onlyDrops {
     if (maxSupply != 0 && totalMinted + _quantity > maxSupply) revert SupplyExceeded();
 

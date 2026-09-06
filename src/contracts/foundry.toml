@@ -1,0 +1,40 @@
+# Forge test config for the Hup contracts. Two profiles because the engine (OZ 5.6.1) and the
+# LSP collections (OZ 4.9.6 nested under @lukso) cannot share one compilation unit.
+#   forge test                        -> EVM half (engine + ERC721/1155)
+#   FOUNDRY_PROFILE=lsp forge test    -> LSP half (LSP7/LSP8 collections + deployers)
+
+[profile.default]
+src = "forge-test/evm"
+test = "forge-test/evm"
+out = "forge-test/out"
+cache_path = "forge-test/cache"
+libs = []
+auto_detect_remappings = false
+remappings = [
+  "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+]
+solc = "0.8.36"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+
+[profile.lsp]
+src = "forge-test/lsp"
+test = "forge-test/lsp"
+out = "forge-test/out-lsp"
+cache_path = "forge-test/cache-lsp"
+libs = []
+auto_detect_remappings = false
+remappings = [
+  "@openzeppelin/contracts/=node_modules/@lukso/lsp8-contracts/node_modules/@openzeppelin/contracts/",
+  "@lukso/=node_modules/@lukso/",
+  "@erc725/smart-contracts-v8/=node_modules/@erc725/smart-contracts-v8/",
+  "@erc725/smart-contracts/=node_modules/@erc725/smart-contracts/",
+  "solidity-bytes-utils/=node_modules/@erc725/smart-contracts-v8/node_modules/solidity-bytes-utils/",
+]
+solc = "0.8.36"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = true

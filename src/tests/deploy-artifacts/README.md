@@ -5,6 +5,20 @@ picker is labelled with its artifact's own file date and time (local, from the s
 `Last-Modified`), so what shows in the list is always the freshness of the bytes on disk — if a
 `.sol` was edited after that stamp, recompile before deploying.
 
+## Salt
+
+Every HupDrops-suite deploy through `deploy.html` uses the page's default salt, which is
+`ethers.id("hup-drops")`:
+
+    0xf0ce65d134332f2f32db13128aa640fec06947fce782a68767efb8a977e82fe0
+
+Same salt, same bytes, same address on every chain — so the addresses seeded in the page's
+`CTOR_DEFAULTS` are derived from this value, and `node src/tests/salt.js <label>` reproduces it or
+derives a fresh one when the same build has to go onto a chain a second time. The LSP26 picker is
+the one exception: it keeps the salt the canonical follower registry was deployed with, so it lands
+on `0xf011…dDcA` everywhere. `node src/tests/ctor-args.js` encodes constructor arguments for
+explorer verification.
+
 ## HupDrops suite
 
 Compiled with the same settings Remix uses: **solc 0.8.36, optimizer on / 200 runs, viaIR**. Remix
@@ -31,6 +45,24 @@ always means new satellites.
 
 `artifacts/` holds the raw compiler output the two scripts read; `../../abis/HupDrops.json` is the
 ABI the app uses and is generated from the same compile.
+
+### HupSplits
+
+The payment-split factory the engine turns payee tables into. It takes **no constructor
+arguments**, so with the default salt the same bytes land on the same address on every chain
+(`0xcf0F7922FCB5bbFa03B6BAa39D584E5749D5923b`). Deploy it once per chain, before or after the
+engine, then register it on `/admin/contracts` with `setSplits` and fill `chain<id>.splits` in
+`src/config/contracts.js`. Until it is registered, any drop that asks for a split reverts with
+`SplitsUnavailable`; drops that do not ask for one are unaffected.
+
+### HupNativeBalance
+
+A stateless adapter whose `balanceOf(account)` answers the wallet's native-coin balance, with
+`decimals()` of 18, so an asset-holder gate can be pointed at the coin itself. **No constructor
+arguments**, so the default salt lands it on one address on every chain. Deploy it once per
+chain, fill `chain<id>.nativeGate` in `src/config/contracts.js`, and the drop form offers a
+"native coin" button in the asset gate. The engine needs no change and no registration: it reads
+the adapter like any other asset.
 
 ## HupOffers
 
