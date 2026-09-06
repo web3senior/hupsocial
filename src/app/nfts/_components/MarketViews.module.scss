@@ -131,13 +131,14 @@
     margin-inline-start: auto;
     padding: 0 0.9rem;
     border-radius: 999px;
-    background-color: var(--text);
-    color: var(--surface);
+    // The strip's chain scopes these on the pill; otherwise the connected wallet's from :root
+    background-color: var(--network-color-primary, var(--color-primary));
+    color: var(--network-color-text, var(--white, #fff));
     font-size: 0.82rem;
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
-    transition: opacity 0.15s ease;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
 
     &:hover {
       opacity: 0.85;

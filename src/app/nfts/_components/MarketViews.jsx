@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import { PaintBrushIcon, RocketLaunchIcon, ShieldCheckIcon, SquaresFourIcon, RankingIcon } from '@phosphor-icons/react'
 import { appChains, CONTRACTS } from '@/config/contracts'
+import { networkColorStyle } from '@/lib/networkColors'
 import Tooltip from '@/components/ui/Tooltip'
 import FeaturedCollections from './FeaturedCollections'
 import styles from './MarketViews.module.scss'
@@ -107,6 +108,10 @@ export default function MarketViews({ shellClassName }) {
   // cannot be unpressed sends the reader hunting for the "All" button
   const setNetwork = (value) => setParam('networkId', value === networkId ? '' : value, CHAIN_SCOPED_PARAMS)
 
+  // The chain in force on the strip; with "All" pressed there is none and the pill falls
+  // back to the connected wallet's colours from :root
+  const selectedChain = tradeChains.find((chain) => String(chain.id) === networkId)
+
   return (
     // The shared large step — the global container rule (styles/Global.scss) clears the
     // fixed sidebar with the live --aside-width, so the card needs no page-local sizing
@@ -170,7 +175,7 @@ export default function MarketViews({ shellClassName }) {
 
         {/* Drops used to be a tab of the section strip above the page; with the strip gone,
             this is the way through to new mints from the market */}
-        <Link href="/drops" className={styles.views__drops}>
+        <Link href="/drops" className={styles.views__drops} style={networkColorStyle(selectedChain)}>
           <RocketLaunchIcon size={15} weight="fill" aria-hidden="true" />
           Drops
         </Link>
