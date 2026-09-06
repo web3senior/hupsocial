@@ -4,8 +4,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePublicClient, useReadContract, useReadContracts } from 'wagmi'
 import { isAddress, toHex } from 'viem'
 import clsx from 'clsx'
-import { ArrowLeftIcon, CaretLeftIcon, CaretRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
-import { LSP4_METADATA_KEY, pickImageUrl } from '@/lib/lsp4'
+import { ArrowLeftIcon, CaretLeftIcon, CaretRightIcon, MagnifyingGlassIcon, WarningIcon } from '@phosphor-icons/react'
+import {
+  LSP4_METADATA_KEY,
+  LSP8_TOKEN_METADATA_BASE_URI_KEY,
+  decodeVerifiableUri,
+  erc725yGetDataAbi,
+  fetchMetadataJson,
+  pickImageUrl,
+  pickLsp4Image,
+} from '@/lib/lsp4'
 import { resolveLsp8TokenDocument, resolveNftMetadata } from '@/lib/nftMetadata'
 import { loadNftMetadata } from '@/lib/nftMetadataBatch'
 import { mapWithConcurrency } from '@/lib/concurrency'
@@ -13,6 +21,7 @@ import { resolveNftImageUrl } from '@/hooks/useNftMetadata'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { handleBrokenImage } from '@/lib/utils'
 import { toast } from '@/components/NextToast'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 import Lsp4MetadataEditor from './Lsp4MetadataEditor'
 import styles from './TokenMetadataEditor.module.scss'
 
@@ -48,7 +57,12 @@ const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}
  */
 const describeToken = (token) => {
   if (token.loading) return 'Reading its metadata…'
-  if (token.missing) return 'Never minted'
+  if (token.missing) return 'Not in circulation — burned, or never minted'
+  if (token.unminted) {
+    if (token.hasOverride) return 'Not minted yet · already carries its own metadata'
+    if (token.tier === 'baseUri') return 'Not minted yet · follows the collection folder'
+    return 'Not minted yet · nothing resolves for it yet'
+  }
 
   const held = `held by ${shortAddress(token.owner)}`
   if (token.hasOverride) {
@@ -72,26 +86,70 @@ const describeToken = (token) => {
  * hand-edited documents is a batch of chances to write the wrong file to the wrong id, and the
  * bulk path already covers the case where every token changes at once.
  *
+ * The set is shown in two halves, because they are two different jobs. Minted tokens belong to
+ * somebody: editing one changes what a collector already holds. Unminted numbers belong to
+ * nobody yet — they are the uploaded artwork waiting its turn, and a document written there is
+ * simply what the next collector will receive. Mixing them in one list hid both.
+ *
  * @param {Object} props
- * @param {string} props.collection The LSP8 contract.
+ * @param {string} props.collection The collection contract — LSP8 unless told otherwise.
  * @param {number} props.chainId
+ * @param {number} [props.cap] Highest number this collection will ever hand out — the uploaded
+ *   set. Unknown, or zero for an open edition, leaves only the minted half listable.
+ * @param {number} [props.mintedCount] Numbers handed out so far, as a high-water mark a burn does
+ *   not move. Falls back to `totalSupply()`, which does.
+ * @param {string} [props.baseUri] Where an unminted number resolves from. Read from the
+ *   collection when the caller does not already have it.
+ * @param {string} [props.uriSuffix] Appended after the number, for folders serving `1.json`.
+ * @param {boolean} [props.isLsp8=true] False for an ERC721 folder collection, whose tokens have
+ *   no store of their own to read or write.
+ * @param {boolean} [props.editable=isLsp8] False shows the same two halves read-only, for the
+ *   standards — and the frozen collections — where a token cannot carry a document of its own.
  * @param {boolean} [props.busy]
  * @param {Function} props.onSave Called with `(tokenIdBytes32, verifiableUri)` to write onchain.
+ * @param {Function} [props.onPreview] Called with a minted token's number when a read-only cell is
+ *   clicked — a collection whose tokens cannot be edited here is still worth looking at.
  */
-export default function TokenMetadataEditor({ collection, chainId, busy = false, onSave }) {
+export default function TokenMetadataEditor({
+  collection,
+  chainId,
+  cap,
+  mintedCount,
+  baseUri,
+  uriSuffix = '',
+  isLsp8 = true,
+  editable = isLsp8,
+  busy = false,
+  onSave,
+  onPreview,
+}) {
   const publicClient = usePublicClient({ chainId })
   const [tokenInput, setTokenInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [token, setToken] = useState(null)
   const [page, setPage] = useState(0)
+  const [scope, setScope] = useState(null)
+
+  const knownMinted = Number.isFinite(Number(mintedCount)) ? Math.max(0, Number(mintedCount)) : null
 
   const { data: supply } = useReadContract({
     address: collection,
     abi: TOKEN_ABI,
     functionName: 'totalSupply',
     chainId,
-    query: { enabled: Boolean(collection) },
+    query: { enabled: Boolean(collection) && knownMinted === null },
   })
+
+  // Asked only when the caller has not already got it — the drop panel has it on screen already
+  const { data: baseUriBytes } = useReadContract({
+    address: collection,
+    abi: erc725yGetDataAbi,
+    functionName: 'getData',
+    args: [LSP8_TOKEN_METADATA_BASE_URI_KEY],
+    chainId,
+    query: { enabled: Boolean(collection) && !baseUri },
+  })
+  const folderUri = baseUri || decodeVerifiableUri(baseUriBytes) || ''
 
   /*
    * Ids are 1..N. That holds because the collection declares LSP8TokenIdFormat NUMBER and the
@@ -99,17 +157,37 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
    * collection where it fails would already be resolving nothing.
    *
    * Burned tokens leave gaps: totalSupply falls while the numbers already handed out do not, so
-   * the last page can show ids that no longer exist. Opening one says "not minted" rather than
-   * pretending otherwise, which is the honest failure for a list that cannot know.
+   * the minted half can show ids that no longer exist. Opening one says so rather than
+   * pretending otherwise, which is the honest failure for a list that cannot know. `mintedCount`
+   * is the better line to draw the halves at wherever the caller can supply it, since the
+   * high-water mark is exactly where minting resumes.
    */
-  const total = Number(supply ?? 0)
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const minted = knownMinted ?? Number(supply ?? 0)
+  const hasCeiling = Number(cap ?? 0) > 0
+  const total = Math.max(minted, hasCeiling ? Number(cap) : 0)
+  const unminted = total - minted
+
+  // The chosen half wins even when it is empty — "Minted (0)" is an answer, not a dead end. The
+  // fallback only settles the first render, and picks the half that has something in it.
+  const activeScope = scope === 'unminted' && unminted === 0 ? 'minted' : (scope ?? (minted > 0 ? 'minted' : 'unminted'))
+  const isUnmintedScope = activeScope === 'unminted'
+
+  const rangeStart = isUnmintedScope ? minted + 1 : 1
+  const rangeCount = Math.max(0, isUnmintedScope ? unminted : minted)
+  const pageCount = Math.max(1, Math.ceil(rangeCount / PAGE_SIZE))
   const pageIds = useMemo(
-    () => Array.from({ length: Math.min(PAGE_SIZE, Math.max(0, total - page * PAGE_SIZE)) }, (_, i) => page * PAGE_SIZE + i + 1),
-    [total, page],
+    () => Array.from({ length: Math.min(PAGE_SIZE, Math.max(0, rangeCount - page * PAGE_SIZE)) }, (_, i) => rangeStart + page * PAGE_SIZE + i),
+    [rangeStart, rangeCount, page],
   )
 
-  // One batched call for the visible page: which tokens already carry their own document.
+  const chooseScope = (next) => {
+    setScope(next)
+    setPage(0)
+  }
+
+  // One batched call for the visible page: which tokens already carry their own document. Only
+  // LSP8 has a per-token store to ask about — an ERC721 folder collection would revert on every
+  // one of these, so it is never asked.
   const { data: overrides } = useReadContracts({
     contracts: pageIds.map((id) => ({
       address: collection,
@@ -118,7 +196,7 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
       args: [tokenIdToBytes32(id), LSP4_METADATA_KEY],
       chainId,
     })),
-    query: { enabled: pageIds.length > 0 },
+    query: { enabled: isLsp8 && pageIds.length > 0 },
   })
 
   /*
@@ -132,9 +210,15 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
   const [thumbs, setThumbs] = useState({})
   const [pending, setPending] = useState(() => new Set())
   const askedRef = useRef(new Set())
+  const [thumbTick, setThumbTick] = useState(0)
+  // Which token the editor currently shows, readable from a save that finishes after a re-render
+  const openIdRef = useRef(null)
 
   useEffect(() => {
     if (!collection || !pageIds.length) return undefined
+    // The unminted half decides per number whether to read a pre-written document or the folder,
+    // and that answer is the multicall above — so it waits for it rather than painting twice.
+    if (isUnmintedScope && isLsp8 && overrides === undefined) return undefined
 
     const asked = askedRef.current
     const wanted = pageIds.filter((id) => !asked.has(id))
@@ -144,6 +228,14 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
 
     let cancelled = false
     const done = new Set()
+
+    /** LSP8 numbers travel as bytes32; an ERC721 folder collection numbers them plainly. */
+    const tokenKey = (id) => (isLsp8 ? tokenIdToBytes32(id) : String(id))
+    /** What the multicall above says about one number: bytes written for it, or nothing yet. */
+    const hasOverrideAt = (id) => {
+      const value = overrides?.[pageIds.indexOf(id)]?.result
+      return Boolean(value && value !== '0x')
+    }
 
     // `null` is an answer — the token resolves to nothing and the cell keeps its number.
     const paint = (entries) => {
@@ -164,10 +256,40 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
     }
 
     const run = async () => {
+      /*
+       * A number nobody has minted has nothing to look up. The indexer refuses to remember it —
+       * rightly, since an unowned id is a ghost row everywhere else in the app — so asking the
+       * batch endpoint would buy an ownership read per tile and cache none of it. What the
+       * number does have is its place in the folder, which is precisely what it will resolve to
+       * the moment somebody mints it. That file is the preview.
+       */
+      if (isUnmintedScope) {
+        await mapWithConcurrency(wanted, THUMB_FALLBACK_CONCURRENCY, async (id) => {
+          if (cancelled) return
+
+          // Unless a document was already written for it ahead of the mint, which wins here the
+          // same way it will win onchain
+          if (hasOverrideAt(id) && publicClient) {
+            const metadata = await resolveNftMetadata({ publicClient, collection, tokenId: tokenKey(id), isLsp8 }).catch(() => null)
+            paint([[id, metadata ? { ...metadata, imageIsProxied: false } : null]])
+            return
+          }
+
+          /* A base URI carrying a fragment is the placeholder state a numbered drop launches in:
+             every id resolves to that one document, so the whole page shares a single fetch
+             rather than asking for the same file once per tile. */
+          const previewUri = folderUri.includes('#') ? folderUri : `${folderUri}${id}${uriSuffix}`
+          const doc = folderUri ? await fetchMetadataJson(previewUri).catch(() => null) : null
+          const lsp4 = doc?.LSP4Metadata ?? doc
+          paint([[id, lsp4 ? { name: lsp4.name ?? null, image: pickLsp4Image(lsp4), imageIsProxied: false } : null]])
+        })
+        return
+      }
+
       // Issued in one tick, so the coalescer folds the whole page into a single request
       const answers = await Promise.all(
         wanted.map((id) =>
-          loadNftMetadata({ chainId: Number(chainId), collection, tokenId: tokenIdToBytes32(id), isLsp8: true })
+          loadNftMetadata({ chainId: Number(chainId), collection, tokenId: tokenKey(id), isLsp8 })
             .then((metadata) => [id, metadata])
             .catch(() => [id, undefined]),
         ),
@@ -183,7 +305,7 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
 
       await mapWithConcurrency(unanswered, THUMB_FALLBACK_CONCURRENCY, async (id) => {
         if (cancelled) return
-        const metadata = await resolveNftMetadata({ publicClient, collection, tokenId: tokenIdToBytes32(id), isLsp8: true }).catch(() => null)
+        const metadata = await resolveNftMetadata({ publicClient, collection, tokenId: tokenKey(id), isLsp8 }).catch(() => null)
         paint([[id, metadata ? { ...metadata, imageIsProxied: false } : null]])
       })
     }
@@ -202,7 +324,19 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
         return next
       })
     }
-  }, [pageIds, collection, chainId, publicClient])
+  }, [pageIds, collection, chainId, publicClient, isUnmintedScope, isLsp8, folderUri, uriSuffix, overrides, thumbTick])
+
+  /** Re-resolves one number's artwork right away — after a save changed it. The tick re-runs the
+      fetch effect, which otherwise only wakes when the page of numbers changes. */
+  const forgetThumb = (id) => {
+    askedRef.current.delete(id)
+    setThumbs((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    setThumbTick((n) => n + 1)
+  }
 
   const load = () => {
     const id = parseInt(tokenInput, 10)
@@ -214,25 +348,37 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
     if (!publicClient || !isAddress(collection)) return
 
     const idBytes = tokenIdToBytes32(id)
+    const notMintedYet = id > minted
     // Opens on the artwork the grid already resolved, so the token you clicked is on screen
     // while its document is still being read rather than a beat of nothing.
     const thumb = thumbs[id]
-    setToken({ id, idBytes, loading: true, name: thumb?.name, image: resolveNftImageUrl(thumb, { width: HEAD_WIDTH, still: true }) })
+    setToken({
+      id,
+      idBytes,
+      loading: true,
+      unminted: notMintedYet,
+      name: thumb?.name,
+      image: resolveNftImageUrl(thumb, { width: HEAD_WIDTH, still: true }),
+    })
     setLoading(true)
+    openIdRef.current = id
 
     try {
       /*
-       * Ownership and the document, together. A token that was never minted has no owner, and
-       * writing metadata for it would be writing into a slot nothing resolves.
+       * Ownership and the document, together — except above the high-water mark, where there is
+       * nobody to ask about and a null owner would only be read as a burn. A number that has not
+       * been minted is not a mistake to catch here: LSP8 keeps a document against the id whether
+       * or not the token exists, so writing one now is how a creator decides what the next
+       * collector receives, before anyone owns it.
        */
       const [owner, resolved] = await Promise.all([
-        publicClient
-          .readContract({ address: collection, abi: TOKEN_ABI, functionName: 'tokenOwnerOf', args: [idBytes] })
-          .catch(() => null),
+        notMintedYet
+          ? Promise.resolve(null)
+          : publicClient.readContract({ address: collection, abi: TOKEN_ABI, functionName: 'tokenOwnerOf', args: [idBytes] }).catch(() => null),
         resolveLsp8TokenDocument({ publicClient, collection, tokenId: idBytes }),
       ])
 
-      if (!owner) {
+      if (!owner && !notMintedYet) {
         setToken({ id, idBytes, missing: true })
         return
       }
@@ -249,11 +395,19 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
         id,
         idBytes,
         owner,
+        unminted: notMintedYet,
         current,
         name: current.name,
         hasOverride: resolved.hasOverride,
         tier: resolved.tier,
+        // A token with its own document shows that document's art: the grid's thumbnail came
+        // through a cache that may predate the override and still carry the collection's image
         image:
+          (resolved.hasOverride &&
+            resolveStorageImageUrl(pickImageUrl(current.images) || pickImageUrl(current.image) || pickImageUrl(current.icon), {
+              width: HEAD_WIDTH,
+              still: true,
+            })) ||
           resolveNftImageUrl(thumb, { width: HEAD_WIDTH, still: true }) ||
           resolveStorageImageUrl(pickImageUrl(current.images) || pickImageUrl(current.image) || pickImageUrl(current.icon), {
             width: HEAD_WIDTH,
@@ -272,7 +426,15 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
     return (
       <div className={styles.token}>
         <div className={styles.token__head}>
-          <button type="button" className={styles.token__back} onClick={() => setToken(null)} disabled={busy}>
+          <button
+            type="button"
+            className={styles.token__back}
+            onClick={() => {
+              openIdRef.current = null
+              setToken(null)
+            }}
+            disabled={busy}
+          >
             <ArrowLeftIcon size={14} /> All tokens
           </button>
           <span className={clsx(styles.token__art, styles.token__headArt)}>
@@ -288,8 +450,28 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
 
         {token.missing && (
           <p className={styles.token__note}>
-            Token #{token.id} has not been minted, so there is nothing to point at yet. Its number is on this page
-            because the collection&rsquo;s supply once reached it — a burn leaves the gap behind.
+            Nobody holds token #{token.id}. Its number is in the minted half because the collection&rsquo;s supply once
+            reached it — a burn leaves the gap behind, and nothing can be written into it.
+          </p>
+        )}
+
+        {token.unminted && !token.loading && (
+          <p className={styles.token__note}>
+            Token #{token.id} has not been minted. What you save here is written against its number now and is what
+            whoever mints it receives — the folder&rsquo;s file for #{token.id} is only the starting point below.
+          </p>
+        )}
+
+        {/* What a save reaches, said before the form: one number, never the collection. The fear
+            worth answering is that touching one token scrambles the others — it cannot. */}
+        {!token.loading && !token.missing && (
+          <p className={styles.token__alert}>
+            <WarningIcon size={14} weight="fill" aria-hidden="true" />
+            <span>
+              {token.hasOverride
+                ? `Only token #${token.id} changes: it already carries metadata of its own, and saving replaces that. Every other token is untouched.`
+                : `Only token #${token.id} changes. Saving gives it metadata of its own, which wins over the collection’s folder for this number alone — the other tokens keep following the folder, and a later change to the folder will not touch this one.`}
+            </span>
           </p>
         )}
 
@@ -302,7 +484,30 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
             name={`#${token.id}`}
             subject="token"
             busy={busy}
-            onSave={(uri) => onSave?.(token.idBytes, uri)}
+            onSave={async (uri) => {
+              const hash = await onSave?.(token.idBytes, uri)
+              const id = token.id
+              /* The grid and the server-side cache both resolved this number before it had a
+                 document of its own, and nothing onchain tells the cache it changed. So, after the
+                 save has already reported: let the block land, ask the cache to re-read this one
+                 token, then re-resolve the tile and the open editor. Nobody waits on any of it. */
+              const settle = async () => {
+                if (hash && publicClient) await publicClient.waitForTransactionReceipt({ hash }).catch(() => null)
+                await fetch('/api/v1/nfts/metadata/refresh', {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify({
+                    chainId: Number(chainId),
+                    collection,
+                    tokenId: isLsp8 ? tokenIdToBytes32(id) : String(id),
+                    isLsp8: Boolean(isLsp8),
+                  }),
+                }).catch(() => null)
+                forgetThumb(id)
+                if (openIdRef.current === id) open(id)
+              }
+              void settle()
+            }}
           />
         )}
       </div>
@@ -311,80 +516,150 @@ export default function TokenMetadataEditor({ collection, chainId, busy = false,
 
   return (
     <div className={styles.token}>
+      {/* A read-only grid with no count to draw from would otherwise render as nothing at all */}
+      {total === 0 && !editable && (
+        <p className={styles.token__note}>This collection does not say how many tokens it has, so there is nothing to list here.</p>
+      )}
+
       {total > 0 && (
         <>
-          <div className={styles.token__grid}>
-            {pageIds.map((id, index) => {
-              // A token that already carries its own document is the one a creator is usually
-              // looking for — either to change it again, or to avoid overwriting it by accident.
-              const overridden = overrides?.[index]?.result && overrides[index].result !== '0x'
-              const thumb = thumbs[id]
-              const image = resolveNftImageUrl(thumb, { width: THUMB_WIDTH, still: true })
-              const isPending = pending.has(id)
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className={clsx(
+          {/* The two halves only exist where the collection declares a ceiling. An open edition
+              has no unminted numbers to separate — its next token is decided at the mint. Once
+              the last one is gone the count still stands, but there is no half left to switch to. */}
+          {hasCeiling && (
+            <div className={styles.token__scope}>
+              <strong>
+                Total {countFormat.format(total)} token{total === 1 ? '' : 's'}
+              </strong>
+              {unminted > 0 && (
+                <SegmentedControl
+                  className={styles.token__scopeSwitch}
+                  options={[
+                    { value: 'minted', label: `Minted (${countFormat.format(minted)})` },
+                    { value: 'unminted', label: `Unminted (${countFormat.format(unminted)})` },
+                  ]}
+                  value={activeScope}
+                  onChange={chooseScope}
+                  label="Which tokens"
+                  as="tabs"
+                  size="sm"
+                />
+              )}
+            </div>
+          )}
+
+          {rangeCount === 0 ? (
+            <p className={styles.token__note}>Nothing has been minted yet — the whole collection is waiting in the unminted half.</p>
+          ) : (
+            <>
+              <div className={styles.token__grid}>
+                {pageIds.map((id, index) => {
+                  // A token that already carries its own document is the one a creator is usually
+                  // looking for — either to change it again, or to avoid overwriting it by accident.
+                  const overridden = overrides?.[index]?.result && overrides[index].result !== '0x'
+                  const thumb = thumbs[id]
+                  const image = resolveNftImageUrl(thumb, { width: THUMB_WIDTH, still: true })
+                  const isPending = pending.has(id)
+                  // A read-only grid still opens minted tokens for a look; only an unminted
+                  // number, which nobody can hold yet, has nothing behind it to show
+                  const previewable = !editable && !isUnmintedScope && Boolean(onPreview)
+                  // Resolved, but not from anything of its own: the file the folder link should
+                  // hold for this number is missing, so what shows is the collection standing in
+                  const borrowed = !isUnmintedScope && Boolean(thumb) && thumb.source !== 'token'
+                  const className = clsx(
                     styles.token__cell,
                     overridden && styles['token__cell--overridden'],
+                    borrowed && styles['token__cell--borrowed'],
                     isPending && !image && styles['token__cell--pending'],
-                  )}
-                  disabled={busy || loading}
-                  aria-busy={isPending || undefined}
-                  onClick={() => open(id)}
-                  title={`${thumb?.name || `Token #${id}`}${overridden ? ' — has its own metadata' : ''}`}
-                >
-                  <span className={styles.token__art}>
-                    {image ? <img src={image} alt="" loading="lazy" onError={handleBrokenImage} /> : <em>#{id}</em>}
-                  </span>
-                  <span className={styles.token__cellLabel}>#{id}</span>
-                </button>
-              )
-            })}
-          </div>
+                    !editable && !previewable && styles['token__cell--static'],
+                  )
+                  const title = `${thumb?.name || `Token #${id}`}${overridden ? ' — has its own metadata' : ''}${
+                    borrowed ? ' — no file of its own where the folder link points; the collection stands in' : ''
+                  }${isUnmintedScope ? ' — not minted yet' : ''}`
+                  const art = (
+                    <>
+                      <span className={styles.token__art}>
+                        {image ? <img src={image} alt="" loading="lazy" onError={handleBrokenImage} /> : <em>#{id}</em>}
+                      </span>
+                      <span className={styles.token__cellLabel}>#{id}</span>
+                    </>
+                  )
 
-          <div className={styles.token__pager}>
-            <button type="button" onClick={() => setPage((n) => Math.max(0, n - 1))} disabled={page === 0}>
-              <CaretLeftIcon size={13} /> Previous
-            </button>
-            <span>
-              {countFormat.format(pageIds[0] ?? 0)}–{countFormat.format(pageIds[pageIds.length - 1] ?? 0)} of{' '}
-              {countFormat.format(total)}
-            </span>
-            <button type="button" onClick={() => setPage((n) => Math.min(pageCount - 1, n + 1))} disabled={page >= pageCount - 1}>
-              Next <CaretRightIcon size={13} />
-            </button>
-          </div>
+                  // Nothing to open where a token cannot carry a document of its own and nobody
+                  // asked to look at it, so the cell stops offering — the grid is there to be read
+                  return editable || previewable ? (
+                    <button
+                      key={id}
+                      type="button"
+                      className={className}
+                      disabled={busy || loading}
+                      aria-busy={isPending || undefined}
+                      onClick={() => (editable ? open(id) : onPreview(id))}
+                      title={title}
+                    >
+                      {art}
+                    </button>
+                  ) : (
+                    <figure key={id} className={className} aria-busy={isPending || undefined} title={title}>
+                      {art}
+                    </figure>
+                  )
+                })}
+              </div>
+
+              <div className={styles.token__pager}>
+                <button type="button" onClick={() => setPage((n) => Math.max(0, n - 1))} disabled={page === 0}>
+                  <CaretLeftIcon size={13} /> Previous
+                </button>
+                <span>
+                  #{countFormat.format(pageIds[0] ?? 0)}–#{countFormat.format(pageIds[pageIds.length - 1] ?? 0)} ·{' '}
+                  {countFormat.format(rangeCount)} {isUnmintedScope ? 'unminted' : 'minted'}
+                </span>
+                <button type="button" onClick={() => setPage((n) => Math.min(pageCount - 1, n + 1))} disabled={page >= pageCount - 1}>
+                  Next <CaretRightIcon size={13} />
+                </button>
+              </div>
+            </>
+          )}
 
           <small className={styles.token__note}>
-            A highlighted number already carries its own metadata. The rest follow the collection.
+            {!editable
+              ? `Every one of these follows the collection’s folder — on this standard a token cannot carry a document of its own.${
+                  onPreview && !isUnmintedScope ? ' Open one to see it the way collectors do.' : ''
+                }`
+              : isUnmintedScope
+                ? 'Nobody owns these yet. What you see is the file the folder holds for each number; open one to give it a document of its own before it mints — a highlighted number already has one.'
+                : 'A highlighted number already carries its own metadata. The rest follow the collection’s folder link — a dashed one has no file there, so the collection’s own image stands in for it.'}
           </small>
         </>
       )}
 
-      <div className={styles.token__lookup}>
-        <span className={styles.token__field}>
-          <MagnifyingGlassIcon size={15} />
-          <input
-            type="number"
-            min="1"
-            value={tokenInput}
-            placeholder="Token number"
-            disabled={busy || loading}
-            onChange={(e) => setTokenInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), load())}
-          />
-        </span>
-        <button type="button" className={clsx(styles.token__go)} onClick={load} disabled={busy || loading || !tokenInput.trim()}>
-          {loading ? 'Reading…' : 'Open'}
-        </button>
-      </div>
+      {editable && (
+        <>
+          <div className={styles.token__lookup}>
+            <span className={styles.token__field}>
+              <MagnifyingGlassIcon size={15} />
+              <input
+                type="number"
+                min="1"
+                value={tokenInput}
+                placeholder="Token number"
+                disabled={busy || loading}
+                onChange={(e) => setTokenInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), load())}
+              />
+            </span>
+            <button type="button" className={clsx(styles.token__go)} onClick={load} disabled={busy || loading || !tokenInput.trim()}>
+              {loading ? 'Reading…' : 'Open'}
+            </button>
+          </div>
 
-      <small className={styles.token__note}>
-        Give one token its own name, artwork and traits. What you write here wins over the collection&rsquo;s base URI for
-        that token alone — every other token carries on resolving as it did.
-      </small>
+          <small className={styles.token__note}>
+            Give one token its own name, artwork and traits. What you write here wins over the collection&rsquo;s base URI
+            for that token alone — every other token carries on resolving as it did.
+          </small>
+        </>
+      )}
     </div>
   )
 }

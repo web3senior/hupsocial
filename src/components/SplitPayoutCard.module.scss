@@ -1,0 +1,118 @@
+.split {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: var(--drop-card-pad, 1rem);
+  border: 1px solid var(--border);
+  border-radius: var(--drop-card-radius, var(--global-border-radius));
+  background: var(--surface);
+
+  &__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      white-space: nowrap;
+
+      code {
+        font-variant-numeric: tabular-nums;
+      }
+    }
+  }
+
+  &__payees {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__payee {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    font-size: var(--font-size-12);
+
+    &--me {
+      box-shadow: inset 0 0 0 1px var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__share {
+    flex-shrink: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__owed {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    color: var(--text-muted, #888);
+
+    em {
+      font-style: normal;
+      color: var(--color);
+    }
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: var(--font-size-12);
+  }
+
+  &__actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        border-color: var(--network-color-primary, var(--color-primary));
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__note {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.5;
+  }
+}

@@ -225,6 +225,8 @@ export default function Page() {
   const [dropsFollowerInputs, setDropsFollowerInputs] = useState({})
   const [dropsCommunityInputs, setDropsCommunityInputs] = useState({})
   const [dropsCommunityTxStates, setDropsCommunityTxStates] = useState({})
+  const [dropsSplitsInputs, setDropsSplitsInputs] = useState({})
+  const [dropsSplitsTxStates, setDropsSplitsTxStates] = useState({})
   const [dropsFollowerTxStates, setDropsFollowerTxStates] = useState({})
   const [dropsFeeInputs, setDropsFeeInputs] = useState({})
   const [dropsFeeTxStates, setDropsFeeTxStates] = useState({})
@@ -1437,16 +1439,20 @@ export default function Page() {
       const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
       const standardIds = dropStandardRowsFor(chain.id).map((row) => row.id)
 
-      const [deployerAddresses, followerSystem, communitySystem, mintFeeBps, mintFee, mintFeeEnabled, creationFee] = await Promise.all([
+      const [deployerAddresses, followerSystem, communitySystem, splits, mintFeeBps, mintFee, mintFeeEnabled, creationFee, featuredFee] = await Promise.all([
         Promise.all(
           standardIds.map((id) => client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'deployers', args: [BigInt(id)] })),
         ),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'followerSystem' }),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'communitySystem' }),
+        // Absent on engines older than the splits build (the Monad test engine): null keeps the
+        // rest of the card readable rather than failing every lever on that chain
+        client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'splits' }).catch(() => null),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'mintFeeBps' }),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'mintFee' }),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'mintFeeEnabled' }),
         client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'creationFee' }),
+        client.readContract({ address: dropsAddress, abi: dropsAbi, functionName: 'featuredFee' }).catch(() => null),
       ])
 
       setDropsConfigs((prev) => ({
@@ -1457,10 +1463,12 @@ export default function Page() {
           standardIds,
           followerSystem,
           communitySystem,
+          splits,
           mintFeeBps,
           mintFee,
           mintFeeEnabled,
           creationFee,
+          featuredFee,
         },
       }))
     } catch (err) {
@@ -1588,6 +1596,38 @@ export default function Page() {
     }
   }
 
+  // Until set, any drop asking for a payout or royalty split reverts SplitsUnavailable; drops
+  // that ask for none are unaffected. HupSplits itself needs no setup — no owner, no fees.
+  const handleSetDropsSplits = async (chain, dropsAddress, draft) => {
+    const factory = draft?.trim()
+    if (!isAddress(factory)) {
+      setDropsSplitsTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid factory address' } }))
+      return
+    }
+
+    setDropsSplitsTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: dropsAddress,
+        abi: dropsAbi,
+        functionName: 'setSplits',
+        args: [factory],
+        chainId: chain.id,
+      })
+
+      setDropsSplitsTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadDropsConfig(chain, dropsAddress), 3000)
+    } catch (err) {
+      console.error(`Drops splits factory update error on chain ${chain.id}:`, err)
+      setDropsSplitsTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
   const handleToggleDropsMintFee = async (chain, dropsAddress, enabled) => {
     setDropsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which: 'flatToggle', loading: true, error: null } }))
 
@@ -1613,7 +1653,8 @@ export default function Page() {
   }
 
   // Set a HupDrops fee knob (admin wallet signs): the mint cut (entered in %, stored in bps,
-  // capped at 10% by the contract), the flat per-item fee, or the drop-creation fee
+  // capped at 10% by the contract), the flat per-item fee, the drop-creation fee, or the
+  // featured-tier surcharge
   const handleSetDropsFee = async (chain, dropsAddress, which) => {
     const draft = dropsFeeInputs[chain.id]?.[which]?.trim()
     let functionName
@@ -1642,7 +1683,7 @@ export default function Page() {
         setDropsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid amount in native units' } }))
         return
       }
-      functionName = 'setCreationFee'
+      functionName = which === 'featured' ? 'setFeaturedFee' : 'setCreationFee'
     }
 
     setDropsFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
@@ -3727,6 +3768,11 @@ export default function Page() {
                   const communityUnset = onChainCommunity && onChainCommunity.toLowerCase() === zeroAddress
                   const communityMatches =
                     onChainCommunity && deployment.community && onChainCommunity.toLowerCase() === deployment.community.toLowerCase()
+                  const splitsTx = dropsSplitsTxStates[chain.id]
+                  const splitsDraft = dropsSplitsInputs[chain.id] ?? deployment.splits ?? ''
+                  const onChainSplits = state?.splits
+                  const splitsUnset = onChainSplits && onChainSplits.toLowerCase() === zeroAddress
+                  const splitsMatches = onChainSplits && deployment.splits && onChainSplits.toLowerCase() === deployment.splits.toLowerCase()
                   const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
                   const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
                   const onChainFollower = state?.followerSystem
@@ -3945,6 +3991,58 @@ export default function Page() {
                         </div>
 
                         <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Splits Factory</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {splitsUnset ? (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                                ⚠️ Not set — payout and royalty splits are unavailable on this chain
+                              </div>
+                            ) : (
+                              onChainSplits && (
+                                <div
+                                  className={clsx(
+                                    styles['admin-contracts__validation'],
+                                    splitsMatches ? styles['admin-contracts__validation--success'] : styles['admin-contracts__validation--warning'],
+                                  )}
+                                >
+                                  {splitsMatches ? '✓ Wired to' : '⚠️ Set to'} <code>{onChainSplits}</code>
+                                  {splitsMatches ? '' : ", which is not this chain's configured HupSplits"}
+                                </div>
+                              )
+                            )}
+
+                            <form
+                              className={styles['admin-contracts__edit-form']}
+                              onSubmit={(e) => {
+                                e.preventDefault()
+                                handleSetDropsSplits(chain, deployment.drops, splitsDraft)
+                              }}
+                            >
+                              <div className={styles['admin-contracts__input-group']}>
+                                <input
+                                  type="text"
+                                  className={styles['admin-contracts__input']}
+                                  value={splitsDraft}
+                                  onChange={(e) => setDropsSplitsInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                                  placeholder="0x… HupSplits"
+                                />
+                              </div>
+                              <div className={styles['admin-contracts__actions']}>
+                                <button
+                                  type="submit"
+                                  disabled={!splitsDraft.trim() || splitsTx?.loading}
+                                  className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                                >
+                                  {splitsTx?.loading ? 'Writing...' : 'Set Splits Factory'}
+                                </button>
+                              </div>
+                              {splitsTx?.error && <span style={{ color: '#ef4444' }}>❌ {splitsTx.error}</span>}
+                              {splitsTx?.success && <span style={{ color: '#10b981' }}>🚀 Splits factory updated.</span>}
+                            </form>
+                          </div>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Mint Fee</span>
                           <div className={styles['admin-contracts__detail-value']}>
                             {state && !state.loading && !state.error && <strong>{Number(state.mintFeeBps ?? 0n) / 100}%</strong>}
@@ -4090,6 +4188,52 @@ export default function Page() {
                               {feeTx?.which === 'creation' && feeTx?.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
                               {feeTx?.which === 'creation' && feeTx?.success && (
                                 <span style={{ color: '#10b981' }}>🚀 Creation fee updated.</span>
+                              )}
+                            </form>
+                          </div>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Featured Fee</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {state && !state.loading && !state.error && (
+                              <strong>{state.featuredFee === null ? 'not on this engine build' : `${formatNative(state.featuredFee)} ${symbol}`}</strong>
+                            )}
+                            <form
+                              className={styles['admin-contracts__edit-form']}
+                              onSubmit={(e) => {
+                                e.preventDefault()
+                                handleSetDropsFee(chain, deployment.drops, 'featured')
+                              }}
+                            >
+                              <div className={styles['admin-contracts__input-group']}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  className={styles['admin-contracts__input']}
+                                  value={dropsFeeInputs[chain.id]?.featured ?? ''}
+                                  onChange={(e) =>
+                                    setDropsFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], featured: e.target.value } }))
+                                  }
+                                  placeholder={`Surcharge for the featured tier, in ${symbol}`}
+                                />
+                              </div>
+                              <span className={styles['admin-contracts__hint']}>
+                                Paid on top of the creation fee, or later through featureDrop. Zero means every drop can feature itself for free.
+                              </span>
+                              <div className={styles['admin-contracts__actions']}>
+                                <button
+                                  type="submit"
+                                  disabled={feeTx?.which === 'featured' && feeTx?.loading}
+                                  className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                                >
+                                  {feeTx?.which === 'featured' && feeTx?.loading ? 'Writing...' : 'Set Featured Fee'}
+                                </button>
+                              </div>
+                              {feeTx?.which === 'featured' && feeTx?.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
+                              {feeTx?.which === 'featured' && feeTx?.success && (
+                                <span style={{ color: '#10b981' }}>🚀 Featured fee updated.</span>
                               )}
                             </form>
                           </div>

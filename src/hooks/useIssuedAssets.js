@@ -5,7 +5,8 @@ import { usePublicClient } from 'wagmi'
 import { concat, hexToString, isAddress, pad, slice, toHex } from 'viem'
 
 /** keccak256('LSP12IssuedAssets[]') — the array a Universal Profile lists what it created in. */
-export const LSP12_ISSUED_ASSETS_KEY = '0x7c8c3416d6cda87cd42c71ea1843df28ac4850354f988d55ee2eaa47b6dc05cd'
+export { LSP12_ISSUED_ASSETS_KEY } from '@/lib/lsp12'
+import { LSP12_ISSUED_ASSETS_KEY } from '@/lib/lsp12'
 
 const ERC725Y_ABI = [
   { name: 'getData', type: 'function', stateMutability: 'view', inputs: [{ type: 'bytes32' }], outputs: [{ type: 'bytes' }] },

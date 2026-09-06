@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
 import { formatEther, isAddress, parseEther, toHex, zeroAddress, zeroHash } from 'viem'
@@ -8,40 +9,44 @@ import { useConnection, usePublicClient, useReadContract, useReadContracts, useW
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import { hashIpfsContent, uploadFileToIPFS, uploadFolderToIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
-import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { describeWalletError } from '@/lib/walletErrors'
+import { isUniversalProfile } from '@/lib/lsp3'
+import { ERC725Y_SET_DATA_BATCH_ABI, encodeIssuedAssetAppend, issuedAssetInterfaceId, readIssuedAssetListing } from '@/lib/lsp12'
 import {
   ALLOWLIST_BATCH_SIZE,
   DROP_GATES,
-  DROP_SOCIALS,
   MAX_DROP_PHASES,
-  LSP4_DATA_KEYS,
-  MAX_DROP_CREATORS,
-  INTERFACEID_LSP0,
-  creatorsElementKeyAt,
-  encodeCreatorsWrites,
+  MAX_PHASE_NAME_BYTES,
   LSP8_DATA_KEYS,
-  buildDropLinks,
-  buildLsp4MetadataJson,
   decodeVerifiableURI,
-  encodeVerifiableURI,
-  encodeVerifiableURIFromDigest,
+  DROP_START_MODES,
+  emptySchedule,
   formatPhaseTime,
   gateLabel,
   isLuksoStandard,
   isNumberedStandard,
+  isValidSplit,
   normalizeAllowlist,
-  parseDropLinks,
+  phaseNameByteLength,
   phaseStatus,
   PHASE_STATUS,
+  resolveSchedule,
+  scheduleErrorMessage,
+  sharesOneTokenDocument,
+  toSplitPayees,
 } from '@/lib/drops'
 import dropsAbi from '@/abis/HupDrops.json'
 import collectionAbi from '@/abis/HupDropCollection.json'
-import DropArtworkUpload from '@/components/DropArtworkUpload'
+import DropPayeeTable, { emptyPayee } from '@/components/DropPayeeTable'
+import SplitPayoutCard from '@/components/SplitPayoutCard'
+import DropGatePicker from '@/components/DropGatePicker'
+import DropPhaseTrack from '@/components/DropPhaseTrack'
+import DropWhenPicker from '@/components/DropWhenPicker'
+import Profile from '@/components/Profile'
 import { toast } from '@/components/NextToast'
-import NativeDialog from '@/components/ui/NativeDialog'
-import { ImageIcon, PencilSimpleIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
+import { Spinner } from '@/components/Loading'
+import SegmentedControl from '@/components/ui/SegmentedControl'
+import { PaintBrushIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
 import styles from './DropManagePanel.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
@@ -54,23 +59,16 @@ const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address
 
 const formatNative = (wei) => amountFormat.format(Number(formatEther(BigInt(wei ?? 0))))
 
-const normalizeIpfsUri = (value) => (value?.startsWith('ipfs://') ? value : `ipfs://${value}`)
-
-// Reading the clock must stay out of render — only ever called from an event handler
-const nowSeconds = () => BigInt(Math.floor(Date.now() / 1000))
-
-const MAX_DESCRIPTION_LENGTH = 1000
-
 /**
  * Creator-only control surface on the drop detail page: indexed revenue and activity, the phase
- * schedule, the collection metadata editor, and the permanent close switch. Renders nothing
- * unless the connected wallet is the drop's creator; every action is also enforced onchain.
+ * schedule, payout, and the permanent close switch. Metadata itself is managed in the Studio,
+ * which this panel only points at. Renders nothing unless the connected wallet is the drop's
+ * creator; every action is also enforced onchain.
  *
  * @param {Object} props.drop The live drop struct from getDrop.
  * @param {string} props.collection The drop's collection contract.
- * @param {Object} props.collectionIdentity Resolved { name, symbol, description, image, links }.
  */
-export default function DropManagePanel({ chainId, dropId, drop, collection, collectionIdentity, onMetadataUpdated, onClosed }) {
+export default function DropManagePanel({ chainId, dropId, drop, collection, onClosed }) {
   const { address, chain: walletChain } = useConnection()
   const publicClient = usePublicClient({ chainId })
   const chainInfo = appChains.find((chain) => chain.id === chainId)
@@ -82,16 +80,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
 
   const isCreator = Boolean(address && drop?.creator && address.toLowerCase() === drop.creator.toLowerCase())
 
-  const editDialogRef = useRef(null)
-  const [description, setDescription] = useState('')
-  const [image, setImage] = useState('')
-  const [icon, setIcon] = useState('')
-  const [banner, setBanner] = useState('')
-  const [socials, setSocials] = useState({ website: '', x: '', discord: '', telegram: '', instagram: '' })
-  const [linkRows, setLinkRows] = useState([])
-  const [isSavingMetadata, setIsSavingMetadata] = useState(false)
-  const [isImageUploading, setIsImageUploading] = useState(false)
-  const [isBannerUploading, setIsBannerUploading] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
   const [confirmClose, setConfirmClose] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const [phaseBusy, setPhaseBusy] = useState(null)
@@ -99,14 +88,10 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
   const [isSavingAllowlist, setIsSavingAllowlist] = useState(false)
   const [payoutDraft, setPayoutDraft] = useState('')
   const [isSavingPayout, setIsSavingPayout] = useState(false)
+  const [splitRows, setSplitRows] = useState([emptyPayee()])
+  const [isSavingSplit, setIsSavingSplit] = useState(false)
   const [newPhase, setNewPhase] = useState(null)
   const [isAddingPhase, setIsAddingPhase] = useState(false)
-  const [creatorDraft, setCreatorDraft] = useState('')
-  const [isSavingCreators, setIsSavingCreators] = useState(false)
-  const [baseUriDraft, setBaseUriDraft] = useState('')
-  const [suffixDraft, setSuffixDraft] = useState('')
-  const [isSavingTokenUri, setIsSavingTokenUri] = useState(false)
-  const [isPinningFolder, setIsPinningFolder] = useState(false)
   const [royaltyReceiverDraft, setRoyaltyReceiverDraft] = useState('')
   const [royaltyBpsDraft, setRoyaltyBpsDraft] = useState('')
   const [confirmFreeze, setConfirmFreeze] = useState(false)
@@ -155,6 +140,18 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
     query: { enabled: Boolean(dropsAddress && isCreator) },
   })
   const payoutOverride = payoutDestination && payoutDestination !== zeroAddress ? payoutDestination : null
+
+  // The factory the engine deploys splits through: zero until the admin registers one
+  const { data: splitsFactory } = useReadContract({
+    abi: dropsAbi,
+    address: dropsAddress,
+    functionName: 'splits',
+    chainId,
+    query: { enabled: Boolean(dropsAddress && isCreator) },
+  })
+  const splitsAvailable = Boolean(splitsFactory && splitsFactory !== zeroAddress)
+  // Every token a phase charges in — a split holding one of them shows that balance too
+  const paymentTokens = phases.filter((entry) => entry.token && entry.token !== zeroAddress).map((entry) => ({ address: entry.token, isLsp7: Boolean(entry.isLsp7) }))
 
   // What the platform actually takes, read live rather than assumed: an admin can change either
   // knob while this panel is open, and a creator deciding where to point their payout deserves
@@ -205,38 +202,19 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
   )
   const communities = communityList?.data ?? []
 
-  const creatorsRead = { abi: collectionAbi, address: collection ?? undefined, chainId, query: { enabled: Boolean(collection && isCreator && isLukso) } }
-  const { data: creatorsCountRaw, refetch: refetchCreatorsCount } = useReadContract({
-    ...creatorsRead,
-    functionName: 'getData',
-    args: [LSP4_DATA_KEYS.creators],
-  })
-  const creatorsCount = creatorsCountRaw && creatorsCountRaw !== '0x' ? Number(BigInt(creatorsCountRaw)) : 0
-  const { data: creatorEntries, refetch: refetchCreatorEntries } = useReadContracts({
-    contracts: Array.from({ length: Math.min(creatorsCount, MAX_DROP_CREATORS) }, (_, index) => ({
-      ...creatorsRead,
-      functionName: 'getData',
-      args: [creatorsElementKeyAt(index)],
-    })),
-    query: { enabled: Boolean(collection && isCreator && isLukso && creatorsCount > 0) },
-  })
-  // getData returns raw bytes; a creator entry is a bare 20-byte address
-  const creators = (creatorEntries ?? [])
-    .map((entry) => entry?.result)
-    .filter((value) => typeof value === 'string' && value.length === 42)
-
   const collectionRead = { abi: collectionAbi, address: collection ?? undefined, chainId, query: { enabled: Boolean(collection && isCreator) } }
   const { data: metadataFrozen = false, refetch: refetchFrozen } = useReadContract({ ...collectionRead, functionName: 'metadataFrozen' })
 
   const isNumbered = isNumberedStandard(standardId)
 
-  const { data: tokenOneUri, refetch: refetchTokenUri } = useReadContract({
+  // Where token 1 resolves today — only read to say so; changing it is the Studio's job
+  const { data: tokenOneUri } = useReadContract({
     ...collectionRead,
     functionName: 'tokenURI',
     args: [1n],
     query: { enabled: Boolean(collection && isCreator && isNumbered && !isLukso) },
   })
-  const { data: lsp8BaseUriRaw, refetch: refetchLsp8BaseUri } = useReadContract({
+  const { data: lsp8BaseUriRaw } = useReadContract({
     ...collectionRead,
     functionName: 'getData',
     args: [LSP8_DATA_KEYS.baseUri],
@@ -248,24 +226,52 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  // Own instances for the sequential awaits — sharing `hash` would re-fire the pendingActionRef effect
+  // Own instance for the sequential awaits — sharing `hash` would re-fire the pendingActionRef effect
   const { writeContractAsync: writeAllowlistAsync } = useWriteContract()
-  const { writeContractAsync: writeCollectionAsync } = useWriteContract()
   const pendingActionRef = useRef(null)
-  const isBusy =
-    isPending ||
-    isConfirming ||
-    isSavingMetadata ||
-    isClosing ||
-    isImageUploading ||
-    isBannerUploading ||
-    phaseBusy !== null ||
-    isAddingPhase ||
-    isSavingAllowlist ||
-    isSavingCreators ||
-    isSavingPayout ||
-    isSavingTokenUri ||
-    isPinningFolder
+  const isBusy = isPending || isConfirming || isClosing || phaseBusy !== null || isAddingPhase || isSavingAllowlist || isSavingPayout || isSavingSplit
+
+  /* LSP12IssuedAssets[] on the creator's profile: the other half of the LSP4Creators[] link the
+     collection wrote at launch, and what makes explorers show the creator as verified. Read for a
+     Universal Profile creator only — an EOA has no profile keys to list anything in. */
+  const [profileListing, setProfileListing] = useState(null)
+  const [isListing, setIsListing] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      // Yields before touching state, so the effect body itself writes nothing
+      await Promise.resolve()
+      if (cancelled || !isLukso || !isCreator || !collection || !publicClient) return
+      if (!(await isUniversalProfile(publicClient, drop.creator))) return
+      const listing = await readIssuedAssetListing(publicClient, drop.creator, collection)
+      if (!cancelled) setProfileListing(listing)
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [isLukso, isCreator, collection, publicClient, drop?.creator])
+
+  const handleListOnProfile = async () => {
+    if (!profileListing || profileListing.listed) return
+    setIsListing(true)
+    try {
+      const { keys, values } = encodeIssuedAssetAppend({
+        asset: collection,
+        interfaceId: issuedAssetInterfaceId(isNumbered),
+        count: profileListing.count,
+      })
+      // Written to the profile itself, which is why only the creator's own wallet can do this
+      await writeAllowlistAsync({ address: drop.creator, abi: ERC725Y_SET_DATA_BATCH_ABI, functionName: 'setDataBatch', args: [keys, values], chainId })
+      toast('Listed on your profile — explorers now show you as its verified creator', 'success')
+      setProfileListing({ count: profileListing.count + 1, listed: true })
+    } catch (err) {
+      toast(describeWalletError(err, { fallback: 'Listing on your profile failed' }), 'error')
+    } finally {
+      setIsListing(false)
+    }
+  }
 
   useEffect(() => {
     if (!submitError) return
@@ -277,18 +283,13 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
     const action = pendingActionRef.current
     pendingActionRef.current = null
 
-    if (action === 'metadata') {
-      toast('Collection metadata updated', 'success')
-      editDialogRef.current?.close()
-      setTimeout(() => onMetadataUpdated?.(), 1500)
-    }
     if (action === 'close') {
       toast('Drop closed — minting has ended for good', 'success')
       setConfirmClose(false)
       onClosed?.()
     }
     if (action === 'phase') {
-      toast('Stage updated', 'success')
+      toast('Phase updated', 'success')
       setPhaseBusy(null)
       refetchPhases()
     }
@@ -312,127 +313,6 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
   }, [royaltyReceiver, royaltyBps])
 
   if (!isCreator) return null
-
-  const openEditor = () => {
-    setDescription(collectionIdentity?.description ?? '')
-    setImage(collectionIdentity?.image ?? '')
-    setIcon(collectionIdentity?.icon ?? '')
-    setBanner(collectionIdentity?.banner ?? '')
-    const { socials: storedSocials, extra } = parseDropLinks(collectionIdentity?.links ?? [])
-    setSocials(storedSocials)
-    setLinkRows(extra)
-    editDialogRef.current?.open()
-  }
-
-  /** Uploads a collection image (artwork, icon, or banner) to IPFS and stores its CID. */
-  const handleImageUpload = (setter, label, setBusy) => async (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      toast('Please choose an image file', 'error')
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast(`${label} must be under 10 MB`, 'error')
-      return
-    }
-
-    setBusy(true)
-    try {
-      const cid = await uploadFileToIPFS(file)
-      if (!cid) throw new Error('Upload failed')
-      setter(cid)
-    } catch (err) {
-      toast(err.message || `${label} upload failed. Please try again.`, 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleImageSelect = handleImageUpload(setImage, 'Image', setIsImageUploading)
-  const handleIconSelect = handleImageUpload(setIcon, 'Icon', setIsImageUploading)
-  const handleBannerSelect = handleImageUpload(setBanner, 'Banner', setIsBannerUploading)
-
-  const handleSaveMetadata = async () => {
-    if (isWrongChain) {
-      toast(`Switch your wallet to ${chainInfo?.name || 'the right network'} first`, 'error')
-      return
-    }
-
-    const links = buildDropLinks(socials, linkRows)
-
-    setIsSavingMetadata(true)
-    let uri
-    let metadataHash = null
-    try {
-      const imageUri = image ? normalizeIpfsUri(image) : ''
-      const iconUri = icon ? normalizeIpfsUri(icon) : ''
-      const bannerUri = banner ? normalizeIpfsUri(banner) : ''
-
-      const [imageHash, iconHash, backgroundImageHash] = isLukso
-        ? await Promise.all([
-            imageUri ? hashIpfsContent(imageUri) : null,
-            iconUri ? hashIpfsContent(iconUri) : null,
-            bannerUri ? hashIpfsContent(bannerUri) : null,
-          ])
-        : [null, null, null]
-
-      const metadata = withAuthor(
-        isLukso
-          ? buildLsp4MetadataJson({
-              name: collectionIdentity?.name ?? '',
-              description: description.trim(),
-              imageUrl: imageUri,
-              imageHash,
-              iconUrl: iconUri,
-              iconHash,
-              backgroundImageUrl: bannerUri,
-              backgroundImageHash,
-              links,
-            })
-          : {
-              name: collectionIdentity?.name ?? '',
-              symbol: collectionIdentity?.symbol ?? '',
-              description: description.trim(),
-              image: imageUri,
-              ...(iconUri ? { icon: iconUri } : {}),
-              ...(bannerUri ? { banner_image: bannerUri } : {}),
-              ...(socials.website.trim() ? { external_link: socials.website.trim() } : {}),
-              links,
-            },
-        address
-      )
-      uri = normalizeIpfsUri(await uploadObjectToIPFS(metadata))
-      // The LSP4Metadata key holds a VerifiableURI over the JSON as the gateway serves it, not as posted
-      if (isLukso) metadataHash = await hashIpfsContent(uri)
-    } catch (err) {
-      toast(err.message || 'Failed to upload metadata', 'error')
-      setIsSavingMetadata(false)
-      return
-    }
-    setIsSavingMetadata(false)
-
-    pendingActionRef.current = 'metadata'
-    // The collection is creator-owned (onlyOwner) — the wallet signs directly, no burner path
-    if (isLukso) {
-      writeContract({
-        abi: collectionAbi,
-        address: collection,
-        functionName: 'setData',
-        args: [LSP4_DATA_KEYS.metadata, encodeVerifiableURIFromDigest(uri, metadataHash)],
-        chainId,
-      })
-    } else {
-      writeContract({
-        abi: collectionAbi,
-        address: collection,
-        functionName: 'setContractURI',
-        args: [uri],
-        chainId,
-      })
-    }
-  }
 
   /** Sets the collection's ERC2981 royalty; 0% clears it. */
   const handleSetRoyalty = () => {
@@ -501,7 +381,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
           args,
         })
         await tx.wait().catch(() => null)
-        toast(paused ? 'Stage paused' : 'Stage started', 'success')
+        toast(paused ? 'Phase paused' : 'Phase started', 'success')
         refetchPhases()
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -587,69 +467,24 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
     }
   }
 
-  /** Pins a picked folder to IPFS and fills the base URI and suffix from it. */
-  const handleFolderPick = async (event) => {
-    const files = Array.from(event.target.files ?? [])
-    event.target.value = ''
-    if (files.length === 0) return
-
-    setIsPinningFolder(true)
-    try {
-      const cid = await uploadFolderToIPFS(files)
-      setBaseUriDraft(`ipfs://${cid}/`)
-
-      const sample = String(files[0].webkitRelativePath || files[0].name).split('/').pop()
-      const dot = sample.lastIndexOf('.')
-      setSuffixDraft(dot > 0 ? sample.slice(dot) : '')
-
-      toast(`Pinned ${files.length} files — check the preview, then save`, 'success')
-    } catch (err) {
-      toast(err.message || 'Folder upload failed', 'error')
-    } finally {
-      setIsPinningFolder(false)
-    }
-  }
-
-  /** Points the collection's per-token metadata at a new base URI (the reveal). */
-  const handleSaveTokenUri = async () => {
-    if (isWrongChain) {
-      toast(`Switch your wallet to ${chainInfo?.name || 'the right network'} first`, 'error')
+  /** setPayoutSplit deploys the table's split if it does not exist and points the drop at it, in one signature. */
+  const handleSetPayoutSplit = async () => {
+    const payees = toSplitPayees(splitRows)
+    if (!isValidSplit(payees)) {
+      toast('A split needs distinct wallets whose shares total exactly 100%', 'error')
       return
     }
-    const base = baseUriDraft.trim()
-    if (!base) {
-      toast('Enter a base URI, or pick a folder to pin one', 'error')
-      return
-    }
-
-    setIsSavingTokenUri(true)
+    setIsSavingSplit(true)
     try {
-      if (isLukso) {
-        await writeCollectionAsync({
-          abi: collectionAbi,
-          address: collection,
-          functionName: 'setData',
-          args: [LSP8_DATA_KEYS.baseUri, encodeVerifiableURI(base)],
-          chainId,
-        })
-      } else {
-        await writeCollectionAsync({
-          abi: collectionAbi,
-          address: collection,
-          functionName: 'setBaseURI',
-          args: [base, suffixDraft.trim()],
-          chainId,
-        })
-      }
-      toast('Token metadata updated — each token now resolves to its own asset', 'success')
-      setBaseUriDraft('')
-      setSuffixDraft('')
-      refetchTokenUri()
-      refetchLsp8BaseUri()
+      // Creator's own address only, like setPayoutDestination — no burner session, no forwarder
+      await writeAllowlistAsync({ abi: dropsAbi, address: dropsAddress, functionName: 'setPayoutSplit', args: [BigInt(dropId), payees], chainId })
+      toast('Your share of every mint now goes to the split', 'success')
+      setSplitRows([emptyPayee()])
+      refetchPayout()
     } catch (err) {
-      toast(describeWalletError(err, { fallback: 'Transaction rejected or encountered an error.' }), 'error')
+      toast(describeWalletError(err, { fallback: 'Setting the split failed' }), 'error')
     } finally {
-      setIsSavingTokenUri(false)
+      setIsSavingSplit(false)
     }
   }
 
@@ -660,12 +495,10 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
       return
     }
 
-    const now = nowSeconds()
-    const start = newPhase.startAt ? BigInt(Math.floor(new Date(newPhase.startAt).getTime() / 1000)) : now - 60n
-    const end = newPhase.endAt ? BigInt(Math.floor(new Date(newPhase.endAt).getTime() / 1000)) : 0n
+    const { startTime, endTime, paused, error: scheduleError } = resolveSchedule(newPhase.schedule)
 
-    if (end !== 0n && end <= start) {
-      toast('The phase has to end after it starts', 'error')
+    if (scheduleError) {
+      toast(scheduleErrorMessage(scheduleError), 'error')
       return
     }
     if (newPhase.gate === DROP_GATES.COMMUNITY && !newPhase.communityId) {
@@ -674,9 +507,10 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
     }
 
     const phaseInput = {
-      startTime: start,
-      endTime: end,
-      paused: newPhase.manualStart,
+      name: newPhase.name.trim(),
+      startTime,
+      endTime,
+      paused,
       token: newPhase.price && newPhase.token ? newPhase.token : zeroAddress,
       isLsp7: Boolean(newPhase.price && newPhase.token && newPhase.isLsp7),
       price: parseEther(newPhase.price || '0'),
@@ -699,64 +533,13 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
       } else {
         await writeAllowlistAsync({ abi: dropsAbi, address: dropsAddress, functionName: 'addPhase', args, chainId })
       }
-      toast('Stage added — it joins the schedule at the end', 'success')
+      toast('Phase added — it joins the schedule at the end', 'success')
       setNewPhase(null)
       refetchPhases()
     } catch (err) {
       toast(describeWalletError(err, { fallback: 'Adding the phase failed' }), 'error')
     } finally {
       setIsAddingPhase(false)
-    }
-  }
-
-  /** Publishes a new LSP4Creators[] list on the collection. */
-  const saveCreators = async (nextAddresses) => {
-    if (isWrongChain) {
-      toast(`Switch your wallet to ${chainInfo?.name || 'the right network'} first`, 'error')
-      return
-    }
-
-    setIsSavingCreators(true)
-    try {
-      // A Universal Profile and an EOA get different map entries, so each address is probed for LSP0
-      const withInterfaces = await Promise.all(
-        nextAddresses.map(async (entry) => {
-          let interfaceId = '0x00000000'
-          try {
-            const supported = await publicClient.readContract({
-              address: entry,
-              abi: [{ name: 'supportsInterface', type: 'function', stateMutability: 'view', inputs: [{ type: 'bytes4' }], outputs: [{ type: 'bool' }] }],
-              functionName: 'supportsInterface',
-              args: [INTERFACEID_LSP0],
-            })
-            if (supported) interfaceId = INTERFACEID_LSP0
-          } catch {
-            // Not ERC165 (or no code) — an EOA, the zero id
-          }
-          return { address: entry, interfaceId }
-        }),
-      )
-
-      const { keys, values } = encodeCreatorsWrites(withInterfaces, creators)
-
-      // LSP4Creators[] is a whole-array rewrite in one setDataBatch; the collection is onlyOwner,
-      // so the wallet signs directly — no burner path
-      await writeAllowlistAsync({
-        abi: collectionAbi,
-        address: collection,
-        functionName: 'setDataBatch',
-        args: [keys, values],
-        chainId,
-      })
-
-      toast('Creators updated', 'success')
-      setCreatorDraft('')
-      refetchCreatorsCount()
-      refetchCreatorEntries()
-    } catch (err) {
-      toast(describeWalletError(err, { fallback: 'Updating the creators failed' }), 'error')
-    } finally {
-      setIsSavingCreators(false)
     }
   }
 
@@ -805,8 +588,18 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
   }
 
   const isClosed = Boolean(drop?.closed)
-  const imageUrl = image ? resolveStorageImageUrl(image) : null
-  const iconUrl = icon ? resolveStorageImageUrl(icon) : null
+  const studioHref = `/nfts/studio?network=${chainId}&address=${collection}`
+
+  // Each tab is listed only while something in it can render, so no tab ever opens empty
+  const tabOptions = [
+    { value: 'overview', label: 'Overview' },
+    ...(phases.length > 0 ? [{ value: 'stages', label: 'Phases' }] : []),
+    { value: 'metadata', label: 'Metadata' },
+    { value: 'payout', label: 'Payout' },
+    ...(!metadataFrozen || !isClosed ? [{ value: 'danger', label: 'Danger' }] : []),
+  ]
+  // A tab can disappear under the user — closing the drop can retire Danger — so fall back
+  const tab = tabOptions.some((option) => option.value === activeTab) ? activeTab : 'overview'
 
   return (
     <section className={styles.manage}>
@@ -815,56 +608,91 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
           <h2>Manage drop</h2>
           <small>Only you see this — you created this drop.</small>
         </div>
-        <button type="button" className={styles.manage__edit} onClick={openEditor} disabled={isBusy || metadataFrozen}>
-          <PencilSimpleIcon size={14} />
-          {metadataFrozen ? 'Metadata frozen' : 'Edit metadata'}
-        </button>
+        <Link href={studioHref} className={styles.manage__edit}>
+          <PaintBrushIcon size={14} aria-hidden="true" />
+          {metadataFrozen ? 'View metadata' : 'Edit metadata'}
+        </Link>
       </header>
+
+      <SegmentedControl
+        className={styles.manage__tabs}
+        options={tabOptions}
+        value={tab}
+        onChange={setActiveTab}
+        label="Manage sections"
+        as="tabs"
+      />
 
       {/* Earnings lead, at a size that reads across a room. There is no withdraw button and
           there never will be: proceeds push to the payout destination inside the mint itself, so
           this is money already in the creator's wallet, not a balance held here waiting to be
           claimed. Saying so is the point — a creator arriving from a launchpad that escrows will
           look for the button. */}
-      <div className={styles.manage__earnings}>
-        <span className={styles.manage__earningsLabel}>Earned from mints</span>
-        <strong className={styles.manage__earningsValue}>
-          {totals ? formatNative(creatorNetWei) : '—'} <em>{nativeSymbol}</em>
-        </strong>
-<small className={styles.manage__earningsNote}>
-          {minterPaidWei > 0n ? (
-            <>
-              Minters paid {formatNative(minterPaidWei)} {nativeSymbol} in total:{' '}
-              <strong>
-                {formatNative(creatorNetWei)} {nativeSymbol} to you
-              </strong>
-              {percentageFeeWei > 0n && `, ${formatNative(percentageFeeWei)} ${nativeSymbol} platform cut`}
-              {flatFeeWei > 0n && `, ${formatNative(flatFeeWei)} ${nativeSymbol} in platform fees on top`}
-              {referralsWei > 0n && `, ${formatNative(referralsWei)} ${nativeSymbol} to referrers`}.{' '}
-            </>
-          ) : null}
-          Paid out on every mint — nothing to withdraw.
-        </small>
-      </div>
+      {tab === 'overview' && (
+        <>
+          <div className={styles.manage__earnings}>
+            <span className={styles.manage__earningsLabel}>Earned from mints</span>
+            <strong className={styles.manage__earningsValue}>
+              {totals ? formatNative(creatorNetWei) : '—'} <em>{nativeSymbol}</em>
+            </strong>
+            <small className={styles.manage__earningsNote}>
+              {minterPaidWei > 0n ? (
+                <>
+                  Minters paid {formatNative(minterPaidWei)} {nativeSymbol} in total:{' '}
+                  <strong>
+                    {formatNative(creatorNetWei)} {nativeSymbol} to you
+                  </strong>
+                  {percentageFeeWei > 0n && `, ${formatNative(percentageFeeWei)} ${nativeSymbol} platform cut`}
+                  {flatFeeWei > 0n && `, ${formatNative(flatFeeWei)} ${nativeSymbol} in platform fees on top`}
+                  {referralsWei > 0n && `, ${formatNative(referralsWei)} ${nativeSymbol} to referrers`}.{' '}
+                </>
+              ) : null}
+              Paid out on every mint — nothing to withdraw.
+            </small>
+          </div>
 
-      <div className={styles.manage__stats}>
-        <div className={styles.manage__stat}>
-          <span>Items minted</span>
-          <strong>{totals ? countFormat.format(totals.items_minted) : countFormat.format(Number(drop?.minted ?? 0))}</strong>
-        </div>
-        <div className={styles.manage__stat}>
-          <span>Mint transactions</span>
-          <strong>{totals ? countFormat.format(totals.mint_count) : '—'}</strong>
-        </div>
-      </div>
+          <div className={styles.manage__stats}>
+            <div className={styles.manage__stat}>
+              <span>Items minted</span>
+              <strong>{totals ? countFormat.format(totals.items_minted) : countFormat.format(Number(drop?.minted ?? 0))}</strong>
+            </div>
+            <div className={styles.manage__stat}>
+              <span>Mint transactions</span>
+              <strong>{totals ? countFormat.format(totals.mint_count) : '—'}</strong>
+            </div>
+          </div>
 
-      {indexed && indexed.indexed === false && (
-        <p className={styles.manage__hint}>Revenue and activity appear once the indexer has scanned this drop.</p>
+          {indexed && indexed.indexed === false && (
+            <p className={styles.manage__hint}>Revenue and activity appear once the indexer has scanned this drop.</p>
+          )}
+
+          {profileListing && (
+            <div className={styles.manage__listing}>
+              <span>
+                {profileListing.listed
+                  ? 'Your profile lists this collection — explorers show you as its verified creator.'
+                  : 'Your profile does not list this collection yet, so explorers show its creator as unverified.'}
+              </span>
+              {!profileListing.listed && (
+                <button type="button" onClick={handleListOnProfile} disabled={isBusy || isListing || isWrongChain}>
+                  {isListing ? 'Listing…' : 'List on my profile'}
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {phases.length > 0 && (
+      {tab === 'stages' && phases.length > 0 && (
         <div className={styles.manage__phases}>
-          <h3>Mint stages</h3>
+          <h3>Mint phases</h3>
+          {/* Ghost rungs for the phases still unspent, so the eight-phase ceiling is visible */}
+          <DropPhaseTrack
+            className={styles.manage__phaseTrack}
+            phases={phases}
+            slots={MAX_DROP_PHASES}
+            color={chainInfo?.primaryColor}
+          />
           <ul>
             {phases.map((phase, index) => {
               const status = phaseStatus(phase)
@@ -880,7 +708,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
                           ? 'Upcoming'
                           : 'Ended'}
                   </span>
-                  <span className={styles.manage__phaseName}>Stage {index + 1}</span>
+                  <span className={styles.manage__phaseName}>{phase.name?.trim() || `Phase ${index + 1}`}</span>
                   <span className={styles.manage__phaseMeta}>
                     {phase.price === 0n ? 'Free' : `${formatNative(phase.price)} ${nativeSymbol}`} · {gateLabel(Number(phase.gate))}
                     {formatPhaseTime(phase.startTime) ? ` · ${formatPhaseTime(phase.startTime)}` : ''}
@@ -895,7 +723,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
                       onClick={() => handleTogglePhase(index, !phase.paused)}
                       disabled={isBusy}
                     >
-                      {phaseBusy === index ? '…' : phase.paused ? 'Start' : 'Pause'}
+                      {phaseBusy === index ? <Spinner size="14px" color="currentColor" strokeColor="currentColor" /> : phase.paused ? 'Start' : 'Pause'}
                     </button>
                   )}
                 </li>
@@ -911,7 +739,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
             newPhase ? (
               <div className={styles.manage__newPhase}>
                 <div className={styles.manage__phaseHead}>
-                  <strong>New stage {phases.length + 1}</strong>
+                  <strong>New phase {phases.length + 1}</strong>
                   <button type="button" onClick={() => setNewPhase(null)} disabled={isBusy}>
                     <XIcon size={12} />
                     Cancel
@@ -919,6 +747,23 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
                 </div>
 
                 <div className={styles.manage__newPhaseGrid}>
+                  <label className={clsx(styles.manage__field, styles['manage__field--wide'])}>
+                    <span>
+                      Phase name <em>optional</em>
+                    </span>
+                    <input
+                      type="text"
+                      value={newPhase.name}
+                      placeholder={`e.g. ${phases.length === 0 ? 'Presale' : 'Public'}`}
+                      // Phase names are capped in bytes, not characters
+                      onChange={(e) => {
+                        let next = e.target.value
+                        while (phaseNameByteLength(next) > MAX_PHASE_NAME_BYTES) next = next.slice(0, -1)
+                        setNewPhase({ ...newPhase, name: next })
+                      }}
+                      disabled={isBusy}
+                    />
+                  </label>
                   <label className={styles.manage__field}>
                     <span>Price ({nativeSymbol})</span>
                     <input
@@ -943,24 +788,6 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
                       disabled={isBusy}
                     />
                   </label>
-                  <label className={styles.manage__field}>
-                    <span>Starts</span>
-                    <input
-                      type="datetime-local"
-                      value={newPhase.startAt}
-                      onChange={(e) => setNewPhase({ ...newPhase, startAt: e.target.value })}
-                      disabled={isBusy || newPhase.manualStart}
-                    />
-                  </label>
-                  <label className={styles.manage__field}>
-                    <span>Ends</span>
-                    <input
-                      type="datetime-local"
-                      value={newPhase.endAt}
-                      onChange={(e) => setNewPhase({ ...newPhase, endAt: e.target.value })}
-                      disabled={isBusy}
-                    />
-                  </label>
                   {Number(drop?.maxSupply ?? 0) > 0 && (
                     <label className={styles.manage__field}>
                       <span>Allocation</span>
@@ -975,56 +802,61 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
                       />
                     </label>
                   )}
-                  <label className={styles.manage__field}>
-                    <span>Who can mint</span>
-                    <select
-                      value={newPhase.gate}
-                      onChange={(e) => setNewPhase({ ...newPhase, gate: Number(e.target.value) })}
-                      disabled={isBusy}
-                    >
-                      <option value={DROP_GATES.OPEN}>Open to everyone</option>
-                      <option value={DROP_GATES.ALLOWLIST}>Allowlist</option>
-                      {hasCommunityGate && <option value={DROP_GATES.COMMUNITY}>Community members</option>}
-                    </select>
-                  </label>
-                  {newPhase.gate === DROP_GATES.COMMUNITY && (
-                    <label className={styles.manage__field}>
-                      <span>Which community</span>
-                      <select
-                        value={newPhase.communityId}
-                        onChange={(e) => setNewPhase({ ...newPhase, communityId: e.target.value })}
-                        disabled={isBusy}
-                      >
-                        <option value="">Choose…</option>
-                        {communities.map((community) => (
-                          <option key={community.id} value={community.id}>
-                            {community.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
                 </div>
 
-                <label className={styles.manage__newPhaseToggle}>
-                  <input
-                    type="checkbox"
-                    checked={newPhase.manualStart}
-                    onChange={(e) => setNewPhase({ ...newPhase, manualStart: e.target.checked })}
-                    disabled={isBusy}
-                  />
-                  Create it paused, and start it myself
-                </label>
+                <DropWhenPicker
+                  value={newPhase.schedule}
+                  onChange={(schedule) => setNewPhase({ ...newPhase, schedule })}
+                  disabled={isBusy}
+                />
 
-                <button type="button" className={styles.manage__phaseToggle} onClick={handleAddPhase} disabled={isBusy}>
-                  {isAddingPhase ? 'Adding…' : 'Add a stage'}
+                <DropGatePicker
+                  chainId={chainId}
+                  hasCommunityGate={hasCommunityGate}
+                  value={newPhase.gate}
+                  onChange={(gate) => setNewPhase({ ...newPhase, gate })}
+                  disabled={isBusy}
+                />
+
+                {newPhase.gate === DROP_GATES.COMMUNITY && (
+                  <label className={styles.manage__field}>
+                    <span>Which community</span>
+                    <select
+                      value={newPhase.communityId}
+                      onChange={(e) => setNewPhase({ ...newPhase, communityId: e.target.value })}
+                      disabled={isBusy}
+                    >
+                      <option value="">Choose…</option>
+                      {communities.map((community) => (
+                        <option key={community.id} value={community.id}>
+                          {community.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <button type="button" className={styles.manage__newPhaseSubmit} onClick={handleAddPhase} disabled={isBusy}>
+                  {isAddingPhase ? <Spinner size="14px" color="currentColor" strokeColor="currentColor" /> : <PlusIcon size={13} />}
+                  {isAddingPhase ? 'Adding' : 'Add a phase'}
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 className={styles.manage__addPhase}
-                onClick={() => setNewPhase({ startAt: '', endAt: '', price: '', perWallet: '', allocation: '', gate: DROP_GATES.OPEN, communityId: '', manualStart: true })}
+                onClick={() =>
+                  setNewPhase({
+                    name: '',
+                    // A phase added to a live drop waits for its creator by default
+                    schedule: emptySchedule({ startMode: DROP_START_MODES.MANUAL }),
+                    price: '',
+                    perWallet: '',
+                    allocation: '',
+                    gate: DROP_GATES.OPEN,
+                    communityId: '',
+                  })
+                }
                 disabled={isBusy}
               >
                 <PlusIcon size={13} />
@@ -1036,7 +868,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
         </div>
       )}
 
-      {hasAllowlistPhase && (
+      {tab === 'stages' && hasAllowlistPhase && (
         <div className={styles.manage__allowlistBlock}>
           <h3>
             Allowlist
@@ -1088,155 +920,41 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
         </div>
       )}
 
-      {isNumbered && !metadataFrozen && !isClosed && (
-        <div className={styles.manage__tokenUri}>
-          <h3>Token metadata</h3>
-          <p className={styles.manage__hint}>
-            {currentTokenUri ? (
-              <>
-                Token #1 currently resolves to <code title={currentTokenUri}>{currentTokenUri}</code>.{' '}
-                {currentTokenUri.includes('#')
-                  ? 'That’s the single-artwork placeholder — every token shares it.'
-                  : 'Each token resolves to its own file.'}
-              </>
-            ) : (
-              'Point each token at its own artwork.'
-            )}
-          </p>
-
-          <p className={styles.manage__hint}>
-            <a href={`/api/v1/drops/sample?standard=${standardId}`} download>
-              Download a sample metadata folder
-            </a>{' '}
-            — three example files named the way {isLukso ? 'LSP8' : 'this standard'} expects, plus a README with the
-            steps.
-          </p>
-
-          {isNumbered && !metadataFrozen && (
-            <DropArtworkUpload
-              standardId={standardId}
-              maxSupply={Number(drop?.maxSupply ?? 0)}
-              collectionName={drop?.name ?? ''}
-              disabled={isBusy}
-              onPinned={({ cid, suffix }) => {
-                setBaseUriDraft(`ipfs://${cid}/`)
-                setSuffixDraft(suffix)
-              }}
-            />
-          )}
-
-          <div className={styles.manage__tokenUriRow}>
-            <label className={styles.manage__field}>
-              <span>Base URI</span>
-              <input
-                type="text"
-                value={baseUriDraft}
-                placeholder="ipfs://<folder cid>/"
-                onChange={(e) => setBaseUriDraft(e.target.value.trim())}
-                disabled={isBusy}
-                spellCheck={false}
-              />
-            </label>
-            {/* LSP8 derives per-token URIs from the base key alone — no suffix to give it */}
-            {!isLukso && (
-              <label className={clsx(styles.manage__field, styles['manage__field--narrow'])}>
-                <span>Suffix</span>
-                <input
-                  type="text"
-                  value={suffixDraft}
-                  placeholder=".json"
-                  onChange={(e) => setSuffixDraft(e.target.value.trim())}
-                  disabled={isBusy}
-                  spellCheck={false}
-                />
-              </label>
-            )}
-          </div>
-
-          {baseUriDraft && (
+      {/* Metadata is managed in the Studio, which writes to this same collection with the same
+          owner keys and keeps working after the drop closes — this card only says where things
+          stand and opens the door */}
+      {tab === 'metadata' && (
+        <div className={styles.manage__studio}>
+          <div>
+            <h3>Metadata lives in the Studio</h3>
             <p className={styles.manage__hint}>
-              Token #1 will resolve to <code>{`${baseUriDraft}1${isLukso ? '' : suffixDraft}`}</code>
+              The collection&rsquo;s name, story and cover images{isLukso ? ', its creators' : ''}
+              {isNumbered ? ', and the artwork behind every token' : ''} — one place, for this and any other collection
+              you own.
             </p>
-          )}
-
-          <div className={styles.manage__tokenUriActions}>
-            <label className={styles.manage__folderPick}>
-              <input type="file" webkitdirectory="" directory="" multiple onChange={handleFolderPick} disabled={isBusy} hidden />
-              {isPinningFolder ? 'Pinning…' : 'Upload folder'}
-            </label>
-            <button type="button" onClick={handleSaveTokenUri} disabled={isBusy || !baseUriDraft.trim()}>
-              {isSavingTokenUri ? 'Saving…' : 'Save'}
-            </button>
+            {isNumbered && currentTokenUri && (
+              <p className={styles.manage__hint}>
+                Token #1 currently loads from <code title={currentTokenUri}>{currentTokenUri}</code>.{' '}
+                {sharesOneTokenDocument(currentTokenUri)
+                  ? 'That’s the single-artwork placeholder — every token shares it until you upload the set.'
+                  : 'Each token resolves to its own file.'}
+              </p>
+            )}
+            {metadataFrozen && (
+              <p className={styles.manage__hint}>
+                Metadata is frozen — the Studio still shows it{isLukso ? ' and lets you edit the creators' : ''}, but nothing
+                else can change.
+              </p>
+            )}
           </div>
-
-          <p className={styles.manage__hint}>
-            Upload a folder named by token id (<code>1.json</code>, <code>2.json</code>, …), or paste a CID you pinned
-            elsewhere — large collections are better pinned with your own tool. Hup pins whatever you upload here.
-          </p>
+          <Link href={studioHref} className={styles.manage__studioLink}>
+            <PaintBrushIcon size={14} aria-hidden="true" />
+            Open in Studio
+          </Link>
         </div>
       )}
 
-      {isLukso && (
-        <div className={styles.manage__creators}>
-          <h3>
-            Creators
-            <small>credited on the collection itself</small>
-          </h3>
-
-          {creators.length > 0 && (
-            <ul className={styles.manage__allowlistList}>
-              {creators.map((entry) => {
-                const isDropCreator = entry.toLowerCase() === drop?.creator?.toLowerCase()
-                return (
-                  <li key={entry}>
-                    <code title={entry}>{shortAddress(entry)}</code>
-                    {!isDropCreator && (
-                      <button
-                        type="button"
-                        onClick={() => saveCreators(creators.filter((value) => value !== entry))}
-                        disabled={isBusy}
-                        aria-label={`Remove ${entry} from the creators`}
-                      >
-                        <XIcon size={12} />
-                      </button>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-
-          {creators.length < MAX_DROP_CREATORS && (
-            <div className={styles.manage__payoutRow}>
-              <input
-                type="text"
-                value={creatorDraft}
-                placeholder="0x… collaborator"
-                onChange={(e) => setCreatorDraft(e.target.value.trim())}
-                disabled={isBusy}
-                spellCheck={false}
-              />
-              <button
-                type="button"
-                onClick={() => saveCreators([...creators, creatorDraft])}
-                disabled={
-                  isBusy ||
-                  !isAddress(creatorDraft) ||
-                  creators.some((entry) => entry.toLowerCase() === creatorDraft.toLowerCase())
-                }
-              >
-                {isSavingCreators ? 'Saving…' : 'Add'}
-              </button>
-            </div>
-          )}
-
-          <p className={styles.manage__hint}>
-            Written straight to the collection you own, so it keeps working even after you freeze the metadata.
-          </p>
-        </div>
-      )}
-
-      {!isClosed && (
+      {tab === 'payout' && !isClosed && (
         <div className={styles.manage__payout}>
           <h3>Where the money goes</h3>
           {/* A creator should not have to read a contract to learn what cut they keep. Every row
@@ -1310,46 +1028,65 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
               </button>
             )}
           </div>
+
+          {splitsAvailable && (
+            <>
+              <h3>Split between wallets</h3>
+              {payoutOverride && <SplitPayoutCard chainId={chainId} candidate={payoutOverride} title="Your current split" tokens={paymentTokens} />}
+              <p className={styles.manage__hint}>
+                Deploys an immutable split that pays these wallets by share and points your proceeds at it — one
+                signature. To pay different people later, save a new table; the old split stays as it was.
+              </p>
+              <DropPayeeTable rows={splitRows} onChange={setSplitRows} chainId={chainId} disabled={isBusy} />
+              <div className={styles.manage__payoutRow}>
+                <button type="button" onClick={handleSetPayoutSplit} disabled={isBusy || !isValidSplit(toSplitPayees(splitRows))}>
+                  {isSavingSplit ? 'Saving…' : 'Save split'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      <div className={styles.manage__royalty}>
-        <h3>Royalty</h3>
-        <div className={styles.manage__royaltyRow}>
-          <label className={styles.manage__field}>
-            <span>Percentage (max 10%)</span>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              step="0.01"
-              value={royaltyBpsDraft}
-              placeholder="0"
-              onChange={(e) => setRoyaltyBpsDraft(e.target.value)}
-              disabled={isBusy}
-            />
-          </label>
-          <label className={styles.manage__field}>
-            <span>Receiver</span>
-            <input
-              type="text"
-              value={royaltyReceiverDraft}
-              placeholder={address ?? '0x…'}
-              onChange={(e) => setRoyaltyReceiverDraft(e.target.value)}
-              disabled={isBusy}
-            />
-          </label>
-          <button type="button" className={styles.manage__phaseToggle} onClick={handleSetRoyalty} disabled={isBusy}>
-            Save
-          </button>
+      {tab === 'payout' && (
+        <div className={styles.manage__royalty}>
+          <h3>Royalty</h3>
+          <div className={styles.manage__royaltyRow}>
+            <label className={styles.manage__field}>
+              <span>Percentage (max 10%)</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.01"
+                value={royaltyBpsDraft}
+                placeholder="0"
+                onChange={(e) => setRoyaltyBpsDraft(e.target.value)}
+                disabled={isBusy}
+              />
+            </label>
+            <label className={styles.manage__field}>
+              <span>Receiver</span>
+              <input
+                type="text"
+                value={royaltyReceiverDraft}
+                placeholder={address ?? '0x…'}
+                onChange={(e) => setRoyaltyReceiverDraft(e.target.value)}
+                disabled={isBusy}
+              />
+            </label>
+            <button type="button" className={styles.manage__phaseToggle} onClick={handleSetRoyalty} disabled={isBusy}>
+              Save
+            </button>
+          </div>
+          <p className={styles.manage__hint}>
+            Currently {Number(royaltyBps) / 100}% {Number(royaltyBps) > 0 && royaltyReceiver ? `to ${shortAddress(royaltyReceiver)}` : ''} — ERC2981,
+            honoured by marketplaces that support it. 0% clears it.
+          </p>
         </div>
-        <p className={styles.manage__hint}>
-          Currently {Number(royaltyBps) / 100}% {Number(royaltyBps) > 0 && royaltyReceiver ? `to ${shortAddress(royaltyReceiver)}` : ''} — ERC2981,
-          honoured by marketplaces that support it. 0% clears it.
-        </p>
-      </div>
+      )}
 
-      {mints.length > 0 && (
+      {tab === 'overview' && mints.length > 0 && (
         <div className={styles.manage__activity}>
           <h3>Activity</h3>
           {/* The table scrolls inside this rather than being clipped: three nowrap columns plus
@@ -1368,7 +1105,9 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
             <tbody>
               {mints.map((mint) => (
                 <tr key={mint.tx_hash + mint.first_token_id}>
-                  <td>{mint.display_name || shortAddress(mint.minter)}</td>
+                  <td>
+                    <Profile creator={mint.minter} networkId={chainId} variant="compact" size={24} />
+                  </td>
                   <td>{countFormat.format(mint.quantity)}</td>
                   <td>
                     {Number(mint.total_paid) === 0 ? 'Free' : `${formatNative(mint.total_paid)} ${nativeSymbol}`}
@@ -1382,7 +1121,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
         </div>
       )}
 
-      {!metadataFrozen && (
+      {tab === 'danger' && !metadataFrozen && (
         <div className={styles.manage__danger}>
           <div>
             <strong>Freeze metadata</strong>
@@ -1408,7 +1147,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
         </div>
       )}
 
-      {!isClosed && (
+      {tab === 'danger' && !isClosed && (
         <div className={styles.manage__danger}>
           <div>
             <strong>Close drop</strong>
@@ -1437,141 +1176,6 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, col
         </div>
       )}
 
-      <NativeDialog
-        ref={editDialogRef}
-        className={styles.manage__dialog}
-        aria-label="Edit collection metadata"
-        onClick={(e) => e.stopPropagation()}
-        onClose={(e) => e.stopPropagation()}
-        onCancel={(e) => e.stopPropagation()}
-      >
-        <header className={styles.manage__dialogHeader}>
-          <button type="button" className={styles.manage__dialogCancel} onClick={() => editDialogRef.current?.close()}>
-            Cancel
-          </button>
-          <h3>Collection metadata</h3>
-        </header>
-
-        <div className={styles.manage__dialogBody}>
-          <p className={styles.manage__hint}>
-            Uploaded to IPFS and referenced onchain — updating costs one transaction. Shown on the drop page and anywhere the
-            collection appears.
-          </p>
-
-          <div className={styles.manage__identity}>
-            <label className={clsx(styles.manage__image, imageUrl && styles['manage__image--filled'])}>
-              {imageUrl ? <img src={imageUrl} alt="" /> : <ImageIcon size={22} weight="light" />}
-              <input type="file" accept="image/*" onChange={handleImageSelect} disabled={isBusy} hidden />
-            </label>
-            <div className={styles.manage__imageHint}>
-              <strong>Artwork {isImageUploading && <em>uploading…</em>}</strong>
-              <small>Tap to replace the collection image.</small>
-            </div>
-          </div>
-
-          <div className={styles.manage__identity}>
-            <label className={clsx(styles.manage__image, styles['manage__image--icon'], iconUrl && styles['manage__image--filled'])}>
-              {iconUrl ? <img src={iconUrl} alt="" /> : <ImageIcon size={18} weight="light" />}
-              <input type="file" accept="image/*" onChange={handleIconSelect} disabled={isBusy} hidden />
-            </label>
-            <div className={styles.manage__imageHint}>
-              <strong>Icon</strong>
-              <small>Square logo wallets and explorers show. Falls back to the artwork.</small>
-            </div>
-          </div>
-
-          <label className={styles.manage__field}>
-            <span>
-              Description
-              <em>
-                {description.length}/{MAX_DESCRIPTION_LENGTH}
-              </em>
-            </span>
-            <textarea
-              rows={4}
-              value={description}
-              maxLength={MAX_DESCRIPTION_LENGTH}
-              placeholder="What is the story behind this collection?"
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={isBusy}
-            />
-          </label>
-
-          <div className={styles.manage__field}>
-            <span>Banner {isBannerUploading && <em>uploading…</em>}</span>
-            <label className={clsx(styles.manage__banner, banner && styles['manage__banner--filled'])}>
-              {banner ? (
-                <img src={resolveStorageImageUrl(banner)} alt="" />
-              ) : (
-                <span>
-                  <ImageIcon size={18} weight="light" />
-                  Upload banner
-                </span>
-              )}
-              <input type="file" accept="image/*" onChange={handleBannerSelect} disabled={isBusy} hidden />
-            </label>
-            <small>Shown atop the drop page. Recommended 1600 × 640.</small>
-          </div>
-
-          {DROP_SOCIALS.map(({ key, title, placeholder }) => (
-            <label key={key} className={styles.manage__field}>
-              <span>{title}</span>
-              <input
-                type="url"
-                value={socials[key]}
-                placeholder={placeholder}
-                onChange={(e) => setSocials((prev) => ({ ...prev, [key]: e.target.value }))}
-                disabled={isBusy}
-              />
-            </label>
-          ))}
-
-          <div className={styles.manage__linksEditor}>
-            <span>More links</span>
-            {linkRows.map((row, index) => (
-              <div key={index} className={styles.manage__linkRow}>
-                <input
-                  type="text"
-                  value={row.title}
-                  placeholder="Title"
-                  onChange={(e) =>
-                    setLinkRows((rows) => rows.map((r, i) => (i === index ? { ...r, title: e.target.value } : r)))
-                  }
-                  disabled={isBusy}
-                />
-                <input
-                  type="url"
-                  value={row.url}
-                  placeholder="https://…"
-                  onChange={(e) => setLinkRows((rows) => rows.map((r, i) => (i === index ? { ...r, url: e.target.value } : r)))}
-                  disabled={isBusy}
-                />
-                <button
-                  type="button"
-                  onClick={() => setLinkRows((rows) => rows.filter((_, i) => i !== index))}
-                  aria-label="Remove link"
-                  disabled={isBusy}
-                >
-                  <XIcon size={14} />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className={styles.manage__addLink}
-              onClick={() => setLinkRows((rows) => [...rows, { title: '', url: '' }])}
-              disabled={isBusy}
-            >
-              <PlusIcon size={14} />
-              Add link
-            </button>
-          </div>
-
-          <button type="button" className={styles.manage__save} onClick={handleSaveMetadata} disabled={isBusy}>
-            {isBusy ? 'Updating…' : 'Update metadata'}
-          </button>
-        </div>
-      </NativeDialog>
     </section>
   )
 }

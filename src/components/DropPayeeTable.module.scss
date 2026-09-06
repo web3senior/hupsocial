@@ -1,0 +1,129 @@
+.payees {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    input {
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: inherit;
+      padding: 0.5rem 0.7rem;
+      font-size: var(--font-size-12);
+      font-family: inherit;
+    }
+  }
+
+  &__who {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    input {
+      width: 100%;
+    }
+  }
+
+  &__profile {
+    display: inline-flex;
+  }
+
+  &__error {
+    font-size: var(--font-size-12);
+    color: var(--danger, #ef4444);
+  }
+
+  &__share {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    input {
+      width: 5.5rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__remove {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    color: var(--text-muted, #888);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--color);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  &__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__add {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: inherit;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__total {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    font-variant-numeric: tabular-nums;
+
+    &--off {
+      color: var(--danger, #ef4444);
+    }
+  }
+}

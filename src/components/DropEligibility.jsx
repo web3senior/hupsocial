@@ -5,10 +5,12 @@ import { useConnection, useReadContracts } from 'wagmi'
 import { isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { CheckCircleIcon, PlusIcon, XCircleIcon, XIcon } from '@phosphor-icons/react'
+import { Spinner } from '@/components/Loading'
 import { CONTRACTS } from '@/config/wagmi'
 import { DROP_GATES, gateLabel } from '@/lib/drops'
 import dropsAbi from '@/abis/HupDrops.json'
 import { toast } from '@/components/NextToast'
+import Profile from '@/components/Profile'
 import styles from './DropEligibility.module.scss'
 
 // One list per viewer, shared across every drop — the whole point is answering "which of my
@@ -19,8 +21,6 @@ import styles from './DropEligibility.module.scss'
 const getWalletsKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}my-wallets`
 
 const MAX_WALLETS = 10
-
-const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
 
 const loadWallets = () => {
   if (typeof window === 'undefined') return []
@@ -133,6 +133,12 @@ export default function DropEligibility({ chainId, dropId, phaseIndex, phase, cr
 
   const perWallet = Number(phase.perWallet ?? 0)
 
+  /* A followers gate can name an account other than the creator — zero means the creator, which
+     is what every drop made before that was possible carries. */
+  const followed = phase.gateAsset && phase.gateAsset !== zeroAddress ? phase.gateAsset : creator
+  const followsCreator = followed?.toLowerCase() === creator?.toLowerCase()
+  const followedLabel = followsCreator ? 'the creator' : `${followed.slice(0, 6)}…${followed.slice(-4)}`
+
   /** Why a wallet can't mint — the cheapest true statement, most specific first. */
   const reasonFor = (index) => {
     const minted = Number(results?.[index * 3 + 1]?.result ?? 0)
@@ -140,7 +146,7 @@ export default function DropEligibility({ chainId, dropId, phaseIndex, phase, cr
 
     if (perWallet > 0 && minted >= perWallet) return `Already minted ${minted} of ${perWallet}`
     if (gate === DROP_GATES.ALLOWLIST && onAllowlist === false) return 'Not on the allowlist'
-    if (gate === DROP_GATES.FOLLOWERS) return `Doesn${'’'}t follow the creator`
+    if (gate === DROP_GATES.FOLLOWERS) return `Doesn${'’'}t follow ${followedLabel}`
     if (gate === DROP_GATES.ASSET_HOLDERS || gate === DROP_GATES.ASSET_HOLDERS_1155) return `Doesn${'’'}t hold enough of the gate asset`
     // Every gate passed, so what is left is the phase itself — closed, sold out, or not open yet
     return `Can${'’'}t mint right now`
@@ -166,11 +172,11 @@ export default function DropEligibility({ chainId, dropId, phaseIndex, phase, cr
             return (
               <li key={wallet} className={clsx(canMint && styles['eligibility__row--eligible'])}>
                 <span className={styles.eligibility__verdict} aria-hidden="true">
-                  {isLoading ? '…' : canMint ? <CheckCircleIcon size={16} weight="fill" /> : <XCircleIcon size={16} />}
+                  {isLoading ? <Spinner size="16px" color="currentColor" strokeColor="currentColor" /> : canMint ? <CheckCircleIcon size={16} weight="fill" /> : <XCircleIcon size={16} />}
                 </span>
 
                 <span className={styles.eligibility__who}>
-                  <code title={wallet}>{shortAddress(wallet)}</code>
+                  <Profile creator={wallet} networkId={chainId} variant="compact" size={24} />
                   {isConnected && <em>connected</em>}
                   {isCreator && <em>creator</em>}
                 </span>

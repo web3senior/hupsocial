@@ -28,6 +28,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
+    text-decoration: none;
     border: 1px solid var(--border);
     background: var(--background);
     color: inherit;
@@ -46,6 +47,13 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+  }
+
+  // Hugs its options rather than stretching to the panel's width — the control scrolls with
+  // edge fades on its own when the panel is narrower than the row
+  &__tabs {
+    align-self: flex-start;
+    max-width: 100%;
   }
 
   // The earnings headline. Big enough to be the first thing read, quiet enough not to shout
@@ -131,6 +139,39 @@
     line-height: 1.5;
   }
 
+  // The creator-verification row: one sentence and, until the profile lists the collection, one button
+  &__listing {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+
+    button {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        border-color: var(--primary, #ec4899);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
   // Wide content scrolls inside its own box rather than being clipped or pushing the panel
   // sideways. It also owns the rounded corners, since the table can no longer clip its own.
   &__tableScroll {
@@ -191,6 +232,10 @@
       padding: 0.55rem 0.7rem;
       font-size: var(--font-size-12);
     }
+  }
+
+  &__phaseTrack {
+    margin-block-end: 0.15rem;
   }
 
   &__phaseStatus {
@@ -340,8 +385,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    border: 1px dashed var(--border);
-    background: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
     color: inherit;
     border-radius: 999px;
     padding: 0.35rem 0.8rem;
@@ -358,11 +403,40 @@
 
     &:hover:not(:disabled) {
       border-color: var(--primary, #ec4899);
-      border-style: solid;
     }
 
     &:disabled {
       opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  // The form's one commit, styled like every other primary submit in the drop flow: the chain's
+  // colour, full width, contents centred
+  &__newPhaseSubmit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    margin-top: 0.25rem;
+    border: none;
+    background-color: var(--network-color-primary, var(--primary, #ec4899));
+    color: var(--network-color-text, #fff);
+    border-radius: var(--global-border-radius);
+    padding: 0.8rem 1rem;
+    font: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    &:disabled {
+      background-color: var(--surface);
+      color: var(--text-muted, #888);
       cursor: not-allowed;
     }
   }
@@ -375,6 +449,18 @@
     border-radius: var(--global-border-radius);
     background: var(--surface-muted);
     padding: 0.75rem;
+
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface);
+      color: inherit;
+      padding: 0.55rem 0.7rem;
+      font: inherit;
+      font-size: var(--font-size-12);
+    }
   }
 
   &__phaseHead {
@@ -413,18 +499,6 @@
     @media (max-width: 420px) {
       grid-template-columns: 1fr;
     }
-
-    select {
-      width: 100%;
-      box-sizing: border-box;
-      border: 1px solid var(--border);
-      border-radius: var(--global-border-radius);
-      background: var(--surface);
-      color: inherit;
-      padding: 0.55rem 0.7rem;
-      font: inherit;
-      font-size: var(--font-size-12);
-    }
   }
 
   &__newPhaseToggle {
@@ -436,80 +510,40 @@
     cursor: pointer;
   }
 
-  &__tokenUri {
+  // A doorway, not a form: heading and hint on the left, one pill on the right
+  &__studio {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-
-    h3 {
-      margin: 0;
-      font-size: var(--font-size-14, 0.875rem);
-    }
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 
     code {
       word-break: break-all;
     }
-  }
 
-  &__tokenUriRow {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  &__tokenUriActions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-
-    button,
-    label {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: inherit;
-      border-radius: 999px;
-      padding: 0.35rem 0.8rem;
-      font-size: var(--font-size-12);
-      font-weight: 600;
-      cursor: pointer;
-
-      &:hover:not(:disabled) {
-        border-color: var(--primary, #ec4899);
-      }
-
-      &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
+    h3 {
+      margin: 0 0 0.25rem;
+      font-size: var(--font-size-14, 0.875rem);
     }
   }
 
-  // The hidden input drives the disabled look; the label itself never gets :disabled
-  &__folderPick:has(input:disabled) {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  &__studioLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: inherit;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
 
-  &__creators {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-
-    h3 {
-      margin: 0;
-      display: flex;
-      align-items: baseline;
-      gap: 0.5rem;
-      font-size: var(--font-size-14, 0.875rem);
-
-      small {
-        font-weight: 400;
-        color: var(--text-muted, #888);
-        font-size: var(--font-size-12);
-      }
+    &:hover {
+      border-color: var(--primary, #ec4899);
     }
   }
 
@@ -593,6 +627,10 @@
 
   &__phaseToggle {
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.5rem;
     border: 1px solid var(--border);
     background: var(--surface);
     color: inherit;
@@ -761,107 +799,6 @@
     color: var(--text-muted, #888);
   }
 
-  &__dialog {
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--global-border-radius);
-    background: var(--surface);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
-    width: min(440px, calc(100vw - 6px - 2em - 2px));
-  }
-
-  &__dialogHeader {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.85rem 1rem;
-    border-bottom: 1px solid var(--border);
-
-    h3 {
-      margin: 0;
-      font-size: var(--font-size-16, 1rem);
-    }
-  }
-
-  &__dialogCancel {
-    all: unset;
-    cursor: pointer;
-    position: absolute;
-    left: 1rem;
-    font-size: var(--font-size-12);
-    color: var(--text-muted, #888);
-  }
-
-  &__dialogBody {
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
-    padding: 1rem;
-    max-height: 70svh;
-    overflow-y: auto;
-  }
-
-  &__identity {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  &__image {
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    width: 64px;
-    height: 64px;
-    border-radius: var(--global-border-radius);
-    border: 1px dashed var(--border);
-    color: var(--text-muted, #888);
-    cursor: pointer;
-    overflow: hidden;
-
-    &:hover {
-      border-color: var(--primary, #ec4899);
-    }
-
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    &--filled {
-      border-style: solid;
-    }
-
-    &--icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-    }
-  }
-
-  &__imageHint {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-
-    strong {
-      font-size: var(--font-size-14, 0.875rem);
-    }
-
-    em {
-      font-style: normal;
-      font-weight: 400;
-      color: var(--text-muted, #888);
-    }
-
-    small {
-      font-size: var(--font-size-12);
-      color: var(--text-muted, #888);
-    }
-  }
-
   &__field {
     display: flex;
     flex-direction: column;
@@ -905,125 +842,9 @@
     &--narrow {
       flex: 0 1 8rem;
     }
-  }
 
-  &__banner {
-    display: grid;
-    place-items: center;
-    aspect-ratio: 1600 / 640;
-    border: 1px dashed var(--border);
-    border-radius: var(--global-border-radius);
-    color: var(--text-muted, #888);
-    cursor: pointer;
-    overflow: hidden;
-
-    &:hover {
-      border-color: var(--primary, #ec4899);
-    }
-
-    > span {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: var(--font-size-12);
-    }
-
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    &--filled {
-      border-style: solid;
-    }
-  }
-
-  &__linksEditor {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-
-    > span {
-      font-size: var(--font-size-12);
-      color: var(--text-muted, #888);
-    }
-  }
-
-  &__linkRow {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
-    gap: 0.4rem;
-    align-items: center;
-
-    input {
-      width: 100%;
-      box-sizing: border-box;
-      border: 1px solid var(--border);
-      border-radius: var(--global-border-radius);
-      background: var(--surface-muted);
-      color: inherit;
-      padding: 0.45rem 0.6rem;
-      font: inherit;
-      font-size: var(--font-size-12);
-
-      &:focus-visible {
-        outline: none;
-        border-color: var(--primary, #ec4899);
-      }
-    }
-
-    button {
-      all: unset;
-      cursor: pointer;
-      display: grid;
-      place-items: center;
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      color: var(--text-muted, #888);
-
-      &:hover {
-        background: var(--hover);
-      }
-    }
-  }
-
-  &__addLink {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    align-self: flex-start;
-    border: none;
-    background: none;
-    color: var(--primary, #ec4899);
-    font-size: var(--font-size-12);
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0;
-  }
-
-  &__save {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    border: none;
-    background-color: var(--primary, #ec4899);
-    color: #fff;
-    border-radius: 999px;
-    padding: 0.7rem 1rem;
-    font-size: var(--font-size-14, 0.875rem);
-    font-weight: 600;
-    cursor: pointer;
-
-    &:hover:not(:disabled) {
-      opacity: 0.9;
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    &--wide {
+      grid-column: 1 / -1;
     }
   }
 }

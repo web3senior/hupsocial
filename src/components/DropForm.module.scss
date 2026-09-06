@@ -1,0 +1,1229 @@
+.dropForm {
+  // One scale for the whole form — retune it from here
+  --drop-radius: 1.35rem;
+  --drop-card-radius: 1rem;
+  --drop-card-pad: 0.8rem 0.95rem;
+  --drop-gap: 0.6rem;
+  --drop-inset: 1rem;
+  // Hovering an upload target darkens its fill; the dark theme needs a deeper mix to shift at all
+  --drop-upload-hover: color-mix(in srgb, #000 8%, var(--surface-muted));
+
+  // The switches answer to the drop's chain like every other accent on the page
+  --toggle-active: var(--network-color-primary, var(--primary, #ec4899));
+  --toggle-active-border: var(--network-color-primary, var(--primary, #ec4899));
+  --toggle-tick: var(--network-color-primary, var(--primary, #ec4899));
+
+  // Owns no chrome of its own — the page around it provides that
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  user-select: none;
+  container-type: inline-size;
+  container-name: dropForm;
+
+  /* What the creator wrote is theirs to select. The controls are listed explicitly because
+     user-select: none inherits straight through a form field in Chrome. */
+  input,
+  textarea,
+  select {
+    user-select: text;
+  }
+
+  // The preview column is the drop as it will be read, not instructions for filling it in
+  &__aside,
+  &__facts dd {
+    user-select: text;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: 0.4rem 0.5rem;
+  }
+
+  &__headerEnd {
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  &__iconButton {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: var(--surface-muted);
+      color: var(--text);
+    }
+  }
+
+  &__steps {
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+
+    ol {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      opacity: 0.45;
+    }
+  }
+
+  &__stepsHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: var(--font-size-14, 0.875rem);
+
+    span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__stepMark {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    font-size: var(--font-size-12);
+    line-height: 1;
+  }
+
+  &__stepText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+
+    strong { font-size: var(--font-size-14, 0.875rem); font-weight: 600; }
+    small { font-size: var(--font-size-12); color: var(--text-muted, #888); }
+  }
+
+  &__step--active {
+    opacity: 1;
+
+    .dropForm__stepMark {
+      border-color: var(--network-color-primary, var(--color-primary));
+      color: var(--network-color-primary, var(--color-primary));
+      font-weight: 700;
+    }
+  }
+
+  &__step--done {
+    opacity: 0.8;
+
+    .dropForm__stepMark {
+      border-color: transparent;
+      color: #10b981;
+    }
+  }
+
+  &__stepsFoot {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.5;
+  }
+
+  &__draft {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__draftDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+    flex-shrink: 0;
+  }
+
+  &__reset {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding-inline-end: 0.25rem;
+    cursor: pointer;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+    transition: color 0.15s ease;
+    white-space: nowrap;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    // Its own hover, and after the plain one: --armed alone loses to :hover on specificity, so
+    // the armed button was going dark under the cursor at the exact moment it means "destructive"
+    &--armed {
+      color: #ef4444;
+
+      &:hover {
+        color: #dc2626;
+      }
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  &__required {
+    margin-inline-start: 0.15rem;
+    color: var(--status-error, #dc2626);
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding-block: 0.35rem 0.55rem;
+  }
+
+  &__image {
+    position: relative;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    overflow: hidden;
+    transition: background-color 0.15s ease;
+
+    // The ring holds its colour; only the fill darkens, so hover never reads as a selection
+    &:hover {
+      background: var(--drop-upload-hover);
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    // The artwork is the frame once it's there — the ring steps back to a hairline
+    &--filled {
+      border: 1px solid var(--border);
+    }
+  }
+
+  /* Inset by 1px with the stroke straddling the path, so the 2px line lands exactly on the
+     element's edge whatever size or shape the target is. */
+  &__frame {
+    position: absolute;
+    inset: 1px;
+    width: calc(100% - 2px);
+    height: calc(100% - 2px);
+    overflow: visible;
+    pointer-events: none;
+
+    rect {
+      fill: none;
+      // currentColor, not a border token: --border-strong is a white alpha in both themes
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-dasharray: 6 5;
+      stroke-linecap: round;
+      opacity: 0.45;
+    }
+  }
+
+  &__imageHint {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    // min-width: 0 so an unbroken filename cannot widen the dialog
+    min-width: 0;
+
+    strong {
+      font-size: var(--font-size-16, 1rem);
+      font-weight: 600;
+      color: var(--foreground, var(--text));
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+
+    small {
+      font-size: var(--font-size-14, 0.875rem);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__imageActions {
+    display: flex;
+    gap: 0.75rem;
+    font-size: var(--font-size-12);
+
+    label,
+    button {
+      all: unset;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+
+    button {
+      color: #e34948;
+    }
+  }
+
+  &__counter {
+    float: inline-end;
+    font-style: normal;
+    opacity: 0.7;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    gap: var(--drop-gap);
+
+    @media (max-width: 420px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  // The form's one surface: a filled card holding its own label, control and hint
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad);
+    transition: border-color 0.15s ease;
+
+    &:focus-within {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+
+    > span {
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text-muted, #888);
+
+      em {
+        font-style: normal;
+        font-weight: 400;
+        opacity: 0.7;
+      }
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
+      opacity: 0.85;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      // Without this a long option name sets the select's min-content width and widens the row
+      min-width: 0;
+      box-sizing: border-box;
+
+      /* The dropdown list is painted by the browser, not by this stylesheet, and a transparent
+         option lands on whatever the UA decides — which on Windows is a light sheet even under a
+         dark color-scheme. Naming both colours is the only way it follows the theme everywhere. */
+      option {
+        background-color: var(--surface);
+        // inherit, not --text: the select already resolves the brighter field colour
+        color: inherit;
+      }
+      border: none;
+      background: none;
+      color: inherit;
+      padding: 0;
+      font: inherit;
+      font-size: var(--font-size-15, 0.9375rem);
+      resize: vertical;
+
+      &:focus-visible {
+        outline: none;
+      }
+
+      &::placeholder {
+        color: var(--text-muted, #888);
+        opacity: 0.75;
+      }
+    }
+
+    // Spinners fight the borderless field
+    input[type='number'] {
+      appearance: textfield;
+
+      &::-webkit-outer-spin-button,
+      &::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+      }
+    }
+
+    textarea {
+      min-height: 5.5rem;
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+
+      &:hover,
+      &:focus {
+        scrollbar-color: var(--thumbBG) transparent;
+      }
+    }
+  }
+
+  &__brandingToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    align-self: flex-start;
+    border: none;
+    background: none;
+    padding: 0.15rem 0;
+    color: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+
+    em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+
+    svg {
+      transition: transform 0.15s ease;
+    }
+  }
+
+  // Closed points right, open turns it down — a quarter turn, not the half a down-caret needed
+  &__caret--open {
+    transform: rotate(90deg);
+  }
+
+  &__branding {
+    display: flex;
+    flex-direction: column;
+    gap: var(--drop-gap);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--drop-card-radius) + 0.25rem);
+    padding: 0.85rem;
+  }
+
+  &__banner {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1600 / 640;
+    border: none;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    overflow: hidden;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background: var(--drop-upload-hover);
+    }
+
+    > span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: var(--font-size-12);
+
+      em {
+        font-style: normal;
+      }
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &--filled {
+      border: 1px solid var(--border);
+    }
+  }
+
+  &__bannerHint {
+    margin-top: -0.25rem;
+    padding-inline: 0.2rem;
+    font-size: var(--font-size-10, 0.625rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  &__phase {
+    display: flex;
+    flex-direction: column;
+    gap: var(--drop-gap);
+
+    &:not(:only-of-type) {
+      border: 1px solid var(--border);
+      border-radius: calc(var(--drop-card-radius) + 0.25rem);
+      padding: 0.85rem;
+    }
+  }
+
+  &__phaseHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-inline: 0.2rem;
+
+    strong {
+      font-size: var(--font-size-12);
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border: none;
+      background: none;
+      color: var(--text-muted, #888);
+      padding: 0;
+      font: inherit;
+      font-size: var(--font-size-12);
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        color: var(--network-color-primary, var(--primary, #ec4899));
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__labelHint {
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+    cursor: help;
+  }
+
+  &__tokenKind {
+    display: inline-flex;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+
+    button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted, #888);
+      border-radius: 999px;
+      padding: 0.25rem 0.65rem;
+      font: inherit;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__gateProfile {
+    display: flex;
+    align-items: center;
+    margin-block-start: 0.35rem;
+    font-size: var(--font-size-12);
+  }
+
+  &__gateNote {
+    margin: 0;
+    padding-inline: 0.15rem;
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  &__phaseNote {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad);
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+
+    p {
+      margin: 0;
+
+      + p {
+        margin-block-start: 0.5rem;
+      }
+    }
+
+    strong {
+      color: var(--text, inherit);
+      font-weight: 600;
+    }
+
+    > svg {
+      flex-shrink: 0;
+      margin-block-start: 0.1rem;
+      color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+  }
+
+  &__phaseNoteMore {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--network-color-primary, var(--primary, #ec4899));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  &__addPhase {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 1px dashed var(--border-strong, var(--border));
+    background: none;
+    color: inherit;
+    border-radius: var(--drop-card-radius);
+    padding: 0.7rem 0.85rem;
+    font: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+
+    em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+
+    &:hover:not(:disabled) {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+      border-style: solid;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  // Option rows carry the same card chrome as the fields: title left, pills right, hint below
+  &__presets,
+  &__optionCard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad);
+  }
+
+  &__optionCard {
+    display: block;
+  }
+
+  &__presets {
+    > span {
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+    }
+
+    // direct child only — a bare `div` also catches Tooltip's popover panels
+    > div {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.3rem;
+    }
+
+    // Helper text always takes its own line under the pills
+    > small {
+      flex-basis: 100%;
+      margin-top: 0.15rem;
+      font-size: var(--font-size-12);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
+      opacity: 0.85;
+    }
+
+    // The pills only — a bare `button` also catches the label's info dot
+    > div button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted, #888);
+      border-radius: 999px;
+      padding: 0.3rem 0.7rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+    }
+  }
+
+  &__preset--active {
+    border-color: var(--network-color-primary, var(--primary, #ec4899)) !important;
+    color: var(--network-color-primary, var(--primary, #ec4899)) !important;
+  }
+
+  // The typed value the pills above it set, inset on its own line inside the option card
+  &__rateField {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--drop-card-radius) - 0.15rem);
+    background: var(--background);
+    padding: 0.7rem 0.75rem;
+    cursor: text;
+    transition: border-color 0.15s ease;
+
+    &:focus-within {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+  }
+
+  &__rateIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--network-color-primary, var(--primary, #ec4899));
+    color: #fff;
+  }
+
+  &__rateValue {
+    display: inline-flex;
+    align-items: baseline;
+    margin-right: auto;
+    font-size: var(--font-size-18, 1.125rem);
+    font-weight: 700;
+
+    // Sized to the digits, so the caret sits right where the number ends
+    input {
+      width: calc(var(--rate-len, 1) * 1ch);
+      min-width: 1ch;
+      border: 0;
+      padding: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      font-variant-numeric: tabular-nums;
+      outline: none;
+      appearance: textfield;
+
+      &::-webkit-outer-spin-button,
+      &::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+      }
+    }
+  }
+
+  &__rateCut {
+    min-width: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text-muted, #888);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  &__rateHint {
+    text-align: right;
+  }
+
+  &__preview {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad);
+
+    img {
+      flex-shrink: 0;
+      width: 56px;
+      height: 56px;
+      border-radius: calc(var(--drop-card-radius) - 0.35rem);
+      object-fit: cover;
+    }
+
+    div {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    strong {
+      font-size: var(--font-size-15, 0.9375rem);
+    }
+
+    > div > span {
+      font-size: var(--font-size-12);
+      color: var(--network-color-primary, var(--primary, #ec4899));
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0.25rem 0 0;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      line-height: 1.45;
+    }
+  }
+
+  &__facts {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad);
+
+    div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    dt {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      flex-shrink: 0;
+    }
+
+    dd {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      font-size: var(--font-size-12);
+      text-align: end;
+      // min-width: 0 so a pasted address cannot widen the review card
+      min-width: 0;
+      overflow-wrap: anywhere;
+
+      small {
+        color: var(--text-muted, #888);
+      }
+    }
+  }
+
+  &__note {
+    margin: 0;
+    border-radius: var(--drop-card-radius);
+    background: var(--surface-muted);
+    padding: var(--drop-card-pad);
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  // The one action a notice can carry: re-check a stalled receipt, or dismiss a stale warning
+  &__noteAction {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.25rem;
+    padding: 0.15rem 0.6rem;
+    font: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--color);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--network-color-primary, var(--color-primary));
+    }
+  }
+
+  &__done {
+    align-items: center;
+    text-align: center;
+    padding-block: 1.5rem;
+
+    h4 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    a {
+      width: 100%;
+      box-sizing: border-box;
+      text-decoration: none;
+      text-align: center;
+    }
+  }
+
+  &__doneMark {
+    position: relative;
+    display: block;
+    width: 72px;
+    height: 72px;
+
+    img {
+      width: 100%;
+      height: 100%;
+      border-radius: var(--drop-card-radius);
+      object-fit: cover;
+    }
+
+    svg {
+      position: absolute;
+      inset-block-end: -2px;
+      inset-inline-end: -2px;
+      color: #22a06b;
+      background: var(--surface);
+      border-radius: 50%;
+    }
+  }
+
+  &__submit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+    border: none;
+    background-color: var(--network-color-primary, var(--primary, #ec4899));
+    color: #fff;
+    border-radius: var(--drop-card-radius);
+    padding: 0.95rem 1rem;
+    font-size: var(--font-size-15, 0.9375rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    // Reads as a resting block rather than a faded accent
+    &:disabled {
+      background-color: var(--surface-muted);
+      color: var(--text-muted, #888);
+      cursor: not-allowed;
+    }
+  }
+
+  &__rail {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 100%;
+    max-width: 40rem;
+    margin-inline: auto;
+    margin-block-end: 1.5rem;
+  }
+
+  // A button because the rail is the way back; the ones you cannot return to still answer hover
+  &__railStep {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    text-align: center;
+    cursor: help;
+
+    // The connector rides the mark row, drawn from each step but the first
+    &:not(:first-child)::before {
+      content: '';
+      position: absolute;
+      inset-inline: calc(-50% + 1.25rem) calc(50% + 1.25rem);
+      inset-block-start: 0.9rem;
+      height: 1px;
+      background: var(--border);
+    }
+  }
+
+  // A button only so the whole name answers hover and the keyboard, never to be clicked
+  &__railLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+
+    svg {
+      opacity: 0.5;
+    }
+  }
+
+  .dropForm__railStep:hover &__railLabel svg,
+  .dropForm__railStep:focus-visible &__railLabel svg {
+    opacity: 1;
+    color: var(--network-color-primary, var(--primary, #ec4899));
+  }
+
+  // A step already behind you is somewhere you can go
+  &__railStep--return {
+    cursor: pointer;
+
+    &:hover .dropForm__railMark {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+      color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+  }
+
+  &__railMark {
+    display: grid;
+    place-items: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+  }
+
+  &__railStep--active {
+    color: var(--text, inherit);
+    font-weight: 600;
+
+    .dropForm__railMark {
+      border-color: transparent;
+      background: var(--network-color-primary, var(--primary, #ec4899));
+      color: #fff;
+    }
+  }
+
+  &__railStep--done {
+    color: var(--text, inherit);
+
+    .dropForm__railMark {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+      color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+  }
+
+  &__columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+
+    // Past this the preview fits beside the fields and still leaves the form a usable column
+    @container dropForm (min-width: 40rem) {
+      grid-template-columns: minmax(0, 1fr) 16rem;
+      gap: 1.5rem;
+    }
+  }
+
+  // A step with no preview beside it should not be squeezed into the column one would have taken
+  &__columns--single {
+    @container dropForm (min-width: 40rem) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  &__aside {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: sticky;
+    // Clears the fixed header the same way the page container does
+    top: calc(var(--header-height, 4rem) + 1rem);
+  }
+
+  &__asideTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+  }
+
+  &__asideNote {
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  &__artwork {
+    display: flex;
+    flex-direction: column;
+    gap: var(--drop-gap);
+  }
+
+  &__artworkIntro {
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    line-height: 1.55;
+    color: var(--text-muted, #888);
+
+    strong {
+      color: var(--text, inherit);
+      font-weight: 600;
+    }
+  }
+
+  &__pinned {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: var(--drop-card-radius);
+    background: color-mix(in srgb, var(--network-color-primary, var(--primary, #ec4899)) 10%, transparent);
+    padding: var(--drop-card-pad);
+    font-size: var(--font-size-13, 0.8125rem);
+
+    code {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: var(--font-size-12);
+      opacity: 0.75;
+    }
+
+    .dropForm__skip {
+      margin-inline-start: auto;
+      white-space: nowrap;
+    }
+  }
+
+  // The steps that use it are short ones, and a button stretched across the whole page reads as
+  // an empty row rather than an action
+  &__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+
+    .dropForm__submit {
+      min-width: 14rem;
+      margin-top: 0;
+    }
+  }
+
+  // Sits under the network list, which is itself centred — a left-aligned button under a
+  // centred column reads as a stray
+  &__nav--center {
+    justify-content: center;
+  }
+
+  &__skip {
+    align-self: center;
+    border: none;
+    background: none;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-13, 0.8125rem);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--text, inherit);
+    }
+  }
+}
+
+:global([data-theme='dark']) .dropForm {
+  --drop-upload-hover: color-mix(in srgb, #000 35%, var(--surface-muted));
+  // The dark knob is near-black, so its tick stays white rather than taking the chain colour
+  --toggle-tick: #ffffff;
+}
