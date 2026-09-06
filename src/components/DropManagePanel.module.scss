@@ -75,6 +75,10 @@
   }
 
   &__earningsValue {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0 0.15em;
     font-size: 2.25rem;
     line-height: 1.1;
     font-weight: 700;
@@ -87,8 +91,27 @@
       font-size: 1rem;
       font-weight: 600;
       color: var(--text-muted, #888);
-      margin-left: 0.3rem;
+      margin-left: 0.15rem;
     }
+
+    &--earned {
+      color: var(--tip-earned-color);
+    }
+  }
+
+  // The tip pill's spinning dollar sign, sized as the headline's currency glyph
+  &__earningsSign {
+    flex: none;
+    width: 0.95em;
+    height: 0.95em;
+    object-fit: contain;
+  }
+
+  &__earningsUsd {
+    color: var(--tip-earned-color);
+    font-size: var(--font-size-16, 1rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
   &__earningsNote {

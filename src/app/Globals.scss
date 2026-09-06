@@ -58,6 +58,8 @@
   // percentage and its caret carry the direction regardless, so the hue is never the only cue.
   --trend-up: #0d9488;
   --trend-down: #d1383d;
+  // Money earned (the tip pill, drop earnings): one flat green that clears 7:1 on every surface
+  --tip-earned-color: #21c95e;
   // Floor-line hue (collection floor chart). Passes on all three surfaces, so the dark and
   // terminal blocks below inherit it rather than restating it.
   --chart-line: #8b5cf6;

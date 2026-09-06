@@ -12,6 +12,7 @@ import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { describeWalletError } from '@/lib/walletErrors'
 import { isUniversalProfile } from '@/lib/lsp3'
 import { ERC725Y_SET_DATA_BATCH_ABI, encodeIssuedAssetAppend, issuedAssetInterfaceId, readIssuedAssetListing } from '@/lib/lsp12'
+import { formatUsd, rateFor, usdValue } from '@/lib/usdAmount'
 import {
   ALLOWLIST_BATCH_SIZE,
   DROP_GATES,
@@ -46,6 +47,7 @@ import Profile from '@/components/Profile'
 import { toast } from '@/components/NextToast'
 import { Spinner } from '@/components/Loading'
 import SegmentedControl from '@/components/ui/SegmentedControl'
+import { DOLLAR_SIGN_SRC } from '@/components/ui/Tip'
 import { PaintBrushIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
 import styles from './DropManagePanel.module.scss'
 
@@ -187,6 +189,11 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, onC
   const creatorNetWei = grossWei - percentageFeeWei - referralsWei
   // The whole amount that left minters' wallets: the price plus the flat fee charged on top
   const minterPaidWei = grossWei + flatFeeWei
+  const hasEarned = Boolean(totals) && creatorNetWei > 0n
+  // Priced at read time from the route's best-effort rate; an unpriced chain shows no dollar line
+  const earnedUsd = hasEarned
+    ? formatUsd(usdValue(creatorNetWei, chainInfo?.nativeCurrency?.decimals ?? 18, rateFor(indexed?.data?.usd, null)))
+    : null
 
   const { data: communitySystem } = useReadContract({
     abi: dropsAbi,
@@ -632,9 +639,14 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, onC
         <>
           <div className={styles.manage__earnings}>
             <span className={styles.manage__earningsLabel}>Earned from mints</span>
-            <strong className={styles.manage__earningsValue}>
-              {totals ? formatNative(creatorNetWei) : '—'} <em>{nativeSymbol}</em>
+            {/* Once something is earned it wears the tip pill's green and spinning dollar sign: the
+                same money, seen from the creator's side. At zero it stays in plain ink. */}
+            <strong className={clsx(styles.manage__earningsValue, hasEarned && styles['manage__earningsValue--earned'])}>
+              {hasEarned && <img className={styles.manage__earningsSign} src={DOLLAR_SIGN_SRC} alt="" />}
+              {totals ? formatNative(creatorNetWei) : '—'}
+              <em>{nativeSymbol}</em>
             </strong>
+            {earnedUsd && <span className={styles.manage__earningsUsd}>≈ {earnedUsd}</span>}
             <small className={styles.manage__earningsNote}>
               {minterPaidWei > 0n ? (
                 <>

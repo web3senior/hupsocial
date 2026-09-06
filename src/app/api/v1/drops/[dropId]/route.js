@@ -5,7 +5,9 @@
  * creator's Manage panel charts. Live mint state still resolves from chain; this is history.
  */
 import { NextResponse } from 'next/server'
+import { zeroAddress } from 'viem'
 import pool from '@/lib/db'
+import { fetchUsdPrices, priceKeyFor } from '@/lib/prices'
 
 export const runtime = 'nodejs'
 
@@ -18,6 +20,10 @@ export async function GET(request, { params }) {
     if (!networkId || !/^\d+$/.test(String(dropId))) {
       return NextResponse.json({ success: false, error: 'networkId and a numeric dropId are required' }, { status: 400 })
     }
+
+    // Best effort and cached five minutes; a chain with no market price ships no rate at all
+    const nativeKey = priceKeyFor(networkId, zeroAddress)
+    const pricesPromise = fetchUsdPrices([nativeKey])
 
     const [dropRows] = await pool.execute(
       `SELECT d.network_id, d.drop_id, d.collection, d.creator, d.standard_id,
@@ -77,7 +83,10 @@ export async function GET(request, { params }) {
       [networkId, dropId],
     )
 
-    return NextResponse.json({ success: true, data: { drop: dropRows[0], phases, mints, totals, daily } })
+    return NextResponse.json({
+      success: true,
+      data: { drop: dropRows[0], phases, mints, totals, daily, usd: { [zeroAddress]: (await pricesPromise).get(nativeKey) ?? null } },
+    })
   } catch (error) {
     // The tables appear with the first cidex drops sync — until then report unindexed, not a 500
     if (error?.code === 'ER_NO_SUCH_TABLE') {

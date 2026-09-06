@@ -25,7 +25,7 @@ const formatEarnedFigure = (usd) =>
     .trim()
 
 // The spinning dollar sign the earned pill wears in place of a "+$" prefix
-const DOLLAR_SIGN_SRC = '/dollar.webp'
+export const DOLLAR_SIGN_SRC = '/dollar.webp'
 
 const compactCount = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 

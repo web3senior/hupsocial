@@ -460,12 +460,7 @@
       // orange tint across icon + counter on hover
       &[data-action='tip'] {
         color: var(--color-icon-muted, var(--black-600));
-        // Teal, not green: --trend-up is the palette's validated "up" hue and sidesteps the
-        // green-vs-red colorblind collision documented in Globals.scss. Lightened in dark,
-        // where the light theme's 600-weight teal sits too close to the surface.
-        // One flat green in every theme — it clears 7:1 on the dark card, and on white it
-        // carries the pill's tint and its own weight rather than leaning on hue alone.
-        --tip-earned-color: #21c95e;
+        // --tip-earned-color comes from Globals.scss so drop earnings can wear the same green
 
         // Hovers in its own green, the colour it already wears once the post has earned —
         // one action, one hue, in both states
