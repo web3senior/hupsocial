@@ -3,10 +3,19 @@
  * @description Memoized viem public clients for server-side contract reads. Imports
  * chain data from config/contracts (never config/wagmi) so evaluating this module
  * never constructs wallet connectors.
+ *
+ * Endpoints come from lib/serverRpc's resolution order (RPC_URL_<chainId> first, then the
+ * chain's listed URLs, thirdweb hosts keyed when THIRDWEB_RPC_SECRET_KEY is set) behind a
+ * viem fallback transport, so a keyless endpoint refusing our datacenter egress costs one
+ * timeout before the next is tried, never the whole request.
  */
 
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, fallback, http } from 'viem'
 import { appChains } from '@/config/contracts'
+import { serverRpcEndpoints } from '@/lib/serverRpc'
+
+// One endpoint that stops answering costs this long before the next is asked
+const ENDPOINT_TIMEOUT_MS = 10_000
 
 // Cached on globalThis so hot reloads reuse the clients (and their HTTP agents)
 // instead of leaking a new transport per edit, same reasoning as lib/db.js.
@@ -26,22 +35,32 @@ export const getServerPublicClient = (chainId) => {
   const chain = appChains.find((c) => c.id === id)
   if (!chain) return null
 
-  // Keyed by endpoint as well as chain, because the map outlives a hot reload: repointing a
-  // chain's RPC in config/contracts would otherwise keep handing back a client still bound to
-  // the endpoint that was there at boot, and the edit would look like it did nothing until the
-  // dev server was restarted.
-  const rpcUrl = chain.rpcUrls.default.http[0]
-  const cacheKey = `${id}|${rpcUrl}`
+  const endpoints = serverRpcEndpoints(id)
+  if (!endpoints.length) return null
+
+  // Keyed by the endpoint list as well as chain, because the map outlives a hot reload:
+  // repointing a chain's RPC in config/contracts or the env would otherwise keep handing back
+  // a client still bound to the endpoints that were there at boot.
+  const cacheKey = `${id}|${endpoints.map((endpoint) => endpoint.url).join(',')}`
 
   const cached = clients.get(cacheKey)
   if (cached) return cached
 
+  // Metadata resolution fires several reads per token — batching folds them into one
+  // JSON-RPC request so public endpoints don't rate-limit a feed render. Retries stay off per
+  // endpoint so failing over is what a dead endpoint triggers, not a second wait on it.
+  const transports = endpoints.map((endpoint) =>
+    http(endpoint.url, {
+      batch: true,
+      timeout: ENDPOINT_TIMEOUT_MS,
+      retryCount: 0,
+      ...(endpoint.headers ? { fetchOptions: { headers: endpoint.headers } } : {}),
+    }),
+  )
+
   const client = createPublicClient({
     chain,
-    // Metadata resolution fires several reads per token — batching folds them into
-    // one JSON-RPC request so public endpoints don't rate-limit a feed render. Bounded so
-    // an endpoint that stops answering costs a request twenty seconds, not viem's default four attempts.
-    transport: http(rpcUrl, { batch: true, timeout: 10_000, retryCount: 1 }),
+    transport: fallback(transports, { retryCount: 0 }),
   })
 
   clients.set(cacheKey, client)

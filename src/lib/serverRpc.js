@@ -28,7 +28,8 @@
 import { ethers } from 'ethers'
 import { appChains } from '@/config/contracts'
 
-const THIRDWEB_RPC_SECRET_KEY = process.env.THIRDWEB_RPC_SECRET_KEY
+// The project secret key thirdweb issues is the same credential under either name
+const THIRDWEB_RPC_SECRET_KEY = process.env.THIRDWEB_RPC_SECRET_KEY || process.env.THIRDWEB_SECRET_KEY
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
