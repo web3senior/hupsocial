@@ -112,7 +112,8 @@
 
   --bg: #131313;
   --background: #131313;
-  --foreground: #e5ebff;
+  // Neutral off-white a few steps under white: 13.0:1 on #131313, 10.1:1 on #2a2a2a, no blue glare
+  --foreground: #d4d8e2;
 
   --dim: #8e95b1;
   --muted: #696e81;
