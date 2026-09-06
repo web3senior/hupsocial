@@ -100,14 +100,14 @@ const BALANCE_CONTRACTS = [
   { key: 'followerSystem', label: 'Follower System' },
 ]
 
-// Native amounts span ETH and MON-sized units, so cap the decimals with Intl rather than
-// printing raw ether strings — but never round dust down to a flat "0", which would read
-// as an empty contract.
+// Four decimals for ordinary amounts; dust keeps three significant digits so a small fee is
+// printed as the figure it is, never rounded to "0" or hidden behind a "<" placeholder.
+const nativeFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 4 })
+const dustFormat = new Intl.NumberFormat('en', { maximumSignificantDigits: 3 })
 const formatNative = (wei) => {
   const value = Number(formatEther(wei ?? 0n))
   if (value === 0) return '0'
-  if (value < 0.0001) return '<0.0001'
-  return new Intl.NumberFormat('en', { maximumFractionDigits: 4 }).format(value)
+  return value < 0.0001 ? dustFormat.format(value) : nativeFormat.format(value)
 }
 
 // One card per chain per contract adds up to a hundred-plus cards, so each group is a tab
@@ -299,21 +299,63 @@ export default function Page() {
     }
   }
 
+  // Re-read one contract's balance and merge it into the chain's overview row
+  const refreshContractBalance = async (chain, key) => {
+    const address = CONTRACTS[`chain${chain.id}`]?.[key]
+    const tracked = BALANCE_CONTRACTS.find((entry) => entry.key === key)
+    if (!tracked || !isAddress(address ?? '')) return
+
+    try {
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      const value = await client.getBalance({ address })
+      setContractBalances((prev) => {
+        const items = [...(prev[chain.id]?.items ?? [])]
+        const index = items.findIndex((item) => item.address === address)
+        const entry = { ...tracked, address, value }
+        if (index === -1) items.push(entry)
+        else items[index] = entry
+        const total = items.reduce((sum, item) => sum + (item.value ?? 0n), 0n)
+        return { ...prev, [chain.id]: { ...prev[chain.id], loading: false, items, total, error: null } }
+      })
+    } catch (err) {
+      console.error(`Balance read error for ${key} on chain ${chain.id}:`, err)
+      // A failed single read must not blank a card that already has figures
+      setContractBalances((prev) =>
+        prev[chain.id]?.items ? prev : { ...prev, [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read balance' } }
+      )
+    }
+  }
+
+  // The overview reads every contract once per open; a contract tab re-reads its own balance
+  // each time it opens and whenever the window regains focus, so a fee left by a mint made in
+  // another tab shows without a page reload.
   useEffect(() => {
     if (!isAdmin) return
-    config.chains.forEach((chain) => loadChainBalances(chain))
+    const section = SECTIONS.find((entry) => entry.id === activeSection)
+    if (!section?.contractKey) {
+      config.chains.forEach((chain) => loadChainBalances(chain))
+      return
+    }
+
+    const refresh = () => config.chains.forEach((chain) => refreshContractBalance(chain, section.contractKey))
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin])
+  }, [isAdmin, activeSection])
 
   // Pull a single contract's balance out of the overview so the withdraw cards can show what
   // they are about to move without issuing their own RPC call
   const balanceOf = (chainId, contractAddress) => contractBalances[chainId]?.items?.find((item) => item.address === contractAddress)?.value
 
-  // Render that balance for a withdraw card — an em dash when the chain's read failed, so a
-  // dead RPC reads as "unknown" instead of spinning forever
+  // Render that balance for a withdraw card — an em dash once the chain's read has finished
+  // without a figure, so a dead RPC reads as "unknown" instead of spinning forever
   const renderBalance = (chainId, contractAddress, symbol) => {
     const value = balanceOf(chainId, contractAddress)
-    if (value === undefined) return <span>{contractBalances[chainId]?.error ? '—' : 'Loading…'}</span>
+    if (value === undefined) {
+      const finished = contractBalances[chainId] && !contractBalances[chainId].loading
+      return <span>{finished ? '—' : 'Loading…'}</span>
+    }
 
     return (
       <strong>
