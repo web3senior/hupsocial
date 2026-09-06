@@ -38,7 +38,7 @@ const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address
  * @param {boolean} [props.busy] A transaction is in flight: the dialog locks itself open — no
  *   cancel, no Esc, no backdrop click — until the caller closes it on success or the wallet
  *   refuses and the minter gets the form back to try again.
- * @param {'approve'|'wallet'|'mining'|null} [props.stage] Which wait the confirm button names.
+ * @param {'approve'|'check'|'wallet'|'mining'|null} [props.stage] Which wait the confirm button names.
  * @param {Function} props.onConfirm Runs the mint. The caller closes the dialog once it lands.
  */
 const MintReviewDialog = forwardRef(function MintReviewDialog(
@@ -173,9 +173,11 @@ const MintReviewDialog = forwardRef(function MintReviewDialog(
           {busy
             ? stage === 'approve'
               ? 'Approve in your wallet…'
-              : stage === 'mining'
-                ? 'Minting…'
-                : 'Confirm in your wallet…'
+              : stage === 'check'
+                ? 'Checking…'
+                : stage === 'mining'
+                  ? 'Minting…'
+                  : 'Confirm in your wallet…'
             : needsApproval
               ? 'Approve and mint'
               : 'Confirm mint'}

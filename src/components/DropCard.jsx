@@ -26,6 +26,39 @@ import styles from './DropCard.module.scss'
 const amountFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
 const countFormat = new Intl.NumberFormat('en')
 
+const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
+
+// What each of the engine's refusals means to the person minting; the ones that carry numbers
+// read them out of the revert when the node decoded it
+const MINT_REVERTS = {
+  WalletLimitReached: ([limit]) =>
+    limit !== undefined ? `This wallet has already minted its ${countFormat.format(Number(limit))} for this phase.` : 'This wallet has minted all this phase allows.',
+  SupplyExceeded: ([, remaining]) =>
+    remaining !== undefined ? `Only ${countFormat.format(Number(remaining))} left — lower the quantity.` : 'Not enough left for that quantity.',
+  AllocationExceeded: ([, remaining]) =>
+    remaining !== undefined ? `This phase has only ${countFormat.format(Number(remaining))} left.` : 'This phase does not have that many left.',
+  PhaseNotActive: () => 'This phase is not open right now.',
+  DropNotActive: () => 'This drop has closed.',
+  GateNotPassed: () => "This wallet doesn't meet the phase's requirement.",
+  InsufficientPayment: () => 'The price changed since this page loaded — reload and try again.',
+  InvalidReferral: () => 'This referral link cannot credit anyone for your mint — open the drop without it and try again.',
+  Unauthorized: () => 'Your wallet is signing as a different account than the one connected here — switch accounts in the wallet or reconnect.',
+  SessionExpired: () => 'Your session key has expired — reconnect and try again.',
+  EnforcedPause: () => 'Minting is paused on this network for the moment.',
+  TransferFailed: () => "The creator's payout address is refusing the payment — the creator has to fix it before anyone can mint.",
+}
+// The same sentences keyed by name, for describeWalletError once a wallet has already refused
+const KNOWN_MINT_REVERTS = Object.fromEntries(Object.entries(MINT_REVERTS).map(([name, describe]) => [name, describe([])]))
+
+/** The engine's decoded refusal inside a viem error, as a sentence, or null when it is something else. */
+const describeMintRevert = (error) => {
+  const revert = error?.walk?.((link) => link?.name === 'ContractFunctionRevertedError')
+  const name = revert?.data?.errorName
+  return name && MINT_REVERTS[name] ? MINT_REVERTS[name](revert.data.args ?? []) : null
+}
+
+const isInsufficientFunds = (error) => Boolean(error?.walk?.((link) => /insufficient funds/i.test(`${link?.details ?? ''} ${link?.message ?? ''}`)))
+
 const ERC20_TOKEN_ABI = [
   { name: 'allowance', type: 'function', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
   { name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [{ type: 'bool' }] },
@@ -78,7 +111,8 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
   const [quantity, setQuantity] = useState(1)
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
-  const { address } = useConnection()
+  const [isChecking, setIsChecking] = useState(false)
+  const { address, connector } = useConnection()
   const mintedToastRef = useRef(false)
   // The one loading toast a mint holds open from the wallet prompt to the receipt
   const mintToastRef = useRef(null)
@@ -174,9 +208,9 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
   const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
   // Separate hook: sharing `hash` with the mint would fire the confirmed effect on the approval's receipt
   const { writeContractAsync: writeApprovalAsync } = useWriteContract()
-  const isBusy = isPending || isConfirming || isBurnerBusy || isApproving
+  const isBusy = isPending || isConfirming || isBurnerBusy || isApproving || isChecking
   // What the review dialog's button says while it waits — derived, so no effect has to set it
-  const mintStage = isApproving ? 'approve' : isPending ? 'wallet' : isConfirming || isBurnerBusy ? 'mining' : null
+  const mintStage = isApproving ? 'approve' : isChecking ? 'check' : isPending ? 'wallet' : isConfirming || isBurnerBusy ? 'mining' : null
 
   /** The verdict lands on the loading toast the mint opened, or on a fresh one if that is gone. */
   const settleMint = (message, type) => {
@@ -188,7 +222,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
   // A refusal hands the review form back rather than closing it, so the minter can try again
   useEffect(() => {
     if (!submitError) return
-    settleMint(describeWalletError(submitError, { fallback: 'Transaction rejected' }), 'error')
+    settleMint(describeWalletError(submitError, { known: KNOWN_MINT_REVERTS, fallback: 'Transaction rejected' }), 'error')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitError])
 
@@ -276,6 +310,50 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
   const markerArt = drop.icon || drop.image
   const markerUrl = markerArt ? resolveStorageImageUrl(markerArt, { width: 48 }) : null
 
+  /**
+   * Runs the mint against the chain before the wallet is asked, so a refusal arrives as a reason
+   * rather than the wallet's bare "could not estimate gas". Resolves to the sentence to show, or
+   * null when the mint should go ahead — which includes the check itself failing to run, since a
+   * flaky RPC must not block a mint the wallet's own node would accept.
+   */
+  const preflightMint = async (args, value) => {
+    if (!publicClient) return null
+    const decimals = nativeCurrency?.decimals ?? 18
+    const symbol = nativeCurrency?.symbol ?? ''
+    const amount = (wei) => `${amountFormat.format(Number(formatUnits(wei, decimals)))} ${symbol}`
+
+    // The wallet signs with whichever account it has selected, which is not always the one this page connected
+    const accounts = await connector?.getAccounts?.().catch(() => null)
+    if (accounts?.length && !accounts.some((account) => account.toLowerCase() === address.toLowerCase())) {
+      return `Your wallet is on a different account than the one connected here (${shortAddress(address)}) — switch to it in the wallet or reconnect.`
+    }
+
+    let balance
+    let code
+    try {
+      ;[balance, code] = await Promise.all([publicClient.getBalance({ address }), publicClient.getCode({ address })])
+    } catch {
+      return null
+    }
+    if (balance < value) return `This wallet holds ${amount(balance)} and the mint costs ${amount(value)}.`
+
+    const request = { address: dropsAddress, abi: dropsAbi, functionName: 'mint', args, account: address, value }
+    try {
+      await publicClient.simulateContract(request)
+      // A smart account (Universal Profile, Safe) usually has its gas relayed, so only a plain
+      // wallet paying its own way has to afford gas on top of the price
+      if (value > 0n && !code) await publicClient.estimateContractGas(request)
+      return null
+    } catch (err) {
+      const reason = describeMintRevert(err)
+      if (reason) return reason
+      if (isInsufficientFunds(err)) {
+        return `This wallet holds ${amount(balance)}: enough for the price, not for the gas on top. Add a little ${symbol} and try again.`
+      }
+      return null
+    }
+  }
+
   // No event when the review dialog confirms — only a direct card click has one to contain
   const handleMint = async (e) => {
     e?.stopPropagation()
@@ -289,7 +367,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
     mintedToastRef.current = false
     // One toast for the whole mint: it changes its words at each wait and ends as the verdict
     mintToastRef.current?.dismiss()
-    mintToastRef.current = toast('Confirm the mint in your wallet…', 'loading')
+    mintToastRef.current = toast('Checking the mint…', 'loading')
     const args = [address, dropId, BigInt(phaseIndex), BigInt(boundedQuantity), referralArg]
     // A token phase sends only the native platform fee as value — the engine pulls the token price
     const mintValue = (isTokenPriced ? 0n : totalPrice) + totalPlatformFee
@@ -324,6 +402,14 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
       }
     }
 
+    setIsChecking(true)
+    const problem = await preflightMint(args, mintValue).finally(() => setIsChecking(false))
+    if (problem) {
+      settleMint(problem, 'error')
+      return
+    }
+    mintToastRef.current?.update('Confirm the mint in your wallet…', 'loading')
+
     // Burner sessions send msg.value 0, so any paid mint (platform fee included) uses the connected wallet
     const session =
       mintValue === 0n
@@ -349,7 +435,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
         refetchPhases()
         refetchMintedByMe()
       } catch (err) {
-        settleMint(err.message || 'Transaction rejected or encountered an error.', 'error')
+        settleMint(describeWalletError(err, { known: KNOWN_MINT_REVERTS, fallback: 'Transaction rejected or encountered an error.' }), 'error')
       } finally {
         setIsBurnerBusy(false)
       }
