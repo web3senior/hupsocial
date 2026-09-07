@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
@@ -70,6 +70,196 @@ const readStoredCover = (value) => ({
 /** A stored cover reference as something an <img> can use. */
 const resolveCoverUrl = (src) => (src ? resolveStorageImageUrl(src, { width: PROFILE_COVER_WIDTH }) : null)
 
+/* Both columns land together in cidex/scripts/add-profile-index-cache.sql, so probing one probes both. */
+const CACHE_COLUMN = 'is_universal_profile'
+
+/* How old a row's indexer answer may be before it is asked again, behind the response. A wallet
+   the indexer had nothing for can only become a Universal Profile by being deployed, so it waits longer. */
+const UP_RECHECK_MS = 10 * 60_000
+const EOA_RECHECK_MS = 60 * 60_000
+
+const checkedAt = new Map()
+
+const isUniversalProfile = (profile) => Boolean(profile && (profile.name || profile.fullName))
+
+/** The row's copy of the indexer document, in the indexer's own shape. */
+const indexedFromRow = (row) => {
+  const cover = readStoredCover(row.profileHeader).ref
+  return {
+    id: row.wallet_address,
+    name: row.name,
+    description: row.description,
+    tags: parseJsonList(row.tags),
+    links: parseJsonList(row.links),
+    lastMetadataUpdate: row.profile_indexed_stamp,
+    profileImages: row.profileImage ? [{ src: row.profileImage }] : [],
+    backgroundImages: cover ? [{ src: cover }] : [],
+  }
+}
+
+/**
+ * Remembers the indexer's answer on the row. The Hup-first rule is applied by the statement
+ * itself — a row whose sync stamp still equals the indexer's keeps its own copy — so an edit
+ * saved while the indexer was answering is never overwritten. Never inserts: an unknown address
+ * must not become a user by being read.
+ * @param {string} address
+ * @param {object|null} profile The indexer document, or null when it has no profile for the wallet.
+ */
+async function cacheIndexerAnswer(address, profile) {
+  if (!profile) {
+    await pool.execute('UPDATE users SET is_universal_profile = 0, profile_indexed_stamp = NULL WHERE wallet_address = ?', [address])
+    return
+  }
+
+  const stamp = String(profile.lastMetadataUpdate ?? '')
+  const keep = 'profile_sync_stamp <=> ?'
+  const copy = [
+    profile.name || profile.fullName || '',
+    profile.description ?? null,
+    profile.profileImages?.[0]?.src ?? null,
+    profile.backgroundImages?.[0]?.src ?? null,
+    JSON.stringify(profile.tags ?? []),
+    JSON.stringify(profile.links ?? []),
+  ]
+
+  await pool.execute(
+    `UPDATE users SET
+      is_universal_profile = 1,
+      profile_indexed_stamp = ?,
+      name = IF(${keep}, name, ?),
+      description = IF(${keep}, description, ?),
+      profileImage = IF(${keep}, profileImage, ?),
+      profileHeader = IF(${keep}, profileHeader, ?),
+      tags = IF(${keep}, tags, ?),
+      links = IF(${keep}, links, ?),
+      profile_sync_stamp = IF(${keep}, profile_sync_stamp, NULL)
+    WHERE wallet_address = ?`,
+    [stamp, ...copy.flatMap((value) => [stamp, value]), stamp, address],
+  )
+}
+
+/** Without the cache columns, the one write the read has always done: drop a sync stamp the chain has moved past. */
+async function dropOvertakenSyncStamp(address, storedStamp, profile) {
+  if (storedStamp === null || storedStamp === String(profile.lastMetadataUpdate ?? '')) return
+  await pool.execute('UPDATE users SET profile_sync_stamp = NULL WHERE wallet_address = ?', [address])
+}
+
+const logCacheError = (error) => console.error('[PROFILE_INDEX_CACHE_ERROR]:', error.message)
+
+/** Asks the indexer again behind the response once the row's answer is old enough. */
+function scheduleIndexerRecheck(address, row) {
+  const key = address.toLowerCase()
+  const maxAge = row.is_universal_profile ? UP_RECHECK_MS : EOA_RECHECK_MS
+  if (Date.now() - (checkedAt.get(key) ?? 0) < maxAge) return
+  checkedAt.set(key, Date.now())
+
+  after(async () => {
+    try {
+      const upData = await queryUniversalProfile(address)
+      if (!Array.isArray(upData?.data?.Profile)) return
+      const live = upData.data.Profile[0]
+      await cacheIndexerAnswer(address, isUniversalProfile(live) ? live : null)
+    } catch (error) {
+      logCacheError(error)
+    }
+  })
+}
+
+/**
+ * A Universal Profile as the read serves it, from the indexer document — live, or the row's copy
+ * of it. The row can be AHEAD of that document: see cidex/scripts/add-profile-sync-stamp.sql.
+ */
+function shapeUniversalProfile(profile, row, address, { badge, origin }) {
+  const liveStamp = String(profile.lastMetadataUpdate ?? '')
+  const storedStamp = row?.profile_sync_stamp ?? null
+  const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
+  const storedCover = readStoredCover(row?.profileHeader)
+
+  if (hupIsAhead) {
+    profile.name = row.name
+    profile.description = row.description
+    profile.tags = parseJsonList(row.tags)
+    profile.links = parseJsonList(row.links)
+    /* fullName is the indexer's own "name#tag" rendering of the name that was just replaced.
+       Dropping it lets a byline rebuild one from the name above instead of showing the old
+       one — see the displayName memo in components/Profile.jsx. */
+    profile.fullName = null
+    /* The stored reference rather than the resolved URL: a retry has to put this picture back
+       into an LSP3 document, and a proxy URL cannot be turned back into a CID. */
+    profile.profileImageRef = row.profileImage || null
+    profile.profileHeaderRef = storedCover.ref
+    profile.coverRemoved = storedCover.removed
+    /* What the editor offers a Sync button for. */
+    profile.syncPending = true
+  }
+
+  profile.profileImage = hupIsAhead
+    ? resolveAvatarImageUrl(row.profileImage, AVATAR_MAX_SIZE)
+    : profile.profileImages && profile.profileImages.length > 0
+      ? resolveAvatarImageUrl(profile.profileImages[0].src, AVATAR_MAX_SIZE)
+      : null
+
+  /* The LSP3 backgroundImage, which the indexer serves as `backgroundImages`.
+     Unlike the avatar above, a Hup row that is ahead does NOT simply win here: most rows
+     have never held a cover, and reading that as "no cover" would blank a real one off the
+     profile for as long as an edit sat unsigned. Only a row that has actually set the cover
+     one way or the other — a picture, or a removal — speaks for it. */
+  const indexedCover = profile.backgroundImages?.[0]?.src ?? null
+  profile.profileHeader = resolveCoverUrl(hupIsAhead && storedCover.set ? storedCover.ref : indexedCover)
+
+  profile.wallet_address = normalizeAddress(address)
+
+  // Birthday is a Hup-native field with no UP metadata equivalent — always
+  // sourced from our own users row, even when the profile itself is a UP.
+  profile.birthday = row?.birthday ?? null
+  // Same for the community badge: a UP describes a person, not their Hup memberships.
+  profile.badge = badge
+  profile.origin = origin
+  /* Read from the profile's OWN tags and description, so the mark travels with the metadata
+     rather than with anything Hup remembers about the account — see lib/agentProfile.js. */
+  profile.agent = resolveAgentProfile(profile)
+
+  return profile
+}
+
+/** A profile the indexer has nothing for, from the row alone. */
+function shapeDatabaseProfile(row, { badge, origin }) {
+  const dbProfile = row
+
+  // The notification email is private contact data on a public endpoint —
+  // never let SELECT u.* leak it now that the column is actually populated.
+  delete dbProfile.email
+  delete dbProfile.email_verified_at
+  delete dbProfile.email_notifications
+
+  /* Resolve profile image from any protocol (IPFS, UP cloud, http, etc.) */
+  dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
+  dbProfile.profileHeader = resolveCoverUrl(readStoredCover(dbProfile.profileHeader).ref)
+
+  /* Only meaningful beside a Universal Profile, which this branch by definition is not. */
+  delete dbProfile.profile_sync_stamp
+  delete dbProfile.is_universal_profile
+  delete dbProfile.profile_indexed_stamp
+
+  /* The raw pointer columns say nothing a client can render, and a stale one must never be
+     mistaken for a badge — only the verified resolution above is exposed. */
+  delete dbProfile.badge_network_id
+  delete dbProfile.badge_contract_address
+  delete dbProfile.badge_community_id
+  dbProfile.badge = badge
+
+  /* The raw code says nothing a client can render — no flag, no name — so only the resolved
+     form is exposed, exactly as the badge is. */
+  delete dbProfile.origin_code
+  dbProfile.origin = origin
+
+  /* Same mark, same rule, off the cached copy of the same two fields — the resolver takes the
+     JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
+  dbProfile.agent = resolveAgentProfile(dbProfile)
+
+  return dbProfile
+}
+
 export async function GET(request, { params }) {
   try {
     const { address } = await params
@@ -82,15 +272,14 @@ export async function GET(request, { params }) {
        them is far heavier than a profile read, and their only consumer (the OG share
        card) queries /api/v1/leaderboard itself. */
 
-    /* The UP lookup and the DB fallback run in parallel: the local query is cheap,
-       and paying for it upfront means a UP miss (or a slow/hung upstream, bounded
-       by the helper's timeout) adds zero extra latency before the fallback. */
-    /* The badge joins from the users row itself, so it needs nothing from the two reads
-       beside it and adds no latency running in the same batch. It is re-verified against
+    /* The row first, on its own: a primary-key read on the local database that already holds
+       everything the header, the byline and the page show once the indexer has been asked
+       about this wallet once. */
+    /* The badge joins from the users row itself, so it needs nothing from the read beside it
+       and adds no latency running in the same batch. It is re-verified against
        community_members on every call — see lib/badge.js for why it is never stored already
        resolved. */
-    const [upData, [rows], badge] = await Promise.all([
-      queryUniversalProfile(address),
+    const [[rows], badge] = await Promise.all([
       pool.execute(
         `SELECT
           u.*,
@@ -108,127 +297,61 @@ export async function GET(request, { params }) {
         return null
       }),
     ])
+    const row = rows[0]
 
     /* Hup-native, like birthday: a Universal Profile describes a person, not where they told
        Hup they are from, so both branches below take this from our own users row. Sequential
        rather than part of the batch above because it reads that row's value; it costs one
        indexed lookup, and only for profiles that actually publish a country. */
-    const origin = await resolveOrigin(rows[0]?.origin_code)
+    const origin = await resolveOrigin(row?.origin_code)
 
-    /* Check if the profile data exists and has valid metadata */
-    const profile = upData?.data?.Profile?.[0]
+    /* The indexer is asked on the response path only when the row cannot answer for it: the
+       row has never recorded what the indexer said, or the columns that record it are not
+       migrated in yet (then this read behaves exactly as it did before them). */
+    const cacheable = await hasColumn('users', CACHE_COLUMN)
 
-    if (profile && (profile.name || profile.fullName)) {
-      /* Hup-first editing. A Universal Profile edited here is written to our own row straight
-         away and pushed onchain afterwards, so between those two moments — and for as long as a
-         signature is never given — the indexer is still serving the metadata the user has just
-         replaced. The stamp says which copy is newer, by equality against the indexer's own
-         value: see cidex/scripts/add-profile-sync-stamp.sql. */
-      const liveStamp = String(profile.lastMetadataUpdate ?? '')
-      const storedStamp = rows[0]?.profile_sync_stamp ?? null
-      const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
-      const storedCover = readStoredCover(rows[0]?.profileHeader)
+    if (cacheable && row && row.is_universal_profile !== null) {
+      scheduleIndexerRecheck(address, row)
 
-      if (hupIsAhead) {
-        profile.name = rows[0].name
-        profile.description = rows[0].description
-        profile.tags = parseJsonList(rows[0].tags)
-        profile.links = parseJsonList(rows[0].links)
-        /* fullName is the indexer's own "name#tag" rendering of the name that was just replaced.
-           Dropping it lets a byline rebuild one from the name above instead of showing the old
-           one — see the displayName memo in components/Profile.jsx. */
-        profile.fullName = null
-        /* The stored reference rather than the resolved URL: a retry has to put this picture back
-           into an LSP3 document, and a proxy URL cannot be turned back into a CID. */
-        profile.profileImageRef = rows[0].profileImage || null
-        profile.profileHeaderRef = storedCover.ref
-        profile.coverRemoved = storedCover.removed
-        /* What the editor offers a Sync button for. */
-        profile.syncPending = true
-      } else if (storedStamp !== null) {
-        /* The chain has moved past the edit — our own write landed, or the profile was changed on
-           another client. Either way the indexer is authoritative again and the marker has done
-           its job. Fire and forget: a failed clear costs one more comparison on the next read,
-           never the profile itself. */
-        pool
-          .execute('UPDATE users SET profile_sync_stamp = NULL WHERE wallet_address = ?', [address])
-          .catch((clearError) => console.error('[SYNC_STAMP_CLEAR_ERROR]:', clearError.message))
+      if (row.is_universal_profile) {
+        return NextResponse.json({
+          source: 'universal_profile',
+          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin }),
+        })
       }
 
-      /* Fallback to profileImages array elements if they exist as per incoming payload */
-      profile.profileImage = hupIsAhead
-        ? resolveAvatarImageUrl(rows[0].profileImage, AVATAR_MAX_SIZE)
-        : profile.profileImages && profile.profileImages.length > 0
-          ? resolveAvatarImageUrl(profile.profileImages[0].src, AVATAR_MAX_SIZE)
-          : null
+      return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin }) })
+    }
 
-      /* The LSP3 backgroundImage, which the indexer serves as `backgroundImages`.
-         Unlike the avatar above, a Hup row that is ahead does NOT simply win here: most rows
-         have never held a cover, and reading that as "no cover" would blank a real one off the
-         profile for as long as an edit sat unsigned. Only a row that has actually set the cover
-         one way or the other — a picture, or a removal — speaks for it. */
-      const indexedCover = profile.backgroundImages?.[0]?.src ?? null
-      profile.profileHeader = resolveCoverUrl(hupIsAhead && storedCover.set ? storedCover.ref : indexedCover)
+    const upData = await queryUniversalProfile(address)
+    const answered = Array.isArray(upData?.data?.Profile)
+    const live = answered ? upData.data.Profile[0] : null
+    const isUP = isUniversalProfile(live)
 
-      profile.wallet_address = normalizeAddress(address) // Ensure wallet address is included in the response for consistency
+    /* A failed lookup (timeout, upstream down) remembers nothing, so the next read asks again. */
+    if (row && answered) {
+      const storedStamp = row.profile_sync_stamp ?? null
+      checkedAt.set(address.toLowerCase(), Date.now())
+      after(() => {
+        const write = cacheable ? cacheIndexerAnswer(address, isUP ? live : null) : isUP ? dropOvertakenSyncStamp(address, storedStamp, live) : Promise.resolve()
+        return write.catch(logCacheError)
+      })
+    }
 
-      // Birthday is a Hup-native field with no UP metadata equivalent — always
-      // sourced from our own users row, even when the profile itself is a UP.
-      profile.birthday = rows[0]?.birthday ?? null
-      // Same for the community badge: a UP describes a person, not their Hup memberships.
-      profile.badge = badge
-      profile.origin = origin
-      /* Read from the profile's OWN tags and description, so the mark travels with the metadata
-         rather than with anything Hup remembers about the account — see lib/agentProfile.js. */
-      profile.agent = resolveAgentProfile(profile)
-
+    if (isUP) {
       return NextResponse.json({
         source: 'universal_profile',
-        data: profile,
+        data: shapeUniversalProfile(live, row, address, { badge, origin }),
       })
     }
 
     /* Fallback to Database if the UP endpoint fails or returns no profile */
 
-    if (rows.length === 0) {
+    if (!row) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    const dbProfile = rows[0]
-
-    // The notification email is private contact data on a public endpoint —
-    // never let SELECT u.* leak it now that the column is actually populated.
-    delete dbProfile.email
-    delete dbProfile.email_verified_at
-    delete dbProfile.email_notifications
-
-    /* Resolve profile image from any protocol (IPFS, UP cloud, http, etc.) */
-    dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
-    dbProfile.profileHeader = resolveCoverUrl(readStoredCover(dbProfile.profileHeader).ref)
-
-    /* Only meaningful beside a Universal Profile, which this branch by definition is not. */
-    delete dbProfile.profile_sync_stamp
-
-    /* The raw pointer columns say nothing a client can render, and a stale one must never be
-       mistaken for a badge — only the verified resolution above is exposed. */
-    delete dbProfile.badge_network_id
-    delete dbProfile.badge_contract_address
-    delete dbProfile.badge_community_id
-    dbProfile.badge = badge
-
-    /* The raw code says nothing a client can render — no flag, no name — so only the resolved
-       form is exposed, exactly as the badge is. */
-    delete dbProfile.origin_code
-    dbProfile.origin = origin
-
-    /* Same mark, same rule, off the cached copy of the same two fields — the resolver takes the
-       JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
-    dbProfile.agent = resolveAgentProfile(dbProfile)
-
-    return NextResponse.json({
-      source: 'database',
-      data: dbProfile,
-    })
+    return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin }) })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
