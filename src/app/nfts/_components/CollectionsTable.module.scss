@@ -162,6 +162,7 @@
       width: 40px;
       padding-right: 0;
       background-color: var(--surface);
+      transition: background-color 0.15s ease; // Same timing as the row, or the pinned pair snaps while the rest fades
       color: var(--text-muted);
     }
 
@@ -171,6 +172,7 @@
       z-index: 1;
       width: 176px;
       background-color: var(--surface);
+      transition: background-color 0.15s ease;
 
       // The seam where the scrolling columns disappear. A box-shadow here would replace the
       // header's underline — same property, later rule — so the line is painted instead, off
