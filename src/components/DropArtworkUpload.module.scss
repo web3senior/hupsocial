@@ -289,13 +289,6 @@
     padding: 0.8rem;
     max-height: 26rem;
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-
-    &:hover,
-    &:focus-within {
-      scrollbar-color: var(--thumbBG) transparent;
-    }
   }
 
   &__card {

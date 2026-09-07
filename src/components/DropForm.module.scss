@@ -424,13 +424,6 @@
 
     textarea {
       min-height: 5.5rem;
-      scrollbar-width: thin;
-      scrollbar-color: transparent transparent;
-
-      &:hover,
-      &:focus {
-        scrollbar-color: var(--thumbBG) transparent;
-      }
     }
   }
 

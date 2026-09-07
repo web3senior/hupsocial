@@ -89,17 +89,6 @@
         border-color: var(--network-color-primary, var(--color-primary));
       }
     }
-
-    // Hidden until the box is in use, so the form is not fenced in by scrollbars
-    textarea {
-      scrollbar-width: thin;
-      scrollbar-color: transparent transparent;
-
-      &:hover,
-      &:focus {
-        scrollbar-color: var(--thumbBG) transparent;
-      }
-    }
   }
 
   &__list {

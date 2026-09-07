@@ -112,8 +112,7 @@
 
   --bg: #131313;
   --background: #131313;
-  // Neutral off-white a few steps under white: 13.0:1 on #131313, 10.1:1 on #2a2a2a, no blue glare
-  --foreground: #d4d8e2;
+  --foreground: #ffffffa6;
 
   --dim: #8e95b1;
   --muted: #696e81;
@@ -328,6 +327,14 @@ html {
   // A no-op while unlocked, since `overflow: hidden scroll` already shows the scrollbar.
   scrollbar-gutter: stable;
   min-height: 100%;
+}
+
+// Every scroller inside the page — dialog bodies, card lists, tables — carries a thin bar that
+// is always painted: a hidden one reads as "no more rows". Zero specificity, so a module's
+// `scrollbar-width: none` still hides a rail outright; the page's own bar on html is left alone.
+:where(body *) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--thumbBG) transparent;
 }
 
 // html,

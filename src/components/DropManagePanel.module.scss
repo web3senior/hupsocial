@@ -201,13 +201,6 @@
     overflow-x: auto;
     border-radius: var(--global-border-radius);
     background: var(--surface-muted);
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-
-    &:hover,
-    &:focus-within {
-      scrollbar-color: var(--thumbBG) transparent;
-    }
   }
 
   &__splitTable {
