@@ -255,7 +255,19 @@ const markdownToEditorHtml = (text) => {
     .join('<br>')
 }
 
-// Convert the editor's DOM back to markdown for state / onchain storage.
+// Inline formatting tags and the markdown marker each one serializes to
+const INLINE_MARKERS = { STRONG: '**', B: '**', EM: '*', I: '*' }
+
+// Edge whitespace stays outside the markers: markdown refuses "** 🔧 Burn**" and "**link **", and a
+// selection drags that space in constantly (double-click trailing space, end-of-node nbsp, a line break)
+const wrapInline = (text, marker) => {
+  const leading = text.match(/^[\s​]*/)[0]
+  const trailing = text.match(/[\s​]*$/)[0]
+  const inner = text.slice(leading.length, text.length - trailing.length)
+  return inner ? `${leading}${marker}${inner}${marker}${trailing}` : text
+}
+
+// Convert the editor DOM back to markdown for state / onchain storage.
 //
 // This walks nodes rather than string-replacing tags because a contentEditable mixes
 // two line models: the explicit <br>s we seed on init, and the block wrappers the
@@ -265,46 +277,35 @@ const markdownToEditorHtml = (text) => {
 const editorToMarkdown = (editor) => {
   if (!editor) return ''
 
-  const lines = ['']
-  const appendText = (text) => {
-    // A pre-wrap editor also receives literal newlines from the browser's Enter
-    // handling, and pasted Windows clipboard text arrives with \r\n line endings
-    const parts = text.split(/\r\n|[\r\n]/)
-    lines[lines.length - 1] += parts[0]
-    for (let index = 1; index < parts.length; index += 1) lines.push(parts[index])
-  }
-  const breakLine = () => lines.push('')
+  let out = ''
+  const atLineStart = () => !out || out.endsWith('\n')
 
   const walk = (node) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === Node.TEXT_NODE) {
-        appendText(child.data)
+        // Pasted Windows clipboard text arrives with \r\n line endings
+        out += child.data.replace(/\r\n|\r/g, '\n')
         return
       }
       if (child.nodeType !== Node.ELEMENT_NODE) return
 
       const tag = child.nodeName
       if (tag === 'BR') {
-        // No following sibling means this is the browser's filler <br>, not a typed break
-        if (child.nextSibling) breakLine()
+        // No following sibling means this is the filler <br> the browser adds, not a typed break
+        if (child.nextSibling) out += '\n'
         return
       }
       if (BLOCK_ELEMENTS.has(tag)) {
-        if (lines[lines.length - 1] !== '') breakLine()
+        if (!atLineStart()) out += '\n'
         walk(child)
-        if (child.nextSibling) breakLine()
+        if (child.nextSibling) out += '\n'
         return
       }
-      if (tag === 'STRONG' || tag === 'B') {
-        appendText('**')
+      const marker = INLINE_MARKERS[tag]
+      if (marker) {
+        const start = out.length
         walk(child)
-        appendText('**')
-        return
-      }
-      if (tag === 'EM' || tag === 'I') {
-        appendText('*')
-        walk(child)
-        appendText('*')
+        out = out.slice(0, start) + wrapInline(out.slice(start), marker)
         return
       }
       walk(child)
@@ -315,8 +316,7 @@ const editorToMarkdown = (editor) => {
 
   // Text nodes carry already-decoded characters, so the zero-width space applyFormat
   // parks after a tag and the nbsp the browser inserts are stripped as literals here
-  return lines
-    .join('\n')
+  return out
     .replace(/​/g, '')
     .replace(/ /g, ' ')
     .replace(/\n{3,}/g, '\n\n')

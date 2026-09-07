@@ -62,7 +62,10 @@ export function renderMarkdown(markdown) {
 
   const renderer = new marked.Renderer()
 
-  renderer.text = (token) => {
+  // A list item or heading hands over a container whose .text is raw source; its formatting lives in .tokens
+  renderer.text = function (token) {
+    if (token?.tokens?.length) return this.parser.parseInline(token.tokens)
+
     const rawText = typeof token === 'string' ? token : token?.text || ''
 
     return rawText.replace(CASHTAG_PATTERN, (match, prefix, symbol) => {
