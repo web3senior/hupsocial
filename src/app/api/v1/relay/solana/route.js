@@ -9,20 +9,24 @@ export const runtime = 'nodejs'
 // --- Relay policy ---
 // The relayer's key is the fee payer of everything that lands here, so a transaction may only
 // carry instructions of the Hup program on that network, and only the sponsored ones: create
-// (post, comment, repost), like and unlike — the same set the EVM relay covers. Delete stays
-// unsponsored for the same reason un-repost is on EVM. A `create` must name the author as the
-// program-fee payer, so the relayer never funds more than the network fee. Every program
-// instruction in one transaction has to come from the same signer, which is who the throttle
-// counts against.
+// (post, comment, repost), update, like and unlike — the same set the EVM relay covers. Delete
+// stays unsponsored for the same reason un-repost is on EVM. A `create` must name the author
+// as the program-fee payer, so the relayer never funds more than the network fee. Every
+// program instruction in one transaction has to come from the same signer, which is who the
+// throttle counts against.
 
 const COMPUTE_BUDGET_PROGRAM = new PublicKey('ComputeBudget111111111111111111111111111111')
 
 const SPONSORED = new Map(
-  ['create', 'like', 'unlike'].map((name) => [Buffer.from(HUP_SOLANA_DISCRIMINATORS[name]).toString('hex'), name]),
+  ['create', 'update', 'like', 'unlike'].map((name) => [Buffer.from(HUP_SOLANA_DISCRIMINATORS[name]).toString('hex'), name]),
 )
 
-// The kind byte of `create` picks the bucket: a repost is create(kind = 2) with no metadata
-const bucketFor = (name, data) => (name === 'create' && data[8] === HUP_SOLANA_KIND.REPOST ? 'repost' : name)
+// The kind byte of `create` picks the bucket: a repost is create(kind = 2) with no metadata.
+// Buckets are named for the action, not the instruction, so update throttles as `edit`.
+const bucketFor = (name, data) => {
+  if (name === 'create') return data[8] === HUP_SOLANA_KIND.REPOST ? 'repost' : 'create'
+  return name === 'update' ? 'edit' : name
+}
 
 let relayer = null
 let relayerLoaded = false
@@ -108,7 +112,7 @@ export async function GET(request) {
 
   return NextResponse.json({
     feePayer: keypair.publicKey.toBase58(),
-    buckets: ['create', 'repost', 'like', 'unlike'],
+    buckets: ['create', 'edit', 'repost', 'like', 'unlike'],
   })
 }
 

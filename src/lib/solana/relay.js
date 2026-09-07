@@ -94,7 +94,7 @@ export const relaySolanaInstructions = async ({ networkId, signer, instructions 
  * @param {{wallet: object, account: object}} params.signer
  * @param {Array} params.instructions
  * @param {'throw'|'fallback'} [params.onCooldown='fallback'] - Posting rethrows a cooldown (the author was told to wait); hearts fall through to the wallet, where the prompt is consent to pay.
- * @param {boolean} [params.sponsor=true] - False for actions the relay never covers (edits, deletes), which skips the round trip.
+ * @param {boolean} [params.sponsor=true] - False for actions the relay never covers (deletes), which skips the round trip.
  * @param {boolean} [params.confirm=true]
  * @returns {Promise<{signature: string, sponsored: boolean}>}
  */

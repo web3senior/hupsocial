@@ -16,8 +16,8 @@ const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
 // in config/contracts.js (HupCommunity, HupTipper, the LSP26 registry, …) is refused outright
 // — a forwarder executes against whatever target the request names, so this list is the whole
 // defence. The Hup contract is narrowed further to the sponsored selectors in
-// config/gasless.js — `create`, `batchLike` and `unlike` only, since it also carries paid,
-// owner-only and admin functions that must never run on our key.
+// config/gasless.js — `create`, `update`, `batchLike` and `unlike` only, since it also carries
+// paid, owner-only and admin functions that must never run on our key.
 // Unlike has its own small window, which is what caps heart-toggle farming: every
 // like→unlike→like cycle spends one sponsored unlike, so cycles stop at that bucket's max.
 // Un-repost is deliberately unsponsored: it rides deleteContent, which deletes any of the

@@ -51,8 +51,13 @@ export const isGaslessChainId = (networkId) => {
 // A poll vote is the cheapest tap on the platform and, unlike a like, it is final onchain —
 // there is no unvote to farm a cycle with, so the window only has to bound how many polls one
 // account can answer in an hour.
+//
+// An edit is authoring-shaped (it writes a CID to storage like a post does) but throttles
+// apart from create on purpose: the commonest edit is a typo fix seconds after posting, and
+// sharing create's cooldown would bounce exactly that one to the wallet.
 export const GASLESS_POLICY = {
   create: { cooldownMs: 60000, windowMs: 3600000, max: 20 },
+  edit: { cooldownMs: 30000, windowMs: 3600000, max: 20 },
   like: { cooldownMs: 0, windowMs: 3600000, max: 30 },
   unlike: { cooldownMs: 0, windowMs: 3600000, max: 5 },
   repost: { cooldownMs: 0, windowMs: 3600000, max: 30 },
@@ -63,13 +68,14 @@ export const GASLESS_POLICY = {
 export const gaslessPolicyFor = (bucket) => GASLESS_POLICY[bucket] ?? GASLESS_POLICY.chat
 
 // Which bucket a relayed Hup call belongs to; anything absent here is not sponsored.
-// Creating content, liking, unliking and reposting are sponsored. Un-repost is deliberately
-// not: it rides deleteContent, a selector that deletes ANY of the caller's content, and
-// sponsoring deletions is a different decision from sponsoring taps. batchLike is the only
-// like selector listed because it is the only one the app sends — even a single heart goes
-// out as batchLike([id]).
+// Creating content, editing it, liking, unliking and reposting are sponsored. Un-repost is
+// deliberately not: it rides deleteContent, a selector that deletes ANY of the caller's
+// content, and sponsoring deletions is a different decision from sponsoring taps. batchLike
+// is the only like selector listed because it is the only one the app sends — even a single
+// heart goes out as batchLike([id]).
 export const GASLESS_BUCKETS = {
   create: 'create',
+  update: 'edit',
   batchLike: 'like',
   unlike: 'unlike',
 }

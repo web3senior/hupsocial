@@ -1259,12 +1259,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   )
 
   /**
-   * Relays `create` through our forwarder so the author pays no gas. Returns the relayed
-   * transaction hash, or null when the relay is unavailable for this wallet or network, leaving
-   * the caller to send the transaction the usual way. Only `create` is sponsored — edits keep
-   * paying their own gas.
+   * Relays `create` or `update` through our forwarder so the author pays no gas. Returns the
+   * relayed transaction hash, or null when the relay is unavailable for this wallet or network,
+   * leaving the caller to send the transaction the usual way.
    */
-  const tryGaslessCreate = async (args) => {
+  const tryGaslessHupAction = async (functionName, args) => {
     if (!isGaslessEnabled(targetChainId) || !targetChain || !targetPublicClient) return null
 
     try {
@@ -1276,7 +1275,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         chain: targetChain,
         publicClient: targetPublicClient,
         owner: address,
-        functionName: 'create',
+        functionName,
         args,
         signTypedDataAsync,
         useSessionKey: session.active,
@@ -1296,7 +1295,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   /**
    * The Solana counterpart of the four write branches below: one instruction, sponsored by the
    * relay where it serves the cluster (posts, comments, quotes), otherwise signed and paid by
-   * the Solana wallet. Edits are never sponsored, as on EVM. Resolves as soon as the cluster has
+   * the Solana wallet. Edits are sponsored too, as on EVM. Resolves as soon as the cluster has
    * taken the transaction — confirmation is the tracker's job, exactly as on EVM.
    * @param {string} metadata The pinned metadata CID.
    * @returns {Promise<string>} The base58 signature.
@@ -1312,7 +1311,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       const { signature } = await sendHupAction({
         networkId,
         signer,
-        sponsor: false,
+        onCooldown: 'throw',
         confirm: false,
         instructions: [hupInstruction.update({ networkId, actor, id: existingPost.id, metadata, allowComments })],
       })
@@ -1350,13 +1349,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       return
     }
 
-    // Same reason: a sponsored post still cooling down should not pin its media first
-    if (actionType !== 'edit') {
-      const cooldown = gaslessCooldown('create', targetChainId, signerAddress)
-      if (cooldown > 0) {
-        toast(`Slow down — you can post again in ${formatWait(cooldown)}.`, 'error')
-        return
-      }
+    // Same reason: a sponsored post or edit still cooling down should not pin its media first
+    const cooldown = gaslessCooldown(actionType === 'edit' ? 'update' : 'create', targetChainId, signerAddress)
+    if (cooldown > 0) {
+      toast(`Slow down — you can ${actionType === 'edit' ? 'edit' : 'post'} again in ${formatWait(cooldown)}.`, 'error')
+      return
     }
 
     if (!hasPostBody) {
@@ -1502,11 +1499,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         // can be an entirely different network
         const postContractAddress = CONTRACTS[`chain${existingPost?.network_id}`]?.hup
         if (!postContractAddress) throw new Error('Contract configuration missing for network')
+        const updateArgs = [address, existingPost.id, metadata, allowComments]
+        const relayedHash = await tryGaslessHupAction('update', updateArgs)
+        if (relayedHash) {
+          finishSubmission({ txHash: relayedHash })
+          return
+        }
         submitOnchain({
           abi,
           address: postContractAddress,
           functionName: 'update',
-          args: [address, existingPost.id, metadata, allowComments],
+          args: updateArgs,
           chainId: targetChainId,
         })
       } else if (isComment) {
@@ -1514,7 +1517,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         const targetContractAddress = CONTRACTS[`chain${replyTarget?.network_id}`]?.hup
         if (!targetContractAddress) throw new Error('Contract configuration missing for network')
         const createArgs = [address, ContentType.Comment, metadata, replyTarget.id, allowComments]
-        const relayedHash = await tryGaslessCreate(createArgs)
+        const relayedHash = await tryGaslessHupAction('create', createArgs)
         if (relayedHash) {
           finishSubmission({ txHash: relayedHash })
           return
@@ -1531,7 +1534,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         const targetContractAddress = CONTRACTS[`chain${quoteTarget?.network_id}`]?.hup
         if (!targetContractAddress) throw new Error('Contract configuration missing for network')
         const createArgs = [address, ContentType.Post, metadata, 0, allowComments]
-        const relayedHash = await tryGaslessCreate(createArgs)
+        const relayedHash = await tryGaslessHupAction('create', createArgs)
         if (relayedHash) {
           finishSubmission({ txHash: relayedHash })
           return
@@ -1551,7 +1554,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           : CONTRACTS[`chain${targetChainId}`]?.hup || process.env.NEXT_PUBLIC_CONTRACT_POST
         if (!postContractAddress) throw new Error('Contract configuration missing for network')
         const createArgs = [address, ContentType.Post, metadata, 0, allowComments]
-        const relayedHash = await tryGaslessCreate(createArgs)
+        const relayedHash = await tryGaslessHupAction('create', createArgs)
         if (relayedHash) {
           finishSubmission({ txHash: relayedHash })
           return

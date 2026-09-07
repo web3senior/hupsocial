@@ -269,7 +269,7 @@ export default function GasPage() {
 
               <p className={styles.footnote}>
                 Donations are voluntary and non-refundable. The relayer is a hot wallet that does one thing — pay gas
-                for posts, likes and reposts — and the post counts above are estimates at the current gas price.
+                for posts, edits, likes and reposts — and the post counts above are estimates at the current gas price.
               </p>
             </>
           )}
