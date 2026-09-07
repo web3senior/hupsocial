@@ -190,9 +190,11 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    max-width: 100%;
     margin-bottom: 4px;
     padding-left: 0.4rem;
     text-decoration: none;
+    white-space: nowrap;
 
     &:hover {
       color: var(--text);
@@ -200,8 +202,18 @@
     }
 
     svg {
+      flex: 0 0 auto;
       opacity: 0.6;
     }
+  }
+
+  // A community can be named a whole sentence; the badge shows its first few words and the
+  // full name lives in the title, so the line never wraps under the card
+  &__communityName {
+    min-width: 0;
+    max-width: 36ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__header {

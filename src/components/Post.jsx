@@ -267,7 +267,10 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             onClick={(e) => e.stopPropagation()}
           >
             <UsersIcon size={13} />
-            {`Posted in ${displayItem.community_name}`}
+            <span>Posted in</span>
+            <span className={styles.post__communityName} title={displayItem.community_name}>
+              {displayItem.community_name}
+            </span>
           </Link>
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
