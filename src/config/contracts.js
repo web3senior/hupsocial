@@ -4,7 +4,7 @@
  * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, baseSepolia, bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, /* baseSepolia, */ bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Arbitrum Orbit L2, ETH as gas
@@ -30,13 +30,14 @@ export const robinhood = defineChain({
 // that work. Browsers need the reverse order on LUKSO — see BROWSER_RPC_URLS in config/wagmi.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
 lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.com', 'https://rpc.mainnet.lukso.network'] } }
-baseSepolia.rpcUrls = {
-  ...baseSepolia.rpcUrls,
-  default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
-}
+// Base Sepolia is switched off across the app
+// baseSepolia.rpcUrls = {
+//   ...baseSepolia.rpcUrls,
+//   default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
+// }
 
 // Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia]
+export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood /* , baseSepolia */]
 
 // ''            — not deployed on that chain.
 // hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
@@ -108,32 +109,32 @@ export const CONTRACTS = {
     univ3Quoter: '',
   },
   // Dev chain — Base Sepolia
-  chain84532: {
-    name: 'base-sepolia',
-    forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
-    forwarderName: 'HupChatForwarder',
-    hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
-    status: '',
-    community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
-    polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
-    fund: '0xEB6c36fE71aC893Dca06fCAbc78C0C6690eA6D4b',
-    chat: '',
-    // No LSP26 on Base Sepolia: follower gates are unavailable here
-    followerSystem: '',
-    store: '',
-    tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
-    trade: '',
-    offers: '',
-    events: '',
-    predict: '',
-    apps: '',
-    drops: '',
-    splits: '',
-    launch: '0x560D9F7FC0e532bcCe5B183A698e7186363f29f1',
-    univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
-    univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
-    wnative: '0x4200000000000000000000000000000000000006',
-  },
+  // chain84532: {
+  //   name: 'base-sepolia',
+  //   forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
+  //   forwarderName: 'HupChatForwarder',
+  //   hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
+  //   status: '',
+  //   community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
+  //   polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
+  //   fund: '0xEB6c36fE71aC893Dca06fCAbc78C0C6690eA6D4b',
+  //   chat: '',
+  //   // No LSP26 on Base Sepolia: follower gates are unavailable here
+  //   followerSystem: '',
+  //   store: '',
+  //   tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
+  //   trade: '',
+  //   offers: '',
+  //   events: '',
+  //   predict: '',
+  //   apps: '',
+  //   drops: '',
+  //   splits: '',
+  //   launch: '0x560D9F7FC0e532bcCe5B183A698e7186363f29f1',
+  //   univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
+  //   univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
+  //   wnative: '0x4200000000000000000000000000000000000006',
+  // },
   chain143: {
     name: 'monad',
     forwarder: '0x09FAf2fddED624958589aD9ca704Bc4C6C232e72',

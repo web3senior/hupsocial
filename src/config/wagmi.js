@@ -3,7 +3,7 @@ import {
   arbitrum,
   arbitrumSepolia,
   base,
-  baseSepolia,
+  // baseSepolia,
   bsc,
   celo,
   lukso,
@@ -32,10 +32,11 @@ lukso.faucetUrl = `https://faucet.testnet.lukso.network/`
 lukso.primaryColor = `#FD1669`
 lukso.textColor = `#fff`
 
-// Base Sepolia — the dev chain; a chain without colours blanks every network-coloured control
-baseSepolia.faucetUrl = `https://faucets.chain.link/base-sepolia`
-baseSepolia.primaryColor = `#0052FF`
-baseSepolia.textColor = `#fff`
+// Base Sepolia — switched off across the app. Colours stay beside the switch: a chain added
+// back without them blanks every network-coloured control, which setNetworkColor now guards.
+// baseSepolia.faucetUrl = `https://faucets.chain.link/base-sepolia`
+// baseSepolia.primaryColor = `#0052FF`
+// baseSepolia.textColor = `#fff`
 
 // CELO
 celo.faucetUrl = `https://faucet.celo.org/celo-sepolia/`
