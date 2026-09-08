@@ -124,6 +124,21 @@
       "viaIR": true,
       "constructorArgs": "from the creation tx",
       "note": "verify one; the rest follow by similarity"
+    },
+    {
+      "contract": "HupFund",
+      "address": "0xbFa95c400099b499Cca00E2A6cc52998733bB02A",
+      "file": "HupFund.json",
+      "contractName": "src/Extensions/HupFund.sol:HupFund",
+      "compiler": "v0.8.36+commit.8a079791",
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "viaIR": true,
+      "constructorArgs": "0x00000000000000000000000020e229667cec8a0e9d3c6fb89693b2a44ec2c50e",
+      "note": "fundraising escrow (salt ethers.id(\"hup-fund\"), block 76969421) — args: admin. Source-unit names are the forge build's own (absolute OZ paths) so the metadata hash matches exactly."
     }
   ]
 }

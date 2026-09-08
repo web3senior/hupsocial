@@ -18,6 +18,7 @@ import tipperAbi from '@/abis/HupTipper.json'
 import communityAbi from '@/abis/HupCommunity.json'
 import pollsAbi from '@/abis/HupPolls.json'
 import dropsAbi from '@/abis/HupDrops.json'
+import fundAbi from '@/abis/HupFund.json'
 import { dropStandardLabel, dropStandardRowsFor } from '@/lib/drops'
 import { TIP_TOKENS } from '@/lib/tokens'
 import styles from './page.module.scss'
@@ -127,6 +128,7 @@ const SECTIONS = [
   { id: 'drops', label: 'Drops', icon: '🎨', contractKey: 'drops' },
   { id: 'community', label: 'Community', icon: '👥', contractKey: 'community' },
   { id: 'polls', label: 'Polls', icon: '📊', contractKey: 'polls' },
+  { id: 'fund', label: 'Fundraise', icon: '🪙', contractKey: 'fund' },
 ]
 
 const DEFAULT_SECTION = SECTIONS[0].id
@@ -232,6 +234,13 @@ export default function Page() {
   const [dropsFeeTxStates, setDropsFeeTxStates] = useState({})
   const [dropsReceiverInputs, setDropsReceiverInputs] = useState({})
   const [dropsWithdrawStates, setDropsWithdrawStates] = useState({})
+  // HupFund: one config read per chain, then the fee setter, the fee sweep and the pause toggle
+  const [fundConfigs, setFundConfigs] = useState({})
+  const [fundFeeInputs, setFundFeeInputs] = useState({})
+  const [fundFeeTxStates, setFundFeeTxStates] = useState({})
+  const [fundReceiverInputs, setFundReceiverInputs] = useState({})
+  const [fundWithdrawStates, setFundWithdrawStates] = useState({})
+  const [fundPauseTxStates, setFundPauseTxStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
 
@@ -1243,6 +1252,138 @@ export default function Page() {
     } catch (err) {
       console.error(`ERC677 ${enabled ? 'enable' : 'disable'} error on chain ${chain.id}:`, err)
       setErc677TxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Read everything the Fundraise card shows for one chain's HupFund in a single pass
+  const loadFundConfig = async (chain, fundAddress) => {
+    setFundConfigs((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      const read = (functionName) => client.readContract({ address: fundAddress, abi: fundAbi, functionName })
+      const [version, feeBps, feesAccrued, paused, nextCampaignId] = await Promise.all([
+        read('version'),
+        read('fundFeeBps'),
+        read('feesAccrued'),
+        read('paused'),
+        read('nextCampaignId'),
+      ])
+
+      setFundConfigs((prev) => ({
+        ...prev,
+        [chain.id]: {
+          loading: false,
+          version,
+          feeBps: Number(feeBps),
+          feesAccrued,
+          paused,
+          campaigns: Number(nextCampaignId) - 1,
+        },
+      }))
+      // Seed the fee field with the live rate so an untouched form re-submits nothing surprising
+      setFundFeeInputs((prev) => (prev[chain.id] === undefined ? { ...prev, [chain.id]: String(Number(feeBps)) } : prev))
+    } catch (err) {
+      console.error(`Fund config read error for chain ${chain.id}:`, err)
+      setFundConfigs((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read the fund contract' },
+      }))
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const fundAddress = CONTRACTS[`chain${chain.id}`]?.fund
+      if (fundAddress) loadFundConfig(chain, fundAddress)
+    })
+  }, [isAdmin])
+
+  // Set the platform fee for campaigns created from now on. Campaigns already open keep the
+  // rate they were created with — the contract freezes it — so this never reprices a live pot.
+  const handleSetFundFee = async (chain, fundAddress) => {
+    const bps = Number(fundFeeInputs[chain.id])
+    if (!Number.isInteger(bps) || bps < 0 || bps > 1000) {
+      setFundFeeTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a whole number of basis points, 0 to 1000 (10%)' } }))
+      return
+    }
+
+    setFundFeeTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: fundAddress,
+        abi: fundAbi,
+        functionName: 'setFundFeeBps',
+        args: [BigInt(bps)],
+        chainId: chain.id,
+      })
+
+      setFundFeeTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+      setTimeout(() => loadFundConfig(chain, fundAddress), 3000)
+    } catch (err) {
+      console.error(`Fund fee update error on chain ${chain.id}:`, err)
+      setFundFeeTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Sweep the fee ledger. Only feesAccrued moves — campaign pots are out of the admin's reach
+  // by construction, so this can never touch money that is still somebody's to refund.
+  const handleWithdrawFundFees = async (chain, fundAddress) => {
+    const receiver = fundReceiverInputs[chain.id]?.trim() || address
+    if (!isAddress(receiver)) {
+      setFundWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver address' } }))
+      return
+    }
+
+    setFundWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: fundAddress,
+        abi: fundAbi,
+        functionName: 'withdrawFees',
+        args: [receiver],
+        chainId: chain.id,
+      })
+
+      setFundWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+      setTimeout(() => loadFundConfig(chain, fundAddress), 3000)
+      setTimeout(() => loadChainBalances(chain), 3000)
+    } catch (err) {
+      console.error(`Fund fee withdrawal error on chain ${chain.id}:`, err)
+      setFundWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Pause blocks new campaigns, backings and withdrawals. It never blocks a refund claim —
+  // the contract exempts claimRefund so backers can always leave.
+  const handleFundPause = async (chain, fundAddress, pause) => {
+    setFundPauseTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: fundAddress,
+        abi: fundAbi,
+        functionName: pause ? 'pause' : 'unpause',
+        chainId: chain.id,
+      })
+
+      setFundPauseTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash, action: pause ? 'paused' : 'resumed' } }))
+      setTimeout(() => loadFundConfig(chain, fundAddress), 3000)
+    } catch (err) {
+      console.error(`Fund ${pause ? 'pause' : 'unpause'} error on chain ${chain.id}:`, err)
+      setFundPauseTxStates((prev) => ({
         ...prev,
         [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
@@ -4341,6 +4482,218 @@ export default function Page() {
           {activeSection === 'community' && renderFollowerSystemSection(FOLLOWER_SYSTEM_TARGETS.community)}
 
           {activeSection === 'polls' && renderFollowerSystemSection(FOLLOWER_SYSTEM_TARGETS.polls)}
+
+          {activeSection === 'fund' && (
+            <section className={styles['admin-contracts__section']}>
+              <header className={styles['admin-contracts__header']}>
+                <h2 className={styles['admin-contracts__title']}>HupFund</h2>
+                <p className={styles['admin-contracts__subtitle']}>
+                  Escrowed fundraising campaigns. The fee is taken once, when a creator withdraws a pot, at the rate frozen into the
+                  campaign when it was created — changing it here only affects campaigns opened afterwards. Fees land in their own ledger,
+                  and that ledger is the only balance this page can move: campaign pots are unreachable by design. Pause stops new
+                  campaigns, backings and withdrawals; refund claims always go through.
+                </p>
+              </header>
+
+              <div className={styles['admin-contracts__grid']}>
+                {visibleChains('fund').map((chain) => {
+                  const deployment = CONTRACTS[`chain${chain.id}`]
+                  const fundConfig = fundConfigs[chain.id]
+                  const feeDraft = fundFeeInputs[chain.id] ?? ''
+                  const receiverDraft = fundReceiverInputs[chain.id] ?? ''
+                  const feeTx = fundFeeTxStates[chain.id]
+                  const withdrawTx = fundWithdrawStates[chain.id]
+                  const pauseTx = fundPauseTxStates[chain.id]
+                  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+                  const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+                  const isLocked = !fundConfig || fundConfig.loading || Boolean(fundConfig.error)
+                  const feesAccrued = fundConfig?.feesAccrued ?? 0n
+                  const feePercent = fundConfig ? (fundConfig.feeBps / 100).toFixed(2).replace(/\.?0+$/, '') : ''
+
+                  return (
+                    <div
+                      key={`fund-${chain.id}`}
+                      className={styles['admin-contracts__card']}
+                      style={{
+                        '--network-color-primary': chain.primaryColor || '#f97316',
+                        '--network-color-text': chain.textColor || '#0d0d0d',
+                      }}
+                    >
+                      <div className={styles['admin-contracts__card-header']}>
+                        <div className={styles['admin-contracts__network-info']}>
+                          <div className={styles['admin-contracts__card-icon']}>
+                            <img src={chain.iconUrl} alt="" />
+                          </div>
+                          <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                        </div>
+                        <span className={styles['admin-contracts__badge']}>HUPFUND</span>
+                      </div>
+
+                      <div className={styles['admin-contracts__details']}>
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Fund Address</span>
+                          <span className={styles['admin-contracts__detail-value']}>
+                            {explorerUrl ? (
+                              <a href={`${explorerUrl}/address/${deployment.fund}`} target="_blank" rel="noopener noreferrer">
+                                <code>{deployment.fund}</code> ↗
+                              </a>
+                            ) : (
+                              <code>{deployment.fund}</code>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Contract</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {(!fundConfig || fundConfig.loading) && <span>Loading…</span>}
+                            {fundConfig?.error && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                                {fundConfig.error}
+                              </div>
+                            )}
+                            {fundConfig?.version && !fundConfig.paused && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
+                                ✓ v{fundConfig.version} — live, {fundConfig.campaigns} {fundConfig.campaigns === 1 ? 'campaign' : 'campaigns'} opened
+                              </div>
+                            )}
+                            {fundConfig?.version && fundConfig.paused && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                                ⚠️ v{fundConfig.version} — PAUSED: no new campaigns, backings or withdrawals ({fundConfig.campaigns} opened)
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {fundConfig?.version && (
+                          <>
+                            <div className={styles['admin-contracts__detail-row']}>
+                              <span className={styles['admin-contracts__detail-label']}>Fee For New Campaigns</span>
+                              <span className={styles['admin-contracts__detail-value']}>
+                                {fundConfig.feeBps} bps ({feePercent}%)
+                              </span>
+                            </div>
+                            <div className={styles['admin-contracts__detail-row']}>
+                              <span className={styles['admin-contracts__detail-label']}>Fees Accrued</span>
+                              <span className={styles['admin-contracts__detail-value']}>
+                                {formatEther(feesAccrued)} {symbol}
+                              </span>
+                            </div>
+                          </>
+                        )}
+
+                        {feeTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Fee Tx</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {feeTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                              {feeTx.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
+                              {feeTx.success && <span style={{ color: '#10b981' }}>🚀 Fee updated for campaigns created from now on.</span>}
+                            </div>
+                          </div>
+                        )}
+
+                        {withdrawTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Withdraw Tx</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {withdrawTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                              {withdrawTx.error && <span style={{ color: '#ef4444' }}>❌ {withdrawTx.error}</span>}
+                              {withdrawTx.success && <span style={{ color: '#10b981' }}>🚀 Fees swept.</span>}
+                            </div>
+                          </div>
+                        )}
+
+                        {pauseTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Pause Tx</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {pauseTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                              {pauseTx.error && <span style={{ color: '#ef4444' }}>❌ {pauseTx.error}</span>}
+                              {pauseTx.success && <span style={{ color: '#10b981' }}>🚀 Contract {pauseTx.action}.</span>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetFundFee(chain, deployment.fund)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Fee (basis points, 100 = 1%, max 1000)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="1000"
+                            step="1"
+                            className={styles['admin-contracts__input']}
+                            value={feeDraft}
+                            onChange={(e) => setFundFeeInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                            placeholder="0"
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={isLocked || feeTx?.loading || feeDraft === '' || Number(feeDraft) === fundConfig?.feeBps}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {feeTx?.loading ? 'Writing...' : 'Set Fee'}
+                          </button>
+                        </div>
+                      </form>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleWithdrawFundFees(chain, deployment.fund)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Sweep Fees To (defaults to your wallet)</label>
+                          <input
+                            type="text"
+                            className={styles['admin-contracts__input']}
+                            value={receiverDraft}
+                            onChange={(e) => setFundReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                            placeholder={address || '0x...'}
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={isLocked || withdrawTx?.loading || feesAccrued === 0n}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {withdrawTx?.loading ? 'Writing...' : feesAccrued === 0n ? 'Nothing To Sweep' : `Sweep ${formatEther(feesAccrued)} ${symbol}`}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleFundPause(chain, deployment.fund, !fundConfig?.paused)}
+                            disabled={isLocked || pauseTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                          >
+                            {pauseTx?.loading ? 'Writing...' : fundConfig?.paused ? 'Unpause' : 'Pause'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )
+                })}
+              </div>
+              {visibleChains('fund').length === 0 && (
+                <p className={styles['admin-contracts__empty']}>No HupFund deployments match this filter.</p>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </>

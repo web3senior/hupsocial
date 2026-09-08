@@ -53,6 +53,7 @@ import ArticleCard from './ArticleCard'
 import DropCard from './DropCard'
 import PredictCard from './PredictCard'
 import PollCard from './PollCard'
+import FundCard from './FundCard'
 import LaunchCard from './LaunchCard'
 import MiniAppEmbed from './MiniAppEmbed'
 import CashtagStrip from './CashtagStrip'
@@ -373,6 +374,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               {displayItem?.content?.predictMarket && <PredictCard marketRef={displayItem.content.predictMarket} />}
 
               {displayItem?.content?.poll && <PollCard pollRef={displayItem.content.poll} />}
+              {displayItem?.content?.hupFund && <FundCard fundRef={displayItem.content.hupFund} />}
 
               {displayItem?.content?.tokenLaunch && <LaunchCard launchRef={displayItem.content.tokenLaunch} />}
 
@@ -1069,6 +1071,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
       {/* A quoted poll is votable in place, like the original — the card resolves the same
           onchain tally either way, so nothing is gained by making the reader open the post */}
       {quotedPost?.content?.poll && <PollCard pollRef={quotedPost.content.poll} />}
+      {quotedPost?.content?.hupFund && <FundCard fundRef={quotedPost.content.hupFund} />}
       {quotedPost?.content?.tokenLaunch && <LaunchCard launchRef={quotedPost.content.tokenLaunch} />}
       {quotedPost?.content?.nftDrop && (
         // Quoting a drop is a referral channel like reposting: mints made from this

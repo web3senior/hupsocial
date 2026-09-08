@@ -149,3 +149,23 @@ code — a hand-typed address is never overwritten.
 The `/admin/deploy-lsp7` page deploys the same LSP7 source directly (no factory), reading
 `src/abis/HupTestLSP7.deploy.json`; it passes the connected wallet as `owner_`, so its behaviour
 is unchanged. Deploys made before 2026-08-23 have the two-argument constructor.
+
+## HupFund
+
+Escrowed fundraising campaigns (`src/contracts/v2/Extensions/HupFund.sol`). Built with
+**foundry: solc 0.8.36, optimizer on / 200 runs, viaIR, cancun** — the `HupFund.json` artifact here
+is that compile's `abi` + `bytecode`, and `../../abis/HupFund.json` is the same ABI.
+
+**Salt: `hup-fund`** — not the page default. Its `ethers.id` value:
+
+    0x99b0688e2639a7e384860f67876cd48922e9fba5681cfcbdc57504c66012bb72
+
+Set it in `deploy.html` before deploying so every chain lands on the same address. The constructor
+takes one argument, the admin EOA (`CTOR_DEFAULTS.HupFund` carries it per chain): no Hup core, no
+forwarder, on purpose — the contract holds backers' money and answers to nobody but `msg.sender`.
+
+After deploying: fill `chain<id>.fund` in `src/config/contracts.js`, register the deployment with
+cidex via the template at the bottom of `cidex/scripts/add-hupfund.sql` (name must be `HupFund`),
+restart cidex, and set the fee and sweep the ledger from the Fundraise tab on `/admin/contracts`.
+
+Deployed: Base Sepolia `0xEB6c36fE71aC893Dca06fCAbc78C0C6690eA6D4b` (2026-09-08).

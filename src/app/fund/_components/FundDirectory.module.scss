@@ -1,0 +1,386 @@
+.directory {
+  /* The progress ramp, shared with FundCard and the campaign page so a campaign reads as one
+     colour wherever it appears. The card's accent is the chain's own, scoped per card. */
+  --fund-early: #e11d48;
+  --fund-started: #f59e0b;
+  --fund-halfway: #84cc16;
+  --fund-funded: #15803d;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+
+  /* Two rows: what is being looked at, then how it is narrowed. They were one wrapping row, so
+     the search field's position moved every time the scope list gained or lost "Mine". */
+  &__toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  &__toolbarRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1 1 12rem;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    background: var(--background);
+    color: var(--text-muted, #888);
+    transition: border-color 0.15s ease;
+
+    &:focus-within {
+      border-color: var(--network-color-primary, #ec4899);
+    }
+
+    input {
+      all: unset;
+      flex: 1;
+      min-width: 0;
+      font-size: var(--font-size-12);
+      color: var(--text, inherit);
+
+      &::placeholder {
+        color: var(--text-muted, #888);
+      }
+    }
+  }
+
+  &__select {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--background);
+    color: inherit;
+    padding: 0.35rem 1.75rem 0.35rem 0.75rem;
+    font-size: var(--font-size-12);
+    cursor: pointer;
+  }
+
+  &__createButton {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background-color: var(--network-color-primary, var(--network-color-primary, #ec4899));
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.4rem 0.85rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__item {
+    display: block;
+  }
+
+  &__card {
+    position: relative; /* Anchors the stretched title link over the whole card */
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.85rem 1rem;
+    background: var(--background);
+    color: inherit;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--network-color-primary, #ec4899) 45%, var(--border));
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+    }
+
+    /* Whatever is focused inside the card, the card says so — otherwise tabbing to the title
+       of a borderless row lands somewhere invisible */
+    &:focus-within {
+      border-color: var(--network-color-primary, #ec4899);
+    }
+  }
+
+  &__skeleton {
+    gap: 0.6rem;
+    pointer-events: none;
+  }
+
+  &__skeletonTop {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__cardTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  // Profile sizes itself to its contents; in a card row it takes the slack instead, so the
+  // status cluster sits flush right. Nested for the specificity to beat its own rule, and
+  // raised over the stretched title link so the name, avatar and hover card stay reachable.
+  .directory__creator {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  &__cardTopRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  &__badge {
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+
+    &--open {
+      background: color-mix(in srgb, var(--network-color-primary, #ec4899) 14%, transparent);
+      color: var(--network-color-primary, #ec4899);
+    }
+
+    &--funded {
+      background: rgba(21, 128, 61, 0.14);
+      color: var(--fund-funded);
+    }
+
+    &--closed {
+      background: rgba(100, 116, 139, 0.14);
+      color: var(--text-muted, #64748b);
+    }
+
+    &--refunding {
+      background: rgba(225, 29, 72, 0.14);
+      color: #e11d48;
+    }
+
+    &--withdrawn {
+      background: rgba(21, 128, 61, 0.14);
+      color: #15803d;
+    }
+  }
+
+  &__backed {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    color: var(--status-success, #15803d);
+  }
+
+  &__network {
+    font-size: var(--font-size-10, 0.65rem);
+    color: var(--text-muted, #888);
+    text-transform: capitalize;
+  }
+
+  
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16, 1rem);
+    line-height: 1.35;
+  }
+
+  /* The whole card is the target, but only the question is the link — so the accessible name
+     is the question rather than every word on the row */
+  &__titleLink {
+    color: inherit;
+    text-decoration: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--network-color-primary, #ec4899);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  }
+
+  /* Both the running window and the settled result use it, and both sit tight under whatever
+     they describe */
+  &__bar {
+    gap: 0.25rem;
+  }
+
+  /* Two lines on a card; the campaign page carries the whole pitch */
+  &__description {
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* The money line is the one a reader scans for, so it is the largest thing on the card */
+  &__amounts {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__raised {
+    font-size: 1.3rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  &__goal {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__percent {
+    font-size: var(--font-size-12);
+    font-weight: 700;
+  }
+
+  
+  /* Who has already answered: overlapping faces, then the count — the same social proof the
+     connect popup puts under its title */
+  &__backers {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__faces {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Nested for the specificity to beat Profile's own rule, and raised over the stretched title
+     link — a face carries a hover card and a link of its own, and neither is reachable under it */
+  .directory__face {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+
+    &:not(:first-child) {
+      margin-left: -8px;
+    }
+
+    /* The face lifts clear of its neighbours while it is being read */
+    &:hover {
+      z-index: 2;
+    }
+
+    img {
+      /* A card-colored ring separates the overlapping faces from each other */
+      border: 2px solid var(--background);
+      background-color: var(--surface-muted);
+
+      /* Profile paints the identicon fingerprint over the picture. At this size it lands on
+         top of the neighbour it overlaps and reads as noise, and the hover card behind each
+         face carries the same fingerprint at a size worth checking. */
+      + img {
+        display: none;
+      }
+    }
+  }
+
+  &__backersText {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    /* The count is the figure being sold, so it carries the card's own text color rather than
+       the muted tone around it */
+    strong {
+      color: var(--foreground);
+      font-weight: 600;
+    }
+  }
+
+  &__foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__copy {
+    margin-left: auto;
+  }
+
+  /* EmptyState owns the copy and the icon; the module only gives it room */
+  &__empty {
+    padding: 2.5rem 1rem;
+  }
+
+  &__loadMore {
+    all: unset;
+    cursor: pointer;
+    text-align: center;
+    padding: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-12);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+  }
+}

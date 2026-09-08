@@ -1,0 +1,53 @@
+/* Four boxes on one baseline. The value is the loudest number on the page while the campaign
+   runs, and it takes the chain's own colour so the clock reads as part of the content, not the
+   wallet chrome around it. */
+.countdown {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &__cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 3.25rem;
+  }
+
+  &__value {
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--network-color-primary, var(--primary, #ec4899));
+  }
+
+  &__label {
+    margin-top: 0.35rem;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #888);
+  }
+
+  /* The separator hangs off the cell's right edge so the boxes stay evenly spaced */
+  &__colon {
+    position: absolute;
+    right: -0.45rem;
+    top: 0;
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-muted, #888);
+  }
+
+  &__ended {
+    margin: 0;
+    text-align: center;
+    font-size: var(--font-size-16, 1rem);
+    font-weight: 700;
+    color: var(--text-muted, #888);
+  }
+}

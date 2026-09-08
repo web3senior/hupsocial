@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, ImageIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -36,6 +36,8 @@ import DropCard from '@/components/DropCard'
 import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
 import CreatePollDialog from '@/components/CreatePollDialog'
 import AttachPollDialog from '@/components/AttachPollDialog'
+import CreateFundDialog from '@/components/CreateFundDialog'
+import AttachFundDialog from '@/components/AttachFundDialog'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import clsx from 'clsx'
@@ -133,7 +135,7 @@ const loadDraftContent = () => {
 // A published payload carries its attachment references alongside the content (see the tail of
 // handleCreatePost), and each of those is restored into its own state. Leaving them on the
 // content object would have getSerializablePostContent spread a second copy into the next one.
-const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'tokenLaunch', 'nftDrop', 'miniApp', 'poll', 'article']
+const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'tokenLaunch', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'article']
 
 const stripAttachments = (content) => {
   const bare = { ...content }
@@ -443,6 +445,15 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // The Poll button opens a chooser first — new poll, or one already asked — which then
   // hands off to createPollRef for the new-poll path
   const attachPollRef = useRef(null)
+
+  // A fundraise is the same shape as a poll: the campaign is opened onchain first, and the
+  // post only carries a reference to it, so the card always shows what has actually been
+  // raised rather than a figure frozen at publish time.
+  const [hupFund, setHupFund] = useState(() =>
+    restoredContent?.hupFund ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.hupFund ?? null) : (loadAttachmentDraft()?.hupFund ?? null))
+  )
+  const createFundRef = useRef(null)
+  const attachFundRef = useRef(null)
   // Every in-flight attachment upload, keyed by uploadId: the File so a failed tile can retry,
   // the AbortController so Remove cancels the transfer, the promise so submit can await it
   const uploadsRef = useRef(new Map())
@@ -560,6 +571,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     Boolean(nftDrop) ||
     Boolean(miniApp) ||
     Boolean(poll) ||
+    Boolean(hupFund) ||
     Boolean(article)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
@@ -606,6 +618,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const dropsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.drops)
   // Polls the same: the ballot has to settle on the chain the post lands on
   const pollsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.polls)
+  // Fundraising the same: the money has to settle on the chain the post lands on
+  const fundAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.fund)
   // The composer already holds an image and text, so the create dialog opens with two of its four
   // required fields filled — the author only types a name and a ticker
   const launchPrefillImage = mediaItems.find((item) => item.type === 'image' && item.cid)?.cid ?? ''
@@ -1418,6 +1432,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // Polls as well — the poll already exists onchain (opened in CreatePollDialog); PollCard
       // resolves the tally live, so a post never carries a count that has since moved
       if (poll) serializableContent.poll = poll
+      if (hupFund) serializableContent.hupFund = hupFund
 
       // Edits rebuild the payload from the composer's text/media state, so reference keys
       // that only exist in the stored JSON must be carried over or the edit erases them
@@ -1612,12 +1627,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   useEffect(() => {
     if (!persistsDraft) return
     try {
-      if (poll) localStorage.setItem(getAttachmentDraftKey(), JSON.stringify({ poll }))
+      if (poll || hupFund) localStorage.setItem(getAttachmentDraftKey(), JSON.stringify({ poll, hupFund }))
       else localStorage.removeItem(getAttachmentDraftKey())
     } catch (error) {
       console.error('Failed to save post attachments:', error)
     }
-  }, [persistsDraft, poll])
+  }, [persistsDraft, poll, hupFund])
 
   useEffect(() => {
     const uploads = uploadsRef.current
@@ -1813,6 +1828,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 </div>
               )}
 
+              {hupFund && (
+                <div className={styles.nftAttachment}>
+                  <BagIcon size={16} />
+                  <span>Fundraise attached (campaign #{hupFund.campaignId})</span>
+                  <button type="button" onClick={() => setHupFund(null)} aria-label="Detach fundraise" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              )}
+
               {mediaItems.some((item) => item.type !== 'audio') && (
                 <div className={styles.mediaGrid}>
                   {mediaItems.map((item, index) => {
@@ -1975,6 +2000,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 <ListChecksIcon size={20} />
               </button>
             )}
+            {canAttachNft && fundAvailable && (
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => attachFundRef.current?.open()} title="Fundraise" aria-label="Add a fundraise" disabled={isBusy || Boolean(hupFund)}>
+                <BagIcon size={20} />
+              </button>
+            )}
             {canAttachNft && (
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => attachMiniAppRef.current?.open()} title="Mini app" aria-label="Attach a mini app" disabled={isBusy || Boolean(miniApp)}>
                 <PuzzlePieceIcon size={20} />
@@ -2098,6 +2128,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         onCreateNew={() => createPollRef.current?.open()}
       />
       <CreatePollDialog ref={createPollRef} fixedChainId={targetChainId} onCreated={(reference) => reference && setPoll(reference)} />
+
+      <AttachFundDialog
+        ref={attachFundRef}
+        chainId={targetChainId}
+        onAttach={(reference) => reference && setHupFund(reference)}
+        onCreateNew={() => createFundRef.current?.open()}
+      />
+      <CreateFundDialog ref={createFundRef} fixedChainId={targetChainId} onCreated={(reference) => reference && setHupFund(reference)} />
     </NativeDialog>
   )
 }

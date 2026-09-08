@@ -1,0 +1,213 @@
+/* The money is the headline. Everything else on the card — the clock, the faces, the button —
+   is arranged around the one line that says how far along this is. */
+.fundCard {
+  /* The progress ramp: an alarm colour while a campaign is barely started, amber as it gets
+     going, green once the goal is in reach. Literal rather than tokenised because the palette
+     carries no progress ramp, and alpha tints hold in both themes. */
+  --fund-early: #e11d48;
+  --fund-started: #f59e0b;
+  --fund-halfway: #84cc16;
+  --fund-funded: #15803d;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface, var(--background));
+
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-15, 0.95rem);
+    font-weight: 700;
+    line-height: 1.35;
+    min-width: 0;
+
+    a {
+      color: inherit;
+      text-decoration: none;
+
+      &:hover {
+        color: var(--network-color-primary, var(--primary, #ec4899));
+      }
+    }
+  }
+
+  &__badge {
+    flex-shrink: 0;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    background: color-mix(in srgb, var(--network-color-primary, #ec4899) 14%, transparent);
+    color: var(--network-color-primary, #ec4899);
+
+    &--funded {
+      background: rgba(21, 128, 61, 0.14);
+      color: var(--fund-funded);
+    }
+
+    &--closed {
+      background: rgba(100, 116, 139, 0.14);
+      color: var(--text-muted, #64748b);
+    }
+
+    &--refunding {
+      background: rgba(225, 29, 72, 0.14);
+      color: #e11d48;
+    }
+
+    &--withdrawn {
+      background: rgba(21, 128, 61, 0.14);
+      color: #15803d;
+    }
+  }
+
+  &__description {
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+    /* Two lines on a card; the campaign page carries the whole thing */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__amounts {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__raised {
+    font-size: 1.35rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  &__goal {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__bar {
+    gap: 0.3rem;
+  }
+
+  &__percent {
+    font-size: var(--font-size-12);
+    font-weight: 700;
+  }
+
+  &__meta {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  &__backers {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    strong {
+      color: var(--foreground);
+      font-weight: 700;
+    }
+  }
+
+  &__faces {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Nested for the specificity to beat Profile's own rule */
+  .fundCard__face {
+    flex-shrink: 0;
+
+    &:not(:first-child) {
+      margin-left: -8px;
+    }
+
+    &:hover {
+      z-index: 2;
+    }
+
+    img {
+      /* A card-coloured ring separates the overlapping faces from each other */
+      border: 2px solid var(--surface, var(--background));
+      background-color: var(--surface-muted);
+
+      /* Profile paints the identicon fingerprint over the picture; at this size it lands on
+         the neighbour it overlaps and reads as noise */
+      + img {
+        display: none;
+      }
+    }
+  }
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    margin-left: auto;
+    border: none;
+    border-radius: 999px;
+    background: var(--network-color-primary, var(--primary, #ec4899));
+    color: var(--network-color-text, #fff);
+    padding: 0.45rem 1rem;
+    font-size: var(--font-size-12);
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &__yours {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--fund-funded);
+  }
+
+  &__hidden {
+    margin-top: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+}

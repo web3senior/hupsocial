@@ -1,0 +1,510 @@
+.detail {
+  /* The progress ramp, shared with FundCard so a campaign is one colour wherever it is read */
+  --fund-early: #e11d48;
+  --fund-started: #f59e0b;
+  --fund-halfway: #84cc16;
+  --fund-funded: #15803d;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    align-self: flex-start;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-13, 0.8125rem);
+    text-decoration: none;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--text, inherit);
+    }
+  }
+
+  &__loading {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text-muted, #888);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__creator {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    min-width: 0;
+
+    // Profile pins itself to max-content; beside the status cluster it must give instead, so a
+    // long name truncates rather than shoving the badge off the row. Nested for the
+    // specificity to beat Profile's own rule.
+    .detail__creatorProfile {
+      flex-shrink: 1;
+      width: auto;
+      min-width: 0;
+    }
+  }
+
+  &__started {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__headerActions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  &__badge {
+    flex-shrink: 0;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    background: color-mix(in srgb, var(--network-color-primary, #ec4899) 14%, transparent);
+    color: var(--network-color-primary, #ec4899);
+
+    &--funded {
+      background: rgba(21, 128, 61, 0.14);
+      color: var(--fund-funded);
+    }
+
+    &--closed {
+      background: rgba(100, 116, 139, 0.14);
+      color: var(--text-muted, #64748b);
+    }
+
+    &--refunding {
+      background: rgba(225, 29, 72, 0.14);
+      color: #e11d48;
+    }
+
+    &--withdrawn {
+      background: rgba(21, 128, 61, 0.14);
+      color: #15803d;
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font-size: clamp(1.35rem, 4vw, 1.9rem);
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  /* The clock leads the page: a deadline is the reason a reader acts now rather than later */
+  &__clock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--surface-muted, rgba(0, 0, 0, 0.03));
+  }
+
+  &__clockLabel {
+    margin: 0;
+    font-size: var(--font-size-11, 0.7rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #888);
+  }
+
+  &__money {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  &__amounts {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  &__raised {
+    font-size: clamp(1.6rem, 5vw, 2.1rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  &__goal {
+    font-size: var(--font-size-13, 0.8125rem);
+    color: var(--text-muted, #888);
+  }
+
+  &__percent {
+    font-size: var(--font-size-13, 0.8125rem);
+    font-weight: 700;
+  }
+
+  &__meta {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__backButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--network-color-primary, var(--primary, #ec4899));
+    color: var(--network-color-text, #fff);
+    padding: 0.85rem 1.25rem;
+    font-size: var(--font-size-15, 0.95rem);
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  /* The money actions sit together under the bar: the primary one in the chain colour, the
+     secondary ones quiet, and the irreversible one only ever behind a second press */
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__secondary {
+    all: unset;
+    cursor: pointer;
+    align-self: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+      color: var(--text, inherit);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    &--danger {
+      border-color: rgba(225, 29, 72, 0.4);
+      color: #e11d48;
+
+      &:hover:not(:disabled) {
+        background: rgba(225, 29, 72, 0.08);
+        color: #e11d48;
+      }
+    }
+  }
+
+  &__confirm {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px dashed rgba(225, 29, 72, 0.5);
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-12);
+    text-align: center;
+    line-height: 1.5;
+
+    p {
+      margin: 0;
+    }
+
+    div {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+
+  &__valve {
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+    text-align: center;
+  }
+
+  /* The clock box says what the money is doing once the countdown no longer applies */
+  &__clockNote {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+    text-align: center;
+  }
+
+  &__yours {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    font-weight: 600;
+    color: var(--fund-funded);
+  }
+
+  &__close {
+    all: unset;
+    cursor: pointer;
+    align-self: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+      color: var(--text, inherit);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+  }
+
+  &__about {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  }
+
+  &__facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+
+    div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+
+    dt {
+      font-size: var(--font-size-10, 0.65rem);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+
+    dd {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+
+      // A date, and an address, are longer than the amounts beside them, so they drop a step
+      // and wrap inside their own cell rather than widening every column of the grid
+      &.detail__when {
+        font-size: var(--font-size-12);
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      a {
+        color: var(--network-color-primary, var(--primary, #ec4899));
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+
+  &__faq {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+
+    ul {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+  }
+
+  /* The answer inside a DetailSection body — the section owns its frame and summary row */
+  &__answer {
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    line-height: 1.55;
+    color: var(--text-muted, #888);
+    white-space: pre-wrap;
+  }
+
+  &__backers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+
+    // A grid of backer cards rather than rows: a row has no room for a memo, a card hands it a
+    // full line of its own. auto-fill keeps it responsive with no media query.
+    ul {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 0.6rem;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    li {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.6rem 0.75rem;
+      background: var(--background);
+      font-size: var(--font-size-12);
+    }
+
+    // Who and how much share the card's top line. Profile sizes itself to its contents; here
+    // it fills the slack so the amount sits flush right and a long name truncates.
+    .detail__backerTop {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      .detail__backer {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+      }
+    }
+  }
+
+  &__backerAmount {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__memo {
+    // The backer's own words, as a quote under their name. User-authored prose wraps inside
+    // the card's width rather than truncating or shoving the layout.
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+    border-radius: 6px;
+    background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  &__backerTime {
+    color: var(--text-muted, #888);
+  }
+
+  // Centered under the backer grid — the conventional seat for a load-more control
+  &__more {
+    all: unset;
+    cursor: pointer;
+    align-self: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+      color: var(--text, inherit);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+  }
+
+  &__note {
+    margin: 0.25rem 0 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.5;
+  }
+
+  &__tx {
+    align-self: flex-start;
+    font-size: var(--font-size-12);
+    color: var(--network-color-primary, var(--primary, #ec4899));
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
