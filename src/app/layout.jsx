@@ -1,12 +1,14 @@
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist_Mono, Inter } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
 import './Globals.scss'
 import './../styles/Global.scss'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+// The app sans — the closest open face to X's Chirp, which is proprietary and cannot be bundled.
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
+  display: 'swap',
 })
 
 const geistMono = Geist_Mono({
@@ -111,7 +113,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body>
         <ServiceWorkerRegistry />
         <ClientLayout>{children}</ClientLayout>
