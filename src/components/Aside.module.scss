@@ -66,26 +66,6 @@
     width: 100%;
   }
 
-  .navContainer {
-  }
-
-  .navList {
-    overflow-y: auto;
-    overflow-x: hidden; // Keep nowrap rows and tooltip pseudo-elements from flashing a horizontal scrollbar mid-transition
-
-    // The standard properties opt this list out of the global 14px ::-webkit-scrollbar chrome
-    // (Chromium 121+ ignores those rules once scrollbar-width/color are declared): a thin bar
-    // that stays invisible until the menu is hovered or actively scrolled, so the gutter
-    // never jumps. The scrolling class comes from the onScroll handler in Aside.jsx.
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-
-    &:hover,
-    &.navListScrolling {
-      scrollbar-color: var(--thumbBG) transparent;
-    }
-  }
-
   .link {
     justify-content: flex-start;
   }
@@ -105,6 +85,24 @@
   gap: 0.2rem;
   list-style: none;
   padding-right: 0.1rem; // Add some padding to prevent scrollbar from overlapping content
+
+  // Both rails scroll: the compact one runs out of room first, since a zoomed-in viewport
+  // holds fewer rows than the icons the rail carries.
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden; // Keep nowrap rows from flashing a horizontal scrollbar mid-transition
+
+  // The standard properties opt this list out of the global 14px ::-webkit-scrollbar chrome
+  // (Chromium 121+ ignores those rules once scrollbar-width/color are declared): a thin bar
+  // that stays invisible until the menu is hovered or actively scrolled, so the gutter
+  // never jumps. The scrolling class comes from the onScroll handler in Aside.jsx.
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+
+  &:hover,
+  &.navListScrolling {
+    scrollbar-color: var(--thumbBG) transparent;
+  }
 }
 
 .link {
@@ -131,54 +129,6 @@
 
   &:active {
     transform: scale(0.95);
-  }
-
-  // Tooltip
-  &[data-tooltip] {
-    position: relative;
-
-    &::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      left: calc(100% + 10px);
-      top: 50%;
-      transform: translateY(-50%) translateX(-4px);
-      background-color: var(--black);
-      color: var(--white);
-      padding: 4px 8px;
-      font-size: var(--font-size-12);
-      font-family: inherit;
-      font-weight: 400;
-      -webkit-font-smoothing: antialiased;
-      border-radius: 1000px;
-      pointer-events: none;
-      opacity: 0;
-      white-space: nowrap;
-      z-index: 10;
-      box-shadow: var(--shadow-sm);
-
-      // Visibility is used instead of display to allow transition animations
-      visibility: hidden;
-
-      // Snappy exit transition when the mouse leaves
-      transition:
-        opacity 0.1s ease,
-        transform 0.1s ease,
-        visibility 0.1s ease;
-    }
-
-    &:hover::after {
-      // Reveal tooltip on hover
-      visibility: visible;
-      opacity: 1;
-      transform: translateY(-50%) translateX(0);
-
-      // Balanced 0.5-second hover delay before revealing
-      transition:
-        opacity 0.1s ease 0.5s,
-        transform 0.1s ease 0.5s,
-        visibility 0s linear 0.5s;
-    }
   }
 }
 

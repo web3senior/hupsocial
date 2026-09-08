@@ -19,6 +19,7 @@ import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import BatchLikeTrigger from './BatchLikeTrigger'
 import NativePopover from './ui/NativePopover'
+import Tooltip from './ui/Tooltip'
 import NavBadge from './ui/NavBadge'
 import Avatar from './ui/Avatar'
 import { GitHub } from './Icons'
@@ -121,24 +122,25 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
   if (Component) {
     return (
       <>
-        <button
-          type="button"
-          className={clsx(styles.link, styles.moreButton)}
-          aria-label={item.name}
-          data-tooltip={showTooltip ? item.name : undefined}
-          onClick={() => {
-            // The composer can only publish with a wallet behind it — say so here rather than
-            // letting the author write a whole post into a dialog that cannot submit
-            if (!canCompose) {
-              toast('Please connect wallet', 'error')
-              return
-            }
-            setIsComponentOpen(true)
-            onNavigate?.()
-          }}
-        >
-          {content}
-        </button>
+        <Tooltip content={showTooltip ? item.name : null} placement="right" size="compact" hoverOnly>
+          <button
+            type="button"
+            className={clsx(styles.link, styles.moreButton)}
+            aria-label={item.name}
+            onClick={() => {
+              // The composer can only publish with a wallet behind it — say so here rather than
+              // letting the author write a whole post into a dialog that cannot submit
+              if (!canCompose) {
+                toast('Please connect wallet', 'error')
+                return
+              }
+              setIsComponentOpen(true)
+              onNavigate?.()
+            }}
+          >
+            {content}
+          </button>
+        </Tooltip>
 
         {isComponentOpen && <Component item={item} onClose={() => setIsComponentOpen(false)} />}
       </>
@@ -146,19 +148,20 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
   }
 
   return (
-    <Link
-      href={item.path}
-      className={clsx(styles.link, isActive && styles.linkActive)}
-      aria-label={item.name}
-      data-tooltip={showTooltip ? item.name : undefined}
-      aria-current={isActive ? 'page' : undefined}
-      onClick={(event) => {
-        onLinkClick?.(event)
-        onNavigate?.()
-      }}
-    >
-      {content}
-    </Link>
+    <Tooltip content={showTooltip ? item.name : null} placement="right" size="compact" hoverOnly>
+      <Link
+        href={item.path}
+        className={clsx(styles.link, isActive && styles.linkActive)}
+        aria-label={item.name}
+        aria-current={isActive ? 'page' : undefined}
+        onClick={(event) => {
+          onLinkClick?.(event)
+          onNavigate?.()
+        }}
+      >
+        {content}
+      </Link>
+    </Tooltip>
   )
 }
 
@@ -391,17 +394,14 @@ export default function Aside() {
         <div className={styles.footerNav}>
           <NativePopover
             trigger={
-              <button
-                type="button"
-                className={clsx(styles.link, styles.moreButton)}
-                aria-label="More"
-                data-tooltip={isCompact ? 'More' : undefined}
-              >
-                <div className={styles.iconWrapper}>
-                  <EqualsIcon size={24} />
-                </div>
-                {!isCompact && <span className={styles.linkText}>More</span>}
-              </button>
+              <Tooltip content={tooltipReady ? 'More' : null} placement="right" size="compact" hoverOnly>
+                <button type="button" className={clsx(styles.link, styles.moreButton)} aria-label="More">
+                  <div className={styles.iconWrapper}>
+                    <EqualsIcon size={24} />
+                  </div>
+                  {!isCompact && <span className={styles.linkText}>More</span>}
+                </button>
+              </Tooltip>
             }
             placement="right-end"
             type="auto"
@@ -525,19 +525,20 @@ export default function Aside() {
             )}
           </NativePopover>
 
-          <Link
-            href="/networks"
-            className={clsx(styles.link, isActivePath(pathname, '/networks') && styles.linkActive)}
-            aria-label="Networks"
-            data-tooltip={tooltipReady ? 'Networks' : undefined}
-            aria-current={isActivePath(pathname, '/networks') ? 'page' : undefined}
-            onClick={closeSidebar}
-          >
-            <div className={styles.iconWrapper}>
-              <StackIcon size={20} weight={isActivePath(pathname, '/networks') ? 'fill' : 'regular'} />
-            </div>
-            {!isCompact && <span className={styles.linkText}>Networks</span>}
-          </Link>
+          <Tooltip content={tooltipReady ? 'Networks' : null} placement="right" size="compact" hoverOnly>
+            <Link
+              href="/networks"
+              className={clsx(styles.link, isActivePath(pathname, '/networks') && styles.linkActive)}
+              aria-label="Networks"
+              aria-current={isActivePath(pathname, '/networks') ? 'page' : undefined}
+              onClick={closeSidebar}
+            >
+              <div className={styles.iconWrapper}>
+                <StackIcon size={20} weight={isActivePath(pathname, '/networks') ? 'fill' : 'regular'} />
+              </div>
+              {!isCompact && <span className={styles.linkText}>Networks</span>}
+            </Link>
+          </Tooltip>
         </div>
       </div>
 
