@@ -47,7 +47,6 @@ import Profile from '@/components/Profile'
 import { toast } from '@/components/NextToast'
 import { Spinner } from '@/components/Loading'
 import SegmentedControl from '@/components/ui/SegmentedControl'
-import { DOLLAR_SIGN_SRC } from '@/components/ui/Tip'
 import { PaintBrushIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
 import styles from './DropManagePanel.module.scss'
 
@@ -639,10 +638,8 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, onC
         <>
           <div className={styles.manage__earnings}>
             <span className={styles.manage__earningsLabel}>Earned from mints</span>
-            {/* Once something is earned it wears the tip pill's green and spinning dollar sign: the
-                same money, seen from the creator's side. At zero it stays in plain ink. */}
+            {/* Once something is earned it takes the up colour. At zero it stays in plain ink. */}
             <strong className={clsx(styles.manage__earningsValue, hasEarned && styles['manage__earningsValue--earned'])}>
-              {hasEarned && <img className={styles.manage__earningsSign} src={DOLLAR_SIGN_SRC} alt="" />}
               {totals ? formatNative(creatorNetWei) : '—'}
               <em>{nativeSymbol}</em>
             </strong>

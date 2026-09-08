@@ -95,20 +95,12 @@
     }
 
     &--earned {
-      color: var(--tip-earned-color);
+      color: var(--up);
     }
   }
 
-  // The tip pill's spinning dollar sign, sized as the headline's currency glyph
-  &__earningsSign {
-    flex: none;
-    width: 0.95em;
-    height: 0.95em;
-    object-fit: contain;
-  }
-
   &__earningsUsd {
-    color: var(--tip-earned-color);
+    color: var(--up);
     font-size: var(--font-size-16, 1rem);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
