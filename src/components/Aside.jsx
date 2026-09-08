@@ -14,6 +14,7 @@ import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useFaviconBadge } from '@/hooks/useFaviconBadge'
 import { useProfile } from '@/hooks/useProfile'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
@@ -197,9 +198,13 @@ export default function Aside() {
     // opens on, so the badge always clears by reading the feed.
     isConnected && address ? `/api/v1/notifications?wallet_address=${address}&filter=inbox&limit=1` : null,
     (url) => fetch(url).then((r) => r.json()),
-    { refreshInterval: 60_000, revalidateOnFocus: true }
+    // refreshWhenHidden keeps the poll alive in a background tab — without it the favicon badge
+    // could never appear for anything that arrives while the user is away.
+    { refreshInterval: 60_000, revalidateOnFocus: true, refreshWhenHidden: true }
   )
   const unreadCount = notifData?.success ? (notifData.meta?.unread_count ?? 0) : 0
+
+  useFaviconBadge(unreadCount)
 
   // Client-side navigation fires no focus event and never remounts the layout, so without this the
   // badge only moves on the 60s poll tick.
