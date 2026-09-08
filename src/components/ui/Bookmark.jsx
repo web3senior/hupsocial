@@ -8,9 +8,12 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import { getPostById } from '@/lib/api'
 import { getBookmarkFoldersKey } from '@/lib/savedPostsKey'
+import Counter from './Counter'
 import NativePopover from './NativePopover'
 import Tooltip from './Tooltip'
 import postStyles from '../Post.module.scss'
+
+const countFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 
 const foldersFetcher = async (url) => {
   const res = await fetch(url)
@@ -215,12 +218,15 @@ export const Bookmark = ({ post }) => {
   }
 
   const isLoading = interactionState.isProcessing
-  const iconColor = interactionState.isBookmarked ? 'var(--blue-500, red)' : 'currentColor'
   const iconWeight = interactionState.isBookmarked ? 'fill' : 'regular'
+  const bookmarkCount = interactionState.bookmarkCount
 
   const savedOn = post?.bookmarked_at
     ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(post.bookmarked_at))
     : null
+
+  const ownLabel = savedOn ? `Saved on ${savedOn}` : interactionState.isBookmarked ? 'Saved' : 'Save'
+  const tooltip = bookmarkCount > 0 ? `${ownLabel} · ${countFormat.format(bookmarkCount)} saved` : ownLabel
 
   if (!isMounted) return null
 
@@ -235,18 +241,15 @@ export const Bookmark = ({ post }) => {
         }
       }}
       trigger={
-        <Tooltip
-          content={savedOn ? `Saved on ${savedOn}` : interactionState.isBookmarked ? 'Saved' : 'Save'}
-          placement="bottom"
-          size="compact"
-          hoverOnly
-        >
+        <Tooltip content={tooltip} placement="bottom" size="compact" hoverOnly>
           <button
             data-action="bookmark"
+            data-saved={interactionState.isBookmarked ? 'true' : undefined}
             disabled={isLoading}
             aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
           >
-            <BookmarkIcon width={17} height={17} color={iconColor} weight={iconWeight} />
+            <BookmarkIcon width={17} height={17} weight={iconWeight} />
+            {bookmarkCount > 0 && <Counter value={bookmarkCount} />}
           </button>
         </Tooltip>
       }

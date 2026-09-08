@@ -440,10 +440,21 @@
         }
       }
 
-      &[data-action='bookmark']:hover {
-        color: color-mix(in srgb, var(--blue-400) 60%, transparent);
-        &:before {
-          background-color: color-mix(in srgb, var(--blue-400) 10%, transparent);
+      &[data-action='bookmark'] {
+        &:hover {
+          color: color-mix(in srgb, var(--blue-400) 60%, transparent);
+          &:before {
+            background-color: color-mix(in srgb, var(--blue-400) 10%, transparent);
+          }
+        }
+
+        // Saved: the counter takes the filled mark's blue, hover only deepens the halo
+        &[data-saved='true'] {
+          color: var(--blue-500);
+
+          &:hover {
+            color: var(--blue-500);
+          }
         }
       }
 
