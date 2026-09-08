@@ -185,7 +185,6 @@ export default function LeaderboardPage() {
                     className={`${styles.podiumItem} ${getRankClass(leader.rank)}`}
                     onClick={() => openProfile(leader.wallet_address)}
                   >
-                    <RankBadge rank={leader.rank} />
                     <CrownedProfile
                       rank={leader.rank}
                       wallet={leader.wallet_address}
@@ -273,18 +272,6 @@ function Metric({ icon: Icon, label, value }) {
     <span className={styles.metric} title={label}>
       <Icon size={15} />
       <span>{compactFormatter.format(value)}</span>
-    </span>
-  )
-}
-
-/*
- * The crown rides the avatar itself, so the badge alongside it carries the plain
- * number — two medals for one rank would only read as noise.
- */
-function RankBadge({ rank }) {
-  return (
-    <span className={styles.rankBadge}>
-      <span className={styles.rankNumber}>#{rank}</span>
     </span>
   )
 }

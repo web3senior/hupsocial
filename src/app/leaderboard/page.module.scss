@@ -224,22 +224,6 @@
   //   var(--surface);
 }
 
-.rankBadge {
-  grid-column: 1 / -1;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  width: fit-content;
-  min-height: 28px;
-  padding: 0 0.55rem;
-  border-radius: 999px;
-  color: var(--text);
-  background-color: var(--surface-muted);
-  border: 1px solid var(--border);
-  font-size: var(--system-12-font-size);
-  font-weight: 700;
-}
-
 .podiumIdentity,
 .identity {
   display: flex;
@@ -415,8 +399,8 @@ background-color: var(--surface-muted);
 }
 
 .podiumProfile {
-  // Clears the crown's overhang so it never rides up into the rank badge
-  margin-top: 0.75rem;
+  // Keeps the crown's overhang clear of the card's top edge
+  margin-top: 0.35rem;
 }
 
 .avatar {
