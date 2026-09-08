@@ -1,16 +1,18 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
-import { useChainId, useConnection, usePublicClient, useSignMessage, useSignTypedData } from 'wagmi'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useChainId, useConnection, usePublicClient, useSignMessage, useSignTypedData, useSwitchChain } from 'wagmi'
 import { isHexString, Wallet, ethers } from 'ethers'
 import ecies from 'eciesjs'
 import clsx from 'clsx'
 import abiChat from '@/abis/Chat.json'
 import { unlockAppKeyFromStorage, unlockAppKeyWithPassword, lockAppPrivateKey, APP_PASSWORD_SESSION_STORAGE, ENCRYPTED_APP_KEY_STORAGE, clearVaultIfWalletChanged } from '@/lib/appVault'
 import { getActiveChain } from '@/lib/communication'
+import { CONTRACTS, config } from '@/config/wagmi'
+import { appChains } from '@/config/contracts'
 import { encryptData, decryptData, isPrivateKeyEncrypted } from '@/lib/cryptoHelper'
-import { CheckIcon, CopyIcon, DatabaseIcon, EyeIcon, EyeSlashIcon, KeyIcon, ShieldWarningIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { CheckIcon, CopyIcon, DatabaseIcon, EyeIcon, EyeSlashIcon, KeyIcon, ShieldWarningIcon, UploadSimpleIcon, WarningIcon } from '@phosphor-icons/react'
 import styles from './page.module.scss'
 
 import {
@@ -60,6 +62,12 @@ export default function Register() {
   const tunnelAddress = activeChainContracts?.chat
   const forwarderAddress = activeChainContracts?.forwarder
   const relayRpcUrl = activeChainConfig?.rpcUrls?.default?.http?.[0]
+
+  // The Tunnel contract only lives on a couple of chains; anywhere else is a
+  // switch prompt, never a dead end.
+  const switchChain = useSwitchChain({ config })
+  const tunnelChains = useMemo(() => appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.chat), [])
+  const isTunnelChain = Boolean(tunnelAddress)
 
   // ■■■ Core State ■■■
   const [isActivating, setIsActivating] = useState(false)
@@ -157,10 +165,22 @@ export default function Register() {
     return () => clearInterval(interval)
   }, [checkStatus, isConnected])
 
+  // ─── Network Switching ───────────────────────────────────────────────────
+
+  const switchToTunnelChain = (chainId = tunnelChains[0]?.id) => {
+    if (!chainId) return
+    setErrorMsg('')
+    switchChain.mutate(
+      { chainId },
+      { onError: (error) => setErrorMsg(error?.shortMessage || error?.message || 'Could not switch network.') }
+    )
+  }
+
   // ─── Vault Creation ──────────────────────────────────────────────────────
 
   const handleCreateVaultAndActivate = async () => {
     if (!isConnected || !address) return setErrorMsg('Please connect your wallet first.')
+    if (!isTunnelChain) return switchToTunnelChain()
     if (vaultPassword.length < 4) return setErrorMsg('Your PIN must be at least 8 characters.')
     if (vaultPassword !== confirmVaultPassword) return setErrorMsg('PINs do not match.')
     setIsActivating(true)
@@ -295,7 +315,10 @@ export default function Register() {
       setErrorMsg('')
 
       if (!address) throw new Error('Wallet not connected.')
-      if (!tunnelAddress) throw new Error('Tunnel contract is not configured.')
+      if (!tunnelAddress) {
+        switchToTunnelChain()
+        return
+      }
 
       // Unlock vault to get the public key.
       // Also register when directPubKey is provided — this handles the case where
@@ -366,6 +389,7 @@ export default function Register() {
 
   const triggerActivation = () => {
     setErrorMsg('')
+    if (!isTunnelChain) return switchToTunnelChain()
     const pin = sessionStorage.getItem(APP_PASSWORD_SESSION_STORAGE)
     if (pin) {
       handleActivateIdentity(pin)
@@ -379,6 +403,7 @@ export default function Register() {
   // ─── Session Revocation ──────────────────────────────────────────────────
 
   const handleRevokeSession = async () => {
+    if (!isTunnelChain) return switchToTunnelChain()
     try {
       setIsActivating(true)
       const txHash = await relayViaForwarder(tunnelAddress, abiChat, 'revokeSession', [], 80000)
@@ -486,6 +511,37 @@ export default function Register() {
           </div>
         )}
 
+        {/* ■■■ Unsupported Network ■■■ */}
+        {isConnected && !isTunnelChain && (
+          <div className={clsx(styles.register__chainNotice)}>
+            <div className={clsx(styles.register__chainNoticeHead)}>
+              <WarningIcon size={16} />
+              <span>
+                {tunnelChains.length > 0
+                  ? `Chat isn't available on ${activeChainConfig?.name || 'this network'}.`
+                  : 'Chat is not deployed on any network yet.'}
+              </span>
+            </div>
+            {tunnelChains.length > 0 && (
+              <div className={clsx(styles.register__chainActions)}>
+                {tunnelChains.map((chain) => (
+                  <button
+                    key={chain.id}
+                    type="button"
+                    onClick={() => switchToTunnelChain(chain.id)}
+                    disabled={switchChain.isPending}
+                    className={clsx(styles.register__switchChain)}
+                  >
+                    {switchChain.isPending && switchChain.variables?.chainId === chain.id
+                      ? 'Switching…'
+                      : `Switch to ${chain.name}`}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ■■■ Error Banner ■■■ */}
         {errorMsg && (
           <div className={clsx(styles.register__alertError)}>
@@ -562,7 +618,7 @@ export default function Register() {
         {/* ■■■ Security Modules ■■■ */}
         <div className={clsx(styles.register__secureModules)}>
           {/* Vault Creation */}
-          {!hasLocalVault && isConnected && (
+          {!hasLocalVault && isConnected && isTunnelChain && (
             <div className={clsx(styles.register__secureSetup)}>
               <h5>
                 <DatabaseIcon size={16} /> Set PIN
@@ -728,7 +784,19 @@ export default function Register() {
 
         {/* ■■■ Footer Actions ■■■ */}
         <footer className={clsx(styles.register__footer)}>
-          {isFullyRegistered ? (
+          {isConnected && !isTunnelChain ? (
+            <button
+              className={clsx(styles.register__button, 'btn')}
+              onClick={() => switchToTunnelChain()}
+              disabled={switchChain.isPending || tunnelChains.length === 0}
+            >
+              {switchChain.isPending
+                ? 'Switching…'
+                : tunnelChains.length > 0
+                  ? `Switch to ${tunnelChains[0].name}`
+                  : 'Unavailable here'}
+            </button>
+          ) : isFullyRegistered ? (
             <button className={clsx(styles.register__button, 'btn')} onClick={() => router.push(hasSessionUnlocked ? '/chat' : '/unlock')}>
               {hasSessionUnlocked ? 'Open Chat' : 'Unlock to Enter'}
             </button>
