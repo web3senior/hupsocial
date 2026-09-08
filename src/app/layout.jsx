@@ -4,7 +4,6 @@ import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
 import './Globals.scss'
 import './../styles/Global.scss'
 
-// The app sans — the closest open face to X's Chirp, which is proprietary and cannot be bundled.
 const inter = Inter({
   variable: '--font-inter',
   subsets: ['latin'],
