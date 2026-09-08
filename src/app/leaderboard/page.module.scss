@@ -1,4 +1,9 @@
 .page {
+  // The board ranks every chain at once, so it keeps one accent of its own rather than
+  // inheriting :root's connected-wallet network colour
+  --leaderboard-accent: #fd1669;
+  --leaderboard-accent-text: #fff;
+
   min-height: 85svh;
 
   &__container {
@@ -92,8 +97,7 @@
 }
 
 .activeSegment {
-  color: var(--network-color-primary) !important;
-  background-color: var(--network-color-primary, var(--gray-200));
+  color: var(--leaderboard-accent) !important;
 }
 
 .selectLabel {
@@ -116,7 +120,7 @@
     cursor: pointer;
 
     &:focus {
-      outline: 2px solid var(--network-color-primary, var(--blue-300));
+      outline: 2px solid var(--leaderboard-accent);
       outline-offset: 2px;
     }
   }
@@ -124,7 +128,7 @@
 
 .summaryGrid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.5rem;
   padding: 1rem 0;
 
@@ -150,7 +154,7 @@
   color: var(--text);
 
   svg {
-    color: var(--network-color-primary, var(--blue-500));
+    color: var(--leaderboard-accent);
   }
 
   span {
@@ -197,7 +201,7 @@
   transition: border-color 150ms ease, transform 150ms ease, background-color 150ms ease;
 
   &:hover {
-    border-color: var(--network-color-primary, var(--blue-500));
+    border-color: var(--leaderboard-accent);
     transform: translateY(-1px);
   }
 }
@@ -292,7 +296,7 @@
   top: 4rem;
   z-index: 10;
   display: grid;
-  grid-template-columns: 40px 2fr repeat(7, minmax(62px, 0.55fr)) minmax(72px, 0.5fr);
+  grid-template-columns: 40px 2fr repeat(8, minmax(58px, 0.5fr)) minmax(72px, 0.5fr);
   align-items: center;
   gap: 0.7rem;
   width: 100%;
@@ -320,7 +324,7 @@ background-color: var(--surface-muted);
 .leaderRow {
   appearance: none;
   display: grid;
-  grid-template-columns: 42px 2fr repeat(7, minmax(62px, 0.55fr)) minmax(72px, 0.5fr);
+  grid-template-columns: 42px 2fr repeat(8, minmax(58px, 0.5fr)) minmax(72px, 0.5fr);
   align-items: center;
   gap: 0.7rem;
   width: 100%;
@@ -360,6 +364,61 @@ background-color: var(--surface-muted);
   font-weight: 700;
 }
 
+// Crowned identity: the avatar keeps its own box, the crown and ring are laid over it.
+// Both are pinned to the left edge because Profile puts the picture first and centres it
+// on the cross axis, so --crowned-avatar-size is enough to place them exactly.
+.crowned {
+  position: relative;
+  display: block;
+  min-width: 0;
+  // Owns the ring's negative layer so it sinks behind the avatar only, not behind the row
+  isolation: isolate;
+
+  &__crown {
+    position: absolute;
+    top: calc(var(--crowned-avatar-size) * -0.42);
+    left: calc(var(--crowned-avatar-size) / 2);
+    z-index: 2;
+    width: calc(var(--crowned-avatar-size) * 0.62);
+    height: auto;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  // Sits under the picture so the identicon, which hangs past the avatar's bottom-right
+  // corner into this exact band, keeps its own edge instead of being cut by the ring
+  &__ring {
+    position: absolute;
+    top: 50%;
+    left: -3px;
+    z-index: -1;
+    width: calc(var(--crowned-avatar-size) + 6px);
+    height: calc(var(--crowned-avatar-size) + 6px);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  // Each ring takes the highlight colour out of the crown sitting above it
+  &[data-rank='1'] .crowned__ring {
+    border-color: #ff9f0a;
+  }
+
+  &[data-rank='2'] .crowned__ring {
+    border-color: #acacac;
+  }
+
+  &[data-rank='3'] .crowned__ring {
+    border-color: #9c4302;
+  }
+}
+
+.podiumProfile {
+  // Clears the crown's overhang so it never rides up into the rank badge
+  margin-top: 0.75rem;
+}
+
 .avatar {
 
 }
@@ -380,7 +439,7 @@ background-color: var(--surface-muted);
 
   svg {
     flex: 0 0 auto;
-    color: var(--network-color-primary, var(--blue-500));
+    color: var(--leaderboard-accent);
   }
 }
 
@@ -389,8 +448,8 @@ background-color: var(--surface-muted);
   min-width: 62px;
   padding: 0.35rem 0.55rem;
   border-radius: 999px;
-  color: var(--network-color-text, var(--black));
-  background-color: var(--network-color-primary, var(--gray-200));
+  color: var(--leaderboard-accent-text);
+  background-color: var(--leaderboard-accent);
   text-align: center;
   font-size: var(--system-13-font-size);
   font-weight: 800;

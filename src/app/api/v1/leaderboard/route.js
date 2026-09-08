@@ -18,6 +18,7 @@ const SORTS = {
   views: 'ranked.views_received DESC, ranked.score DESC, ranked.latest_post_at DESC',
   transactions: 'ranked.tx_count DESC, ranked.score DESC, ranked.latest_post_at DESC',
   followers: 'ranked.follower_count DESC, ranked.score DESC, ranked.latest_post_at DESC',
+  tips: 'ranked.tips_received DESC, ranked.tippers DESC, ranked.score DESC, ranked.latest_post_at DESC',
 }
 
 // The ranking is identical for every viewer, and computing it means scanning
@@ -32,13 +33,17 @@ const TX_COUNT_SQL = `
   COALESCE(activity.root_posts, 0) +
   COALESCE(activity.comments_made, 0) +
   COALESCE(activity.reposts_made, 0) +
-  COALESCE(given.likes_given, 0)
+  COALESCE(given.likes_given, 0) +
+  COALESCE(tips_out.tips_given, 0)
 `
 
 /*
  * Follower score uses sqrt scaling instead of a linear weight so bulk follow
  * farming yields diminishing returns; follower_count itself is already limited
  * to "qualified" followers (wallets with at least one post or like).
+ *
+ * Tips are counted, never summed: `amount` is raw token units, so an 18-decimal
+ * LYX tip and a 6-decimal USDC tip cannot be added into one number here.
  */
 const SCORE_SQL = `
   (COALESCE(activity.root_posts, 0) * 10) +
@@ -47,6 +52,8 @@ const SCORE_SQL = `
   (COALESCE(received.likes_received, 0) * 8) +
   (COALESCE(given.likes_given, 0) * 1) +
   (COALESCE(views.views_received, 0) * 1) +
+  (COALESCE(tips_in.tips_received, 0) * 25) +
+  (COALESCE(tips_out.tips_given, 0) * 10) +
   FLOOR(SQRT(COALESCE(followers.follower_count, 0)) * 40) +
   (${TX_COUNT_SQL}) * 2
 `
@@ -185,6 +192,23 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     since,
   })
 
+  /* tips.tipped_at is the onchain unix second, not a datetime, so the period bound converts */
+  const tipsReceivedFilter = buildWhere({
+    alias: 't',
+    timeColumn: 'tipped_at',
+    timeAsUnix: true,
+    networkId,
+    since,
+  })
+
+  const tipsGivenFilter = buildWhere({
+    alias: 't',
+    timeColumn: 'tipped_at',
+    timeAsUnix: true,
+    networkId,
+    since,
+  })
+
   /*
    * Follows are indexed from the onchain LSP26 contract, which is permissionless,
    * so the follows table can contain Sybil wallets. Period-scope the rows here;
@@ -221,6 +245,9 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
         COALESCE(received.likes_received, 0) AS likes_received,
         COALESCE(given.likes_given, 0) AS likes_given,
         COALESCE(views.views_received, 0) AS views_received,
+        COALESCE(tips_in.tips_received, 0) AS tips_received,
+        COALESCE(tips_in.tippers, 0) AS tippers,
+        COALESCE(tips_out.tips_given, 0) AS tips_given,
         (${TX_COUNT_SQL}) AS tx_count,
         ${SCORE_SQL} AS score
       FROM (
@@ -229,6 +256,8 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
         SELECT CONVERT(wallet_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM posts WHERE wallet_address IS NOT NULL
         UNION
         SELECT CONVERT(liker_address USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM post_likes WHERE liker_address IS NOT NULL
+        UNION
+        SELECT CONVERT(tipper USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address FROM tips WHERE tipper IS NOT NULL
       ) wallets
       LEFT JOIN users u ON u.wallet_address = wallets.wallet_address
       LEFT JOIN (
@@ -292,6 +321,23 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
         WHERE f.is_following = 1
         GROUP BY CONVERT(f.follower_address USING utf8mb4) COLLATE utf8mb4_general_ci
       ) following ON following.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(t.creator USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          COUNT(*) AS tips_received,
+          COUNT(DISTINCT t.tipper) AS tippers
+        FROM tips t
+        ${tipsReceivedFilter.where}
+        GROUP BY CONVERT(t.creator USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) tips_in ON tips_in.wallet_address = wallets.wallet_address
+      LEFT JOIN (
+        SELECT
+          CONVERT(t.tipper USING utf8mb4) COLLATE utf8mb4_general_ci AS wallet_address,
+          COUNT(*) AS tips_given
+        FROM tips t
+        ${tipsGivenFilter.where}
+        GROUP BY CONVERT(t.tipper USING utf8mb4) COLLATE utf8mb4_general_ci
+      ) tips_out ON tips_out.wallet_address = wallets.wallet_address
     ) ranked
     WHERE ranked.score > 0
   `
@@ -306,6 +352,8 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     ...givenFilter.params,
     ...viewsFilter.params,
     ...followFilter.params,
+    ...tipsReceivedFilter.params,
+    ...tipsGivenFilter.params,
   ]
 
   const [rows] = await pool.execute(fullListQuery, params)
@@ -320,7 +368,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
 }
 
 function buildStatsQuery(networkId, since) {
-  const { memberFilter, postFilter, likeFilter, viewFilter } = buildStatsFilters(networkId, since)
+  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
 
   return `
     SELECT
@@ -328,12 +376,13 @@ function buildStatsQuery(networkId, since) {
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NULL AND p.is_repost IS NULL) AS root_posts,
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NOT NULL) AS comments,
       (SELECT COUNT(*) FROM post_likes pl ${likeFilter.where}) AS likes,
-      (SELECT COUNT(*) FROM post_views pv ${viewFilter.where}) AS views
+      (SELECT COUNT(*) FROM post_views pv ${viewFilter.where}) AS views,
+      (SELECT COUNT(*) FROM tips t ${tipFilter.where}) AS tips
   `
 }
 
 function buildStatsParams(networkId, since) {
-  const { memberFilter, postFilter, likeFilter, viewFilter } = buildStatsFilters(networkId, since)
+  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
 
   return [
     ...memberFilter.params,
@@ -341,6 +390,7 @@ function buildStatsParams(networkId, since) {
     ...postFilter.params,
     ...likeFilter.params,
     ...viewFilter.params,
+    ...tipFilter.params,
   ]
 }
 
@@ -363,10 +413,11 @@ function buildStatsFilters(networkId, since) {
     }),
     likeFilter: buildWhere({ alias: 'pl', timeColumn: 'inserted_at', networkId, since }),
     viewFilter: buildWhere({ alias: 'pv', timeColumn: 'viewed_at', networkId, since }),
+    tipFilter: buildWhere({ alias: 't', timeColumn: 'tipped_at', timeAsUnix: true, networkId, since }),
   }
 }
 
-function buildWhere({ alias, timeColumn, networkId, since, baseConditions = [] }) {
+function buildWhere({ alias, timeColumn, networkId, since, baseConditions = [], timeAsUnix = false }) {
   const conditions = [...baseConditions]
   const params = []
 
@@ -377,7 +428,7 @@ function buildWhere({ alias, timeColumn, networkId, since, baseConditions = [] }
 
   if (since) {
     conditions.push(`${alias}.${timeColumn} >= ?`)
-    params.push(since)
+    params.push(timeAsUnix ? toUnixSeconds(since) : since)
   }
 
   return {
@@ -404,6 +455,11 @@ function getSinceDate(period) {
   return date.toISOString().slice(0, 19).replace('T', ' ')
 }
 
+/* getSinceDate builds its string from an ISO slice, so it is UTC and the Z is safe to re-add */
+function toUnixSeconds(sqlDatetime) {
+  return Math.floor(Date.parse(`${sqlDatetime}Z`) / 1000)
+}
+
 function clampNumber(value, min, max, fallback) {
   if (!Number.isFinite(value)) return fallback
   return Math.min(Math.max(value, min), max)
@@ -427,6 +483,9 @@ function serializeLeader(row, rank) {
     likes_received: toNumber(row.likes_received),
     likes_given: toNumber(row.likes_given),
     views_received: toNumber(row.views_received),
+    tips_received: toNumber(row.tips_received),
+    tips_given: toNumber(row.tips_given),
+    tippers: toNumber(row.tippers),
     tx_count: toNumber(row.tx_count),
     score: toNumber(row.score),
     latest_post_at: row.latest_post_at,
@@ -440,6 +499,7 @@ function serializeStats(stats = {}) {
     comments: toNumber(stats.comments),
     likes: toNumber(stats.likes),
     views: toNumber(stats.views),
+    tips: toNumber(stats.tips),
   }
 }
 

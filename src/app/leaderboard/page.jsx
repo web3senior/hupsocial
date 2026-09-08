@@ -8,6 +8,7 @@ import {
   ChatCircleIcon,
   EyeIcon,
   FlameIcon,
+  HandCoinsIcon,
   HashIcon,
   HeartIcon,
   PackageIcon,
@@ -15,17 +16,20 @@ import {
   TrophyIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
 import { useProfile } from '@/hooks/useProfile'
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
+const PODIUM_AVATAR_SIZE = 48
+const ROW_AVATAR_SIZE = 32
 
-const RANK_ICONS = {
+const RANK_CROWNS = {
   1: '/icons/1st.svg',
-  2: '/icons/2nd.svg', // Fixed typo: 2st -> 2nd
-  3: '/icons/3rd.svg', // Fixed typo: 3st -> 3rd
+  2: '/icons/2nd.svg',
+  3: '/icons/3rd.svg',
 }
 
 const PERIOD_OPTIONS = [
@@ -41,6 +45,7 @@ const SORT_OPTIONS = [
   { value: 'views', label: 'Views' },
   { value: 'transactions', label: 'Transactions' },
   { value: 'followers', label: 'Followers' },
+  { value: 'tips', label: 'Tips' },
 ]
 
 const numberFormatter = new Intl.NumberFormat('en-US')
@@ -55,6 +60,7 @@ const EMPTY_STATS = {
   comments: 0,
   likes: 0,
   views: 0,
+  tips: 0,
 }
 
 const fetcher = async (url) => {
@@ -160,6 +166,7 @@ export default function LeaderboardPage() {
             <StatCard icon={ChatCircleIcon} label="Comments" value={stats.comments} />
             <StatCard icon={HeartIcon} label="Likes" value={stats.likes} />
             <StatCard icon={EyeIcon} label="Views" value={stats.views} />
+            <StatCard icon={HandCoinsIcon} label="Tips" value={stats.tips} />
           </section>
 
           {error && <p className={styles.errorState}>{error.message}</p>}
@@ -179,7 +186,12 @@ export default function LeaderboardPage() {
                     onClick={() => openProfile(leader.wallet_address)}
                   >
                     <RankBadge rank={leader.rank} />
-                    <Profile creator={leader.wallet_address} variant="fullWithoutTime" />
+                    <CrownedProfile
+                      rank={leader.rank}
+                      wallet={leader.wallet_address}
+                      size={PODIUM_AVATAR_SIZE}
+                      className={styles.podiumProfile}
+                    />
                     <div className={styles.scoreBlock}>
                       <span>{numberFormatter.format(leader.score)}</span>
                       <small>score</small>
@@ -197,6 +209,7 @@ export default function LeaderboardPage() {
                   <span>Likes</span>
                   <span>Reposts</span>
                   <span>Views</span>
+                  <span>Tips</span>
                   <span>Transactions</span>
                   <span>Followers</span>
                   <span>Score</span>
@@ -209,13 +222,19 @@ export default function LeaderboardPage() {
                     onClick={() => openProfile(leader.wallet_address)}
                   >
                     <span className={styles.rankNumber}>{leader.rank}</span>
-                    <Profile creator={leader.wallet_address} className={styles.avatar} variant="fullWithoutTime" />
+                    <CrownedProfile
+                      rank={leader.rank}
+                      wallet={leader.wallet_address}
+                      size={ROW_AVATAR_SIZE}
+                      className={styles.avatar}
+                    />
 
                     <Metric icon={FlameIcon} label="Posts" value={leader.root_posts} />
                     <Metric icon={ChatCircleIcon} label="Comments" value={leader.comments_made} />
                     <Metric icon={HeartIcon} label="Likes" value={leader.likes_received} />
                     <Metric icon={RepeatIcon} label="Reposts" value={leader.reposts_made} />
                     <Metric icon={EyeIcon} label="Views" value={leader.views_received} />
+                    <Metric icon={HandCoinsIcon} label="Tips received" value={leader.tips_received} />
                     <Metric icon={PackageIcon} label="Transactions" value={leader.tx_count} />
                     <Metric icon={UsersIcon} label="Followers" value={leader.follower_count} />
                     <span className={styles.rowScore}>{compactFormatter.format(leader.score)}</span>
@@ -258,13 +277,38 @@ function Metric({ icon: Icon, label, value }) {
   )
 }
 
+/*
+ * The crown rides the avatar itself, so the badge alongside it carries the plain
+ * number — two medals for one rank would only read as noise.
+ */
 function RankBadge({ rank }) {
-  const iconSrc = RANK_ICONS[rank]
-
   return (
     <span className={styles.rankBadge}>
-      {iconSrc && <img src={iconSrc} alt={`Rank ${rank}`} />}
       <span className={styles.rankNumber}>#{rank}</span>
+    </span>
+  )
+}
+
+/*
+ * Profile.jsx stays the one identity renderer; the crown is an overlay anchored off the
+ * avatar box it was handed, which is why the size travels as a variable rather than a guess.
+ */
+function CrownedProfile({ rank, wallet, size, className }) {
+  const crownSrc = RANK_CROWNS[rank]
+
+  return (
+    <span
+      className={clsx(styles.crowned, className)}
+      style={{ '--crowned-avatar-size': `${size}px` }}
+      data-rank={crownSrc ? rank : undefined}
+    >
+      {crownSrc && (
+        <>
+          <span className={styles.crowned__ring} aria-hidden="true" />
+          <img className={styles.crowned__crown} src={crownSrc} alt="" aria-hidden="true" />
+        </>
+      )}
+      <Profile creator={wallet} variant="fullWithoutTime" size={size} />
     </span>
   )
 }
