@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CheckIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -26,6 +26,7 @@ import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
+import NativePopover from '@/components/ui/NativePopover'
 import NetworkSelect from '@/components/ui/NetworkSelect'
 import GifPicker from '@/components/GifPicker'
 import SellNftModal from '@/components/SellNftModal'
@@ -623,6 +624,76 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // The composer already holds an image and text, so the create dialog opens with two of its four
   // required fields filled — the author only types a name and a ticker
   const launchPrefillImage = mediaItems.find((item) => item.type === 'image' && item.cid)?.cid ?? ''
+
+  // Every chain-gated attachment hangs off one labelled menu instead of the icon row. The row
+  // grew a glyph per attachment type until it overflowed unannounced, and a bare icon never
+  // said what it attached — most authors never found these at all.
+  const attachOptions = [
+    canAttachNft && nftTradeAvailable && {
+      key: 'nft',
+      icon: StorefrontIcon,
+      label: 'Sell an NFT',
+      hint: 'List one you own, buyable from the post',
+      attached: Boolean(nftListing),
+    },
+    canAttachNft && pollsAvailable && {
+      key: 'poll',
+      icon: ListChecksIcon,
+      label: 'Poll',
+      hint: 'Ask a question, votes settle onchain',
+      attached: Boolean(poll),
+    },
+    canAttachNft && fundAvailable && {
+      key: 'fund',
+      icon: BagIcon,
+      label: 'Fundraise',
+      hint: 'Collect funds toward a goal',
+      attached: Boolean(hupFund),
+    },
+    canAttachNft && predictAvailable && {
+      key: 'predict',
+      icon: ChartLineUpIcon,
+      label: 'Prediction market',
+      hint: 'Let readers take a side on an outcome',
+      attached: Boolean(predictMarket),
+    },
+    canAttachNft && launchAvailable && {
+      key: 'launch',
+      icon: CoinIcon,
+      label: 'Launch a token',
+      hint: 'Open a token launch from this post',
+      attached: Boolean(tokenLaunch),
+    },
+    canAttachNft && dropsAvailable && {
+      key: 'drop',
+      icon: ImagesSquareIcon,
+      label: 'NFT drop',
+      hint: 'Attach a mint readers can join',
+      attached: Boolean(nftDrop),
+    },
+    canAttachNft && {
+      key: 'miniapp',
+      icon: PuzzlePieceIcon,
+      label: 'Mini app',
+      hint: 'Embed an app inside the post',
+      attached: Boolean(miniApp),
+    },
+  ].filter(Boolean)
+
+  // Dispatch lives here rather than as a closure on each option: the list above is rebuilt
+  // every render, and the dialog refs it would have to capture can't be read during one
+  const openAttachment = useCallback((key) => {
+    switch (key) {
+      case 'nft': setShowSellNftModal(true); break
+      case 'poll': attachPollRef.current?.open(); break
+      case 'fund': attachFundRef.current?.open(); break
+      case 'predict': setShowAttachMarket(true); break
+      case 'launch': setShowAttachLaunch(true); break
+      case 'drop': setShowAttachDrop(true); break
+      case 'miniapp': attachMiniAppRef.current?.open(); break
+      default: break
+    }
+  }, [])
 
   const handleClose = useCallback(
     (e) => {
@@ -1975,46 +2046,59 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('em')} title="Italic" aria-label="Italic" disabled={isBusy}>
               <TextItalicIcon size={20} />
             </button>
-            {canAttachNft && nftTradeAvailable && (
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowSellNftModal(true)} title="Sell an NFT" aria-label="Sell an NFT" disabled={isBusy || Boolean(nftListing)}>
-                <StorefrontIcon size={20} />
-              </button>
-            )}
-            {canAttachNft && predictAvailable && (
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowAttachMarket(true)} title="Prediction market" aria-label="Attach a prediction market" disabled={isBusy || Boolean(predictMarket)}>
-                <ChartLineUpIcon size={20} />
-              </button>
-            )}
-            {canAttachNft && launchAvailable && (
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowAttachLaunch(true)} title="Launch a token" aria-label="Launch a token" disabled={isBusy || Boolean(tokenLaunch)}>
-                <CoinIcon size={20} />
-              </button>
-            )}
-            {canAttachNft && dropsAvailable && (
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowAttachDrop(true)} title="NFT drop" aria-label="Attach an NFT drop" disabled={isBusy || Boolean(nftDrop)}>
-                <ImageIcon size={20} />
-              </button>
-            )}
-            {canAttachNft && pollsAvailable && (
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => attachPollRef.current?.open()} title="Poll" aria-label="Add a poll" disabled={isBusy || Boolean(poll)}>
-                <ListChecksIcon size={20} />
-              </button>
-            )}
-            {canAttachNft && fundAvailable && (
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => attachFundRef.current?.open()} title="Fundraise" aria-label="Add a fundraise" disabled={isBusy || Boolean(hupFund)}>
-                <BagIcon size={20} />
-              </button>
-            )}
-            {canAttachNft && (
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => attachMiniAppRef.current?.open()} title="Mini app" aria-label="Attach a mini app" disabled={isBusy || Boolean(miniApp)}>
-                <PuzzlePieceIcon size={20} />
-              </button>
+            {attachOptions.length > 0 && (
+              <NativePopover
+                placement="top-start"
+                className={styles.attachPanel}
+                trigger={
+                  <button
+                    type="button"
+                    className={styles.attachTrigger}
+                    onMouseDown={(e) => e.preventDefault()}
+                    title="Attach"
+                    aria-label="Attach something to this post"
+                    disabled={isBusy}
+                  >
+                    <PlusIcon size={14} weight="bold" />
+                    <span>Attach</span>
+                  </button>
+                }
+              >
+                {({ close }) => (
+                  <ul className={styles.attachMenu}>
+                    {attachOptions.map((option) => {
+                      const Icon = option.icon
+                      return (
+                        <li key={option.key}>
+                          <button
+                            type="button"
+                            className={styles.attachMenu__item}
+                            disabled={isBusy || option.attached}
+                            onClick={() => {
+                              close()
+                              openAttachment(option.key)
+                            }}
+                          >
+                            <Icon size={20} />
+                            <span className={styles.attachMenu__text}>
+                              <span className={styles.attachMenu__label}>{option.label}</span>
+                              <span className={styles.attachMenu__hint}>{option.hint}</span>
+                            </span>
+                            {option.attached && <CheckIcon size={16} weight="bold" />}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </NativePopover>
             )}
           </div>
 
           <div className={styles.footerActions}>
-            {/* Hidden while busy: the freed width keeps "Signing..." from wrapping the toolbar */}
-            {!isBusy && (
+            {/* Hidden while busy: the freed width keeps "Signing..." from wrapping the toolbar.
+                Hidden on an empty composer too — a 0/5000 nobody needs costs the tool row width */}
+            {!isBusy && postText.length > 0 && (
               <span className={clsx(styles.charCount, { [styles['charCount--over']]: isTextOverLimit })}>
                 {postText.length}/{MAX_POST_LENGTH}
               </span>

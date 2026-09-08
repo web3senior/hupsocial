@@ -547,7 +547,10 @@ dialog.newPost {
     display: none;
   }
 
-  button {
+  // Direct children only: the Attach popover's panel is a DOM child of this row (the top
+  // layer moves where it PAINTS, not where it sits in the tree), so a descendant selector
+  // here squeezes every labelled menu row into a 36px icon box
+  > button {
     display: grid;
     place-items: center;
     // Fixed, never squashed: a shrunk glyph reads as a rendering fault, and the row scrolls
@@ -578,6 +581,83 @@ dialog.newPost {
       transform: none;
     }
   }
+
+  /* Carries a word, so it opts out of the square icon-button box above — the grid there
+     would stack its glyph over its label. Deliberately smaller than the tools it sits
+     beside: it opens a menu, it isn't a thirteenth tool. */
+  > .attachTrigger {
+    display: flex;
+    align-items: center;
+    width: auto;
+    height: 28px;
+    gap: 3px;
+    padding: 0 9px 0 7px;
+    margin-left: 6px;
+    border: 1px solid var(--border);
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
+
+.attachPanel {
+  padding: 6px;
+  max-width: min(340px, calc(100vw - 24px));
+}
+
+.attachMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachMenu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  border-radius: var(--global-border-radius);
+  cursor: pointer;
+
+  > svg {
+    flex: 0 0 auto;
+    color: var(--network-color-primary, var(--color-primary));
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.attachMenu__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.attachMenu__label {
+  font-size: var(--font-size-14);
+  font-weight: 600;
+}
+
+.attachMenu__hint {
+  font-size: var(--font-size-12);
+  color: var(--text-muted);
 }
 
 .footerActions {
@@ -692,9 +772,21 @@ dialog.newPost {
   .toolbar {
     gap: 0;
 
-    button {
+    > button {
       width: 32px;
       height: 32px;
+    }
+
+    /* Icon only: the word is what the row can least afford here, and the menu it opens
+       labels every entry anyway */
+    > .attachTrigger {
+      width: 28px;
+      padding: 0;
+      margin-left: 4px;
+
+      span {
+        display: none;
+      }
     }
   }
 
