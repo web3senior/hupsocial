@@ -153,10 +153,10 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             >
               {displayName}
             </Link>
-            <CommunityBadge badge={profile.badge} />
+            <CommunityBadge badge={profile.badge} iconOnly />
             {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two
                 say where a post came from, this one says what published it. */}
-            <AgentBadge agent={profile.agent} />
+            <AgentBadge agent={profile.agent} iconOnly />
             {chainInfo && (
               <div className={styles.badge} title={chainInfo.name}>
                 <img src={chainInfo.iconUrl} alt="" />
@@ -182,18 +182,23 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 // straight from the profile payload, which re-joins community_members on every fetch, so what is
 // on screen is a live membership claim and not a remembered one: leaving the community (or being
 // banned from it) drops the pill on the next load without anything being written.
-export const CommunityBadge = ({ badge, size = 'sm' }) => {
+export const CommunityBadge = ({ badge, size = 'sm', iconOnly = false }) => {
   if (!badge?.tag) return null
 
   return (
     <Link
       href={`/communities/${badge.networkId}/${badge.communityId}`}
-      className={clsx(styles.communityTag, size === 'lg' && styles['communityTag--lg'])}
-      title={`Member of ${badge.communityName}`}
+      className={clsx(styles.communityTag, size === 'lg' && styles['communityTag--lg'], iconOnly && styles['communityTag--icon'])}
+      title={iconOnly ? `${badge.tag} — member of ${badge.communityName}` : `Member of ${badge.communityName}`}
       onClick={(e) => e.stopPropagation()}
     >
-      {badge.logoUrl && <img className={styles.communityTag__logo} src={badge.logoUrl} alt="" width={10} height={10} />}
-      <span>{badge.tag}</span>
+      {badge.logoUrl ? (
+        <img className={styles.communityTag__logo} src={badge.logoUrl} alt="" width={10} height={10} />
+      ) : (
+        // A logo-less community would leave the icon-only chip empty, so its tag stands in for one
+        iconOnly && <span className={styles.communityTag__initial}>{badge.tag.slice(0, 1)}</span>
+      )}
+      {!iconOnly && <span>{badge.tag}</span>}
     </Link>
   )
 }

@@ -14,16 +14,16 @@ import styles from './AgentBadge.module.scss'
 //
 // The label is the profile's own claim (lib/agentProfile.js) rather than one word for everybody —
 // `AI Agent`, `AI` or `Automated`, whichever it actually declared.
-export default function AgentBadge({ agent, size = 'sm', className }) {
+export default function AgentBadge({ agent, size = 'sm', iconOnly = false, className }) {
   if (!agent?.label) return null
 
   return (
     <span
-      className={clsx(styles.agent, size === 'lg' && styles['agent--lg'], className)}
+      className={clsx(styles.agent, size === 'lg' && styles['agent--lg'], iconOnly && styles['agent--icon'], className)}
       title={`${agent.label} — this account states it is run by software`}
     >
       <RobotIcon className={styles.agent__mark} weight="fill" aria-hidden="true" />
-      <span>{agent.label}</span>
+      {!iconOnly && <span>{agent.label}</span>}
     </span>
   )
 }

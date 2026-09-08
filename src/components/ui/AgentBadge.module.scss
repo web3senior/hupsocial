@@ -36,4 +36,18 @@
   &--lg {
     font-size: var(--system-11-font-size);
   }
+
+  // Glyph alone. The chip framed a word; with the word gone the mark stands bare at the size of
+  // the chain and Universal Profile glyphs it now sits in a row with.
+  &--icon {
+    gap: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  &--icon &__mark {
+    width: 14px;
+    height: 14px;
+  }
 }
