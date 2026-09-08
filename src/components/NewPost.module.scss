@@ -521,19 +521,37 @@ dialog.newPost {
   padding: 8px 16px 12px 8px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  // Never wraps: the toolbar inside takes the squeeze by scrolling, so Post stays on this line
+  flex-wrap: nowrap;
 }
 
-/* Icon-only attach row pinned beside Post — titles carry the labels the icons dropped */
+/* Icon-only attach row pinned beside Post — titles carry the labels the icons dropped.
+   One line, always: the row grows with every attachment type a chain gains, and wrapping it
+   pushed Post onto a second line and shifted the whole footer. It scrolls sideways instead,
+   the same way the cashtag strip does, so Post keeps its seat at the end of the row. */
 .toolbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 2px;
   min-width: 0;
+  overflow-x: auto;
+  // A diagonal swipe over the row must not steal the page's scroll
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  // Room for the focus ring the horizontal overflow would otherwise clip
+  padding-block: 2px;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   button {
     display: grid;
     place-items: center;
+    // Fixed, never squashed: a shrunk glyph reads as a rendering fault, and the row scrolls
+    flex: 0 0 auto;
     width: 36px;
     height: 36px;
     padding: 0;
