@@ -37,7 +37,6 @@ export const usePostStore = create((set, get) => ({
         { id: 'posts', label: 'Posts' },
         { id: 'communities', label: 'Communities' },
         { id: 'events', label: 'Events' },
-        { id: 'jobs', label: 'Jobs' },
         { id: 'apps', label: 'Apps' },
       ],
       apps: { list: apps },

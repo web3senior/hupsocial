@@ -168,7 +168,6 @@ export default function UserProfile() {
   ]
   const TabContentMap = {
     events: <></>,
-    //  jobs: JobsTab,
     apps: <></>,
     // feed: FeedTab,
   }
