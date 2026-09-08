@@ -1,14 +1,12 @@
 /**
  * @file lib/relayGasless.js
  * @description Trial gasless path for the actions we sponsor: creating content (posts,
- * replies, quotes, reposts), liking and unliking. Instead of prompting for a transaction,
- * the app signs an ERC-2771 ForwardRequest and posts it to /api/v1/relay, where our relayer
- * pays the gas. Deliberately self-contained: the experiment reverts by deleting this file
- * plus its call sites in components/NewPost.jsx, components/ui/Like.jsx,
- * components/ui/Repost.jsx, hooks/useBatchLike.js and the settings toggle.
- *
- * Un-repost is NOT sponsored: it rides deleteContent, which deletes any of the caller's
- * content, and sponsoring deletions is a different decision from sponsoring taps.
+ * replies, quotes, reposts), editing it, deleting it (un-repost included), liking and
+ * unliking. Instead of prompting for a transaction, the app signs an ERC-2771 ForwardRequest
+ * and posts it to /api/v1/relay, where our relayer pays the gas. Deliberately self-contained:
+ * the experiment reverts by deleting this file plus its call sites in components/NewPost.jsx,
+ * components/Post.jsx, components/ui/Like.jsx, components/ui/Repost.jsx, hooks/useBatchLike.js,
+ * the article owner actions and the settings toggle.
  *
  * Two signer paths, both ending in a plain ECDSA signature because OZ's ERC2771Forwarder
  * recovers with ECDSA and nothing else:
@@ -43,6 +41,8 @@ export const GASLESS_DEFAULT = true
 const RELAY_GAS = {
   create: 600000n,
   update: 300000n, // Rewrites one metadata string plus two flags; no feed or counter writes
+  // Clears the metadata string, sets the deleted flag and decrements at most one parent counter
+  deleteContent: 200000n,
   batchLike: (args) => 150000n + 45000n * BigInt(args?.[1]?.length || 1),
   unlike: 150000n,
   // A ballot is two cold slots (the voter's choice and that option's counter) plus the poll's
@@ -236,7 +236,7 @@ export const gaslessCooldown = (functionName, networkId, owner, args) => {
  * @param {Object} params.chain Viem chain object for the target network (RPC + id).
  * @param {Object} params.publicClient Viem client on that same chain.
  * @param {string} params.owner Connected wallet — the account the action is attributed to.
- * @param {string} params.functionName Hup function to relay (create / update / batchLike / unlike).
+ * @param {string} params.functionName Hup function to relay (create / update / deleteContent / batchLike / unlike).
  * @param {Array} params.args Arguments for that function, owner-first as Hup expects.
  * @param {Function} [params.signTypedDataAsync] wagmi signer, used when no session exists.
  * @param {boolean} [params.useSessionKey] Sign with the burner instead of the wallet.

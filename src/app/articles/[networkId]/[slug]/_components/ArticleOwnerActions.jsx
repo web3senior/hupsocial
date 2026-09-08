@@ -4,11 +4,14 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
-import { useConnection, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, useSignTypedData, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { getPublicClient } from 'wagmi/actions'
 import { NotePencilIcon, TrashSimpleIcon } from '@phosphor-icons/react'
-import { CONTRACTS } from '@/config/wagmi'
+import { CONTRACTS, config } from '@/config/wagmi'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
+import { isSessionActive } from '@/lib/burnerSession'
+import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { describeWalletError } from '@/lib/walletErrors'
 import styles from './ArticleOwnerActions.module.scss'
 
@@ -34,12 +37,50 @@ export default function ArticleOwnerActions({ networkId, postId, author }) {
 
   const { data: hash, isPending, writeContractAsync } = useWriteContract()
   const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash })
+  const { signTypedDataAsync } = useSignTypedData()
 
   const isOwner = Boolean(address && author && address.toLowerCase() === String(author).toLowerCase())
   if (!isOwner) return null
 
   const hupAddress = CONTRACTS[`chain${networkId}`]?.hup
   const isBusy = isPending || isConfirming
+
+  /**
+   * Relays the delete so removing your own article costs nothing, exactly as the feed's post
+   * menu does. False whenever the relay is unavailable, leaving the wallet path below.
+   * @returns {Promise<boolean>} Whether the delete went out sponsored.
+   */
+  const tryGaslessDelete = async () => {
+    const chainId = Number(networkId)
+    if (!isGaslessEnabled(chainId)) return false
+    if (gaslessCooldown('deleteContent', chainId, address) > 0) return false
+
+    const chainDefinition = config.chains.find((chain) => chain.id === chainId)
+    if (!chainDefinition) return false
+
+    // The article's own chain, whichever one the wallet is connected to
+    const publicClient = getPublicClient(config, { chainId })
+    if (!publicClient) return false
+
+    try {
+      const session = await isSessionActive({ userAddress: address, publicClient })
+
+      await relayHupAction({
+        chain: chainDefinition,
+        publicClient,
+        owner: address,
+        functionName: 'deleteContent',
+        args: [address, BigInt(postId)],
+        signTypedDataAsync,
+        useSessionKey: session.active,
+      })
+
+      return true
+    } catch (error) {
+      console.warn('Gasless delete unavailable:', error.message)
+      return false
+    }
+  }
 
   const handleDelete = async () => {
     // Two taps, like the form's reset — deleting is the one action here that cannot be undone
@@ -49,6 +90,12 @@ export default function ArticleOwnerActions({ networkId, postId, author }) {
     }
 
     try {
+      if (await tryGaslessDelete()) {
+        toast('Article deleted onchain', 'success')
+        router.replace('/articles')
+        return
+      }
+
       await writeContractAsync({
         abi,
         address: hupAddress,

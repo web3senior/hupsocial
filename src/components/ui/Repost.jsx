@@ -67,17 +67,20 @@ export const Repost = ({ post, onQuote }) => {
   }
 
   /**
-   * Relays the repost `create` through the forwarder so the tap costs the user nothing.
-   * The relay route buckets it as a repost, not a post, by decoding the ContentType
-   * argument. Returns false whenever the relay is unavailable — cooldown included —
-   * leaving the tap on the usual wallet path, where the prompt is the consent to pay.
-   * @param {Array} args Owner-first `create` args for the repost.
-   * @returns {Promise<boolean>} Whether the repost went out sponsored.
+   * Relays a repost or its undo through the forwarder so the tap costs the user nothing. The
+   * route buckets the repost as a repost, not a post, by decoding the ContentType argument,
+   * and the undo as a delete by its own selector. Returns false whenever the relay is
+   * unavailable — cooldown included — leaving the tap on the usual wallet path, where the
+   * prompt is the consent to pay.
+   * @param {string} functionName 'create' for the repost, 'deleteContent' to undo it.
+   * @param {Array} args Owner-first args for that function.
+   * @param {string} label Names the spent allowance in the cooldown toast.
+   * @returns {Promise<boolean>} Whether the action went out sponsored.
    */
-  const tryGaslessRepost = async (args) => {
+  const tryGaslessRepostAction = async (functionName, args, label) => {
     const chainId = Number(post.network_id)
     if (!isGaslessEnabled(chainId)) return false
-    if (gaslessCooldown('create', chainId, address, args) > 0) return false
+    if (gaslessCooldown(functionName, chainId, address, args) > 0) return false
 
     const chainDefinition = config.chains.find((item) => item.id === chainId)
     if (!chainDefinition) return false
@@ -93,7 +96,7 @@ export const Repost = ({ post, onQuote }) => {
         chain: chainDefinition,
         publicClient: targetPublicClient,
         owner: address,
-        functionName: 'create',
+        functionName,
         args,
         signTypedDataAsync,
         useSessionKey: session.active,
@@ -102,16 +105,16 @@ export const Repost = ({ post, onQuote }) => {
       return true
     } catch (err) {
       if (err.code === 'RELAY_COOLDOWN') {
-        toast('Free-repost allowance is used up for now — using your wallet instead.', 'info')
+        toast(`Free-${label} allowance is used up for now — using your wallet instead.`, 'info')
       } else {
-        console.warn('Gasless repost unavailable:', err.message)
+        console.warn(`Gasless ${label} unavailable:`, err.message)
       }
       return false
     }
   }
 
   // Solana: the repost is create(kind = 2, parent), sponsored as a repost by the relay; undoing
-  // it deletes the viewer's own repost row, unsponsored as on EVM. Both confirm before toasting,
+  // it deletes the viewer's own repost row, sponsored as a delete. Both confirm before toasting,
   // so there is no receipt effect to wait on.
   const repostSolana = async (id) => {
     const signer = solanaWallet.getSigner()
@@ -190,7 +193,6 @@ export const Repost = ({ post, onQuote }) => {
       await sendHupAction({
         networkId,
         signer,
-        sponsor: false,
         instructions: [hupInstruction.delete({ networkId, actor: signer.account.address, id: repostRowId })],
       })
 
@@ -227,7 +229,7 @@ export const Repost = ({ post, onQuote }) => {
       // Owner-first for the relay — attribution flows through _resolveActor both for a
       // session key and for a wallet signing for itself. The wallet fallback below keeps
       // its ZERO_ADDRESS direct-call form.
-      if (await tryGaslessRepost([address, ContentType.Repost, '', BigInt(id), false])) {
+      if (await tryGaslessRepostAction('create', [address, ContentType.Repost, '', BigInt(id), false], 'repost')) {
         toast('Reposted!', 'success')
         return
       }
@@ -283,6 +285,13 @@ export const Repost = ({ post, onQuote }) => {
         }),
         { revalidate: false },
       )
+
+      // Owner-first for the relay, as the repost above: _resolveActor maps a session key back
+      // to the owner, and a wallet signing for itself resolves to itself
+      if (await tryGaslessRepostAction('deleteContent', [address, BigInt(repostRowId)], 'undo')) {
+        toast('Repost removed!', 'success')
+        return
+      }
 
       await writeContractAsync({
         abi,

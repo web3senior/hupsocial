@@ -55,9 +55,14 @@ export const isGaslessChainId = (networkId) => {
 // An edit is authoring-shaped (it writes a CID to storage like a post does) but throttles
 // apart from create on purpose: the commonest edit is a typo fix seconds after posting, and
 // sharing create's cooldown would bounce exactly that one to the wallet.
+//
+// Delete is windowed as tightly as unlike, and for the same reason: post→delete→post and
+// repost→un-repost→repost are drain cycles, each spending exactly one sponsored delete per
+// round, so cycles stop at this bucket's max.
 export const GASLESS_POLICY = {
   create: { cooldownMs: 60000, windowMs: 3600000, max: 20 },
   edit: { cooldownMs: 30000, windowMs: 3600000, max: 20 },
+  delete: { cooldownMs: 0, windowMs: 3600000, max: 8 },
   like: { cooldownMs: 0, windowMs: 3600000, max: 30 },
   unlike: { cooldownMs: 0, windowMs: 3600000, max: 5 },
   repost: { cooldownMs: 0, windowMs: 3600000, max: 30 },
@@ -68,14 +73,15 @@ export const GASLESS_POLICY = {
 export const gaslessPolicyFor = (bucket) => GASLESS_POLICY[bucket] ?? GASLESS_POLICY.chat
 
 // Which bucket a relayed Hup call belongs to; anything absent here is not sponsored.
-// Creating content, editing it, liking, unliking and reposting are sponsored. Un-repost is
-// deliberately not: it rides deleteContent, a selector that deletes ANY of the caller's
-// content, and sponsoring deletions is a different decision from sponsoring taps. batchLike
-// is the only like selector listed because it is the only one the app sends — even a single
+// deleteContent covers both removing your own content and undoing a repost. The contract is
+// what makes it safe to sponsor: it reverts unless the resolved actor is the item's creator,
+// and reverts again once the item is deleted, so no id can be paid for twice. batchLike is
+// the only like selector listed because it is the only one the app sends — even a single
 // heart goes out as batchLike([id]).
 export const GASLESS_BUCKETS = {
   create: 'create',
   update: 'edit',
+  deleteContent: 'delete',
   batchLike: 'like',
   unlike: 'unlike',
 }

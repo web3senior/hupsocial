@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { isArticle } from '@/lib/article'
 import Link from 'next/link'
 import { usePostStore } from '@/stores/usePostStore'
-import { useWaitForTransactionReceipt, useConnection, useWriteContract, usePublicClient } from 'wagmi'
+import { useWaitForTransactionReceipt, useConnection, useSignTypedData, useWriteContract, usePublicClient } from 'wagmi'
+import { getPublicClient } from 'wagmi/actions'
 import { initHupContract } from '@/lib/communication'
 import { getPostById, recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -35,7 +36,9 @@ import {
   TrashSimpleIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
-import { CONTRACTS } from '@/config/wagmi'
+import { CONTRACTS, config } from '@/config/wagmi'
+import { isSessionActive } from '@/lib/burnerSession'
+import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { renderMarkdown } from '@/lib/markdown'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { postToMarkdown, getPostMarkdownUrl } from '@/lib/postMarkdown'
@@ -621,11 +624,57 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
     hash,
   })
   const publicClient = usePublicClient()
+  const { signTypedDataAsync } = useSignTypedData()
   const sellPopoverRef = useRef(null)
   // A Solana post is owned and deleted by the Solana wallet, an EVM post by the EVM one
   const solanaWallet = useSolanaWallet()
   const isSolanaPost = isSolanaNetworkId(item.network_id)
   const isOwner = sameAddress(isSolanaPost ? solanaWallet.address : address, item.wallet_address)
+
+  /**
+   * Relays the delete through the forwarder so removing your own post costs nothing. The
+   * contract refuses anything the resolved actor did not write, and refuses an id twice, so
+   * the relayer can only ever pay to remove this post once. Returns false when the relay is
+   * unavailable — cooldown included — leaving the tap on the wallet path, where the prompt is
+   * the consent to pay.
+   * @param {string|number} id The content id to remove.
+   * @returns {Promise<boolean>} Whether the delete went out sponsored.
+   */
+  const tryGaslessDelete = async (id) => {
+    const chainId = Number(item.network_id)
+    if (!isGaslessEnabled(chainId)) return false
+    if (gaslessCooldown('deleteContent', chainId, address) > 0) return false
+
+    const chainDefinition = config.chains.find((chain) => chain.id === chainId)
+    if (!chainDefinition) return false
+
+    // Pinned to the post's own chain: the relay reads nonce and forwarder trust there,
+    // regardless of which network the wallet is connected to
+    const targetPublicClient = getPublicClient(config, { chainId }) ?? publicClient
+
+    try {
+      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
+
+      await relayHupAction({
+        chain: chainDefinition,
+        publicClient: targetPublicClient,
+        owner: address,
+        functionName: 'deleteContent',
+        args: [address, BigInt(id)],
+        signTypedDataAsync,
+        useSessionKey: session.active,
+      })
+
+      return true
+    } catch (err) {
+      if (err.code === 'RELAY_COOLDOWN') {
+        toast('Free-delete allowance is used up for now — using your wallet instead.', 'info')
+      } else {
+        console.warn('Gasless delete unavailable:', err.message)
+      }
+      return false
+    }
+  }
 
   const deletePost = async (e, id) => {
     e.stopPropagation()
@@ -642,11 +691,9 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
       setIsDeleting(true)
       try {
         const networkId = Number(item.network_id)
-        // Never sponsored, like un-repost on EVM: deletions are the author's own spend
         await sendHupAction({
           networkId,
           signer,
-          sponsor: false,
           instructions: [hupInstruction.delete({ networkId, actor: signer.account.address, id })],
         })
         toast('Post deleted onchain', 'success')
@@ -672,24 +719,13 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
     }
 
     try {
-      // const session = await isSessionActive({
-      //   userAddress: address,
-      //   publicClient,
-      // })
-
-      // if (session.active) {
-      //   await writeWithBurnerSession({
-      //     chain: activeChain[0],
-      //     contractAddress: targetChain.hup,
-      //     abi,
-      //     functionName: 'batchLike',
-      //     args: [address, [id]],
-      //   })
-
-      //   return
-      // }
-
       setIsDeleting(true)
+
+      if (await tryGaslessDelete(id)) {
+        toast('Post deleted onchain', 'success')
+        setIsDeleting(false)
+        return
+      }
 
       writeContract(
         {
