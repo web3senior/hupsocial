@@ -165,7 +165,7 @@
     width: 1.2em;
     height: 1.2em;
     border: 1px solid var(--border);
-    border-radius: 50%;
+    border-radius: 2px;
     object-fit: cover;
   }
 
@@ -199,7 +199,7 @@
     width: 1.2em;
     height: 1.2em;
     border: 1px solid var(--border);
-    border-radius: 50%;
+    border-radius: 2px;
     background-color: var(--tag);
     font-size: 0.9em;
     text-transform: uppercase;
