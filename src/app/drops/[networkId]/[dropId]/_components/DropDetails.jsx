@@ -708,19 +708,12 @@ export default function DropDetails({ networkId, dropId, referral }) {
           <ul>
             {recentMints.map((mint) => {
               const quantity = Number(mint.quantity)
-              const first = Number(mint.first_token_id)
-              // Numbered collections mint a contiguous run; editions are copies of the one artwork
-              const what = numbered
-                ? quantity > 1
-                  ? `#${first}–#${first + quantity - 1}`
-                  : `#${first}`
-                : `${countFormat.format(quantity)} ×`
               return (
                 <li key={`${mint.tx_hash}-${mint.first_token_id}`}>
                   <Profile creator={mint.minter} networkId={chainId} variant="compact" size={28} className={styles.drop__minter} />
                   <span className={styles.drop__mintVerb}>minted</span>
                   <b className={styles.drop__mintWhat}>
-                    {what} {symbolLabel}
+                    {countFormat.format(quantity)} {symbolLabel}
                   </b>
                   <time className={styles.drop__mintWhen} dateTime={mint.minted_at} title={dateTimeFormat.format(new Date(mint.minted_at))}>
                     {formatRelativeTime(mint.minted_at)}
