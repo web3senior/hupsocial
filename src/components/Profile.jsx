@@ -16,6 +16,7 @@ import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
 import AgentBadge from './ui/AgentBadge'
 import Avatar from './ui/Avatar'
+import ProfilePortfolio from './ProfilePortfolio'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
 import clsx from 'clsx'
@@ -296,6 +297,10 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
       )}
 
       {profile.description && <p className={styles.hoverCard__bio}>{profile.description}</p>}
+
+      {/* Public holdings, headlined on the post's own chain — the card is opened from a post, so
+          the balance worth showing first is the one on the network that post lives on */}
+      <ProfilePortfolio address={creator} networkId={targetNetworkId} />
 
       <button type="button" className={styles.hoverCard__followers}>
         {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(followerCountData ?? 0))} followers

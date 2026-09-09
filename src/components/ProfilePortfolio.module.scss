@@ -1,0 +1,91 @@
+.portfolio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+
+  // auto-fit rather than two fixed columns: a wallet with holdings but no priced ones drops the
+  // portfolio tile, and the balance left behind should fill the card instead of half of it
+  &__tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  &__tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background-color: var(--tag);
+  }
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    font-size: var(--system-11-font-size);
+    color: var(--gray-400);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__chain {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+  }
+
+  &__value {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    min-width: 0;
+    font-size: var(--system-14-font-size);
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__usd {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__change {
+    flex-shrink: 0;
+    font-size: var(--system-11-font-size);
+    font-weight: 500;
+    color: var(--gray-400);
+
+    &--up {
+      color: var(--up);
+    }
+
+    &--down {
+      color: var(--down);
+    }
+  }
+
+  &__meta {
+    margin: 0;
+    font-size: var(--system-11-font-size);
+    color: var(--gray-400);
+  }
+
+  // Same box the tiles occupy, so the card does not resize under the cursor when figures land
+  &__shimmer {
+    height: 41px;
+    border-radius: var(--global-border-radius);
+  }
+}

@@ -29,8 +29,13 @@ const NATIVE_KEYS = {
   143: 'coingecko:monad',
   4663: 'coingecko:ethereum',
   8453: 'coingecko:ethereum',
+  // Dev chain. Its coin is worthless, but pricing it as ether is what lets the USD surfaces be
+  // exercised before a mainnet rollout.
+  84532: 'coingecko:ethereum',
   42161: 'coingecko:ethereum',
   42220: 'coingecko:celo',
+  // Solana mainnet. Its devnet twin (503) is absent on purpose — that SOL is worthless.
+  501: 'coingecko:solana',
 }
 
 let cache = { at: 0, prices: new Map() }

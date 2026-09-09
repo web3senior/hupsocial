@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * @file lib/luksoAssets.js
  * @description Fungible (LSP7) wallet discovery on LUKSO.
