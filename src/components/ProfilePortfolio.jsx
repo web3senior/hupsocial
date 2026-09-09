@@ -16,9 +16,9 @@
  */
 
 import clsx from 'clsx'
+import { formatUnits } from 'viem'
 import { appChains } from '@/config/contracts'
 import { isSolanaNetworkId, solanaChainFor } from '@/config/solana'
-import { formatTokenDisplay } from '@/app/communities/tokenUnits'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { chainIconFor } from '@/lib/networkColors'
 import { formatUsd } from '@/lib/usdAmount'
@@ -34,6 +34,46 @@ const percentFormatter = new Intl.NumberFormat(undefined, {
   signDisplay: 'exceptZero',
   maximumFractionDigits: 1,
 })
+
+// Two tiles share a 260px card, which leaves each figure about 95px of a semibold 14px line.
+// Precision has to fall away as the magnitude climbs or the number is cut off mid-digit, so the
+// tiles round and the title carries the amount whole.
+const balanceFormatters = {
+  // Sub-1 balances keep significant digits — fraction rounding would collapse dust to '0'
+  small: new Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }),
+  plain: new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }),
+  compact: new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 2 }),
+  exact: new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }),
+}
+
+const usdExactFormatter = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' })
+const usdWholeFormatter = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+
+/** A native balance at tile width, alongside the same amount unrounded for the title. */
+const formatBalance = (balance, decimals) => {
+  if (balance === null || balance === undefined || decimals === null || decimals === undefined) return null
+
+  try {
+    const value = Number(formatUnits(BigInt(balance), Number(decimals)))
+    if (!Number.isFinite(value)) return null
+    const formatter = value > 0 && value < 1 ? balanceFormatters.small : value < 1000 ? balanceFormatters.plain : balanceFormatters.compact
+    return { display: formatter.format(value), exact: balanceFormatters.exact.format(value) }
+  } catch {
+    return null
+  }
+}
+
+// Cents are worth printing on a $12.40 wallet and noise on an $8,288 one, where they were also
+// what pushed the 24h move off the end of the tile. Past six figures formatUsd is already compact.
+const formatTotal = (value) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null
+
+  const magnitude = Math.abs(value)
+  return magnitude >= 1000 && magnitude < 100000 ? usdWholeFormatter.format(value) : formatUsd(value)
+}
+
+// Only worth a tooltip where the tile actually rounded — below a thousand the two agree
+const formatTotalTitle = (value) => (value !== null && Math.abs(value) >= 1000 ? usdExactFormatter.format(value) : undefined)
 
 const chainFor = (chainId) =>
   isSolanaNetworkId(chainId) ? solanaChainFor(chainId) : appChains.find((chain) => chain.id === Number(chainId)) ?? null
@@ -53,13 +93,15 @@ export default function ProfilePortfolio({ address, networkId }) {
   }
 
   const native = portfolio?.native
-  const total = formatUsd(portfolio?.totalUsd)
+  const totalUsd = typeof portfolio?.totalUsd === 'number' ? portfolio.totalUsd : null
+  const total = formatTotal(totalUsd)
   // A wallet the route could not read, or one holding nothing, gets no strip at all
   if (!native && !total) return null
 
   const chain = native ? chainFor(native.chainId) : null
   const chainIcon = chainIconFor(chain)
-  const amount = native ? formatTokenDisplay(native.balance, native.decimals) : null
+  const amount = native ? formatBalance(native.balance, native.decimals) : null
+  const amountTitle = amount ? [`${amount.exact} ${native.symbol || ''}`.trim(), chain?.name].filter(Boolean).join(' · ') : undefined
   const change = typeof portfolio.change24h === 'number' ? portfolio.change24h : null
   const tokenCount = portfolio.tokenCount ?? 0
 
@@ -72,8 +114,8 @@ export default function ProfilePortfolio({ address, networkId }) {
               {chainIcon && <img className={styles.portfolio__chain} src={chainIcon} alt="" width={12} height={12} />}
               {native.symbol || chain?.name || 'Balance'}
             </span>
-            <span className={styles.portfolio__value} title={chain?.name ?? undefined}>
-              {amount}
+            <span className={styles.portfolio__value} title={amountTitle}>
+              {amount.display}
             </span>
           </div>
         )}
@@ -82,7 +124,9 @@ export default function ProfilePortfolio({ address, networkId }) {
           <div className={styles.portfolio__tile}>
             <span className={styles.portfolio__label}>Portfolio</span>
             <span className={styles.portfolio__value}>
-              <span className={styles.portfolio__usd}>{total}</span>
+              <span className={styles.portfolio__usd} title={formatTotalTitle(totalUsd)}>
+                {total}
+              </span>
               {/* Only the move is coloured. Painting the total itself would flip a whole portfolio
                   red over a tenth of a percent, which says far more than the day did */}
               {change !== null && (
