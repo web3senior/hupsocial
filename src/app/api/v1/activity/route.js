@@ -22,11 +22,14 @@
  *                                           exists only when the bettor is not the market owner.
  *   swap                 swap_activity    — swaps have no Hup contract, so there is no
  *                                           notification and no indexed event at all.
+ *   mint                 drop_mints       — HupDrops writes no notification, and the mint row is
+ *                                           the only place the quantity and what was paid live.
+ *   drop_created         drops            — the same table names the collection both verbs print.
  *
  * Deferred verbs. Each becomes one more SOURCES entry when its turn comes; nothing else in this
  * file has to change.
- *   Waiting on mainnet — mint (drop_mints), launch_trade (launch_trades), miner_run
- *   (miner_runs), store_sale (store_sales, since Bazaar only runs on LUKSO and Monad testnet).
+ *   Waiting on mainnet — launch_trade (launch_trades), miner_run (miner_runs), store_sale
+ *   (store_sales, since Bazaar only runs on LUKSO and Monad testnet).
  *   Waiting on rows — event_created (events), app_listed (apps), status (statuses): those
  *   features are on mainnet, but nothing records an actor-and-time row for them yet, so they
  *   need a cidex-side notification before a feed can show them.
@@ -47,6 +50,10 @@
  *   ALTER TABLE post_likes ADD KEY idx_post_likes_recent (liked_at);
  *   ALTER TABLE notifications ADD KEY idx_notifications_action_recent (action_type, created_at);
  *   ALTER TABLE market_bets ADD KEY idx_market_bets_recent (bet_at);
+ *   ALTER TABLE drop_mints ADD KEY idx_drop_mints_recent (minted_at);
+ *   ALTER TABLE drops ADD KEY idx_drops_recent (created_at);
+ * The drops pair ships as cidex/scripts/add-activity-drop-indexes.sql — drops already has
+ * idx_drop_feed, but it leads with network_id and cannot order the whole table by created_at.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
@@ -308,6 +315,112 @@ const SOURCES = [
         `,
         params,
       }
+    },
+  },
+
+  // HupDrops emits no notification, so both verbs read their own table. Two branches rather than
+  // a UNION inside one: each is a different table with its own newest-first index.
+  {
+    id: 'drops',
+    kinds: ['mint', 'drop_created'],
+    build: ({ kinds, networkId, before, limit }) => {
+      const branches = []
+
+      if (kinds.includes('mint')) {
+        const where = ['m.minter IS NOT NULL']
+        const params = []
+
+        if (networkId !== null) {
+          where.push('m.network_id = ?')
+          params.push(networkId)
+        }
+        if (before !== null) {
+          where.push(`m.minted_at < ${DATETIME_FROM_CURSOR}`)
+          params.push(before)
+        }
+
+        params.push(limit)
+
+        branches.push({
+          sql: `
+            SELECT
+              ${text("'mint'")} AS kind,
+              ${text('m.minter')} AS actor,
+              ${text('d.creator')} AS subject,
+              m.network_id AS network_id,
+              ${text("'drop'")} AS entity_type,
+              ${text('CAST(m.drop_id AS CHAR)')} AS entity_id,
+              ${secondsOf('m.minted_at')} AS ts,
+              ${text("CONCAT('mint:', m.id)")} AS uid,
+              m.block_number AS block_number,
+              ${text('m.tx_hash')} AS tx_hash,
+              m.log_index AS log_index,
+              ${text(`JSON_OBJECT(
+                'name', COALESCE(d.name, ''),
+                'quantity', CAST(m.quantity AS CHAR),
+                -- Free phases are the norm on Hup, and a '0 LYX' pill reads as a broken amount
+                -- rather than as free, so an unpaid mint carries no amount at all.
+                'amount', CASE WHEN m.total_paid > 0 THEN CAST(m.total_paid AS CHAR) ELSE NULL END,
+                'symbol', COALESCE(nw.currency_symbol, ''),
+                'decimals', 18
+              )`)} AS meta
+            FROM drop_mints m
+            LEFT JOIN drops d ON d.network_id = m.network_id AND d.drop_id = m.drop_id
+            LEFT JOIN networks nw ON nw.id = m.network_id
+            WHERE ${where.join(' AND ')}
+            ORDER BY m.minted_at DESC
+            LIMIT ?
+          `,
+          params,
+        })
+      }
+
+      if (kinds.includes('drop_created')) {
+        const where = ['d.creator IS NOT NULL']
+        const params = []
+
+        if (networkId !== null) {
+          where.push('d.network_id = ?')
+          params.push(networkId)
+        }
+        if (before !== null) {
+          where.push(`d.created_at < ${DATETIME_FROM_CURSOR}`)
+          params.push(before)
+        }
+
+        params.push(limit)
+
+        branches.push({
+          sql: `
+            SELECT
+              ${text("'drop_created'")} AS kind,
+              ${text('d.creator')} AS actor,
+              ${text('NULL')} AS subject,
+              d.network_id AS network_id,
+              ${text("'drop'")} AS entity_type,
+              ${text('CAST(d.drop_id AS CHAR)')} AS entity_id,
+              ${secondsOf('d.created_at')} AS ts,
+              ${text("CONCAT('drop:', d.id)")} AS uid,
+              d.block_number AS block_number,
+              ${text('d.tx_hash')} AS tx_hash,
+              -- The drops table keys on (network_id, drop_id) and stores no log index; the
+              -- receipt shows the height and the hash without one.
+              NULL AS log_index,
+              ${text(`JSON_OBJECT(
+                'name', COALESCE(d.name, ''),
+                'symbol', COALESCE(d.symbol, ''),
+                'max_supply', CAST(d.max_supply AS CHAR)
+              )`)} AS meta
+            FROM drops d
+            WHERE ${where.join(' AND ')}
+            ORDER BY d.created_at DESC
+            LIMIT ?
+          `,
+          params,
+        })
+      }
+
+      return branches
     },
   },
 

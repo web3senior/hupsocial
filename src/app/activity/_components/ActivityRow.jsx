@@ -257,6 +257,31 @@ function Sentence({ row, amount, asset, nftName }) {
           {amount ? <Amount value={amount} /> : null}
         </>
       )
+    // A mint states the count only when it is more than one — "minted 1 × Name" reads as a
+    // quantity field left in the copy, where "minted Name" reads as the act it was.
+    case 'mint': {
+      const quantity = Number(row.meta?.quantity ?? 1)
+      const name = row.meta?.name || `drop #${row.entity_id}`
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>minted</span>{' '}
+          <span className={styles.row__asset}>{quantity > 1 ? `${quantity} × ${name}` : name}</span>
+          {amount ? (
+            <>
+              <span className={styles.row__verb}> for</span>
+              <Amount value={amount} />
+            </>
+          ) : null}
+        </>
+      )
+    }
+    case 'drop_created':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>opened the drop</span>{' '}
+          <span className={styles.row__asset}>{row.meta?.name || `#${row.entity_id}`}</span>
+        </>
+      )
     case 'bet':
       return (
         <>

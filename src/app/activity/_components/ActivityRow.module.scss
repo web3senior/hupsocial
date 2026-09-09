@@ -64,6 +64,12 @@
     --tone-color: #8b5cf6;
   }
 
+  // Drops take the one hue no other verb claims — near the repost green, but far enough from it
+  // that a mint and a repost never read as the same act at a glance.
+  &[data-tone='drop'] {
+    --tone-color: #82c91e;
+  }
+
   &__icon {
     display: inline-flex;
     justify-content: center;

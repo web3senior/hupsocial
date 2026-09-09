@@ -11,6 +11,8 @@ import {
   PulseIcon,
   RepeatIcon,
   ShoppingBagOpenIcon,
+  SparkleIcon,
+  StampIcon,
   TagIcon,
   UserPlusIcon,
   UsersThreeIcon,
@@ -27,7 +29,12 @@ export const TABS = [
     kinds: ['post', 'comment', 'repost', 'like', 'follow', 'community_created', 'community_joined'],
     empty: 'No posts, likes, follows or communities yet.',
   },
-  { id: 'nfts', label: 'NFTs', kinds: ['nft_sale', 'offer_made', 'offer_filled'], empty: 'No sales or offers yet.' },
+  {
+    id: 'nfts',
+    label: 'NFTs',
+    kinds: ['nft_sale', 'offer_made', 'offer_filled', 'mint', 'drop_created'],
+    empty: 'No sales, offers or mints yet.',
+  },
   { id: 'money', label: 'Money', kinds: ['tip', 'bet', 'swap'], empty: 'No tips, bets or swaps yet.' },
 ]
 
@@ -51,6 +58,8 @@ export const KIND_META = {
   nft_sale: { icon: ShoppingBagOpenIcon, tone: 'money', weight: 'fill', label: 'Bought' },
   offer_made: { icon: TagIcon, tone: 'offer', weight: 'fill', label: 'Offer' },
   offer_filled: { icon: HandshakeIcon, tone: 'offer', weight: 'fill', label: 'Offer filled' },
+  mint: { icon: StampIcon, tone: 'drop', weight: 'fill', label: 'Mint' },
+  drop_created: { icon: SparkleIcon, tone: 'drop', weight: 'fill', label: 'Drop opened' },
   bet: { icon: ChartLineUpIcon, tone: 'market', weight: 'bold', label: 'Bet' },
   swap: { icon: ArrowsDownUpIcon, tone: 'trade', weight: 'bold', label: 'Swap' },
   community_created: { icon: UsersThreeIcon, tone: 'community', weight: 'fill', label: 'Community created' },
@@ -74,6 +83,7 @@ const AMOUNT_KEY = {
   offer_made: 'price',
   offer_filled: 'payout',
   bet: 'amount',
+  mint: 'amount',
 }
 
 const amountFormatter = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
@@ -144,6 +154,7 @@ export function hrefOf(row) {
   if (kind === 'nft_sale' && networkId && entityId) return `/nfts/${networkId}/${entityId}`
   if (kind === 'bet' && networkId && entityId) return `/predict/${networkId}/${entityId}`
   if (kind === 'swap') return '/swap'
+  if (row.entity_type === 'drop' && networkId && entityId) return `/drops/${networkId}/${entityId}`
   if (row.entity_type === 'community' && networkId && entityId) return `/communities/${networkId}/${entityId}`
 
   // An NFT offer lands on the asset's own page, anchored at the offer's row in its book;
