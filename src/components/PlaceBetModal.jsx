@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
-import { appChains } from '@/config/contracts'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import useStakeToken from '@/hooks/useStakeToken'
 import predictAbi from '@/abis/HupPredict.json'
 import { toast } from '@/components/NextToast'
@@ -54,15 +52,12 @@ const lsp7Abi = [
  */
 const PlaceBetModal = ({ market, outcomeIndex, outcomeLabel, onClose, onPlaced }) => {
   const [amount, setAmount] = useState('1')
-  const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const { address } = useConnection()
   const dialogRef = useRef(null)
   const lastActionRef = useRef(null)
 
   // Bets settle on the market's own chain, not whichever chain is currently active
   const chainId = Number(market.network_id)
-  const publicClient = usePublicClient({ chainId })
-  const chainInfo = appChains.find((chain) => chain.id === chainId)
   const predictAddress = CONTRACTS[`chain${chainId}`]?.predict || null
 
   const isLsp7 = Boolean(Number(market.is_token_lsp7))
@@ -104,7 +99,7 @@ const PlaceBetModal = ({ market, outcomeIndex, outcomeLabel, onClose, onPlaced }
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = isPending || isConfirming || isBurnerBusy
+  const isBusy = isPending || isConfirming
 
   // Mount = open / unmount = close, matching the TipModal dialog contract
   useEffect(() => {
@@ -153,43 +148,18 @@ const PlaceBetModal = ({ market, outcomeIndex, outcomeLabel, onClose, onPlaced }
     }
   }
 
-  const handleBet = async (e) => {
+  // A bet stakes real funds, so it always goes out from the connected wallet, never the
+  // burner session key, whose balance is only a gas float
+  const handleBet = (e) => {
     e.stopPropagation()
     if (amountUnits === null || !predictAddress || !address) return
-
-    const args = [address, BigInt(market.market_id), outcomeIndex, amountUnits]
-
-    // Route through the burner session key if one's active — approve stays wagmi-only regardless
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
-
-    if (session.active) {
-      setIsBurnerBusy(true)
-      try {
-        await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: predictAddress,
-          abi: predictAbi,
-          functionName: 'placeBet',
-          args: isNative ? [...args, { value: amountUnits }] : args,
-        })
-
-        toast('Bet placed 🎯', 'success')
-        onPlaced?.()
-        dialogRef.current?.close()
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsBurnerBusy(false)
-      }
-      return
-    }
 
     lastActionRef.current = 'bet'
     writeContract({
       abi: predictAbi,
       address: predictAddress,
       functionName: 'placeBet',
-      args,
+      args: [address, BigInt(market.market_id), outcomeIndex, amountUnits],
       chainId,
       ...(isNative ? { value: amountUnits } : {}),
     })
