@@ -91,7 +91,7 @@
   .ticker__name {
     font-size: 10px;
     color: var(--text-muted);
-    // "The Black Bull" would otherwise stretch the card past the price column
+    // A long token name would otherwise stretch the card past the price column
     max-width: 14ch;
     overflow: hidden;
     text-overflow: ellipsis;

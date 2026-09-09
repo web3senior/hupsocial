@@ -3,16 +3,16 @@
  * @description The tokens a $CASHTAG resolves to, and the only ones that get a live card.
  *
  * Every row's `key` is a DefiLlama coin key — the same format lib/prices.js already builds —
- * which is what lets one batched request price and chart Ethereum natives, ERC20s on five
- * chains, and Solana SPL mints together. Adding a row means adding a key, not a data source.
+ * which is what lets one batched request price and chart native coins and ERC20s across five
+ * chains together. Adding a row means adding a key, not a data source.
  *
  * Every key in this file was verified against the live DefiLlama chart API before being
  * committed. That check is not ceremony: the hand-maintained map this replaces carried at
- * least three addresses that resolve to nothing — BONK's was not even valid base58, and
- * AAVE's pointed at an address that has never been AAVE. A cashtag that quotes the wrong
- * token is worse than one that quotes nothing, so a row that cannot be verified stays out.
+ * least three addresses that resolve to nothing — AAVE's pointed at an address that has never
+ * been AAVE. A cashtag that quotes the wrong token is worse than one that quotes nothing, so
+ * a row that cannot be verified stays out.
  *
- * `source: 'dex'` marks the tokens DefiLlama indexes too thinly to chart, which fall back to
+ * `source: 'dex'` marks a token DefiLlama indexes too thinly to chart, which falls back to
  * GeckoTerminal pool data. See lib/priceHistory.js.
  */
 
@@ -74,15 +74,6 @@ export const CASHTAGS = {
   // DefiLlama prices neither contract under its own address, so both read from the listing
   PYUSD: { name: 'PayPal USD', key: 'coingecko:paypal-usd' },
   FDUSD: { name: 'First Digital USD', key: 'coingecko:first-digital-usd' },
-
-  // --- Solana ---
-  // Symbols are not unique on Solana and the popular ones all have same-symbol, same-name
-  // spoofs, so these mints are pinned explicitly and never resolved by search.
-  ANSEM: { name: 'The Black Bull', key: 'solana:9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump' },
-  BONK: { name: 'Bonk', key: 'solana:DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' },
-  // DefiLlama has no history for this one — too thin to index — so it charts from its
-  // deepest GeckoTerminal pool instead
-  TBULL: { name: 'tBULL', key: 'solana:Gmb2t5kLfSfVTKSqy8fzkxfHPkNBF4YcuaZYnMK4SdvS', source: 'dex' },
 }
 
 /**

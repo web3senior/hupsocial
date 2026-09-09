@@ -40,9 +40,8 @@ export const RANGES = {
 const MIN_POINTS = 5
 
 // A series is labelled by the window it was asked for only when it very nearly spans it.
-// Short of that it is labelled by what it actually covers — TBULL has about five hours of
-// history anywhere, and calling that "7D" beside a +49% figure was the real defect, not the
-// shortness of the line.
+// Short of that it is labelled by what it actually covers — a token with five hours of history
+// anywhere, labelled "7D" beside its move, was the real defect, not the shortness of the line.
 const LABEL_AS_REQUESTED = 0.8
 
 export const DEFAULT_RANGE = '1D'
@@ -154,8 +153,8 @@ async function topPoolFor(mint) {
  * Read a Solana mint from Jupiter's chart API — the same series jup.ag draws, aggregated across
  * a token's pools rather than read from one of them. That distinction is the whole reason this
  * exists: GeckoTerminal answers per-pool, and a pool it has only lately begun indexing returns
- * a handful of candles no matter which aggregation you ask for. TBULL's deepest pool gave five
- * hours; the same week from here is 168.
+ * a handful of candles no matter which aggregation you ask for — five hours where the same
+ * week from here is 168.
  *
  * Timestamps go out in milliseconds and come back in seconds, which the API is not shy about —
  * it 400s with the exact property it wanted, which is how the shape below was arrived at.

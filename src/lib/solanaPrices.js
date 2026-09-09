@@ -94,8 +94,8 @@ async function fetchFromDexScreener(mint) {
     const { pairs } = await response.json()
     if (!Array.isArray(pairs)) return null
 
-    // Deepest pool only. TBULL, for one, has a ~$65k Meteora pool alongside pools holding $6
-    // and $308 — the shallow ones quote a price no one could actually trade at.
+    // Deepest pool only. A mint's real pool sits alongside dust pools holding a few dollars,
+    // and those quote a price no one could actually trade at.
     const best = pairs
       .filter((pair) => pair?.chainId === 'solana' && pair?.baseToken?.address === mint)
       .sort((a, b) => (num(b?.liquidity?.usd) ?? 0) - (num(a?.liquidity?.usd) ?? 0))[0]

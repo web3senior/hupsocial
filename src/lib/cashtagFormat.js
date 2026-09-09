@@ -13,7 +13,7 @@
 
 import { rangeLabelFor } from './priceHistory'
 
-// Sub-cent memecoins need the long tail or $BONK renders as "$0.00"
+// Sub-cent tokens need the long tail or they all render as "$0.00"
 export const priceLabel = (price) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -22,8 +22,8 @@ export const priceLabel = (price) =>
     maximumFractionDigits: price < 0.01 ? 8 : price < 1 ? 6 : 2,
   }).format(price)
 
-// A launch-price move can run to six figures of percent — ANSEM's is +125,000% — so anything
-// past four digits switches to compact notation rather than breaking the row
+// A move measured from a launch price can run to six figures of percent, so anything past
+// four digits switches to compact notation rather than breaking the row
 export const percentLabel = (percent) => {
   const magnitude = Math.abs(percent)
   const formatted =
@@ -41,8 +41,8 @@ export const signedPercentLabel = (percent) => `${percent >= 0 ? '+' : '−'}${p
  * The one move a cashtag prints, and what to call the window it covers.
  *
  * The series' own change wins whenever there is a series: printing a 24h figure beside a
- * week-long chart meant ANSEM could show a red number over a green line — down on the day, up
- * on the week — and neither reading was wrong, which is what made it impossible to trust. The
+ * week-long chart meant a token could show a red number over a green line — down on the day,
+ * up on the week — and neither reading was wrong, which is what made it impossible to trust. The
  * label always names whichever number won, so the two can never drift apart.
  *
  * @param {{change24h: ?number, history: ?object}} token a row from /api/v1/tokens/cashtags

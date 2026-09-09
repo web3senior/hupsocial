@@ -5,8 +5,8 @@
  * A badge answers one question — "which chain is this token actually on?" — so it is only
  * worth drawing when the answer is not already obvious. Native coins carry their chain in the
  * artwork itself (the Bitcoin logo IS Bitcoin), and badging those just doubles the mark up.
- * Tokens are the ambiguous case: $ANSEM could be an SPL mint or an ERC20 and nothing about
- * the bull tells you which.
+ * Tokens are the ambiguous case: a ticker could be an SPL mint or an ERC20 and nothing about
+ * its artwork tells you which.
  *
  * That distinction falls straight out of a DefiLlama key, so nothing has to be declared per
  * token: `solana:<mint>` and `ethereum:0x…` name their chain, while `coingecko:ethereum`
