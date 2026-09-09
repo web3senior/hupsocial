@@ -15,7 +15,11 @@
  * @returns {Object|undefined} A React style object, or undefined when there is nothing to scope.
  */
 export const networkColorStyle = (chain) =>
-  chain?.primaryColor ? { '--network-color-primary': chain.primaryColor, '--network-color-text': chain.textColor } : undefined
+  chain?.primaryColor
+    ? // Both or neither: a scoped primary with the text colour left to :root reads the wallet's
+      // chain, which is how white lands on a light brand colour
+      { '--network-color-primary': chain.primaryColor, '--network-color-text': chain.textColor || '#fff' }
+    : undefined
 
 /**
  * A chain's logo as an image source: the hosted icon when the config carries one, else its inline

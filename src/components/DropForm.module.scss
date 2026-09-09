@@ -767,7 +767,7 @@
     height: 28px;
     border-radius: 999px;
     background: var(--network-color-primary, var(--primary, #ec4899));
-    color: #fff;
+    color: var(--network-color-text, #fff);
   }
 
   &__rateValue {
@@ -974,7 +974,7 @@
     margin-top: 0.25rem;
     border: none;
     background-color: var(--network-color-primary, var(--primary, #ec4899));
-    color: #fff;
+    color: var(--network-color-text, #fff);
     border-radius: var(--drop-card-radius);
     padding: 0.95rem 1rem;
     font-size: var(--font-size-15, 0.9375rem);
@@ -1078,7 +1078,7 @@
     .dropForm__railMark {
       border-color: transparent;
       background: var(--network-color-primary, var(--primary, #ec4899));
-      color: #fff;
+      color: var(--network-color-text, #fff);
     }
   }
 

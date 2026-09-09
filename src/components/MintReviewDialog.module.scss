@@ -173,7 +173,7 @@
     border-radius: 999px;
     cursor: pointer;
     background-color: var(--network-color-primary, var(--color-primary));
-    color: var(--white);
+    color: var(--network-color-text, #fff);
     font-size: var(--font-size-14, 0.875rem);
     font-weight: 700;
 

@@ -941,7 +941,7 @@
     border-radius: 999px;
     cursor: pointer;
     background-color: var(--network-color-primary, var(--color-primary));
-    color: var(--white);
+    color: var(--network-color-text, #fff);
     font-size: var(--font-size-14, 0.875rem);
     font-weight: 700;
 
@@ -1083,7 +1083,7 @@
     padding: 0 0.6rem;
     border-radius: 999px;
     background: var(--network-color-primary, var(--color-primary));
-    color: #fff;
+    color: var(--network-color-text, #fff);
     font-size: var(--font-size-10, 0.65rem);
     font-weight: 700;
     letter-spacing: 0.03em;

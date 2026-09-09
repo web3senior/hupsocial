@@ -342,7 +342,7 @@
     &--active {
       background-color: var(--network-color-primary);
       border-color: var(--network-color-primary);
-      color: var(--white);
+      color: var(--network-color-text, #fff);
 
       small {
         color: inherit;

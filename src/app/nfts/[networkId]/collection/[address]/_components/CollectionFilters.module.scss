@@ -42,7 +42,7 @@
     padding: 0 4px;
     border-radius: 999px;
     background-color: var(--network-color-primary, var(--color-primary));
-    color: var(--white, #fff);
+    color: var(--network-color-text, #fff);
     font-size: var(--font-size-10, 10px);
     font-weight: 700;
   }

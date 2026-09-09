@@ -31,7 +31,7 @@
     gap: 0.35rem;
     border: none;
     background-color: var(--network-color-primary);
-    color: #fff;
+    color: var(--network-color-text, #fff);
     border-radius: 999px;
     padding: 0.55rem 1rem;
     font-size: var(--font-size-14, 0.875rem);

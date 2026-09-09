@@ -40,7 +40,7 @@
      changes. It is runtime-only — undefined until a wallet connects — so the fallback is not
      optional here: bare, this button would be invisible to every signed-out visitor. */
   background: var(--network-color-primary, var(--primary, #2a78d6));
-  color: var(--white, #fff);
+  color: var(--network-color-text, #fff);
   font-size: var(--font-size-12, 0.75rem);
   font-weight: 600;
   text-decoration: none;

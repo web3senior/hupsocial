@@ -67,7 +67,7 @@
       border: none;
       border-radius: 999px;
       background: var(--network-color-primary, var(--primary, #ec4899));
-      color: #fff;
+      color: var(--network-color-text, #fff);
       padding: 0.7rem 1.35rem;
       font-size: var(--font-size-14, 0.875rem);
       font-weight: 600;
