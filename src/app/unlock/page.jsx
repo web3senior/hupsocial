@@ -71,7 +71,7 @@ export default function Page() {
               <input type="password" name="password" id="password" onChange={(e) => setPassword(e.target.value)} />
             </div>
 
-            <button className={`${styles.actionButton} ${styles.createButton}`} disabled={!password || isUnlocking} onClick={unlock}>
+            <button className={`${styles.actionButton} ${styles.createButton}`} disabled={!password || isUnlocking}>
               {isUnlocking ? 'Unlocking...' : 'Unlock'}
             </button>
 
