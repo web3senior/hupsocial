@@ -144,6 +144,7 @@ dialog.newPost {
 
   &__body {
     margin: 0;
+    font-family: var(--font-sans) !important;
     font-size: var(--font-size-14);
     line-height: 1.5;
     color: var(--text-secondary, inherit);
