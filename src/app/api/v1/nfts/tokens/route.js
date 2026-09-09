@@ -24,6 +24,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const networkId = searchParams.get('networkId')
+    const collection = searchParams.get('collection')
 
     // Same backing filter as the grid, so the currency list can't offer a token whose only
     // active listing is no longer fillable
@@ -33,6 +34,12 @@ export async function GET(request) {
     if (networkId) {
       whereClause += ` AND l.network_id = ?`
       whereParams.push(networkId)
+    }
+
+    // The collection page filters one collection, so its currency list is that collection's
+    if (collection) {
+      whereClause += ` AND l.collection = ?`
+      whereParams.push(collection.toLowerCase())
     }
 
     const [rows] = await pool.execute(

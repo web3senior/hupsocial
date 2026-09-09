@@ -22,6 +22,7 @@ import NftMarketCard from '@/components/NftMarketCard'
 import LayoutToggle from '@/components/ui/LayoutToggle'
 import SegmentedControl from '@/components/ui/SegmentedControl'
 import CollectionBrowser from './CollectionBrowser'
+import CollectionFilters, { DEFAULT_COLLECTION_FILTERS, describeFilters } from './CollectionFilters'
 import CollectionGallery from './CollectionGallery'
 import CollectionHeader from './CollectionHeader'
 import CollectionMint from './CollectionMint'
@@ -83,6 +84,10 @@ export default function CollectionView({ networkId, address }) {
   // [{label, value}] — values sharing a label widen the result, different labels narrow it.
   // The server does the matching against cached token metadata; see the traits API route.
   const [traits, setTraits] = useState([])
+  // Sort, referral, payment token, seller and price range — the market grid's panel minus
+  // what this page already fixes (network, collection, standard) or shows as tabs (status).
+  // Not remembered across visits, same as the market's own: they are this collection's.
+  const [filters, setFilters] = useState(DEFAULT_COLLECTION_FILTERS)
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
@@ -145,9 +150,28 @@ export default function CollectionView({ networkId, address }) {
       collection,
       status: status === 'active' ? '' : status,
       traits: traits.length > 0 ? JSON.stringify(traits) : '',
+      sort: filters.sort === DEFAULT_COLLECTION_FILTERS.sort ? '' : filters.sort,
+      referral: filters.referral,
+      token: filters.token,
+      seller: filters.seller,
+      // Typed in the currency's own units, sent in its base ones — see CollectionFilters
+      minPrice: filters.minPriceBase,
+      maxPrice: filters.maxPriceBase,
     }),
-    [chainId, collection, status, traits],
+    [chainId, collection, status, traits, filters],
   )
+
+  // Sorting by sale time while only live listings show would order nothing — widen to
+  // everything; a deliberate Sold tab is left as it is
+  const handleFiltersChange = useCallback(
+    (next) => {
+      setFilters(next)
+      if (next.sort === 'recently_sold' && status === 'active') setStatus('all')
+    },
+    [status, setStatus, setFilters],
+  )
+
+  const filterChips = describeFilters(filters)
 
   useEffect(() => {
     // The browse tab doesn't read listings at all — CollectionBrowser owns its own fetching,
@@ -273,6 +297,11 @@ export default function CollectionView({ networkId, address }) {
           </div>
 
           <div className={styles.collection__tools}>
+            {/* Both panels read listings, so both stand down for the tabs that don't */}
+            {!isBrowsingCollection && (
+              <CollectionFilters chainId={chainId} collection={collection} chainInfo={chainInfo} value={filters} onChange={handleFiltersChange} />
+            )}
+
             {/* Traits filter listings; the browse tab shows tokens whether or not they were
                 ever listed, so the panel would claim a scope it doesn't have */}
             {!isBrowsingCollection && (
@@ -288,10 +317,25 @@ export default function CollectionView({ networkId, address }) {
           </div>
         </div>
 
-        {/* Applied traits, each removable on its own — the panel behind the funnel is where
-            they were picked, but a filtered grid has to show what is filtering it */}
-        {traits.length > 0 && !isBrowsingCollection && (
+        {/* Applied traits and filters, each removable on its own — the panels behind the
+            toolbar are where they were picked, but a filtered grid has to show what is
+            filtering it */}
+        {(traits.length > 0 || filterChips.length > 0) && !isBrowsingCollection && (
           <div className={styles.collection__chips}>
+            {filterChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                className={styles.collection__chip}
+                onClick={() => setFilters((current) => ({ ...current, ...chip.reset }))}
+                aria-label={`Remove the ${chip.label} filter`}
+              >
+                <small>{chip.label}</small>
+                <span>{chip.value}</span>
+                <XIcon size={12} />
+              </button>
+            ))}
+
             {traits.map((trait) => (
               <button
                 key={`${trait.label}:${trait.value}`}
@@ -306,7 +350,14 @@ export default function CollectionView({ networkId, address }) {
               </button>
             ))}
 
-            <button type="button" className={styles.collection__chipsClear} onClick={() => setTraits([])}>
+            <button
+              type="button"
+              className={styles.collection__chipsClear}
+              onClick={() => {
+                setTraits([])
+                setFilters(DEFAULT_COLLECTION_FILTERS)
+              }}
+            >
               Clear all
             </button>
           </div>
@@ -330,8 +381,8 @@ export default function CollectionView({ networkId, address }) {
           />
         ) : items.length === 0 && !isLoading ? (
           <EmptyState align="center" className={styles.collection__empty}>
-            {traits.length > 0
-              ? 'No NFT here matches those traits — try removing one.'
+            {traits.length > 0 || filterChips.length > 0
+              ? 'No NFT here matches those filters — try removing one.'
               : status === 'active'
                 ? 'Nothing from this collection is up for sale right now.'
                 : 'No listings match this view.'}

@@ -181,10 +181,12 @@ export const getNftListings = async (page = 1, limit = 24, filters = {}) => {
  * Rows carry `is_native`, `symbol`/`decimals` (null until the indexer names the token) and a
  * `listing_count` — the client labels and orders the <select> from those.
  * @param {string|number} [networkId] Restrict to one chain; omitted returns every chain's.
+ * @param {string} [collection] Restrict to one collection — the collection page's filter.
  */
-export const getNftPaymentTokens = async (networkId) => {
+export const getNftPaymentTokens = async (networkId, collection) => {
   const params = new URLSearchParams()
   if (networkId) params.set('networkId', networkId)
+  if (collection) params.set('collection', collection.toLowerCase())
 
   const response = await fetch(`/api/v1/nfts/tokens?${params.toString()}`)
   if (!response.ok) throw new Error('Failed to fetch NFT payment tokens')
@@ -200,11 +202,13 @@ export const getNftPaymentTokens = async (networkId) => {
  * `listing_count`.
  * @param {string} [q] Name fragment or wallet-address prefix.
  * @param {string|number} [networkId] Restrict to one chain; omitted searches every chain.
+ * @param {string} [collection] Restrict to sellers with listings in one collection.
  */
-export const getNftSellers = async (q, networkId) => {
+export const getNftSellers = async (q, networkId, collection) => {
   const params = new URLSearchParams()
   if (q) params.set('q', q)
   if (networkId) params.set('networkId', networkId)
+  if (collection) params.set('collection', collection.toLowerCase())
 
   const response = await fetch(`/api/v1/nfts/sellers?${params.toString()}`)
   if (!response.ok) throw new Error('Failed to fetch NFT sellers')

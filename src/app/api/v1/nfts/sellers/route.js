@@ -27,6 +27,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const q = (searchParams.get('q') || '').trim()
     const networkId = searchParams.get('networkId')
+    const collection = searchParams.get('collection')
 
     // Matching the grid's own filter, so a seller whose only active listing lost its backing
     // stops being suggested rather than offering an empty grid
@@ -36,6 +37,12 @@ export async function GET(request) {
     if (networkId) {
       whereClause += ` AND l.network_id = ?`
       whereParams.push(networkId)
+    }
+
+    // The collection page's typeahead only wants sellers holding listings in that collection
+    if (collection) {
+      whereClause += ` AND l.collection = ?`
+      whereParams.push(collection.toLowerCase())
     }
 
     if (q) {
