@@ -9,12 +9,19 @@ import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 const MAX_INPUT = 5000
 const CACHE_LIMIT = 500
 const UPSTREAM_TIMEOUT = 12000
+// Every chunk and every retry has to fit in here, so a throttled provider still leaves
+// room to answer with JSON instead of hitting the platform's own timeout
+const TOTAL_BUDGET = 25000
+const RETRY_DELAYS = [600, 1600]
 
 const cache = new Map()
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const readCache = (key) => {
   if (!cache.has(key)) return null
@@ -59,23 +66,31 @@ const fetchJson = async (url, init) => {
     throw Object.assign(new Error(`upstream unreachable: ${error.message}`), { retryable: true })
   }
 
-  if (!res.ok) throw Object.assign(new Error(`upstream responded ${res.status}`), { retryable: res.status >= 500 })
+  // gtx answers a burst of chunks from one IP with 429, so throttling is worth waiting out
+  if (!res.ok) {
+    throw Object.assign(new Error(`upstream responded ${res.status}`), {
+      retryable: res.status >= 500 || res.status === 429 || res.status === 403,
+    })
+  }
 
   // A redirect to Google's /sorry interstitial arrives as HTML, not as an error status
   const body = await res.text()
   try {
     return JSON.parse(body)
   } catch {
-    throw new Error('upstream returned a non-JSON body')
+    throw Object.assign(new Error('upstream returned a non-JSON body'), { retryable: true })
   }
 }
 
-const withRetry = async (task) => {
-  try {
-    return await task()
-  } catch (error) {
-    if (!error?.retryable) throw error
-    return task()
+const withRetry = async (task, deadline) => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await task()
+    } catch (error) {
+      const delay = RETRY_DELAYS[attempt]
+      if (!error?.retryable || delay === undefined || Date.now() + delay >= deadline) throw error
+      await sleep(delay)
+    }
   }
 }
 
@@ -114,8 +129,9 @@ const viaGtx = async (chunk, target) => {
   }
 }
 
-// Keyless last resort. The anonymous daily quota is per server IP, so MYMEMORY_EMAIL is
-// worth setting; errors come back as 200 with a code in responseStatus
+// Keyless last resort, reached only once Google is unusable. The anonymous daily quota is
+// per server IP, so MYMEMORY_EMAIL is worth setting; errors come back as 200 with a code
+// in responseStatus
 const viaMyMemory = async (chunk, target) => {
   const params = new URLSearchParams({ q: chunk, langpair: `Autodetect|${target}` })
   if (process.env.MYMEMORY_EMAIL) params.set('de', process.env.MYMEMORY_EMAIL)
@@ -130,25 +146,28 @@ const viaMyMemory = async (chunk, target) => {
   return { text: decodeEntities(text), detected: '' }
 }
 
+// pace is the gap held between a provider's own chunks, so a long post never arrives as a
+// burst the keyless endpoints answer with a rate limit
 const PROVIDERS = [
-  { name: 'cloud', chunk: 4500, available: () => Boolean(process.env.GOOGLE_TRANSLATE_API_KEY), translate: viaCloudApi },
-  { name: 'gtx', chunk: 1500, available: () => true, translate: viaGtx },
-  // 500 chars a call, so a long post would mean a dozen round trips and a burnt daily quota
-  { name: 'mymemory', chunk: 450, available: (text) => text.length <= 1500, translate: viaMyMemory },
+  { name: 'cloud', chunk: 4500, pace: 0, available: () => Boolean(process.env.GOOGLE_TRANSLATE_API_KEY), translate: viaCloudApi },
+  { name: 'gtx', chunk: 1500, pace: 400, available: () => true, translate: viaGtx },
+  { name: 'mymemory', chunk: 450, pace: 400, available: () => true, translate: viaMyMemory },
 ]
 
 const translateText = async (text, target) => {
+  const deadline = Date.now() + TOTAL_BUDGET
   let lastError
 
   for (const provider of PROVIDERS) {
-    if (!provider.available(text)) continue
+    if (!provider.available() || Date.now() >= deadline) continue
 
     try {
       const pieces = []
       let detected = ''
 
-      for (const chunk of chunkText(text, provider.chunk)) {
-        const result = await withRetry(() => provider.translate(chunk, target))
+      for (const [index, chunk] of chunkText(text, provider.chunk).entries()) {
+        if (index && provider.pace) await sleep(provider.pace)
+        const result = await withRetry(() => provider.translate(chunk, target), deadline)
         pieces.push(result.text)
         if (!detected) detected = result.detected
       }
@@ -192,6 +211,6 @@ export async function POST(request) {
     return NextResponse.json(result, { headers: { 'Cache-Control': 'private, max-age=86400' } })
   } catch (error) {
     console.error('[translate] every provider failed:', error)
-    return NextResponse.json({ error: 'Unable to reach the translation service' }, { status: 502 })
+    return NextResponse.json({ error: 'Unable to reach the translation service', detail: error?.message || '' }, { status: 502 })
   }
 }
