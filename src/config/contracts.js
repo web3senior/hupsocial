@@ -4,7 +4,7 @@
  * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, /* baseSepolia, */ bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, baseSepolia, bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Arbitrum Orbit L2, ETH as gas
@@ -30,14 +30,13 @@ export const robinhood = defineChain({
 // that work. Browsers need the reverse order on LUKSO — see BROWSER_RPC_URLS in config/wagmi.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
 lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://42.rpc.thirdweb.com', 'https://rpc.mainnet.lukso.network'] } }
-// Base Sepolia is switched off across the app
-// baseSepolia.rpcUrls = {
-//   ...baseSepolia.rpcUrls,
-//   default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
-// }
+baseSepolia.rpcUrls = {
+  ...baseSepolia.rpcUrls,
+  default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
+}
 
 // Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood /* , baseSepolia */]
+export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia]
 
 // ''            — not deployed on that chain.
 // hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
@@ -88,7 +87,7 @@ export const CONTRACTS = {
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
     community: '0xB7Af957f4157aeAdA5Cab17D3B55fB1f1315F41A',
-    chat: '0x3a98ACd2B8CcBe85121F95BF9F9636A484A80d67',
+    chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
@@ -108,33 +107,36 @@ export const CONTRACTS = {
     univ3Router: '',
     univ3Quoter: '',
   },
-  // Dev chain — Base Sepolia
-  // chain84532: {
-  //   name: 'base-sepolia',
-  //   forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
-  //   forwarderName: 'HupChatForwarder',
-  //   hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
-  //   status: '',
-  //   community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
-  //   polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
-  //   fund: '0xEB6c36fE71aC893Dca06fCAbc78C0C6690eA6D4b',
-  //   chat: '',
-  //   // No LSP26 on Base Sepolia: follower gates are unavailable here
-  //   followerSystem: '',
-  //   store: '',
-  //   tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
-  //   trade: '',
-  //   offers: '',
-  //   events: '',
-  //   predict: '',
-  //   apps: '',
-  //   drops: '',
-  //   splits: '',
-  //   launch: '0x560D9F7FC0e532bcCe5B183A698e7186363f29f1',
-  //   univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
-  //   univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
-  //   wnative: '0x4200000000000000000000000000000000000006',
-  // },
+  chain84532: {
+    name: 'base-sepolia',
+    forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
+    forwarderName: 'HupChatForwarder',
+    hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
+    status: '',
+    community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
+    polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
+    fund: '0xEB6c36fE71aC893Dca06fCAbc78C0C6690eA6D4b',
+    chat: '',
+    // No LSP26 on Base Sepolia: follower gates are unavailable here
+    followerSystem: '',
+    store: '',
+    tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
+    trade: '',
+    offers: '',
+    events: '',
+    predict: '',
+    apps: '',
+    drops: '',
+    splits: '',
+    launch: '0x6CCC098Ad9d535E6445a40A9483D5C58f30bd46D',
+    univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
+    univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
+    wnative: '0x4200000000000000000000000000000000000006',
+    univ4Router: '0x492E6456D9528771018DeB9E87ef7750EF184104',
+    univ4PoolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
+    univ4Quoters: ['0x4A6513c898fe1B2d0E78d3b0e0A4a151589B1cBa'],
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+  },
   chain143: {
     name: 'monad',
     forwarder: '0x09FAf2fddED624958589aD9ca704Bc4C6C232e72',
@@ -143,7 +145,7 @@ export const CONTRACTS = {
     hupForwarderName: 'HupForwarder',
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
-    chat: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
+    chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     store: '',
     tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
