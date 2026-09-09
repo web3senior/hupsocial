@@ -3,7 +3,7 @@
 .tipEarned {
   display: inline-flex;
   align-items: center;
-  gap: 0.1em;
+  gap: 0.2em;
 
   // Sized to the figure's cap height plus a little — it is the currency glyph now
   &__sign {
@@ -11,5 +11,9 @@
     width: 1.15em;
     height: 1.15em;
     object-fit: contain;
+    // dollar.webp spins inside a canvas that is ~10% empty either side and drops the glyph ~2%
+    // below centre: reclaim that dead space so the pill insets the sign, not the file's margins
+    margin-inline: -0.117em -0.099em;
+    transform: translateY(-0.025em);
   }
 }
