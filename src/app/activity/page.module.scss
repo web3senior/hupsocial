@@ -8,6 +8,8 @@
     flex-direction: column;
     gap: 0.75rem;
     padding: 0;
+    // Keeps the stream's sticky toolbar in its own stacking context, under the fixed aside.
+    isolation: isolate;
   }
 
   &__lede {
