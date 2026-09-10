@@ -502,7 +502,12 @@
 
           // The Counter wrapper — the button's only div child
           > div {
-            padding-inline: 6px;
+            // Paints 22px tall while its margin box still contributes the wrapper's own 18px,
+            // so the footer row is the same height whether or not the post has earned
+            box-sizing: content-box;
+            padding-block: 2px;
+            margin-block: -2px;
+            padding-inline: 8px;
             margin-inline-start: 2px;
             border-radius: 999px;
             background-color: color-mix(in srgb, var(--tip-earned-color) 14%, transparent);

@@ -1,19 +1,22 @@
 // The tip badge's earned pill: the spinning dollar sign and the figure it prefixes, centred
 // on each other inside the Counter's 18px line.
 .tipEarned {
-  display: inline-flex;
+  // Block-level, not inline-flex: an inline-flex box hands its baseline to the image's bottom
+  // edge, which hangs the coin off the text baseline and clips it against the pill's overflow
+  display: flex;
   align-items: center;
-  gap: 0.2em;
+  gap: 0.18em;
 
-  // Sized to the figure's cap height plus a little — it is the currency glyph now
+  // Matched to the figure's own presence — it is the currency glyph now, not an ornament
   &__sign {
     flex: none;
-    width: 1.15em;
-    height: 1.15em;
+    width: 1em;
+    height: 1em;
     object-fit: contain;
-    // dollar.webp spins inside a canvas that is ~10% empty either side and drops the glyph ~2%
-    // below centre: reclaim that dead space so the pill insets the sign, not the file's margins
-    margin-inline: -0.117em -0.099em;
-    transform: translateY(-0.025em);
+    // dollar.webp spins inside a canvas that is 10.2% empty on the left and 8.6% on the right
+    // and drops the glyph 2.2% below centre: reclaim that dead space so the pill insets the
+    // sign, not the file's margins
+    margin-inline: -0.102em -0.086em;
+    transform: translateY(-0.021em);
   }
 }
