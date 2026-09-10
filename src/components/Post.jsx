@@ -434,7 +434,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             }}
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-between`}
           >
-            <div className="flex flex-row align-items-center justify-content-start`" style={{ gap: `4px` }}>
+            <div className={clsx(styles.post__actions__group, 'flex flex-row align-items-center justify-content-start')}>
               {actionsSet.has('like') && <Like post={displayItem || item} />}
 
               {actionsSet.has('comment') && <CommentAction post={commentTarget} onComment={setShowCommentModal} />}
@@ -445,7 +445,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
               {actionsSet.has('view') && <View post={item} />}
             </div>
-            <div className="flex align-items-center gap-025">
+            <div className={clsx(styles.post__actions__group, 'flex align-items-center')}>
               {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
               {/* captureRef: the card copies itself, exactly as it is on screen */}
               {actionsSet.has('share') && <Share item={displayItem || item} captureRef={sectionRef} />}

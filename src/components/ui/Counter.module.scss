@@ -2,7 +2,8 @@
 .counterWrapper {
   display: inline-flex;
   position: relative;
-  overflow: hidden;
+  overflow: hidden;     /* Clips the slide-up entry, so the box must never be narrower than its number */
+  flex: none;           /* A crowded footer row shrinks its padding, not the count inside this box */
   height: 18px;         /* Match the 18px footer icons — anything taller grows the button when counters mount after hydration, shifting the page below by 2px */
   min-width: 14px;      /* Prevent layout jumps when count shifts */
   align-items: center;
@@ -13,6 +14,7 @@
   display: inline-block;
   font-size: 14px;
   line-height: 18px;
+  white-space: nowrap;
 }
 
 /* Applied only when the value changes after mount — initial paint stays static */

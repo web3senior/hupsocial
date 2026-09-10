@@ -366,15 +366,50 @@
     user-select: none;
     width: 100%;
 
+    // On a phone the groups dissolve so space-between spreads all seven buttons across the
+    // row — that free space is what an earned tip badge takes, instead of the icons
+    &__group {
+      gap: 4px;
+
+      @media (max-width: 600px) {
+        display: contents;
+      }
+    }
+
+    @media (max-width: 600px) {
+      gap: 2px;
+      // Last resort for a row that still can't fit (four-figure counters beside a
+      // three-figure tip on a 320px phone): the tail wraps rather than leaving the card
+      flex-wrap: wrap;
+      row-gap: 4px;
+    }
+
     button,
     a {
       @extend %icon-ripple-button;
       padding: 10px;
       transition: all 0.01s ease-in-out;
       color: var(--black-600);
+      // A shrunk button renders its 18px glyph 13px wide and oval — the row gives up padding instead
+      flex: none;
 
+      > svg {
+        flex: none;
+      }
+
+      // Keyed on data-action: the menus these buttons open render inside this row with icons of their own size
+      &[data-action] > svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      // Horizontal padding is the row's slack; the vertical keeps the 34px tap height
       @media (max-width: 600px) {
-        padding: 8px;
+        padding: 8px 5px;
+      }
+
+      @media (max-width: 400px) {
+        padding: 8px 3px;
       }
 
       &:before {
@@ -514,6 +549,15 @@
             color: var(--tip-earned-color);
             font-weight: 600;
             font-variant-numeric: tabular-nums;
+
+            @media (max-width: 600px) {
+              padding-inline: 6px;
+            }
+
+            @media (max-width: 400px) {
+              padding-inline: 5px;
+              margin-inline-start: 0;
+            }
           }
 
           // The pill supplies its own inset, so drop the shared counter gap
@@ -537,6 +581,17 @@
 
       span {
         padding-inline-start: 4px;
+
+        @media (max-width: 400px) {
+          padding-inline-start: 3px;
+        }
+      }
+
+      // The last of the row's slack on a small phone, before an icon would have to give
+      @media (max-width: 400px) {
+        [data-counter] span {
+          font-size: 13px;
+        }
       }
     }
   }

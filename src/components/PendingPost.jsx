@@ -56,7 +56,7 @@ export default function PendingPost({ entry }) {
           are the same icons in the same order, inert until the real card replaces them. */}
       <footer className={clsx(postStyles.post__footer, styles['pending-post__footer'])}>
         <div className={clsx(postStyles.post__actions, 'flex flex-row align-items-center justify-content-between')}>
-          <div className="flex flex-row align-items-center justify-content-start" style={{ gap: '4px' }}>
+          <div className={clsx(postStyles.post__actions__group, 'flex flex-row align-items-center justify-content-start')}>
             <button type="button" tabIndex={-1} data-action="like">
               <HeartIcon width={18} height={18} />
             </button>
@@ -73,7 +73,7 @@ export default function PendingPost({ entry }) {
               <ChartBarIcon width={17} height={17} />
             </button>
           </div>
-          <div className="flex align-items-center gap-025">
+          <div className={clsx(postStyles.post__actions__group, 'flex align-items-center')}>
             <button type="button" tabIndex={-1} data-action="bookmark">
               <BookmarkSimpleIcon width={17} height={17} />
             </button>
