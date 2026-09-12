@@ -166,6 +166,13 @@
     }
   }
 
+  /* One frame on a fast machine, longer on a slow one — the panel is already on screen either way */
+  &__loading {
+    display: grid;
+    place-items: center;
+    padding: 40px 0;
+  }
+
   &__empty {
     margin: 24px 8px;
     color: var(--text-muted);

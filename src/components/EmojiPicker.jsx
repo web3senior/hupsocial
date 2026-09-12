@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlassIcon, SmileyIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
+import { ContentSpinner } from '@/components/Loading'
 import NativePopover from '@/components/ui/NativePopover'
 import { EMOJI_GROUPS, loadRecentEmoji, rememberEmoji, searchEmoji } from '@/lib/emoji'
 import styles from '@/components/EmojiPicker.module.scss'
@@ -23,9 +24,14 @@ export default function EmojiPicker({ onSelect, disabled = false }) {
   const searchRef = useRef(null)
   const sectionRefs = useRef({})
   const scrollFrameRef = useRef(null)
+  const pendingJumpRef = useRef(null)
 
-  // The grid is ~1100 buttons. None of them exist until the panel is opened for the first time.
-  const [hasOpened, setHasOpened] = useState(false)
+  // How much of the grid exists yet: 0 nothing, 1 the first category, 2 every category. Building
+  // ~1100 buttons costs a few hundred milliseconds, and React does that work before the browser
+  // paints — so mounting them on the click that opens the panel means the panel itself does not
+  // appear until they are all built. The stages below hand the browser a frame in between, so the
+  // panel opens at once and the emoji land in it.
+  const [renderStage, setRenderStage] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [recent, setRecent] = useState([])
@@ -36,18 +42,24 @@ export default function EmojiPicker({ onSelect, disabled = false }) {
 
   // Recents are read on open and then held still: re-sorting them under the pointer would move
   // the next emoji out from under a second click.
-  const sections = useMemo(
-    () =>
-      recent.length > 0
-        ? [{ ...RECENT_SECTION, items: recent.map((char) => ({ char, keywords: 'recently used' })) }, ...EMOJI_GROUPS]
-        : EMOJI_GROUPS,
+  const recentSection = useMemo(
+    () => (recent.length > 0 ? { ...RECENT_SECTION, items: recent.map((char) => ({ char, keywords: 'recently used' })) } : null),
     [recent]
   )
 
+  // Every section the strip can reach, mounted or not
+  const sections = useMemo(() => (recentSection ? [recentSection, ...EMOJI_GROUPS] : EMOJI_GROUPS), [recentSection])
+
+  // One category per stage. Recents sit outside the count — they are a handful of buttons, and
+  // staging them would shift every later index the first time a recent emoji exists.
+  const isFullyMounted = renderStage >= EMOJI_GROUPS.length
+  const mountedSections =
+    renderStage === 0 ? [] : [...(recentSection ? [recentSection] : []), ...EMOJI_GROUPS.slice(0, renderStage)]
+
   const handleBeforeToggle = useCallback((event) => {
     if (event.newState !== 'open') return
-    // Mount and seed before the primitive measures the panel, so it anchors to the real box
-    setHasOpened(true)
+    // Seeded before the primitive measures the panel. The panel's box never depends on what is in
+    // the grid — its height and width are fixed — so an empty body measures the same as a full one.
     setQuery('')
     setRecent(loadRecentEmoji())
   }, [])
@@ -63,6 +75,15 @@ export default function EmojiPicker({ onSelect, disabled = false }) {
     if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) searchRef.current?.focus()
   }, [])
 
+  // One category per frame, so the browser paints and takes input between batches instead of
+  // locking up for the length of the whole grid. Built once and never torn down — a second open
+  // costs nothing.
+  useEffect(() => {
+    if (!isOpen || isFullyMounted) return
+    const frame = requestAnimationFrame(() => setRenderStage((stage) => stage + 1))
+    return () => cancelAnimationFrame(frame)
+  }, [isOpen, isFullyMounted, renderStage])
+
   // Escape belongs to the panel while it is open. Without this the composer's own <dialog> takes
   // the same keypress as a cancel and the whole composer closes behind the picker.
   useEffect(() => {
@@ -77,14 +98,24 @@ export default function EmojiPicker({ onSelect, disabled = false }) {
   useEffect(() => () => cancelAnimationFrame(scrollFrameRef.current), [])
 
   const jumpToSection = (key) => {
+    setActiveSection(key)
     const body = bodyRef.current
     const section = sectionRefs.current[key]
-    if (!body || !section) return
-    setActiveSection(key)
+    // Tapped a category before its section was built — the jump waits for the effect below
+    if (!body || !section) {
+      pendingJumpRef.current = key
+      return
+    }
+    pendingJumpRef.current = null
     // offsetTop against the scroll box itself — scrollIntoView would drag the composer's own
     // scroll container along with it, and the page's global smooth scrolling with that
     body.scrollTop = section.offsetTop
   }
+
+  // The section a tab asked for before it existed, run once the grid is complete
+  useEffect(() => {
+    if (isFullyMounted && pendingJumpRef.current) jumpToSection(pendingJumpRef.current)
+  }, [isFullyMounted])
 
   // Which category the reader is actually looking at, so the strip follows the scroll
   const handleBodyScroll = () => {
@@ -183,14 +214,18 @@ export default function EmojiPicker({ onSelect, disabled = false }) {
           )}
 
           <div ref={bodyRef} className={styles.picker__body} onScroll={handleBodyScroll}>
-            {!hasOpened ? null : isSearching ? (
+            {isSearching ? (
               results.length > 0 ? (
                 renderGrid(results, 'search')
               ) : (
                 <p className={styles.picker__empty}>No emoji match “{query.trim()}”</p>
               )
+            ) : renderStage === 0 ? (
+              <div className={styles.picker__loading}>
+                <ContentSpinner />
+              </div>
             ) : (
-              sections.map((section) => (
+              mountedSections.map((section) => (
                 <section
                   key={section.key}
                   ref={(node) => {
