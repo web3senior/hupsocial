@@ -209,7 +209,7 @@ export default function LeaderboardPage() {
                   <span>Reposts</span>
                   <span>Views</span>
                   <span>Tips</span>
-                  <span>Transactions</span>
+                  <span>TXs</span>
                   <span>Followers</span>
                   <span>Score</span>
                 </div>
@@ -230,7 +230,7 @@ export default function LeaderboardPage() {
 
                     <Metric icon={FlameIcon} label="Posts" value={leader.root_posts} />
                     <Metric icon={ChatCircleIcon} label="Comments" value={leader.comments_made} />
-                    <Metric icon={HeartIcon} label="Likes" value={leader.likes_received} />
+                    <Metric icon={HeartIcon} label="Likes" value={leader.likes_received} title={likesTitle(leader)} />
                     <Metric icon={RepeatIcon} label="Reposts" value={leader.reposts_made} />
                     <Metric icon={EyeIcon} label="Views" value={leader.views_received} />
                     <Metric icon={HandCoinsIcon} label="Tips received" value={leader.tips_received} />
@@ -267,13 +267,19 @@ function StatCard({ icon: Icon, label, value }) {
   )
 }
 
-function Metric({ icon: Icon, label, value }) {
+function Metric({ icon: Icon, label, value, title }) {
   return (
-    <span className={styles.metric} title={label}>
+    <span className={styles.metric} title={title || label}>
       <Icon size={15} />
       <span>{compactFormatter.format(value)}</span>
     </span>
   )
+}
+
+/* The column shows likes received, but every neighbouring column is an action the member took, so
+   the hover spells out which side of the like each number is. */
+function likesTitle(leader) {
+  return `Likes received: ${numberFormatter.format(leader.likes_received)} — Likes given: ${numberFormatter.format(leader.likes_given)}`
 }
 
 /*
