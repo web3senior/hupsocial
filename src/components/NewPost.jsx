@@ -29,6 +29,7 @@ import NativeDialog from '@/components/ui/NativeDialog'
 import NativePopover from '@/components/ui/NativePopover'
 import NetworkSelect from '@/components/ui/NetworkSelect'
 import GifPicker from '@/components/GifPicker'
+import EmojiPicker from '@/components/EmojiPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
 import AttachLaunchModal from '@/components/AttachLaunchModal'
@@ -465,6 +466,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const moderationDialogRef = useRef(null)
   const moderationDecisionRef = useRef(false)
   const editorRef = useRef(null)
+  // Where the caret last sat inside the editor. A selection that leaves the contenteditable is
+  // gone — the emoji picker's search field takes focus, and with it the range an insertion needs —
+  // so the last in-editor caret is kept here and restored when the text arrives.
+  const lastCaretRef = useRef(null)
   const dialogRef = useRef(null)
   const composerRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -848,6 +853,50 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted])
 
+  // getCaretState returns null for a selection outside the editor, so this only ever remembers
+  // carets that were inside it
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const caret = getCaretState(editorRef.current)
+      if (caret) lastCaretRef.current = caret
+    }
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [])
+
+  // Insert text where the author left the caret — the one path a pasted string and a picked emoji
+  // both take. A selection that has drifted out of the editor falls back to the last one that was
+  // inside it; with no caret history at all the text lands at the end.
+  const insertTextAtCaret = (text) => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = window.getSelection()
+    if (!selection) return
+
+    // Read the selection BEFORE focusing: focusing a contenteditable whose selection was taken by
+    // another field (the picker's search box) gives it a fresh caret at position zero, which looks
+    // live enough to pass any check made afterwards — and every emoji would land at the start.
+    const current = selection.rangeCount ? selection.getRangeAt(0) : null
+    const hasLiveCaret = Boolean(current) && editor.contains(current.startContainer)
+
+    editor.focus()
+    if (!hasLiveCaret) restoreCaretState(editor, lastCaretRef.current)
+    if (!selection.rangeCount) return
+
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+    const textNode = document.createTextNode(text)
+    range.insertNode(textNode)
+    range.setStartAfter(textNode)
+    range.setEndAfter(textNode)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    lastCaretRef.current = getCaretState(editor)
+
+    handleEditorInput()
+  }
+
   // Handle paste: upload clipboard images to IPFS or insert plain text
   const handlePaste = async (event) => {
     const items = Array.from(event.clipboardData?.items || [])
@@ -879,20 +928,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     const text = event.clipboardData.getData('text/plain')
     if (!text) return
     event.preventDefault()
-
-    const selection = window.getSelection()
-    if (!selection || !selection.rangeCount) return
-
-    const range = selection.getRangeAt(0)
-    range.deleteContents()
-    const textNode = document.createTextNode(text)
-    range.insertNode(textNode)
-    range.setStartAfter(textNode)
-    range.setEndAfter(textNode)
-    selection.removeAllRanges()
-    selection.addRange(range)
-
-    handleEditorInput()
+    insertTextAtCaret(text)
   }
 
   // Toggle bold/italic using Selection + Range (no deprecated execCommand)
@@ -2046,6 +2082,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('em')} title="Italic" aria-label="Italic" disabled={isBusy}>
               <TextItalicIcon size={20} />
             </button>
+            <EmojiPicker onSelect={insertTextAtCaret} disabled={isBusy} />
             {attachOptions.length > 0 && (
               <NativePopover
                 placement="top-start"
