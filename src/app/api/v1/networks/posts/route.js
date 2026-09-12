@@ -420,7 +420,7 @@ async function attachRepostOriginals(rows, viewerAddress) {
         n.name as network_name,
         n.explorer_url,
         comm.name as community_name,
-        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND is_active = 1) as total_likes,
         (
           (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
             AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
@@ -627,7 +627,7 @@ function buildPostSelect(viewerAddress) {
         n.name as network_name,
         n.explorer_url,
         comm.name as community_name,
-        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND is_active = 1) as total_likes,
         (
           (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
             AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
@@ -644,7 +644,7 @@ function buildPostSelect(viewerAddress) {
         (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
         (SELECT COUNT(*) FROM tips WHERE post_id = p.id AND network_id = p.network_id) as total_tips,
         (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,
-        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address  = ?))` : '0'} as has_liked,
+        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ? AND is_active = 1))` : '0'} as has_liked,
         ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?))` : '0'} as has_bookmarked
       FROM posts p
       LEFT JOIN users u ON p.wallet_address = u.wallet_address

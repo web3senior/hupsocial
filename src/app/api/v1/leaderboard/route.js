@@ -170,11 +170,13 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     baseConditions: ['p.wallet_address IS NOT NULL'],
   })
 
+  /* cidex keeps an unliked row and flips is_active to 0, so an unfiltered count still counts the unlike */
   const receivedFilter = buildWhere({
     alias: 'pl',
     timeColumn: 'inserted_at',
     networkId,
     since,
+    baseConditions: ['pl.is_active = 1'],
   })
 
   const givenFilter = buildWhere({
@@ -182,7 +184,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     timeColumn: 'inserted_at',
     networkId,
     since,
-    baseConditions: ['pl.liker_address IS NOT NULL'],
+    baseConditions: ['pl.liker_address IS NOT NULL', 'pl.is_active = 1'],
   })
 
   const viewsFilter = buildWhere({
@@ -411,7 +413,7 @@ function buildStatsFilters(networkId, since) {
       since,
       baseConditions: ['p.wallet_address IS NOT NULL'],
     }),
-    likeFilter: buildWhere({ alias: 'pl', timeColumn: 'inserted_at', networkId, since }),
+    likeFilter: buildWhere({ alias: 'pl', timeColumn: 'inserted_at', networkId, since, baseConditions: ['pl.is_active = 1'] }),
     viewFilter: buildWhere({ alias: 'pv', timeColumn: 'viewed_at', networkId, since }),
     tipFilter: buildWhere({ alias: 't', timeColumn: 'tipped_at', timeAsUnix: true, networkId, since }),
   }

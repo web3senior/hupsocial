@@ -34,7 +34,7 @@ export async function GET(request, { params }) {
         u.name as display_name,
         u.profileImage as profile_image,
         comm.name as community_name,
-        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id) as total_likes,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND is_active = 1) as total_likes,
         (
           (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
             AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
