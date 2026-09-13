@@ -1,5 +1,64 @@
 # Hup
 
+## Uniswap v4 integration (ETHOnline 2026)
+
+Hup Launch is a one-phase token launchpad: a launch attaches to a social post and is a live Uniswap v4 pool from its first block. The factory mints the full 1B supply, initializes an ordinary hookless pool at the canonical 1% tier, deposits the whole supply as one single-sided range through the PositionManager, locks the position NFT in a contract with no withdrawal path, and swaps the creator's opening buy inside the same transaction. Because every launch is a plain v4 pool, aggregators and Hup's own swap page route it like any other, and creator fees are ordinary LP fees split by `HupLaunchLocker` at collect time.
+
+Developer feedback for the Uniswap Foundation is in [FEEDBACK.md](./FEEDBACK.md).
+
+### Where the v4 code is
+
+Line numbers refer to the files as of this commit.
+
+| File | What it does | Key lines |
+| --- | --- | --- |
+| `src/contracts/v2/Extensions/HupLaunch.sol` | Factory and registry. Creates the token, initializes the pool, mints the single-sided position, locks it, swaps the opening buy. | `LAUNCH_FEE` / `TICK_SPACING` L88, L93; `MAX_USABLE_TICK` L105; `createLaunch` L208; `PoolKey` construction L234-240 (`hooks: IHooks(address(0))` L239); `poolManager.initialize` L242; full-supply mint call L244; rounding dust to `0xdEaD` L267-268; opening buy `poolManager.unlock` L288; `unlockCallback` L298-323 (`poolManager.swap` L304-311, settle / take L319-320); `_collectPayment` L496; `_mintFullSupplyPosition` L523-560 (`LiquidityAmounts` L535-537, Permit2 approval L541-542, `MINT_POSITION + SETTLE_PAIR` actions L544, `modifyLiquidities` L559); `_settle` L563-571; `_openingSqrtPriceX96` L580-590; `_fullSupplyRange` L599-616 |
+| `src/contracts/v2/Extensions/HupLaunchLocker.sol` | Holds every position NFT forever (no decrease, no transfer out). Splits fees by which currency they landed in, burns a share of the token side, runs the auto-compounding pot. | `onERC721Received` L182; `register` L195-216; `setFeeRecipient` L228-238; `collect` L247-249; `compound` L264-330 (`INCREASE_LIQUIDITY + SETTLE_PAIR + SWEEP + SWEEP` L296-298, `modifyLiquidities` L306); `claim` L332-334; `claimFor` L345-347; `transferProtocolRecipient` L353; `_collect` L383-432 (zero-liquidity `DECREASE_LIQUIDITY + TAKE_PAIR` L393-398, quote-side split L410-413, token-side burn L416-421); `_pull` L435-442 |
+| `src/contracts/v2/Extensions/HupLaunchToken.sol` | The EIP-1167 cloned ERC20 each launch mints once, in full, to the factory. | whole file |
+| `src/contracts/v2/Extensions/IHupLaunch.sol` | Interface, `Launch` struct (`poolId`, `quote`, `positionTokenId`), events, errors. | whole file |
+| `src/contracts/forge-launch/test/HupLaunchV4.t.sol`, `HupLaunchLocker.t.sol` | Fork tests against the real Base Sepolia v4 deployment. | whole files |
+| `src/lib/uniswap-v4.js` | Pool keys and UniversalRouter / V4Router action encoding on viem. | `V4_PROBE_TIERS` L31-37; `v4PoolKey` L43-49; `launchPoolKey` L61-71; `buildV4SwapForKey` L122-137 |
+| `src/lib/uniswap.js` | The v3 half of the swap page (fee tiers, path encoding). | whole file |
+| `src/lib/launch.js` | BigInt price math shared by every launch surface. | `sqrtPriceToPriceWei` L114; `estimateOpeningBuy` L144 |
+| `src/lib/launchQuote.js` | Quote-asset symbol and decimals from config, so API routes need no chain reads. | whole file |
+| `src/hooks/useLaunchFeeSchedule.js` | Rebuilds a launch's pool key from the factory's immutable `LAUNCH_FEE` and `TICK_SPACING`. | `useLaunchPoolKey` L35 |
+| `src/components/LaunchCard.jsx` | The in-post swap widget. | Permit2 allowance reads L197-215; V4Quoter `quoteExactInputSingle` L240-255; PoolManager `Swap` watcher L259; approve, Permit2 grant, then `UniversalRouter.execute` L370-405 (`buildV4SwapForKey` L396, `execute` L398-405) |
+| `src/components/CreateLaunchDialog.jsx` | The composer's create flow. | ERC20 quote approval L552-570; `createLaunch` write L643-650 |
+| `src/app/trade/[networkId]/[id]/_components/LaunchDetail.jsx` | The launch trading page. | whole file |
+| `src/app/trade/[networkId]/[id]/_components/LaunchFees.jsx` | Creator fee panel: collect, claim, repoint the recipient. | `collect` L176-181; `claimFor` L193-198; `setFeeRecipient` L215-220; `claim` L236-241 |
+| `src/app/swap/_components/SwapForm.jsx` | Dual-venue swap page: v3 and v4 quote side by side, best output executes. | v4 tier probing L204-224; launch-pool quote L229-245; Permit2 grant L993; launch-pool execute L1024-1034; hookless v4 execute L1037-1050 |
+| `src/config/contracts.js` | Per-chain `launch`, `univ4Router`, `univ4PoolManager`, `univ4Quoters`, `permit2`. | `chain84532` L126-154 (`launch` L147, `univ4Router` L151, `univ4PoolManager` L152, `univ4Quoters` L153, `permit2` L154) |
+| `src/abis/UniswapV4.json`, `src/abis/HupLaunch.json`, `src/abis/HupLaunchLocker.json` | ABIs the app calls. | whole files |
+
+### Base Sepolia (chain 84532)
+
+| Contract | Address |
+| --- | --- |
+| Uniswap v4 PoolManager | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
+| Uniswap v4 PositionManager | `0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80` |
+| UniversalRouter | `0x492E6456D9528771018DeB9E87ef7750EF184104` |
+| V4Quoter | `0x4A6513c898fe1B2d0E78d3b0e0A4a151589B1cBa` |
+| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+| HupLaunch (factory) | `0xDe312Dd73C546858b7892Ab7C756babe1F9948e0` |
+| HupLaunchLocker | `0x309ca62947f5d92590C56fB2fb251C54eEe952Db` |
+
+The HupLaunch and HupLaunchLocker deployment above predates the hookless revision of the source in this repository: it is the earlier iteration that attached a dynamic-fee hook to each pool. A redeploy of the hookless factory is pending.
+
+### Build and test
+
+The launch stack compiles under its own Foundry profile (`[profile.launch]` in `src/contracts/foundry.toml`), from `src/contracts`:
+
+```sh
+cd src/contracts
+FOUNDRY_PROFILE=launch forge build
+FOUNDRY_PROFILE=launch forge test --match-path "forge-launch/test/*" --fork-url https://base-sepolia-rpc.publicnode.com -vv
+```
+
+The Uniswap sources are vendored under `src/contracts/lib/` and gitignored. Restore them with `npm pack @uniswap/v4-periphery`, then copy its `src` plus `lib/v4-core`, `lib/permit2` and v4-core's `solmate` and `openzeppelin-contracts` into `lib/`, and add `forge-std`. The `forge install` / git submodule equivalents are `uniswap/v4-periphery`, `uniswap/v4-core`, `uniswap/permit2` and `foundry-rs/forge-std` into that same folder; the remappings in `foundry.toml` expect exactly those paths, with OpenZeppelin coming from `node_modules`.
+
+### Indexing
+
+The app never scans chains. The launch indexer (the factory's `LaunchCreated`, the PoolManager's `Swap` filtered by pool id, and each token's `Transfer` for holder balances) lives in a separate service called cidex; the app only reads its database through `/api/v1/launches` and the routes beneath it.
 
 # Hup Unified Protocol Architecture
 
