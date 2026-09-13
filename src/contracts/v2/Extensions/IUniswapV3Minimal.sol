@@ -7,7 +7,7 @@ pragma solidity ^0.8.36;
  * @notice Hand-vendored slices of the Uniswap v3 core and periphery interfaces — only the
  *         functions HupLaunch and HupLaunchLocker actually call.
  * @dev Vendored rather than imported as packages, the same way ILSP7Minimal/ILSP8Minimal are:
- *      the official @uniswap packages drag in their own solc pinning and libraries this repo
+ *      the official Uniswap npm packages drag in their own solc pinning and libraries this repo
  *      doesn't need. Struct layouts match the deployed contracts exactly — these ABI-encode
  *      identically to the originals.
  * @custom:version 1.0.0

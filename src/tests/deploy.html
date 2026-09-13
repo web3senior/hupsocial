@@ -308,6 +308,9 @@
     const DEFAULT_SALT = "0xf0ce65d134332f2f32db13128aa640fec06947fce782a68767efb8a977e82fe0";
     // The salt the canonical LSP26 registry was deployed with; only its picker uses it
     const LSP26_SALT = "0x7c0acd1428c1a42815d06ceeb50b11fcb9beddb1dcc582ddf5f9ca37979c7e4d";
+    // Salts a picker pins for itself. Leaving one in the field would silently send the next
+    // contract to a one-off address, so loading anything else restores the default.
+    const PINNED_SALTS = new Set([LSP26_SALT].map((salt) => salt.toLowerCase()));
 
     // LSP26 Follower System init code, captured byte-for-byte from the original
     // LUKSO mainnet deployment tx. With LSP26_SALT it reproduces
@@ -341,7 +344,7 @@
       { id: "HupDropsDeployer1155", label: "HupDrops deployer · ERC1155 (editions, EVM)", file: "HupDropsDeployer1155.json" },
       { id: "HupOffers", label: "HupOffers (escrowed offers / OTC)", file: "HupOffers.json" },
       { id: "HupCommunity", label: "HupCommunity", file: "HupCommunity.json" },
-      { id: "HupLaunch", label: "HupLaunch (token launchpad → live Uniswap v3 pool)", file: "HupLaunch.json" },
+      { id: "HupLaunch", label: "HupLaunch (token launchpad → live Uniswap v4 pool)", file: "HupLaunch.json" },
       { id: "HupFund", label: "HupFund (fundraising campaigns, escrowed — admin only)", file: "HupFund.json" },
       { id: "HupTestToken", label: "Test token · ERC20 (faucet, any EVM)", file: "HupTestToken.json", signerArgs: ["owner_"] },
       { id: "HupTestERC721", label: "Test NFT · ERC721 (faucet, any EVM)", file: "HupTestERC721.json", signerArgs: ["owner_"] },
@@ -421,22 +424,20 @@
           "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA", // canonical LSP26
         ],
       },
-      // HupLaunch: Hup core (burner sessions only — a placeholder works until one exists, and
-      // setHupContract can rotate a real core in later because it probes the target), the
-      // chain's HupChatForwarder, the admin, then the chain's Uniswap v3 stack: factory,
-      // NonfungiblePositionManager, wrapped native. The Base Sepolia trio was verified onchain
-      // 2026-08-11 (router/quoter/posMgr all cross-reference this factory + WETH9, 0.30% tier
-      // enabled). Per-chain rollout later: resolve each chain's trio from Uniswap's official
-      // deployments registry — never guess, the factory constructor probes the fee tier and
-      // refuses a wrong factory, but a wrong posMgr only fails at first launch.
+      // HupLaunch: Hup core (burner sessions only, and setHupContract can rotate a real core
+      // in later because it probes the target), the HupChatForwarder, the admin, then the
+      // Uniswap v4 stack: PoolManager, PositionManager, Permit2. Pools are hookless, so there
+      // is nothing to deploy first. The Base Sepolia pair was verified onchain 2026-09-08 — the
+      // PositionManager reports the PoolManager below as its own, and reports the canonical
+      // Permit2. Resolve and verify the same way on every new chain; never guess an address.
       HupLaunch: {
         84532: [ // Base Sepolia (dev)
           "0xf6b33ecab0fa561300453c1bb1B520Ce544544ae", // Hup core
           "0x18B86518709a6C0942F3adCD0CD528D1716e0A80", // HupChatForwarder
           "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
-          "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24", // Uniswap v3 factory
-          "0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2", // NonfungiblePositionManager
-          "0x4200000000000000000000000000000000000006", // WETH9 (OP-stack predeploy)
+          "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408", // v4 PoolManager
+          "0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80", // v4 PositionManager
+          "0x000000000022D473030F116dDEE9F6B43aC78BA3", // Permit2 (canonical)
         ],
       },
       // HupFund: the admin only — no Hup core (no session keys) and no forwarder, on purpose:
@@ -1049,6 +1050,15 @@
         log("Loaded LSP26 bytecode — predicted address should be 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA");
         if (provider) checkChain().catch((e) => log(e.message, "err"));
         return;
+      }
+
+      // A picker that pins a salt sets it here rather than trusting whoever loaded it last
+      if (loadedArtifact.salt) {
+        els.saltInput.value = loadedArtifact.salt;
+        els.saltHint.textContent = `Mined salt for ${loadedArtifact.contractName} — its address carries the hook's permission bits.`;
+      } else if (PINNED_SALTS.has(els.saltInput.value.trim().toLowerCase())) {
+        els.saltInput.value = DEFAULT_SALT;
+        els.saltHint.textContent = "Using the default salt.";
       }
 
       const fields = [...els.ctorFields.querySelectorAll("input")];
