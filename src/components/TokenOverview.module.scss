@@ -1,0 +1,252 @@
+.token {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-block: 1rem;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background-secondary, var(--background));
+    padding: 1rem;
+  }
+
+  &__identity {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    h1 {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin: 0;
+      font-size: var(--font-size-20, 1.25rem);
+      font-weight: 700;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  &__symbol {
+    font-size: var(--font-size-14);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__rule {
+    width: 1px;
+    height: 0.75rem;
+    background: var(--border);
+  }
+
+  &__address,
+  &__explorer {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &:hover {
+      color: var(--network-color-primary, var(--primary, #0d6efd));
+    }
+  }
+
+  &__origin {
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.45;
+    color: var(--text-muted, #888);
+  }
+
+  &__trade {
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--network-color-primary, var(--primary, #0d6efd));
+    padding: 0.5rem 1.1rem;
+    font-size: var(--font-size-14);
+    font-weight: 600;
+    color: var(--network-color-text, #fff);
+    text-decoration: none;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &__market {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 1rem;
+  }
+
+  &__price {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    strong {
+      font-size: var(--font-size-24, 1.5rem);
+      font-weight: 700;
+    }
+  }
+
+  &__change {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--font-size-13);
+    font-style: normal;
+    font-weight: 600;
+
+    span {
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+
+    // Never colour alone: the arrow beside the figure carries the same direction — see the note
+    // in PriceSparkline
+    &--up {
+      color: var(--chart-up, #16a34a);
+    }
+
+    &--down {
+      color: var(--chart-down, #dc2626);
+    }
+  }
+
+  &__chart {
+    width: 100%;
+  }
+
+  &__ranges {
+    display: flex;
+    gap: 0.3rem;
+
+    button {
+      all: unset;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 0.2rem 0.6rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text-muted, #888);
+
+      &:hover {
+        border-color: var(--border);
+      }
+    }
+  }
+
+  // Outlined rather than filled: the surface behind these is the card's own background, so a
+  // background-only selected state disappears on the light theme
+  &__range--active {
+    border-color: var(--network-color-primary, var(--primary, #0d6efd)) !important;
+    color: var(--network-color-primary, var(--primary, #0d6efd)) !important;
+  }
+
+  &__noMarket {
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 1rem;
+  }
+
+  &__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      padding: 0.7rem 0.8rem;
+    }
+
+    dt {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    dd {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+      font-weight: 600;
+    }
+  }
+
+  @media (max-width: 30rem) {
+    &__header {
+      flex-wrap: wrap;
+    }
+
+    &__trade {
+      order: 3;
+      width: 100%;
+      text-align: center;
+    }
+  }
+}
+
+// The trade CTA and, for whoever the contract names as owner, the one control that writes to
+// this page. Grouped so the header's right edge stays a single cluster at every width.
+.token__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.token__edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text);
+    background: var(--hover);
+  }
+}
+
+// The author's one-line pitch, directly under the identity it belongs to
+.token__tagline {
+  margin: 0.35rem 0 0;
+  max-width: 52ch;
+  font-size: var(--font-size-14);
+  line-height: 1.5;
+  color: var(--text);
+  text-wrap: pretty;
+}
