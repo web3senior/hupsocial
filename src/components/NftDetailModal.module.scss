@@ -72,7 +72,9 @@
     align-self: start;
     width: 100%;
     aspect-ratio: 1;
-    overflow: hidden;
+    // clip, not hidden: a scroll container has a zero automatic minimum size, and the phone
+    // layout then sizes the artwork's grid row to 2px and lands the panel over it
+    overflow: clip;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -85,7 +87,8 @@
     }
 
     @media (width <= 760px) {
-      position: static;
+      // Relative, not static: the frame and 3D buttons still anchor to the artwork
+      position: relative;
       max-height: 46vh;
     }
   }
