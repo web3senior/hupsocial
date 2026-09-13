@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
-import { encodeFunctionData, erc20Abi, formatUnits, parseUnits } from 'viem'
+import { encodeFunctionData, erc20Abi, formatUnits, isAddress, parseUnits } from 'viem'
 import {
   useBalance,
   useConnection,
@@ -13,11 +14,12 @@ import {
   useWriteContract,
 } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
-import { useActiveChain } from '@/hooks/useActiveChain'
+import { useActiveChain, setActiveChainId } from '@/hooks/useActiveChain'
 import useTokenMarket from '@/hooks/useTokenMarket'
 import { withSlippage } from '@/lib/launch'
 import { FEE_TIERS, ROUTER_ADDRESS_THIS, encodePath, formatAmount } from '@/lib/uniswap'
-import { V4_PROBE_TIERS, buildV4Swap, v4PoolKey } from '@/lib/uniswap-v4'
+import { V4_NATIVE, V4_PROBE_TIERS, buildV4Swap, buildV4SwapForKey, launchPoolKey, v4PoolKey } from '@/lib/uniswap-v4'
+import { resolveQuoteAsset } from '@/lib/launchQuote'
 import NetworkSelect from '@/components/ui/NetworkSelect'
 import TokenIcon from '@/components/ui/TokenIcon'
 import TokenSelectDialog from './TokenSelectDialog'
@@ -26,6 +28,7 @@ import TrendingTokens from './TrendingTokens'
 import uniAbi from '@/abis/UniswapV3Periphery.json'
 import v4Abi from '@/abis/UniswapV4.json'
 import sushiAbi from '@/abis/SushiV2Router.json'
+import launchAbi from '@/abis/HupLaunch.json'
 import { toast } from '@/components/NextToast'
 import { ArrowsDownUpIcon, CaretDownIcon, CaretRightIcon, InfoIcon, PencilSimpleIcon } from '@phosphor-icons/react'
 import styles from './SwapForm.module.scss'
@@ -136,10 +139,11 @@ const useTokenSide = (token, chainId, owner) => {
 /**
  * Every candidate route across all venues for one input amount, one quote call each. v3:
  * direct pairs probe each fee tier, WNATIVE-routed pairs every tier pair. v4: hookless
- * native↔token pool keys across the probe tiers, on every known quoter. Sushi (classic v2):
- * the direct pair, plus the WNATIVE hop for token↔token routes. Routes without a pool
- * simply fail their slot and drop out. Lifted out of the component because the form quotes
- * twice — once to price a typed receive amount, once for the swap it actually submits.
+ * native↔token pool keys across the probe tiers, on every known quoter, plus the launch pool
+ * when the pair is a Hup launch against its own quote asset. Sushi (classic v2): the direct
+ * pair, plus the WNATIVE hop for token↔token routes. Routes without a pool simply fail their
+ * slot and drop out. Lifted out of the component because the form quotes twice — once to
+ * price a typed receive amount, once for the swap it actually submits.
  */
 const buildCandidates = (route, amountIn) => {
   if (!route || amountIn <= 0n) return []
@@ -157,6 +161,7 @@ const buildCandidates = (route, amountIn) => {
     tokenIn,
     tokenOut,
     univ4Quoters,
+    launchPool,
   } = route
   const list = []
 
@@ -218,6 +223,29 @@ const buildCandidates = (route, amountIn) => {
     }
   }
 
+  // A Hup launch trades in one pool only: hookless at the factory's launch tier, and pinned by
+  // the factory rather than found by probing. It is quoted like any other v4 pool, alongside
+  // the probed tiers, and the best output wins.
+  if (v4Ready && launchPool) {
+    for (const quoter of univ4Quoters) {
+      list.push({
+        venue: 'launch',
+        poolKey: launchPool.poolKey,
+        zeroForOne: launchPool.zeroForOne,
+        amountIn,
+        contract: {
+          abi: v4Abi.quoter,
+          address: quoter,
+          functionName: 'quoteExactInputSingle',
+          args: [
+            { poolKey: launchPool.poolKey, zeroForOne: launchPool.zeroForOne, exactAmount: amountIn, hookData: '0x' },
+          ],
+          chainId,
+        },
+      })
+    }
+  }
+
   // Sushi probes its direct pair for every route — v2 has real token↔token pairs, unlike
   // v3's WNATIVE-only two-hop — plus the WNATIVE hop when neither side is the wrapped coin
   if (sushiReady && inAddress && outAddress) {
@@ -271,8 +299,8 @@ const bestOf = (results, candidates) => {
   })
   if (bestIndex < 0) return null
 
-  const { venue, fees, tier, path, amountIn } = candidates[bestIndex]
-  return { amountOut: bestOut, amountIn, venue, fees, tier, path }
+  const { venue, fees, tier, path, amountIn, poolKey, zeroForOne } = candidates[bestIndex]
+  return { amountOut: bestOut, amountIn, venue, fees, tier, path, poolKey, zeroForOne }
 }
 
 // The traded token wears no caret once it's picked — the amount beside it is the busy part of
@@ -318,6 +346,14 @@ const SwapForm = () => {
   // sell the pay side — everything else on the card follows from these two plus the mode.
   const [mode, setMode] = useState('buy')
   const [asset, setAsset] = useState(null)
+  // Read once, at mount: the link seeds the form and then stops mattering, so editing the pair
+  // afterwards must not be undone by a query string still sitting in the address bar
+  const searchParams = useSearchParams()
+  const [deepLink, setDeepLink] = useState(() => {
+    const wanted = searchParams.get('token')
+    if (!wanted || !isAddress(wanted)) return null
+    return { address: wanted.toLowerCase(), chainId: Number(searchParams.get('chain')) || null }
+  })
   const [counter, setCounter] = useState(NATIVE)
   // Which unit the amount field is typed in: dollars of the counter token, or token units
   const [denom, setDenom] = useState('usd')
@@ -350,6 +386,7 @@ const SwapForm = () => {
   const univ4Quoters = chainContracts?.univ4Quoters ?? []
   const permit2 = chainContracts?.permit2 || undefined
   const sushiRouter = chainContracts?.sushiV2Router || undefined
+  const launchFactory = chainContracts?.launch || undefined
 
   // The venues quote side by side and the best answer executes. v4 only handles genuine
   // native↔token pairs (native is currency 0x0 there), so Celo-style chains and token↔token
@@ -380,6 +417,24 @@ const SwapForm = () => {
     setCounter(nativeEntry)
     setAmount('')
   }, [chainId, nativeEntry])
+
+  // A token page's Trade button arrives as ?chain=&token=. Applied after the reset above rather
+  // than beside it: naming another chain re-runs that effect, which would wipe the very selection
+  // this one is making, so the asset is only set on the pass where the chain already agrees.
+  // Nothing is read from the link but a chain and an address — symbol and decimals come off the
+  // contract, so a link cannot dress a token up as one it isn't.
+  useEffect(() => {
+    if (!deepLink) return
+
+    if (deepLink.chainId && deepLink.chainId !== chainId) {
+      setActiveChainId(deepLink.chainId)
+      return
+    }
+
+    setMode('buy')
+    setAsset({ address: deepLink.address })
+    setDeepLink(null)
+  }, [deepLink, chainId])
 
   // The pair the engine trades, straight off the mode
   const tokenIn = mode === 'buy' ? counter : asset
@@ -452,6 +507,66 @@ const SwapForm = () => {
       (inAddress.toLowerCase() === wnative.toLowerCase() || outAddress.toLowerCase() === wnative.toLowerCase()),
   )
 
+  // Is either side of this pair a token launched on Hup? Asked of the factory rather than of the
+  // picker, so a pasted address resolves the same as a row tapped in the list. launchIdOf is 0
+  // for anything it didn't mint; the fee tier and tick spacing are immutable, hence cached forever.
+  const { data: launchProbe } = useReadContracts({
+    contracts: [
+      { abi: launchAbi, address: launchFactory, functionName: 'launchIdOf', args: [tokenIn?.address ?? ZERO], chainId },
+      { abi: launchAbi, address: launchFactory, functionName: 'launchIdOf', args: [tokenOut?.address ?? ZERO], chainId },
+      { abi: launchAbi, address: launchFactory, functionName: 'hook', chainId },
+      { abi: launchAbi, address: launchFactory, functionName: 'TICK_SPACING', chainId },
+    ],
+    query: {
+      enabled: Boolean(v4Ready && launchFactory && chainId && (tokenIn?.address || tokenOut?.address)),
+      staleTime: Infinity,
+    },
+  })
+  const readOrNull = (slot) => (slot?.status === 'success' ? slot.result : null)
+  const launchIdIn = BigInt(readOrNull(launchProbe?.[0]) ?? 0n)
+  const launchIdOut = BigInt(readOrNull(launchProbe?.[1]) ?? 0n)
+  const launchId = launchIdIn > 0n ? launchIdIn : launchIdOut
+  const launchToken = launchIdIn > 0n ? tokenIn?.address : launchIdOut > 0n ? tokenOut?.address : null
+  const launchHook = readOrNull(launchProbe?.[2])
+  const launchTickSpacing = readOrNull(launchProbe?.[3])
+
+  // Which asset the launch is paired against — the pool exists for that one asset and no other
+  const { data: launchRecord } = useReadContract({
+    abi: launchAbi,
+    address: launchFactory,
+    functionName: 'getLaunch',
+    args: [launchId],
+    chainId,
+    query: { enabled: Boolean(launchFactory && chainId && launchId > 0n), staleTime: Infinity },
+  })
+  const launchQuoteAddress = launchRecord?.quote ?? null
+
+  // The launch's pool key, and which way through it this pair trades. Null unless the counter
+  // side IS the launch's quote asset: anything else would need a hop the router isn't given.
+  const launchPool = useMemo(() => {
+    if (!v4Ready || !launchToken || !launchHook || launchTickSpacing === null || !launchQuoteAddress) return null
+
+    const poolKey = launchPoolKey({
+      token: launchToken,
+      quote: launchQuoteAddress,
+      hook: launchHook,
+      tickSpacing: Number(launchTickSpacing),
+    })
+    // v4 speaks native as currency 0x0, never WNATIVE
+    const currencyIn = (tokenIn?.native ? V4_NATIVE : tokenIn?.address)?.toLowerCase()
+    const currencyOut = (tokenOut?.native ? V4_NATIVE : tokenOut?.address)?.toLowerCase()
+    if (!currencyIn || !currencyOut) return null
+
+    const pair = [poolKey.currency0.toLowerCase(), poolKey.currency1.toLowerCase()]
+    if (!pair.includes(currencyIn) || !pair.includes(currencyOut)) return null
+
+    return { poolKey, zeroForOne: currencyIn === pair[0] }
+  }, [v4Ready, launchToken, launchHook, launchTickSpacing, launchQuoteAddress, tokenIn, tokenOut])
+
+  // A launch picked against the wrong counter is a dead end the form should name, not a mystery
+  const launchQuoteMismatch = Boolean(launchToken && launchQuoteAddress && !launchPool)
+  const launchQuoteSymbol = launchQuoteMismatch ? resolveQuoteAsset(chainId, launchQuoteAddress).symbol : null
+
   // The typed amount as token units of whichever side it denominates — dollars divide through
   // the counter price first, so everything downstream sees one shape
   const entryAmount = useMemo(() => {
@@ -506,9 +621,10 @@ const SwapForm = () => {
             tokenIn,
             tokenOut,
             univ4Quoters,
+            launchPool,
           },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [v3Ready, v4Ready, sushiReady, sushiRouter, quoterAddress, inAddress, outAddress, isDirect, wnative, chainId, tokenIn, tokenOut, isSamePair],
+    [v3Ready, v4Ready, sushiReady, sushiRouter, quoterAddress, inAddress, outAddress, isDirect, wnative, chainId, tokenIn, tokenOut, isSamePair, launchPool],
   )
 
   // Stage one, only when a receive amount was typed: quote a couple of reference sizes to read
@@ -662,14 +778,15 @@ const SwapForm = () => {
 
   // Approval requirements depend on which venue won the quote: v3 and Sushi each take one
   // plain approve to their router; v4 takes token→Permit2, then Permit2→UniversalRouter
-  // (amount + unexpired)
+  // (amount + unexpired). A launch pool is v4 — same router, same two grants.
   const erc20In = Boolean(!tokenIn?.native && tokenIn?.address && swapAmountIn > 0n)
   const nowSeconds = Math.floor(Date.now() / 1000)
+  const wonOnV4 = best?.venue === 'v4' || best?.venue === 'launch'
   const needsV3Approve = Boolean(best?.venue === 'v3' && erc20In && allowance < swapAmountIn)
   const needsSushiApprove = Boolean(best?.venue === 'sushi' && erc20In && sushiAllowance < swapAmountIn)
-  const needsPermit2Erc20 = Boolean(best?.venue === 'v4' && erc20In && permit2Erc20Allowance < swapAmountIn)
+  const needsPermit2Erc20 = Boolean(wonOnV4 && erc20In && permit2Erc20Allowance < swapAmountIn)
   const needsPermit2Grant = Boolean(
-    best?.venue === 'v4' &&
+    wonOnV4 &&
       erc20In &&
       !needsPermit2Erc20 &&
       (!permit2Grant || permit2Grant[0] < swapAmountIn || Number(permit2Grant[1]) <= nowSeconds),
@@ -904,6 +1021,20 @@ const SwapForm = () => {
       venue: best.venue,
     }
 
+    if (best.venue === 'launch') {
+      // The launch's own pool, through the same UniversalRouter the probed v4 leg uses
+      const swap = buildV4SwapForKey(best.poolKey, best.zeroForOne, swapAmountIn, minOut)
+      writeContract({
+        abi: v4Abi.universalRouter,
+        address: univ4Router,
+        functionName: 'execute',
+        args: [swap.commands, swap.inputs, BigInt(nowSeconds + 600)],
+        value: swap.value,
+        chainId,
+      })
+      return
+    }
+
     if (best.venue === 'v4') {
       // Single-pool native↔token swap through the UniversalRouter; native input rides as tx
       // value, token input is pulled via the Permit2 grants approved above
@@ -1027,6 +1158,10 @@ const SwapForm = () => {
   } else if (!hasAmount) {
     submitLabel = 'Enter an amount'
     submitDisabled = true
+  } else if (launchQuoteMismatch && !best) {
+    // A launch has exactly one pool; naming its quote asset beats a bare "no route"
+    submitLabel = isQuoting ? 'Fetching quote…' : `This launch only trades against ${launchQuoteSymbol}`
+    submitDisabled = true
   } else if (!best || swapAmountIn <= 0n) {
     submitLabel = isQuoting ? 'Fetching quote…' : 'No route for this pair'
     submitDisabled = true
@@ -1058,9 +1193,11 @@ const SwapForm = () => {
       ? best.path.length === 2
         ? 'Sushi 0.3%'
         : `Sushi via W${nativeSymbol}`
-      : best.venue === 'v4'
-        ? `v4 ${feeLabel(best.tier.fee)}`
-        : best.fees.length === 1
+      : best.venue === 'launch'
+        ? 'the Hup launch pool'
+        : best.venue === 'v4'
+          ? `v4 ${feeLabel(best.tier.fee)}`
+          : best.fees.length === 1
           ? `v3 ${feeLabel(best.fees[0])}`
           : `v3 via W${nativeSymbol} ${best.fees.map(feeLabel).join(' → ')}`
   const slippageHint =

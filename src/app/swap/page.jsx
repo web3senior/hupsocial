@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import PageTitle from '@/components/PageTitle'
 import SectionTabs from '@/components/ui/SectionTabs'
 import SwapForm from './_components/SwapForm'
@@ -15,7 +16,11 @@ export default function SwapPage() {
       <SectionTabs section="trade" />
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="medium">
-          <SwapForm />
+          {/* The form seeds its pair from ?chain=&token= (useSearchParams), which needs a
+              boundary or the whole route opts out of prerendering */}
+          <Suspense>
+            <SwapForm />
+          </Suspense>
         </div>
       </div>
     </>

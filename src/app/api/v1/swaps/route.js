@@ -19,7 +19,7 @@
  *     amount_in DECIMAL(65,0) NOT NULL DEFAULT 0,
  *     amount_out DECIMAL(65,0) NOT NULL DEFAULT 0,  -- quoted at submit, not settled output
  *     native_wei DECIMAL(65,0) NOT NULL DEFAULT 0,  -- native-leg estimate for volume rollups
- *     venue VARCHAR(8) NOT NULL DEFAULT 'v3',      -- 'v3' | 'v4' | 'sushi'; widened from VARCHAR(4) 2026-08-16
+ *     venue VARCHAR(8) NOT NULL DEFAULT 'v3',      -- 'v3' | 'v4' | 'sushi' | 'launch'; widened from VARCHAR(4) 2026-08-16
  *     verified TINYINT(1) NOT NULL DEFAULT 0,
  *     created_at BIGINT UNSIGNED NOT NULL,
  *     PRIMARY KEY (id),
@@ -49,7 +49,7 @@ export async function POST(request) {
     const amountIn = String(body.amountIn ?? '0')
     const amountOut = String(body.amountOut ?? '0')
     const nativeWei = String(body.nativeWei ?? '0')
-    const venue = ['v3', 'v4', 'sushi'].includes(body.venue) ? body.venue : 'v3'
+    const venue = ['v3', 'v4', 'sushi', 'launch'].includes(body.venue) ? body.venue : 'v3'
     const tokenInSymbol = String(body.tokenInSymbol ?? '').slice(0, 32)
     const tokenOutSymbol = String(body.tokenOutSymbol ?? '').slice(0, 32)
 
