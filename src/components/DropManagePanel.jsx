@@ -25,20 +25,18 @@ import {
   formatPhaseTime,
   gateLabel,
   isLuksoStandard,
-  isNumberedStandard,
-  isValidSplit,
-  normalizeAllowlist,
+  isNumberedStandard,  normalizeAllowlist,
   phaseNameByteLength,
   phaseStatus,
   PHASE_STATUS,
   resolveSchedule,
   scheduleErrorMessage,
   sharesOneTokenDocument,
-  toSplitPayees,
 } from '@/lib/drops'
+import { isValidSplit, toSplitPayees } from '@/lib/splits'
 import dropsAbi from '@/abis/HupDrops.json'
 import collectionAbi from '@/abis/HupDropCollection.json'
-import DropPayeeTable, { emptyPayee } from '@/components/DropPayeeTable'
+import PayeeTable, { emptyPayee } from '@/components/PayeeTable'
 import SplitPayoutCard from '@/components/SplitPayoutCard'
 import DropGatePicker from '@/components/DropGatePicker'
 import DropPhaseTrack from '@/components/DropPhaseTrack'
@@ -1046,7 +1044,7 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, onC
                 Deploys an immutable split that pays these wallets by share and points your proceeds at it — one
                 signature. To pay different people later, save a new table; the old split stays as it was.
               </p>
-              <DropPayeeTable rows={splitRows} onChange={setSplitRows} chainId={chainId} disabled={isBusy} />
+              <PayeeTable rows={splitRows} onChange={setSplitRows} chainId={chainId} disabled={isBusy} />
               <div className={styles.manage__payoutRow}>
                 <button type="button" onClick={handleSetPayoutSplit} disabled={isBusy || !isValidSplit(toSplitPayees(splitRows))}>
                   {isSavingSplit ? 'Saving…' : 'Save split'}

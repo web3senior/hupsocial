@@ -236,6 +236,52 @@ export const writeWithBurnerSession = async ({ chain, contractAddress, abi, func
 }
 
 /**
+ * True when a session write failed before it could ever reach the mempool: an empty burner
+ * balance on this chain, or a key this tab cannot sign with. Both mean the caller may send the
+ * same action from the connected wallet instead. A revert or a dropped transaction is
+ * deliberately NOT matched — those may already be onchain, and must never be re-sent anywhere.
+ */
+export const isSessionUnusableError = (err) => {
+  if (!err) return false
+  // A cancelled vault unlock, and the coded throws from this file
+  if (err.code === 4001 || ['INSUFFICIENT_FUNDS', 'NO_SESSION_KEY', 'VAULT_LOCKED', 'WRONG_PIN'].includes(err.code)) return true
+
+  const message = [err.shortMessage, err.message, err.info?.error?.message, err.error?.message].filter(Boolean).join(' ').toLowerCase()
+
+  return (
+    message.includes('insufficient funds') ||
+    message.includes('no burner session key') ||
+    message.includes('session key is still locked') ||
+    message.includes('missing rpc url for burner transaction')
+  )
+}
+
+/**
+ * Whether the session key can pay for a transaction of its own on one chain.
+ *
+ * The burner is funded per chain, so an active session says nothing about whether it can send
+ * HERE — and unlike a relayed call, which the sponsor pays for, a direct session write spends
+ * the burner's own balance. An empty one has to fall back to the wallet.
+ *
+ * A failed read counts as fundable: the write itself is the authority, and callers fall back
+ * on isSessionUnusableError anyway.
+ *
+ * @param {Object} publicClient - viem client pinned to the chain the action targets.
+ */
+export const canSessionPayGas = async (publicClient) => {
+  const burner = getStoredBurner()
+  if (!burner) return false
+  if (!publicClient) return true
+
+  try {
+    return (await publicClient.getBalance({ address: burner.address })) > 0n
+  } catch (err) {
+    console.warn('Could not read session key balance:', err.message)
+    return true
+  }
+}
+
+/**
  * Reads stored credentials. Designed to be fast and non-blocking for background checks.
  * Does not decrypt locked keys to avoid unnecessary password prompts.
  */

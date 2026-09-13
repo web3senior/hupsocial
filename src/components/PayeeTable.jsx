@@ -4,8 +4,8 @@ import clsx from 'clsx'
 import { isAddress } from 'viem'
 import { PlusIcon, XIcon } from '@phosphor-icons/react'
 import Profile from '@/components/Profile'
-import { MAX_SPLIT_PAYEES, SPLIT_TOTAL_BPS } from '@/lib/drops'
-import styles from './DropPayeeTable.module.scss'
+import { MAX_SPLIT_PAYEES, SPLIT_TOTAL_BPS } from '@/lib/splits'
+import styles from './PayeeTable.module.scss'
 
 const percentFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 })
 
@@ -15,7 +15,7 @@ export const emptyPayee = () => ({ address: '', percent: '' })
 export const payeeTotalBps = (rows) => rows.reduce((total, row) => total + Math.round(Number(row.percent || 0) * 100), 0)
 
 /**
- * Drop Payee Table
+ * Payee Table
  * The rows a payment split is made of: a wallet and its percentage, as many as the splitter takes.
  * Every valid address resolves to a profile chip, so a creator sees who they are paying rather
  * than a hex string, and the footer says how far the shares are from the 100% the contract insists on.
@@ -25,7 +25,7 @@ export const payeeTotalBps = (rows) => rows.reduce((total, row) => total + Math.
  * @param {number} props.chainId For the profile chips.
  * @param {boolean} [props.disabled]
  */
-export default function DropPayeeTable({ rows, onChange, chainId, disabled = false }) {
+export default function PayeeTable({ rows, onChange, chainId, disabled = false }) {
   const update = (index, patch) => onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   const remove = (index) => onChange(rows.filter((_, i) => i !== index))
   const add = () => onChange([...rows, emptyPayee()])

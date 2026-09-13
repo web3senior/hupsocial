@@ -40,11 +40,7 @@ import {
   isLuksoStandard,
   LSP4_TOKEN_TYPE_COLLECTION,
   MAX_PHASE_NAME_BYTES,
-  isValidSplit,
-  MAX_SPLIT_PAYEES,
   normalizeAllowlist,
-  predictSplitAddress,
-  toSplitPayees,
   phaseNameByteLength,
   resolveSchedule,
   sanitizeSchedule,
@@ -52,6 +48,7 @@ import {
   scheduleFollowing,
   scheduleIsSet,
 } from '@/lib/drops'
+import { isValidSplit, MAX_SPLIT_PAYEES, predictSplitAddress, toSplitPayees } from '@/lib/splits'
 import dropsAbi from '@/abis/HupDrops.json'
 import { toast } from '@/components/NextToast'
 import {
@@ -70,7 +67,7 @@ import DropChainPicker from './DropChainPicker'
 import Profile from './Profile'
 import DropGateAsset from './DropGateAsset'
 import DropGatePicker, { dropGateOptions } from './DropGatePicker'
-import DropPayeeTable, { emptyPayee } from './DropPayeeTable'
+import PayeeTable, { emptyPayee } from './PayeeTable'
 import DropPreviewCard from './DropPreviewCard'
 import DropTokenIdentity from './DropTokenIdentity'
 import DropWhenPicker from './DropWhenPicker'
@@ -2330,7 +2327,7 @@ export default function DropForm({ chainId, onCreated }) {
                     the drop at a new split from the manage panel.
                   </InfoHint>
                 </span>
-                <DropPayeeTable rows={payoutRows} onChange={setPayoutRows} chainId={chainId} disabled={isBusy} />
+                <PayeeTable rows={payoutRows} onChange={setPayoutRows} chainId={chainId} disabled={isBusy} />
                 <small className={styles.dropForm__rateHint}>
                   {predicted.payout ? `Split contract: ${predicted.payout}` : 'The split address appears once the shares total 100%'}
                 </small>
@@ -2372,7 +2369,7 @@ export default function DropForm({ chainId, onCreated }) {
             {royaltyBps > 0 && royaltyMode === 'split' && (
               <div className={styles.dropForm__field}>
                 <span>Who gets what</span>
-                <DropPayeeTable rows={royaltyRows} onChange={setRoyaltyRows} chainId={chainId} disabled={isBusy} />
+                <PayeeTable rows={royaltyRows} onChange={setRoyaltyRows} chainId={chainId} disabled={isBusy} />
                 <small className={styles.dropForm__rateHint}>
                   {predicted.royalty ? `Split contract: ${predicted.royalty}` : 'The split address appears once the shares total 100%'}
                 </small>
