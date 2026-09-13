@@ -45,3 +45,30 @@ export async function hasColumn(table, column) {
     return false
   }
 }
+
+/**
+ * Whether a table exists in the current database. Same reasoning as hasColumn — a feature whose
+ * whole table has not landed on production yet has to read as "nothing set" rather than a 500.
+ * @param {string} table Table name.
+ * @returns {Promise<boolean>} True when the table is there.
+ */
+export async function hasTable(table) {
+  const key = `${table}.*`
+  const probe = probes.get(key)
+  if (probe?.present) return true
+  if (probe && Date.now() - probe.probedAt < PROBE_RETRY_MS) return false
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT 1 FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1`,
+      [table],
+    )
+    probes.set(key, { present: rows.length > 0, probedAt: Date.now() })
+    return rows.length > 0
+  } catch (error) {
+    console.error(`[schema] probe for ${key} failed:`, error.message)
+    probes.set(key, { present: false, probedAt: Date.now() })
+    return false
+  }
+}

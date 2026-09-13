@@ -1,18 +1,17 @@
 /**
  * @file lib/profileHelper.js
- * @description Helper to fetch Universal Profiles from LUKSO API and cache them in the database.
+ * @description Fills the author identity a list of rows is missing — display name and avatar —
+ * by reading each wallet's Universal Profile from LUKSO, and caches the answer in `users` so
+ * the same wallet is never read twice.
  */
 
 import { isEvmAddress } from './address'
+import { readUniversalProfiles } from './lukso'
 
 export async function fulfillUniversalProfiles(items, pool) {
   try {
-    const endpoint = process.env.NEXT_PUBLIC_LUKSO_API_ENDPOINT
-    if (!endpoint) return
-
-    // Find unique wallet addresses that have display_name === null. Only EVM addresses can be
-    // Universal Profiles; a Solana (base58) author is skipped so it is neither sent to the LUKSO
-    // indexer nor written back lowercased — base58 is case-sensitive.
+    // Only EVM addresses can be Universal Profiles; a Solana (base58) author is skipped so it is
+    // neither read for nor written back lowercased — base58 is case-sensitive.
     const missingAddresses = [
       ...new Set(
         items
@@ -23,50 +22,17 @@ export async function fulfillUniversalProfiles(items, pool) {
 
     if (missingAddresses.length === 0) return
 
-    const graphqlQuery = {
-      query: `query MyQuery($ids: [String!]!) {
-        Profile(where: {id: {_in: $ids}}) {
-          id
-          fullName
-          name
-          tags
-          links { id title url }
-          standard
-          profileImages { src url }
-          description
-          url
-        }
-      }`,
-      variables: { ids: missingAddresses },
-      operationName: 'MyQuery'
-    }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(graphqlQuery),
-    })
-
-    if (!response.ok) {
-      console.warn('LUKSO upstream API returned status:', response.status)
-      return
-    }
-
-    const result = await response.json()
-    const profiles = result?.data?.Profile || []
+    // One multicall for every pointer, then the documents they name. An address missing from
+    // this map was never answered for and is left alone: it must not be cached either way.
+    const answers = await readUniversalProfiles(missingAddresses)
 
     const profileMap = {}
-    for (const profile of profiles) {
-      const profileImage = profile.profileImages && profile.profileImages.length > 0 
-        ? profile.profileImages[0].src 
-        : null
-      
-      profileMap[profile.id.toLowerCase()] = {
+    for (const [address, profile] of answers) {
+      if (!profile) continue
+
+      profileMap[address] = {
         display_name: profile.name || profile.fullName || null,
-        profile_image: profileImage,
+        profile_image: profile.profileImages?.[0]?.src ?? null,
         description: profile.description || null,
         tags: profile.tags || [],
         links: profile.links || [],
@@ -93,7 +59,7 @@ export async function fulfillUniversalProfiles(items, pool) {
       // Cache in DB (even if name/image is null, we set it to '' so we don't query again)
       const nameVal = profile.display_name !== null ? profile.display_name : ''
       const imageVal = profile.profile_image !== null ? profile.profile_image : ''
-      
+
       try {
         await pool.execute(
           `
@@ -132,34 +98,33 @@ export async function fulfillUniversalProfiles(items, pool) {
       }
     }
 
-    // Handle missing addresses that were NOT returned by the Envio query (not UP/not indexable)
-    // To avoid querying them repeatedly, cache them in DB as EOA / empty profiles
-    const returnedAddresses = new Set(profiles.map(p => p.id.toLowerCase()))
-    for (const addr of missingAddresses) {
-      if (!returnedAddresses.has(addr)) {
-        try {
-          await pool.execute(
-            `
-            INSERT INTO users (
-              wallet_address,
-              name,
-              profileImage,
-              created_at,
-              last_seen_at,
-              lastUpdate
-            )
-            VALUES (?, '', '', NOW(), NOW(), CURRENT_TIMESTAMP)
-            ON DUPLICATE KEY UPDATE
-              name = '',
-              profileImage = '',
-              last_seen_at = NOW(),
-              lastUpdate = CURRENT_TIMESTAMP
-            `,
-            [addr]
+    // Wallets the chain answered about and had no profile for: cached as empty so they are not
+    // read again. An address the chain never answered for is deliberately not in this list.
+    for (const [addr, profile] of answers) {
+      if (profile) continue
+
+      try {
+        await pool.execute(
+          `
+          INSERT INTO users (
+            wallet_address,
+            name,
+            profileImage,
+            created_at,
+            last_seen_at,
+            lastUpdate
           )
-        } catch (dbError) {
-          console.error(`Failed to cache EOA flag in DB for address ${addr}:`, dbError.message)
-        }
+          VALUES (?, '', '', NOW(), NOW(), CURRENT_TIMESTAMP)
+          ON DUPLICATE KEY UPDATE
+            name = '',
+            profileImage = '',
+            last_seen_at = NOW(),
+            lastUpdate = CURRENT_TIMESTAMP
+          `,
+          [addr]
+        )
+      } catch (dbError) {
+        console.error(`Failed to cache EOA flag in DB for address ${addr}:`, dbError.message)
       }
     }
   } catch (error) {

@@ -104,3 +104,57 @@ export const SWAP_TOKENS = {
   ],
   // 143 (monad): no canonical USDC configured yet — picker offers WMON-paired pastes only
 }
+
+// Curated quote assets per chainId — what a creator can pair a Hup Launch against besides the
+// chain's native coin. The factory's own allowlist is the authority (HupLaunch.quoteOpeningValue,
+// set by an admin per asset); this list only supplies the candidates to read that mapping for, so
+// an asset appears in the picker exactly when an admin has priced it onchain.
+//
+// Wrapped native is deliberately absent: the native coin is already a v4 currency in its own
+// right, so a WETH-quoted launch would split its liquidity against the native pool for nothing.
+//
+// Unlike the lists above, these rows DO carry decimals — every figure a launch renders (price,
+// market cap, volume) is raw base units of its quote asset, so a server route with no chain
+// access still has to divide by the right power of ten. They are display values: anything about
+// to spend money reads decimals onchain and prefers that (hooks/useQuoteAsset). Getting one wrong
+// is not subtle — Base's USDC is 6 where BNB's is 18, and a 12-place slip reads as a plausible
+// market cap rather than as an error.
+//
+// Every address verified against DefiLlama (symbol + decimals) on 2026-09-10; Base Sepolia's was
+// read onchain, being a testnet DefiLlama does not price.
+export const LAUNCH_QUOTES = {
+  1: [
+    { symbol: 'USDC', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6 },
+    { symbol: 'USDT', address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6 },
+    { symbol: 'WBTC', address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', decimals: 8 },
+  ],
+  56: [
+    { symbol: 'USDT', address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
+    { symbol: 'USDC', address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', decimals: 18 }, // Binance-Peg
+    { symbol: 'BTCB', address: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', decimals: 18 },
+  ],
+  8453: [
+    { symbol: 'USDC', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 }, // native Circle USDC
+    { symbol: 'cbBTC', address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf', decimals: 8 },
+  ],
+  42161: [
+    { symbol: 'USDC', address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6 }, // native Circle USDC
+    { symbol: 'USD₮0', address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6 },
+    { symbol: 'ARB', address: '0x912CE59144191C1204E64559FE8253a0e49E6548', decimals: 18 },
+  ],
+  42220: [
+    { symbol: 'USDC', address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C', decimals: 6 }, // native Circle USDC
+    { symbol: 'USDm', address: '0x765DE816845861e75A25fCA122bb6898B8B1282a', decimals: 18 }, // ex-cUSD (Mento)
+    { symbol: 'G$', address: '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A', decimals: 18 }, // GoodDollar
+  ],
+  4663: [
+    { symbol: 'USDG', address: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168', decimals: 6 }, // verified onchain
+  ],
+  84532: [
+    { symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6 }, // Circle testnet USDC
+  ],
+  // Robinhood Chain's tokenized equities are NOT listed here — there are ~194 of them and the set
+  // changes, so they come from the issuer's live registry via lib/stockTokens.js.
+  //
+  // 42 (lukso): no Uniswap v4, so no launches at all. 143 (monad): no canonical stablecoin yet.
+}

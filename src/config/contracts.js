@@ -4,7 +4,7 @@
  * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, baseSepolia, bsc, celo, lukso, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, baseSepolia, bsc,soneium, celo, lukso, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Arbitrum Orbit L2, ETH as gas
@@ -35,8 +35,24 @@ baseSepolia.rpcUrls = {
   default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
 }
 
+// Same failure on the mainnets these testnets mirror: mainnet.base.org refuses our calls exactly
+// as sepolia.base.org does, and a server read there comes back empty with no error anyone sees —
+// a token page showed a name from the price feed and no supply, because every chain read had
+// silently failed. Pinned first, with each chain's own defaults kept behind it, so this can only
+// add a working endpoint and never remove one.
+mainnet.rpcUrls = {
+  ...mainnet.rpcUrls,
+  default: { http: ['https://ethereum-rpc.publicnode.com', ...mainnet.rpcUrls.default.http] },
+}
+base.rpcUrls = { ...base.rpcUrls, default: { http: ['https://base-rpc.publicnode.com', ...base.rpcUrls.default.http] } }
+arbitrum.rpcUrls = {
+  ...arbitrum.rpcUrls,
+  default: { http: ['https://arbitrum-one-rpc.publicnode.com', ...arbitrum.rpcUrls.default.http] },
+}
+celo.rpcUrls = { ...celo.rpcUrls, default: { http: ['https://celo-rpc.publicnode.com', ...celo.rpcUrls.default.http] } }
+
 // Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arbitrum, base, celo, robinhood, baseSepolia]
+export const appChains = [mainnet, lukso, bsc, monad,soneium, arbitrum, base, celo, robinhood, baseSepolia]
 
 // ''            — not deployed on that chain.
 // hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
@@ -128,7 +144,7 @@ export const CONTRACTS = {
     apps: '',
     drops: '',
     splits: '',
-    launch: '0x6CCC098Ad9d535E6445a40A9483D5C58f30bd46D',
+    launch: '0xDe312Dd73C546858b7892Ab7C756babe1F9948e0',
     univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
     univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
     wnative: '0x4200000000000000000000000000000000000006',
@@ -328,6 +344,35 @@ export const CONTRACTS = {
     univ4Quoters: ['0x3972C00f7ed4885e145823eb7C655375d275A1C5'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506',
+  },
+    chain1868: {
+    name: 'soneium',
+    forwarder: '',
+    hup: '',
+    status: '',
+    followerSystem: '',
+    community: '',
+    store: '',
+    tipper: '',
+    trade: '',
+    offers: '',
+    events: '',
+    predict: '',
+    apps: '',
+    polls: '',
+    fund: '',
+    drops: '',
+    splits: '',
+    nativeGate: '',
+    launch: '',
+    univ3Router: '',
+    univ3Quoter: '',
+    wnative: '',
+    univ4Router: '',
+    univ4PoolManager: '',
+    univ4Quoters: [''],
+    permit2: '',
+    sushiV2Router: '',
   },
 }
 

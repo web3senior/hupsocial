@@ -1,105 +1,188 @@
 /**
- * Direct LUKSO Envio GraphQL access.
- * Shared by the universal-profile proxy route and the profile API route so
- * server code never has to self-fetch its own HTTP endpoints.
+ * @file lib/lukso.js
+ * @description Universal Profiles read from LUKSO itself.
+ *
+ * A profile lives in the wallet's own ERC725Y storage under the LSP3Profile key: a
+ * VerifiableURI pointing at the JSON document. That is the source. The Envio GraphQL index is
+ * a copy of it, and asking a copy put a third party on the critical path of every avatar,
+ * byline and header chip in the app — one that answers 403 to some networks outright and is
+ * behind the chain by however long its own sync takes.
+ *
+ * The document shape callers get is the one the index used to serve (`profileImages`,
+ * `backgroundImages`, `lastMetadataUpdate`), so the profile read, its row cache and the
+ * Hup-first sync stamp all keep working on it unchanged.
  */
 
-const PROFILE_FIELDS = `    id
-    fullName
-    name
-    tags
-    links { id title url }
-    standard
-    transactions_aggregate { aggregate { count } }
-    profileImages { src url }
-    isEOA
-    isContract
-    followed_aggregate { aggregate { count } }
-    following_aggregate { aggregate { count } }
-    description
-    createdBlockNumber
-    createdTimestamp
-    lastMetadataUpdate
-    url`
+import { keccak256 } from 'viem'
+import { isEvmAddress } from '@/lib/address'
+import { mapWithConcurrency } from '@/lib/concurrency'
+import { decodeVerifiableUri, erc725yGetDataAbi, fetchMetadataJson } from '@/lib/lsp4'
+import { LSP3_PROFILE_KEY } from '@/lib/lsp3'
+import { getServerPublicClient } from '@/lib/serverPublicClient'
 
-const buildProfileQuery = (fields) => `query MyQuery($id: String!) {
-  Profile(where: {id: {_eq: $id}}) {
-${fields}
-  }
-}`
+const LUKSO_CHAIN_ID = 42
 
-/* The LSP3 cover is asked for in its own query shape because a field the upstream schema does
-   not have is not a missing field in the reply — GraphQL rejects the whole document, `Profile`
-   comes back undefined, and every Universal Profile in the app silently degrades to its database
-   row. The richer query is tried first and dropped for the life of the process the one time the
-   upstream refuses it. */
-const PROFILE_QUERY_WITH_COVER = buildProfileQuery(`${PROFILE_FIELDS}
-    backgroundImages { src url }`)
-const PROFILE_QUERY = buildProfileQuery(PROFILE_FIELDS)
+// A hung gateway must cost the profile, never the request that asked for it
+const DOCUMENT_TIMEOUT_MS = 6000
 
-let coverFieldUnsupported = false
+// Documents are IPFS fetches; the pointers beside them are one RPC call however many there are
+const DOCUMENT_CONCURRENCY = 6
+const POINTER_BATCH = 40
 
 /**
- * One GraphQL round trip. Throws on transport failure; returns the parsed body otherwise,
- * `errors` and all — deciding what an error means is the caller's job.
+ * What "the profile changed" means with no indexer block number to lean on: the pointer itself.
+ * Hashed and cut to 16 bytes because `users.profile_indexed_stamp` is varchar(64) and a base32
+ * CIDv1 URI is longer than that on its own — every consumer only ever compares it for equality.
  */
-async function postProfileQuery(endpoint, query, addr, timeoutMs) {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({
-      query,
-      variables: { id: addr.toLowerCase() },
-      operationName: 'MyQuery',
-    }),
-    // A hung upstream must not stall page navigation — fall back to the DB instead.
-    signal: AbortSignal.timeout(timeoutMs),
-  })
+const pointerStamp = (pointer) => (pointer && pointer !== '0x' ? keccak256(pointer).slice(0, 34) : '')
 
-  const contentType = response.headers.get('content-type')
-  if (!contentType || !contentType.includes('application/json')) {
-    const errorText = await response.text()
-    console.error('Upstream API non-JSON response:', errorText.slice(0, 200))
-    return null
+/**
+ * LSP3 image variants as the `{ src }` list the profile read consumes, largest first: the avatar
+ * proxy downscales to the rung it needs and never enlarges, so the biggest file on offer is what
+ * keeps a retina avatar sharp. Written-by-hand documents put a bare string or a nested array
+ * where the spec asks for one flat list, and all three shapes are read here.
+ */
+const imageEntries = (field) => {
+  const flat = Array.isArray(field) ? field.flat() : field ? [field] : []
+
+  return flat
+    .map((entry) => (typeof entry === 'string' ? { url: entry, width: 0 } : entry))
+    .filter((entry) => entry && typeof entry.url === 'string' && entry.url.trim() !== '')
+    .sort((a, b) => (Number(b.width) || 0) - (Number(a.width) || 0))
+    .map((entry) => ({ src: entry.url }))
+}
+
+const textOf = (value) => (typeof value === 'string' ? value : null)
+
+const linkEntries = (field) =>
+  (Array.isArray(field) ? field : [])
+    .filter((link) => link && typeof link === 'object' && typeof link.url === 'string' && link.url.trim() !== '')
+    .map((link) => ({ title: String(link.title ?? '').trim(), url: link.url.trim() }))
+
+/** The LSP3 document in the shape the profile read consumes. */
+const shapeProfile = (address, pointer, doc) => ({
+  id: address.toLowerCase(),
+  name: textOf(doc.name) ?? '',
+  /* The index's own "name#tag" rendering has no onchain equivalent — the displayName memo in
+     components/Profile.jsx rebuilds one from the name and the address. */
+  fullName: null,
+  description: textOf(doc.description),
+  tags: (Array.isArray(doc.tags) ? doc.tags : []).filter((tag) => typeof tag === 'string'),
+  links: linkEntries(doc.links),
+  profileImages: imageEntries(doc.profileImage),
+  backgroundImages: imageEntries(doc.backgroundImage),
+  lastMetadataUpdate: pointerStamp(pointer),
+})
+
+/**
+ * Every wallet's LSP3 pointer in one round trip. A per-item failure is an answer — nothing
+ * implementing ERC725Y is at that address — while a thrown call is the chain not answering at
+ * all, which must never be mistaken for "this wallet has no profile".
+ */
+async function readPointers(client, addresses) {
+  const pointers = new Map()
+
+  for (let start = 0; start < addresses.length; start += POINTER_BATCH) {
+    const chunk = addresses.slice(start, start + POINTER_BATCH)
+    const results = await client.multicall({
+      allowFailure: true,
+      contracts: chunk.map((address) => ({
+        address,
+        abi: erc725yGetDataAbi,
+        functionName: 'getData',
+        args: [LSP3_PROFILE_KEY],
+      })),
+    })
+
+    results.forEach((result, index) => pointers.set(chunk[index], result.status === 'success' ? result.result : null))
   }
 
-  return await response.json()
+  return pointers
+}
+
+/** The document a pointer names, or null when it names nothing readable. */
+async function readDocument(pointer, timeoutMs) {
+  const uri = decodeVerifiableUri(pointer)
+  if (!uri) return null
+
+  const json = await fetchMetadataJson(uri, { baseUrl: process.env.NEXT_PUBLIC_BASE_URL, timeoutMs }).catch(() => null)
+  const doc = json?.LSP3Profile
+
+  return doc && typeof doc === 'object' ? doc : null
 }
 
 /**
- * Query a Universal Profile from the LUKSO Envio GraphQL endpoint.
- * Returns the raw GraphQL response body ({ data: { Profile: [...] } }) or null
- * on any configuration, network, timeout, or upstream error — callers treat
- * null as "no UP, use the fallback".
- * @param {string} addr - Wallet address (any casing)
- * @param {{ timeoutMs?: number }} [options]
- * @returns {Promise<Object|null>}
+ * Universal Profiles for a list of wallets, read from LUKSO.
+ *
+ * @param {string[]} addresses Wallet addresses, any casing.
+ * @param {{ timeoutMs?: number }} [options] Bound on a single document fetch.
+ * @returns {Promise<Map<string, object|null>>} Keyed by lowercase address. A key present with
+ *   null means the chain answered and that wallet publishes no profile — safe to remember. A
+ *   key that is absent was never answered for, and must not be cached as anything.
  */
-export async function queryUniversalProfile(addr, { timeoutMs = 4000 } = {}) {
-  const endpoint = process.env.NEXT_PUBLIC_LUKSO_API_ENDPOINT
-  if (!endpoint || !addr) {
-    if (!endpoint) console.error('Configuration Error: NEXT_PUBLIC_LUKSO_API_ENDPOINT is missing')
-    return null
-  }
+export async function readUniversalProfiles(addresses, { timeoutMs = DOCUMENT_TIMEOUT_MS } = {}) {
+  const answers = new Map()
+  const wanted = []
+  const seen = new Set()
 
-  try {
-    if (coverFieldUnsupported) return await postProfileQuery(endpoint, PROFILE_QUERY, addr, timeoutMs)
+  for (const address of addresses ?? []) {
+    if (typeof address !== 'string') continue
+    const key = address.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
 
-    const body = await postProfileQuery(endpoint, PROFILE_QUERY_WITH_COVER, addr, timeoutMs)
-    /* A validation error is the only outcome that costs a second request, and it can only ever
-       happen once: everything the profile read needs is in the shorter query. */
-    if (body?.errors && !body?.data?.Profile) {
-      coverFieldUnsupported = true
-      console.warn('LUKSO indexer has no Profile.backgroundImages — covers will come from Hup only:', body.errors[0]?.message)
-      return await postProfileQuery(endpoint, PROFILE_QUERY, addr, timeoutMs)
+    // Base58 is not an address the LUKSO chain has anything to say about, and it can never be a
+    // Universal Profile — an answer, not a failed lookup.
+    if (!isEvmAddress(address)) {
+      answers.set(key, null)
+      continue
     }
 
-    return body
-  } catch (networkError) {
-    console.error('LUKSO upstream error:', networkError.message)
-    return null
+    wanted.push({ key, address })
   }
+
+  if (wanted.length === 0) return answers
+
+  const client = getServerPublicClient(LUKSO_CHAIN_ID)
+  if (!client) {
+    console.error('Configuration Error: no server RPC endpoint for LUKSO')
+    return answers
+  }
+
+  let pointers
+  try {
+    pointers = await readPointers(client, wanted.map((entry) => entry.address))
+  } catch (error) {
+    console.error('LUKSO profile read failed:', error.shortMessage || error.message)
+    return answers
+  }
+
+  const documents = await mapWithConcurrency(wanted, DOCUMENT_CONCURRENCY, async (entry) => {
+    const pointer = pointers.get(entry.address)
+    if (!pointer || pointer === '0x') return null
+
+    const doc = await readDocument(pointer, timeoutMs)
+    return doc ? shapeProfile(entry.address, pointer, doc) : null
+  })
+
+  wanted.forEach((entry, index) => answers.set(entry.key, documents[index]))
+
+  return answers
+}
+
+/**
+ * One wallet's Universal Profile, read from LUKSO.
+ *
+ * @param {string} addr Wallet address, any casing.
+ * @param {{ timeoutMs?: number }} [options] Bound on the document fetch.
+ * @returns {Promise<{ answered: boolean, profile: object|null }>} `answered` false means the
+ *   chain could not be reached — callers fall back without remembering anything.
+ */
+export async function readUniversalProfile(addr, options) {
+  if (!addr) return { answered: false, profile: null }
+
+  const key = String(addr).toLowerCase()
+  const answers = await readUniversalProfiles([addr], options)
+
+  return answers.has(key) ? { answered: true, profile: answers.get(key) } : { answered: false, profile: null }
 }
