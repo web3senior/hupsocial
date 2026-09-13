@@ -1,0 +1,408 @@
+// One card treatment, shared by every region of the page so they read as one system rather
+// than as panels that happen to look similar.
+%launch-card-surface {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1rem;
+
+  @media (max-width: 600px) {
+    border-radius: 16px;
+    padding: 0.85rem;
+  }
+}
+
+.detail {
+  // The trading workspace: a rail held open for what comes next, the chart taking whatever is
+  // left, and a ticket column sized to the buy/sell card. It collapses in two steps — the rail
+  // goes first because it is supporting material, then the ticket drops under the chart.
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &__pending {
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.5rem 0.75rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  // The identity block wears no card. A terminal opens on the token itself, and a frame around
+  // the name only competes with the figures underneath it.
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding-top: 0.5rem;
+  }
+
+  &__image {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+
+    @media (max-width: 600px) {
+      width: 56px;
+      height: 56px;
+    }
+  }
+
+  &__identity {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    h1 {
+      margin: 0;
+      font-size: 2.25rem;
+      font-weight: 600;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      @media (max-width: 600px) {
+        font-size: 1.5rem;
+      }
+    }
+  }
+
+  // Symbol, contract, venue and creator on one line, separated by rules rather than dots so
+  // the four read as distinct facts instead of one run-on sentence
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__symbol {
+    color: var(--text-muted, #888);
+    font-weight: 500;
+  }
+
+  &__rule {
+    width: 1px;
+    height: 1.1rem;
+    background: var(--border);
+
+    @media (max-width: 600px) {
+      display: none;
+    }
+  }
+
+  &__address {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    padding: 0.15rem 0.4rem;
+    margin-inline-start: -0.4rem;
+    color: var(--text-muted, #888);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--surface-muted);
+      color: var(--text);
+    }
+  }
+
+  &__venue {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--network-color-primary, var(--primary, #ec4899));
+    font-weight: 500;
+  }
+
+  &__creator {
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__site {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-muted, #888);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--network-color-primary, var(--text));
+      text-decoration: underline;
+    }
+  }
+
+  &__description {
+    margin: 0.15rem 0 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  // Figures carry the page, so they get room and a rule between them rather than a box each
+  &__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0 1.5rem;
+    margin: 0;
+    border-block: 1px solid var(--border);
+    padding: 1rem 0;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      min-width: 0;
+      padding-inline-start: 1.5rem;
+      border-inline-start: 1px solid var(--border);
+
+      &:first-child {
+        padding-inline-start: 0;
+        border-inline-start: 0;
+      }
+    }
+
+    dt {
+      font-size: var(--font-size-14, 0.875rem);
+      color: var(--text-muted, #888);
+    }
+
+    dd {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0;
+      min-width: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    b {
+      font-size: 1.6rem;
+      font-weight: 600;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    // The annotation beside a figure — a change, a share. Direction is the whole point of these,
+    // so the colour is left to the modifier: `.detail__stats em` would otherwise outrank a bare
+    // `.detail__delta--up` class and paint every one of them muted.
+    em {
+      flex-shrink: 0;
+      font-style: normal;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+    }
+
+    @media (max-width: 900px) {
+      gap: 1rem;
+
+      > div {
+        padding-inline-start: 0;
+        border-inline-start: 0;
+      }
+
+      b {
+        font-size: 1.25rem;
+      }
+    }
+  }
+
+  &__delta--up { color: var(--up, #16a34a); }
+  &__delta--down { color: var(--down, #dc2626); }
+
+  // Overlapped so the stack reads as a group at a glance rather than as three separate faces
+  &__faces {
+    display: inline-flex;
+    flex-shrink: 0;
+
+    > * {
+      margin-inline-start: -0.55rem;
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px var(--background);
+
+      &:first-child {
+        margin-inline-start: 0;
+      }
+    }
+  }
+
+  // Areas, not auto-placement: each track is claimed by name, so a column can move to another
+  // row at a breakpoint without the markup being reordered — and the rail always renders
+  // something, because a declared track left empty holds its width regardless.
+  // The chart takes the whole free track and the holders sit under it, rather than the three of
+  // them sharing a row. A price chart is the one element here whose usefulness scales directly
+  // with its width — candles squeezed into a third of the page read as fragments however dense
+  // the data behind them is — and the holder list loses nothing by being a band beneath it.
+  &__workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+    grid-template-areas:
+      'chart ticket'
+      'rail ticket';
+    gap: 1rem;
+    align-items: start;
+
+    @media (max-width: 900px) {
+      grid-template-columns: minmax(0, 1fr);
+      // On a phone the reason you opened this page is to trade, so the ticket leads
+      grid-template-areas:
+        'ticket'
+        'chart'
+        'rail';
+    }
+  }
+
+  &__rail {
+    grid-area: rail;
+    min-width: 0;
+    position: sticky;
+    top: 1rem;
+
+    @media (max-width: 1400px) {
+      position: static;
+    }
+  }
+
+  &__main {
+    @extend %launch-card-surface;
+    grid-area: chart;
+    min-width: 0;
+  }
+
+  // The ticket column stacks two cards rather than being one, so the buy/sell widget and the
+  // fee panel stay separately legible
+  &__ticket {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    grid-area: ticket;
+    min-width: 0;
+    position: sticky;
+    top: 1rem;
+
+    @media (max-width: 900px) {
+      position: static;
+    }
+  }
+
+  &__chartEmpty {
+    margin: 0;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__trades {
+    @extend %launch-card-surface;
+  }
+
+  // Section headings, not chips: the reference reads its tabs as titles you switch between
+  &__tabs {
+    display: flex;
+    align-items: baseline;
+    gap: 1.25rem;
+    margin-bottom: 0.75rem;
+
+    button {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      color: var(--text-muted, #888);
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      cursor: pointer;
+
+      &[aria-selected='true'] {
+        color: var(--text);
+      }
+
+      @media (max-width: 600px) {
+        font-size: 1.1rem;
+      }
+    }
+  }
+
+  // Wide content scrolls inside its own box; the page body never scrolls sideways
+  &__tableWrap {
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-14, 0.875rem);
+
+    th {
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-muted);
+      color: var(--text-muted, #888);
+      font-size: var(--font-size-12);
+      font-weight: 500;
+      text-align: start;
+      white-space: nowrap;
+
+      &:first-child { border-start-start-radius: 10px; border-end-start-radius: 10px; }
+      &:last-child { border-start-end-radius: 10px; border-end-end-radius: 10px; }
+    }
+
+    td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+  }
+
+  &__num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__side {
+    font-weight: 600;
+    color: var(--up, #16a34a);
+
+    &--sell {
+      color: var(--down, #dc2626);
+    }
+  }
+
+  // Wraps a Profile, which brings its own link and hover card — this only has to keep a long
+  // name from widening the tape's last column
+  &__trader {
+    display: inline-flex;
+    align-items: center;
+    max-width: 14ch;
+    min-width: 0;
+
+    span,
+    a {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}

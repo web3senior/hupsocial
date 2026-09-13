@@ -1,0 +1,179 @@
+.fees {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  padding: 1rem;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-16);
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+
+    div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    dt {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  &__amount {
+    font-size: var(--font-size-18);
+    font-weight: 600;
+    word-break: break-all;
+
+    span {
+      font-size: var(--font-size-12);
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__recipient {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.5rem 0.6rem;
+
+    input {
+      flex: 1 1 12rem;
+      min-width: 0;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--background);
+      color: inherit;
+      padding: 0.45rem 0.6rem;
+      font: inherit;
+      font-size: var(--font-size-14);
+      text-overflow: ellipsis;
+
+      &:focus-visible {
+        outline: none;
+        border-color: var(--accent-primary, var(--primary, #0d6efd));
+      }
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: transparent;
+      color: inherit;
+      padding: 0.35rem 0.7rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__recipientWho {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+
+    > span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  // One wallet or several — a segmented pair, so the editor says which shape it is saving
+  &__modes {
+    display: flex;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+  }
+
+  &__mode--active {
+    border-color: var(--accent-primary, var(--primary, #0d6efd));
+    background: color-mix(in srgb, var(--accent-primary, #0d6efd) 12%, transparent);
+  }
+
+  &__payees {
+    flex: 1 1 100%;
+    min-width: 0;
+    display: grid;
+    gap: 0.4rem;
+
+    > small {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+      overflow-wrap: anywhere;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  &__button {
+    flex: 1 1 10rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--global-border-radius);
+    border: 1px solid var(--border);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    &--primary {
+      background: var(--accent-primary, var(--primary, #0d6efd));
+      color: var(--accent-text, #fff);
+      border-color: transparent;
+    }
+
+    &--secondary {
+      background: transparent;
+    }
+  }
+
+  &__note {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+}

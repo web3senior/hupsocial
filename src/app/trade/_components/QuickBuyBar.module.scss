@@ -1,0 +1,171 @@
+// One pill holding three things that belong together: the mark that says what it is, the number
+// it will spend, and the way into the rest. Built as a single control rather than three buttons
+// in a row, because the amount is not a filter — it is the charge on every ⚡ in the table.
+.quickBuy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--tag);
+  padding: 0.25rem 0.35rem 0.25rem 0.6rem;
+
+  &__mark {
+    display: inline-flex;
+    color: #eda100;
+  }
+
+  // Sized to its content rather than the browser's default text-field width, so the pill is as
+  // wide as the number rather than always wide enough for five figures
+  &__amount {
+    width: 3.5ch;
+    min-width: 3.5ch;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-size: var(--font-size-14);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    text-align: center;
+
+    &:focus {
+      outline: none;
+    }
+
+    // The spinners would double the control's width for a value people type, not step through
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      appearance: none;
+      margin: 0;
+    }
+
+    appearance: textfield;
+  }
+
+  &__unit {
+    font-size: var(--font-size-10, 10px);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-muted, #888);
+  }
+
+  &__gear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    padding: 0.25rem;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  // No bare `display` here. A closed popover is hidden by the UA's own `display: none`, and any
+  // author-level display beats it — which left this panel laid out over the header full-time,
+  // invisible but eating every click aimed at the buttons behind it. The primitive escalates its
+  // open state with !important, so the override has to match it.
+  &__panel {
+    flex-direction: column;
+    gap: 0.9rem;
+    width: min(20rem, calc(100vw - 2rem));
+    padding: 0.9rem;
+
+    &:global(:popover-open) {
+      display: flex !important;
+    }
+  }
+
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  &__label {
+    font-size: var(--font-size-10, 10px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #888);
+  }
+
+  &__presets {
+    display: flex;
+    gap: 0.3rem;
+
+    button {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: none;
+      padding: 0.35rem 0;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+
+      &:hover {
+        background: var(--tag);
+      }
+    }
+  }
+
+  &__preset--active {
+    border-color: var(--primary, #ec4899) !important;
+    color: var(--primary, #ec4899) !important;
+  }
+
+  &__slippage {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.35rem 0.6rem;
+
+    input {
+      width: 4ch;
+      border: 0;
+      background: none;
+      padding: 0;
+      font-size: var(--font-size-12, 12px);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+
+      &:focus {
+        outline: none;
+      }
+    }
+
+    span {
+      flex: 1;
+      font-size: var(--font-size-12, 12px);
+      color: var(--text-muted, #888);
+    }
+
+    // Only shown when the tolerance is not the default — it is the way back to it, not a control
+    button {
+      border: 0;
+      background: none;
+      padding: 0;
+      font-size: var(--font-size-12);
+      color: var(--primary, #ec4899);
+      cursor: pointer;
+    }
+  }
+
+  &__note {
+    margin: 0;
+    font-size: var(--font-size-10, 10px);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+}

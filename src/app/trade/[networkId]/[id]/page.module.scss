@@ -1,0 +1,30 @@
+.page {
+  min-height: 85svh;
+
+  // A trading layout is several panels side by side, so the page itself carries no card
+  // chrome — each region draws its own, and the gaps between them do the separating.
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    isolation: isolate;
+
+    @media (max-width: 600px) {
+      padding-inline: 0;
+    }
+  }
+
+  // Mirrors the workspace grid so the boundary and the real page occupy the same shape
+  &__skeleton {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+    gap: 1rem;
+    margin-top: 1rem;
+
+    @media (max-width: 900px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  &__skeleton-chart { height: 22rem; border-radius: 20px; }
+  &__skeleton-ticket { height: 22rem; border-radius: 20px; }
+}

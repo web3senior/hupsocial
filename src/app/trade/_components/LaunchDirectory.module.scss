@@ -1,0 +1,265 @@
+// The explorer's shell: a title carrying the size of the set, a toolbar, and whichever of the two
+// views is on. Nothing here styles a launch — that belongs to LaunchGrid and LaunchTable, which
+// share this list and nothing else.
+.directory {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted, #888);
+  }
+
+  // The count is the one thing on this row that changes, so it wears the chip rather than the word
+  &__count {
+    border-radius: 999px;
+    background: var(--tag);
+    padding: 0.1rem 0.5rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    color: var(--text);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  // Secondary to Launch: same pill metrics so the pair reads as one control, outlined rather
+  // than filled so the primary action still wins the row
+  &__swap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border);
+    background-color: transparent;
+    color: var(--text);
+    border-radius: 999px;
+    padding: 0.55rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      background-color: var(--tag);
+    }
+  }
+
+  &__launch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: none;
+    background-color: var(--primary, #ec4899);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.55rem 1rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    // Without this a flex item refuses to shrink under its own content, so five sort pills hold
+    // the row open past the viewport and the card — which clips rather than scrolls — hides the
+    // overflow instead of offering it
+    min-width: 0;
+  }
+
+  // Pills rather than a segmented control: there are five of them and the labels are long enough
+  // that a sliding track would be measuring more than it was worth
+  &__sorts {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    min-width: 0;
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: var(--tag);
+      padding: 0.4rem 0.85rem;
+      font-size: var(--font-size-12, 12px);
+      font-weight: 600;
+      color: var(--text-muted, #888);
+      cursor: pointer;
+      white-space: nowrap;
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+  }
+
+  &__sort--active {
+    border-color: color-mix(in srgb, var(--primary, #ec4899) 45%, transparent) !important;
+    background: color-mix(in srgb, var(--primary, #ec4899) 14%, transparent) !important;
+    color: var(--primary, #ec4899) !important;
+  }
+
+  &__tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    color: var(--text-muted, #888);
+
+    &:focus-within {
+      border-color: var(--primary, #ec4899);
+    }
+
+    input {
+      width: 8rem;
+      border: 0;
+      background: none;
+      padding: 0;
+      font-size: var(--font-size-12, 12px);
+      color: var(--text);
+
+      &:focus {
+        outline: none;
+      }
+
+      // The native clear affordance sits at a size and colour of its own choosing and clashes
+      // with the pill it is inside
+      &::-webkit-search-cancel-button {
+        appearance: none;
+      }
+    }
+  }
+
+  // One track carrying three options, so the set reads as a single axis rather than three
+  // independent toggles that could all be off
+  &__filters {
+    display: inline-flex;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px;
+  }
+
+  &__filter {
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    padding: 0.3rem 0.7rem;
+    font-size: var(--font-size-12, 12px);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  &__filter--active {
+    background: color-mix(in srgb, var(--primary, #ec4899) 14%, transparent) !important;
+    color: var(--primary, #ec4899) !important;
+  }
+
+  &__mine {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: none;
+    padding: 0.4rem 0.85rem;
+    font-size: var(--font-size-12, 12px);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  &__mine--active {
+    border-color: color-mix(in srgb, var(--primary, #ec4899) 45%, transparent) !important;
+    background: color-mix(in srgb, var(--primary, #ec4899) 14%, transparent) !important;
+    color: var(--primary, #ec4899) !important;
+  }
+
+  &__view {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  // The toolbar stacks rather than wrapping mid-row: the sorts scroll on their own line, and the
+  // tools keep the shape they have on a desktop
+  .directory__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+
+    // A column flex line takes the width of its widest item, so a row of pills that does not wrap
+    // would stretch both children past the card — which clips rather than scrolls, hiding them.
+    // Capped here, the pills scroll inside their own line and the tools wrap inside theirs.
+    > * {
+      max-width: 100%;
+    }
+  }
+
+  // One scrolling line rather than a wrapped block: the sorts are a single axis, and reading them
+  // as two rows suggests they are two groups
+  .directory__sorts {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .directory__search input {
+    width: 100%;
+  }
+}

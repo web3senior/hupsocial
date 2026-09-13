@@ -1,0 +1,176 @@
+// Deliberately the same table furniture as the activity tape one tab over — the two sit in the
+// same section, and a leaderboard that styled its own header row would read as another page.
+.leaderboard {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-14, 0.875rem);
+
+  // Wide content scrolls inside its own box; the page body never scrolls sideways
+  &__wrap {
+    overflow-x: auto;
+  }
+
+  th {
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-12);
+    font-weight: 500;
+    text-align: start;
+    white-space: nowrap;
+
+    &:first-child {
+      border-start-start-radius: 10px;
+      border-end-start-radius: 10px;
+    }
+
+    &:last-child {
+      border-start-end-radius: 10px;
+      border-end-end-radius: 10px;
+    }
+  }
+
+  // Every column but the trader is a figure, and figures are read against the right edge
+  th:not(:nth-child(2)),
+  td:not(:nth-child(2)) {
+    text-align: end;
+  }
+
+  th:first-child,
+  td:first-child {
+    text-align: start;
+  }
+
+  td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  &__row {
+    // The connected wallet's own row, so it is found without reading every name
+    &--me td {
+      background: color-mix(in srgb, var(--accent-primary, #6f6bff) 9%, transparent);
+    }
+
+    // Pinned below the page when the wallet ranked outside it — the rule says the rows above
+    // are not contiguous with this one
+    &--pinned td {
+      border-top: 2px solid var(--border);
+    }
+  }
+
+  &__rank {
+    color: var(--text-muted, #888);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    width: 2.5rem;
+
+    &--1 {
+      color: #d4a017;
+    }
+
+    &--2 {
+      color: #9aa3ad;
+    }
+
+    &--3 {
+      color: #b1764a;
+    }
+  }
+
+  // Wraps a Profile, which brings its own link and hover card — this only has to keep a long
+  // name from widening the column
+  &__who {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 16ch;
+    min-width: 0;
+
+    span,
+    a {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__you {
+    flex: none;
+    padding: 0.05rem 0.3rem;
+    border-radius: 5px;
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-11, 0.6875rem);
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  &__num {
+    font-variant-numeric: tabular-nums;
+
+    small {
+      display: block;
+      color: var(--text-muted, #888);
+      font-size: var(--font-size-12);
+    }
+  }
+
+  &__pnl {
+    font-variant-numeric: tabular-nums;
+
+    b {
+      font-weight: 600;
+    }
+
+    small {
+      display: block;
+      font-size: var(--font-size-12);
+      opacity: 0.75;
+    }
+
+    &--up {
+      color: var(--up, #16a34a);
+    }
+
+    &--down {
+      color: var(--down, #dc2626);
+    }
+  }
+
+  &__muted {
+    color: var(--text-muted, #888);
+    font-weight: 400;
+  }
+
+  &__note {
+    margin: 0.75rem 0 0;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-12);
+  }
+
+  // Below 600px the app's global table styling drops the header row and stacks every cell under
+  // its own data-label instead. The rank's desktop column width would pin that label against its
+  // number, and a 16ch cap on a full-width row truncates a name that now has room for itself.
+  @media (max-width: 600px) {
+    // Every stacked cell reads "label … value", and the rank is no exception once it is a full
+    // row rather than the narrow first column it is on desktop
+    td:first-child {
+      text-align: end;
+    }
+
+    &__rank {
+      width: auto;
+    }
+
+    &__who {
+      max-width: none;
+    }
+  }
+}

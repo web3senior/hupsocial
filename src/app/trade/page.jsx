@@ -1,20 +1,18 @@
 import PageTitle from '@/components/PageTitle'
-import SectionTabs from '@/components/ui/SectionTabs'
 import LaunchDirectory from './_components/LaunchDirectory'
 import styles from './page.module.scss'
 
 export const metadata = {
-  title: 'Tokens',
+  title: 'Trade',
   description: 'Launch and trade memecoins on Hup.',
 }
 
 export default function LaunchesPage() {
   return (
     <>
-      <PageTitle name="Tokens" />
-      <SectionTabs section="trade" />
+      <PageTitle name="Trade" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="xxlarge">
           <LaunchDirectory />
         </div>
       </div>

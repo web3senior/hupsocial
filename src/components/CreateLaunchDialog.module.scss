@@ -7,6 +7,67 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
   width: min(420px, calc(100vw - 6px - 2em - 2px));
 
+  &__draft {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.45rem 0.7rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    span {
+      flex: 1;
+    }
+
+    button {
+      all: unset;
+      cursor: pointer;
+      flex-shrink: 0;
+      font-weight: 600;
+      color: var(--primary, #0d6efd);
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__locked {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+    padding: 0.6rem 0.7rem;
+
+    > svg {
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+      color: var(--text-muted, #888);
+    }
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    strong {
+      font-size: var(--font-size-12);
+      font-weight: 600;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
+    }
+  }
+
   &__header {
     position: relative;
     display: flex;
@@ -173,6 +234,24 @@
     span {
       color: var(--text-muted, #888);
       font-variant-numeric: tabular-nums;
+    }
+  }
+
+  // The last thing read before Review: a protection the creator gets for free and would otherwise
+  // never learn about. Deliberately not a toggle row — there is nothing here to decide, so it
+  // carries no control and no border, only the chip stating the rule and the sentence behind it.
+  &__protection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+    padding: 0.65rem 0.7rem;
+
+    small {
+      font-size: var(--font-size-12);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
     }
   }
 
@@ -373,6 +452,129 @@
   // The switch itself is the shared ToggleSwitch; this only seats it against the first line of copy
   &__switch {
     margin-top: 0.15rem;
+  }
+
+  &__fee {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.75rem;
+  }
+
+  &__feeAmount {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+
+    > span {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    > div {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--background);
+      padding-inline-end: 0.6rem;
+
+      &:focus-within {
+        border-color: var(--primary, #ec4899);
+      }
+    }
+
+    input {
+      width: 5rem;
+      box-sizing: border-box;
+      border: none;
+      background: transparent;
+      color: inherit;
+      padding: 0.5rem 0.6rem;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+      font-variant-numeric: tabular-nums;
+      text-align: end;
+
+      &:focus-visible {
+        outline: none;
+      }
+    }
+
+    em {
+      flex-shrink: 0;
+      font-style: normal;
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__feeQuote {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0;
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+    padding: 0.55rem 0.7rem;
+    font-size: var(--font-size-12);
+
+    span {
+      color: var(--text-muted, #888);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__required {
+    font-style: normal;
+    color: #e34948;
+  }
+
+  &__recipient {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+    padding-inline-end: 0.6rem;
+
+    &:focus-within {
+      border-color: var(--primary, #ec4899);
+    }
+
+    input {
+      border: none;
+      background: transparent;
+      min-width: 0;
+      // An address is long and monospaced-ish; let it shrink rather than push the clear button out
+      font-size: var(--font-size-14, 0.875rem);
+      text-overflow: ellipsis;
+    }
+
+    button {
+      display: inline-flex;
+      flex-shrink: 0;
+      border: none;
+      background: none;
+      padding: 0;
+      color: var(--text-muted, #888);
+      cursor: pointer;
+
+      &:hover {
+        color: inherit;
+      }
+    }
+  }
+
+  &__recipient--invalid {
+    border-color: #e34948;
   }
 
   &__preview {

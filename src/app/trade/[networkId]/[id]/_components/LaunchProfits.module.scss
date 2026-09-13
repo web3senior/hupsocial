@@ -1,0 +1,201 @@
+// The same card treatment the chart and the tape wear, so the three columns read as one system
+.profits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1rem;
+
+  @media (max-width: 600px) {
+    border-radius: 16px;
+    padding: 0.85rem;
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+
+      @media (max-width: 600px) {
+        font-size: 1.1rem;
+      }
+    }
+
+    p {
+      margin: 0;
+      font-size: var(--font-size-12);
+      line-height: 1.4;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  // A long rail scrolls inside itself rather than growing past the chart it sits beside
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: 32rem;
+    overflow-y: auto;
+
+    // Below the three-column breakpoint the rail is a full-width band, so its cards lay out
+    // across it instead of stacking into one tall column
+    @media (max-width: 1400px) {
+      flex-direction: row;
+      flex-wrap: wrap;
+      max-height: none;
+      overflow-y: visible;
+
+      > * {
+        flex: 1 1 15rem;
+      }
+    }
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+    background: var(--surface-muted);
+    border: 1px solid transparent;
+    border-radius: 14px;
+    padding: 0.6rem 0.7rem;
+
+    // The connected wallet's own card, so it is found without reading every name
+    &--me {
+      border-color: color-mix(in srgb, var(--accent-primary, #6f6bff) 45%, transparent);
+      background: color-mix(in srgb, var(--accent-primary, #6f6bff) 9%, var(--surface-muted));
+    }
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  // Wraps a Profile, which brings its own avatar, link and hover card — this only has to let the
+  // name ellipsis rather than push the rank off the card. Every nested wrapper needs its own
+  // min-width: 0, or the flex chain refuses to shrink below the name's intrinsic width.
+  &__who {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+
+    div {
+      min-width: 0;
+    }
+
+    span,
+    a {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__tags {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    gap: 0.3rem;
+  }
+
+  &__you {
+    padding: 0.05rem 0.3rem;
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-11, 0.6875rem);
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  &__rank {
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-11, 0.6875rem);
+    font-style: normal;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+
+    &--1 { color: #d4a017; }
+    &--2 { color: #9aa3ad; }
+    &--3 { color: #b1764a; }
+  }
+
+  &__figures {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      min-width: 0;
+    }
+
+    dt {
+      font-size: var(--font-size-11, 0.6875rem);
+      color: var(--text-muted, #888);
+    }
+
+    dd {
+      display: flex;
+      align-items: baseline;
+      gap: 0.3rem;
+      margin: 0;
+      min-width: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    b {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      flex: none;
+      font-size: var(--font-size-11, 0.6875rem);
+      font-weight: 500;
+      opacity: 0.75;
+    }
+  }
+
+  // Profit is what the rail is for, so it takes the room a long figure needs and reads right
+  &__profit {
+    margin-inline-start: auto;
+    text-align: end;
+
+    dd {
+      justify-content: flex-end;
+    }
+  }
+
+  &__pnl--up { color: var(--up, #16a34a); }
+  &__pnl--down { color: var(--down, #dc2626); }
+
+  &__muted {
+    color: var(--text-muted, #888);
+    font-weight: 400;
+  }
+}

@@ -1,0 +1,327 @@
+// The dense view. Everything here serves one goal: a column you can read straight down without
+// your eye catching. So every figure is tabular-lining, every numeric cell is right-aligned, and
+// the row's own chrome — hover, borders — is quiet enough that the numbers are the only thing
+// with contrast.
+.table {
+  width: 100%;
+  // Fixed rather than auto, and the reason is not speed. Under auto layout a column is sized by
+  // its content's MINIMUM width — and the name cell's min-width is zero, because clipping it with
+  // `overflow: hidden` is what makes an ellipsis possible. So the column collapsed to its avatar
+  // and every name in it spilled across the sparkline next door. Fixed takes the widths declared
+  // on the header row instead, which is also what keeps a column from resizing every time one
+  // figure in it gains a digit.
+  table-layout: fixed;
+  // The floor those widths add up to. Below it the table scrolls rather than squeezing.
+  min-width: 77.25rem;
+  border-collapse: collapse;
+  font-size: var(--font-size-12, 12px);
+
+  // And the page body must never be the thing that scrolls sideways
+  &__scroller {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-bottom: 1px solid var(--border);
+    background: var(--background);
+    padding: 0.55rem 0.6rem;
+    font-size: var(--font-size-10, 10px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    color: var(--text-muted, #888);
+  }
+
+  td {
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0.6rem;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  &__row {
+    cursor: pointer;
+
+    &:hover {
+      // The row's own chain tints the hover, so which network a token lives on is felt rather
+      // than looked up — the same colour its card carries in the grid
+      background: color-mix(in srgb, var(--network-color-primary, var(--text-muted, #888)) 8%, transparent);
+    }
+  }
+
+  &__rank {
+    width: 2.75rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted, #888);
+  }
+
+  // Headers carry each column’s own alignment rather than the browser’s centred default, so a
+  // label always sits over the edge of the figures it names
+  &__coin {
+    width: 13rem;
+    text-align: left;
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  // The art sits in a fixed square with the fallback behind it, so a CID no gateway answers
+  // leaves a coin glyph rather than the browser's broken-image mark
+  &__art {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--tag);
+    color: var(--text-muted, #888);
+    overflow: visible;
+
+    > img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+  }
+
+  &__artFallback {
+    display: grid;
+    place-items: center;
+  }
+
+  // Rides the corner rather than taking a column: which chain a token is on is a qualifier of its
+  // identity, not a field beside it
+  &__chain {
+    position: absolute !important;
+    inset: auto -2px -2px auto !important;
+    width: 14px !important;
+    height: 14px !important;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--background);
+  }
+
+  // A definite ceiling rather than `min-width: 0`: left to shrink, the flex item collapses to its
+  // first letter and hands the rest of the name to the column next door
+  &__names {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+
+    strong,
+    em {
+      display: block;
+      max-width: 10rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    strong {
+      font-size: var(--font-size-12, 12px);
+      font-weight: 600;
+    }
+
+    em {
+      font-style: normal;
+      font-size: var(--font-size-10, 10px);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__graph {
+    width: 7rem;
+    text-align: left;
+  }
+
+  &__spark {
+    display: block;
+    width: 100%;
+  }
+
+  &__blank {
+    display: block;
+    text-align: center;
+    color: var(--text-muted, #888);
+  }
+
+  // Wide enough for the longest figure each column can hold, so nothing is negotiated away when
+  // one row's number is longer than the rest of the column's
+  &__figure {
+    width: 5.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted, #888);
+
+    // The market cap is the one figure in the row that carries its own weight
+    b {
+      font-weight: 600;
+      color: var(--text);
+    }
+  }
+
+  // Four digits and a sign is the widest a move gets before it stops being a percentage anyone
+  // reads, and the column holds that width whether this page contains one or not
+  &__change {
+    width: 6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--text-muted, #888);
+
+    &--up {
+      color: var(--chart-up, #22a06b);
+    }
+
+    &--down {
+      color: var(--chart-down, #e34948);
+    }
+  }
+
+  &__action {
+    width: 3.25rem;
+    text-align: right;
+  }
+
+  // Deliberately the loudest thing in the row: it is the only cell that spends money, and a
+  // trader scanning for it should not have to look
+  &__buy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--global-border-radius);
+    background: color-mix(in srgb, #22a06b 22%, transparent);
+    padding: 0.35rem 0.6rem;
+    color: #22a06b;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, #22a06b 34%, transparent);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  // The same slot for a token Hup cannot trade in one press. Deliberately quieter than the ⚡:
+  // it goes to a page rather than spending anything, and the pair is only preselected there.
+  &__swap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--global-border-radius);
+    background: var(--tag);
+    padding: 0.35rem 0.6rem;
+    color: var(--text-muted, #888);
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+}
+
+// Degrades to what a phone can actually use: the name, what it is worth, its day, and the button.
+// Addressed by position rather than by class, because a column is only hidden in company with its
+// own header — and the header carries a different class from the cells beneath it.
+@media (max-width: 900px) {
+  .table {
+    th:nth-child(n + 5):nth-child(-n + 11),
+    td:nth-child(n + 5):nth-child(-n + 11) {
+      display: none;
+    }
+  }
+}
+
+// Below 600px the app's global table stylesheet turns every table into stacked cards — one cell
+// per line, headers hidden, each value labelled by a `data-label`. That is the right answer for a
+// table of records, and the wrong one here: reading a column downward is the entire purpose of
+// this view, and stacking destroys it. So this table opts out and simply narrows, keeping the four
+// columns above. Every declaration below undoes one of that stylesheet's, so they travel together.
+@media (max-width: 600px) {
+  .table {
+    // Fixed layout honours the widths declared on the header row rather than scaling them to fit,
+    // so a phone needs its own set — clearing the desktop floor alone would only let the table
+    // stop growing, not shrink. The rank goes with them: it is the least useful column here, and
+    // dropping it is what buys the other four enough room to land inside the screen.
+    min-width: 0;
+
+    th:nth-child(1),
+    td:nth-child(1),
+    th:nth-child(4),
+    td:nth-child(4) {
+      display: none;
+    }
+
+    th,
+    td {
+      padding: 0.5rem 0.45rem;
+    }
+
+    .table__coin {
+      width: 8.75rem;
+    }
+
+    .table__figure {
+      width: 4.5rem;
+    }
+
+    .table__change {
+      width: 4.75rem;
+    }
+
+    .table__action {
+      width: 2.5rem;
+    }
+
+    thead {
+      position: static;
+      clip: auto;
+      width: auto;
+      height: auto;
+      margin: 0;
+      overflow: visible;
+    }
+
+    tr {
+      display: table-row;
+      margin-bottom: 0;
+    }
+
+    td {
+      display: table-cell;
+      font-size: var(--font-size-12);
+
+      &::before {
+        content: none;
+      }
+    }
+
+    // What is left of the coin column once four columns share a phone's width
+    .table__names strong,
+    .table__names em {
+      max-width: 7rem;
+    }
+  }
+}

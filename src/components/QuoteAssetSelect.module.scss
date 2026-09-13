@@ -1,0 +1,131 @@
+.quoteSelect {
+  &__trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--background);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    strong {
+      font-weight: 600;
+    }
+
+    // The caret sits at the far edge, the way a select's does
+    svg:last-child {
+      margin-inline-start: auto;
+      opacity: 0.6;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  // Matches the trigger rather than the panel default, so the list reads as the field opening
+  &__panel {
+    width: min(24rem, calc(100vw - 2rem));
+    padding: 0.35rem;
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.55rem;
+    margin-bottom: 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+
+    svg {
+      flex-shrink: 0;
+      opacity: 0.6;
+    }
+
+    input {
+      width: 100%;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      outline: none;
+
+      // Safari draws its own clear affordance over the field's own padding
+      &::-webkit-search-cancel-button {
+        appearance: none;
+      }
+    }
+  }
+
+  &__list {
+    // Nine rows before it scrolls: enough to read as a list, short enough to stay a dropdown
+    max-height: 19rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.5rem;
+    border: 0;
+    border-radius: var(--global-border-radius);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+
+    strong {
+      font-weight: 600;
+    }
+
+    // The company name is the disambiguator, not the label, so it sits right-aligned and quiet
+    em {
+      margin-inline-start: auto;
+      overflow: hidden;
+      font-style: normal;
+      opacity: 0.6;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &:hover,
+    &:focus-visible {
+      background: var(--surface-2, rgba(127, 127, 127, 0.12));
+    }
+  }
+
+  &__option--active {
+    background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  }
+
+  &__logo {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--surface-2, rgba(127, 127, 127, 0.12));
+    font-size: 0.7rem;
+    font-weight: 600;
+    object-fit: cover;
+  }
+
+  &__empty {
+    padding: 0.75rem 0.5rem;
+    opacity: 0.6;
+    text-align: center;
+  }
+}

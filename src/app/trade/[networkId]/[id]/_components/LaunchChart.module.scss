@@ -1,0 +1,309 @@
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  // No border box: the reference reads as marks floating on the page, not a framed widget
+  padding: 0.25rem 0 0;
+
+  &__empty {
+    margin: 0;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  &__ohlc {
+    display: flex;
+    // Six significant digits on a sub-cent price is a long field, and five of them sit in this
+    // row — on a narrow card they wrap rather than shoving the interval controls off the header
+    flex-wrap: wrap;
+    gap: 0.2rem 0.7rem;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+
+    div {
+      display: flex;
+      align-items: baseline;
+      gap: 0.25rem;
+    }
+
+    dt {
+      font-size: var(--font-size-12);
+      color: var(--text-muted, #888);
+    }
+
+    // One steady ink. Colouring these by candle direction meant the row flipped as the
+    // crosshair travelled, so the chart read as flickering rather than as a tape.
+    dd {
+      margin: 0;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text);
+    }
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  // A segmented track rather than loose buttons, so the group reads as one control
+  &__intervals {
+    display: flex;
+    gap: 0.15rem;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    padding: 0.15rem;
+
+    button {
+      border: none;
+      background: transparent;
+      color: var(--text-muted, #888);
+      border-radius: 999px;
+      padding: 0.25rem 0.7rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      line-height: 1.4;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+  }
+
+  // Inset so the selected pill never stands taller than the ones beside it, and so it still
+  // separates from the track on a dark ground where the drop shadow does nothing
+  &__interval--active {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    box-shadow: inset 0 0 0 1px var(--border), 0 1px 2px rgba(15, 23, 42, 0.12);
+  }
+
+  // Same pill as one segment of the tracks beside it, so the row reads as one bank of controls
+  &__maximize {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--text-muted, #888);
+    // Stretched rather than padded to a height: the tracks beside it are sized by their own
+    // font metrics, so any fixed padding here drifts out of line the moment those change
+    align-self: stretch;
+    padding: 0 0.55rem;
+    line-height: 0;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &[aria-pressed='true'] {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+  }
+
+  // The canvas is transparent and the library's own gridlines are off, so the dot grid lives
+  // here — which keeps it on the app's theme tokens instead of a hex baked into JS.
+  &__stage {
+    position: relative;
+  }
+
+  &__traderTip {
+    position: absolute;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    max-width: 220px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+    padding: 0.4rem 0.55rem;
+    pointer-events: none;
+
+    b {
+      font-size: var(--font-size-12);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      font-size: var(--font-size-10, 0.625rem);
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__canvas {
+    height: 320px;
+    // A quiet stretch of tape is itself a row of muted dashes, so at 10% the grid and the
+    // candles were two dotted textures competing. 6% on a wider pitch keeps the grid readable
+    // as position without ever being mistaken for data.
+    background-image: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--text-muted, #888) 6%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+    background-position: 0 0;
+
+    @media (max-width: 600px) {
+      height: 260px;
+    }
+
+    // Lightweight Charts lays its panes out in a real <table>, so the app's global table styles
+    // land on it: `table-layout: fixed` split the leftover width evenly between the price axis
+    // and the (empty) left axis column, starving the axis to half the width its labels need and
+    // clipping every price. The border framed the chart, and the row hover flashed behind it.
+    table {
+      table-layout: auto;
+      border: none;
+    }
+
+    // ...and below 600px that same global sheet stacks tr/td into blocks so data tables read as
+    // cards. On the chart's layout table that dropped the price axis cell underneath the plot
+    // and out of the pane, so every phone rendered the chart with a blank price scale.
+    tr {
+      display: table-row;
+      border: none;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
+
+    td {
+      display: table-cell;
+      border-bottom: none;
+      font-size: inherit;
+      text-align: start;
+
+      // The card pattern prefixes each cell with its column name from data-label
+      &::before {
+        content: none;
+      }
+    }
+  }
+
+  &__volume {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-top: 1px solid var(--border);
+    padding: 0.85rem 0 0;
+  }
+
+  &__volumeHead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+
+    > div:first-child {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    span {
+      font-size: var(--font-size-16, 1rem);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    // The figure the section is about, so it carries the weight rather than its label
+    strong {
+      font-size: 1.75rem;
+      font-weight: 600;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__split {
+    display: flex;
+    // A 2px surface gap so the two fills read as separate marks rather than one bar
+    gap: 2px;
+    height: 6px;
+
+    span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      min-width: 2px;
+    }
+  }
+
+  &__splitLegend {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    p {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      margin: 0;
+
+      &:last-child {
+        text-align: end;
+      }
+    }
+
+    b {
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      // Detail lines wear text ink; the count above carries the colour
+      color: var(--text-muted, #888);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+/* Fullscreen overrides live at the top level: nesting `&__canvas` under `&:fullscreen` would
+   compile to `.chart:fullscreen__canvas`, which matches nothing. The section is transparent
+   inline, so fullscreen has to paint the page ground itself or the backdrop shows through. */
+.chart:fullscreen {
+  height: 100%;
+  overflow: hidden;
+  background: var(--background);
+  padding: 1rem 1.25rem;
+}
+
+/* The stage takes whatever the header and volume panel leave, and the canvas fills it —
+   Lightweight Charts is built with autoSize, so it follows without being told. */
+.chart:fullscreen .chart__stage {
+  flex: 1;
+  min-height: 180px;
+}
+
+.chart:fullscreen .chart__canvas {
+  height: 100%;
+}

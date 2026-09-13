@@ -1,0 +1,185 @@
+// Artwork first, in a square. A memecoin is recognised before it is evaluated, so the tile is the
+// card's whole top half and the figures sit underneath in a fixed block — every card the same
+// height whether its name wraps or not, because a ragged grid reads as broken rather than organic.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  &__card {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    overflow: hidden;
+
+    &:hover {
+      // The card's own chain lights its edge, so where a token lives is read rather than assumed
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--text-muted, #888)) 60%, transparent);
+    }
+  }
+
+  &__link {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  &__media {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    background: var(--tag);
+    color: var(--text-muted, #888);
+  }
+
+  &__fallback {
+    display: grid;
+    place-items: center;
+  }
+
+  &__art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.6rem 0.7rem 0.7rem;
+  }
+
+  &__nameRow {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__chain {
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+  }
+
+  &__ticker {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__figures {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+
+    b {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.25rem;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    // The unit belongs against the number, at a size that does not compete with it
+    small {
+      font-size: var(--font-size-10, 0.625rem);
+      font-weight: 400;
+      color: var(--text-muted, #888);
+    }
+
+    // Coloured through a custom property rather than directly: `.grid__figures em` outranks a
+    // bare `.grid__change--up`, so a direct colour here would quietly win over the modifier and
+    // paint every move — up, down and flat — the same grey
+    em {
+      font-style: normal;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--change-color, var(--text-muted, #888));
+    }
+  }
+
+  &__change--up {
+    --change-color: var(--chart-up, #22a06b);
+  }
+
+  &__change--down {
+    --change-color: var(--chart-down, #e34948);
+  }
+
+  // Over the artwork, outside the link: the age is a label, the ⚡ is a button, and neither should
+  // navigate anywhere
+  &__overlay {
+    position: absolute;
+    inset: 0.45rem 0.45rem auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    pointer-events: none;
+  }
+
+  &__age {
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    padding: 0.15rem 0.45rem;
+    font-size: var(--font-size-10, 0.625rem);
+    font-weight: 600;
+    color: #fff;
+    backdrop-filter: blur(4px);
+  }
+
+  &__buy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, #22a06b 88%, transparent);
+    padding: 0.3rem;
+    color: #fff;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #22a06b;
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    // A token Hup cannot trade in one press goes to the swap page instead, and says so by being
+    // the quieter of the two marks rather than a green button that does something different
+    &--swap {
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(4px);
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.75);
+      }
+    }
+  }
+}
