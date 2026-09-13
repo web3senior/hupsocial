@@ -19,6 +19,37 @@ optimizer = true
 optimizer_runs = 200
 via_ir = true
 
+# Launch stack (Uniswap v4 hook + factory + locker). v4 sources are vendored under lib/ and are
+# not committed: restore with `npm pack @uniswap/v4-periphery` and copy its src, lib/v4-core,
+# lib/permit2 and v4-core's solmate + openzeppelin-contracts into lib/.
+[profile.launch]
+src = "v2/Extensions"
+test = "forge-launch/test"
+out = "forge-launch/out"
+cache_path = "forge-launch/cache"
+libs = []
+auto_detect_remappings = false
+remappings = [
+  "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+  "@uniswap/v4-core/=lib/v4-core/",
+  "v4-periphery/=lib/v4-periphery/",
+  "solmate/=lib/v4-core/lib/solmate/",
+  "openzeppelin-contracts/=lib/v4-core/lib/openzeppelin-contracts/",
+  "permit2/=lib/permit2/",
+  "forge-std/=lib/forge-std/src/",
+]
+skip = [
+  "*LSP*", "*Genesis*", "*Sunrise*", "Account Links/*", "Follower System/*",
+  "*Apps*", "*BatchTransfer*", "*Bazaar*", "*Community*", "*DataExtension*", "*Drop*",
+  "*Editions*", "*Events*", "*Fund*", "*Gift*", "*Miner*", "*NativeBalance*", "*Offers*",
+  "*Polls*", "*Predict*", "*Split*", "*Status*", "*Test*", "*Tipper*", "*Trade*",
+]
+solc = "0.8.36"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+
 [profile.lsp]
 src = "forge-test/lsp"
 test = "forge-test/lsp"

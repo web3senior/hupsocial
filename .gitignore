@@ -51,3 +51,8 @@ next-env.d.ts
 # forge test outputs
 src/contracts/forge-test/out*/
 src/contracts/forge-test/cache*/
+
+# Vendored Uniswap v4 sources and forge output for the launch stack
+src/contracts/lib/
+src/contracts/forge-launch/out/
+src/contracts/forge-launch/cache/
