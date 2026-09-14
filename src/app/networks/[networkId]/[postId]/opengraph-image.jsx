@@ -30,15 +30,15 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import makeBlockie from 'ethereum-blockies-base64'
 import { ImageResponse } from 'next/og'
-import sharp from 'sharp'
 import pool from '@/lib/db'
 import { isEvmAddress, normalizeAddress, shortAddress } from '@/lib/address'
 import { getPostById } from '@/lib/api'
 import { getChainIconSvg } from '@/lib/chains'
-import { queryUniversalProfile } from '@/lib/lukso'
+import { readUniversalProfile } from '@/lib/lukso'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
 import { truncate, summarizePostContent } from '@/lib/postSummary'
-import { extractIPFSCid, resolveAvatarImageUrl, resolveIPFSImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
+import { resolveArtworkUrl, svgToPngDataUri, toFetchable, toPngDataUri } from '@/lib/ogImage'
+import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 
 export const runtime = 'nodejs'
 
@@ -78,13 +78,10 @@ const AVATAR_SLOT_PX = 88
 const POSTER_WIDTH = 640
 const NFT_IMAGE_WIDTH = 512
 
-/* Artwork past this is a broken or hostile source, not something worth decoding into a card */
-const MAX_IMAGE_BYTES = 12 * 1024 * 1024
-
-/* Whether the author is a Universal Profile is decided the way the feed decides it — the LUKSO
-   indexer either knows the address or it does not — but on a much tighter clock than the profile
-   API's 4s. This is one badge on a card a crawler is already waiting on, so a slow indexer has to
-   cost the badge rather than the render. */
+/* Whether the author is a Universal Profile is decided the way the feed decides it — LUKSO
+   either serves an LSP3 document for the address or it does not — but on a much tighter clock than
+   the profile API's. This is one badge on a card a crawler is already waiting on, so a slow read
+   has to cost the badge rather than the render. */
 const UP_LOOKUP_TIMEOUT_MS = 1500
 
 /* The identity row is the feed's own, blown up. Everything beside the avatar is sized off this
@@ -263,118 +260,12 @@ const fontSizeFor = (length) => {
 }
 
 /**
- * Makes a resolved reference reachable from the server: the storage helpers emit app-relative
- * proxy paths, and fetch needs an origin in front of them.
- * @param {string|null} resolved - Output of one of the storageHelper resolvers.
- * @param {string} baseUrl - Origin of this deployment.
- * @returns {string|null}
- */
-const toFetchable = (resolved, baseUrl) => {
-  if (!resolved) return null
-  return resolved.startsWith('/') ? `${baseUrl}${resolved}` : resolved
-}
-
-/**
- * Resolves a piece of artwork to a fetchable URL, through the proxy wherever it carries a CID.
- *
- * resolveStorageImageUrl only re-routes a UP-cloud or already-proxied URL when a width is
- * given; extracting the CID first means every shape that carries one goes through the proxy,
- * width or not. The plain (no-width) object is the one the feed itself requests for post
- * images, so it is the one most likely to be sitting on the CDN.
- *
- * @param {string} uri - ipfs:// URI, bare CID, UP-cloud URL, data: URI or absolute URL.
- * @param {string} baseUrl - Origin used to absolutize the app-relative storage proxies.
- * @param {{ width?: number, still?: boolean }} [options] - Proxy resize hints.
- * @returns {string|null}
- */
-const resolveArtworkUrl = (uri, baseUrl, options = {}) => {
-  if (!uri || typeof uri !== 'string') return null
-  if (uri.startsWith('data:')) return uri
-
-  /* Some rows carry a bare CID where the schema expects an ipfs:// URI */
-  const normalized = /^(Qm|baf)/.test(uri) ? `ipfs://${uri}` : uri
-
-  const cid = extractIPFSCid(normalized)
-  const resolved = cid ? resolveIPFSImageUrl(cid, options) : resolveStorageImageUrl(normalized, options)
-  return toFetchable(resolved, baseUrl)
-}
-
-/**
- * Fetches an image and re-encodes it as a PNG data URI.
- *
- * Satori will fetch a remote src itself, but it has no decoder for WebP or animated GIF and
- * no timeout, so a gateway stall would hang the whole card. Decoding here means one bounded
- * fetch, one format satori always understands, and a null on any failure.
- *
- * @param {string} url
- * @param {number} boxSize - Longest edge to fit within, in pixels.
- * @param {number} timeoutMs - How long this picture is worth waiting for.
- * @returns {Promise<string|null>}
- */
-const toPngDataUri = async (url, boxSize, timeoutMs) => {
-  if (!url) return null
-
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
-    if (!response.ok) return null
-
-    const arrayBuffer = await response.arrayBuffer()
-    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) return null
-
-    const png = await sharp(Buffer.from(arrayBuffer), { animated: false, autoOrient: true })
-      /* `inside` bounds the pixel count without changing the aspect ratio. Cropping here as
-         well as in the layout would crop twice — a wide photo squared off by sharp and then
-         cropped again by objectFit keeps only the middle of the middle. */
-      .resize({ width: boxSize, height: boxSize, fit: 'inside', withoutEnlargement: true })
-      /* PNG has alpha, satori composites it onto the card, and the card is dark — flatten
-         so a transparent logo does not disappear into the background */
-      .flatten({ background: COLORS.background })
-      .png()
-      .toBuffer()
-
-    return `data:image/png;base64,${png.toString('base64')}`
-  } catch {
-    /* A card without artwork still reads; one that never arrives does not */
-    return null
-  }
-}
-
-/**
- * Rasterizes a chain logo into a PNG data URI at the size it will be laid out.
- *
- * The logos are inline SVG, and handing satori one is not the same bet as handing it a photo:
- * several carry gradients and referenced clipPaths, which is the support gap the Hup mark below
- * had to be flattened around. sharp draws the markup properly, and rendering at 4x the slot
- * before the resize is what keeps a 32px viewBox from arriving soft. Alpha is kept — the badge
- * is a shape on the card, not a picture in a frame.
- *
- * @param {string|null} svg - Raw SVG markup from config/chainIcons.
- * @param {number} sizePx - Longest edge, in the card's own pixels.
- * @returns {Promise<string|null>}
- */
-const svgToPngDataUri = async (svg, sizePx) => {
-  if (!svg) return null
-
-  try {
-    const png = await sharp(Buffer.from(svg), { density: 72 * 4 })
-      .resize({ width: sizePx, height: sizePx, fit: 'inside' })
-      .png()
-      .toBuffer()
-
-    return `data:image/png;base64,${png.toString('base64')}`
-  } catch (error) {
-    console.warn('[post-og] chain logo render failed:', error.message)
-    return null
-  }
-}
-
-/**
- * The author's Universal Profile, or null when the LUKSO indexer does not know the address.
+ * The author's Universal Profile, or null when the wallet publishes none.
  *
  * Read in-process rather than through our own profile API: that endpoint would re-resolve the
  * avatar, the badge and the origin the card has no use for, over an HTTP hop back into
  * ourselves. Only EVM addresses are asked about — a Solana author is not a UP, and base58 must
- * not be lowercased on the way to the indexer.
+ * not be lowercased on the way to the chain.
  *
  * @param {string} address
  * @returns {Promise<Object|null>}
@@ -382,11 +273,10 @@ const svgToPngDataUri = async (svg, sizePx) => {
 const resolveUniversalProfile = async (address) => {
   if (!isEvmAddress(address)) return null
 
-  const result = await queryUniversalProfile(address, { timeoutMs: UP_LOOKUP_TIMEOUT_MS })
-  const profile = result?.data?.Profile?.[0]
+  const { profile } = await readUniversalProfile(address, { timeoutMs: UP_LOOKUP_TIMEOUT_MS })
 
-  /* The same bar the profile API sets before it calls a row a universal_profile: an indexed
-     address with no name is a contract the indexer happens to have seen, not a profile. */
+  /* The same bar the profile API sets before it calls a row a universal_profile: an ERC725Y
+     account with no name is a contract that happens to answer, not a profile. */
   return profile?.name || profile?.fullName ? profile : null
 }
 
@@ -503,8 +393,8 @@ export default async function Image({ params }) {
 
     const bodyText = post.content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
     const [avatar, artwork, universalProfile, chainLogo] = await Promise.all([
-      toPngDataUri(toFetchable(resolveAvatarImageUrl(post.profile_image, AVATAR_SLOT_PX), baseUrl), AVATAR_SLOT_PX * 2, AVATAR_TIMEOUT_MS),
-      resolvePostArtwork(post, baseUrl).then((url) => toPngDataUri(url, 760, ARTWORK_TIMEOUT_MS)),
+      toPngDataUri(toFetchable(resolveAvatarImageUrl(post.profile_image, AVATAR_SLOT_PX), baseUrl), AVATAR_SLOT_PX * 2, AVATAR_TIMEOUT_MS, { background: COLORS.background }),
+      resolvePostArtwork(post, baseUrl).then((url) => toPngDataUri(url, 760, ARTWORK_TIMEOUT_MS, { background: COLORS.background })),
       /* Both of these sit inside the artwork's own wait, so the identity row costs the card
          nothing it was not already spending */
       resolveUniversalProfile(post.wallet_address),
