@@ -2,6 +2,7 @@
 
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { LightningIcon, XIcon } from '@phosphor-icons/react'
+import { createRequestPendingError } from '@/lib/miniAppBridge'
 import NativeDialog from './ui/NativeDialog'
 import styles from './MiniAppSessionDialog.module.scss'
 
@@ -21,6 +22,8 @@ const MiniAppSessionDialog = forwardRef(function MiniAppSessionDialog(props, ref
     /** Presents the consent request; resolves on allow, rejects with code 4001 on decline. */
     confirm: (pendingRequest) =>
       new Promise((resolve, reject) => {
+        // A second request must not replace this resolver, or the first caller waits forever
+        if (resolverRef.current) return reject(createRequestPendingError())
         resolverRef.current = { resolve, reject }
         setRequest(pendingRequest)
         dialogRef.current?.open()

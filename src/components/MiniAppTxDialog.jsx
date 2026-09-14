@@ -4,6 +4,7 @@ import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { formatEther, hexToString, isHex } from 'viem'
 import { WarningIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
+import { createRequestPendingError } from '@/lib/miniAppBridge'
 import NativeDialog from './ui/NativeDialog'
 import styles from './MiniAppTxDialog.module.scss'
 
@@ -27,6 +28,8 @@ const MiniAppTxDialog = forwardRef(function MiniAppTxDialog(props, ref) {
      */
     confirm: (pendingRequest) =>
       new Promise((resolve, reject) => {
+        // A second request must not replace this resolver, or the first caller waits forever
+        if (resolverRef.current) return reject(createRequestPendingError())
         resolverRef.current = { resolve, reject }
         setRequest(pendingRequest)
         setIsBusy(false)

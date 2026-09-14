@@ -73,6 +73,14 @@ const RPC_ERRORS = {
   disconnected: { code: 4900, message: 'The host is not connected to a wallet' },
   internal: { code: -32603, message: 'Internal error' },
   invalidParams: { code: -32602, message: 'Invalid method parameters' },
+  requestPending: { code: -32002, message: 'Another request is already awaiting your confirmation' },
+}
+
+/** Thrown by a confirmation surface that is already holding a request for the user. */
+export function createRequestPendingError() {
+  const err = new Error(RPC_ERRORS.requestPending.message)
+  err.code = RPC_ERRORS.requestPending.code
+  return err
 }
 
 /**
@@ -176,7 +184,8 @@ export async function executeWalletMethod({ method, params, session = {}, contex
       return result
     } catch (err) {
       emit('signature:rejected', { method, reason: err?.message })
-      throw err?.code === 4001 ? RPC_ERRORS.userRejected : { code: 4001, message: err?.message || 'Request rejected' }
+      // Coded wallet errors (4902 unknown chain, -32002 already pending, …) keep their code
+      throw err?.code === 4001 ? RPC_ERRORS.userRejected : { code: typeof err?.code === 'number' ? err.code : 4001, message: err?.message || 'Request rejected' }
     }
   }
 

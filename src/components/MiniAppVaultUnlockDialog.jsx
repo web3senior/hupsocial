@@ -2,6 +2,7 @@
 
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { KeyIcon, XIcon } from '@phosphor-icons/react'
+import { createRequestPendingError } from '@/lib/miniAppBridge'
 import NativeDialog from './ui/NativeDialog'
 import styles from './MiniAppVaultUnlockDialog.module.scss'
 
@@ -26,6 +27,8 @@ const MiniAppVaultUnlockDialog = forwardRef(function MiniAppVaultUnlockDialog(pr
     /** Presents the unlock; resolves once the vault opens, rejects with code 4001 on cancel. */
     unlock: (pendingRequest) =>
       new Promise((resolve, reject) => {
+        // A second request must not replace this resolver, or the first caller waits forever
+        if (resolverRef.current) return reject(createRequestPendingError())
         resolverRef.current = { resolve, reject }
         setRequest(pendingRequest)
         setPin('')
