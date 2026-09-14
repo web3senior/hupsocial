@@ -2,13 +2,13 @@ import { after, NextResponse } from 'next/server'
 import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
-import { queryUniversalProfile } from '@/lib/lukso'
+import { readUniversalProfile } from '@/lib/lukso'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 import { resolveAgentProfile } from '@/lib/agentProfile'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 import { hasColumn } from '@/lib/schema'
 
-/** Stored JSON list columns come back as text; the indexer's own fields are already arrays. */
+/** Stored JSON list columns come back as text; a profile read from the chain already carries arrays. */
 function parseJsonList(value) {
   if (Array.isArray(value)) return value
   if (typeof value !== 'string' || value.trim() === '') return []
@@ -73,8 +73,8 @@ const resolveCoverUrl = (src) => (src ? resolveStorageImageUrl(src, { width: PRO
 /* Both columns land together in cidex/scripts/add-profile-index-cache.sql, so probing one probes both. */
 const CACHE_COLUMN = 'is_universal_profile'
 
-/* How old a row's indexer answer may be before it is asked again, behind the response. A wallet
-   the indexer had nothing for can only become a Universal Profile by being deployed, so it waits longer. */
+/* How old a row's chain answer may be before it is asked again, behind the response. A wallet
+   the chain had no profile for can only become a Universal Profile by being deployed, so it waits longer. */
 const UP_RECHECK_MS = 10 * 60_000
 const EOA_RECHECK_MS = 60 * 60_000
 
@@ -82,7 +82,7 @@ const checkedAt = new Map()
 
 const isUniversalProfile = (profile) => Boolean(profile && (profile.name || profile.fullName))
 
-/** The row's copy of the indexer document, in the indexer's own shape. */
+/** The row's copy of the onchain document, in the shape the chain reader returns. */
 const indexedFromRow = (row) => {
   const cover = readStoredCover(row.profileHeader).ref
   return {
@@ -98,14 +98,14 @@ const indexedFromRow = (row) => {
 }
 
 /**
- * Remembers the indexer's answer on the row. The Hup-first rule is applied by the statement
- * itself — a row whose sync stamp still equals the indexer's keeps its own copy — so an edit
- * saved while the indexer was answering is never overwritten. Never inserts: an unknown address
+ * Remembers what the chain said on the row. The Hup-first rule is applied by the statement
+ * itself — a row whose sync stamp still equals the chain's keeps its own copy — so an edit
+ * saved while the read was in flight is never overwritten. Never inserts: an unknown address
  * must not become a user by being read.
  * @param {string} address
- * @param {object|null} profile The indexer document, or null when it has no profile for the wallet.
+ * @param {object|null} profile The onchain document, or null when the wallet publishes none.
  */
-async function cacheIndexerAnswer(address, profile) {
+async function cacheChainAnswer(address, profile) {
   if (!profile) {
     await pool.execute('UPDATE users SET is_universal_profile = 0, profile_indexed_stamp = NULL WHERE wallet_address = ?', [address])
     return
@@ -146,8 +146,8 @@ async function dropOvertakenSyncStamp(address, storedStamp, profile) {
 
 const logCacheError = (error) => console.error('[PROFILE_INDEX_CACHE_ERROR]:', error.message)
 
-/** Asks the indexer again behind the response once the row's answer is old enough. */
-function scheduleIndexerRecheck(address, row) {
+/** Reads the chain again behind the response once the row's answer is old enough. */
+function scheduleChainRecheck(address, row) {
   const key = address.toLowerCase()
   const maxAge = row.is_universal_profile ? UP_RECHECK_MS : EOA_RECHECK_MS
   if (Date.now() - (checkedAt.get(key) ?? 0) < maxAge) return
@@ -155,10 +155,9 @@ function scheduleIndexerRecheck(address, row) {
 
   after(async () => {
     try {
-      const upData = await queryUniversalProfile(address)
-      if (!Array.isArray(upData?.data?.Profile)) return
-      const live = upData.data.Profile[0]
-      await cacheIndexerAnswer(address, isUniversalProfile(live) ? live : null)
+      const { answered, profile: live } = await readUniversalProfile(address)
+      if (!answered) return
+      await cacheChainAnswer(address, isUniversalProfile(live) ? live : null)
     } catch (error) {
       logCacheError(error)
     }
@@ -166,7 +165,7 @@ function scheduleIndexerRecheck(address, row) {
 }
 
 /**
- * A Universal Profile as the read serves it, from the indexer document — live, or the row's copy
+ * A Universal Profile as the read serves it, from the onchain document — live, or the row's copy
  * of it. The row can be AHEAD of that document: see cidex/scripts/add-profile-sync-stamp.sql.
  */
 function shapeUniversalProfile(profile, row, address, { badge, origin }) {
@@ -180,10 +179,6 @@ function shapeUniversalProfile(profile, row, address, { badge, origin }) {
     profile.description = row.description
     profile.tags = parseJsonList(row.tags)
     profile.links = parseJsonList(row.links)
-    /* fullName is the indexer's own "name#tag" rendering of the name that was just replaced.
-       Dropping it lets a byline rebuild one from the name above instead of showing the old
-       one — see the displayName memo in components/Profile.jsx. */
-    profile.fullName = null
     /* The stored reference rather than the resolved URL: a retry has to put this picture back
        into an LSP3 document, and a proxy URL cannot be turned back into a CID. */
     profile.profileImageRef = row.profileImage || null
@@ -199,7 +194,7 @@ function shapeUniversalProfile(profile, row, address, { badge, origin }) {
       ? resolveAvatarImageUrl(profile.profileImages[0].src, AVATAR_MAX_SIZE)
       : null
 
-  /* The LSP3 backgroundImage, which the indexer serves as `backgroundImages`.
+  /* The LSP3 backgroundImage, which the reader serves as `backgroundImages`.
      Unlike the avatar above, a Hup row that is ahead does NOT simply win here: most rows
      have never held a cover, and reading that as "no cover" would blank a real one off the
      profile for as long as an edit sat unsigned. Only a row that has actually set the cover
@@ -222,7 +217,7 @@ function shapeUniversalProfile(profile, row, address, { badge, origin }) {
   return profile
 }
 
-/** A profile the indexer has nothing for, from the row alone. */
+/** A profile the chain has nothing for, from the row alone. */
 function shapeDatabaseProfile(row, { badge, origin }) {
   const dbProfile = row
 
@@ -273,7 +268,7 @@ export async function GET(request, { params }) {
        card) queries /api/v1/leaderboard itself. */
 
     /* The row first, on its own: a primary-key read on the local database that already holds
-       everything the header, the byline and the page show once the indexer has been asked
+       everything the header, the byline and the page show once the chain has been read
        about this wallet once. */
     /* The badge joins from the users row itself, so it needs nothing from the read beside it
        and adds no latency running in the same batch. It is re-verified against
@@ -305,13 +300,13 @@ export async function GET(request, { params }) {
        indexed lookup, and only for profiles that actually publish a country. */
     const origin = await resolveOrigin(row?.origin_code)
 
-    /* The indexer is asked on the response path only when the row cannot answer for it: the
-       row has never recorded what the indexer said, or the columns that record it are not
-       migrated in yet (then this read behaves exactly as it did before them). */
+    /* The chain is read on the response path only when the row cannot answer for it: the row
+       has never recorded what the chain said, or the columns that record it are not migrated
+       in yet (then this read behaves exactly as it did before them). */
     const cacheable = await hasColumn('users', CACHE_COLUMN)
 
     if (cacheable && row && row.is_universal_profile !== null) {
-      scheduleIndexerRecheck(address, row)
+      scheduleChainRecheck(address, row)
 
       if (row.is_universal_profile) {
         return NextResponse.json({
@@ -323,17 +318,15 @@ export async function GET(request, { params }) {
       return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin }) })
     }
 
-    const upData = await queryUniversalProfile(address)
-    const answered = Array.isArray(upData?.data?.Profile)
-    const live = answered ? upData.data.Profile[0] : null
+    const { answered, profile: live } = await readUniversalProfile(address)
     const isUP = isUniversalProfile(live)
 
-    /* A failed lookup (timeout, upstream down) remembers nothing, so the next read asks again. */
+    /* A failed read (timeout, RPC down) remembers nothing, so the next one asks again. */
     if (row && answered) {
       const storedStamp = row.profile_sync_stamp ?? null
       checkedAt.set(address.toLowerCase(), Date.now())
       after(() => {
-        const write = cacheable ? cacheIndexerAnswer(address, isUP ? live : null) : isUP ? dropOvertakenSyncStamp(address, storedStamp, live) : Promise.resolve()
+        const write = cacheable ? cacheChainAnswer(address, isUP ? live : null) : isUP ? dropOvertakenSyncStamp(address, storedStamp, live) : Promise.resolve()
         return write.catch(logCacheError)
       })
     }
@@ -345,7 +338,7 @@ export async function GET(request, { params }) {
       })
     }
 
-    /* Fallback to Database if the UP endpoint fails or returns no profile */
+    /* Fallback to Database when the chain has no profile for this wallet */
 
     if (!row) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -494,7 +487,7 @@ export async function PUT(request, { params }) {
       queryValues.push(origin.code)
     }
 
-    /* Sent only by the owner's editor, and only for a Universal Profile: it carries the indexer
+    /* Sent only by the owner's editor, and only for a Universal Profile: it carries the onchain
        stamp this save has just overtaken, which is what makes the read above prefer this row
        until the matching onchain write lands. */
     if (typeof syncStamp === 'string' && (await canWrite('profile_sync_stamp'))) {
