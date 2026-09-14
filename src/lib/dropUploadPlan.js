@@ -12,6 +12,9 @@
  * thousand images. Batching is safe for artwork precisely because it does not need a single
  * directory: every image is addressed by a full URL from inside its token's metadata, so a
  * collection's art can live across several pinned folders without anything downstream noticing.
+ * An image too big for even one request on its own goes up as a single file instead, through the
+ * presigned path that has no such cap — a full URL is a full URL whether it points into a folder
+ * or at a file.
  * The metadata, by contrast, MUST land as one directory — `baseURI + tokenId` can only resolve
  * inside a single root — which is exactly why it is the half that fits.
  */
@@ -27,9 +30,9 @@ export const IMAGE_BATCH_FILES = 400
 /**
  * Groups artwork into batches that will each fit one request.
  *
- * A single file larger than the batch budget still gets its own batch rather than being dropped:
- * it may well fail at the route, and the honest place to find that out is with a real error about
- * that file, not by silently omitting a token from the collection.
+ * A single file larger than the batch budget still gets a batch of its own rather than being
+ * dropped; `isSoloBatch` picks those out so the caller sends them as one file, not through the
+ * folder route that cannot take them.
  *
  * @param {Array<{name: string, bytes: Uint8Array, token: number}>} images
  */
@@ -54,6 +57,13 @@ export function planImageBatches(images, { maxBytes = IMAGE_BATCH_BYTES, maxFile
 }
 
 /**
+ * A batch the folder route cannot carry: one image already past the batch budget. It goes up on
+ * its own through the single-file path, which is presigned past the platform body cap — and
+ * loses nothing by it, since its metadata addresses it by a full URL either way.
+ */
+export const isSoloBatch = (batch, { maxBytes = IMAGE_BATCH_BYTES } = {}) => batch.length === 1 && batch[0].bytes.byteLength > maxBytes
+
+/**
  * The filename an image keeps inside its pinned batch. Flattened to `<token>.<ext>` so the URL is
  * derivable from the token number alone — an artist's original names ("HOODLESS #1111 final
  * v2.png") survive pinning badly, and nothing downstream needs them.
@@ -66,16 +76,17 @@ export const imageFileName = (image) => {
 /**
  * Everything the metadata pass needs, keyed by token: where the image landed and what its bytes
  * hash to. Built from the batch results as they come back, so a resumed upload can rebuild this
- * from the batches it already finished.
+ * from the batches it already finished. A solo upload pinned the file itself, so its cid is the
+ * whole address; a folder batch addresses each image by name under the directory root.
  *
- * @param {Array<{cid: string, images: Array}>} completed
+ * @param {Array<{cid: string, images: Array, solo?: boolean}>} completed
  */
 export function indexPinnedImages(completed) {
   const byToken = new Map()
-  for (const { cid, images } of completed) {
+  for (const { cid, images, solo } of completed) {
     for (const image of images) {
       byToken.set(image.token, {
-        url: `ipfs://${cid}/${imageFileName(image)}`,
+        url: solo ? `ipfs://${cid}` : `ipfs://${cid}/${imageFileName(image)}`,
         hash: hashBytes(image.bytes),
       })
     }
@@ -114,18 +125,19 @@ export function buildMetadataFiles({ images, pinnedImages, standardId, collectio
 /**
  * Progress as a share of the whole job, weighted by bytes rather than by file count — a thousand
  * 8 KB JSON files are not half the work of a thousand 40 KB images, and a bar that says they are
- * stalls at the halfway mark for the entire second half.
+ * stalls at the halfway mark for the entire second half. `bytesInFlight` is what the batch under
+ * way has sent so far: a solo file reports as it goes, since it can be the longest single step.
  */
-export function uploadProgress({ imageBatches, doneBatches, metadataDone }) {
+export function uploadProgress({ imageBatches, doneBatches, bytesInFlight = 0, metadataDone }) {
   const imageBytes = imageBatches.reduce((sum, batch) => sum + batch.reduce((n, i) => n + i.bytes.byteLength, 0), 0)
-  const doneBytes = imageBatches.slice(0, doneBatches).reduce((sum, batch) => sum + batch.reduce((n, i) => n + i.bytes.byteLength, 0), 0)
+  const doneBytes = imageBatches.slice(0, doneBatches).reduce((sum, batch) => sum + batch.reduce((n, i) => n + i.bytes.byteLength, 0), 0) + bytesInFlight
 
   // The metadata pass is one request against many, so give it a fixed slice rather than pretending
   // to measure it — a tenth is about what it costs in practice.
   const METADATA_SHARE = 0.1
   if (!imageBytes) return metadataDone ? 100 : 0
 
-  const imageShare = (doneBytes / imageBytes) * (1 - METADATA_SHARE) * 100
+  const imageShare = (Math.min(doneBytes, imageBytes) / imageBytes) * (1 - METADATA_SHARE) * 100
   return Math.min(100, Math.round(imageShare + (metadataDone ? METADATA_SHARE * 100 : 0)))
 }
 

@@ -238,6 +238,15 @@ export async function uploadObjectToIPFS(contentObj, { timeoutMs = OBJECT_UPLOAD
   }
 }
 
+/* The platform rejects an oversized function body only after the whole thing has been sent, so a
+   folder past the cap costs a full upload to earn a 413. Checked here instead, against the same
+   budget the artwork batches are planned to. Single files have the presigned path; a directory
+   does not, because neither presigned path produces a directory root. */
+const FOLDER_BUDGET_BYTES = 4 * 1024 * 1024
+
+const folderTooLarge = (bytes) =>
+  `That folder is ${Math.round(bytes / (1024 * 1024))} MB — a directory has to go up in one request, and the limit is about 4 MB. Pin it with your own IPFS tool and paste the CID.`
+
 /**
  * Pins a set of files as one IPFS DIRECTORY and returns its root CID — what a numbered
  * collection's reveal needs, since tokenURI resolves as baseURI + tokenId + suffix and only a
@@ -253,9 +262,14 @@ export async function uploadObjectToIPFS(contentObj, { timeoutMs = OBJECT_UPLOAD
  * @returns {Promise<string>} The directory CID (bare, no `ipfs://` prefix).
  */
 export async function uploadFolderToIPFS(files) {
+  const list = Array.from(files)
+
+  const bytes = list.reduce((sum, file) => sum + (file.size ?? 0), 0)
+  if (bytes > FOLDER_BUDGET_BYTES) throw new Error(folderTooLarge(bytes))
+
   try {
     const form = new FormData()
-    for (const file of Array.from(files)) form.append('files', file, file.webkitRelativePath || file.name)
+    for (const file of list) form.append('files', file, file.webkitRelativePath || file.name)
 
     const res = await fetch('/api/ipfs/folder', { method: 'POST', body: form })
     if (!res.ok) throw new Error(await readFailure(res, 'Folder upload failed'))

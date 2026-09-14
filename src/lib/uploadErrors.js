@@ -18,6 +18,10 @@ const MAX_LENGTH = 120
    cause when a request to the storage edge never leaves the page. */
 const NETWORK_FAILURE = /^(TypeError: )?(Failed to fetch|Load failed|NetworkError|Network request failed)/i
 
+/* The platform refuses a function body over its cap before the route ever runs, with a page that
+   names the cap by code rather than by size. */
+const PAYLOAD_TOO_LARGE = /FUNCTION_PAYLOAD_TOO_LARGE|Request Entity Too Large/i
+
 const MESSAGE_KEYS = ['message', 'Message', 'error', 'details', 'reason']
 
 function findMessage(value, depth = 0) {
@@ -76,6 +80,7 @@ export function shortUploadError(error, fallback = 'Upload failed', maxLength = 
   const raw = typeof error === 'string' ? error : typeof error?.message === 'string' ? error.message : ''
   if (!raw.trim()) return fallback
   if (NETWORK_FAILURE.test(raw.trim())) return 'Upload could not reach storage (network or CORS)'
+  if (PAYLOAD_TOO_LARGE.test(raw)) return 'Too big for one request — the server accepts about 4 MB at a time'
 
   const message = extractProviderMessage(raw) || fallback
   if (message.length <= maxLength) return message

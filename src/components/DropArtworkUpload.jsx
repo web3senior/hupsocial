@@ -13,8 +13,8 @@ import {
   validateCollection,
   validateReadyMade,
 } from '@/lib/dropUpload'
-import { buildMetadataFiles, estimateRemaining, indexPinnedImages, planImageBatches, uploadProgress, imageFileName } from '@/lib/dropUploadPlan'
-import { uploadFolderToIPFS } from '@/lib/ipfs'
+import { buildMetadataFiles, estimateRemaining, indexPinnedImages, isSoloBatch, planImageBatches, uploadProgress, imageFileName } from '@/lib/dropUploadPlan'
+import { uploadFileToIPFS, uploadFolderToIPFS } from '@/lib/ipfs'
 import { isLuksoStandard } from '@/lib/drops'
 import { toast } from '@/components/NextToast'
 import styles from './DropArtworkUpload.module.scss'
@@ -205,26 +205,43 @@ export default function DropArtworkUpload({ standardId, maxSupply = 0, collectio
     if (!items.length || uploading) return
 
     const batches = planImageBatches(items)
-    const bytesTotal = items.reduce((n, i) => n + i.bytes.byteLength, 0)
+    const bytesOf = (images) => images.reduce((n, i) => n + i.bytes.byteLength, 0)
+    const bytesTotal = bytesOf(items)
     const startedAt = Date.now()
+
+    // Progress from the batches already kept, plus whatever the one under way has sent so far
+    const report = ({ doneBatches, bytesInFlight = 0 }) => {
+      const bytesDone = doneBatchesRef.current.reduce((n, b) => n + bytesOf(b.images), 0) + bytesInFlight
+      setProgress({
+        percent: uploadProgress({ imageBatches: batches, doneBatches, bytesInFlight, metadataDone: false }),
+        done: doneBatchesRef.current.reduce((n, b) => n + b.images.length, 0),
+        total: items.length,
+        estimate: estimateRemaining({ bytesDone, bytesTotal, elapsedMs: Date.now() - startedAt }),
+      })
+    }
 
     setUploading(true)
     try {
       // --- artwork, in batches: each is its own directory, which is fine because every image is
-      // addressed by a full URL from inside its token's metadata ---
+      // addressed by a full URL from inside the metadata of its token ---
       for (let index = doneBatchesRef.current.length; index < batches.length; index++) {
         const batch = batches[index]
         const files = batch.map((image) => new File([image.bytes], imageFileName(image), { type: image.type }))
-        const cid = await uploadFolderToIPFS(files)
-        doneBatchesRef.current = [...doneBatchesRef.current, { cid, images: batch }]
 
-        const bytesDone = doneBatchesRef.current.reduce((n, b) => n + b.images.reduce((m, i) => m + i.bytes.byteLength, 0), 0)
-        setProgress({
-          percent: uploadProgress({ imageBatches: batches, doneBatches: index + 1, metadataDone: false }),
-          done: doneBatchesRef.current.reduce((n, b) => n + b.images.length, 0),
-          total: items.length,
-          estimate: estimateRemaining({ bytesDone, bytesTotal, elapsedMs: Date.now() - startedAt }),
-        })
+        // One image past the batch budget goes up as a file, not a folder: the folder route is
+        // bounded by the platform body cap, and the single-file path is presigned past it
+        const solo = isSoloBatch(batch)
+        let cid
+        if (solo) {
+          const uri = await uploadFileToIPFS(files[0], {
+            onProgress: (sent) => report({ doneBatches: index, bytesInFlight: Math.round(sent * files[0].size) }),
+          })
+          cid = uri.replace(/^ipfs:\/\//, '')
+        } else {
+          cid = await uploadFolderToIPFS(files)
+        }
+        doneBatchesRef.current = [...doneBatchesRef.current, { cid, images: batch, solo }]
+        report({ doneBatches: index + 1 })
       }
 
       // --- metadata, as ONE directory: baseURI + tokenId can only resolve inside a single root ---
