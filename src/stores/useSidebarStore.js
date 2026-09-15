@@ -56,7 +56,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon },
   { id: 'bazaar', name: 'Bazaar', path: sectionLanding(SECTIONS.bazaar), icon: StorefrontIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
   // Beside Bazaar: an escrowed deal on the same HupOffers contract the NFT market's offers use
-  { id: 'p2p', name: 'P2P Trading', path: '/p2p', icon: HandshakeIcon },
+  { id: 'p2p', name: 'P2P', path: '/p2p', icon: HandshakeIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
