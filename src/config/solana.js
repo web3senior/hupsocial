@@ -67,7 +67,9 @@ export const SOLANA_NETWORKS = {
     rpcUrl: 'https://api.devnet.solana.com',
     isTestnet: true,
     // Deployed from Solana Playground 2026-08-24 (see src/contracts/solana/hup/README.md)
-    hupProgramId: '9kNAEGDmFZ5iCrmPJRpcEjtFAfPUEhydLAm3YYEcDo5L',
+    // Paused: an empty id keeps devnet out of SOLANA_CHAINS (pickers) while 503 rows still resolve
+    // hupProgramId: '9kNAEGDmFZ5iCrmPJRpcEjtFAfPUEhydLAm3YYEcDo5L',
+    hupProgramId: '',
   }),
 }
 

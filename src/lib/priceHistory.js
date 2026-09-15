@@ -269,6 +269,40 @@ export async function fetchPriceHistory(symbols, range = DEFAULT_RANGE) {
 }
 
 /**
+ * History for one DefiLlama key (`chainSlug:0x…`) — a token named by its contract rather than
+ * by a listed ticker, which is how the token pages address one.
+ *
+ * The symbol path above refuses anything unlisted so that no caller can make a `$PEPE` card
+ * quote a lookalike contract. That guard is about a ticker standing in for a contract; here the
+ * contract is the thing being asked about and is printed on the page, so it does not apply.
+ *
+ * @param {string} key
+ * @param {string} range one of RANGES
+ * @returns {Promise<object|null>} the series, or null when nothing upstream can chart it
+ */
+export async function fetchHistoryForKey(key, range = DEFAULT_RANGE) {
+  if (!key) return null
+  if (!RANGES[range]) range = DEFAULT_RANGE
+  const { ttlMs } = RANGES[range]
+
+  const cacheKey = `${key}:${range}`
+  const hit = cache.get(cacheKey)
+  if (hit) {
+    const age = Date.now() - hit.at
+    const usable = hit.series === null ? age < MISS_TTL_MS : age < ttlMs
+    if (usable) return hit.series ? { ...hit.series, range } : null
+  }
+
+  const { ok, found } = await fetchFromLlama([key], range)
+  const series = found.get(key) ?? null
+  // Only an upstream that actually answered can establish a gap; a timeout is remembered as
+  // nothing at all, so the next caller retries rather than inheriting a fake miss
+  if (ok) cache.set(cacheKey, { at: Date.now(), series })
+
+  return series ? { ...series, range } : null
+}
+
+/**
  * What to call the span a series actually drew, which is not always the range it was asked
  * for. A pool GeckoTerminal has only just begun indexing answers a week-long request with a
  * few hours; the line is still worth drawing, but it must not claim to be the week.

@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react'
 import PageTitle from '@/components/PageTitle'
-import SectionTabs from '@/components/ui/SectionTabs'
 import P2pDirectory from './_components/P2pDirectory'
 import styles from './page.module.scss'
 
@@ -16,7 +15,6 @@ export default function Page() {
   return (
     <>
       <PageTitle name="P2P Trading" />
-      <SectionTabs section="trade" />
       {/* Same container every directory page uses — main is full-bleed and the sidebar is
           fixed over it, so content without this sits underneath the nav */}
       <div className={`${styles.page} animate fade`}>

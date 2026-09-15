@@ -356,6 +356,71 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+// The page fades into the background where it scrolls past a viewport edge — under the fixed
+// header and over the bottom nav — instead of being cut off mid-line. Both bands are driven by
+// the root scroller, so each one is gone at the end it belongs to, where there is nothing left
+// to fade into.
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset-inline: 0;
+  height: var(--scroll-fade-size);
+  pointer-events: none;
+  // Over the page content, under the header, the sidebar and the bottom nav. Dialogs and
+  // popovers paint in the top layer, so they clear it regardless.
+  z-index: 1;
+}
+
+body::before {
+  top: var(--header-height);
+  background: linear-gradient(to bottom, var(--background), transparent);
+}
+
+body::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--background), transparent);
+}
+
+// Without scroll-driven animations the bands stay put, which still reads as a soft edge.
+@supports (animation-timeline: scroll()) {
+  body::before,
+  body::after {
+    animation-timeline: scroll(root block);
+    animation-duration: auto;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+  }
+
+  body::before {
+    animation-name: scroll-edge-fade-in;
+    animation-range: 0 var(--scroll-fade-size);
+  }
+
+  body::after {
+    animation-name: scroll-edge-fade-out;
+    animation-range: calc(100% - var(--scroll-fade-size)) 100%;
+  }
+}
+
+@keyframes scroll-edge-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scroll-edge-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;

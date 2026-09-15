@@ -300,6 +300,11 @@ $secondary-color: #9e481d;
   --bottom-nav-inset: 0.5rem;
   --bottom-nav-space: calc(var(--bottom-nav-height) + var(--bottom-nav-inset) * 2 + env(safe-area-inset-bottom, 0px));
 
+  // Fixed header (components/Header) and the soft edge the page fades into where it scrolls
+  // past a viewport edge — under the header and over the bottom nav (app/Globals.scss).
+  --header-height: 70px;
+  --scroll-fade-size: 64px;
+
   // Card Specifics
   --card-padding: 16px;
   --card-shadow: 0 1px 4px rgba(12, 12, 13, 0.1);

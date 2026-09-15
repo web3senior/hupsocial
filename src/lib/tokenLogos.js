@@ -12,13 +12,17 @@ const CACHE_TTL_MS = 60 * 60 * 1000 // Branding is effectively static; only re-c
 // ceiling costs nothing.
 const FETCH_TIMEOUT_MS = 5000
 
-// GeckoTerminal network slugs for the chains it indexes. Monad and Robinhood are absent
-// (too new/niche) and testnet tokens have no listing, so those simply get no logo.
-// Shared with lib/tokenInfo.js, which reads the same upstream one token at a time.
+// GeckoTerminal network slugs for the chains it indexes — every app chain but Base Sepolia, which
+// is a testnet and will never be listed. Monad and Robinhood were absent when this was written and
+// are indexed now, which is worth re-checking against /api/v2/networks rather than assuming.
+// Shared with lib/tokenInfo.js and lib/tokenMarkets.js, which read the same upstream.
 export const GECKOTERMINAL_NETWORKS = {
   1: 'eth',
   42: 'lukso',
   56: 'bsc',
+  143: 'monad',
+  // 1868: 'soneium',
+  4663: 'robinhood',
   8453: 'base',
   42161: 'arbitrum',
   42220: 'celo',

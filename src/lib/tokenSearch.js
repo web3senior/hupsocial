@@ -15,6 +15,7 @@ const LUKSO_CHAIN_IDS = [42]
 const GECKOTERMINAL_NETWORKS = {
   1: 'eth',
   56: 'bsc',
+  // 1868: 'soneium',
   8453: 'base',
   42161: 'arbitrum',
   42220: 'celo',

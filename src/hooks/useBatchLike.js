@@ -20,7 +20,14 @@ import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { hupInstruction } from '@/lib/solana/hup'
 import { sendHupAction } from '@/lib/solana/relay'
 import { getNetworkDisplayName } from '@/lib/chains'
-import { ensureVaultUnlocked, isBurnerUnlocked, isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import {
+  canSessionPayGas,
+  ensureVaultUnlocked,
+  isBurnerUnlocked,
+  isSessionActive,
+  isSessionUnusableError,
+  writeWithBurnerSession,
+} from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { MAX_BATCH_LIKE_COUNT, chunk, describeDropped, preflightQueue } from '@/lib/batchLike'
 import { getWalletBatchMap, useSidebarStore } from '@/stores/useSidebarStore'
@@ -216,6 +223,21 @@ export const useBatchLike = () => {
           }
         }
 
+        // Signing a relayed request costs the burner nothing, but a direct session write pays
+        // its own gas — and the key is funded per chain, so an active session says nothing
+        // about whether it can send HERE. The two flags stay apart for that reason: an empty
+        // burner still signs for the relay, it just cannot be the one to broadcast.
+        let sessionCanPay = sessionUsable && (await canSessionPayGas(targetPublicClient ?? publicClient))
+
+        // Said once, and only where the wallet actually takes over: a sponsored basket never
+        // reaches the wallet at all, so an empty session key is not worth mentioning there
+        let sessionNoticeShown = false
+        const noticeSessionFallback = () => {
+          if (sessionNoticeShown || !sessionUsable || sessionCanPay) return
+          sessionNoticeShown = true
+          toast('Session key has no gas on this network — sending with your wallet.', 'info')
+        }
+
         const batches = chunk(queue, MAX_BATCH_LIKE_COUNT)
 
         // The pre-check only skips a relay round trip that the local cooldown mirror already
@@ -255,8 +277,8 @@ export const useBatchLike = () => {
             }
           }
 
-          if (!sent) {
-            if (sessionUsable) {
+          if (!sent && sessionCanPay) {
+            try {
               // Burner key authorization route needs no wallet confirmation
               await writeWithBurnerSession({
                 chain: chainDefinition,
@@ -265,16 +287,28 @@ export const useBatchLike = () => {
                 functionName: 'batchLike',
                 args: [address, batch],
               })
-            } else {
-              await ensureWalletChain()
-              await writeContractAsync({
-                abi,
-                chainId: numericChainId,
-                address: targetChain.hup,
-                functionName: 'batchLike',
-                args: [address, batch],
-              })
+
+              sent = true
+            } catch (err) {
+              // Only a failure that never reached the mempool is safe to re-send from the
+              // wallet; a revert bubbles up as the failure it is. One empty balance settles it
+              // for every remaining chunk too — same key, same chain.
+              if (!isSessionUnusableError(err)) throw err
+              sessionCanPay = false
+              console.warn('Session like unavailable:', err.message)
             }
+          }
+
+          if (!sent) {
+            noticeSessionFallback()
+            await ensureWalletChain()
+            await writeContractAsync({
+              abi,
+              chainId: numericChainId,
+              address: targetChain.hup,
+              functionName: 'batchLike',
+              args: [address, batch],
+            })
           }
 
           // Flag every signed post as liked so feed hearts turn red immediately instead of

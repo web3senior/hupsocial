@@ -32,6 +32,7 @@ const mainnetChains = [
   { chainId: 8453, name: "base", rpcUrl: "https://base.drpc.org" },
   { chainId: 42220, name: "celo", rpcUrl: "https://celo-rpc.publicnode.com" },
   { chainId: 4663, name: "robinhood", rpcUrl: "https://rpc.mainnet.chain.robinhood.com" },
+  // { chainId: 1868, name: "soneium", rpcUrl: "https://soneium-rpc.publicnode.com" },
 ];
 
 async function checkFactoryOnMainnets() {

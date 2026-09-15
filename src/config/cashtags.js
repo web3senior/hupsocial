@@ -90,6 +90,7 @@ export const SLUG_CHAIN_IDS = {
   base: 8453,
   celo: 42220,
   lukso: 42,
+  // soneium: 1868,
 }
 
 /** The cashtag registry entry for a symbol, or null when Hup does not carry that token. */

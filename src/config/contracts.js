@@ -4,7 +4,7 @@
  * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, baseSepolia, bsc,soneium, celo, lukso, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, baseSepolia, bsc, /* soneium, */ celo, lukso, mainnet, monad } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Arbitrum Orbit L2, ETH as gas
@@ -21,6 +21,32 @@ export const robinhood = defineChain({
     default: {
       name: 'Blockscout',
       url: `https://robinhoodchain.blockscout.com`,
+    },
+  },
+})
+
+// Circle's L1, USDC as gas (18-decimal native units). The only keyless mainnet RPC that serves
+// state reads: Circle's own hosts are keyed (Blockdaemon, dRPC) or WAF-blocked, and thirdweb's
+// 5042 answers chain id and block number only. Set RPC_URL_5042 for a keyed server endpoint.
+export const arc = defineChain({
+  id: 5042,
+  name: 'Arc',
+  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+  rpcUrls: {
+    default: {
+      http: [`https://rpc.arc-scan.org`],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Arc Explorer',
+      url: `https://explorer.arc.io`,
+    },
+  },
+  contracts: {
+    multicall3: {
+      address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+      blockCreated: 0,
     },
   },
 })
@@ -50,9 +76,10 @@ arbitrum.rpcUrls = {
   default: { http: ['https://arbitrum-one-rpc.publicnode.com', ...arbitrum.rpcUrls.default.http] },
 }
 celo.rpcUrls = { ...celo.rpcUrls, default: { http: ['https://celo-rpc.publicnode.com', ...celo.rpcUrls.default.http] } }
+// soneium.rpcUrls = { ...soneium.rpcUrls, default: { http: ['https://soneium-rpc.publicnode.com', ...soneium.rpcUrls.default.http] } }
 
 // Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad,soneium, arbitrum, base, celo, robinhood, baseSepolia]
+export const appChains = [mainnet, lukso, bsc, monad, arc, /* soneium, */ arbitrum, base, celo, robinhood, baseSepolia]
 
 // ''            — not deployed on that chain.
 // hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
@@ -83,7 +110,6 @@ export const CONTRACTS = {
     drops: '',
     splits: '',
     nativeGate: '',
-    launch: '',
     univ3Router: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
     univ3Quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
     wnative: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
@@ -119,7 +145,6 @@ export const CONTRACTS = {
     splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
     nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
     // No Uniswap on LUKSO
-    launch: '',
     univ3Router: '',
     univ3Quoter: '',
   },
@@ -144,7 +169,6 @@ export const CONTRACTS = {
     apps: '',
     drops: '',
     splits: '',
-    launch: '0xDe312Dd73C546858b7892Ab7C756babe1F9948e0',
     univ3Router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
     univ3Quoter: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
     wnative: '0x4200000000000000000000000000000000000006',
@@ -175,7 +199,6 @@ export const CONTRACTS = {
     drops: '0xE0380267cdDdE4658bF1d933F02670fAef4E3C5a',
     splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
     nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
-    launch: '',
     univ3Router: '0xfE31F71C1b106EAc32F1A19239c9a9A72ddfb900',
     univ3Quoter: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
     wnative: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A', // WMON
@@ -203,7 +226,6 @@ export const CONTRACTS = {
     drops: '0x52900b137403a52402CE0D83E6C96c54708f6B42',
     splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
     nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
-    launch: '',
     univ3Router: '0x5615CDAb10dc425a742d643d949a7F474C01abc4',
     univ3Quoter: '0x82825d0554fA07f7FC52Ab63c961F330fdEFa8E8',
     wnative: '0x471EcE3750Da237f93B8E339c536989b8978a438', // CELO itself — no WETH9 on Celo
@@ -234,7 +256,6 @@ export const CONTRACTS = {
     drops: '0xf60a2F3D2644f2f9D57878e031603672DfD8bAF1',
     splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
     nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
-    launch: '',
     univ3Router: '0x2626664c2603336E57B271c5C0b26F421741e481',
     univ3Quoter: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
     wnative: '0x4200000000000000000000000000000000000006',
@@ -262,7 +283,6 @@ export const CONTRACTS = {
     drops: '0x50f9643A4E1c5285A6Ac23cdA23304Cbe7783E68',
     splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
     nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
-    launch: '',
     univ3Router: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
     univ3Quoter: '0x78D78E420Da98ad378D7799bE8f4AF69033EB077',
     wnative: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', // WBNB
@@ -291,7 +311,6 @@ export const CONTRACTS = {
     drops: '0xa9a40F6Cd90E840A29319100d18AE7aE1C549d2F',
     splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
     nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',
-    launch: '',
     // v4 only; both quoters are wired and the batch quote uses whichever answers
     univ3Router: '',
     univ3Quoter: '',
@@ -335,7 +354,6 @@ export const CONTRACTS = {
     drops: '',
     splits: '',
     nativeGate: '',
-    launch: '',
     univ3Router: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
     univ3Quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
     wnative: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
@@ -345,8 +363,37 @@ export const CONTRACTS = {
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506',
   },
-    chain1868: {
-    name: 'soneium',
+  // chain1868: {
+  //   name: 'soneium',
+  //   forwarder: '',
+  //   hup: '',
+  //   status: '',
+  //   followerSystem: '',
+  //   community: '',
+  //   store: '',
+  //   tipper: '',
+  //   trade: '',
+  //   offers: '',
+  //   events: '',
+  //   predict: '',
+  //   apps: '',
+  //   polls: '',
+  //   fund: '',
+  //   drops: '',
+  //   splits: '',
+  //   nativeGate: '',
+  //   launch: '',
+  //   univ3Router: '',
+  //   univ3Quoter: '',
+  //   wnative: '',
+  //   univ4Router: '',
+  //   univ4PoolManager: '',
+  //   univ4Quoters: [],
+  //   permit2: '',
+  //   sushiV2Router: '',
+  // },
+  chain5042: {
+    name: 'arc',
     forwarder: '',
     hup: '',
     status: '',
@@ -364,13 +411,12 @@ export const CONTRACTS = {
     drops: '',
     splits: '',
     nativeGate: '',
-    launch: '',
     univ3Router: '',
     univ3Quoter: '',
     wnative: '',
     univ4Router: '',
     univ4PoolManager: '',
-    univ4Quoters: [''],
+    univ4Quoters: [],
     permit2: '',
     sushiV2Router: '',
   },

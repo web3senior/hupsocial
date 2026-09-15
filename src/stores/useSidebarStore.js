@@ -3,12 +3,12 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import {
-  ArrowsDownUpIcon,
   ArticleIcon,
   BellIcon,
   BookmarkSimpleIcon,
   CalendarBlankIcon,
   ChartBarIcon,
+  ChartLineUpIcon,
   ChatCircleIcon,
   CurrencyCircleDollarIcon,
   CurrencyDollarIcon,
@@ -45,6 +45,8 @@ export const NAV_ITEMS_SCHEMA = [
   // an opinion. A checklist, not a bar chart — Insights owns ChartBar here, and the sideways
   // variant just reads as a chart someone knocked over.
   { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
+  // Beside polls, not in Trade: a bet here is parimutuel and judge-resolved, with no way out before it settles
+  { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
   // Beside polls for the same reason: asking people for something, in public, on the record.
   { id: 'fund', name: 'Fundraise', path: '/fund', icon: CurrencyCircleDollarIcon },
   // With the social rows for the same reason polls are: an article is something someone wrote,
@@ -52,7 +54,6 @@ export const NAV_ITEMS_SCHEMA = [
   // for long-form, so it earns a row rather than living behind the More menu.
   { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon },
   { id: 'bazaar', name: 'Bazaar', path: sectionLanding(SECTIONS.bazaar), icon: StorefrontIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
-  { id: 'trade', name: 'Trade', path: sectionLanding(SECTIONS.trade), icon: ArrowsDownUpIcon, activePaths: sectionPaths(SECTIONS.trade) },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },

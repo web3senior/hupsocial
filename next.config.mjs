@@ -104,6 +104,19 @@ const nextConfig = {
         destination: '/bazaar',
         permanent: true,
       },
+      // The launch pages became the Trade section. Every token link shared before the rename
+      // points at the old path, and a token page is a thing people paste into group chats — so
+      // these have to keep resolving rather than 404 once the nav stopped naming them.
+      {
+        source: '/launches',
+        destination: '/trade',
+        permanent: true,
+      },
+      {
+        source: '/launches/:path*',
+        destination: '/trade/:path*',
+        permanent: true,
+      },
     ];
   },
 };

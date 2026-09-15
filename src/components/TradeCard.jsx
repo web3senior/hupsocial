@@ -34,6 +34,7 @@ const STATUS_CANCELLED = 3
 const OPENSEA_CHAIN_SLUGS = {
   1: 'ethereum',
   56: 'bnb',
+  // 1868: 'soneium',
   8453: 'base',
   42161: 'arbitrum',
   42220: 'celo',

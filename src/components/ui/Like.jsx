@@ -14,7 +14,7 @@ import {
   useWriteContract,
 } from 'wagmi'
 import { getPublicClient } from 'wagmi/actions'
-import { isSessionActive, localStorageBatchLikeKey, writeWithBurnerSession } from '@/lib/burnerSession'
+import { canSessionPayGas, isSessionActive, isSessionUnusableError, localStorageBatchLikeKey, writeWithBurnerSession } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
@@ -316,18 +316,32 @@ export const Like = ({ post, onUpdate }) => {
       }
 
       // The contract resolves the burner key back to the owner, so the session key signs
-      // unlike() exactly like it signs batchLike() — and neither needs a wallet confirmation
+      // unlike() exactly like it signs batchLike() — and neither needs a wallet confirmation.
+      // It pays its own gas though, and it is funded per chain: an empty balance here falls
+      // through to the wallet instead of failing the tap, the same way a spent free-like
+      // allowance does. A heart that stops working reads as broken.
       if (session.active) {
-        await writeWithBurnerSession({
-          chain: chainDefinition,
-          contractAddress: targetChain.hup,
-          abi,
-          functionName,
-          args,
-        })
+        if (await canSessionPayGas(targetPublicClient)) {
+          try {
+            await writeWithBurnerSession({
+              chain: chainDefinition,
+              contractAddress: targetChain.hup,
+              abi,
+              functionName,
+              args,
+            })
 
-        settle()
-        return
+            settle()
+            return
+          } catch (err) {
+            // Only a failure that never reached the mempool is safe to re-send from the
+            // wallet; a revert bubbles up as the failure it is
+            if (!isSessionUnusableError(err)) throw err
+            console.warn('Session key could not send this heart:', err.message)
+          }
+        } else {
+          toast('Session key has no gas on this network — sending with your wallet.', 'info')
+        }
       }
 
       pendingActionRef.current = liked ? 'like' : 'unlike'

@@ -39,7 +39,7 @@
  * the server's local zone and shift every row by its offset. market_bets.bet_at and
  * swap_activity.created_at are already unix seconds and pass through untouched.
  *
- * Integrity note: swap rows are client-reported at confirmation time (see api/v1/swaps) and
+ * Integrity note: swap rows were client-reported by the swap page (on arco.cash since 2026-09-15) and
  * carry verified = 0 until a future job checks receipts, so the feed treats them as telemetry.
  * Every other verb comes from an indexed event.
  *

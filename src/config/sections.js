@@ -14,17 +14,6 @@ export const SECTIONS = {
       { id: 'drops', label: 'Drops', path: '/drops' },
     ],
   },
-  // Positions you take with fungible value — swapping, launching, OTC, prediction markets.
-  trade: {
-    id: 'trade',
-    name: 'Trade',
-    tabs: [
-      { id: 'swap', label: 'Swap', path: '/swap' },
-      { id: 'tokens', label: 'Tokens', path: '/launches' },
-      { id: 'p2p', label: 'P2P', path: '/p2p' },
-      { id: 'predict', label: 'Predict', path: '/predict' },
-    ],
-  },
 }
 
 // Every route a section owns, for the sidebar row's multi-path active state

@@ -15,7 +15,7 @@ import styles from './PendingPost.module.scss'
 // Attachments (a quote, a poll, a listing, a market…) render from live data the real card
 // fetches by id. The ghost has no id yet, so it stands in for them with a block of roughly the
 // right weight rather than firing lookups for a post that does not exist.
-const ATTACHMENT_KEYS = ['quoteOf', 'nftListing', 'predictMarket', 'tokenLaunch', 'nftDrop', 'miniApp', 'poll', 'article']
+const ATTACHMENT_KEYS = ['quoteOf', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'article']
 
 const getElement = (content, type) => content?.elements?.find((element) => element?.type === type)
 

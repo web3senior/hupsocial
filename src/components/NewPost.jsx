@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CheckIcon, CoinIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CheckIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -32,7 +32,6 @@ import GifPicker from '@/components/GifPicker'
 import EmojiPicker from '@/components/EmojiPicker'
 import SellNftModal from '@/components/SellNftModal'
 import AttachMarketModal from '@/components/AttachMarketModal'
-import AttachLaunchModal from '@/components/AttachLaunchModal'
 import AttachDropModal from '@/components/AttachDropModal'
 import DropCard from '@/components/DropCard'
 import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
@@ -137,7 +136,7 @@ const loadDraftContent = () => {
 // A published payload carries its attachment references alongside the content (see the tail of
 // handleCreatePost), and each of those is restored into its own state. Leaving them on the
 // content object would have getSerializablePostContent spread a second copy into the next one.
-const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'tokenLaunch', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'article']
+const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'article']
 
 const stripAttachments = (content) => {
   const bare = { ...content }
@@ -409,12 +408,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     restoredContent?.predictMarket ?? (actionType === 'edit' ? getContentPayload(existingPost)?.predictMarket ?? null : null)
   )
   const [showAttachMarket, setShowAttachMarket] = useState(false)
-  // Token launches too — a { launchId, token, chainId } reference the LaunchCard resolves live,
-  // so the curve's price and state are never frozen into the stored post
-  const [tokenLaunch, setTokenLaunch] = useState(() =>
-    restoredContent?.tokenLaunch ?? (actionType === 'edit' ? getContentPayload(existingPost)?.tokenLaunch ?? null : null)
-  )
-  const [showAttachLaunch, setShowAttachLaunch] = useState(false)
   // NFT drops as well — a thin reference plus static art; DropCard resolves supply, phases,
   // and progress live from the HupDrops engine so the card never shows stale mint state
   const [nftDrop, setNftDrop] = useState(
@@ -573,7 +566,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     mediaItems.length > 0 ||
     Boolean(nftListing) ||
     Boolean(predictMarket) ||
-    Boolean(tokenLaunch) ||
     Boolean(nftDrop) ||
     Boolean(miniApp) ||
     Boolean(poll) ||
@@ -618,8 +610,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const nftTradeAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.trade)
   // Prediction markets pin to the same chain the post lands on, like NFT listings
   const predictAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.predict)
-  // Token launches pin to the post's chain like the others
-  const launchAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.launch)
   // NFT drops too — only offered where the HupDrops engine is deployed
   const dropsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.drops)
   // Polls the same: the ballot has to settle on the chain the post lands on
@@ -628,7 +618,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const fundAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.fund)
   // The composer already holds an image and text, so the create dialog opens with two of its four
   // required fields filled — the author only types a name and a ticker
-  const launchPrefillImage = mediaItems.find((item) => item.type === 'image' && item.cid)?.cid ?? ''
 
   // Every chain-gated attachment hangs off one labelled menu instead of the icon row. The row
   // grew a glyph per attachment type until it overflowed unannounced, and a bare icon never
@@ -662,13 +651,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       hint: 'Let readers take a side on an outcome',
       attached: Boolean(predictMarket),
     },
-    canAttachNft && launchAvailable && {
-      key: 'launch',
-      icon: CoinIcon,
-      label: 'Launch a token',
-      hint: 'Open a token launch from this post',
-      attached: Boolean(tokenLaunch),
-    },
     canAttachNft && dropsAvailable && {
       key: 'drop',
       icon: ImagesSquareIcon,
@@ -693,7 +675,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       case 'poll': attachPollRef.current?.open(); break
       case 'fund': attachFundRef.current?.open(); break
       case 'predict': setShowAttachMarket(true); break
-      case 'launch': setShowAttachLaunch(true); break
       case 'drop': setShowAttachDrop(true); break
       case 'miniapp': attachMiniAppRef.current?.open(); break
       default: break
@@ -1519,10 +1500,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // the reference from the indexed API
       if (predictMarket) serializableContent.predictMarket = predictMarket
 
-      // Token launches as well — the launch already exists onchain (created in CreateLaunchDialog);
-      // LaunchCard resolves price and curve state live so the post never carries stale numbers
-      if (tokenLaunch) serializableContent.tokenLaunch = tokenLaunch
-
       // NFT drops as well — the drop already exists onchain (created at /drops/create);
       // DropCard resolves supply and phase state live so the post never carries stale numbers
       if (nftDrop) serializableContent.nftDrop = nftDrop
@@ -1878,16 +1855,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 </div>
               )}
 
-              {tokenLaunch && (
-                <div className={styles.nftAttachment}>
-                  <CoinIcon size={16} />
-                  <span>Token launch attached (launch #{tokenLaunch.launchId})</span>
-                  <button type="button" onClick={() => setTokenLaunch(null)} aria-label="Detach token launch" disabled={isBusy}>
-                    <XIcon size={14} />
-                  </button>
-                </div>
-              )}
-
               {nftDrop && (
                 <div className={styles.dropPreview}>
                   <div className={styles.nftAttachment}>
@@ -2212,19 +2179,6 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             setShowAttachMarket(false)
           }}
           onClose={() => setShowAttachMarket(false)}
-        />
-      )}
-
-      {showAttachLaunch && (
-        <AttachLaunchModal
-          chainId={targetChainId}
-          prefillImage={launchPrefillImage}
-          prefillDescription={postText}
-          onAttached={(launchReference) => {
-            setTokenLaunch(launchReference)
-            setShowAttachLaunch(false)
-          }}
-          onClose={() => setShowAttachLaunch(false)}
         />
       )}
 

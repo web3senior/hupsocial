@@ -1,4 +1,5 @@
 import { txExplorerUrl } from '@/lib/explorer'
+import { ARCO_URL } from '@/lib/arco'
 import { offerHref } from '@/lib/nftLinks'
 import {
   ArrowsDownUpIcon,
@@ -153,7 +154,7 @@ export function hrefOf(row) {
   if (kind === 'follow' && subject) return `/${subject}`
   if (kind === 'nft_sale' && networkId && entityId) return `/nfts/${networkId}/${entityId}`
   if (kind === 'bet' && networkId && entityId) return `/predict/${networkId}/${entityId}`
-  if (kind === 'swap') return '/swap'
+  if (kind === 'swap') return `${ARCO_URL}/swap`
   if (row.entity_type === 'drop' && networkId && entityId) return `/drops/${networkId}/${entityId}`
   if (row.entity_type === 'community' && networkId && entityId) return `/communities/${networkId}/${entityId}`
 

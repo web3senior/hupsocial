@@ -344,7 +344,6 @@
       { id: "HupDropsDeployer1155", label: "HupDrops deployer · ERC1155 (editions, EVM)", file: "HupDropsDeployer1155.json" },
       { id: "HupOffers", label: "HupOffers (escrowed offers / OTC)", file: "HupOffers.json" },
       { id: "HupCommunity", label: "HupCommunity", file: "HupCommunity.json" },
-      { id: "HupLaunch", label: "HupLaunch (token launchpad → live Uniswap v4 pool)", file: "HupLaunch.json" },
       { id: "HupFund", label: "HupFund (fundraising campaigns, escrowed — admin only)", file: "HupFund.json" },
       { id: "HupTestToken", label: "Test token · ERC20 (faucet, any EVM)", file: "HupTestToken.json", signerArgs: ["owner_"] },
       { id: "HupTestERC721", label: "Test NFT · ERC721 (faucet, any EVM)", file: "HupTestERC721.json", signerArgs: ["owner_"] },
@@ -422,22 +421,6 @@
           "0x46a3dfCb1F4ec29dB7F96C0D3962DF20E6EdB259", // HupChatForwarder
           "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
           "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA", // canonical LSP26
-        ],
-      },
-      // HupLaunch: Hup core (burner sessions only, and setHupContract can rotate a real core
-      // in later because it probes the target), the HupChatForwarder, the admin, then the
-      // Uniswap v4 stack: PoolManager, PositionManager, Permit2. Pools are hookless, so there
-      // is nothing to deploy first. The Base Sepolia pair was verified onchain 2026-09-08 — the
-      // PositionManager reports the PoolManager below as its own, and reports the canonical
-      // Permit2. Resolve and verify the same way on every new chain; never guess an address.
-      HupLaunch: {
-        84532: [ // Base Sepolia (dev)
-          "0xf6b33ecab0fa561300453c1bb1B520Ce544544ae", // Hup core
-          "0x18B86518709a6C0942F3adCD0CD528D1716e0A80", // HupChatForwarder
-          "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e", // admin
-          "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408", // v4 PoolManager
-          "0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80", // v4 PositionManager
-          "0x000000000022D473030F116dDEE9F6B43aC78BA3", // Permit2 (canonical)
         ],
       },
       // HupFund: the admin only — no Hup core (no session keys) and no forwarder, on purpose:

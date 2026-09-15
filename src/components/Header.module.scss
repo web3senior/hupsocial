@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 70px;
+  height: var(--header-height);
   user-select: none;
   background-color: var(--background);
   z-index: 2;

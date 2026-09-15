@@ -91,7 +91,10 @@ div[class*='__container'] {
     'medium': 768px,  // Tablets
     'large': 1024px,  // Small laptops
     'xlarge': 1280px, // Desktops
-    'xxlarge': 1536px // Large screens
+    'xxlarge': 1536px, // Large screens
+    // Edge to edge, for trading surfaces that want every pixel. The clearance maths below still
+    // applies, so it seats flush beside the aside instead of sliding under it.
+    'full': 100%
   );
 
   // Loop to generate data-width attribute selectors dynamically
