@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "remix:localhost": "remixd -s ./ -u https://remix.ethereum.org"
+    "remix:localhost": "remixd -s ./ -u https://app.remix.live"
   },
   "dependencies": {
     "@lukso/lsp1-contracts": "^0.16.3",
