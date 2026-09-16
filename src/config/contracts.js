@@ -25,16 +25,16 @@ export const robinhood = defineChain({
   },
 })
 
-// Circle's L1, USDC as gas (18-decimal native units). The only keyless mainnet RPC that serves
-// state reads: Circle's own hosts are keyed (Blockdaemon, dRPC) or WAF-blocked, and thirdweb's
-// 5042 answers chain id and block number only. Set RPC_URL_5042 for a keyed server endpoint.
+// Circle's L1, USDC as gas (18-decimal native units). Circle's own endpoint leads and arc-scan
+// covers it; every other provider Circle lists (Alchemy, Blockdaemon, dRPC, QuickNode) is keyed,
+// so set RPC_URL_5042 to use one. eth_getLogs here caps at 2000 results per range.
 export const arc = defineChain({
   id: 5042,
   name: 'Arc',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   rpcUrls: {
     default: {
-      http: [`https://rpc.arc-scan.org`],
+      http: [`https://rpc.mainnet.arc.io`, `https://rpc.arc-scan.org`],
     },
   },
   blockExplorers: {
@@ -394,8 +394,8 @@ export const CONTRACTS = {
   // },
   chain5042: {
     name: 'arc',
-    forwarder: '',
-    hup: '',
+    forwarder: '0xc407722d150c8a65e890096869f8015D90a89EfD',
+    hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
     status: '',
     followerSystem: '',
     community: '',
@@ -405,7 +405,7 @@ export const CONTRACTS = {
     offers: '',
     events: '',
     predict: '',
-    apps: '',
+    apps: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
     polls: '',
     fund: '',
     drops: '',

@@ -84,7 +84,7 @@ robinhood.textColor = `#fff`
 robinhood.isNew = true
 
 // Arc
-arc.primaryColor = `#131C30`
+arc.primaryColor = `#acc6e9`
 arc.textColor = `#fff`
 arc.isNew = true
 
@@ -150,6 +150,8 @@ export const BROWSER_RPC_URLS = {
   [robinhood.id]: ['https://robinhood-rpc.publicnode.com'],
   // sepolia.base.org refuses server callers; publicnode leads
   [baseSepolia.id]: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'],
+  // Both keyless endpoints reflect the request Origin; arc-scan covers the official one's 503s
+  [arc.id]: ['https://rpc.mainnet.arc.io', 'https://rpc.arc-scan.org'],
 }
 
 /** Fails over across the chain's known-good endpoints; viem's default where there are none. */
