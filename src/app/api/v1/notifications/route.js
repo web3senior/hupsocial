@@ -26,7 +26,7 @@ export const runtime = 'nodejs'
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
 
-const MENTION_TYPES = ['post_received_comment', 'post_received_quote', 'post_received_repost']
+const MENTION_TYPES = ['post_received_comment', 'post_received_quote', 'post_received_repost', 'post_mentioned']
 const MONEY_TYPES = [
   'post_received_tip',
   'post_sent_tip',

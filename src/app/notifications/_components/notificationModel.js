@@ -1,5 +1,6 @@
 import {
   ArrowsCounterClockwiseIcon,
+  AtIcon,
   BellIcon,
   ChartLineUpIcon,
   ChatCircleIcon,
@@ -24,7 +25,7 @@ import { offerHref } from '@/lib/nftLinks'
 // exactly like X keeps the feed to things other people did to you.
 export const FILTERS = [
   { id: 'inbox', label: 'All', empty: 'Nothing from anyone yet.' },
-  { id: 'mentions', label: 'Mentions', empty: 'No replies or quotes yet.' },
+  { id: 'mentions', label: 'Mentions', empty: 'No replies, quotes or mentions yet.' },
   { id: 'money', label: 'Money', empty: 'No tips, sales, offers or bets yet.' },
   { id: 'you', label: 'You', empty: 'Your own activity will show up here.' },
 ]
@@ -46,6 +47,7 @@ export const ACTION_META = {
   post_received_repost: { icon: RepeatIcon, tone: 'repost', weight: 'bold', group: 'entity', verb: 'reposted your post', previewFrom: 'entity' },
   post_received_comment: { icon: ChatCircleIcon, tone: 'reply', weight: 'fill', group: 'none', verb: 'replied to your post', previewFrom: 'child' },
   post_received_quote: { icon: QuotesIcon, tone: 'reply', weight: 'fill', group: 'none', verb: 'quoted your post', previewFrom: 'child' },
+  post_mentioned: { icon: AtIcon, tone: 'reply', weight: 'bold', group: 'none', verb: 'mentioned you', previewFrom: 'entity' },
   user_received_follow: { icon: UserPlusIcon, tone: 'follow', weight: 'fill', group: 'action', verb: 'followed you' },
   post_received_tip: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'tipped your post', previewFrom: 'entity' },
   nft_sold: { icon: StorefrontIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'bought your NFT' },

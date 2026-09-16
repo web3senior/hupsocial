@@ -441,6 +441,17 @@ button {
   border-bottom: 1px dotted currentColor;
 }
 
+// Post bodies, quote cards and the composer's own chips all render the same mention
+.mention {
+  color: var(--blue-500);
+  font-weight: 500;
+  unicode-bidi: isolate;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .rounded,
 .rounded-full {
   border-radius: 9999px;

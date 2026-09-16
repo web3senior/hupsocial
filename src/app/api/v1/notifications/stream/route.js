@@ -25,6 +25,7 @@ export async function GET(request) {
             'post_received_like',
             'post_received_repost',
             'post_received_quote',
+            'post_mentioned',
             'user_received_follow'
         ];
 

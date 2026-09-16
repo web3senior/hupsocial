@@ -8,6 +8,8 @@
  * machine-made. Both live here so there is one place to change the wording.
  */
 
+import { MENTION_LINK_PATTERN } from '@/lib/mentions'
+
 /**
  * Cuts to a word boundary. A bare slice ends mid-word ("swipe for the next, an"), which reads
  * as a broken card on every surface that still renders a headline.
@@ -21,7 +23,7 @@
  * @returns {string}
  */
 export const truncate = (text, max) => {
-  const clean = (text || '').replace(/\s+/g, ' ').trim()
+  const clean = (text || '').replace(MENTION_LINK_PATTERN, '@$1').replace(/\s+/g, ' ').trim()
   if (clean.length <= max) return clean
 
   const cut = clean.slice(0, max - 1)

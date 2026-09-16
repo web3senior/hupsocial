@@ -1086,9 +1086,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
       {quotedText && (
         <div
           className={styles.post__quoteCard__text}
-          onClick={(e) => {
-            if (e.target.closest('a')) e.stopPropagation()
-          }}
+          onClick={(e) => handleBodyLinkClick(e, router)}
           dangerouslySetInnerHTML={{ __html: renderMarkdown(quotedText) }}
         />
       )}
@@ -1150,7 +1148,21 @@ const translationFetcher = async ([text, targetLang]) => {
 
 // ■■■ Sub-Component Definition ■■■
 
+// A mention is injected HTML with no Link behind it, so a plain click is routed by hand to
+// skip a full page load; modified clicks keep the browser's new-tab behavior
+function handleBodyLinkClick(event, router) {
+  const anchor = event.target.closest('a')
+  if (!anchor) return
+  event.stopPropagation()
+
+  const mention = anchor.getAttribute('data-mention')
+  if (!mention || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  router.push(`/${mention}`)
+}
+
 export function PostText({ sourceText, postId, styles, renderMarkdown, isCollapsible = false, baseClassName }) {
+  const router = useRouter()
   const [showTranslation, setShowTranslation] = useState(false)
   const contentRef = useRef(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -1216,10 +1228,8 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
         // Marks the clamp for anything that has to undo it — a copy of this post as a picture
         // shows all of the words, because a picture has nothing to expand (lib/postCaptureSheet.js)
         data-collapsed={isCollapsible && !isExpanded ? 'true' : undefined}
-        onClick={(e) => {
-          // Links inside dangerouslySetInnerHTML have no React handler; keep their clicks from opening post details
-          if (e.target.closest('a')) e.stopPropagation()
-        }}
+        // Links inside dangerouslySetInnerHTML have no React handler; keep their clicks from opening post details
+        onClick={(e) => handleBodyLinkClick(e, router)}
         dangerouslySetInnerHTML={{
           __html: renderMarkdown(renderedContentText || ''),
         }}

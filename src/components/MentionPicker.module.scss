@@ -1,0 +1,78 @@
+// Descendants are nested under the panel so the composer's own bare `button` and `img` rules,
+// which reach into it through the DOM, never win
+.mentionPicker {
+  position: fixed;
+  inset: auto;
+  width: min(300px, calc(100vw - 16px));
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 264px;
+    margin: 0;
+    padding: 0.35rem;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .mentionPicker__option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &[data-active='true'] {
+      background-color: var(--hover);
+    }
+  }
+
+  .mentionPicker__avatar {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__name {
+    overflow: hidden;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__address {
+    color: var(--text-muted);
+    font-family: var(--font-family-monospace);
+    font-size: 0.72rem;
+  }
+
+  &__status {
+    margin: 0;
+    padding: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+}

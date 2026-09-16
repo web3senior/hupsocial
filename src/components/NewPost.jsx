@@ -24,6 +24,7 @@ import { sendHupAction } from '@/lib/solana/relay'
 import SolanaConnectButton from '@/components/ui/SolanaConnectButton'
 import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
+import { MENTION_LINK_PATTERN, mentionLabel, mentionMarkdown } from '@/lib/mentions'
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
 import NativePopover from '@/components/ui/NativePopover'
@@ -41,6 +42,7 @@ import CreateFundDialog from '@/components/CreateFundDialog'
 import AttachFundDialog from '@/components/AttachFundDialog'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
+import MentionPicker from './MentionPicker'
 import clsx from 'clsx'
 import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS, withAuthor } from '@/lib/ipfs'
@@ -241,6 +243,14 @@ const BLOCK_ELEMENTS = new Set(['DIV', 'P', 'LI', 'BLOCKQUOTE', 'PRE', 'H1', 'H2
 const escapeEditorHtml = (text) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+// A mention is one uneditable unit in the editor, so Backspace removes it whole and the address
+// behind it can't be half-edited. The label arrives already escaped.
+const mentionChipHtml = (label, address) =>
+  `<span class="mention" contenteditable="false" data-mention="${address}">@${label}</span>`
+
+// `@` at a word start, then the name typed so far, ending at the caret
+const MENTION_QUERY_PATTERN = /(?:^|[\s(\u200B])@([\p{L}\p{N}_.-]{0,32})$/u
+
 // Convert stored markdown to editor HTML (bold/italic only — used once on init).
 // Escaping runs first so a post that literally contains "<b>hi</b>" re-opens as text
 // rather than turning into markup on every edit.
@@ -252,6 +262,7 @@ const markdownToEditorHtml = (text) => {
     .split(/\r\n|[\r\n]/)
     .map((line) =>
       escapeEditorHtml(line)
+        .replace(MENTION_LINK_PATTERN, (match, label, address) => mentionChipHtml(label, address))
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
     )
@@ -302,6 +313,10 @@ const editorToMarkdown = (editor) => {
         if (!atLineStart()) out += '\n'
         walk(child)
         if (child.nextSibling) out += '\n'
+        return
+      }
+      if (child.dataset?.mention) {
+        out += mentionMarkdown(child.textContent.replace(/^@/, ''), child.dataset.mention)
         return
       }
       const marker = INLINE_MARKERS[tag]
@@ -463,6 +478,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // gone — the emoji picker's search field takes focus, and with it the range an insertion needs —
   // so the last in-editor caret is kept here and restored when the text arrives.
   const lastCaretRef = useRef(null)
+  // The `@query` being typed and the caret rect its picker hangs from
+  const [mention, setMention] = useState(null)
+  const mentionPickerRef = useRef(null)
   const dialogRef = useRef(null)
   const composerRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -709,6 +727,37 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     handleClose()
   }, [isConnectionSettled, isConnected, isSolanaTarget, handleClose])
 
+  // Typing, clicking and arrowing all open or close the picker the same way: by reading the text
+  // that runs up to the caret
+  const readMentionQuery = () => {
+    const editor = editorRef.current
+    const selection = window.getSelection()
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+    const node = range?.startContainer
+    if (!editor || !range?.collapsed || node?.nodeType !== Node.TEXT_NODE || !editor.contains(node)) return null
+
+    const match = node.data.slice(0, range.startOffset).match(MENTION_QUERY_PATTERN)
+    return match ? { node, offset: range.startOffset, query: match[1], range, selection } : null
+  }
+
+  const syncMention = useCallback(() => {
+    const found = readMentionQuery()
+    if (!found) {
+      setMention(null)
+      return
+    }
+
+    const rects = found.range.getClientRects()
+    const caretRect = rects.length ? rects[rects.length - 1] : editorRef.current.getBoundingClientRect()
+    setMention((current) =>
+      current?.query === found.query && current.caretRect.top === caretRect.top && current.caretRect.left === caretRect.left
+        ? current
+        : { query: found.query, caretRect }
+    )
+  }, [])
+
+  const dismissMention = useCallback(() => setMention(null), [])
+
   const updateTextContent = (nextText) => {
     setPostContent((prevContent) => {
       const nextElements = [...prevContent.elements]
@@ -723,6 +772,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const handleEditorInput = () => {
     updateTextContent(editorToMarkdown(editorRef.current))
     if (!historyRef.current.restoring) scheduleHistorySnapshot()
+    syncMention()
   }
 
   const pushHistorySnapshot = () => {
@@ -780,6 +830,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // The browser's native undo stack can't see our programmatic edits, so Ctrl+Z /
   // Ctrl+Shift+Z / Ctrl+Y are intercepted and served from the snapshot history
   const handleEditorKeyDown = (event) => {
+    if (mentionPickerRef.current?.handleKeyDown(event)) return
     if (!(event.ctrlKey || event.metaKey)) return
     const key = event.key.toLowerCase()
     if (key === 'z') {
@@ -840,10 +891,39 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     const handleSelectionChange = () => {
       const caret = getCaretState(editorRef.current)
       if (caret) lastCaretRef.current = caret
+      syncMention()
     }
     document.addEventListener('selectionchange', handleSelectionChange)
     return () => document.removeEventListener('selectionchange', handleSelectionChange)
-  }, [])
+  }, [syncMention])
+
+  // Swaps the `@query` for an uneditable chip and parks the caret after a space
+  const insertMention = (suggestion) => {
+    const found = readMentionQuery()
+    setMention(null)
+    if (!found) return
+
+    const { node, offset, query, selection } = found
+    const tail = node.splitText(offset)
+    node.data = node.data.slice(0, node.data.length - query.length - 1)
+
+    const chip = document.createElement('span')
+    chip.className = 'mention'
+    chip.contentEditable = 'false'
+    chip.dataset.mention = suggestion.address
+    chip.textContent = `@${mentionLabel(suggestion.name || suggestion.ensName, suggestion.address)}`
+    tail.parentNode.insertBefore(chip, tail)
+
+    if (!/^[\s\u00A0]/.test(tail.data)) tail.data = `\u00A0${tail.data}`
+    const caret = document.createRange()
+    caret.setStart(tail, 1)
+    caret.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(caret)
+    lastCaretRef.current = getCaretState(editorRef.current)
+
+    handleEditorInput()
+  }
 
   // Insert text where the author left the caret — the one path a pasted string and a picked emoji
   // both take. A selection that has drifted out of the editor falls back to the last one that was
@@ -1831,8 +1911,18 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 className={clsx(styles.editor, { [styles.editor_comment]: isComment })}
                 onInput={handleEditorInput}
                 onKeyDown={handleEditorKeyDown}
+                onBlur={dismissMention}
                 onPaste={handlePaste}
                 data-placeholder={isComment ? 'Post your reply' : isQuote ? 'Add a comment' : "What's happening?"}
+              />
+
+              <MentionPicker
+                ref={mentionPickerRef}
+                query={mention?.query ?? ''}
+                caretRect={mention?.caretRect ?? null}
+                viewer={address ?? null}
+                onPick={insertMention}
+                onDismiss={dismissMention}
               />
 
               {nftListing && (

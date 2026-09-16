@@ -25,6 +25,7 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { getMediaItems, getText } from '@/lib/content'
 import { sendNotificationDigest } from '@/lib/mailer'
+import { MENTION_LINK_PATTERN } from '@/lib/mentions'
 import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 
 // Serverless-budget caps: recipients per run, rows fetched per run, and lines
@@ -63,6 +64,7 @@ const MAX_SNIPPET = 140
 const EMAIL_WORTHY_TYPES = [
   'post_received_comment',
   'post_received_quote',
+  'post_mentioned',
   'post_received_repost',
   'user_received_follow',
   'post_received_tip',
@@ -85,12 +87,13 @@ const WORTHY_PLACEHOLDERS = EMAIL_WORTHY_TYPES.map(() => '?').join(', ')
 /**
  * Action types whose line is worth quoting a post under, mapped to the `data`
  * key holding that post's id — the same child-post resolution the in-app feed
- * does through `previewFrom: 'child'`. Only replies and quotes qualify: a like
+ * does through `previewFrom: 'child'`. Only replies, quotes and mentions qualify: a like
  * or a repost adds no words, and the post they point at is the recipient's own.
  */
 const SNIPPET_SOURCE = {
   post_received_comment: 'comment_post_id',
   post_received_quote: 'quote_post_id',
+  post_mentioned: 'mention_post_id',
 }
 
 const shortWallet = (wallet) => `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
@@ -156,7 +159,7 @@ const postSnippet = (content) => {
   const parsed = parseJson(content)
   if (!parsed || parsed.encrypted) return null
 
-  const text = getText(parsed).trim()
+  const text = getText(parsed).replace(MENTION_LINK_PATTERN, '@$1').trim()
   if (text) return text.length > MAX_SNIPPET ? `${text.slice(0, MAX_SNIPPET).trim()}…` : text
 
   const items = getMediaItems(parsed)

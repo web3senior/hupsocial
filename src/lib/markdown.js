@@ -1,6 +1,11 @@
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
+import { MENTION_HREF_PATTERN } from '@/lib/mentions'
+
+const isMentionLink = (token) => MENTION_HREF_PATTERN.test(String(token?.href || '')) && String(token?.text || '').startsWith('@')
+
+const mentionAttrs = (token) => (isMentionLink(token) ? ` class="mention" data-mention="${escapeAttr(token.href.slice(1))}"` : '')
 
 function escapeAttr(value) {
   return String(value || '')
@@ -79,7 +84,7 @@ export function renderMarkdown(markdown) {
     const text = token?.text || ''
     const target = isInternalHref(token?.href) ? '' : ' rel="noopener noreferrer" target="_blank"'
 
-    return `<a href="${href}"${title}${target}>${text}</a>`
+    return `<a href="${href}"${mentionAttrs(token)}${title}${target}>${text}</a>`
   }
 
   const dirtyHtml = marked.parse(content, {
@@ -90,7 +95,7 @@ export function renderMarkdown(markdown) {
 
   return DOMPurify.sanitize(dirtyHtml, {
     ADD_TAGS: ['span'],
-    ADD_ATTR: ['target', 'rel', 'data-symbol', 'data-chain', 'data-address'],
+    ADD_ATTR: ['target', 'rel', 'data-symbol', 'data-chain', 'data-address', 'data-mention'],
   }).trim()
 }
 /* ─── Articles ─────────────────────────────────────────────────────────────────────────────
@@ -186,7 +191,7 @@ export function renderArticleMarkdown(markdown) {
     const title = token?.title ? ` title="${escapeAttr(token.title)}"` : ''
     const target = isInternalHref(href) ? '' : ' rel="noopener noreferrer" target="_blank"'
 
-    return `<a href="${escapeAttr(href)}"${title}${target}>${text}</a>`
+    return `<a href="${escapeAttr(href)}"${mentionAttrs(token)}${title}${target}>${text}</a>`
   }
 
   renderer.image = (token) => {
