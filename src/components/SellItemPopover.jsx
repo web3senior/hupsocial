@@ -14,7 +14,8 @@ import { fetchIPFS } from '@/lib/ipfsGateways'
 import { uploadObjectToIPFS } from '@/lib/ipfs'
 import { resolveIdentity, generateContentKey, wrapContentKey, unwrapContentKey, encryptContent, decryptContent } from '@/lib/sellVault'
 import { requestVaultUnlock } from '@/lib/vaultUnlockBus'
-import { CaretLeftIcon, CaretRightIcon, LockIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon, KeyIcon, LockIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import NativeDialog from './ui/NativeDialog'
 import RecipientField from './ui/RecipientField'
 import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
@@ -80,6 +81,9 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   const [isEditing, setIsEditing] = useState(false)
   const [buyersPage, setBuyersPage] = useState(0)
   const [isSubmittingBurner, setIsSubmittingBurner] = useState(false)
+  // Gates live polling. The dialog stays mounted while closed, so without this the buyer list
+  // would keep hitting the RPC for every post on the page, forever.
+  const [isOpen, setIsOpen] = useState(false)
 
   const { data: listing, refetch: refetchListing } = useReadContract({
     abi: sellAbi,
@@ -120,7 +124,9 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     functionName: 'getBuyers',
     args: [BigInt(item.id), BigInt(buyersPage * BUYERS_PAGE_SIZE), BigInt(BUYERS_PAGE_SIZE)],
     chainId,
-    query: { enabled: Boolean(sellAddress && hasListing) },
+    // Stale-while-revalidate: keeps showing the last list while it re-reads, so a new purchase
+    // appears on its own without the seller closing and reopening the dialog.
+    query: { enabled: Boolean(sellAddress && hasListing), refetchInterval: isOpen ? 8000 : false, refetchOnWindowFocus: true },
   })
 
   // Memoized (not `?? []`) — an inline fallback array is a new reference every render, which
@@ -144,7 +150,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     functionName: 'getPendingGrants',
     args: [BigInt(item.id), 0n, BigInt(BUYERS_PAGE_SIZE)],
     chainId,
-    query: { enabled: Boolean(sellAddress && hasListing) },
+    query: { enabled: Boolean(sellAddress && hasListing), refetchInterval: isOpen ? 8000 : false, refetchOnWindowFocus: true },
   })
 
   const pendingBuyers = useMemo(() => pendingData?.[0] ?? [], [pendingData])
@@ -206,6 +212,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   // instead of relying on remount.
   useImperativeHandle(ref, () => ({
     open: () => {
+      setIsOpen(true)
       refetchListing()
       refetchBuyers()
       refetchPending()
@@ -245,7 +252,13 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     }
 
     setQuantity(listing.quantity.toString())
-    setVaultAddress(listing.vault && listing.vault.toLowerCase() !== zeroAddress ? listing.vault : '')
+    // A recipient object, never a bare string: RecipientField reads value.input.trim() during
+    // render, so a string here throws and takes the whole dialog down with it.
+    setVaultAddress(
+      listing.vault && listing.vault.toLowerCase() !== zeroAddress
+        ? { input: listing.vault, address: listing.vault, profile: null }
+        : EMPTY_RECIPIENT,
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasListing, listing])
 
@@ -351,20 +364,31 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     const incomplete = links.find((l) => !l.name.trim() || !l.url.trim())
     if (incomplete) throw new Error('Every link needs both a name and a URL')
 
-    const payload = {
-      ...(contentName.trim() && { name: contentName.trim() }),
-      ...(contentDescription.trim() && { description: contentDescription.trim() }),
-      ...(links.length > 0 && { links: links.map((l) => ({ name: l.name.trim(), url: l.url.trim() })) }),
-      ...(contentFiles.length > 0 && {
-        files: await Promise.all(
-          contentFiles.map(async (file) => ({
-            filename: file.name,
-            mimeType: file.type || 'application/octet-stream',
-            dataBase64: await fileToBase64(file),
-          })),
-        ),
-      }),
+    // The elements shape, NOT a flat { name, description, ... } object — lib/gatedContent.js
+    // reads envelope.elements and finds nothing in a flat one, which renders as "the seller
+    // hasn't attached any content". It mirrors the post-content elements format on purpose.
+    const elements = []
+    if (contentName.trim()) elements.push({ type: 'name', data: { text: contentName.trim() } })
+    if (contentDescription.trim()) elements.push({ type: 'description', data: { text: contentDescription.trim() } })
+    if (links.length > 0) {
+      elements.push({ type: 'links', data: { items: links.map((l) => ({ name: l.name.trim(), url: l.url.trim() })) } })
     }
+    if (contentFiles.length > 0) {
+      elements.push({
+        type: 'files',
+        data: {
+          items: await Promise.all(
+            contentFiles.map(async (file) => ({
+              filename: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              dataBase64: await fileToBase64(file),
+            })),
+          ),
+        },
+      })
+    }
+
+    const payload = { elements }
 
     const contentKey = existingKey ?? generateContentKey()
     const envelope = await encryptContent(contentKey, payload)
@@ -602,6 +626,13 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
       onCancel={(e) => {
         // Esc must not discard the form while uploads or the transaction are in flight
         if (isBusy) e.preventDefault()
+        e.stopPropagation()
+      }}
+      onClose={(e) => {
+        // React re-dispatches close up the component tree even though the native event does
+        // not bubble, so without this a nested dialog closing would also close this one.
+        e.stopPropagation()
+        setIsOpen(false)
       }}
     >
         <div className={styles.sellPopover}>
@@ -913,13 +944,14 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
           {hasListing && pendingBuyers.length > 0 && (
             <section className={styles.pendingGrants}>
               <h4>
+                <KeyIcon size={15} />
                 {pendingBuyers.length} buyer{pendingBuyers.length === 1 ? '' : 's'} waiting for a key
               </h4>
               <p className={styles.muted}>
-                Their payment is held by the contract until you release it. Releasing the keys pays you in the same transaction.
+                Their payment is held by the contract until you release it. Releasing pays you in the same transaction.
               </p>
-              <button type="button" onClick={handleGrantPending} disabled={isGranting} className={styles.submitButton}>
-                {isGranting ? 'Releasing...' : `Release ${pendingBuyers.length} key${pendingBuyers.length === 1 ? '' : 's'}`}
+              <button type="button" onClick={handleGrantPending} disabled={isGranting} className={styles.releaseButton}>
+                {isGranting ? 'Releasing…' : `Release ${pendingBuyers.length} key${pendingBuyers.length === 1 ? '' : 's'}`}
               </button>
             </section>
           )}
@@ -937,13 +969,17 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                       // Grant state is the only thing worth showing here now: quantity used to
                       // vary per buyer, but a key is wrapped to a person, so every buyer holds
                       // exactly one. What differs between them is whether they have it yet.
-                      const state = pageRefunded[i] ? 'Refunded' : pageGranted[i] ? 'Key released' : 'Awaiting key'
+                      const [state, stateClass] = pageRefunded[i]
+                        ? ['Refunded', styles.stateRefunded]
+                        : pageGranted[i]
+                          ? ['Key released', styles.stateGranted]
+                          : ['Awaiting key', styles.stateWaiting]
                       return (
                         <li key={`${buyer}-${i}`}>
                           <div className={styles.buyerProfile}>
                             <Profile creator={buyer} variant="fullWithoutTime" />
                           </div>
-                          <span className={styles.buyerAmount}>{state}</span>
+                          <span className={clsx(styles.buyerAmount, stateClass)}>{state}</span>
                         </li>
                       )
                     })}

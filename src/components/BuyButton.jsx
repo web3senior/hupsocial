@@ -2,11 +2,10 @@
 
 import { erc20Abi, formatEther, formatUnits, zeroAddress } from 'viem'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */ } from 'wagmi/chains'
-import { useChainId, useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { useEffect, useRef, useState } from 'react'
+import { useChainId, useConnection, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useEffect, useRef } from 'react'
 import { CONTRACTS } from '@/config/wagmi'
 import { USDC } from '@/lib/tokens'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import sellAbi from '@/abis/HupSell.json'
 import { resolveIdentity } from '@/lib/sellVault'
 import { requestVaultUnlock } from '@/lib/vaultUnlockBus'
@@ -48,12 +47,10 @@ export default function BuyButton({ item }) {
   const walletChainId = useChainId()
   const { switchChainAsync } = useSwitchChain()
   const chainId = Number(item.network_id)
-  const publicClient = usePublicClient({ chainId })
   const targetChain = CONTRACTS[`chain${item.network_id}`]
   const sellAddress = targetChain?.sell
   const chainInfo = CHAINS.find((c) => c.id === chainId)
   const currencySymbol = chainInfo?.nativeCurrency?.symbol || ''
-  const [isBurnerBusy, setIsBurnerBusy] = useState(false)
 
   const { data: listing } = useReadContract({
     abi: sellAbi,
@@ -156,7 +153,7 @@ export default function BuyButton({ item }) {
   // One purchase per buyer, so this is a yes/no rather than a quantity. A refunded purchase is
   // not a purchase: the escrow went back, and the buyer may buy again.
   const hasPurchased = Boolean(purchase && Number(purchase.paidAt) !== 0 && !purchase.refunded)
-  const isBusy = isPending || isConfirming || isBurnerBusy
+  const isBusy = isPending || isConfirming
 
   // Once purchased, keep showing the reveal action even if the listing later goes
   // inactive (e.g. sold out) — access shouldn't disappear just because stock ran out.
@@ -246,32 +243,11 @@ export default function BuyButton({ item }) {
     // front-run) can never charge more than the price shown on this button
     const args = [address, BigInt(item.id), listing.price, listing.paymentToken, isLsp7, identity.pubKeyHex]
 
-    // Route through the burner session key if one's active — same convenience the rest of the
-    // app already gets (e.g. Like), skipping the wallet popup. Approve/authorizeOperator stays
-    // wagmi-only regardless (see handleApprove) since those calls have no session awareness.
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
-
-    if (session.active) {
-      setIsBurnerBusy(true)
-      try {
-        await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: sellAddress,
-          abi: sellAbi,
-          functionName: 'buy',
-          args: isTokenListing ? args : [...args, { value: listing.price }],
-        })
-
-        toast('Purchase complete', 'success')
-        refetchPurchased()
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsBurnerBusy(false)
-      }
-      return
-    }
-
+    // Deliberately NOT routed through the burner session, unlike a like or a post. A purchase
+    // spends the user's money, and value always leaves the connected wallet — the same rule tips
+    // and predict bets follow. Routing it through the session key would also split the approve
+    // from the spend: handleApprove authorises from the connected wallet, so a burner buy would
+    // arrive with no allowance. The wallet prompt here is the user's consent to pay.
     lastActionRef.current = 'buy'
     writeContract({
       abi: sellAbi,
