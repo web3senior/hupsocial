@@ -82,3 +82,9 @@
 .lowStock {
   color: var(--warning-500, #f59e0b);
 }
+
+/* The dollar figure leads the stat line — it is the number a seller and a buyer both scan for */
+.earned {
+  color: var(--success-500, #10b981);
+  font-weight: 700;
+}

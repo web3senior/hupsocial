@@ -7,6 +7,7 @@ import pool from '@/lib/db'
 import { communityJoin } from '@/lib/communityJoin'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { attachTipUsdTotals } from '@/lib/tipTotals'
+import { attachSalesUsdTotals } from '@/lib/salesTotals'
 
 export const runtime = 'nodejs'
 
@@ -77,6 +78,7 @@ export async function GET(request, { params }) {
 
     // Dollars for the tip badge — the post-tip revalidation reads this row
     await attachTipUsdTotals([post])
+    await attachSalesUsdTotals([post])
 
     return NextResponse.json({
       success: true,

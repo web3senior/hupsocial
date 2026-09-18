@@ -18,6 +18,12 @@ const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSe
 
 const compact = (n) => new Intl.NumberFormat(undefined, { notation: 'compact' }).format(n)
 
+// Matches the tip badge's formatting (ui/Tip.jsx) so the two money figures on one post
+// never disagree about how a dollar looks.
+const compactUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 })
+const plainUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const formatEarned = (usd) => (usd >= 1000 ? compactUsd : plainUsd).format(usd)
+
 // LSP7 Digital Asset (LUKSO) — operator-based equivalents of allowance/approve
 const lsp7Abi = [
   {
@@ -184,9 +190,13 @@ export default function BuyButton({ item }) {
       : '...'
     : `${formatEther(listing.price)} ${currencySymbol}`.trim()
 
-  // No revenue figure any more. It would have to span however many payment tokens the listing
-  // has been priced in over its life, and each buyer's escrow snapshots its own, so a single
-  // headline number could only ever be right by accident. The sale count below stands alone.
+  // What the listing has actually earned, in dollars. Summed per payment token and priced
+  // server-side (lib/salesTotals.js) from store_sales, which cidex writes only on
+  // AccessGranted — so this is money already paid out, never an escrow still waiting on a
+  // key. Null on a chain with no market price, where the sale count stands alone, exactly
+  // as the tip badge falls back.
+  const earnedUsd = Number(item.sales_usd) || 0
+  const hasEarned = earnedUsd > 0
 
   const handleApprove = async (e) => {
     e.stopPropagation()
@@ -309,6 +319,8 @@ export default function BuyButton({ item }) {
         <div className={styles.salesStat}>
           <TrendUpIcon size={13} />
           <span>
+            {hasEarned && <span className={styles.earned}>{formatEarned(earnedUsd)} earned</span>}
+            {hasEarned && listing.totalSold > 0n && ' · '}
             {listing.totalSold > 0n && `${compact(listing.totalSold)} sold`}
             {listing.totalSold > 0n && listing.quantity > 0n && ' · '}
             {/* Remaining slots, not units: one purchase per buyer, so this is how many more
