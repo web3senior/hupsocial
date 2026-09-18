@@ -3,18 +3,21 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { erc20Abi, formatEther, formatUnits, isAddress, parseEther, parseUnits, zeroAddress } from 'viem'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */ } from 'wagmi/chains'
-import { useConnection, usePublicClient, useReadContract, useSignMessage, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useChainId, useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { USDC } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import storeAbi from '@/abis/HupBazaar.json'
+import sellAbi from '@/abis/HupSell.json'
 import { toast } from '@/components/NextToast'
 import { normalizeEnvelope } from '@/lib/gatedContent'
-import { CaretLeftIcon, CaretRightIcon, LockIcon, PlusIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { fetchIPFS } from '@/lib/ipfsGateways'
+import { uploadObjectToIPFS } from '@/lib/ipfs'
+import { resolveIdentity, generateContentKey, wrapContentKey, unwrapContentKey, encryptContent, decryptContent } from '@/lib/sellVault'
+import { requestVaultUnlock } from '@/lib/vaultUnlockBus'
+import { CaretLeftIcon, CaretRightIcon, LockIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
 import RecipientField from './ui/RecipientField'
 import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
-import NetworkSelect from '@/components/ui/NetworkSelect'
 import Profile from './Profile'
 import styles from './SellItemPopover.module.scss'
 
@@ -22,7 +25,7 @@ const MAX_FILE_SIZE_MB = 10
 const MAX_FILES = 5
 const MAX_LINKS = 5
 const BUYERS_PAGE_SIZE = 5
-const FEE_DENOMINATOR = 10_000 // matches HupBazaar.sol's FEE_DENOMINATOR constant (buyFeeBps is in basis points)
+const FEE_DENOMINATOR = 10_000 // matches HupSell.sol's FEE_DENOMINATOR constant (buyFeeBps is in basis points)
 const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */]
 const LUKSO_CHAIN_IDS = [42]
 
@@ -39,17 +42,29 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   const dialogRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  const { address, chain: walletChain } = useConnection()
-  const { signMessageAsync } = useSignMessage()
-  const switchChain = useSwitchChain({ config })
+  const { address } = useConnection()
+  // Reactive, unlike a render-time chain snapshot: read again after switchChainAsync resolves
+  const walletChainId = useChainId()
+  const { switchChainAsync } = useSwitchChain({ config })
   const chainId = Number(item.network_id)
   const publicClient = usePublicClient({ chainId })
   const targetChain = CONTRACTS[`chain${item.network_id}`]
-  const storeAddress = targetChain?.store
+  const sellAddress = targetChain?.sell
   const chainInfo = CHAINS.find((c) => c.id === chainId)
   const currencySymbol = chainInfo?.nativeCurrency?.symbol || 'native token'
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
-  const isWrongChain = Boolean(walletChain && walletChain.id !== chainId)
+
+  /**
+   * Puts the wallet on the post's chain. A listing is not a thing the seller picks a network
+   * for — the post already lives on one, and the listing has to be written there. So there is
+   * no network chooser in this dialog and no "wrong network" wall: every write just switches
+   * first. Mirrors Like.jsx and SendNftModal.jsx.
+   */
+  const ensureWalletChain = async () => {
+    if (walletChainId === chainId) return
+    toast(`Switching to ${chainInfo?.name || 'the post network'}...`, 'info')
+    await switchChainAsync({ chainId })
+  }
 
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -67,30 +82,30 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   const [isSubmittingBurner, setIsSubmittingBurner] = useState(false)
 
   const { data: listing, refetch: refetchListing } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
+    abi: sellAbi,
+    address: sellAddress,
     functionName: 'getListing',
     args: [BigInt(item.id)],
     chainId,
-    query: { enabled: Boolean(storeAddress) },
+    query: { enabled: Boolean(sellAddress) },
   })
 
   const hasListing = Boolean(listing && listing.seller && listing.seller.toLowerCase() !== zeroAddress)
 
   const { data: listingFeeValue } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
+    abi: sellAbi,
+    address: sellAddress,
     functionName: 'listingFee',
     chainId,
-    query: { enabled: Boolean(storeAddress) },
+    query: { enabled: Boolean(sellAddress) },
   })
 
   const { data: buyFeeBpsValue } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
+    abi: sellAbi,
+    address: sellAddress,
     functionName: 'buyFeeBps',
     chainId,
-    query: { enabled: Boolean(storeAddress) },
+    query: { enabled: Boolean(sellAddress) },
   })
 
   // Paginated, on-chain buyer list — bounded per call by MAX_BUYERS_BATCH_READ_COUNT on the
@@ -100,84 +115,91 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     isLoading: loadingPurchases,
     refetch: refetchBuyers,
   } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
+    abi: sellAbi,
+    address: sellAddress,
     functionName: 'getBuyers',
     args: [BigInt(item.id), BigInt(buyersPage * BUYERS_PAGE_SIZE), BigInt(BUYERS_PAGE_SIZE)],
     chainId,
-    query: { enabled: Boolean(storeAddress && hasListing) },
+    query: { enabled: Boolean(sellAddress && hasListing) },
   })
 
   // Memoized (not `?? []`) — an inline fallback array is a new reference every render, which
   // would make any effect depending on these fire on every render (and previously caused an
-  // infinite update loop via the buyer-breakdown effect below).
+  // infinite update loop in the per-token breakdown this replaced).
   const pageBuyers = useMemo(() => buyersPageData?.[0] ?? [], [buyersPageData])
-  const pageBuyerAmounts = useMemo(() => buyersPageData?.[1] ?? [], [buyersPageData])
-  const totalBuyers = buyersPageData ? Number(buyersPageData[2]) : 0
+  const pageGranted = useMemo(() => buyersPageData?.[1] ?? [], [buyersPageData])
+  const pageRefunded = useMemo(() => buyersPageData?.[2] ?? [], [buyersPageData])
+  const totalBuyers = buyersPageData ? Number(buyersPageData[3]) : 0
   const totalBuyerPages = Math.max(1, Math.ceil(totalBuyers / BUYERS_PAGE_SIZE))
 
-  // Every distinct payment token this listing has ever been bought under. If it's 1 (the common
-  // case — a listing that's never changed currency), every buyer necessarily purchased in that
-  // one token, so the per-token breakdown fetch below is skipped entirely as unnecessary.
-  const { data: tokensUsedData, refetch: refetchTokensUsed } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
-    functionName: 'getTokensUsed',
-    args: [BigInt(item.id)],
+  // The seller's grant queue: buyers who have paid and are still waiting for a key. Read as
+  // addresses AND public keys in one call, so a batch grant needs no extra round trip per buyer.
+  const {
+    data: pendingData,
+    isLoading: loadingPending,
+    refetch: refetchPending,
+  } = useReadContract({
+    abi: sellAbi,
+    address: sellAddress,
+    functionName: 'getPendingGrants',
+    args: [BigInt(item.id), 0n, BigInt(BUYERS_PAGE_SIZE)],
     chainId,
-    query: { enabled: Boolean(storeAddress && hasListing) },
+    query: { enabled: Boolean(sellAddress && hasListing) },
   })
-  const tokensUsed = useMemo(() => tokensUsedData ?? [], [tokensUsedData])
 
-  const [buyerBreakdowns, setBuyerBreakdowns] = useState({})
-  const [tokenSymbols, setTokenSymbols] = useState({})
+  const pendingBuyers = useMemo(() => pendingData?.[0] ?? [], [pendingData])
+  const pendingPubKeys = useMemo(() => pendingData?.[1] ?? [], [pendingData])
+  const [isGranting, setIsGranting] = useState(false)
 
-  // Only fetch a per-token breakdown when a listing has actually changed payment tokens at some
-  // point — otherwise amountPurchased already fully describes each buyer (single known currency).
-  useEffect(() => {
-    setBuyerBreakdowns({})
-    if (!storeAddress || !publicClient || tokensUsed.length < 2 || pageBuyers.length === 0) return
-    let cancelled = false
+  /**
+   * Releases keys to everyone currently waiting. Deliberately one button rather than a per-buyer
+   * chore, because this is also the only way the seller gets paid: each of these buyers' escrow
+   * settles in the same transaction that hands them their key.
+   */
+  const handleGrantPending = async () => {
+    if (pendingBuyers.length === 0) return
 
-    const loadBreakdowns = async () => {
-      const symbolEntries = await Promise.all(
-        tokensUsed.map(async (token) => {
-          if (token.toLowerCase() === zeroAddress) return [token, currencySymbol]
-          try {
-            const symbol = await publicClient.readContract({ address: token, abi: erc20Abi, functionName: 'symbol' })
-            return [token, symbol]
-          } catch {
-            return [token, `${token.slice(0, 6)}…${token.slice(-4)}`]
-          }
-        }),
-      )
-      if (cancelled) return
-      setTokenSymbols((prev) => ({ ...prev, ...Object.fromEntries(symbolEntries) }))
+    setIsGranting(true)
+    try {
+      await ensureWalletChain()
 
-      const entries = await Promise.all(
-        pageBuyers.map(async (buyer) => {
-          const perToken = await Promise.all(
-            tokensUsed.map(async (token) => {
-              const amount = await publicClient.readContract({
-                abi: storeAbi,
-                address: storeAddress,
-                functionName: 'buyerAmountByToken',
-                args: [BigInt(item.id), buyer, token],
-              })
-              return { token, amount }
-            }),
-          )
-          return [buyer, perToken.filter((entry) => entry.amount > 0n)]
-        }),
-      )
-      if (!cancelled) setBuyerBreakdowns(Object.fromEntries(entries))
+      let identity = await resolveIdentity()
+      if (!identity) {
+        await requestVaultUnlock({ reason: 'Releasing keys to your buyers' })
+        identity = await resolveIdentity()
+      }
+      if (!identity) throw new Error('Your Security Vault is locked')
+
+      // The seller's own envelope, written at listItem — the only copy of this content key
+      const ownWrapped = await publicClient.readContract({
+        abi: sellAbi,
+        address: sellAddress,
+        functionName: 'wrappedKeys',
+        args: [BigInt(item.id), address],
+      })
+      if (!ownWrapped || ownWrapped === '0x') throw new Error('No content key found for this listing')
+
+      const contentKey = unwrapContentKey(ownWrapped, identity.privKeyHex)
+      const wrapped = pendingPubKeys.map((pubKey) => wrapContentKey(contentKey, pubKey))
+
+      const hash = await writeContractAsync({
+        abi: sellAbi,
+        address: sellAddress,
+        functionName: 'grantAccessBatch',
+        args: [address, BigInt(item.id), pendingBuyers, wrapped],
+        chainId,
+      })
+
+      toast(`Releasing ${pendingBuyers.length} key${pendingBuyers.length === 1 ? '' : 's'}`, 'success')
+      await publicClient.waitForTransactionReceipt({ hash })
+      refetchPending()
+      refetchBuyers()
+    } catch (err) {
+      toast(err.shortMessage || err.message || 'Failed to release keys', 'error')
+    } finally {
+      setIsGranting(false)
     }
-
-    loadBreakdowns()
-    return () => {
-      cancelled = true
-    }
-  }, [storeAddress, publicClient, pageBuyers, tokensUsed, item.id, currencySymbol])
+  }
 
   // The dialog stays mounted while closed, so its reads go stale between opens (e.g. a
   // purchase made from the post's BuyButton elsewhere on the page). Refetch on every open
@@ -186,13 +208,13 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     open: () => {
       refetchListing()
       refetchBuyers()
-      refetchTokensUsed()
+      refetchPending()
       dialogRef.current?.open()
     },
     close: () => dialogRef.current?.close(),
   }))
 
-  const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
+  const { data: hash, isPending, mutate: writeContract, writeContractAsync, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
   const isBusy = isPending || isConfirming || isUploadingContent || isSubmittingBurner
@@ -237,16 +259,40 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     toast('Listing updated', 'success')
     refetchListing()
     refetchBuyers()
-    refetchTokensUsed()
+    refetchPending()
     setIsEditing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed])
 
-  // Pulls the seller's own existing gated content into the form (decrypt allows the seller
-  // through without a purchase) so editing continues from what's already there instead of
-  // forcing a rewrite from scratch. New files/text can still be added on top before saving.
+  /**
+   * Recovers the listing's content key from the seller's own onchain envelope. This is the one
+   * copy that exists — nothing server-side holds it any more — so both editing and granting go
+   * through here.
+   */
+  const recoverContentKey = async () => {
+    let identity = await resolveIdentity()
+    if (!identity) {
+      await requestVaultUnlock({ reason: 'Opening your gated content' })
+      identity = await resolveIdentity()
+    }
+    if (!identity) throw new Error('Your Security Vault is locked')
+
+    const ownWrapped = await publicClient.readContract({
+      abi: sellAbi,
+      address: sellAddress,
+      functionName: 'wrappedKeys',
+      args: [BigInt(item.id), address],
+    })
+    if (!ownWrapped || ownWrapped === '0x') throw new Error('No content key found for this listing')
+
+    return { contentKey: unwrapContentKey(ownWrapped, identity.privKeyHex), identity }
+  }
+
+  // Pulls the seller's own existing gated content back into the form, decrypted in the browser
+  // against their vault identity, so editing continues from what is already there instead of
+  // forcing a rewrite. New files/text can still be added on top before saving.
   const loadExistingContent = async () => {
-    if (!listing?.metadata) return
+    if (!listing?.contentURI) return
     if (!address) {
       toast('Connect your wallet first', 'error')
       return
@@ -254,31 +300,13 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
 
     setIsLoadingContent(true)
     try {
-      const timestamp = Date.now()
-      const message = `Reveal gated content for post ${item.id}\nTimestamp: ${timestamp}`
-      const signature = await signMessageAsync({ message })
+      const { contentKey } = await recoverContentKey()
 
-      const res = await fetch('/api/store/decrypt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postId: item.id,
-          chainId: item.network_id,
-          cid: listing.metadata,
-          message,
-          signature,
-          ...(isLukso && { up_address: address }),
-        }),
-      })
+      const res = await fetchIPFS(String(listing.contentURI).replace('ipfs://', ''))
+      const blob = await res.json()
+      const envelope = normalizeEnvelope(await decryptContent(contentKey, blob.iv, blob.ciphertext))
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Failed to load existing content')
-      }
-
-      const envelope = await res.json()
-      const { name, description, links, files } = normalizeEnvelope(envelope)
-
+      const { name, description, links, files } = envelope
       if (name) setContentName(name)
       if (description) setContentDescription(description)
       if (links.length > 0) setContentLinks((prev) => [...prev, ...links])
@@ -299,7 +327,23 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   const hasContentToUpload = () =>
     Boolean(contentName.trim() || contentDescription.trim() || contentLinks.length > 0 || contentFiles.length > 0)
 
-  const uploadGatedContent = async () => {
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result).split(',')[1])
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}`))
+      reader.readAsDataURL(file)
+    })
+
+  /**
+   * Encrypts the gated payload in the browser and uploads only ciphertext.
+   *
+   * An existing listing re-encrypts under the SAME key it was created with, recovered from chain.
+   * That is not an optimisation: every buyer already holds that one key wrapped to them, so
+   * issuing a new one would silently break every past sale. A new listing mints a fresh key and
+   * returns it so the caller can wrap it to the seller themselves.
+   */
+  const uploadGatedContent = async (existingKey = null) => {
     if (!hasContentToUpload()) return null
 
     // Drop rows the seller added but never filled in; flag ones that are only half-filled
@@ -307,21 +351,28 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     const incomplete = links.find((l) => !l.name.trim() || !l.url.trim())
     if (incomplete) throw new Error('Every link needs both a name and a URL')
 
-    const form = new FormData()
-    form.append('postId', String(item.id))
-    form.append('networkId', String(item.network_id))
-    if (contentName.trim()) form.append('name', contentName.trim())
-    if (contentDescription.trim()) form.append('description', contentDescription.trim())
-    if (links.length > 0) form.append('links', JSON.stringify(links.map((l) => ({ name: l.name.trim(), url: l.url.trim() }))))
-    for (const file of contentFiles) form.append('files', file)
-
-    const res = await fetch('/api/store/encrypt', { method: 'POST', body: form })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.error || 'Failed to encrypt gated content')
+    const payload = {
+      ...(contentName.trim() && { name: contentName.trim() }),
+      ...(contentDescription.trim() && { description: contentDescription.trim() }),
+      ...(links.length > 0 && { links: links.map((l) => ({ name: l.name.trim(), url: l.url.trim() })) }),
+      ...(contentFiles.length > 0 && {
+        files: await Promise.all(
+          contentFiles.map(async (file) => ({
+            filename: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            dataBase64: await fileToBase64(file),
+          })),
+        ),
+      }),
     }
-    const { cid } = await res.json()
-    return cid
+
+    const contentKey = existingKey ?? generateContentKey()
+    const envelope = await encryptContent(contentKey, payload)
+
+    // The upload route only ever sees ciphertext, which is the point: it pins bytes it cannot read
+    const cid = await uploadObjectToIPFS(envelope)
+
+    return { cid, contentKey }
   }
 
   const handleSubmit = async (e) => {
@@ -331,8 +382,15 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
       toast('Connect your wallet first', 'error')
       return
     }
-    if (!storeAddress) {
+    if (!sellAddress) {
       toast("The store contract isn't available on this network yet", 'error')
+      return
+    }
+
+    try {
+      await ensureWalletChain()
+    } catch (err) {
+      toast(err.shortMessage || err.message || 'Could not switch network', 'error')
       return
     }
 
@@ -388,11 +446,33 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     const vault = vaultAddress.address || zeroAddress
 
     // Keep the existing gated content pointer unless the seller uploaded something new
-    let metadata = listing?.metadata || ''
+    let contentURI = listing?.contentURI || ''
+    let sellerWrappedKey = '0x'
     setIsUploadingContent(true)
     try {
-      const uploadedCid = await uploadGatedContent()
-      if (uploadedCid) metadata = uploadedCid
+      if (hasListing) {
+        // An edit re-encrypts under the key this listing was created with, so every buyer who
+        // already holds it keeps working. Only fetched when there is actually new content.
+        if (hasContentToUpload()) {
+          const { contentKey } = await recoverContentKey()
+          const uploaded = await uploadGatedContent(contentKey)
+          if (uploaded) contentURI = uploaded.cid
+        }
+      } else {
+        if (!hasContentToUpload()) throw new Error('Add some content to sell before listing')
+
+        let identity = await resolveIdentity()
+        if (!identity) {
+          await requestVaultUnlock({ reason: 'Creating the key for your gated content' })
+          identity = await resolveIdentity()
+        }
+        if (!identity) throw new Error('Your Security Vault is locked')
+
+        const uploaded = await uploadGatedContent()
+        contentURI = uploaded.cid
+        // The seller's own copy, and the only one that will exist — see HupSell.listItem
+        sellerWrappedKey = wrapContentKey(uploaded.contentKey, identity.pubKeyHex)
+      }
     } catch (err) {
       toast(err.message || 'Failed to upload gated content', 'error')
       setIsUploadingContent(false)
@@ -412,25 +492,25 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         if (hasListing) {
           await writeWithBurnerSession({
             chain: chainInfo,
-            contractAddress: storeAddress,
-            abi: storeAbi,
+            contractAddress: sellAddress,
+            abi: sellAbi,
             functionName: 'updateListing',
-            args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, vault, metadata],
+            args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, vault, contentURI],
           })
         } else {
           await writeWithBurnerSession({
             chain: chainInfo,
-            contractAddress: storeAddress,
-            abi: storeAbi,
+            contractAddress: sellAddress,
+            abi: sellAbi,
             functionName: 'listItem',
-            args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, vault, metadata, { value: listingFeeValue ?? 0n }],
+            args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, vault, contentURI, sellerWrappedKey, { value: listingFeeValue ?? 0n }],
           })
         }
 
         toast('Listing updated', 'success')
         refetchListing()
         refetchBuyers()
-        refetchTokensUsed()
+        refetchPending()
         setIsEditing(false)
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -442,18 +522,18 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
 
     if (hasListing) {
       writeContract({
-        abi: storeAbi,
-        address: storeAddress,
+        abi: sellAbi,
+        address: sellAddress,
         functionName: 'updateListing',
-        args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, vault, metadata],
+        args: [address, BigInt(item.id), priceWei, quantityInt, true, paymentToken, isLsp7, vault, contentURI],
         chainId,
       })
     } else {
       writeContract({
-        abi: storeAbi,
-        address: storeAddress,
+        abi: sellAbi,
+        address: sellAddress,
         functionName: 'listItem',
-        args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, vault, metadata],
+        args: [address, BigInt(item.id), priceWei, quantityInt, paymentToken, isLsp7, vault, contentURI, sellerWrappedKey],
         value: listingFeeValue ?? 0n,
         chainId,
       })
@@ -462,7 +542,14 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
 
   const handleCancel = async (e) => {
     e.stopPropagation()
-    if (!storeAddress || !address) return
+    if (!sellAddress || !address) return
+
+    try {
+      await ensureWalletChain()
+    } catch (err) {
+      toast(err.shortMessage || err.message || 'Could not switch network', 'error')
+      return
+    }
 
     const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
@@ -471,8 +558,8 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
       try {
         await writeWithBurnerSession({
           chain: chainInfo,
-          contractAddress: storeAddress,
-          abi: storeAbi,
+          contractAddress: sellAddress,
+          abi: sellAbi,
           functionName: 'cancelListing',
           args: [address, BigInt(item.id)],
         })
@@ -480,7 +567,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
         toast('Listing updated', 'success')
         refetchListing()
         refetchBuyers()
-        refetchTokensUsed()
+        refetchPending()
         setIsEditing(false)
       } catch (err) {
         toast(err.message || 'Transaction rejected or encountered an error.', 'error')
@@ -491,8 +578,8 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     }
 
     writeContract({
-      abi: storeAbi,
-      address: storeAddress,
+      abi: sellAbi,
+      address: sellAddress,
       functionName: 'cancelListing',
       args: [address, BigInt(item.id)],
       chainId,
@@ -525,29 +612,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
             </button>
           </header>
 
-          <div className={styles.connectedNetwork}>
-            <NetworkSelect />
-          </div>
-
-          {isWrongChain && (
-            <div className={styles.chainWarning}>
-              <WarningIcon size={14} />
-              <span>
-                This post is on {chainInfo?.name || targetChain?.name || 'a different network'} — switch your wallet&apos;s network to{' '}
-                {hasListing ? 'manage' : 'list'} this item.
-              </span>
-              <button
-                type="button"
-                onClick={() => switchChain.mutate({ chainId })}
-                disabled={switchChain.isPending}
-                className={styles.switchChainButton}
-              >
-                {switchChain.isPending ? 'Switching...' : 'Switch'}
-              </button>
-            </div>
-          )}
-
-          {!storeAddress && <p className={styles.notice}>The store contract isn&apos;t available on this network yet.</p>}
+          {!sellAddress && <p className={styles.notice}>The store contract isn&apos;t available on this network yet.</p>}
 
           {!showForm && (
             <div className={styles.summary}>
@@ -584,7 +649,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                   {isLoadingContent ? 'Loading...' : 'Edit'}
                 </button>
                 {listing.isActive && (
-                  <button type="button" onClick={handleCancel} disabled={isBusy || isWrongChain} className={styles.cancelButton}>
+                  <button type="button" onClick={handleCancel} disabled={isBusy} className={styles.cancelButton}>
                     Cancel listing
                   </button>
                 )}
@@ -599,7 +664,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
               <select
                 value={paymentChoice}
                 onChange={(e) => setPaymentChoice(e.target.value)}
-                disabled={isBusy || !storeAddress}
+                disabled={isBusy || !sellAddress}
               >
                 <option value="native">Native token ({currencySymbol})</option>
                 {USDC[chainId]?.address && <option value="usdc">USDC</option>}
@@ -616,7 +681,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                   placeholder="0x..."
                   value={customToken}
                   onChange={(e) => setCustomToken(e.target.value)}
-                  disabled={isBusy || !storeAddress}
+                  disabled={isBusy || !sellAddress}
                   required
                 />
               </label>
@@ -633,7 +698,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                 placeholder="0.01"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                disabled={isBusy || !storeAddress}
+                disabled={isBusy || !sellAddress}
                 required
               />
             </label>
@@ -657,7 +722,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                 placeholder="1"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                disabled={isBusy || !storeAddress}
+                disabled={isBusy || !sellAddress}
                 required
               />
             </label>
@@ -669,7 +734,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
               onChange={setVaultAddress}
               viewer={address ?? null}
               placeholder="Name, ENS, or 0x… (leave empty to receive funds yourself)"
-              disabled={isBusy || !storeAddress}
+              disabled={isBusy || !sellAddress}
             />
 
             <div className={styles.gatedContentBox}>
@@ -678,7 +743,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                 <span>Encrypted — everything below is only revealed to buyers after purchase</span>
               </div>
 
-              {hasListing && listing?.metadata && (
+              {hasListing && listing?.contentURI && (
                 <button
                   type="button"
                   onClick={loadExistingContent}
@@ -696,7 +761,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                   placeholder="e.g. Full tutorial pack"
                   value={contentName}
                   onChange={(e) => setContentName(e.target.value)}
-                  disabled={isBusy || !storeAddress}
+                  disabled={isBusy || !sellAddress}
                 />
               </label>
 
@@ -706,7 +771,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                   placeholder="e.g. What's included, how to use it, anything buyers should know"
                   value={contentDescription}
                   onChange={(e) => setContentDescription(e.target.value)}
-                  disabled={isBusy || !storeAddress}
+                  disabled={isBusy || !sellAddress}
                   rows={3}
                 />
               </label>
@@ -722,7 +787,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                       onChange={(e) =>
                         setContentLinks((prev) => prev.map((l, index) => (index === i ? { ...l, name: e.target.value } : l)))
                       }
-                      disabled={isBusy || !storeAddress}
+                      disabled={isBusy || !sellAddress}
                     />
                     <input
                       type="text"
@@ -731,7 +796,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                       onChange={(e) =>
                         setContentLinks((prev) => prev.map((l, index) => (index === i ? { ...l, url: e.target.value } : l)))
                       }
-                      disabled={isBusy || !storeAddress}
+                      disabled={isBusy || !sellAddress}
                     />
                     <button
                       type="button"
@@ -747,7 +812,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                   type="button"
                   className={styles.addLinkButton}
                   onClick={() => setContentLinks((prev) => [...prev, { name: '', url: '' }])}
-                  disabled={isBusy || !storeAddress || contentLinks.length >= MAX_LINKS}
+                  disabled={isBusy || !sellAddress || contentLinks.length >= MAX_LINKS}
                 >
                   + Add link
                 </button>
@@ -786,13 +851,13 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
 
                     setContentFiles((prev) => [...prev, ...selected])
                   }}
-                  disabled={isBusy || !storeAddress || contentFiles.length >= MAX_FILES}
+                  disabled={isBusy || !sellAddress || contentFiles.length >= MAX_FILES}
                 />
                 <button
                   type="button"
                   className={styles.addFileButton}
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isBusy || !storeAddress || contentFiles.length >= MAX_FILES}
+                  disabled={isBusy || !sellAddress || contentFiles.length >= MAX_FILES}
                 >
                   <PlusIcon size={14} />
                   Add files
@@ -827,7 +892,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
             )}
 
             <div className={styles.actions}>
-              <button type="submit" disabled={isBusy || !storeAddress || isWrongChain}>
+              <button type="submit" disabled={isBusy || !sellAddress}>
                 {isUploadingContent
                   ? 'Encrypting & uploading...'
                   : isBusy
@@ -845,27 +910,40 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
             </form>
           )}
 
+          {hasListing && pendingBuyers.length > 0 && (
+            <section className={styles.pendingGrants}>
+              <h4>
+                {pendingBuyers.length} buyer{pendingBuyers.length === 1 ? '' : 's'} waiting for a key
+              </h4>
+              <p className={styles.muted}>
+                Their payment is held by the contract until you release it. Releasing the keys pays you in the same transaction.
+              </p>
+              <button type="button" onClick={handleGrantPending} disabled={isGranting} className={styles.submitButton}>
+                {isGranting ? 'Releasing...' : `Release ${pendingBuyers.length} key${pendingBuyers.length === 1 ? '' : 's'}`}
+              </button>
+            </section>
+          )}
+
           {hasListing && (
             <section className={styles.buyers}>
               <h4>Buyers</h4>
+              {loadingPending && <p className={styles.muted}>Checking for pending keys...</p>}
               {loadingPurchases && <p className={styles.muted}>Loading...</p>}
               {!loadingPurchases && totalBuyers === 0 && <p className={styles.muted}>No purchases yet.</p>}
               {!loadingPurchases && totalBuyers > 0 && (
                 <>
                   <ul>
                     {pageBuyers.map((buyer, i) => {
-                      const breakdown = buyerBreakdowns[buyer]
+                      // Grant state is the only thing worth showing here now: quantity used to
+                      // vary per buyer, but a key is wrapped to a person, so every buyer holds
+                      // exactly one. What differs between them is whether they have it yet.
+                      const state = pageRefunded[i] ? 'Refunded' : pageGranted[i] ? 'Key released' : 'Awaiting key'
                       return (
                         <li key={`${buyer}-${i}`}>
                           <div className={styles.buyerProfile}>
                             <Profile creator={buyer} variant="fullWithoutTime" />
                           </div>
-                          <span className={styles.buyerAmount}>
-                            {pageBuyerAmounts[i]?.toString()} purchased
-                            {breakdown && breakdown.length > 0
-                              ? ` (${breakdown.map((entry) => `${entry.amount.toString()} ${tokenSymbols[entry.token] || 'tokens'}`).join(', ')})`
-                              : ''}
-                          </span>
+                          <span className={styles.buyerAmount}>{state}</span>
                         </li>
                       )
                     })}

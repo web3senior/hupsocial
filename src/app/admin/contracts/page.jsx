@@ -4,12 +4,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useConnection, useWriteContract } from 'wagmi' // Hook added here
 import { waitForTransactionReceipt } from 'wagmi/actions'
-import { createPublicClient, http, isAddress, keccak256, stringToHex, formatEther, formatUnits, parseEther, parseUnits, zeroAddress } from 'viem'
+import { createPublicClient, http, isAddress, formatEther, formatUnits, parseEther, parseUnits, zeroAddress } from 'viem'
 import Link from 'next/link'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { browserTransport, config, CONTRACTS } from '@/config/wagmi'
-import storeAbi from '@/abis/HupBazaar.json'
+import sellAbi from '@/abis/HupSell.json'
 import eventsAbi from '@/abis/HupEvents.json'
 import appsAbi from '@/abis/HupApps.json'
 import predictAbi from '@/abis/HupPredict.json'
@@ -26,7 +26,6 @@ import styles from './page.module.scss'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
 
-const OPERATOR_ROLE = keccak256(stringToHex('OPERATOR_ROLE'))
 
 // setErc677Token/onTokenTransfer landed in HupTipper 1.1.0 — older deployments have no such
 // function, so writing to them would revert. Gate the whole card on the version it reports.
@@ -81,7 +80,7 @@ const BALANCE_CONTRACTS = [
   { key: 'hup', label: 'Hup' },
   { key: 'status', label: 'HupStatus' },
   { key: 'chat', label: 'HupChat' },
-  { key: 'store', label: 'HupBazaar' },
+  { key: 'sell', label: 'HupSell' },
   { key: 'tipper', label: 'HupTipper' },
   { key: 'trade', label: 'HupTrade' },
   { key: 'offers', label: 'HupOffers' },
@@ -111,8 +110,7 @@ const formatNative = (wei) => {
 const SECTIONS = [
   { id: 'balances', label: 'Balances', icon: '💰', contractKey: null },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
-  { id: 'bazaar-roles', label: 'Bazaar Roles', icon: '🛡️', contractKey: 'store' },
-  { id: 'bazaar-treasury', label: 'Bazaar Treasury', icon: '🏦', contractKey: 'store' },
+  { id: 'sell-treasury', label: 'Sell Treasury', icon: '🏦', contractKey: 'sell' },
   { id: 'events', label: 'Events', icon: '🎟️', contractKey: 'events' },
   { id: 'apps', label: 'Apps', icon: '🧩', contractKey: 'apps' },
   { id: 'predict', label: 'Predict', icon: '🎲', contractKey: 'predict' },
@@ -169,9 +167,6 @@ export default function Page() {
   const [inputs, setInputs] = useState({})
   const [verifications, setVerifications] = useState({})
   const [txStates, setTxStates] = useState({}) // Keep track of pending transactions per chain
-  const [operatorInputs, setOperatorInputs] = useState({})
-  const [roleChecks, setRoleChecks] = useState({})
-  const [roleTxStates, setRoleTxStates] = useState({})
   const [receiverInputs, setReceiverInputs] = useState({})
   const [tokenInputs, setTokenInputs] = useState({})
   const [tokenIsLsp7, setTokenIsLsp7] = useState({})
@@ -493,72 +488,7 @@ export default function Page() {
     setInputs((prev) => ({ ...prev, [chainId]: defaultName }))
   }
 
-  // Check whether an address currently holds OPERATOR_ROLE on the chain's HupBazaar
-  const handleCheckOperator = async (chain, storeAddress) => {
-    const operator = operatorInputs[chain.id]?.trim()
-    if (!isAddress(operator)) {
-      setRoleChecks((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid address' } }))
-      return
-    }
-
-    setRoleChecks((prev) => ({ ...prev, [chain.id]: { loading: true } }))
-
-    try {
-      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
-      const hasRole = await client.readContract({
-        address: storeAddress,
-        abi: storeAbi,
-        functionName: 'hasRole',
-        args: [OPERATOR_ROLE, operator],
-      })
-
-      setRoleChecks((prev) => ({ ...prev, [chain.id]: { loading: false, checked: operator, hasRole } }))
-    } catch (err) {
-      console.error(`Role check error for chain ${chain.id}:`, err)
-      setRoleChecks((prev) => ({
-        ...prev,
-        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read role' },
-      }))
-    }
-  }
-
-  // Grant or revoke OPERATOR_ROLE on the chain's HupBazaar (admin wallet signs)
-  const handleOperatorRole = async (chain, storeAddress, grant) => {
-    const operator = operatorInputs[chain.id]?.trim()
-    if (!isAddress(operator)) {
-      setRoleTxStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid address' } }))
-      return
-    }
-
-    setRoleTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
-
-    try {
-      const txHash = await writeContractAsync({
-        address: storeAddress,
-        abi: storeAbi,
-        functionName: grant ? 'grantRole' : 'revokeRole',
-        args: [OPERATOR_ROLE, operator],
-        chainId: chain.id,
-      })
-
-      setRoleTxStates((prev) => ({
-        ...prev,
-        [chain.id]: { loading: false, success: true, hash: txHash, action: grant ? 'granted' : 'revoked' },
-      }))
-
-      // Refresh the role check shortly after so the result reflects the new state
-      setTimeout(() => handleCheckOperator(chain, storeAddress), 3000)
-    } catch (err) {
-      console.error(`Role ${grant ? 'grant' : 'revoke'} error on chain ${chain.id}:`, err)
-      setRoleTxStates((prev) => ({
-        ...prev,
-        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
-      }))
-    }
-  }
-
-  // Withdraw the store's full native token balance to an address
-  const handleWithdrawNative = async (chain, storeAddress) => {
+  const handleWithdrawNative = async (chain, sellAddress) => {
     const receiver = receiverInputs[chain.id]?.trim()
     if (!isAddress(receiver)) {
       setNativeWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver address' } }))
@@ -569,9 +499,9 @@ export default function Page() {
 
     try {
       const txHash = await writeContractAsync({
-        address: storeAddress,
-        abi: storeAbi,
-        functionName: 'withdrawAll',
+        address: sellAddress,
+        abi: sellAbi,
+        functionName: 'withdrawFees',
         args: [receiver],
         chainId: chain.id,
       })
@@ -588,8 +518,8 @@ export default function Page() {
     }
   }
 
-  // Withdraw the store's full ERC20/LSP7 token balance to an address
-  const handleWithdrawToken = async (chain, storeAddress) => {
+  // Withdraw HupSell's accumulated fees in one token to an address
+  const handleWithdrawToken = async (chain, sellAddress) => {
     const receiver = receiverInputs[chain.id]?.trim()
     const token = tokenInputs[chain.id]?.trim()
     const isLsp7 = Boolean(tokenIsLsp7[chain.id])
@@ -603,9 +533,9 @@ export default function Page() {
 
     try {
       const txHash = await writeContractAsync({
-        address: storeAddress,
-        abi: storeAbi,
-        functionName: 'withdrawAllToken',
+        address: sellAddress,
+        abi: sellAbi,
+        functionName: 'withdrawTokenFees',
         args: [token, receiver, isLsp7],
         chainId: chain.id,
       })
@@ -700,7 +630,7 @@ export default function Page() {
       const txHash = await writeContractAsync({
         address: eventsAddress,
         abi: eventsAbi,
-        functionName: 'withdrawAll',
+        functionName: 'withdrawFees',
         args: [receiver],
         chainId: chain.id,
       })
@@ -798,7 +728,7 @@ export default function Page() {
       const txHash = await writeContractAsync({
         address: appsAddress,
         abi: appsAbi,
-        functionName: 'withdrawAll',
+        functionName: 'withdrawFees',
         args: [receiver],
         chainId: chain.id,
       })
@@ -1935,7 +1865,7 @@ export default function Page() {
       const txHash = await writeContractAsync({
         address: dropsAddress,
         abi: dropsAbi,
-        functionName: 'withdrawAll',
+        functionName: 'withdrawFees',
         args: [receiver],
         chainId: chain.id,
       })
@@ -2341,162 +2271,17 @@ export default function Page() {
             </section>
           )}
 
-          {activeSection === 'bazaar-roles' && (
+          {activeSection === 'sell-treasury' && (
             <section className={styles['admin-contracts__section']}>
               <header className={styles['admin-contracts__header']}>
-                <h2 className={styles['admin-contracts__title']}>HupBazaar Operator Role</h2>
+                <h2 className={styles['admin-contracts__title']}>HupSell Treasury</h2>
                 <p className={styles['admin-contracts__subtitle']}>
-                  Grant or revoke OPERATOR_ROLE on HupBazaar deployments — required for the x402 settlement wallet to call grantPurchase.
+                  Withdraw accumulated listing/buy fees from HupSell. Only fees are withdrawable — buyer escrow is excluded by the contract.
                 </p>
               </header>
 
               <div className={styles['admin-contracts__grid']}>
-                {visibleChains('store').map((chain) => {
-                  const deployment = CONTRACTS[`chain${chain.id}`]
-                  const operatorDraft = operatorInputs[chain.id] ?? ''
-                  const roleCheck = roleChecks[chain.id]
-                  const roleTx = roleTxStates[chain.id]
-                  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
-
-                  return (
-                    <div
-                      key={`store-${chain.id}`}
-                      className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
-                    >
-                      <div className={styles['admin-contracts__card-header']}>
-                        <div className={styles['admin-contracts__network-info']}>
-                          <div className={styles['admin-contracts__card-icon']}>
-                            <img src={chain.iconUrl} alt="" />
-                          </div>
-                          <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
-                        </div>
-                        <span className={styles['admin-contracts__badge']}>HUPBAZAAR</span>
-                      </div>
-
-                      <div className={styles['admin-contracts__details']}>
-                        <div className={styles['admin-contracts__detail-row']}>
-                          <span className={styles['admin-contracts__detail-label']}>Store Address</span>
-                          <span className={styles['admin-contracts__detail-value']}>
-                            {explorerUrl ? (
-                              <a href={`${explorerUrl}/address/${deployment.store}`} target="_blank" rel="noopener noreferrer">
-                                <code>{deployment.store}</code> ↗
-                              </a>
-                            ) : (
-                              <code>{deployment.store}</code>
-                            )}
-                          </span>
-                        </div>
-
-                        {roleCheck && !roleCheck.loading && (
-                          <div className={styles['admin-contracts__detail-row']}>
-                            <span className={styles['admin-contracts__detail-label']}>Role Status</span>
-                            <div className={styles['admin-contracts__detail-value']}>
-                              {roleCheck.error && (
-                                <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
-                                  {roleCheck.error}
-                                </div>
-                              )}
-                              {roleCheck.checked && roleCheck.hasRole && (
-                                <div
-                                  className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}
-                                >
-                                  ✓ {roleCheck.checked.slice(0, 6)}...{roleCheck.checked.slice(-4)} holds OPERATOR_ROLE
-                                </div>
-                              )}
-                              {roleCheck.checked && !roleCheck.hasRole && (
-                                <div
-                                  className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}
-                                >
-                                  {roleCheck.checked.slice(0, 6)}...{roleCheck.checked.slice(-4)} does not hold OPERATOR_ROLE
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {roleTx && (
-                          <div className={styles['admin-contracts__detail-row']}>
-                            <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
-                            <div className={styles['admin-contracts__detail-value']}>
-                              {roleTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
-                              {roleTx.error && <span style={{ color: '#ef4444' }}>❌ {roleTx.error}</span>}
-                              {roleTx.success && <span style={{ color: '#10b981' }}>🚀 Role {roleTx.action}.</span>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <form
-                        className={styles['admin-contracts__edit-form']}
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          handleOperatorRole(chain, deployment.store, true)
-                        }}
-                      >
-                        <div className={styles['admin-contracts__input-group']}>
-                          <label className={styles['admin-contracts__detail-label']}>Operator Wallet Address</label>
-                          <input
-                            type="text"
-                            className={styles['admin-contracts__input']}
-                            value={operatorDraft}
-                            onChange={(e) => setOperatorInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
-                            placeholder="0x..."
-                          />
-                        </div>
-
-                        <div className={styles['admin-contracts__actions']}>
-                          <button
-                            type="submit"
-                            disabled={!operatorDraft.trim() || roleTx?.loading}
-                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
-                          >
-                            {roleTx?.loading ? 'Writing...' : 'Grant OPERATOR_ROLE'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOperatorRole(chain, deployment.store, false)}
-                            disabled={!operatorDraft.trim() || roleTx?.loading}
-                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
-                          >
-                            Revoke
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleCheckOperator(chain, deployment.store)}
-                            disabled={!operatorDraft.trim() || roleCheck?.loading}
-                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
-                          >
-                            {roleCheck?.loading ? 'Checking...' : 'Check Role'}
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  )
-                })}
-              </div>
-              {visibleChains('store').length === 0 && (
-                <p className={styles['admin-contracts__empty']}>No HupBazaar deployments match this filter.</p>
-              )}
-            </section>
-          )}
-
-          {activeSection === 'bazaar-treasury' && (
-            <section className={styles['admin-contracts__section']}>
-              <header className={styles['admin-contracts__header']}>
-                <h2 className={styles['admin-contracts__title']}>HupBazaar Treasury</h2>
-                <p className={styles['admin-contracts__subtitle']}>
-                  Withdraw accumulated listing/buy fees from HupBazaar — native token balance, or any ERC20/LSP7 token balance.
-                </p>
-              </header>
-
-              <div className={styles['admin-contracts__grid']}>
-                {visibleChains('store').map((chain) => {
+                {visibleChains('sell').map((chain) => {
                   const deployment = CONTRACTS[`chain${chain.id}`]
                   const receiverDraft = receiverInputs[chain.id] ?? ''
                   const tokenDraft = tokenInputs[chain.id] ?? ''
@@ -2505,7 +2290,7 @@ export default function Page() {
                   const tokenState = tokenWithdrawStates[chain.id]
                   const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
                   const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
-                  const nativeBalance = renderBalance(chain.id, deployment.store, symbol)
+                  const nativeBalance = renderBalance(chain.id, deployment.sell, symbol)
 
                   return (
                     <div
@@ -2531,11 +2316,11 @@ export default function Page() {
                           <span className={styles['admin-contracts__detail-label']}>Store Address</span>
                           <span className={styles['admin-contracts__detail-value']}>
                             {explorerUrl ? (
-                              <a href={`${explorerUrl}/address/${deployment.store}`} target="_blank" rel="noopener noreferrer">
-                                <code>{deployment.store}</code> ↗
+                              <a href={`${explorerUrl}/address/${deployment.sell}`} target="_blank" rel="noopener noreferrer">
+                                <code>{deployment.sell}</code> ↗
                               </a>
                             ) : (
-                              <code>{deployment.store}</code>
+                              <code>{deployment.sell}</code>
                             )}
                           </span>
                         </div>
@@ -2561,7 +2346,7 @@ export default function Page() {
                         className={styles['admin-contracts__edit-form']}
                         onSubmit={(e) => {
                           e.preventDefault()
-                          handleWithdrawNative(chain, deployment.store)
+                          handleWithdrawNative(chain, deployment.sell)
                         }}
                       >
                         {nativeState && (
@@ -2590,7 +2375,7 @@ export default function Page() {
                         className={styles['admin-contracts__edit-form']}
                         onSubmit={(e) => {
                           e.preventDefault()
-                          handleWithdrawToken(chain, deployment.store)
+                          handleWithdrawToken(chain, deployment.sell)
                         }}
                       >
                         <div className={styles['admin-contracts__input-group']}>
@@ -2641,8 +2426,8 @@ export default function Page() {
                   )
                 })}
               </div>
-              {visibleChains('store').length === 0 && (
-                <p className={styles['admin-contracts__empty']}>No HupBazaar deployments match this filter.</p>
+              {visibleChains('sell').length === 0 && (
+                <p className={styles['admin-contracts__empty']}>No HupSell deployments match this filter.</p>
               )}
             </section>
           )}

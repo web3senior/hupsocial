@@ -1,11 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { useConnection, useSignMessage } from 'wagmi'
+import { zeroAddress } from 'viem'
+import { useChainId, useConnection, usePublicClient, useReadContract, useSwitchChain, useWriteContract } from 'wagmi'
 import { CONTRACTS } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
-import { ArchiveIcon, ArrowSquareOutIcon, CopyIcon, DownloadSimpleIcon, EyeIcon, FileIcon, FileTextIcon, ImageIcon, LinkIcon, LockOpenIcon, MusicNotesIcon, VideoCameraIcon } from '@phosphor-icons/react'
+import { ArchiveIcon, ArrowCounterClockwiseIcon, ArrowSquareOutIcon, CopyIcon, DownloadSimpleIcon, EyeIcon, FileIcon, FileTextIcon, HourglassIcon, ImageIcon, LinkIcon, LockOpenIcon, MusicNotesIcon, VideoCameraIcon } from '@phosphor-icons/react'
 import { normalizeEnvelope } from '@/lib/gatedContent'
+import { fetchIPFS } from '@/lib/ipfsGateways'
+import { resolveIdentity, unwrapContentKey, decryptContent } from '@/lib/sellVault'
+import { requestVaultUnlock } from '@/lib/vaultUnlockBus'
+import sellAbi from '@/abis/HupSell.json'
 import styles from './RevealGatedContent.module.scss'
 
 function base64ByteSize(base64) {
@@ -34,55 +39,115 @@ function fileIconFor(mimeType = '') {
   return FileIcon
 }
 
+/**
+ * Unlocks a gated post entirely in the browser. The server is not in this path at all: the key
+ * comes from the HupSell contract (wrapped to this viewer by the seller), the ciphertext comes
+ * from IPFS, and both are opened against an identity derived from the viewer's Security Vault.
+ * Nothing that could decrypt this ever leaves the tab.
+ */
 export default function RevealGatedContent({ item, cid }) {
   const { address } = useConnection()
-  const { signMessageAsync } = useSignMessage()
+  const chainId = Number(item.network_id)
+  const publicClient = usePublicClient({ chainId })
+  const { writeContractAsync } = useWriteContract()
+  // Reactive, unlike a render-time chain snapshot: read again after switchChainAsync resolves
+  const walletChainId = useChainId()
+  const { switchChainAsync } = useSwitchChain()
+
   const [isRevealing, setIsRevealing] = useState(false)
+  const [isRefunding, setIsRefunding] = useState(false)
   const [revealed, setRevealed] = useState(null)
 
-  const targetChain = CONTRACTS[`chain${item.network_id}`]
+  const sellAddress = CONTRACTS[`chain${item.network_id}`]?.sell
+  const enabled = Boolean(sellAddress && address)
+
+  const { data: purchase } = useReadContract({
+    abi: sellAbi,
+    address: sellAddress,
+    functionName: 'getPurchase',
+    args: [BigInt(item.id), address ?? zeroAddress],
+    chainId,
+    query: { enabled },
+  })
+
+  const { data: refundable, refetch: refetchRefundable } = useReadContract({
+    abi: sellAbi,
+    address: sellAddress,
+    functionName: 'isRefundable',
+    args: [BigInt(item.id), address ?? zeroAddress],
+    chainId,
+    query: { enabled },
+  })
+
+  const hasPurchase = Boolean(purchase && Number(purchase.paidAt) !== 0)
+  const isGranted = Boolean(purchase?.granted)
+  const isRefunded = Boolean(purchase?.refunded)
 
   const handleReveal = async () => {
     if (!address) {
       toast('Connect your wallet first', 'error')
       return
     }
-    if (!targetChain?.store) {
-      toast("The store contract isn't available on this network yet", 'error')
-      return
-    }
 
     setIsRevealing(true)
     try {
-      const timestamp = Date.now()
-      const message = `Reveal gated content for post ${item.id}\nTimestamp: ${timestamp}`
-      const signature = await signMessageAsync({ message })
-
-      const isLukso = Number(item.network_id) === 42
-
-      const res = await fetch('/api/store/decrypt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postId: item.id,
-          chainId: item.network_id,
-          cid,
-          message,
-          signature,
-          ...(isLukso && { up_address: address }),
-        }),
+      const wrapped = await publicClient.readContract({
+        address: sellAddress,
+        abi: sellAbi,
+        functionName: 'wrappedKeys',
+        args: [BigInt(item.id), address],
       })
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Failed to reveal content')
+      if (!wrapped || wrapped === '0x') {
+        throw new Error('The seller has not released your key yet')
       }
 
-      setRevealed(await res.json())
+      // Promptless when the vault is already open this session; otherwise one PIN + one signature
+      let identity = await resolveIdentity()
+      if (!identity) {
+        await requestVaultUnlock({ reason: 'Unlocking this gated post' })
+        identity = await resolveIdentity()
+      }
+      if (!identity) throw new Error('Your Security Vault is locked')
+
+      const contentKey = unwrapContentKey(wrapped, identity.privKeyHex)
+
+      const res = await fetchIPFS(String(cid).replace('ipfs://', ''))
+      const envelope = await res.json()
+
+      setRevealed(await decryptContent(contentKey, envelope.iv, envelope.ciphertext))
     } catch (err) {
-      toast(err.message || 'Failed to reveal content', 'error')
+      // A key that will not open is almost always a vault derived under a different PIN — the
+      // recovery is requestRegrant, not a retry, so say so rather than offering the same button.
+      const message = /decrypt|authentication|bad mac/i.test(err.message || '')
+        ? 'This key was issued to a different vault identity. Ask the seller for a re-grant from your current one.'
+        : err.message || 'Failed to reveal content'
+      toast(message, 'error')
     } finally {
       setIsRevealing(false)
+    }
+  }
+
+  const handleRefund = async () => {
+    setIsRefunding(true)
+    try {
+      // The refund is written on the post's chain, never wherever the wallet happens to sit
+      if (walletChainId !== chainId) await switchChainAsync({ chainId })
+
+      const hash = await writeContractAsync({
+        abi: sellAbi,
+        address: sellAddress,
+        functionName: 'claimRefund',
+        args: [BigInt(item.id)],
+        chainId,
+      })
+      toast('Refund sent', 'success')
+      await publicClient.waitForTransactionReceipt({ hash })
+      refetchRefundable()
+    } catch (err) {
+      toast(err.shortMessage || err.message || 'Refund failed', 'error')
+    } finally {
+      setIsRefunding(false)
     }
   }
 
@@ -172,8 +237,33 @@ export default function RevealGatedContent({ item, cid }) {
     )
   }
 
+  if (hasPurchase && isRefunded) {
+    return <p className={styles.empty}>You were refunded for this purchase.</p>
+  }
+
+  // Paid, but the seller has not published the key yet. The refund is the buyer's lever here, so
+  // it belongs on this screen rather than buried in a settings page.
+  if (hasPurchase && !isGranted) {
+    return (
+      <div className={styles.pending}>
+        <div className={styles.revealHeader}>
+          <HourglassIcon size={13} />
+          <span>Waiting for the seller to release your key</span>
+        </div>
+        <p className={styles.empty}>Your payment is held by the contract until then — it is not with the seller.</p>
+
+        {refundable && (
+          <button type="button" onClick={handleRefund} disabled={isRefunding} className={styles.revealButton}>
+            <ArrowCounterClockwiseIcon size={16} />
+            <span>{isRefunding ? 'Refunding...' : 'Claim refund'}</span>
+          </button>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <button type="button" onClick={handleReveal} disabled={isRevealing} className={styles.revealButton}>
+    <button type="button" onClick={handleReveal} disabled={isRevealing || !enabled} className={styles.revealButton}>
       <EyeIcon size={16} />
       <span>{isRevealing ? 'Revealing...' : 'Reveal content'}</span>
     </button>

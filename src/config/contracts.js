@@ -89,6 +89,8 @@ export const appChains = [mainnet, lukso, bsc, monad, arc, /* soneium, */ arbitr
 // univ3*/univ4*/sushiV2Router/wnative — swap venues; verify onchain against the DEX registry
 //                 before enabling a chain. A wrong router is where user funds would go.
 // nativeIsErc20 — the native coin is an ERC20: approve, never msg.value.
+// univ4HookedPoolsOnly — every v4 pool on the chain carries a hook, so hookless probing finds
+//                 nothing; the in-post trade widget skips it (hooks/useTokenSwap canSwapOn).
 export const CONTRACTS = {
   chain1: {
     name: 'ethereum',
@@ -98,7 +100,7 @@ export const CONTRACTS = {
     status: '0x130BD13f5A7AcA97cfF4Ed32ac2EbF94197Be88f',
     chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
-    store: '',
+    sell: '',
     tipper: '0x9a8Daf359280eb03D734530992691888fA33D476',
     trade: '0x7eb333Ad710d398A38c45d49A6A96568c8276b5f',
     offers: '',
@@ -131,7 +133,7 @@ export const CONTRACTS = {
     community: '0xB7Af957f4157aeAdA5Cab17D3B55fB1f1315F41A',
     chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
-    store: '',
+    sell: '0x1BbB29EEB716D208c680F32888a10EC72b1EA6B7',
     tipper: '0x52A22BEaA2e7d2aC6C0124259b6984f49c56598E',
     trade: '0x4bad88a02d8a4926fE50F69A12A3e095E433CEc0',
     offers: '0xf0c1dB3059608bb589726B651108D3984060D5d8',
@@ -160,7 +162,7 @@ export const CONTRACTS = {
     chat: '',
     // No LSP26 on Base Sepolia: follower gates are unavailable here
     followerSystem: '',
-    store: '',
+    sell: '',
     tipper: '0x638C1aD419759DFA83f4d2FAe380607482dA0268',
     trade: '',
     offers: '',
@@ -187,7 +189,7 @@ export const CONTRACTS = {
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
     chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
-    store: '',
+    sell: '',
     tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
     trade: '0x80218c06A00316687957951036bbD1326a6790C1',
     offers: '0xF7D27236978cc4B4f3Ab469701EAfCD546B64B79',
@@ -214,7 +216,7 @@ export const CONTRACTS = {
     status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
     chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
-    store: '',
+    sell: '0xB7DE0a90D911D7eBA245526cEe3F2deF44346C40',
     tipper: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     trade: '0x94D81b00b1e4596343e84298dD705e93E36eAb14',
     offers: '0x0627e2bDCa82dC70B633DB02Eb179c1525F7Bfdc',
@@ -244,7 +246,7 @@ export const CONTRACTS = {
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
     community: '0x77986dE55d0C746351F3A0797b745306c5Fc072C',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
-    store: '',
+    sell: '',
     tipper: '0x01F725975b17dB66DBF26ebAa02bc74F8a433A18',
     trade: '0x7E14bB18b370b59e0b70759C915f5E3A79599091',
     offers: '0xA724524E11c971B8a98165DEc9065eBa563d424a',
@@ -271,7 +273,7 @@ export const CONTRACTS = {
     hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
     status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
-    store: '',
+    sell: '',
     tipper: '0x74AC93C4A4a67f56af9d1Bd3153910D90F802632',
     trade: '0x594d084D863446cd1618244de695d574a5DfADD5',
     offers: '0x1fFab913fcB1142b2Bb483421Acd1893161dFd3A',
@@ -299,7 +301,7 @@ export const CONTRACTS = {
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     chat: '',
-    store: '',
+    sell: '',
     tipper: '0x3EF07D888e4B4d91e5b6c889E6Bdb7A37BE76CDE',
     trade: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
     offers: '0x9ab0466E3fa6AB0A41AC16d43199D8881b3809E2',
@@ -342,7 +344,7 @@ export const CONTRACTS = {
     status: '0x2269Fb436d594902e3c38085CBB3f350532531B3',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     community: '',
-    store: '',
+    sell: '',
     tipper: '0x0Fc1223079367ADC73F9960E48d786705e992e14',
     trade: '0x71Ce7aF80996AB5a9c265E2048c5759435131631',
     offers: '0x732794525ABFc3D799EFab72E07E1FD183bEE739',
@@ -399,7 +401,7 @@ export const CONTRACTS = {
     status: '',
     followerSystem: '',
     community: '',
-    store: '',
+    sell: '0x3E37500b47AC2A1fC22a6bb8F8e4f8E4267017cf',
     tipper: '',
     trade: '',
     offers: '',
@@ -413,11 +415,23 @@ export const CONTRACTS = {
     nativeGate: '',
     univ3Router: '',
     univ3Quoter: '',
-    wnative: '',
-    univ4Router: '',
-    univ4PoolManager: '',
-    univ4Quoters: [],
-    permit2: '',
+    // The gas coin is USDC; this is its wrapped ERC20 face, a predeploy — verified onchain
+    // 2026-09-18 as symbol USDC, 6 decimals (the native representation is 18, so the two are
+    // NOT interchangeable by value)
+    wnative: '0x3600000000000000000000000000000000000000',
+    // Every Uniswap v4 pool on Arc carries a hook: neither of the two deepest pools' ids can be
+    // reproduced from any hookless key, at any probed tier, in either currency order. Arc is a
+    // launchpad chain and its pools come from launchpad factories. lib/uniswap-v4.js probes
+    // hookless keys only — a hook is arbitrary code running inside the swap — so the in-post
+    // trade widget finds nothing here and skips the chain (hooks/useTokenSwap canSwapOn).
+    univ4HookedPoolsOnly: true,
+    // Uniswap's v4 deployment on Arc, every address probed onchain 2026-09-18
+    univ4Router: '0x4fcA4a51Ab4F23A7447b3284fBd7D73289A89Fb1',
+    // A newer periphery build: its swap params carry minHopPriceX36 (lib/uniswap-v4.js)
+    univ4RouterMinHopPrice: true,
+    univ4PoolManager: '0x8366a39CC670B4001A1121B8F6A443A643e40951',
+    univ4Quoters: ['0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94'],
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     sushiV2Router: '',
   },
 }

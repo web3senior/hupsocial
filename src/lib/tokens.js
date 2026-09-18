@@ -1,19 +1,10 @@
 // Plain shared config (importable from both client components and server routes — no wagmi/window
-// dependencies). Single source of truth for HupBazaar deployments and per-chain USDC.
+// dependencies). Single source of truth for per-chain USDC.
 
-// HupBazaar deployment per chainId. Server routes (decrypt, x402) resolve the contract from here
-// instead of trusting a client-supplied address. Keep in sync with CONTRACTS in config/wagmi.js.
-export const STORE_ADDRESSES = {
-  42: '0x377ECa68C0E1654d8c0B74135F187250A1702eDC', // lukso
-  143: '', // monad
-  42220: '', // celo
-  8453: '', // base
-  56: '', // bnb
-  10143: '0x85765350FF07802155a35fFf261DFfaAb0ffA366', // monad-testnet
-}
-
-// Sales/revenue event indexing lives in cidex (runBazaarSync) — deploy blocks are recorded
-// there in the indexer_state table (see cidex/scripts/add-hupbazaar-contracts.sql).
+// HupSell deployments live in config/contracts.js under each chain's `sell` key, not here. They
+// moved because nothing server-side resolves them any more: gated content is encrypted and
+// decrypted in the browser against keys the seller publishes onchain, so no route needs the
+// address. Sales indexing lives in cidex.
 
 // Canonical USDC per chainId. `eip3009: true` means the token supports EIP-3009
 // transferWithAuthorization and can therefore settle x402 payments. `lsp7: true` means the

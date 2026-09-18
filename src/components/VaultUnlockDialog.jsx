@@ -81,7 +81,10 @@ export default function VaultUnlockDialog() {
         await unlockBurnerWithMaster(masterHex)
       } catch (unlockErr) {
         if (unlockErr?.code === 'WRONG_PIN') clearMasterSecret()
-        throw unlockErr
+        // A device with no session key still has an unlocked vault, and vault consumers that
+        // want no burner at all (gated-content keys) must not be turned away by its absence.
+        // Callers that genuinely need the burner fail later, where the error names the reason.
+        if (unlockErr?.code !== 'NO_SESSION_KEY') throw unlockErr
       }
       settle((resolver) => resolver?.resolve(true))
     } catch (err) {

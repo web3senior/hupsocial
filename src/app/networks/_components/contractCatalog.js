@@ -25,7 +25,7 @@ const CORE_CONTRACTS = [
 const FEATURE_CONTRACTS = [
   { key: 'community', label: 'HupCommunity', description: 'Communities with onchain membership' },
   { key: 'chat', label: 'HupChat', description: 'Onchain chat' },
-  { key: 'store', label: 'HupBazaar', description: 'Marketplace for digital goods' },
+  { key: 'sell', label: 'HupSell', description: 'Gated content with onchain key delivery' },
   { key: 'tipper', label: 'HupTipper', description: 'Post tipping' },
   { key: 'trade', label: 'HupTrade', description: 'NFT sales inside posts' },
   { key: 'offers', label: 'HupOffers', description: 'Offers on NFTs' },

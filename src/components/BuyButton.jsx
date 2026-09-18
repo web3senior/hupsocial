@@ -2,23 +2,20 @@
 
 import { erc20Abi, formatEther, formatUnits, zeroAddress } from 'viem'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */ } from 'wagmi/chains'
-import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useChainId, useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { useEffect, useRef, useState } from 'react'
 import { CONTRACTS } from '@/config/wagmi'
 import { USDC } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
-import storeAbi from '@/abis/HupBazaar.json'
+import sellAbi from '@/abis/HupSell.json'
+import { resolveIdentity } from '@/lib/sellVault'
+import { requestVaultUnlock } from '@/lib/vaultUnlockBus'
 import { toast } from '@/components/NextToast'
 import { SparkleIcon, TrendUpIcon } from '@phosphor-icons/react'
 import RevealGatedContent from './RevealGatedContent'
 import styles from './BuyButton.module.scss'
 
 const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */]
-
-// Compact ("1.2K") for large amounts, but sub-1 amounts keep their significant digits —
-// compact's 2-fraction-digit rounding would collapse e.g. 0.00005 ETH raised to "0 ETH".
-const formatTokenAmount = (n) =>
-  new Intl.NumberFormat(undefined, n > 0 && n < 1 ? { maximumSignificantDigits: 4 } : { notation: 'compact', maximumFractionDigits: 2 }).format(n)
 
 // LSP7 Digital Asset (LUKSO) — operator-based equivalents of allowance/approve
 const lsp7Abi = [
@@ -47,61 +44,38 @@ const lsp7Abi = [
 
 export default function BuyButton({ item }) {
   const { address } = useConnection()
+  // Reactive, unlike a render-time chain snapshot: read again after switchChainAsync resolves
+  const walletChainId = useChainId()
+  const { switchChainAsync } = useSwitchChain()
   const chainId = Number(item.network_id)
   const publicClient = usePublicClient({ chainId })
   const targetChain = CONTRACTS[`chain${item.network_id}`]
-  const storeAddress = targetChain?.store
+  const sellAddress = targetChain?.sell
   const chainInfo = CHAINS.find((c) => c.id === chainId)
   const currencySymbol = chainInfo?.nativeCurrency?.symbol || ''
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
 
   const { data: listing } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
+    abi: sellAbi,
+    address: sellAddress,
     functionName: 'getListing',
     args: [BigInt(item.id)],
     chainId,
-    query: { enabled: Boolean(storeAddress) },
+    query: { enabled: Boolean(sellAddress) },
   })
 
-  const { data: purchasedAmount, refetch: refetchPurchased } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
-    functionName: 'amountPurchased',
-    args: [BigInt(item.id), address],
+  const { data: purchase, refetch: refetchPurchased } = useReadContract({
+    abi: sellAbi,
+    address: sellAddress,
+    functionName: 'getPurchase',
+    args: [BigInt(item.id), address ?? zeroAddress],
     chainId,
-    query: { enabled: Boolean(storeAddress && address) },
+    query: { enabled: Boolean(sellAddress && address) },
   })
 
   const paymentToken = listing?.paymentToken
   const isTokenListing = Boolean(paymentToken && paymentToken.toLowerCase() !== zeroAddress)
   const isLsp7 = Boolean(isTokenListing && listing?.isLsp7)
-
-  // Revenue is tracked per-payment-token on-chain (not a single flat sum), so it stays correct
-  // even if a seller changes a listing's payment token after some sales already happened in a
-  // different one — this reads only the revenue earned in the listing's *current* token.
-  const { data: revenueInCurrentToken } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
-    functionName: 'revenueByToken',
-    args: [BigInt(item.id), paymentToken ?? zeroAddress],
-    chainId,
-    query: { enabled: Boolean(storeAddress && listing) },
-  })
-
-  // If the listing has ever changed payment tokens, "totalSold" spans multiple currencies but
-  // revenueInCurrentToken only reflects the current one — pairing them (e.g. "2 sold · 1 LYX
-  // raised" when 1 of those 2 sales was actually in USDC) would misleadingly imply all sales
-  // raised that amount. Safest is to just not show a revenue figure once that's ambiguous.
-  const { data: tokensUsedData } = useReadContract({
-    abi: storeAbi,
-    address: storeAddress,
-    functionName: 'getTokensUsed',
-    args: [BigInt(item.id)],
-    chainId,
-    query: { enabled: Boolean(storeAddress && listing) },
-  })
-  const hasMultipleTokens = (tokensUsedData?.length ?? 0) > 1
 
   // decimals() shares the same selector on ERC20 and LSP7 — one read covers both
   const { data: tokenDecimals } = useReadContract({
@@ -132,19 +106,27 @@ export default function BuyButton({ item }) {
     abi: erc20Abi,
     address: paymentToken,
     functionName: 'allowance',
-    args: [address, storeAddress],
+    args: [address, sellAddress],
     chainId,
-    query: { enabled: Boolean(isTokenListing && !isLsp7 && address && storeAddress) },
+    query: { enabled: Boolean(isTokenListing && !isLsp7 && address && sellAddress) },
   })
 
   const { data: lsp7Allowance, refetch: refetchLsp7Allowance } = useReadContract({
     abi: lsp7Abi,
     address: paymentToken,
     functionName: 'authorizedAmountFor',
-    args: [storeAddress, address],
+    args: [sellAddress, address],
     chainId,
-    query: { enabled: Boolean(isLsp7 && address && storeAddress) },
+    query: { enabled: Boolean(isLsp7 && address && sellAddress) },
   })
+
+  // The post already decides the chain — approving or buying just switches to it rather than
+  // refusing. Same rule as the sell dialog: a listing is never bought on a network the buyer picked.
+  const ensureWalletChain = async () => {
+    if (walletChainId === chainId) return
+    toast(`Switching to ${chainInfo?.name || 'the post network'}...`, 'info')
+    await switchChainAsync({ chainId })
+  }
 
   const allowance = isLsp7 ? lsp7Allowance : erc20Allowance
   const refetchAllowance = isLsp7 ? refetchLsp7Allowance : refetchErc20Allowance
@@ -171,12 +153,14 @@ export default function BuyButton({ item }) {
   }, [isConfirmed])
 
   const hasListing = Boolean(listing && listing.seller && listing.seller.toLowerCase() !== zeroAddress)
-  const hasPurchased = Boolean(purchasedAmount && purchasedAmount > 0n)
+  // One purchase per buyer, so this is a yes/no rather than a quantity. A refunded purchase is
+  // not a purchase: the escrow went back, and the buyer may buy again.
+  const hasPurchased = Boolean(purchase && Number(purchase.paidAt) !== 0 && !purchase.refunded)
   const isBusy = isPending || isConfirming || isBurnerBusy
 
   // Once purchased, keep showing the reveal action even if the listing later goes
   // inactive (e.g. sold out) — access shouldn't disappear just because stock ran out.
-  if (!storeAddress || !hasListing) return null
+  if (!sellAddress || !hasListing) return null
   const isInactive = !hasPurchased && !listing.isActive
 
   const needsApproval = isTokenListing && allowance !== undefined && allowance < listing.price
@@ -187,20 +171,22 @@ export default function BuyButton({ item }) {
       : '...'
     : `${formatEther(listing.price)} ${currencySymbol}`.trim()
 
-  const volumeLabel =
-    revenueInCurrentToken > 0n &&
-    !hasMultipleTokens &&
-    (isTokenListing
-      ? tokenDecimals !== undefined
-        ? `${formatTokenAmount(Number(formatUnits(revenueInCurrentToken, tokenDecimals)))} ${tokenSymbol || ''}`.trim()
-        : null
-      : `${formatTokenAmount(Number(formatEther(revenueInCurrentToken)))} ${currencySymbol}`.trim())
+  // No revenue figure any more. It would have to span however many payment tokens the listing
+  // has been priced in over its life, and each buyer's escrow snapshots its own, so a single
+  // headline number could only ever be right by accident. The sale count below stands alone.
 
-  const handleApprove = (e) => {
+  const handleApprove = async (e) => {
     e.stopPropagation()
 
     if (!address) {
       toast('Connect your wallet first', 'error')
+      return
+    }
+
+    try {
+      await ensureWalletChain()
+    } catch (err) {
+      toast(err.shortMessage || err.message || 'Could not switch network', 'error')
       return
     }
 
@@ -210,7 +196,7 @@ export default function BuyButton({ item }) {
         abi: lsp7Abi,
         address: paymentToken,
         functionName: 'authorizeOperator',
-        args: [storeAddress, listing.price, '0x'],
+        args: [sellAddress, listing.price, '0x'],
         chainId,
       })
     } else {
@@ -218,7 +204,7 @@ export default function BuyButton({ item }) {
         abi: erc20Abi,
         address: paymentToken,
         functionName: 'approve',
-        args: [storeAddress, listing.price],
+        args: [sellAddress, listing.price],
         chainId,
       })
     }
@@ -232,10 +218,33 @@ export default function BuyButton({ item }) {
       return
     }
 
-    // Committing the displayed price/token/standard onchain: buyItem reverts with ListingChanged
+    try {
+      await ensureWalletChain()
+    } catch (err) {
+      toast(err.shortMessage || err.message || 'Could not switch network', 'error')
+      return
+    }
+
+    // The buyer's own public key rides along with the payment: it is what the seller wraps the
+    // content key to, and putting it in the purchase means there is no separate registration
+    // step to forget. Derived from the Security Vault, so it is reproducible on any device.
+    let identity
+    try {
+      identity = await resolveIdentity()
+      if (!identity) {
+        await requestVaultUnlock({ reason: 'Preparing the key this content will be delivered to' })
+        identity = await resolveIdentity()
+      }
+      if (!identity) throw new Error('Your Security Vault is locked')
+    } catch (err) {
+      toast(err.code === 4001 ? 'Purchase cancelled' : err.message || 'Could not prepare your key', 'error')
+      return
+    }
+
+    // Committing the displayed price/token/standard onchain: buy reverts with ListingChanged
     // if the seller updates the listing between render and inclusion, so a stale UI (or a seller
     // front-run) can never charge more than the price shown on this button
-    const args = [address, BigInt(item.id), 1n, listing.price, listing.paymentToken, isLsp7, '0x']
+    const args = [address, BigInt(item.id), listing.price, listing.paymentToken, isLsp7, identity.pubKeyHex]
 
     // Route through the burner session key if one's active — same convenience the rest of the
     // app already gets (e.g. Like), skipping the wallet popup. Approve/authorizeOperator stays
@@ -247,9 +256,9 @@ export default function BuyButton({ item }) {
       try {
         await writeWithBurnerSession({
           chain: chainInfo,
-          contractAddress: storeAddress,
-          abi: storeAbi,
-          functionName: 'buyItem',
+          contractAddress: sellAddress,
+          abi: sellAbi,
+          functionName: 'buy',
           args: isTokenListing ? args : [...args, { value: listing.price }],
         })
 
@@ -265,9 +274,9 @@ export default function BuyButton({ item }) {
 
     lastActionRef.current = 'buy'
     writeContract({
-      abi: storeAbi,
-      address: storeAddress,
-      functionName: 'buyItem',
+      abi: sellAbi,
+      address: sellAddress,
+      functionName: 'buy',
       args,
       chainId,
       ...(isTokenListing ? {} : { value: listing.price }),
@@ -300,12 +309,11 @@ export default function BuyButton({ item }) {
           <TrendUpIcon size={13} />
           <span>
             {new Intl.NumberFormat(undefined, { notation: 'compact' }).format(listing.totalSold)} sold
-            {volumeLabel ? ` · ${volumeLabel} raised` : ''}
           </span>
         </div>
       )}
 
-      {hasPurchased && <RevealGatedContent item={item} cid={listing.metadata} />}
+      {hasPurchased && <RevealGatedContent item={item} cid={listing.contentURI} />}
     </div>
   )
 }
