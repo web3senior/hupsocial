@@ -90,6 +90,11 @@ const NOTIFICATION_KIND_BY_ACTION = {
   // self-row, and followed_user_created_community fans one creation out to every follower.
   community_created: 'community_created',
   community_member_joined: 'community_joined',
+  // HupSell. sell_received_purchase carries buyer (actor) and seller (recipient);
+  // sell_access_released carries seller (actor) and buyer (recipient). The buyer's own
+  // sell_sent_purchase row describes the same payment and would double the line.
+  sell_received_purchase: 'sell_purchase',
+  sell_access_released: 'sell_unlock',
 }
 
 // Posts, comments and reposts share one table; each kind is a predicate on the same row.

@@ -218,6 +218,23 @@ function Sentence({ row, amount, asset, nftName }) {
           {amount ? <Amount value={amount} /> : null}
         </>
       )
+    case 'sell_purchase':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>bought gated content from</span>
+          {subject ? <> {subject}</> : <span className={styles.row__verb}> a post</span>}
+          {amount ? <Amount value={amount} /> : null}
+        </>
+      )
+    // The seller acted, so they are the actor and the buyer is the subject — the reverse of
+    // every other money row here, where the actor is the one who paid.
+    case 'sell_unlock':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>released the key to</span>
+          {subject ? <> {subject}</> : <span className={styles.row__verb}> a buyer</span>}
+        </>
+      )
     case 'nft_sale':
       return (
         <>

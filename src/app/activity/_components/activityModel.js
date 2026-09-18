@@ -8,6 +8,7 @@ import {
   HandCoinsIcon,
   HandshakeIcon,
   HeartIcon,
+  LockKeyOpenIcon,
   NotePencilIcon,
   PulseIcon,
   RepeatIcon,
@@ -65,6 +66,8 @@ export const KIND_META = {
   swap: { icon: ArrowsDownUpIcon, tone: 'trade', weight: 'bold', label: 'Swap' },
   community_created: { icon: UsersThreeIcon, tone: 'community', weight: 'fill', label: 'Community created' },
   community_joined: { icon: UsersThreeIcon, tone: 'community', label: 'Joined a community' },
+  sell_purchase: { icon: ShoppingBagOpenIcon, tone: 'money', weight: 'fill', previews: true, label: 'Unlock bought' },
+  sell_unlock: { icon: LockKeyOpenIcon, tone: 'money', weight: 'fill', previews: true, label: 'Key released' },
 }
 
 export function getKindMeta(kind) {
@@ -80,6 +83,7 @@ const NFT_STANDARDS = [OFFER_STANDARD.ERC721, OFFER_STANDARD.LSP8, OFFER_STANDAR
 // `amount` (how much of the asset was asked for), so the two must never be confused.
 const AMOUNT_KEY = {
   tip: 'amount',
+  sell_purchase: 'amount',
   nft_sale: 'price',
   offer_made: 'price',
   offer_filled: 'payout',
