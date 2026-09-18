@@ -16,6 +16,8 @@ import styles from './BuyButton.module.scss'
 
 const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */]
 
+const compact = (n) => new Intl.NumberFormat(undefined, { notation: 'compact' }).format(n)
+
 // LSP7 Digital Asset (LUKSO) — operator-based equivalents of allowance/approve
 const lsp7Abi = [
   {
@@ -280,11 +282,17 @@ export default function BuyButton({ item }) {
         )}
       </div>
 
-      {listing.totalSold > 0n && (
+      {(listing.totalSold > 0n || listing.quantity > 0n) && (
         <div className={styles.salesStat}>
           <TrendUpIcon size={13} />
           <span>
-            {new Intl.NumberFormat(undefined, { notation: 'compact' }).format(listing.totalSold)} sold
+            {listing.totalSold > 0n && `${compact(listing.totalSold)} sold`}
+            {listing.totalSold > 0n && listing.quantity > 0n && ' · '}
+            {/* Remaining slots, not units: one purchase per buyer, so this is how many more
+                people can buy. Scarcity is the thing a buyer actually wants to see. */}
+            {listing.quantity > 0n && (
+              <span className={listing.quantity <= 5n ? styles.lowStock : undefined}>{compact(listing.quantity)} left</span>
+            )}
           </span>
         </div>
       )}

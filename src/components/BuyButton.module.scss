@@ -59,3 +59,8 @@
   font-weight: 600;
   color: var(--success-500, #10b981);
 }
+
+/* Only once stock is genuinely short — scarcity shown on every listing is just noise */
+.lowStock {
+  color: var(--warning-500, #f59e0b);
+}
