@@ -46,7 +46,7 @@
 
   // The waiting state is not a success, so it drops the reveal header's green
   .revealHeader {
-    color: var(--text-secondary);
+    color: var(--text-muted, #888);
   }
 }
 

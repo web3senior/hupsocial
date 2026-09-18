@@ -10,7 +10,7 @@ import sellAbi from '@/abis/HupSell.json'
 import { resolveIdentity } from '@/lib/sellVault'
 import { requestVaultUnlock } from '@/lib/vaultUnlockBus'
 import { toast } from '@/components/NextToast'
-import { SparkleIcon, TrendUpIcon } from '@phosphor-icons/react'
+import { KeyIcon, SparkleIcon, TrendUpIcon } from '@phosphor-icons/react'
 import RevealGatedContent from './RevealGatedContent'
 import styles from './BuyButton.module.scss'
 
@@ -126,6 +126,20 @@ export default function BuyButton({ item }) {
     toast(`Switching to ${chainInfo?.name || 'the post network'}...`, 'info')
     await switchChainAsync({ chainId })
   }
+
+  // Only the seller needs this, and only they pay the extra read: it is their task list, not
+  // something a buyer could act on.
+  const isSeller = Boolean(address && listing?.seller && listing.seller.toLowerCase() === address.toLowerCase())
+
+  const { data: pendingData } = useReadContract({
+    abi: sellAbi,
+    address: sellAddress,
+    functionName: 'getPendingGrants',
+    args: [BigInt(item.id), 0n, 50n],
+    chainId,
+    query: { enabled: Boolean(sellAddress && isSeller), refetchInterval: 30000 },
+  })
+  const awaitingCount = pendingData?.[0]?.length ?? 0
 
   const allowance = isLsp7 ? lsp7Allowance : erc20Allowance
   const refetchAllowance = isLsp7 ? refetchLsp7Allowance : refetchErc20Allowance
@@ -263,6 +277,15 @@ export default function BuyButton({ item }) {
 
   return (
     <div className={styles.buyBox} onClick={(e) => e.stopPropagation()}>
+      {isSeller && awaitingCount > 0 && (
+        <div className={styles.awaitingBadge}>
+          <KeyIcon size={13} weight="fill" />
+          <span>
+            {awaitingCount} buyer{awaitingCount === 1 ? '' : 's'} awaiting a key — open Sell to release
+          </span>
+        </div>
+      )}
+
       <div className={styles.actionRow}>
         <span className={styles.badge}>
           <SparkleIcon size={12} />
