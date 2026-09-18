@@ -110,6 +110,7 @@ const formatNative = (wei) => {
 const SECTIONS = [
   { id: 'balances', label: 'Balances', icon: '💰', contractKey: null },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
+  { id: 'sell-fees', label: 'Sell Fees', icon: '💸', contractKey: 'sell' },
   { id: 'sell-treasury', label: 'Sell Treasury', icon: '🏦', contractKey: 'sell' },
   { id: 'events', label: 'Events', icon: '🎟️', contractKey: 'events' },
   { id: 'apps', label: 'Apps', icon: '🧩', contractKey: 'apps' },
@@ -172,6 +173,9 @@ export default function Page() {
   const [tokenIsLsp7, setTokenIsLsp7] = useState({})
   const [nativeWithdrawStates, setNativeWithdrawStates] = useState({})
   const [tokenWithdrawStates, setTokenWithdrawStates] = useState({})
+  const [sellFees, setSellFees] = useState({})
+  const [sellFeeInputs, setSellFeeInputs] = useState({})
+  const [sellFeeTxStates, setSellFeeTxStates] = useState({})
   const [eventsFees, setEventsFees] = useState({})
   const [eventsFeeInputs, setEventsFeeInputs] = useState({})
   const [eventsFeeTxStates, setEventsFeeTxStates] = useState({})
@@ -551,6 +555,88 @@ export default function Page() {
   }
 
   // Read current listing/featured fees from a chain's HupEvents deployment
+  // Current HupSell fees for one chain. buyFeeBps is basis points (200 = 2%); listingFee is
+  // a flat amount in the chain's native coin.
+  const loadSellFees = async (chain, sellAddress) => {
+    setSellFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      const [buyFeeBps, listingFee] = await Promise.all([
+        client.readContract({ address: sellAddress, abi: sellAbi, functionName: 'buyFeeBps' }),
+        client.readContract({ address: sellAddress, abi: sellAbi, functionName: 'listingFee' }),
+      ])
+
+      setSellFees((prev) => ({ ...prev, [chain.id]: { loading: false, buyFeeBps, listingFee } }))
+    } catch (err) {
+      console.error(`Sell fee read error for chain ${chain.id}:`, err)
+      setSellFees((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read fees' },
+      }))
+    }
+  }
+
+  // Load current HupSell fees for every chain with a deployment once the admin is in
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const sellAddress = CONTRACTS[`chain${chain.id}`]?.sell
+      if (sellAddress) loadSellFees(chain, sellAddress)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  /**
+   * Sets HupSell's per-sale cut or its flat listing fee (admin wallet signs).
+   *
+   * The buy fee is entered as a PERCENTAGE and converted to basis points here, because 2 is
+   * what an operator means and 200 is what the contract stores. Capped at 50%, matching
+   * ABSOLUTE_MAX_BUY_FEE_BPS — the contract reverts above it, so catching it here turns a
+   * failed transaction into a message.
+   */
+  const handleSetSellFee = async (chain, sellAddress, which) => {
+    const draft = sellFeeInputs[chain.id]?.[which]?.trim()
+    let value
+
+    if (which === 'buy') {
+      const pct = Number(draft)
+      if (!Number.isFinite(pct) || pct < 0 || pct > 50) {
+        setSellFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a percentage between 0 and 50' } }))
+        return
+      }
+      value = BigInt(Math.round(pct * 100))
+    } else {
+      try {
+        value = parseEther(draft || '')
+      } catch {
+        setSellFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid amount in native units' } }))
+        return
+      }
+    }
+
+    setSellFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: sellAddress,
+        abi: sellAbi,
+        functionName: which === 'buy' ? 'setBuyFeeBps' : 'setListingFee',
+        args: [value],
+        chainId: chain.id,
+      })
+
+      setSellFeeTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: false, success: true, hash: txHash } }))
+      setTimeout(() => loadSellFees(chain, sellAddress), 3000)
+    } catch (err) {
+      console.error(`Sell ${which} fee update error on chain ${chain.id}:`, err)
+      setSellFeeTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
   const loadEventsFees = async (chain, eventsAddress) => {
     setEventsFees((prev) => ({ ...prev, [chain.id]: { loading: true } }))
 
@@ -2267,6 +2353,162 @@ export default function Page() {
               </div>
               {visibleChains('forwarder').length === 0 && (
                 <p className={styles['admin-contracts__empty']}>No forwarder deployments match this filter.</p>
+              )}
+            </section>
+          )}
+
+          {activeSection === 'sell-fees' && (
+            <section className={styles['admin-contracts__section']}>
+              <header className={styles['admin-contracts__header']}>
+                <h2 className={styles['admin-contracts__title']}>HupSell Fees</h2>
+                <p className={styles['admin-contracts__subtitle']}>
+                  Set the platform cut taken from each completed sale, and the flat fee to create a listing. A change applies only to
+                  purchases made after it — every escrow already open keeps the fee it was bought under.
+                </p>
+              </header>
+
+              <div className={styles['admin-contracts__grid']}>
+                {visibleChains('sell').map((chain) => {
+                  const deployment = CONTRACTS[`chain${chain.id}`]
+                  const fees = sellFees[chain.id]
+                  const feeInputs = sellFeeInputs[chain.id] ?? {}
+                  const feeTx = sellFeeTxStates[chain.id]
+                  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+                  const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+
+                  return (
+                    <div
+                      key={`sell-fees-${chain.id}`}
+                      className={styles['admin-contracts__card']}
+                      style={{
+                        '--network-color-primary': chain.primaryColor || '#f97316',
+                        '--network-color-text': chain.textColor || '#0d0d0d',
+                      }}
+                    >
+                      <div className={styles['admin-contracts__card-header']}>
+                        <div className={styles['admin-contracts__network-info']}>
+                          <div className={styles['admin-contracts__card-icon']}>
+                            <img src={chain.iconUrl} alt="" />
+                          </div>
+                          <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                        </div>
+                        <span className={styles['admin-contracts__badge']}>HUPSELL</span>
+                      </div>
+
+                      <div className={styles['admin-contracts__details']}>
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Contract</span>
+                          <span className={styles['admin-contracts__detail-value']}>
+                            {explorerUrl ? (
+                              <a href={`${explorerUrl}/address/${deployment.sell}`} target="_blank" rel="noopener noreferrer">
+                                <code>{deployment.sell}</code> ↗
+                              </a>
+                            ) : (
+                              <code>{deployment.sell}</code>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Current Fees</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {(!fees || fees.loading) && <span>Loading…</span>}
+                            {fees?.error && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                                {fees.error}
+                              </div>
+                            )}
+                            {fees && !fees.loading && !fees.error && (
+                              <strong>
+                                {Number(fees.buyFeeBps) / 100}% per sale · Listing {formatEther(fees.listingFee)} {symbol}
+                              </strong>
+                            )}
+                          </div>
+                        </div>
+
+                        {feeTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {feeTx.loading && <span style={{ color: '#d97706' }}>Signing &amp; broadcasting tx...</span>}
+                              {feeTx.error && <span style={{ color: '#ef4444' }}>❌ {feeTx.error}</span>}
+                              {feeTx.success && (
+                                <span style={{ color: '#10b981' }}>
+                                  🚀 {feeTx.which === 'buy' ? 'Sale fee' : 'Listing fee'} updated.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetSellFee(chain, deployment.sell, 'buy')
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Fee per sale (%)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={styles['admin-contracts__input']}
+                            value={feeInputs.buy ?? ''}
+                            onChange={(e) => setSellFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], buy: e.target.value } }))}
+                            placeholder="e.g. 2"
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={!feeInputs.buy?.trim() || feeTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {feeTx?.loading && feeTx.which === 'buy' ? 'Writing...' : 'Set Sale Fee'}
+                          </button>
+                        </div>
+                      </form>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetSellFee(chain, deployment.sell, 'listing')
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Listing fee ({symbol})</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={styles['admin-contracts__input']}
+                            value={feeInputs.listing ?? ''}
+                            onChange={(e) =>
+                              setSellFeeInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], listing: e.target.value } }))
+                            }
+                            placeholder="e.g. 0"
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={!feeInputs.listing?.trim() || feeTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {feeTx?.loading && feeTx.which === 'listing' ? 'Writing...' : 'Set Listing Fee'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )
+                })}
+              </div>
+              {visibleChains('sell').length === 0 && (
+                <p className={styles['admin-contracts__empty']}>No HupSell deployments match this filter.</p>
               )}
             </section>
           )}
