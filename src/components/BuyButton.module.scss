@@ -75,7 +75,9 @@
   gap: 0.3rem;
   font-size: var(--font-size-12);
   font-weight: 600;
-  color: var(--success-500, #10b981);
+  // --up, not --success-500: the latter is a single static value, while --up carries a
+  // per-theme one (light #16a34a, dark #22fe6b, terminal #22c55e).
+  color: var(--up, #16a34a);
 }
 
 /* Only once stock is genuinely short — scarcity shown on every listing is just noise */
@@ -85,6 +87,6 @@
 
 /* The dollar figure leads the stat line — it is the number a seller and a buyer both scan for */
 .earned {
-  color: var(--success-500, #10b981);
+  color: var(--up, #16a34a);
   font-weight: 700;
 }
