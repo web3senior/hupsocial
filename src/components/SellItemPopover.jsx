@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { erc20Abi, formatEther, formatUnits, isAddress, parseEther, parseUnits, zeroAddress } from 'viem'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */ } from 'wagmi/chains'
 import { useChainId, useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
@@ -26,6 +26,10 @@ const MAX_FILE_SIZE_MB = 10
 const MAX_FILES = 5
 const MAX_LINKS = 5
 const BUYERS_PAGE_SIZE = 5
+// What one getPendingGrants call scans. The contract clamps to MAX_BUYERS_BATCH_READ_COUNT (50).
+const CONTRACT_READ_PAGE = 50
+// Matches HupSell.sol's MAX_BATCH_SIZE — one grantAccessBatch can settle this many buyers.
+const GRANT_BATCH_LIMIT = 50
 const FEE_DENOMINATOR = 10_000 // matches HupSell.sol's FEE_DENOMINATOR constant (buyFeeBps is in basis points)
 const CHAINS = [lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */]
 const LUKSO_CHAIN_IDS = [42]
@@ -138,24 +142,66 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
   const totalBuyers = buyersPageData ? Number(buyersPageData[3]) : 0
   const totalBuyerPages = Math.max(1, Math.ceil(totalBuyers / BUYERS_PAGE_SIZE))
 
-  // The seller's grant queue: buyers who have paid and are still waiting for a key. Read as
-  // addresses AND public keys in one call, so a batch grant needs no extra round trip per buyer.
-  const {
-    data: pendingData,
-    isLoading: loadingPending,
-    refetch: refetchPending,
-  } = useReadContract({
-    abi: sellAbi,
-    address: sellAddress,
-    functionName: 'getPendingGrants',
-    args: [BigInt(item.id), 0n, BigInt(BUYERS_PAGE_SIZE)],
-    chainId,
-    query: { enabled: Boolean(sellAddress && hasListing), refetchInterval: isOpen ? 8000 : false, refetchOnWindowFocus: true },
-  })
-
-  const pendingBuyers = useMemo(() => pendingData?.[0] ?? [], [pendingData])
-  const pendingPubKeys = useMemo(() => pendingData?.[1] ?? [], [pendingData])
+  const [pending, setPending] = useState({ buyers: [], pubKeys: [], loading: false })
   const [isGranting, setIsGranting] = useState(false)
+
+  /**
+   * The seller's grant queue: buyers who have paid and are still waiting for a key, read as
+   * addresses AND public keys together so a batch grant needs no extra round trip per buyer.
+   *
+   * Walks the WHOLE buyer roster rather than one page. getPendingGrants only reports the pending
+   * buyers inside the window it was given, so reading a single page silently hides everyone past
+   * it — with five granted buyers on page one, a sixth waiting buyer produced an empty queue and
+   * could never be released. `scanned` is how far the contract actually got, which is what the
+   * offset advances by; the contract clamps any limit to MAX_BUYERS_BATCH_READ_COUNT.
+   */
+  const loadPending = useCallback(async () => {
+    if (!sellAddress || !hasListing || !publicClient) return
+
+    setPending((prev) => ({ ...prev, loading: true }))
+    const buyers = []
+    const pubKeys = []
+
+    try {
+      let offset = 0n
+      // One grantAccessBatch is capped at MAX_BATCH_SIZE anyway, so stop once a full batch is
+      // queued — the rest surface on the next pass after these are released.
+      while (buyers.length < GRANT_BATCH_LIMIT) {
+        const [pageBuyerList, pagePubKeys, scanned] = await publicClient.readContract({
+          abi: sellAbi,
+          address: sellAddress,
+          functionName: 'getPendingGrants',
+          args: [BigInt(item.id), offset, BigInt(CONTRACT_READ_PAGE)],
+        })
+
+        for (let i = 0; i < pageBuyerList.length && buyers.length < GRANT_BATCH_LIMIT; i++) {
+          buyers.push(pageBuyerList[i])
+          pubKeys.push(pagePubKeys[i])
+        }
+
+        if (scanned === 0n) break
+        offset += scanned
+      }
+
+      setPending({ buyers, pubKeys, loading: false })
+    } catch (err) {
+      console.error('Failed to read the grant queue:', err)
+      setPending({ buyers: [], pubKeys: [], loading: false })
+    }
+  }, [sellAddress, hasListing, publicClient, item.id])
+
+  // Same cadence as the buyer list, and only while the dialog is open
+  useEffect(() => {
+    if (!isOpen) return undefined
+    loadPending()
+    const id = setInterval(loadPending, 8000)
+    return () => clearInterval(id)
+  }, [isOpen, loadPending])
+
+  const pendingBuyers = pending.buyers
+  const pendingPubKeys = pending.pubKeys
+  const loadingPending = pending.loading
+  const refetchPending = loadPending
 
   /**
    * Releases keys to everyone currently waiting. Deliberately one button rather than a per-buyer
