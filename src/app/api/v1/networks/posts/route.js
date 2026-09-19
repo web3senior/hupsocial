@@ -13,6 +13,19 @@ import { getFollowingAddresses } from '@/lib/followSystem'
 
 export const runtime = 'nodejs'
 
+// An anonymous feed page is byte-identical for every caller with the same query, so it can sit on
+// the CDN and absorb the background polls instead of running the query per reader. Anything with a
+// viewer attached carries per-reader state (has_liked, has_bookmarked, community seats) and must
+// never be shared. CDN-Cache-Control is set alongside because Next rewrites Cache-Control on
+// dynamic route handlers — the edge reads the CDN- header in preference.
+const ANON_FEED_CACHE = 'public, max-age=0, s-maxage=20, stale-while-revalidate=60'
+const ANON_FEED_CDN_CACHE = 'public, s-maxage=20, stale-while-revalidate=60'
+
+const feedCacheHeaders = (viewerAddress) =>
+  viewerAddress
+    ? { 'Cache-Control': 'private, no-store' }
+    : { 'Cache-Control': ANON_FEED_CACHE, 'CDN-Cache-Control': ANON_FEED_CDN_CACHE }
+
 // Pinned to the current HupCommunity deployment per network — an unpinned join multiplies every
 // community post by the number of deployments that chain has hosted (see lib/communityJoin.js)
 const COMMUNITY_JOIN = communityJoin()
@@ -367,7 +380,7 @@ export async function GET(request) {
         filter_chain_id: networkId || 'all',
         filter_community_id: communityId || null
       }
-    })
+    }, { headers: feedCacheHeaders(viewerAddress) })
 
   } catch (error) {
     console.error('[POSTS_FETCH_ERROR]:', error.message)
@@ -678,7 +691,7 @@ async function handleTrendingFeed({ networkId, viewerAddress, page, limit, offse
       data: [],
       nextPage: null,
       meta: { page, count: 0, hasMore: false, ...trendingMeta },
-    })
+    }, { headers: feedCacheHeaders(viewerAddress) })
   }
 
   const queryParams = []
@@ -719,7 +732,7 @@ async function handleTrendingFeed({ networkId, viewerAddress, page, limit, offse
     })),
     nextPage: hasMore ? page + 1 : null,
     meta: { page, count: orderedPosts.length, hasMore, ...trendingMeta },
-  })
+  }, { headers: feedCacheHeaders(viewerAddress) })
 }
 
 /**
