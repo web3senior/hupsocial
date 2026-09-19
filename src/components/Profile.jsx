@@ -194,15 +194,16 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
                 The separator only appears between two words — after a handle, never after a mark. */}
             {variant === 'full' && createdAt && (
               <small className={styles.createdAt}>
-                {profile.username ? `· ${toRelativeTime(createdAt)}` : toRelativeTime(createdAt)}
+                {profile.username && !handleUnderName ? `· ${toRelativeTime(createdAt)}` : toRelativeTime(createdAt)}
               </small>
             )}
           </div>
 
-          {/* The address only stands in where there is no handle — with one, the line above
-              already says who this is. */}
-          {isFullLike && creator && !profile.username && <code className={styles.address}>{truncatedAddress}</code>}
-          {isFullLike && handleUnderName && profile.username && <span className={styles.handle}>{`@${profile.username}`}</span>}
+          {handleUnderName && profile.username && <span className={styles.handle}>{`@${profile.username}`}</span>}
+
+          {/* The address stays under the name whether or not a handle sits beside it: a name is
+              chosen and a handle is claimed, but this is the account itself. */}
+          {isFullLike && creator && <code className={styles.address}>{truncatedAddress}</code>}
         </div>
       )}
     </div>

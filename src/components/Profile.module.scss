@@ -216,10 +216,14 @@
 
 // The handle sits on the name's line, so it reads as part of the name — quieter than it, and
 // it gives before the timestamp does when the row runs out of width.
+//
+// Same font box as the name, deliberately: the row centres its items, and two pieces of text at
+// different sizes centred against each other do not share a baseline. Matching the size and the
+// line-height is what puts `atenyun` and `@atenyun` on one line rather than two that nearly are.
 .handle {
   font-weight: 400;
-  line-height: 1;
-  font-size: var(--system-13-font-size);
+  font-size: inherit;
+  line-height: var(--system-16-line-height);
   color: var(--gray-400);
   min-width: 0;
   overflow: hidden;
@@ -230,7 +234,8 @@
 .createdAt {
   padding-left: 0.25rem;
   font-weight: 400;
-  line-height: 1;
+  // The name's line box, so the time sits on the row's baseline instead of floating above it
+  line-height: var(--system-16-line-height);
   font-size: var(--system-13-font-size);
   color: var(--gray-400);
   flex-shrink: 0; // The timestamp holds while the name truncates
