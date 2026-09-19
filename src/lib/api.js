@@ -1,5 +1,6 @@
 import { getViewerId } from './viewer'
 import { normalizeAddress } from './address'
+import { profileUpdateMessage } from './profileSignature'
 
 export const getProfile= async (address) => {
   // Determine the base URL based on the environment
@@ -650,12 +651,34 @@ export const requestAuthNonce = async (address) => {
 
 /**
  * Sends updated profile details to the server backend.
+ *
+ * The route requires a signed claim: every field here is shown to other people as this wallet, so
+ * the caller proves it owns the address before anything is written. Mint the challenge, sign it,
+ * and send both alongside the fields.
+ *
  * @param {FormData} formData - The multi-part form data payload containing profile fields.
  * @param {string} address - The wallet address identifying the account to update.
+ * @param {(message: string) => Promise<string>} signMessage - Signs the claim with that wallet.
+ * @param {number} [chainId] - Chain to verify a smart-account signature against.
  * @returns {Promise<{success: boolean, message?: string, error?: string}>}
  */
-export const updateProfile = async (formData, address) => {
+export const updateProfile = async (formData, address, signMessage, chainId) => {
   try {
+    if (typeof signMessage !== 'function') {
+      return { success: false, error: 'A connected wallet is required to save your profile' }
+    }
+
+    const nonce = await requestAuthNonce(address)
+    if (!nonce) return { success: false, error: 'Could not start a signed save — try again' }
+
+    const issuedAt = Date.now()
+    const signature = await signMessage(profileUpdateMessage({ address, nonce, issuedAt }))
+
+    formData.set('nonce', nonce)
+    formData.set('issuedAt', String(issuedAt))
+    formData.set('signature', signature)
+    if (chainId) formData.set('chainId', String(chainId))
+
     // Hits the Next.js API route you just created
     const response = await fetch(`/api/v1/users/profile/${address}`, {
       method: 'PUT',

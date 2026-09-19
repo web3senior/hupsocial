@@ -22,7 +22,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
-import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useReadContract, useWriteContract } from 'wagmi'
+import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useReadContract, useSignMessage, useWriteContract } from 'wagmi'
 import { lukso } from 'wagmi/chains'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
@@ -1227,6 +1227,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const [editingLinkIndex, setEditingLinkIndex] = useState(null)
   const [activeChain, setActiveChain] = useState()
   const { address, isConnected } = useConnection()
+  const { signMessageAsync } = useSignMessage()
   const luksoClient = usePublicClient({ chainId: lukso.id })
   /* `isUP` says only that the LUKSO indexer answered for this wallet, and it answers for nobody
      when it is unreachable or rate limiting us. The chain is asked separately, and it is the one
@@ -1474,7 +1475,9 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
 
     let saved
     try {
-      saved = await updateProfile(formData, address)
+      /* The chain id only matters for a smart account: verifyWalletSignature falls back to an
+         ERC-1271 call, and a Universal Profile can only answer on its own chain. */
+      saved = await updateProfile(formData, address, (message) => signMessageAsync({ message }), getActiveChain()?.[0]?.id)
     } catch (err) {
       console.error(err)
       setError('An unexpected error occurred')

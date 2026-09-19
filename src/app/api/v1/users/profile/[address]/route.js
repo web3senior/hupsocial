@@ -469,6 +469,9 @@ export async function PUT(request, { params }) {
     const nonce = formData.get('nonce')
     const issuedAt = Number(formData.get('issuedAt'))
     const signature = formData.get('signature')
+    /* The nonce row is written lowercased by /api/v1/auth/nonce, so the burn is matched against the
+       normalized address rather than the raw path segment. */
+    const claimant = normalizeAddress(address)
 
     if (!signature || !nonce || !Number.isFinite(issuedAt)) {
       return NextResponse.json({ error: 'A signed claim is required' }, { status: 400 })
@@ -479,15 +482,18 @@ export async function PUT(request, { params }) {
 
     const [burn] = await pool.execute(
       'DELETE FROM nonces WHERE nonce = ? AND wallet_address = ? AND expires_at > NOW()',
-      [nonce, address],
+      [nonce, claimant],
     )
     if (burn.affectedRows === 0) {
       return NextResponse.json({ error: 'That challenge expired — try again' }, { status: 400 })
     }
 
-    const signed = await verifyWalletSignature(address, profileUpdateMessage({ address, nonce, issuedAt }), signature, {
-      chainId: Number(formData.get('chainId')) || undefined,
-    })
+    const signed = await verifyWalletSignature(
+      claimant,
+      profileUpdateMessage({ address: claimant, nonce, issuedAt }),
+      signature,
+      { chainId: Number(formData.get('chainId')) || undefined },
+    )
     if (!signed) {
       return NextResponse.json({ error: 'That signature does not match the wallet' }, { status: 401 })
     }

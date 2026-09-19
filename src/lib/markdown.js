@@ -182,9 +182,13 @@ export function renderArticleMarkdown(markdown) {
     })
   }
 
-  renderer.link = (token) => {
+  /* A regular function for the same reason renderer.text is one: the label is a CONTAINER whose
+     `.text` is raw source, so it goes back through the parser — which escapes — and only the
+     no-tokens fallback is escaped here. Reading `.text` straight into the output let a label like
+     `[<img src=x onerror=…>](https://example.com)` publish live markup into every reader's page. */
+  renderer.link = function (token) {
     const href = safeUrl(token?.href)
-    const text = token?.text || ''
+    const text = token?.tokens?.length ? this.parser.parseInline(token.tokens) : escapeHtml(token?.text || '')
     /* A link that fails the allowlist keeps its words and loses its destination */
     if (!href) return text
 

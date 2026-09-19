@@ -20,6 +20,10 @@ const DEFAULT_MODEL = 'kimi-k3'
 // Bounds cost/latency on prolific accounts; the prompt only needs a representative sample
 // of someone's voice, not their full history.
 const MAX_POSTS_CHARS = 12000
+const MAX_NAME_CHARS = 120
+const MAX_BIO_CHARS = 600
+/* The response is a small JSON object; without a ceiling the caller sets the output bill. */
+const MAX_COMPLETION_TOKENS = 900
 
 const SYSTEM_PROMPT = `
 You are an expert Web3 Cultural Analyst. Your task is to analyze a user's onchain persona based on their profile and social activity.
@@ -78,10 +82,14 @@ export async function POST(req) {
       timeout: 55000,
     })
 
+    /* Every interpolated field is capped, not just `posts`: the route takes no auth, so an
+       uncapped `bio` is the same unmetered prompt the cap on `posts` exists to prevent. */
+    const clip = (value, limit) => String(value ?? '').slice(0, limit)
+
     const userPrompt = [
-      `Name: ${profile.name || 'Unknown'}`,
-      `Bio: ${profile.bio || 'No bio provided'}`,
-      `Recent Activity: ${String(posts).slice(0, MAX_POSTS_CHARS)}`,
+      `Name: ${clip(profile.name, MAX_NAME_CHARS) || 'Unknown'}`,
+      `Bio: ${clip(profile.bio, MAX_BIO_CHARS) || 'No bio provided'}`,
+      `Recent Activity: ${clip(posts, MAX_POSTS_CHARS)}`,
     ].join('\n')
 
     const model = process.env.MOONSHOT_MODEL || DEFAULT_MODEL
@@ -89,6 +97,7 @@ export async function POST(req) {
     const completion = await client.chat.completions.create({
       // Kimi k2.x/k3 reject any temperature other than 1, so it is left unset on purpose.
       model,
+      max_tokens: MAX_COMPLETION_TOKENS,
       response_format: { type: 'json_object' },
       // Only the kimi-* line takes a reasoning budget; the moonshot-v1-* models reject it.
       ...(model.startsWith('kimi-') ? { reasoning_effort: 'low' } : {}),
