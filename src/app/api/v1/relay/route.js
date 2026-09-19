@@ -374,22 +374,31 @@ export async function POST(request) {
     }
     console.log('RELAY_SIG_OK via', verification.sigStep)
 
-    // Check the on-chain nonce to decide whether simulation is meaningful.
-    // When the client sends messages faster than blocks are mined, previous txs
-    // sit in the mempool with a lower nonce. Simulating against the confirmed state
-    // will always fail with InvalidSigner/nonce-mismatch even though the request is
-    // perfectly valid — so we only simulate when the nonce matches the confirmed state.
+    // The request's nonce has to be exactly the forwarder's: anything lower is a replay, anything
+    // higher cannot be simulated and so cannot be paid for.
     const onChainNonce = BigInt(await forwarder.nonces(fullRequest.from))
     if (fullRequest.nonce < onChainNonce) {
       console.error('RELAY_NONCE_REPLAY:', { requested: fullRequest.nonce.toString(), onChain: onChainNonce.toString() })
       return NextResponse.json({ error: 'Nonce already used (replay).' }, { status: 400 })
     }
 
+    /* A nonce ahead of confirmed state used to skip simulation, on the theory that a pending tx sat
+       in front of it. No honest client produces one: lib/relayGasless.js reads `nonces(from)` fresh
+       immediately before signing, so it re-uses the confirmed nonce rather than incrementing past
+       it. The branch was only reachable by a crafted request, and everything that took it was sent
+       unsimulated — a guaranteed revert billed to the relayer. Refused instead, with the nonce the
+       client should re-sign against. */
+    if (fullRequest.nonce > onChainNonce) {
+      console.error('RELAY_NONCE_AHEAD:', { requested: fullRequest.nonce.toString(), onChain: onChainNonce.toString() })
+      return NextResponse.json(
+        { error: 'Nonce is ahead of the forwarder — re-sign at the current nonce.', nonce: onChainNonce.toString() },
+        { status: 409 },
+      )
+    }
+
     // Pre-flight simulation: catch reverts before spending gas and return a
     // human-readable reason instead of a silent on-chain failure.
-    // Skip when nonce > onChainNonce — a pending tx is already in the mempool ahead
-    // of this one; simulation against confirmed state would report a false nonce error.
-    if (fullRequest.nonce === onChainNonce) {
+    {
       try {
         await forwarder.execute.staticCall(fullRequest, {
           gasLimit: BigInt(fullRequest.gas) + 100000n,
@@ -424,8 +433,6 @@ export async function POST(request) {
         console.error('RELAY_SIM_FAIL:', reason)
         return NextResponse.json({ error: `Simulation failed: ${reason}` }, { status: 400 })
       }
-    } else {
-      console.log(`RELAY_SIM_SKIP: nonce=${fullRequest.nonce} > onChain=${onChainNonce} (pending tx path)`)
     }
 
     // eth_estimateGas on LUKSO returns no revert data and is unreliable.
