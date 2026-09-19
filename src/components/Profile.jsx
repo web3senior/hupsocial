@@ -126,7 +126,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   )
 
   return (
-    <div className={clsx(styles.profile, 'flex align-items-center', className)} style={avatarBox}>
+    <div className={clsx(styles.profile, 'flex', className)} style={avatarBox}>
       {hoverCard ? (
         <NativePopover
           trigger={

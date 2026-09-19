@@ -7,6 +7,11 @@
 }
 
 .profile {
+  // The name sits at the top of the picture rather than beside its middle: the byline is the
+  // first line of the block, and the picture is taller than it wherever a fingerprint hangs off
+  // the corner. Centring left the name drifting down from where a reader starts reading.
+  align-items: flex-start;
+
   // Sized to its contents, but never past the row it sits in — a long display name used to widen
   // this block until the post's own menu fell off the card. A nowrap name has no min-content
   // narrower than itself, so both halves of that are deliberate: min-width lets a flex parent
