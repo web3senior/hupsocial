@@ -7,10 +7,10 @@
 }
 
 .profile {
-  // The name sits at the top of the picture rather than beside its middle: the byline is the
-  // first line of the block, and the picture is taller than it wherever a fingerprint hangs off
-  // the corner. Centring left the name drifting down from where a reader starts reading.
-  align-items: flex-start;
+  // The picture is shorter than the two lines beside it — name over address — so it centres
+  // against them. Top-aligning the two boxes left the picture sitting visibly high, because a
+  // line box carries leading above its glyphs that a circle does not.
+  align-items: center;
 
   // Sized to its contents, but never past the row it sits in — a long display name used to widen
   // this block until the post's own menu fell off the card. A nowrap name has no min-content
